@@ -110,6 +110,14 @@ extern int errno;
 # define SYS_DT_WMRC     CDE_CONFIGURATION_TOP "/sys.dtwmrc"
 
 /*
+ * missing button definitions in X.h
+ */
+#define Button6	6
+#define Button7	7
+#define Button8	8
+#define Button9	9
+
+/*
  * Global Variables And Tables:
  */
 static char cfileName[MAXWMPATH+1];
@@ -247,6 +255,22 @@ static EventTableEntry buttonEvents[] = {
     {"btn5up",      ButtonRelease,  ParseImmed,    Button5,  FALSE},
     {"btn5click",   ButtonRelease,  ParseImmed,    Button5,  TRUE},
     {"btn5click2",  ButtonPress,    ParseImmed,    Button5,  TRUE},
+    {"btn6down",    ButtonPress,    ParseImmed,    Button6,  FALSE},
+    {"btn6up",      ButtonRelease,  ParseImmed,    Button6,  FALSE},
+    {"btn6click",   ButtonRelease,  ParseImmed,    Button6,  TRUE},
+    {"btn6click2",  ButtonPress,    ParseImmed,    Button6,  TRUE},
+    {"btn7down",    ButtonPress,    ParseImmed,    Button7,  FALSE},
+    {"btn7up",      ButtonRelease,  ParseImmed,    Button7,  FALSE},
+    {"btn7click",   ButtonRelease,  ParseImmed,    Button7,  TRUE},
+    {"btn7click2",  ButtonPress,    ParseImmed,    Button7,  TRUE},
+    {"btn8down",    ButtonPress,    ParseImmed,    Button8,  FALSE},
+    {"btn8up",      ButtonRelease,  ParseImmed,    Button8,  FALSE},
+    {"btn8click",   ButtonRelease,  ParseImmed,    Button8,  TRUE},
+    {"btn8click2",  ButtonPress,    ParseImmed,    Button8,  TRUE},
+    {"btn9down",    ButtonPress,    ParseImmed,    Button9,  FALSE},
+    {"btn9up",      ButtonRelease,  ParseImmed,    Button9,  FALSE},
+    {"btn9click",   ButtonRelease,  ParseImmed,    Button9,  TRUE},
+    {"btn9click2",  ButtonPress,    ParseImmed,    Button9,  TRUE},
     { NULL, 0, (Boolean(*)())NULL,  0, FALSE}
 };
 
