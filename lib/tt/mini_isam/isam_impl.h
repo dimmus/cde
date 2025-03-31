@@ -381,7 +381,7 @@ typedef struct issort {
 					     /* many records */
     int		ist_nrecs;		     /* number of records inserted */
     int		ist_currec;		     /* current position */
-    int		(*ist_compf) ();	     /* comparison function */
+    int		(*ist_compf) (const void *, const void *);	     /* comparison function */
     char	*ist_array;		     /* array of records */
 } Issort;
 

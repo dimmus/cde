@@ -42,7 +42,7 @@
  */
 
 
-char *_isbsearch (char *key, char *table, int nelems, int keylen, int (*cmpf) ())
+char *_isbsearch (char *key, char *table, int nelems, int keylen, int (*cmpf) (const void *, const void *))
 {
     int len,l1,result;		     /* current length of array to search */
     char *p,*low;

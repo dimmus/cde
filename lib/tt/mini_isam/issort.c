@@ -49,7 +49,7 @@ extern char *_isunix_malloc();
  */
 
 Issort *
-_issort_create(int reclen, int nrecs, int (*compfunc)(char *, char *))
+_issort_create(int reclen, int nrecs, int (*compfunc)(const void *, const void *))
 {	
     Issort	*p;
 
