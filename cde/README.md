@@ -7,26 +7,6 @@ the Open Group.
 You may reuse and redistribute this code under the terms of this
 license. See the COPYING file for details.
 
-# Downloading
-
-Downloading this release:
-
-CDE may be downloaded in source form from the Common Desktop
-Environment website:
-
-http://sourceforge.net/projects/cdesktopenv/
-
-Or via git:
-
-git clone git://git.code.sf.net/p/cdesktopenv/code CDE
-
-The git repository will always be more up to date than the
-downloadable tarballs we make available, so if you have problems,
-please try the latest version from git master.
-
-Note also that the master branch may be unstable, so your milage may
-vary.
-
 # Compiling
 
 Complete build and installation instructions can be found on the CDE
@@ -71,25 +51,6 @@ $ sudo gmake install
 
 Of course change to location of your TCL directory as needed for your
 system.
-
-# Support
-
-## Mailing list
-
-https://lists.sourceforge.net/lists/listinfo/cdesktopenv-devel
-
-## IRC
-
-There is a CDE IRC channel on irc.libera.chat, channel #cde
-
-## Patches welcome
-
-Please see
-
-https://sourceforge.net/p/cdesktopenv/wiki/Contributing%20to%20CDE/
-
-for information on how to contribute.
-
 
 
 
