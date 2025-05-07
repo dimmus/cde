@@ -62,6 +62,7 @@
 #include "hash.h"
 #include "stdio.h"
 #include "defs.h"
+#include	"stak.h"
 #include "dtksh.h"
 #include "xmksh.h"
 #include "dtkcmds.h"
