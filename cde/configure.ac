@@ -1,33 +1,30 @@
-dnl When changing the version below, also change the CDE_VERSION_* macros
-dnl to match further below
 AC_INIT([Common Desktop Environment],
         [2.5.2],
         [https://sourceforge.net/projects/cdesktopenv],
         [cde],
         [https://sourceforge.net/projects/cdesktopenv])
 AC_CONFIG_HEADERS([include/cde_config.h])
+AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AM_INIT_AUTOMAKE([foreign subdir-objects no-define])
-
-dnl global CDE versioning
 
 CDE_VERSION_MAJOR=2
 CDE_VERSION_MINOR=5
 CDE_VERSION_MICRO=2
-dnl this is blank for a release, or contains an alpha character to indicate a
-dnl dev release.
-CDE_VERSION_DEV=
+CDE_VERSION_DEV=99
 
 AC_SUBST(CDE_VERSION_MAJOR)
 AC_SUBST(CDE_VERSION_MINOR)
 AC_SUBST(CDE_VERSION_MICRO)
 AC_SUBST(CDE_VERSION_DEV)
 
-dnl released in 2012, this should be sufficient
 AC_PREREQ([2.69])
 
 AC_CANONICAL_HOST
 AC_CANONICAL_BUILD
+
+C_STD="c99"
+AC_SUBST(C_STD)
 
 dnl These must be up here for the compiler search list to actually work
 AC_PROG_CC([cc gcc clang])
@@ -35,7 +32,6 @@ AC_PROG_CXX([c++ g++ clang++])
 
 LT_INIT
 AC_PREFIX_DEFAULT(/usr/dt)
-
 
 PKG_PROG_PKG_CONFIG
 
@@ -578,7 +574,7 @@ dnl variable and presumably add those to your Makefile.am files.  We
 dnl have 192 of these currently, so... The user will just have to
 dnl deal, or modify them here directly.
 CPPFLAGS="${CPPFLAGS} ${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS}"
-CFLAGS="${CFLAGS} ${C_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
+CFLAGS="${CFLAGS} -std=$C_STD ${C_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
 CXXFLAGS="${CXXFLAGS} ${CXX_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
 LIBS="${EXTRA_LIBS} ${LIBS} ${PTHREAD_LIBS}"
 

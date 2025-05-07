@@ -16,8 +16,8 @@ DONE
 ?DONE
 
 # imports of of headers
-imports/x11
-imports/motif
+# imports/x11
+# imports/motif
 
 # exports of libraries/headers
 exports
@@ -28,6 +28,7 @@ cscope.out
 
 # Makefiles
 Makefile
+update
 
 # examples
 examples/tt/broadcast
