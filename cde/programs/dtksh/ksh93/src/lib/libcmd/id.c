@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -49,8 +50,8 @@ static const char usage[] =
 "\n[user]\n"
 "\n"
 "[+EXIT STATUS?]{"
-        "[+0?Successful completion.]"
-        "[+>0?An error occurred.]"
+	"[+0?Successful completion.]"
+	"[+>0?An error occurred.]"
 "}"
 "[+SEE ALSO?\blogname\b(1), \bwho\b(1), \bgetgroups\b(2)]"
 ;
@@ -96,11 +97,11 @@ static const char usage[] =
 
 #if _lib_fsid
 static void
-getfsids(Sfio_t* sp, const char* name, int flags, register int lastchar)
+getfsids(Sfio_t* sp, const char* name, int flags, int lastchar)
 {
-	register struct fsg*	fs;
-	register char*		s;
-	register char**		p;
+	struct fsg*	fs;
+	char*		s;
+	char**		p;
 	char**			x;
 
 	if (lastchar)
@@ -119,9 +120,9 @@ getfsids(Sfio_t* sp, const char* name, int flags, register int lastchar)
 				if (flags > 0) x = 0;
 				else
 				{
-					register char**		q;
-					register char*		t;
-					register int		n;
+					char**		q;
+					char*		t;
+					int		n;
 
 					n = 0;
 					q = p;
@@ -187,29 +188,29 @@ putid(Sfio_t* sp, int flags, const char* label, const char* name, long number)
 }
 
 static int
-getids(Sfio_t* sp, const char* name, register int flags)
+getids(Sfio_t* sp, const char* name, int flags)
 {
-	register struct passwd*	pw;
-	register struct group*	grp;
-	register int		i;
-	register int		j;
-	register int		k;
+	struct passwd*	pw;
+	struct group*	grp;
+	int		i;
+	int		j;
+	int		k;
 #if _lib_fsid
-	register struct fsg*	fs;
-	const char*		fs_name;
-	int			fs_id;
+	struct fsg*	fs;
+	const char*	fs_name;
+	int		fs_id;
 #endif
-	char**			p;
-	char*			s;
-	int			lastchar;
-	int			ngroups = 0;
-	const char*		gname;
-	uid_t			user;
-	uid_t			euid;
-	gid_t			group;
-	gid_t			egid;
+	char**		p;
+	char*		s;
+	int		lastchar;
+	int		ngroups = 0;
+	const char*	gname = NULL;
+	uid_t		user = 0;
+	uid_t		euid;
+	gid_t		group = 0;
+	gid_t		egid;
 
-	static gid_t*		groups;
+	static gid_t*	groups;
 
 	if (flags & GG_FLAG)
 	{
@@ -264,14 +265,14 @@ getids(Sfio_t* sp, const char* name, register int flags)
 		{
 			setfsgent();
 			do
-                        {
-                                if (!(fs = getfsgnam(name)))
+			{
+				if (!(fs = getfsgnam(name)))
 				{
-                                        error(ERROR_exit(1), "%u: fss name not found", name);
+					error(ERROR_exit(1), "%u: fss name not found", name);
 					UNREACHABLE();
 				}
-                        } while (isfsg(fs));
-                        fs_id = fs->fs_id;
+			} while (isfsg(fs));
+			fs_id = fs->fs_id;
 		}
 #endif
 	}
@@ -286,17 +287,17 @@ getids(Sfio_t* sp, const char* name, register int flags)
 			fs_id = fsid(0);
 #endif
 		if (flags & N_FLAG)
-			name = (pw = getpwuid(user)) ? pw->pw_name : (char*)0;
+			name = (pw = getpwuid(user)) ? pw->pw_name : NULL;
 	}
 	if (ngroups == 1 && groups[0] == group)
 		ngroups = 0;
 	if ((flags & N_FLAG) && (flags & G_FLAG))
-		gname = (grp = getgrgid(group)) ? grp->gr_name : (char*)0;
+		gname = (grp = getgrgid(group)) ? grp->gr_name : NULL;
 #if _lib_fsid
 	if ((flags & N_FLAG) && (flags & S_FLAG))
 	{
 		setfsgent();
-		fs_name = (fs = getfsgid(fs_id)) ? fs->fs_grp : (char*)0;
+		fs_name = (fs = getfsgid(fs_id)) ? fs->fs_grp : NULL;
 	}
 #endif
 	if ((flags & (U_FLAG|G_FLAG|S_FLAG)) == (U_FLAG|G_FLAG|S_FLAG))
@@ -334,9 +335,9 @@ getids(Sfio_t* sp, const char* name, register int flags)
 		else
 		{
 			if ((euid = geteuid()) != user)
-				putid(sp, flags, " euid", (pw = getpwuid(euid)) ? pw->pw_name : (char*)0, euid);
+				putid(sp, flags, " euid", (pw = getpwuid(euid)) ? pw->pw_name : NULL, euid);
 			if ((egid = getegid()) != group)
-				putid(sp, flags, " egid", (grp = getgrgid(egid)) ? grp->gr_name : (char*)0, egid);
+				putid(sp, flags, " egid", (grp = getgrgid(egid)) ? grp->gr_name : NULL, egid);
 			if (ngroups > 0)
 			{
 				sfputr(sp, " groups", -1);
@@ -359,7 +360,7 @@ getids(Sfio_t* sp, const char* name, register int flags)
 #endif
 		}
 		sfputc(sp,'\n');
-		return(0);
+		return 0;
 	}
 	if (flags & U_FLAG)
 	{
@@ -417,14 +418,14 @@ getids(Sfio_t* sp, const char* name, register int flags)
 		else sfprintf(sp, "%u\n", fs_id);
 	}
 #endif
-	return(0);
+	return 0;
 }
 
 int
 b_id(int argc, char** argv, Shbltin_t* context)
 {
-	register int	flags = 0;
-	register int	n;
+	int	flags = 0;
+	int	n;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	for (;;)
@@ -455,8 +456,9 @@ b_id(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
@@ -467,7 +469,7 @@ b_id(int argc, char** argv, Shbltin_t* context)
 		error(2, "incompatible options selected");
 	if (error_info.errors || argc > 1)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (!(flags & ~(N_FLAG|R_FLAG)))
@@ -476,5 +478,5 @@ b_id(int argc, char** argv, Shbltin_t* context)
 		flags |= (U_FLAG|G_FLAG|N_FLAG|R_FLAG|S_FLAG|GG_FLAG);
 	}
 	error_info.errors = getids(sfstdout, *argv, flags);
-	return(error_info.errors);
+	return error_info.errors;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -35,7 +36,7 @@
 	iconv_t		cvt; \
 	Sfio_t*		tmp; \
 	Vmalloc_t*	vm;
-	
+
 #include <vmalloc.h>
 #include <error.h>
 #include <mc.h>
@@ -52,33 +53,34 @@
 char*
 mcfind(const char* locale, const char* catalog, int category, int nls, char* path, size_t size)
 {
-	register int		c;
-	register char*		s;
-	register char*		e;
-	register char*		p;
-	register const char*	v;
-	int			i;
-	int			first;
-	int			next;
-	int			last;
-	int			oerrno;
-	Lc_t*			lc;
-	char			file[PATH_MAX];
-	char*			paths[5];
+	int		c;
+	char*		s;
+	char*		e;
+	char*		p;
+	const char*	v = NULL;
+	int		i;
+	int		first;
+	int		next;
+	int		last;
+	int		oerrno;
+	Lc_t*		lc;
+	char		file[PATH_MAX];
+	char*		paths[5];
 
-	static char		lc_messages[] = "LC_MESSAGES";
+	static char	lc_messages[] = "LC_MESSAGES";
 
+	NOT_USED(nls);
 	if ((category = lcindex(category, 1)) < 0)
-		return 0;
+		return NULL;
 	if (!(lc = locale ? lcmake(locale) : locales[category]))
-		return 0;
+		return NULL;
 	oerrno = errno;
 	if (catalog && *catalog == '/')
 	{
 		i = eaccess(catalog, R_OK);
 		errno = oerrno;
 		if (i)
-			return 0;
+			return NULL;
 		strlcpy(path, catalog, size);
 		return path;
 	}
@@ -193,7 +195,7 @@ mcfind(const char* locale, const char* catalog, int category, int nls, char* pat
 		}
 	}
 	errno = oerrno;
-	return 0;
+	return NULL;
 }
 
 /*
@@ -203,18 +205,18 @@ mcfind(const char* locale, const char* catalog, int category, int nls, char* pat
  */
 
 Mc_t*
-mcopen(register Sfio_t* ip)
+mcopen(Sfio_t* ip)
 {
-	register Mc_t*		mc;
-	register char**		mp;
-	register char*		sp;
-	Vmalloc_t*		vm;
-	char*			rp;
-	int			i;
-	int			j;
-	int			oerrno;
-	size_t			n;
-	char			buf[MC_MAGIC_SIZE];
+	Mc_t*		mc;
+	char**		mp;
+	char*		sp;
+	Vmalloc_t*	vm;
+	char*		rp;
+	int		i;
+	int		j;
+	int		oerrno;
+	size_t		n;
+	char		buf[MC_MAGIC_SIZE];
 
 	oerrno = errno;
 	if (ip)
@@ -226,20 +228,20 @@ mcopen(register Sfio_t* ip)
 		if (sfread(ip, buf, MC_MAGIC_SIZE) != MC_MAGIC_SIZE)
 		{
 			errno = oerrno;
-			return 0;
+			return NULL;
 		}
 		if (memcmp(buf, MC_MAGIC, MC_MAGIC_SIZE))
-			return 0;
+			return NULL;
 	}
 
 	/*
 	 * allocate the region
 	 */
 
-	if (!(vm = vmopen(Vmdcheap, Vmbest, 0)) || !(mc = vmnewof(vm, 0, Mc_t, 1, 0)))
+	if (!(vm = vmopen()) || !(mc = vmnewof(vm, 0, Mc_t, 1, 0)))
 	{
 		errno = oerrno;
-		return 0;
+		return NULL;
 	}
 	mc->vm = vm;
 	mc->cvt = (iconv_t)(-1);
@@ -328,7 +330,7 @@ mcopen(register Sfio_t* ip)
  bad:
 	vmclose(vm);
 	errno = oerrno;
-	return 0;
+	return NULL;
 }
 
 /*
@@ -338,7 +340,7 @@ mcopen(register Sfio_t* ip)
  */
 
 char*
-mcget(register Mc_t* mc, int set, int num, const char* msg)
+mcget(Mc_t* mc, int set, int num, const char* msg)
 {
 	char*		s;
 	size_t		n;
@@ -354,7 +356,7 @@ mcget(register Mc_t* mc, int set, int num, const char* msg)
 		sfstrseek(mc->tmp, p, SEEK_SET);
 	}
 	n = strlen(s) + 1;
-	iconv_write(mc->cvt, mc->tmp, &s, &n, NiL);
+	iconv_write(mc->cvt, mc->tmp, &s, &n, NULL);
 	return sfstrbase(mc->tmp) + p;
 }
 
@@ -366,12 +368,12 @@ mcget(register Mc_t* mc, int set, int num, const char* msg)
  */
 
 int
-mcput(register Mc_t* mc, int set, int num, const char* msg)
+mcput(Mc_t* mc, int set, int num, const char* msg)
 {
-	register int		i;
-	register char*		s;
-	register Mcset_t*	sp;
-	register char**		mp;
+	int		i;
+	char*		s;
+	Mcset_t*	sp;
+	char**		mp;
 
 	/*
 	 * validate the arguments
@@ -506,18 +508,18 @@ mcput(register Mc_t* mc, int set, int num, const char* msg)
  */
 
 int
-mcdump(register Mc_t* mc, register Sfio_t* op)
+mcdump(Mc_t* mc, Sfio_t* op)
 {
-	register int		i;
-	register int		j;
-	register int		n;
-	register char*		s;
-	register Mcset_t*	sp;
+	int		i;
+	int		j;
+	int		n;
+	char*		s;
+	Mcset_t*	sp;
 
 	/*
 	 * write the magic
 	 */
-	
+
 	if (sfwrite(op, MC_MAGIC, MC_MAGIC_SIZE) != MC_MAGIC_SIZE)
 		return -1;
 
@@ -606,14 +608,14 @@ mcdump(register Mc_t* mc, register Sfio_t* op)
  */
 
 int
-mcindex(register const char* s, char** e, int* set, int* msg)
+mcindex(const char* s, char** e, int* set, int* msg)
 {
-	register int		c;
-	register int		m;
-	register int		n;
-	register int		r;
-	register unsigned char*	cv;
-	char*			t;
+	int		c;
+	int		m;
+	int		n;
+	int		r;
+	unsigned char*	cv;
+	char*		t;
 
 	m = 0;
 	n = strtol(s, &t, 0);
@@ -621,7 +623,7 @@ mcindex(register const char* s, char** e, int* set, int* msg)
 	{
 		SFCVINIT();
 		cv = _Sfcv36;
-		for (n = m = 0; (c = cv[*s]) < 36; s++)
+		for (n = m = 0; (c = cv[*((unsigned char*)s)]) < 36; s++)
 		{
 			m++;
 			n ^= c;
@@ -658,7 +660,7 @@ mcindex(register const char* s, char** e, int* set, int* msg)
  */
 
 int
-mcclose(register Mc_t* mc)
+mcclose(Mc_t* mc)
 {
 	if (!mc)
 		return -1;

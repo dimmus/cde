@@ -1,10 +1,7 @@
 iff	AST_COMMON
 hdr	pthread,stdarg,stddef,stdint,inttypes,types,unistd
 sys	types
-typ	long.double,size_t,ssize_t
 typ	__va_list stdio.h
-
-mac	SF_APPEND,SF_CLOSE	sys/stat.h sys/socket.h
 
 std	noreturn note{ noreturn ok }end compile{
 	#include <stdlib.h>
@@ -14,15 +11,22 @@ std	noreturn note{ noreturn ok }end compile{
 }end
 
 cat{
-	#pragma clang diagnostic ignored "-Wdeprecated-register"
+	#if __clang__
+	#pragma clang diagnostic ignored "-Wmissing-braces"
 	#pragma clang diagnostic ignored "-Wparentheses"
 	#pragma clang diagnostic ignored "-Wstring-plus-int"
 	#pragma clang diagnostic ignored "-Wunused-value"
+	#elif __GNUC__
+	#pragma GCC diagnostic ignored "-Wpragmas"
+	#pragma GCC diagnostic ignored "-Wmissing-braces"
+	#pragma GCC diagnostic ignored "-Wparentheses"
 	#pragma GCC diagnostic ignored "-Wunused-result"
+	#pragma GCC diagnostic ignored "-Wunused-value"
+	#endif
 
-	/* AST backwards compatibility macros */
+	/* AST backward compatibility macros */
 	#undef	_NIL_
-	#define	_NIL_(x)	((x)0)
+	#define	_NIL_(x)	NULL
 	#undef	_STD_
 	#define	_STD_		1
 	#undef	_ARG_
@@ -41,12 +45,6 @@ cat{
 	#define	__STD_C		1
 	#undef	Void_t
 	#define	Void_t		void
-
-	/* disable non-standard Linux/GNU inlines */
-	#ifdef __GNUC__	
-	#	undef	__OPTIMIZE_SIZE__
-	#	define	__OPTIMIZE_SIZE__	1
-	#endif
 
 	/* __INLINE__, if defined, is the inline keyword */
 	#if !defined(__INLINE__) && defined(_WIN32) && !defined(__GNUC__)
@@ -67,14 +65,10 @@ cat{
 	#	endif
 	#endif
 
-	#if !_std_noreturn
-	#if defined(__GNUC__) && (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4))
-	#define noreturn __attribute__((noreturn))
-	#else
-	#define noreturn
-	#endif /* __GNUC__ */
-	#else
+	#if _std_noreturn
 	#include <stdnoreturn.h>
+	#else
+	#define noreturn /* empty */
 	#endif /* _std_noreturn */
 }end
 
@@ -82,7 +76,7 @@ if	tst - note{ <stdarg.h>+<wchar.h> works }end compile{
 		/*<NOSTDIO>*/
 		#include <stdarg.h>
 		#include <wchar.h>
-	}end 
+	}end
 elif	tst - note{ explicit <sys/va_list.h> before <stdarg.h>+<wchar.h> }end compile{
 		/*<NOSTDIO>*/
 		#include <sys/va_list.h>
@@ -138,7 +132,7 @@ tst	- -DN=1 - -DN=2 - -DN=3 - -DN=4 - -DN=5 - -DN=6 - -DN=7 - -DN=8 - -DN=0 outp
 	#endif
 
 	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
-	
+
 	static char			i_char = 1;
 	static short			i_short = 1;
 	static int			i_int = 1;
@@ -152,13 +146,13 @@ tst	- -DN=1 - -DN=2 - -DN=3 - -DN=4 - -DN=5 - -DN=6 - -DN=7 - -DN=8 - -DN=0 outp
 	static unsigned _ast_int8_t	u_long_long = 18446744073709551615;
 	#endif
 	#endif
-	
+
 	static struct
 	{
 		char*	name;
 		int	size;
 		char*	swap;
-	} int_type[] = 
+	} int_type[] =
 	{
 		"char",		sizeof(char),		(char*)&i_char,
 		"short",	sizeof(short),		(char*)&i_short,
@@ -168,18 +162,18 @@ tst	- -DN=1 - -DN=2 - -DN=3 - -DN=4 - -DN=5 - -DN=6 - -DN=7 - -DN=8 - -DN=0 outp
 		_ast_int8_str,	sizeof(_ast_int8_t),	(char*)&i_long_long,
 	#endif
 	};
-	
+
 	static int	int_size[] = { 1, 2, 4, 8 };
-	
+
 	int
-	main()
+	main(void)
 	{
-		register int	t;
-		register int	s;
-		register int	m = 1;
-		register int	b = 1;
-		register int	w = 0;
-	
+		int	t;
+		int	s;
+		int	m = 1;
+		int	b = 1;
+		int	w = 0;
+
 	#ifdef _ast_int8_t
 		unsigned _ast_int8_t	p;
 		char			buf[64];
@@ -232,7 +226,7 @@ tst	- output{
 	#include <string.h>
 	#include <sys/types.h>
 
-	#if _X86_ || _X64_ 
+	#if _X86_ || _X64_
 	#define COND		1
 	#define CONDNAME	"_X64_"
 	#else
@@ -240,13 +234,13 @@ tst	- output{
 	#endif
 
 	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
-	
+
 	static struct
 	{
 		char*	name;
 		int	size;
 		int	cond;
-	} types[] = 
+	} types[] =
 	{
 		"short",	sizeof(short),		0,
 		"int",		sizeof(int),		0,
@@ -255,15 +249,13 @@ tst	- output{
 		"pointer",	sizeof(void*),		COND * 4,
 		"float",	sizeof(float),		0,
 		"double",	sizeof(double),		0,
-	#ifdef _typ_long_double
 		"long_double",	sizeof(long double),	0,
-	#endif
 	};
-	
+
 	int
-	main()
+	main(void)
 	{
-		register int	t;
+		int	t;
 
 		for (t = 0; t < elementsof(types); t++)
 	#if COND
@@ -286,51 +278,45 @@ tst	- output{
 	exit 1
 }end
 
-tst	- -DN=1 - -DN=0 output{
+tst note{ generating _ast_flt\*_t types }end output{
 	#define _BYTESEX_H
 
 	#include <string.h>
 	#include <sys/types.h>
 
-	#if !N
-	#undef	_typ_long_double
-	#endif
-
 	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
-	
+
 	static struct
 	{
 		char*	name;
 		int	size;
-	} flt_type[] = 
+	} flt_type[] =
 	{
 		"float",	sizeof(float),
 		"double",	sizeof(double),
-	#ifdef _typ_long_double
 		"long double",	sizeof(long double),
-	#endif
 	};
-	
-	int
-	main()
-	{
-		register int	t;
-		register int	m = 1;
-	
-	#ifdef _typ_long_double
-		long double	p;
-		char		buf[64];
 
-		if (flt_type[elementsof(flt_type)-1].size <= sizeof(double))
-			return 1;
-		p = 1.12345E-55;
-		sprintf(buf, "%1.5LE", p);
-		if (strcmp(buf, "1.12345E-55"))
-			return 1;
-	#endif
-		for (t = 0; t < elementsof(flt_type); t++)
+	int
+	main(void)
+	{
+		int	t;
+		int	m = 1;
+		int	e = elementsof(flt_type);
+		if (flt_type[e - 1].size <= sizeof(double))
+			e--; /* exclude "long double" */
+		else
 		{
-			while (t < (elementsof(flt_type) - 1) && flt_type[t].size == flt_type[t + 1].size)
+			long double	p;
+			char		buf[64];
+			p = 1.12345E-55;
+			sprintf(buf, "%1.5LE", p);
+			if (strcmp(buf, "1.12345E-55"))
+				e--; /* exclude "long double" */
+		}
+		for (t = 0; t < e; t++)
+		{
+			while (t < (e - 1) && flt_type[t].size == flt_type[t + 1].size)
 				t++;
 			m = flt_type[t].size;
 			printf("#define _ast_flt%d_t		%s\n", flt_type[t].size, flt_type[t].name);
@@ -340,6 +326,9 @@ tst	- -DN=1 - -DN=0 output{
 			printf("#define _ast_fltmax_double		1\n");
 		return 0;
 	}
+}end fail{
+	echo "$0: Could not generate _ast_flt*_t types. Export IFFEFLAGS=-d1 to debug." >&2
+	exit 1
 }end
 
 typ int8_t stdint.h inttypes.h no{
@@ -390,6 +379,15 @@ typ intmax_t stdint.h inttypes.h no{
 	#undef	_typ_intmax_t
 	#define	_typ_intmax_t	1
 	typedef _ast_intmax_t intmax_t;
+}end
+typ intptr_t stdint.h inttypes.h no{
+	#undef	_typ_intptr_t
+	#define	_typ_intptr_t	1
+	#if _ast_sizeof_pointer == 8 && defined(_ast_int8_t)
+	typedef _ast_int8_t intptr_t;
+	#else
+	typedef _ast_int4_t intptr_t;
+	#endif
 }end
 typ uintmax_t stdint.h inttypes.h no{
 	#undef	_typ_uintmax_t
@@ -448,7 +446,7 @@ tst	- -DTRY=1 - -DTRY=1 -Dvoid=char - -DTRY=2 - -DTRY=3 - -DTRY=4 output{
 	}
 	#endif
 	int
-	main()
+	main(void)
 	{
 		int	r;
 
@@ -479,7 +477,7 @@ tst	- -DTRY=1 - -DTRY=1 -Dvoid=char - -DTRY=2 - -DTRY=3 - -DTRY=4 output{
 	#endif /*TRY == 2*/
 			printf("/* va_arg() va_list type */\n");
 	#endif /*TRY == 4*/
-	
+
 	#if !defined(va_copy)
 	#if defined(__va_copy)
 		printf("#ifndef va_copy\n");
@@ -500,7 +498,7 @@ tst	- -DTRY=1 - -DTRY=1 -Dvoid=char - -DTRY=2 - -DTRY=3 - -DTRY=4 output{
 	#endif
 	#endif
 	#endif
-	
+
 		printf("#endif\n");
 		return 0;
 	}
@@ -521,14 +519,6 @@ cat{
 	#		include	<inttypes.h>
 	#		endif
 	#	endif
-	#endif
-	#if !_typ_size_t
-	#	define _typ_size_t	1
-		typedef int size_t;
-	#endif
-	#if !_typ_ssize_t
-	#	define _typ_ssize_t	1
-		typedef int ssize_t;
 	#endif
 	#ifndef _AST_STD_H
 	#	define _def_map_ast	1
@@ -561,7 +551,7 @@ tst - note{ does this compiler have __builtin_unreachable() }end output{
 	 * argc should never be zero on init, but hopefully optimizers aren't that smart.
 	 */
 	#include <stdio.h>
-	#include "releaseflags.h"
+	#include "ast_release.h"
 	void testfn(int a)
 	{
 		switch(a)
@@ -583,4 +573,37 @@ tst - note{ does this compiler have __builtin_unreachable() }end output{
 	}
 }end fail{
 	echo '#define UNREACHABLE()	abort()'
+}end
+
+# TODO: remove when we require C99
+tst	has___func__ note{ does this compiler have __func__ }end execute{
+	#include <string.h>
+	int testfn(void)
+	{
+		return strcmp(__func__,"testfn")==0;
+	}
+	int main(void)
+	{
+		return !(testfn && strcmp(__func__,"main")==0);
+	}
+}end
+
+# TODO: remove when we require C99 (use __func__)
+tst	has___FUNCTION__ note{ does this compiler have __FUNCTION__ }end execute{
+	#include <string.h>
+	int testfn(void)
+	{
+		return strcmp(__FUNCTION__,"testfn")==0;
+	}
+	int main(void)
+	{
+		return !(testfn && strcmp(__FUNCTION__,"main")==0);
+	}
+}end
+
+tst	has__Static_assert note{ does this compiler have _Static_assert }end execute{
+	int main(void)
+	{
+		_Static_assert(2 + 2 == 4, "poof goes reality");
+	}
 }end

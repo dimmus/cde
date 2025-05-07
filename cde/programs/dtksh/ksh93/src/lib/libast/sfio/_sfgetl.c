@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -19,12 +19,12 @@
 #include	"sfhdr.h"
 
 /*
- * for backwards compatibility with pre-threaded sfgetl() inline
+ * for backward compatibility with pre-threaded sfgetl() inline
  */
 
 extern
-Sflong_t _sfgetl(reg Sfio_t* f)
+Sflong_t _sfgetl(Sfio_t* f)
 {
-	sfungetc(f, (unsigned char)_SF_(f)->val);
+	sfungetc(f, (unsigned char)_SFIO_(f)->val);
 	return sfgetl(f);
 }

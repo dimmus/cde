@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -89,10 +89,10 @@ _mm_severity(void)
 
 	if (!severity)
 	{
-		register char*		s;
-		register MM_table_t*	p;
-		register int		n;
-		register int		c;
+		char*		s;
+		MM_table_t*	p;
+		int		n;
+		int		c;
 		char*			e;
 		MM_table_t*		q;
 
@@ -155,7 +155,7 @@ _mm_severity(void)
 							{
 							case 0:
 								*(s - 1) = 0;
-								p->value = strtol(s, NiL, 0);
+								p->value = strtol(s, NULL, 0);
 								break;
 							case 1:
 								p->display = s;
@@ -182,7 +182,7 @@ _mm_severity(void)
 }
 
 static char*
-display(register const MM_table_t* tab, int value, int mask)
+display(const MM_table_t* tab, int value, int mask)
 {
 	while (tab->name)
 	{
@@ -190,16 +190,16 @@ display(register const MM_table_t* tab, int value, int mask)
 			return (char*)tab->display;
 		tab++;
 	}
-	return 0;
+	return NULL;
 }
 
 int
 fmtmsg(long classification, const char* label, int severity, const char* text, const char* action, const char* tag)
 {
-	register int		c;
-	register char*		s;
-	register char*		t;
-	register MM_table_t*	p;
+	int		c;
+	char*		s;
+	char*		t;
+	MM_table_t*	p;
 	int			n;
 	int			m;
 	int			r;

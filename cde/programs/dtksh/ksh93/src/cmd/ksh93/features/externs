@@ -1,15 +1,29 @@
-hdr	nc,exec_attr
+hdr	nc
 mem	exception.name,_exception.name math.h
-lib	setreuid,setregid,nice,fork,spawnveg,fchdir
-lib	pathnative,pathposix,fts_notify
+lib	setreuid,setregid
 lib	memcntl sys/mman.h
-lib	getexecuser,free_execattr exec_attr.h -lsecdb
+
+# for main.c fixargs():
+lib,sys	pstat
+lib	setproctitle
 
 reference	unistd.h
 
 extern	nice		int	(int)
 extern	setreuid	int	(uid_t,uid_t)
 extern	setregid	int	(gid_t,gid_t)
+
+tst	note{ does the system support #! interpreter paths }end cross{
+	cat > "$EXECROOT/file$$" <<!
+	#! $(command -v env) true
+	exit 1
+	!
+	chmod 755 "$EXECROOT/file$$"
+	if	"$EXECROOT/file$$" 2>/dev/null
+	then	echo "#define SHELLMAGIC	1"
+	fi
+	rm -f "$EXECROOT/file$$"
+}end
 
 tst	note{ determining default number of extra bytes per argument for arguments list }end output{
 	/*
@@ -26,7 +40,7 @@ tst	note{ determining default number of extra bytes per argument for arguments l
 	 * So, operating systems are free to consume ARG_MAX space in whatever bizarre way they want, and
 	 * may even come up with more innovative ways to waste buffer space in future. This test assumes
 	 * that null terminators are included in the total, because why wouldn't they be? It builds a
-	 * dummy arguments list and tries fork(2)/execve(2) to figure how how many extra bytes to add to
+	 * dummy arguments list and tries fork(2)/execvp(2) to figure how how many extra bytes to add to
 	 * each argument to account for pointers and whatnot, and outputs that (_arg_extrabytes) as a
 	 * default value for command_xargs() in path.c. We still cannot entirely rely on this value on all
 	 * systems, so path_spawn() in path.c is able to increase it at runtime if E2BIG still occurs.
@@ -35,7 +49,7 @@ tst	note{ determining default number of extra bytes per argument for arguments l
 	#include <ast.h>
 	#include <error.h>
 	#include <sfio.h>
-	#include <stak.h>
+	#include <stk.h>
 	#include <wait.h>
 
 	int main(int argc,char *argv[])
@@ -68,12 +82,12 @@ tst	note{ determining default number of extra bytes per argument for arguments l
 				int bytec;
 
 				error_info.id="_arg_extrabytes test (child)";
-				argv = (char **)stakalloc((argmax / 2 + 1) * sizeof(char*));
+				argv = stkalloc(stkstd, (argmax / 2 + 1) * sizeof(char*));
 				argc = bytec = 0;
 				while(bytec < argmax)
 				{
 					if(argc==0)
-						argv[argc] = "/usr/bin/env";
+						argv[argc] = "env";
 					else if(argc==1)
 						argv[argc] = "true";
 					else
@@ -82,14 +96,14 @@ tst	note{ determining default number of extra bytes per argument for arguments l
 					bytec += strlen(argv[argc]) + 1 + extra_bytes;
 					argc++;
 				}
-				argv[argc] = (char*)0;
-				if(execve(argv[0], argv, environ) < 0)
+				argv[argc] = NULL;
+				if(execvp(argv[0], argv) < 0)
 				{
 					if(errno == E2BIG)
 						return 1;
 					else
 					{
-						error(ERROR_SYSTEM|2, "execve failed");
+						error(ERROR_SYSTEM|2, "execvp failed");
 						return 2;
 					}
 				}
@@ -135,4 +149,81 @@ tst	note{ determining default number of extra bytes per argument for arguments l
 	}
 }end fail{
 	echo "#define _arg_extrabytes	sizeof(char*)	/* BUG: test failed; assuming pointer size */"
+}end
+
+tst	note{ determining size of PID variables }end output{
+	#include <ast.h>
+	#include <sfio.h>
+	int main(void)
+	{
+		const int s = sizeof(pid_t);
+		char *a;
+		Sfio_t *b;
+		/*
+		 * For $$, $PPID, ${.sh.pid} and ${.sh.ppid} to work correctly, the size
+		 * of pid_t must be one of the integer sizes supported by nv_getval().
+		 * If there is ever a system where this test returns 1, then both this
+		 * test and nv_getval() must learn a new integer size attribute.
+		 */
+		if(s==sizeof(int16_t))
+			a="NV_INTEGER|NV_SHORT";
+		else if(s==sizeof(int32_t))
+			a="NV_INTEGER";
+		else if(s==sizeof(Sflong_t))
+			a="NV_INTEGER|NV_LONG";
+		else
+			return 1;
+		/* write NV_PID attribute definition */
+		sfprintf(sfstdout,"#define NV_PID\t(%s)\t/* integer attribute(s) corresponding to sizeof(pid_t)==%d */\n",a,s);
+		/* show nice test result output on FD 9 */
+		b = sfstropen();
+		sfprintf(b," %s (%d bytes) ... ",a,s);
+		a = sfstruse(b);
+		write(9,a,strlen(a));
+		return 0;
+	}
+}end fail{
+	echo "$0: cannot determine size of PID variables" >&2
+	exit 1
+}end
+
+# execve(3) breakage on Android/Termux (early versions of API 35)
+tst	execve_ignores_argv0 note{ does execve(3) ignore the specified argv[0] }end output{
+	#include <string.h>
+	#include <unistd.h>
+	extern char **environ;
+	/* Check if argv[0] can be set to "TEST_OK" while exec'ing self */
+	int main(int argc, char *argv[])
+	{
+		char *orig0 = argv[0], *newenv[2], b[64];
+		int i;
+		sprintf(b,"_KSH_EXECVE_TEST_%d=y",(int)getpid());
+		newenv[0] = b;
+		newenv[1] = NULL;
+		/* check if we've already been re-exec'ed */
+		for (i = 0; environ[i]; i++)
+			if (strcmp(environ[i],newenv[0])==0)
+				return !(strcmp(argv[0],"TEST_OK")!=0);
+		/* exec self */
+		argv[0] = "TEST_OK";
+		execve(orig0,argv,newenv);
+		return 128;
+	}
+}end
+tst	execve_dir_enoexec note{ does execve(3) set errno to ENOEXEC when trying to execute a directory }end output{
+	#include <sys/stat.h>
+	#include <unistd.h>
+	#include <errno.h>
+	extern char **environ;
+	int main(int argc, char *argv[])
+	{
+		char	dirname[64];
+		int	e;
+		sprintf(dirname,".dir.%u",(unsigned)getpid());
+		mkdir(dirname,0777);
+		execve(dirname,argv,environ);
+		e = errno;
+		rmdir(dirname);
+		return !(e == ENOEXEC);
+	}
 }end

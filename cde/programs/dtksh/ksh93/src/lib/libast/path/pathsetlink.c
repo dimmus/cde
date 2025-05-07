@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -31,12 +31,12 @@
 int
 pathsetlink(const char* buf, const char* name)
 {
-	register char*	t = (char*)buf;
+	char*	t = (char*)buf;
 #ifdef UNIV_MAX
-	register char*	s = (char*)buf;
-	register char*	v;
-	int		n;
-	char		tmp[PATH_MAX];
+	char*	s = (char*)buf;
+	char*	v;
+	int	n;
+	char	tmp[PATH_MAX];
 
 	while (*s)
 	{
@@ -64,5 +64,5 @@ pathsetlink(const char* buf, const char* name)
 		}
 	}
 #endif
-	return(symlink(t, name));
+	return symlink(t, name);
 }

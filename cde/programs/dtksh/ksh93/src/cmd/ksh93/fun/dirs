@@ -1,112 +1,46 @@
+########################################################################
+#                                                                      #
+#               This software is part of the ast package               #
+#          Copyright (c) 1982-2012 AT&T Intellectual Property          #
+#          Copyright (c) 2020-2023 Contributors to ksh 93u+m           #
+#                      and is licensed under the                       #
+#                 Eclipse Public License, Version 2.0                  #
+#                                                                      #
+#                A copy of the License is available at                 #
+#      https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.html      #
+#         (with md5 checksum 84283fa8859daf213bdda5a9f8d1be1d)         #
+#                                                                      #
+#                  David Korn <dgk@research.att.com>                   #
+#                  Martijn Dekker <martijn@inlv.org>                   #
+#               K. Eugene Carlson <kvngncrlsn@gmail.com>               #
+#                                                                      #
+########################################################################
 #
-# DIRECTORY MANIPULATION FUNCTIONS, REPLACES CD
-#
-# Uses global parameters _push_max _push_top _push_stack
-integer _push_max=${CDSTACK-32} _push_top=${CDSTACK-32}
-unalias cd
-alias cd=_cd
-# Display directory stack -- $HOME displayed as ~
+# dirs: Display directory stack, with $HOME displayed as ~.
+# For use in conjunction with 'cd', 'mcd', 'pushd', 'popd'.
+
+# Use cd wrapper from .../fun/cd
+autoload cd
+
+typeset -a _push_stack
+
 function dirs
 {
-    typeset dir="${PWD#$HOME/}"
-    case $dir in
-    $HOME)
-        dir=\~
-        ;;
-    /*) ;;
-    *)  dir=\~/$dir
-    esac
-    PS3=
-    select i in "$dir" "${_push_stack[@]}"
-    do	:
-    done < /dev/null
-}
-
-# Change directory and put directory on front of stack
-function _cd
-{
-    typeset dir=
-    integer n=0 type=4
-    case $1 in
-    -|-1|2) # \cd -
-        n=_push_top type=1
-        ;;
-    -[1-9]*([0-9])) # \cd -n
-        n=_push_top+${1#-}-1 type=2
-        ;;
-    1)  # keep present directory
-        print -r - "$PWD"
-	return
-        ;;      
-    [1-9]*([0-9])) # \cd n
-        n=_push_top+${1}-2 type=2
-        ;;
-    *)  if    ((_push_top <= 0))
-        then  type=3 n=_push_max
-        fi
-    esac
-    if    ((type<3))
-    then  if    ((n >= _push_max+1))
-          then  print -u2 cd: Directory stack not that deep.
-                return 1
-          else  dir=${_push_stack[n]}
-          fi
-    fi
-    case $dir in
-    \~*)   dir=$HOME${dir#\~}
-    esac
-    # If there are no arguments, use $dir if non-empty.
-    (($#)) || set -- ${dir:+"$dir"}
-    # \cd prevents alias substitution.
-    # You can use command cd with 12/28/93 and newer.
-    \cd "$@" >| /dev/null || return 1
-    dir=${OLDPWD#$HOME/}
-    case $TERM in
-    630)
-	    print "\033[?${#PWD};2v$PWD\c"
-	    ;;
-    esac
-    case $dir in
-    $HOME)
-        dir=\~
-        ;;
-    /*) ;;
-    *)  dir=\~/$dir
-    esac
-    case $type in
-    1)  # swap first two elements
-        _push_stack[_push_top]=$dir
-        ;;
-    2|3)  # put $dir on top and shift down by one until top
-        integer i=_push_top
-        for dir in "$dir" "${_push_stack[@]}"
-        do  ((i > n)) && break
-            _push_stack[i]=$dir
-            i=i+1
-        done
-        ;;
-    4)  # push name
-        _push_stack[_push_top=_push_top-1]=$dir
-        ;;
-    esac
-    print -r - "$PWD"
-}
-
-# Menu driven change directory command
-function mcd
-{
-    typeset dir="${PWD#$HOME/}"
-    case $dir in
-    $HOME)
-        dir=\~
-        ;;
-    /*) ;;
-    *)  dir=\~/$dir
-    esac
-    PS3='Select by number or enter a name: '
-    select dir in "$dir" "${_push_stack[@]}"
-    do  if    _cd $REPLY
-        then  return
-        fi
-    done
+	typeset dir=${PWD#"$HOME/"} PS3=''
+	# change $HOME to ~
+	case $dir in
+	"$HOME")dir=\~ ;;
+	/*)	;;
+	*) 	dir=\~/$dir ;;
+	esac
+	# Display numbered directory list using a dummy 'select' loop;
+	# redirecting standard input to /dev/null prevents user input
+	# and setting PS3 to empty (above) prevents showing a prompt.
+	# The numbers shown are usable with 'mcd' and the 'cd' wrapper.
+	select i in "$dir" "${_push_stack[@]}"
+	do	:
+	done < /dev/null
+	# The select loop will exit with status 1 as there is no input
+	# to read, but 'dirs' should not pass down that exit status.
+	return 0
 }

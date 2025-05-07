@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -24,7 +25,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: join (AT&T Research) 2009-12-10 $\n]"
+"[-?\n@(#)$Id: join (ksh 93u+m) 2022-08-30 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?join - relational database operator]"
 "[+DESCRIPTION?\bjoin\b performs an \aequality join\a on the files \afile1\a "
@@ -45,7 +46,7 @@ static const char usage[] =
 	"sequence of \bsort -b\b on the fields on which they are to be "
 	"joined otherwise the results are unspecified.]"
 "[+?If either \afile1\a or \afile2\a is \b-\b, \bjoin\b "
-        "uses standard input starting at the current location.]"
+	"uses standard input starting at the current location.]"
 
 "[e:empty]:[string?Replace empty output fields in the list selected with"
 "	\b-o\b with \astring\a.]"
@@ -68,7 +69,7 @@ static const char usage[] =
 "	\afileno\a, where \afileno\a is either 1 or 2, instead of the normal "
 	"output.  If \b-v\b options appear for both 1 and 2, then "
 	"all unpairable lines will be output.] ]"
-"[i:ignorecase?Ignore case in field comparisons.]"
+"[i:ignorecase|ignore-case?Ignore case in field comparisons.]"
 "[B!:mmap?Enable memory mapped reads instead of buffered.]"
 
 "[+?The following obsolete option forms are also recognized: \b-j\b \afield\a"
@@ -160,7 +161,7 @@ typedef struct Join_s
 } Join_t;
 
 static void
-done(register Join_t* jp)
+done(Join_t* jp)
 {
 	if (jp->file[0].iop && jp->file[0].iop != sfstdin)
 		sfclose(jp->file[0].iop);
@@ -180,8 +181,8 @@ done(register Join_t* jp)
 static Join_t*
 init(void)
 {
-	register Join_t*	jp;
-	register int		i;
+	Join_t*	jp;
+	int	i;
 
 	setlocale(LC_ALL, "");
 	if (jp = newof(0, Join_t, 1, 0))
@@ -197,7 +198,7 @@ init(void)
 		    !(jp->file[1].fields = newof(0, Field_t, NFIELD + 1, 0)))
 		{
 			done(jp);
-			return 0;
+			return NULL;
 		}
 		jp->file[0].maxfields = NFIELD;
 		jp->file[1].maxfields = NFIELD;
@@ -209,13 +210,13 @@ init(void)
 static int
 getolist(Join_t* jp, const char* first, char** arglist)
 {
-	register const char*	cp = first;
-	char**			argv = arglist;
-	register int		c;
-	int*			outptr;
-	int*			outmax;
-	int			nfield = NFIELD;
-	char*			str;
+	const char*	cp = first;
+	char**		argv = arglist;
+	int		c;
+	int*		outptr;
+	int*		outmax;
+	int		nfield = NFIELD;
+	char*		str;
 
 	outptr = jp->outlist = newof(0, int, NFIELD + 1, 0);
 	outmax = outptr + NFIELD;
@@ -290,24 +291,24 @@ getolist(Join_t* jp, const char* first, char** arglist)
 static unsigned char*
 getrec(Join_t* jp, int index, int discard)
 {
-	register unsigned char*	sp = jp->state;
-	register File_t*	fp = &jp->file[index];
-	register Field_t*	field = fp->fields;
-	register Field_t*	fieldmax = field + fp->maxfields;
-	register char*		cp;
-	register int		n;
-	char*			tp;
+	unsigned char*	sp = jp->state;
+	File_t*	fp = &jp->file[index];
+	Field_t*	field = fp->fields;
+	Field_t*	fieldmax = field + fp->maxfields;
+	char*		cp;
+	int		n;
+	char*		tp;
 
 	if (sh_checksig(jp->context))
-		return 0;
+		return NULL;
 	if (discard && fp->discard)
-		sfraise(fp->iop, SFSK_DISCARD, NiL);
+		sfraise(fp->iop, SFSK_DISCARD, NULL);
 	fp->spaces = 0;
 	fp->hit = 0;
 	if (!(cp = sfgetr(fp->iop, '\n', 0)))
 	{
 		jp->outmode &= ~(1<<index);
-		return 0;
+		return NULL;
 	}
 	fp->recptr = cp;
 	fp->reclen = sfvalue(fp->iop);
@@ -321,7 +322,7 @@ getrec(Join_t* jp, int index, int discard)
 	else
 		do /* separate into fields */
 		{
-			if (field >= fieldmax)	
+			if (field >= fieldmax)
 			{
 				n = 2 * fp->maxfields;
 				fp->fields = newof(fp->fields, Field_t, n + 1, 0);
@@ -452,14 +453,14 @@ static unsigned char* u1;
  * print field <n> from file <index>
  */
 static int
-outfield(Join_t* jp, int index, register int n, int last)
+outfield(Join_t* jp, int index, int n, int last)
 {
-	register File_t*	fp = &jp->file[index];
-	register char*		cp;
-	register char*		cpmax;
-	register int		size;
-	register Sfio_t*	iop = jp->outfile;
-	char*			tp;
+	File_t*		fp = &jp->file[index];
+	char*		cp;
+	char*		cpmax;
+	int		size;
+	Sfio_t*		iop = jp->outfile;
+	char*		tp;
 
 	if (n < fp->nfields)
 	{
@@ -467,12 +468,12 @@ outfield(Join_t* jp, int index, register int n, int last)
 		cpmax = fp->fields[n].end + 1;
 	}
 	else
-		cp = 0;
+		cp = cpmax = NULL;
 	if ((n = jp->delim) == -1)
 	{
 		if (cp && fp->spaces)
 		{
-			register unsigned char*	sp = jp->state;
+			unsigned char*	sp = jp->state;
 
 			/* eliminate leading spaces */
 			if (jp->mb)
@@ -543,14 +544,14 @@ static int i1,i2,i3;
 #endif
 
 static int
-outrec(register Join_t* jp, int mode)
+outrec(Join_t* jp, int mode)
 {
-	register File_t*	fp;
-	register int		i;
-	register int		j;
-	register int		k;
-	register int		n;
-	int*			out;
+	File_t*	fp;
+	int	i;
+	int	j;
+	int	k;
+	int	n;
+	int*	out;
 
 	if (mode < 0 && jp->file[0].hit++)
 		return 0;
@@ -625,16 +626,16 @@ outrec(register Join_t* jp, int mode)
 static int
 join(Join_t* jp)
 {
-	register unsigned char*	cp1;
-	register unsigned char*	cp2;
-	register int		n1;
-	register int		n2;
-	register int		n;
-	register int		cmp;
-	register int		same;
-	int			o2;
-	Sfoff_t			lo = -1;
-	Sfoff_t			hi = -1;
+	unsigned char*	cp1;
+	unsigned char*	cp2;
+	int		n1;
+	int		n2;
+	int		n;
+	int		cmp;
+	int		same;
+	int		o2;
+	Sfoff_t		lo = -1;
+	Sfoff_t		hi = -1;
 
 	if ((cp1 = getrec(jp, 0, 0)) && (cp2 = getrec(jp, 1, 0)) || (cp2 = 0))
 	{
@@ -673,7 +674,7 @@ sfprintf(sfstdout, "[C#%d:%d(%c-%c),%d,%lld,%lld%s]", __LINE__, cmp, *cp1, *cp2,
 					return -1;
 				else if (lo < 0 && (jp->outmode & C_COMMON))
 				{
-					if ((lo = sfseek(jp->file[1].iop, (Sfoff_t)0, SEEK_CUR)) < 0)
+					if ((lo = sfseek(jp->file[1].iop, 0, SEEK_CUR)) < 0)
 					{
 						error(ERROR_SYSTEM|2, "%s: seek error", jp->file[1].name);
 						return -1;
@@ -744,7 +745,7 @@ sfprintf(sfstdout, "[2#%d:0,%lld,%lld]", __LINE__, lo, hi);
 			}
 			if (lo >= 0)
 			{
-				if ((hi = sfseek(jp->file[1].iop, (Sfoff_t)0, SEEK_CUR)) < 0 ||
+				if ((hi = sfseek(jp->file[1].iop, 0, SEEK_CUR)) < 0 ||
 				    (hi -= jp->file[1].reclen) < 0 ||
 				    sfseek(jp->file[1].iop, lo, SEEK_SET) != lo ||
 				    !(cp2 = getrec(jp, 1, 0)))
@@ -772,7 +773,7 @@ sfprintf(sfstdout, "[X#%d:?,%p,%p,%d,%d,%d%s]", __LINE__, cp1, cp2, cmp, lo, hi,
 	if (cp2)
 	{
 		if (hi >= 0 &&
-		    sfseek(jp->file[1].iop, (Sfoff_t)0, SEEK_CUR) < hi &&
+		    sfseek(jp->file[1].iop, 0, SEEK_CUR) < hi &&
 		    sfseek(jp->file[1].iop, hi, SEEK_SET) != hi)
 		{
 			error(ERROR_SYSTEM|2, "%s: seek error", jp->file[1].name);
@@ -796,7 +797,7 @@ sfprintf(sfstdout, "[X#%d:%d,%p,%p,%d,%02o,%02o%s]", __LINE__, n, cp1, cp2, cmp,
 	if (!cp1 || !(jp->outmode & (1<<n)))
 	{
 		if (cp1 && jp->file[n].iop == sfstdin)
-			sfseek(sfstdin, (Sfoff_t)0, SEEK_END);
+			sfseek(sfstdin, 0, SEEK_END);
 		return 0;
 	}
 	if (outrec(jp, cmp) < 0)
@@ -812,10 +813,10 @@ sfprintf(sfstdout, "[X#%d:%d,%p,%p,%d,%02o,%02o%s]", __LINE__, n, cp1, cp2, cmp,
 int
 b_join(int argc, char** argv, Shbltin_t* context)
 {
-	register int		n;
-	register char*		cp;
-	register Join_t*	jp;
-	char*			e;
+	int		n;
+	char*		cp;
+	Join_t*		jp;
+	char*		e;
 
 #if !DEBUG_TRACE
 	cmdinit(argc, argv, context, ERROR_CATALOG, ERROR_NOTIFY);
@@ -917,8 +918,9 @@ b_join(int argc, char** argv, Shbltin_t* context)
 			break;
 		case '?':
 			done(jp);
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
@@ -927,14 +929,14 @@ b_join(int argc, char** argv, Shbltin_t* context)
 	if (error_info.errors || argc!=2)
 	{
 		done(jp);
-		error(ERROR_usage(2),"%s", optusage(NiL));
+		error(ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	jp->ooutmode = jp->outmode;
 	jp->file[0].name = cp = *argv++;
 	if (streq(cp,"-"))
 	{
-		if (sfseek(sfstdin,(Sfoff_t)0,SEEK_CUR) < 0)
+		if (sfseek(sfstdin,0,SEEK_CUR) < 0)
 		{
 			if (sfdcseekable(sfstdin))
 				error(ERROR_warn(0),"%s: seek may fail",cp);
@@ -943,7 +945,7 @@ b_join(int argc, char** argv, Shbltin_t* context)
 		}
 		jp->file[0].iop = sfstdin;
 	}
-	else if (!(jp->file[0].iop = sfopen(NiL, cp, "r")))
+	else if (!(jp->file[0].iop = sfopen(NULL, cp, "r")))
 	{
 		done(jp);
 		error(ERROR_system(1),"%s: cannot open",cp);
@@ -952,7 +954,7 @@ b_join(int argc, char** argv, Shbltin_t* context)
 	jp->file[1].name = cp = *argv;
 	if (streq(cp,"-"))
 	{
-		if (sfseek(sfstdin,(Sfoff_t)0,SEEK_CUR) < 0)
+		if (sfseek(sfstdin,0,SEEK_CUR) < 0)
 		{
 			if (sfdcseekable(sfstdin))
 				error(ERROR_warn(0),"%s: seek may fail",cp);
@@ -961,7 +963,7 @@ b_join(int argc, char** argv, Shbltin_t* context)
 		}
 		jp->file[1].iop = sfstdin;
 	}
-	else if (!(jp->file[1].iop = sfopen(NiL, cp, "r")))
+	else if (!(jp->file[1].iop = sfopen(NULL, cp, "r")))
 	{
 		done(jp);
 		error(ERROR_system(1),"%s: cannot open",cp);
@@ -969,8 +971,8 @@ b_join(int argc, char** argv, Shbltin_t* context)
 	}
 	if (jp->buffered)
 	{
-		sfsetbuf(jp->file[0].iop, jp->file[0].iop, SF_UNBOUND);
-		sfsetbuf(jp->file[1].iop, jp->file[1].iop, SF_UNBOUND);
+		sfsetbuf(jp->file[0].iop, jp->file[0].iop, SFIO_UNBOUND);
+		sfsetbuf(jp->file[1].iop, jp->file[1].iop, SFIO_UNBOUND);
 	}
 	jp->outfile = sfstdout;
 	if (!jp->outlist)
@@ -982,7 +984,7 @@ b_join(int argc, char** argv, Shbltin_t* context)
 		UNREACHABLE();
 	}
 	else if (jp->file[0].iop==sfstdin || jp->file[1].iop==sfstdin)
-		sfseek(sfstdin,(Sfoff_t)0,SEEK_END);
+		sfseek(sfstdin,0,SEEK_END);
 	done(jp);
 	return error_info.errors;
 }

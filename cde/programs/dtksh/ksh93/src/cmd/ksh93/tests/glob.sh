@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -12,6 +12,7 @@
 #                                                                      #
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
+#            Johnothan King <johnothanking@protonmail.com>             #
 #                                                                      #
 ########################################################################
 
@@ -409,6 +410,187 @@ test_glob '<d_un/d_sym//d_3> <d_un/d_sym//d_3/d_4> <d_un/d_sym//d_tres> <d_un/d_
 test_glob '<d_un/d_sym//d_3> <d_un/d_sym//d_3/d_4> <d_un/d_sym//d_tres> <d_un/d_sym//d_tres/d_quatro>' **/d_*ym//**
 
 set --noglobstar
+
+# ======
+# Shell quoting within bracket expressions in glob patterns had no effect
+# https://github.com/ksh93/ksh/issues/488
+
+mkdir BUG_BRACQUOT
+cd BUG_BRACQUOT
+: > b > \\
+test_glob '<[a-c]>' [a'-'c]
+test_glob '<[!N]>' ['!'N]
+test_glob '<[^N]>' ['^'N]
+test_glob '<[a-c]>' [a$'-'c]
+test_glob '<[!N]>' [$'!'N]
+test_glob '<[^N]>' [$'^'N]
+test_glob '<[a-c]>' [a"-"c]
+test_glob '<[!N]>' ["!"N]
+test_glob '<[^N]>' ["^"N]
+test_glob '<[a-c]>' [a\-c]
+test_glob '<[!N]>' [\!N]
+test_glob '<[^N]>' [\^N]
+# same tests again with ~(S) prefixed (sh pattern)
+# also check that S cancels out previous E
+test_glob '<~(ES)[a-c]>' ~(ES)[a'-'c]
+test_glob '<~(ES)[!N]>' ~(ES)['!'N]
+test_glob '<~(ES)[^N]>' ~(ES)['^'N]
+test_glob '<~(ES)[a-c]>' ~(ES)[a$'-'c]
+test_glob '<~(ES)[!N]>' ~(ES)[$'!'N]
+test_glob '<~(ES)[^N]>' ~(ES)[$'^'N]
+test_glob '<~(ES)[a-c]>' ~(ES)[a"-"c]
+test_glob '<~(ES)[!N]>' ~(ES)["!"N]
+test_glob '<~(ES)[^N]>' ~(ES)["^"N]
+test_glob '<~(ES)[a-c]>' ~(ES)[a\-c]
+test_glob '<~(ES)[!N]>' ~(ES)[\!N]
+test_glob '<~(ES)[^N]>' ~(ES)[\^N]
+# same tests again with ~(K) prefixed (ksh pattern)
+test_glob '<~(K)[a-c]>' ~(K)[a'-'c]
+test_glob '<~(K)[!N]>' ~(K)['!'N]
+test_glob '<~(K)[^N]>' ~(K)['^'N]
+test_glob '<~(K)[a-c]>' ~(K)[a$'-'c]
+test_glob '<~(K)[!N]>' ~(K)[$'!'N]
+test_glob '<~(K)[^N]>' ~(K)[$'^'N]
+test_glob '<~(K)[a-c]>' ~(K)[a"-"c]
+test_glob '<~(K)[!N]>' ~(K)["!"N]
+test_glob '<~(K)[^N]>' ~(K)["^"N]
+test_glob '<~(K)[a-c]>' ~(K)[a\-c]
+test_glob '<~(K)[!N]>' ~(K)[\!N]
+test_glob '<~(K)[^N]>' ~(K)[\^N]
+# quoting should also work for the end character ']'
+test_glob '<[]-z]>' [\]\-z]
+test_glob '<[]-z]>' [']-z']
+test_glob '<[]-z]>' ["]-z"]
+test_glob '<~(S)[]-z]>' ~(S)[\]\-z]
+test_glob '<~(S)[]-z]>' ~(S)[']-z']
+test_glob '<~(S)[]-z]>' ~(S)["]-z"]
+test_glob '<~(K)[]-z]>' ~(K)[\]\-z]
+test_glob '<~(K)[]-z]>' ~(K)[']-z']
+test_glob '<~(K)[]-z]>' ~(K)["]-z"]
+# check internal escaping of bracket expression in glob pattern resulting from field splitting
+# https://github.com/ksh93/ksh/issues/549
+unquoted_patvar='[\!N]'; test_glob '<[\!N]>' $unquoted_patvar
+unquoted_patvar='[\^N]'; test_glob '<[\^N]>' $unquoted_patvar
+unquoted_patvar='[a\-c]'; test_glob '<[a\-c]>' $unquoted_patvar
+: > -; test_glob '<->' $unquoted_patvar
+: > a > c; test_glob '<-> <a> <c>' $unquoted_patvar
+: > !; unquoted_patvar='[\!N]'; test_glob '<!>' $unquoted_patvar
+: > ^; unquoted_patvar='[\^N]'; test_glob '<^>' $unquoted_patvar
+if	[[ -o ?globex ]]
+then	set -o globex
+	rm ./- a c ! ^
+	unquoted_patvar='~(S)[\!N]'; test_glob '<~(S)[\!N]>' $unquoted_patvar
+	unquoted_patvar='~(S)[\^N]'; test_glob '<~(S)[\^N]>' $unquoted_patvar
+	unquoted_patvar='~(S)[a\-c]'; test_glob '<~(S)[a\-c]>' $unquoted_patvar
+	: > -; test_glob '<->' $unquoted_patvar
+	: > a > c; test_glob '<-> <a> <c>' $unquoted_patvar
+	: > !; unquoted_patvar='~(S)[\!N]'; test_glob '<!>' $unquoted_patvar
+	: > ^; unquoted_patvar='~(S)[\^N]'; test_glob '<^>' $unquoted_patvar
+	rm ./- a c ! ^
+	unquoted_patvar='~(K)[\!N]'; test_glob '<~(K)[\!N]>' $unquoted_patvar
+	unquoted_patvar='~(K)[\^N]'; test_glob '<~(K)[\^N]>' $unquoted_patvar
+	unquoted_patvar='~(K)[a\-c]'; test_glob '<~(K)[a\-c]>' $unquoted_patvar
+	: > -; test_glob '<->' $unquoted_patvar
+	: > a > c; test_glob '<-> <a> <c>' $unquoted_patvar
+	: > !; unquoted_patvar='~(K)[\!N]'; test_glob '<!>' $unquoted_patvar
+	: > ^; unquoted_patvar='~(K)[\^N]'; test_glob '<^>' $unquoted_patvar
+	set +o globex
+fi
+cd ..
+
+# ======
+# https://www.reddit.com/r/ksh/comments/13k9af3/globbing_eres/jkjpk5a/
+: > 'ef{' > 'o1_mf_1_13962_l5p4ts16_.arc'
+unquoted_patvar='*f{'
+((SHOPT_BRACEPAT)) && set +B
+test_glob '<ef{>' *f{
+test_glob '<ef{>' $unquoted_patvar
+if	((SHOPT_BRACEPAT))
+then	set -B
+	test_glob '<ef{>' *f{
+	test_glob '<ef{>' $unquoted_patvar	# basic shell patterns should be expanded from unquoted vars
+fi
+unquoted_patvar='~(K)*f{'
+((SHOPT_BRACEPAT)) && set +B
+test_glob '<ef{>' ~(K)*f{
+test_glob '<~(K)*f{>' $unquoted_patvar  	# extended patterns should *not* be expanded from unquoted vars (Bourne/POSIX compat)
+if	[[ -o ?globex ]]
+then	set -o globex				# ...unless the globex option is on
+	test_glob '<ef{>' $unquoted_patvar
+	set +o globex
+fi
+if	((SHOPT_BRACEPAT))
+then	set -B
+	test_glob '<ef{>' ~(K)*f{
+	test_glob '<~(K)*f{>' $unquoted_patvar
+	if	[[ -o ?globex ]]
+	then	set -o globex
+		test_glob '<ef{>' $unquoted_patvar
+		set +o globex
+	fi
+fi
+unquoted_patvar='~(E)^o1_mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$'
+((SHOPT_BRACEPAT)) && set +B
+test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' ~(E)^o1_mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+test_glob '<~(E)^o1_mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$>' $unquoted_patvar
+if	[[ -o ?globex ]]
+then	set -o globex
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' $unquoted_patvar
+	set +o globex
+fi
+if	((SHOPT_BRACEPAT))
+then	set -B
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' ~(E)^o1_mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o~(E)1_mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1~(E)_mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1_~(E)mf_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1_m~(E)f_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1_mf~(E)_1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1_mf_~(E)1_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1_mf_1~(E)_\d{1,6}_[[:alnum:]]{8}_.arc$
+	test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' o1_mf_1_~(E)\d{1,6}_[[:alnum:]]{8}_.arc$
+	# in non-POSIX mode, brace expansion *is* expanded from unquoted var, though extended patterns are not.
+	# TODO: consider fixing this insanity as of ksh 93u+m/1.1 (incompatible change)
+	test_glob '<~(E)^o1_mf_1_\d1_[[:alnum:]]{8}_.arc$> <~(E)^o1_mf_1_\d6_[[:alnum:]]{8}_.arc$>' $unquoted_patvar
+	if	[[ -o ?globex ]]
+	then	set -o globex
+		test_glob '<o1_mf_1_13962_l5p4ts16_.arc>' $unquoted_patvar
+		set +o globex
+	fi
+fi
+# not all ~(...) should disallow brace expansion
+if	((SHOPT_BRACEPAT))
+then	set -B
+	touch ANNOUNCE aSan_CCFLAGS.sav
+	unquoted_patvar='~(i:A){N,S}*'
+	test_glob '<ANNOUNCE> <aSan_CCFLAGS.sav>' ~(i:A){N,S}*
+	test_glob '<~(i:A)N*> <~(i:A)S*>' $unquoted_patvar
+	if	[[ -o ?globex ]]
+	then	set -o globex
+		test_glob '<ANNOUNCE> <aSan_CCFLAGS.sav>' $unquoted_patvar
+		set +o globex
+	fi
+fi
+
+# ======
+: > 'a\\b.txt'
+unquoted_patvar='a\\\\b.*'
+test_glob '<a\\b.txt>' a\\\\b.*
+test_glob '<a\\b.txt>' $unquoted_patvar
+
+# ======
+# 93u+m/1.0.5 regression - glob expansion with brace expansion and parameter expansion
+v='./'
+mkdir -p bin/BAD sbin/WRONG
+((SHOPT_BRACEPAT)) && test_glob '<./bin/*> <./sbin/*>' "./"{bin,sbin}"/*"
+test_glob '<./bin/*>' "$v"bin"/*"
+((SHOPT_BRACEPAT)) && test_glob '<./bin/*> <./sbin/*>' "$v"{bin,sbin}"/*"
+unset null
+((SHOPT_BRACEPAT)) && test_glob '<b*> <s*>' {b,s}"*"
+((SHOPT_BRACEPAT)) && test_glob '<b*> <s*>' $null{b,s}"*"
+((SHOPT_BRACEPAT)) && test_glob '<*b> <*c>' $null"*"{b,c}
+((SHOPT_BRACEPAT)) && test_glob '<*b> <*c>' "*"$null{b,c}
+test_glob '<*>' $null"*"
 
 # ======
 exit $((Errors<125?Errors:125))

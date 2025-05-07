@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,13 +13,24 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#         hyenias <58673227+hyenias@users.noreply.github.com>          #
+#                  Lev Kujawski <int21h@mailbox.org>                   #
+#                      Phi <phi.debian@gmail.com>                      #
 #                                                                      #
 ########################################################################
 
 . "${SHTESTS_COMMON:-${0%/*}/_common}"
 
-integer hasposix=0
-(set -o posix) 2>/dev/null && ((hasposix++))	# not using [[ -o ?posix ]] as it's broken on 93v-
+enum bool=(false true)
+
+bool HAVE_signbit=false
+if	typeset -f .sh.math.signbit >/dev/null && (( signbit(-NaN) ))
+then	HAVE_signbit=true
+else	warning "-lm does not support signbit(-NaN)"
+fi
+
+bool HAVE_posix=false
+(set -o posix) 2>/dev/null && HAVE_posix=true	# not using [[ -o ?posix ]] as it's broken on 93v-
 
 trap '' FPE # NOTE: osf.alpha requires this (no ieee math)
 
@@ -232,10 +243,7 @@ if	{ (( z%2 != 1));} 2> /dev/null
 then	err_exit '% not working on floating point'
 fi
 chr=(a ' ' '=' '\r' '\n' '\\' '\"' '$' "\\'" '[' ']' '(' ')' '<' '\xab' '\040' '`' '{' '}' '*' '\E')
-if	(('a' == 97))
-then	val=(97 32  61 13 10 92 34 36 39 91 93 40 41 60 171 32 96 123 125 42 27)
-else	val=(129 64 126 13 21 224 127 91 125 173 189 77 93 76 171 32 121 192 208 92 39 21)
-fi
+val=(97 32  61 13 10 92 34 36 39 91 93 40 41 60 171 32 96 123 125 42 27)  # ASCII
 q=0
 for ((i=0; i < ${#chr[@]}; i++))
 do	if	(( '${chr[i]}' != ${val[i]} ))
@@ -348,7 +356,7 @@ unset x
 x=010
 (( x == 10 )) || err_exit 'leading zeros in x treated as octal arithmetic with ((x))'
 (( $x == 10 )) || err_exit 'leading zeros in x treated as octal arithmetic with (($x))'
-if	((hasposix))
+if	((HAVE_posix))
 then	set --posix
 	((x == 8)) || err_exit 'posix: leading zeros in x not treated as octal arithmetic with ((x))'
 	(($x == 8)) || err_exit 'posix: leading zeros in x not treated as octal arithmetic with (($x))'
@@ -451,8 +459,8 @@ then	set \
 		Inf		inf	\
 		-Inf		-inf	\
 		Nan		nan	\
-		-Nan		-nan	\
 		1.0/0.0		inf
+	((HAVE_signbit)) && set -- "$@" -Nan -nan
 	while	(( $# >= 2 ))
 	do	x=$(printf "%g\n" $(($1)))
 		[[ $x == $2 ]] || err_exit "printf '%g\\n' \$(($1)) failed -- expected $2, got $x"
@@ -509,8 +517,8 @@ do	for b in $v
 done
 
 typeset -l y y_ascii
-(( y=sin(90) )) 
-y_ascii=$y 
+(( y=sin(90) ))
+y_ascii=$y
 (( y == y_ascii )) || err_exit "no match,\n\t$(printf "%a\n" y)\n!=\n\t$(printf "%a\n" y_ascii)"
 
 ( $SHELL  <<- \EOF
@@ -518,16 +526,16 @@ y_ascii=$y
 	t[p]=6
 	while (( t[p] != 0 )) ; do
 		((
-		p+=1 , 
-		t[p]+=2 , 
-		p+=3 , 
-		t[p]+=5 , 
-		p+=1 , 
-		t[p]+=2 , 
-		p+=1 , 
-		t[p]+=1 , 
+		p+=1 ,
+		t[p]+=2 ,
+		p+=3 ,
+		t[p]+=5 ,
+		p+=1 ,
+		t[p]+=2 ,
+		p+=1 ,
+		t[p]+=1 ,
 		p-=6  ,
-		t[p]-=1 
+		t[p]-=1
 		))
 	:
 	done
@@ -573,7 +581,7 @@ done
 
 function .sh.math.mysin x
 {
-        ((.sh.value = x - x**3/6. + x**5/120.-x**7/5040. + x**9/362880.))
+	((.sh.value = x - x**3/6. + x**5/120.-x**7/5040. + x**9/362880.))
 }
 
 (( abs(sin(.5)-mysin(.5)) < 1e-6 )) || err_exit 'mysin() not close to sin()'
@@ -584,7 +592,7 @@ $SHELL 2> /dev/null  <<- \EOF || err_exit "arithmetic functions defined and refe
 	{
 	        ((.sh.value = x-x**3/6. + x**5/120.-x**7/5040. + x**9/362880.))
 	}
-	(( abs(sin(.5)-mysin(.5)) < 1e-6 )) 
+	(( abs(sin(.5)-mysin(.5)) < 1e-6 ))
 	exit 0
 }
 EOF
@@ -619,7 +627,7 @@ function x
 	float x y
 	float x=$((log10(nz))) y=$((log10($nz)))
 	(( abs(x-y) < 1e-10 )) || err_exit '$nz and nz differs in arithmetic expression when nz is reference to array instance'
-} 
+}
 x z[1]
 
 unset x
@@ -640,7 +648,7 @@ typeset -i foo
 foobar
 (( foo == 8 )) || err_exit  'arithmetic assignment binding to the wrong scope'
 
-(( tgamma(4)/12 )) || err_exit 'floating point attribute for functions not preserved'  
+(( tgamma(4)/12 )) || err_exit 'floating point attribute for functions not preserved'
 
 unset F
 function f
@@ -688,10 +696,11 @@ unset x
 let x=010
 [[ $x == 10 ]] || err_exit 'let treating 010 as octal'
 (set -o letoctal; let x=010; [[ $x == 8 ]]) || err_exit 'let not treating 010 as octal with letoctal on'
-if [[ -o ?posix ]]
+if	((HAVE_posix))
 then	(set -o posix; let x=010; [[ $x == 8 ]]) || err_exit 'let not treating 010 as octal with posix on'
 fi
 
+unset A
 float z=0
 integer aa=2 a=1
 typeset -A A
@@ -743,7 +752,7 @@ print -- -020 | read x
 ((x == -20)) || err_exit 'numbers with leading -0 treated as octal outside ((...))'
 print -- -8#20 | read x
 ((x == -16)) || err_exit 'numbers with leading -8# should be treated as octal'
-if	((hasposix))
+if	((HAVE_posix))
 then	set --posix
 	(($r == 16)) || err_exit 'posix: leading 0 not treated as octal inside ((...))'
 	x=$(($r))
@@ -764,19 +773,19 @@ do	(($x == 1)) || err_exit 'arithmetic in for loop with $x, where $x is hex cons
 done
 x=010
 let "$x==10" || err_exit 'arithmetic with $x where $x is 010 should be decimal in let'
-(( 9.$x == 9.01 )) || err_exit 'arithmetic with 9.$x where x=010 should be 9.01' 
-(( 9$x == 9010 )) || err_exit 'arithmetic with 9$x where x=010 should be 9010' 
+(( 9.$x == 9.01 )) || err_exit 'arithmetic with 9.$x where x=010 should be 9.01'
+(( 9$x == 9010 )) || err_exit 'arithmetic with 9$x where x=010 should be 9010'
 x010=99
 ((x$x == 99 )) || err_exit 'arithmetic with x$x where x=010 should be $x010'
 (( 3+$x == 13 )) || err_exit '3+$x where x=010 should be 13 in ((...))'
-if	((hasposix))
+if	((HAVE_posix))
 then	set --posix
 	(( 3+$x == 11 )) || err_exit 'posix: 3+$x where x=010 should be 11 in ((...))'
 	set --noposix
 fi
 let "(3+$x)==13" || err_exit 'let should not recognize leading 0 as octal'
 unset x
-typeset -RZ3 x=10 
+typeset -RZ3 x=10
 (( $x == 10 )) || err_exit 'leading 0 in -RZ should not create octal constant with ((...))'
 let "$x==10" || err_exit 'leading 0 in -RZ should not create octal constant with let'
 
@@ -901,7 +910,7 @@ unset got
 
 # ======
 # https://github.com/ksh93/ksh/issues/326
-((hasposix)) && for m in u d i o x X
+((HAVE_posix)) && for m in u d i o x X
 do
 	set --posix
 	case $m in
@@ -920,7 +929,7 @@ done
 # BUG_ARITHNAN: In ksh <= 93u+m 2021-11-15 and zsh 5.6 - 5.8, the case-insensitive
 # floating point constants Inf and NaN are recognised in arithmetic evaluation,
 # overriding any variables with the names Inf, NaN, INF, nan, etc.
-if	((hasposix))
+if	((HAVE_posix))
 then	set --posix
 	Inf=42 NaN=13
 	inf=421 nan=137
@@ -970,14 +979,14 @@ float x
 # Test for a bug with short integers that causes core dumps
 # (backported from ksh93v- 2013-08-07).
 "$SHELL" <<- \EOF || err_exit 'detected short integer bug that causes core dumps'
-       typeset -s -i -a t
-       typeset -s -i p
-       (( p=2**17 )) # tape start position
-       (( t[p]+=13))
-       while (( t[p] != 0 ))
-       do      ((t[p]-=1 , p+=1))
-       done
-       exit 0
+	typeset -s -i -a t
+	typeset -s -i p
+	(( p=2**17 )) # tape start position
+	(( t[p]+=13))
+	while (( t[p] != 0 ))
+	do	((t[p]-=1 , p+=1))
+	done
+	exit 0
 EOF
 
 # ======
@@ -985,6 +994,145 @@ got=$(set +x; eval ': $((1 << 2))' 2>&1) \
 || err_exit "bitwise left shift operator fails to parse (got $(printf %q "$got"))"
 got=$(set +x; eval 'got=$( ((y=1<<4)); echo $y )' 2>&1; echo $got) \
 || err_exit "bitwise left shift operator fails to parse in comsub (got $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/623
+function .sh.math.add x y { .sh.value=x+y; }
+got=$(PATH=/dev/null; typeset -i z; set +x; redirect 2>&1; z='add(2 , 3)'; echo $z)
+[[ e=$? -eq 0 && $got == '5' ]] || err_exit ".sh.math.* function parsing: got status $e and $(printf %q "$got")"
+
+# ======
+# arithmetic assignments should not trigger getn disciplines, but the return
+# value should still be cast to the type of the variable that is assigned to
+
+(
+	ulimit -c 0  # fork
+	Errors=0
+	# <<< outdent
+float x
+x.getn() { .sh.value=987.65; }
+let "got = x = 1234.56"
+[[ $got == 1234.56* ]] || err_exit "arithmetic assignment triggers getn discipline (got $got)"
+[[ $x == 987.65* ]] || err_exit "arithmetic comparison fails to trigger getn discipline (got $x)"
+unset x
+whence -q x.getn && err_exit "unset x fails to unset -f x.getn"
+	# >>> indent
+	exit $Errors
+)
+if	let "(e = $?) > 128"
+then	err_exit "getn discipline crashed the shell (got status $e/SIG$(kill -l "$e"))"
+else	let "Errors += e"
+fi
+
+(
+	ulimit -c 0  # fork
+	Errors=0
+	for sz in '' s l
+	do	typeset -${sz}i x=0
+		if	! let "(got = x = 123.95) == 123"
+		then	err_exit "arithmetic assignment does not return properly typecast value (-${sz}i, got $got)"
+		fi
+		typeset -${sz}F x=0
+		let "got = x = 123.95"
+		if	[[ $got != 123.95* ]]  # ignore OS-dependent rounding error
+		then	err_exit "arithmetic assignment does not return properly typecast value (-${sz}F, got $got)"
+		fi
+	done
+	exit $Errors
+)
+if	let "(e = $?) > 128"
+then	err_exit "typeset crashed the shell (got status $e/SIG$(kill -l "$e"))"
+else	let "Errors += e"
+fi
+
+if	! let "(got = RANDOM = 123.95) == 123"
+then	err_exit "arithmetic assignment to RANDOM does not return typecast of assigned value (got $got)"
+fi
+
+let "_ = 123.95, got = _"
+if	[[ $got != '123.95' ]]
+then	err_exit "arithmetic assignment to _ fails (got $got)"
+fi
+
+got=$(let "LINENO = 123"; print $LINENO )
+if	[[ $got != '122' ]]   # TODO: should be 123
+then	err_exit "arithmetic assignment to LINENO fails (got $got)"
+fi
+
+# ======
+# non-base-10 numbers may be negative
+# https://github.com/ksh93/ksh/issues/696
+exp=-20#j12
+integer 20 got=$exp
+[[ $got == "$exp" ]] || err_exit "negative base-20 number (expected '$exp', got '$got')"
+unset got
+
+# ======
+exp=': arithmetic syntax error'
+# when leading 0 is recognised as octal, invalid octal should be an error
+for v in 08 028 089 09 029 098 012345678
+do	got=$(set --letoctal; let "$v" 2>&1)
+	[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "invalid leading-zero octal number $v not an error" \
+		"(expected status 1 and match of *'$exp', got status $e and '$got')"
+done
+# only a single 0 should precede x or X for it to be a hexadecimal number
+got=$(eval ': $((00xF))' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "extra zero before 0x not an error (expansion)" \
+	"(expected status 1 and match of *'$exp', got status $e and '$got')"
+got=$(let '00xF' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "extra zero before 0x not an error (let)" \
+	"(expected status 1 and match of *'$exp', got status $e and '$got')"
+# ksh base specifiers (like 16# for hexadecimal) may not have leading zeros
+got=$(eval ': $((016#F))' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "leading zero before 16# not an error (expansion)" \
+	"(expected status 1 and match of *'$exp', got status $e and '$got')"
+got=$(let '016#F' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "leading zero before 16# not an error (let)" \
+	"(expected status 1 and match of *'$exp', got status $e and '$got')"
+
+# ======
+# Lexer tests. Unmatched `((' crashed ksh or caused incorrect behaviour until 2024-07-20.
+# https://github.com/ksh93/ksh/issues/764
+exp=": \`(' unmatched"
+got=$( ( ulimit -c 0; set +x; eval '{ (( $(( 1 )); }' ) 2>&1 )
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit "unmatched '((', test 1" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$( ( ulimit -c 0; set +x; eval 'x=$(( }; echo end' ) 2>&1 )
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit "unmatched '((', test 2" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$( ( ulimit -c 0; set +x; eval '{ x=$(( }; echo end; }' ) 2>&1 )
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit "unmatched '((', test 3" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$( ( ulimit -c 0; set +x; eval '(( }; echo end' ) 2>&1 )
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit "unmatched '((', test 4" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$( ( ulimit -c 0; set +x; eval '{ (( }; echo end; }' ) 2>&1 )
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit "unmatched '((', test 5" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+got=$( set +x; ( ulimit -c 0; eval '{ (( $(( 1 )) )); }' ) 2>&1 )
+[[ e=$? -eq 0 && -z $got ]] || err_exit "matched '((' in compound command" \
+	"(expected status 0 and ''," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+# ======
+# On ARM systems, division by negative threw an incorrect "divide by zero" error!
+# https://github.com/ksh93/ksh/issues/770
+got=$(let "10 / -10 == -1 && 10 / -1 == -10 && 10 / -2 == -5" 2>&1) || err_exit "division by negative (got $(printf %q "$got"))"
+# Also, from 2024-01-21 to 2024-07-24, the return value of assigning negative to unsigned int was 0 on ARM
+if	! exp=$(PATH=/opt/ast/bin:$PATH; getconf UINT_MAX 2>/dev/null)
+then	warning "getconf UINT_MAX failed; skipping issue 770 test"
+else	typeset -ui i
+	got=$((i = -1))
+	[[ $i == "$exp" ]] || err_exit "unsigned int wrap-around of -1 (expected '$exp', got '$i')"
+	[[ $got == "$exp" ]] || err_exit "return value of assigning -1 to unsigned int (expected '$exp', got '$got')"
+	unset i
+fi
 
 # ======
 exit $((Errors<125?Errors:125))

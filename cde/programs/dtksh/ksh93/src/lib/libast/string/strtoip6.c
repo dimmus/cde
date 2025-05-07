@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -17,12 +17,7 @@
 *                                                                      *
 ***********************************************************************/
 
-#if _PACKAGE_ast
 #include <ast.h>
-#else
-#include <stdint.h>
-#endif
-
 #include <ctype.h>
 #include <ip6.h>
 
@@ -39,13 +34,13 @@
 #define PFX		19
 
 int
-strtoip6(register const char* s, char** e, unsigned char* addr, unsigned char* bits)
+strtoip6(const char* s, char** e, unsigned char* addr, unsigned char* bits)
 {
-	register unsigned char*	b = addr;
-	register unsigned char*	x = b + IP6ADDR;
-	register unsigned char*	z;
-	register int		c;
-	register uint32_t	a;
+	unsigned char*	b = addr;
+	unsigned char*	x = b + IP6ADDR;
+	unsigned char*	z;
+	int		c;
+	uint32_t	a;
 
 	static unsigned char	lex[256];
 

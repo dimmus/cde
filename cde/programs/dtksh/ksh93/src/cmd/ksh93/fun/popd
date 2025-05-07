@@ -1,111 +1,66 @@
-#
-# DIRECTORY MANIPULATION FUNCTIONS PUSHD, POPD AND DIRS
-#
-# Uses global parameters _push_max _push_top _push_stack
-integer _push_max=100 _push_top=100
-# Display directory stack -- $HOME displayed as ~
-function dirs
-{
-    typeset dir="${PWD#$HOME/}"
-    case $dir in
-    $HOME)
-        dir=\~
-        ;;
-    /*) ;;
-    *)  dir=\~/$dir
-    esac
-    print -r - "$dir ${_push_stack[@]}"
-}
+########################################################################
+#                                                                      #
+#               This software is part of the ast package               #
+#          Copyright (c) 1982-2012 AT&T Intellectual Property          #
+#          Copyright (c) 2020-2023 Contributors to ksh 93u+m           #
+#                      and is licensed under the                       #
+#                 Eclipse Public License, Version 2.0                  #
+#                                                                      #
+#                A copy of the License is available at                 #
+#      https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.html      #
+#         (with md5 checksum 84283fa8859daf213bdda5a9f8d1be1d)         #
+#                                                                      #
+#                  David Korn <dgk@research.att.com>                   #
+#                  Martijn Dekker <martijn@inlv.org>                   #
+#                                                                      #
+########################################################################
 
-# Change directory and put directory on front of stack
-function pushd
-{
-    typeset dir= type=0
-    integer i
-    case $1 in
-    "") # pushd
-        if    ((_push_top >= _push_max))
-        then  print pushd: No other directory.
-              return 1
-        fi
-        type=1 dir=${_push_stack[_push_top]}
-        ;;
-    +[1-9]|+[1-9][0-9]) # pushd +n
-        integer i=_push_top$1-1
-        if    ((i >= _push_max))
-        then  print pushd: Directory stack not that deep.
-              return 1
-        fi
-        type=2 dir=${_push_stack[i]}
-        ;;
-    *)  if    ((_push_top <= 0))
-        then  print pushd: Directory stack overflow.
-              return 1
-        fi
-    esac
-    case $dir in
-    \~*)   dir=$HOME${dir#\~}
-    esac
-    cd "${dir:-$1}" > /dev/null || return 1
-    dir=${OLDPWD#$HOME/}
-    case $dir in
-    $HOME)
-        dir=\~
-        ;;
-    /*) ;;
-    *)  dir=\~/$dir
-    esac
-    case $type in
-    0)  # pushd name
-        _push_stack[_push_top=_push_top-1]=$dir
-        ;;
-    1)  # pushd
-        _push_stack[_push_top]=$dir
-        ;;
-    2)  # push +n
-        type=${1#+} i=_push_top-1
-        set -- "${_push_stack[@]}" "$dir" "${_push_stack[@]}"
-        shift $type
-        for dir
-        do  (((i=i+1) < _push_max)) || break
-            _push_stack[i]=$dir
-        done
-    esac
-    dirs
-}
+# popd: pop the current directory from the directory stack
+# and change to the next directory on the stack.
+# For use in conjunction with 'cd', 'dirs', 'mcd', 'pushd'.
+
+# Use cd wrapper from .../fun/cd
+autoload cd
+
+# Non-destructively initialize global parameters for directory stack.
+# Default stack size is 32, or $CDSTACK if set before init.
+integer _push_max=${_push_max:-${CDSTACK:-32}}
+integer _push_top=${_push_top:-${CDSTACK:-32}}
+typeset -a _push_stack
 
 # Pops the top directory
 function popd
 {
-    typeset dir
-    if    ((_push_top >= _push_max))
-    then  print popd: Nothing to pop.
-          return 1
-    fi
-    case $1 in  
-    "")
-        dir=${_push_stack[_push_top]}
-        case $dir in
-        \~*)   dir=$HOME${dir#\~}
-        esac
-        cd "$dir" || return 1
-        ;;
-    +[1-9]|+[1-9][0-9])
-        typeset savedir
-        integer i=_push_top$1-1
-        if    ((i >= _push_max))
-        then  print pushd: Directory stack not that deep.
-              return 1
-        fi
-        while ((i > _push_top))
-        do _push_stack[i]=${_push_stack[i-1]}
-              i=i-1
-        done
-        ;;
-    *)  print pushd: Bad directory.
-        return 1
-    esac
-    unset '_push_stack[_push_top]'
-    _push_top=_push_top+1
-    dirs
+	typeset dir
+	if	((_push_top >= _push_max))
+	then	print -u2 "$0: Nothing to pop."
+		return 1
+	fi
+	case $1 in
+	"")	dir=${_push_stack[_push_top]}
+		# change ~ to $HOME
+		case $dir in
+		\~*)   dir=$HOME${dir#\~} ;;
+		esac
+		\command cd -- "$dir" || return
+		;;
+	+[1-9]|+[1-9][0-9])
+		typeset savedir
+		integer i=_push_top$1-1
+		if	((i >= _push_max))
+		then	print -u2 "$0: Directory stack not that deep."
+			return 1
+		fi
+		while ((i > _push_top))
+		do	_push_stack[i]=${_push_stack[i-1]}
+			i=i-1
+		done
+		;;
+	*)	print -u2 "$0: Bad directory."
+		return 1
+		;;
+	esac
+	unset '_push_stack[_push_top]'
+	_push_top=_push_top+1
+	dirs
 }

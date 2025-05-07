@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -35,10 +35,10 @@ ccnative(void* b, const void* a, size_t n)
 #if CC_ASCII == CC_NATIVE
 	return memcpy(b, a, n * (UCHAR_MAX + 1));
 #else
-	register int			c;
-	register const unsigned char*	m;
-	register unsigned char*		cb = (unsigned char*)b;
-	register unsigned char*		ca = (unsigned char*)a;
+	int			c;
+	const unsigned char*	m;
+	unsigned char*		cb = (unsigned char*)b;
+	unsigned char*		ca = (unsigned char*)a;
 
 	m = CCMAP(CC_ASCII, CC_NATIVE);
 	if (n == sizeof(char))

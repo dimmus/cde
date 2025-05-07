@@ -63,10 +63,10 @@ static const unsigned char	md5_pad[] =
  */
 
 static void
-md5_encode(register unsigned char* output, register UINT4* input, unsigned int len)
+md5_encode(unsigned char* output, UINT4* input, unsigned int len)
 {
-	register unsigned int	i;
-	register unsigned int	j;
+	unsigned int	i;
+	unsigned int	j;
 
 	for (i = j = 0; j < len; i++, j += 4)
 	{
@@ -83,7 +83,7 @@ md5_encode(register unsigned char* output, register UINT4* input, unsigned int l
  */
 
 static void
-md5_decode(register UINT4* output, register unsigned char* input, unsigned int len)
+md5_decode(UINT4* output, unsigned char* input, unsigned int len)
 {
 	unsigned int	i;
 	unsigned int	j;
@@ -98,7 +98,7 @@ md5_decode(register UINT4* output, register unsigned char* input, unsigned int l
 static int
 md5_init(Sum_t* p)
 {
-	register Md5_t*	context = (Md5_t*)p;
+	Md5_t*	context = (Md5_t*)p;
 
 	context->count[0] = context->count[1] = 0;
 	context->state[0] = 0x67452301;
@@ -267,7 +267,7 @@ md5_transform(UINT4 state[4], unsigned char block[64])
 static int
 md5_block(Sum_t* p, const void* s, size_t inputLen)
 {
-	register Md5_t*	context = (Md5_t*)p;
+	Md5_t*	context = (Md5_t*)p;
 	unsigned char*	input = (unsigned char*)s;
 	unsigned int	i;
 	unsigned int	index;
@@ -303,7 +303,7 @@ md5_block(Sum_t* p, const void* s, size_t inputLen)
 static int
 md5_done(Sum_t* p)
 {
-	register Md5_t*	context = (Md5_t*)p;
+	Md5_t*	context = (Md5_t*)p;
 	unsigned char	bits[8];
 	unsigned int	index;
 	unsigned int	padLen;
@@ -330,12 +330,13 @@ md5_done(Sum_t* p)
 }
 
 static int
-md5_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
+md5_print(Sum_t* p, Sfio_t* sp, int flags, size_t scale)
 {
-	register Md5_t*		x = (Md5_t*)p;
-	register unsigned char*	d;
-	register int		n;
+	Md5_t*		x = (Md5_t*)p;
+	unsigned char*	d;
+	int		n;
 
+	NOT_USED(scale);
 	d = (flags & SUM_TOTAL) ? x->digest_sum : x->digest;
 	for (n = 0; n < elementsof(x->digest); n++)
 		sfprintf(sp, "%02x", d[n]);
@@ -345,7 +346,7 @@ md5_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
 static int
 md5_data(Sum_t* p, Sumdata_t* data)
 {
-	register Md5_t*		x = (Md5_t*)p;
+	Md5_t*		x = (Md5_t*)p;
 
 	data->size = elementsof(x->digest);
 	data->num = 0;

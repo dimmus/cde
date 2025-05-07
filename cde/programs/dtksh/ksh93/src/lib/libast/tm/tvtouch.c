@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2013 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                    David Korn <dgkorn@gmail.com>                     *
 *                     Phong Vo <phongvo@gmail.com>                     *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -24,10 +25,6 @@
  */
 
 #define utime		______utime
-
-#ifndef _ATFILE_SOURCE
-#define _ATFILE_SOURCE	1
-#endif
 
 #include <ast.h>
 #include <ls.h>
@@ -73,7 +70,7 @@ extern int	utime(const char*, const time_t*);
 #endif
 
 int
-tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, const Tv_t* cv, int flags)
+tvtouch(const char* path, const Tv_t* av, const Tv_t* mv, const Tv_t* cv, int flags)
 {
 	int		fd;
 	int		mode;
@@ -129,7 +126,7 @@ tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, cons
 	}
 	if (!cv && av == TV_TOUCH_RETAIN && mv == TV_TOUCH_RETAIN && !stat(path, &st) && !chmod(path, st.st_mode & S_IPERM))
 		return 0;
-	if (!utimensat(AT_FDCWD, path, ts[0].tv_nsec == UTIME_NOW && ts[1].tv_nsec == UTIME_NOW ? (struct timespec*)0 : ts, (flags & TV_TOUCH_PHYSICAL) ? AT_SYMLINK_NOFOLLOW : 0))
+	if (!utimensat(AT_FDCWD, path, ts[0].tv_nsec == UTIME_NOW && ts[1].tv_nsec == UTIME_NOW ? NULL : ts, (flags & TV_TOUCH_PHYSICAL) ? AT_SYMLINK_NOFOLLOW : 0))
 		return 0;
 	if (errno != ENOSYS)
 	{
@@ -185,7 +182,7 @@ tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, cons
 	}
 	if (!utimets(path, ts))
 		return 0;
-	if (errno != ENOENT && av == (const Tv_t*)&now && mv == (const Tv_t*)&now && !utimets(path, NiL))
+	if (errno != ENOENT && av == (const Tv_t*)&now && mv == (const Tv_t*)&now && !utimets(path, NULL))
 	{
 		errno = oerrno;
 		return 0;
@@ -214,7 +211,7 @@ tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, cons
 	}
 	if (!utimes(path, am))
 		return 0;
-	if (errno != ENOENT && av == (const Tv_t*)&now && mv == (const Tv_t*)&now && !utimes(path, NiL))
+	if (errno != ENOENT && av == (const Tv_t*)&now && mv == (const Tv_t*)&now && !utimes(path, NULL))
 	{
 		errno = oerrno;
 		return 0;
@@ -226,7 +223,7 @@ tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, cons
 	if (!utime(path, &am))
 		return 0;
 #if _lib_utime_now
-	if (errno != ENOENT && av == (const Tv_t*)&now && mv == (const Tv_t*)&now && !utime(path, NiL))
+	if (errno != ENOENT && av == (const Tv_t*)&now && mv == (const Tv_t*)&now && !utime(path, NULL))
 	{
 		errno = oerrno;
 		return 0;

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2014 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,9 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
 *            Johnothan King <johnothanking@protonmail.com>             *
+*         hyenias <58673227+hyenias@users.noreply.github.com>          *
+*                Govind Kamat <govind_kamat@yahoo.com>                 *
+*               Vincent Mihalkovic <vmihalko@redhat.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -37,6 +40,9 @@
 
 
 #include "shopt.h"
+#include <ast.h>
+
+#if !SHOPT_SCRIPTONLY
 
 #define HIST_MAX	(sizeof(int)*HIST_BSIZE)
 #define HIST_BIG	(0100000-1024)	/* 1K less than maximum short */
@@ -51,9 +57,9 @@
 #if SHOPT_AUDIT
 #   define _HIST_AUDIT	Sfio_t	*auditfp; \
 			char	*tty; \
-			int	auditmask; 
+			int	auditmask;
 #else
-#   define _HIST_AUDIT 
+#   define _HIST_AUDIT
 #endif
 
 #define _HIST_PRIVATE \
@@ -68,7 +74,6 @@
 
 #define hist_ind(hp,c)	((int)((c)&(hp)->histmask))
 
-#include	<ast.h>
 #include	<sfio.h>
 #include	"FEATURE/time"
 #include	<error.h>
@@ -101,14 +106,14 @@ static History_t *hist_ptr;
     static int	acctfd;
     static char *logname;
 #   include <pwd.h>
-    
+
     static int  acctinit(History_t *hp)
     {
-	register char *cp, *acctfile;
+	char *cp, *acctfile;
 	Namval_t *np = nv_search("ACCTFILE",sh.var_tree,0);
 
 	if(!np || !(acctfile=nv_getval(np)))
-		return(0);
+		return 0;
 	if(!(cp = getlogin()))
 	{
 		struct passwd *userinfo = getpwuid(getuid());
@@ -132,7 +137,7 @@ static History_t *hist_ptr;
 	if(acctfd < 0)
 	{
 		acctfd = 0;
-		return(0);
+		return 0;
 	}
 	if(sh_isdevfd(acctfile))
 	{
@@ -142,17 +147,17 @@ static History_t *hist_ptr;
 	}
 	else
 		fcntl(acctfd,F_SETFD,FD_CLOEXEC);
-	return(1);
+	return 1;
     }
 #endif /* SHOPT_ACCTFILE */
 
 #if SHOPT_AUDIT
-static int sh_checkaudit(History_t *hp, const char *name, char *logbuf, size_t len)
+static int sh_checkaudit(const char *name, char *logbuf, size_t len)
 {
 	char	*cp, *last;
 	int	id1, id2, r=0, n, fd;
 	if((fd=open(name, O_RDONLY,O_cloexec)) < 0)
-		return(0);
+		return 0;
 	if((n = read(fd, logbuf,len-1)) < 0)
 		goto done;
 	while(logbuf[n-1]=='\n')
@@ -176,7 +181,7 @@ static int sh_checkaudit(History_t *hp, const char *name, char *logbuf, size_t l
 	while(*cp==';' ||  *cp==' ');
 done:
 	sh_close(fd);
-	return(r);
+	return r;
 }
 #endif /* SHOPT_AUDIT */
 
@@ -185,36 +190,35 @@ static const Sfdisc_t hist_disc = { NULL, hist_write, NULL, hist_exceptf, NULL};
 
 static void hist_touch(void *handle)
 {
-	touch((char*)handle, (time_t)0, (time_t)0, 0);
+	touch((char*)handle, 0, 0, 0);
 }
 
 /*
  * open the history file
  * if HISTNAME is not given and userid==0 then no history file.
  * if HISTFILE is longer than HIST_MAX bytes then it is cleaned up.
- * hist_open() returns 1, if history file is open
+ * sh_histinit() returns 1 if history file is open.
  */
 int  sh_histinit(void)
 {
-	register int fd;
-	register History_t *hp;
-	register char *histname;
+	int fd;
+	History_t *hp;
+	char *histname;
 	char *fname=0;
 	int histmask, maxlines, hist_start=0;
-	register char *cp;
-	register off_t hsize = 0;
+	char *cp;
+	off_t hsize = 0;
 
 	if(sh.hist_ptr=hist_ptr)
-		return(1);
+		return 1;
 	if(!(histname = nv_getval(HISTFILE)))
 	{
-		int offset = staktell();
+		int offset = stktell(sh.stk);
 		if(cp=nv_getval(HOME))
-			stakputs(cp);
-		stakputs(hist_fname);
-		stakputc(0);
-		stakseek(offset);
-		histname = stakptr(offset);
+			sfputr(sh.stk,cp,-1);
+		sfputr(sh.stk,hist_fname,0);
+		stkseek(sh.stk,offset);
+		histname = stkptr(sh.stk,offset);
 	}
 retry:
 	cp = path_relative(histname);
@@ -222,7 +226,7 @@ retry:
 		histmode = S_IRUSR|S_IWUSR;
 	if((fd=open(cp,O_BINARY|O_APPEND|O_RDWR|O_CREAT|O_cloexec,histmode))>=0)
 	{
-		hsize=lseek(fd,(off_t)0,SEEK_END);
+		hsize=lseek(fd,0,SEEK_END);
 	}
 	if((unsigned)fd < 10)
 	{
@@ -247,18 +251,18 @@ retry:
 		/* don't allow root a history_file in /tmp */
 		if(sh.userid)
 		{
-			if(!(fname = pathtmp(NIL(char*),0,0,NIL(int*))))
-				return(0);
+			if(!(fname = pathtmp(NULL,0,0,NULL)))
+				return 0;
 			fd = open(fname,O_BINARY|O_APPEND|O_CREAT|O_RDWR,S_IRUSR|S_IWUSR|O_cloexec);
 		}
 	}
 	if(fd<0)
-		return(0);
+		return 0;
 	/* set the file to close-on-exec */
 	fcntl(fd,F_SETFD,FD_CLOEXEC);
 	if(cp=nv_getval(HISTSIZE))
 	{
-		intmax_t m = strtoll(cp, (char**)0, 10);
+		intmax_t m = strtoll(cp, NULL, 10);
 		if(m>HIST_MAX)
 			m = HIST_MAX;
 		else if(m<0)
@@ -272,7 +276,7 @@ retry:
 	sh.hist_ptr = hist_ptr = hp;
 	hp->histsize = maxlines;
 	hp->histmask = histmask;
-	hp->histfp= sfnew(NIL(Sfio_t*),hp->histbuff,HIST_BSIZE,fd,SF_READ|SF_WRITE|SF_APPENDWR|SF_SHARE);
+	hp->histfp= sfnew(NULL,hp->histbuff,HIST_BSIZE,fd,SFIO_READ|SFIO_WRITE|SFIO_APPENDWR|SFIO_SHARE);
 	memset((char*)hp->histcmds,0,sizeof(off_t)*(hp->histmask+1));
 	hp->histind = 1;
 	hp->histcmds[1] = 2;
@@ -315,28 +319,28 @@ retry:
 	if(fname)
 	{
 		unlink(fname);
-		free((void*)fname);
+		free(fname);
 	}
 	if(hist_clean(fd) && hist_start>1 && hsize > HIST_MAX)
 	{
 #ifdef DEBUG
-		sfprintf(sfstderr,"%lld: hist_trim hsize=%d\n",(Sflong_t)sh.current_pid,hsize);
+		sfprintf(sfstderr,"%jd: hist_trim hsize=%d\n",(Sflong_t)sh.current_pid,hsize);
 		sfsync(sfstderr);
 #endif /* DEBUG */
 		hp = hist_trim(hp,(int)hp->histind-maxlines);
 	}
 	sfdisc(hp->histfp,&hp->histdisc);
-	(HISTCUR)->nvalue.lp = (&hp->histind);
-	sh_timeradd(1000L*(HIST_RECENT-30), 1, hist_touch, (void*)hp->histname);
+	HISTCUR->nvalue = &hp->histind;
+	sh_timeradd(1000L*(HIST_RECENT-30), 1, hist_touch, hp->histname);
 #if SHOPT_ACCTFILE
 	if(sh_isstate(SH_INTERACTIVE))
 		acctinit(hp);
 #endif /* SHOPT_ACCTFILE */
 #if SHOPT_AUDIT
 	{
-		char buff[SF_BUFSIZE];
+		char buff[SFIO_BUFSIZE];
 		hp->auditfp = 0;
-		if(sh_isstate(SH_INTERACTIVE) && (hp->auditmask=sh_checkaudit(hp,SHOPT_AUDITFILE, buff, sizeof(buff))))
+		if(sh_isstate(SH_INTERACTIVE) && (hp->auditmask = sh_checkaudit(SHOPT_AUDITFILE, buff, sizeof(buff))))
 		{
 			if((fd=sh_open(buff,O_BINARY|O_WRONLY|O_APPEND|O_CREAT|O_cloexec,S_IRUSR|S_IWUSR))>=0 && fd < 10)
 			{
@@ -349,31 +353,33 @@ retry:
 			}
 			if(fd>=0)
 			{
+				const char *tty;
 				fcntl(fd,F_SETFD,FD_CLOEXEC);
-				hp->tty = sh_strdup(isatty(2)?ttyname(2):"notty");
-				hp->auditfp = sfnew((Sfio_t*)0,NULL,-1,fd,SF_WRITE);
+				tty = ttyname(2);
+				hp->tty = sh_strdup(tty?tty:"notty");
+				hp->auditfp = sfnew(NULL,NULL,-1,fd,SFIO_WRITE);
 			}
 		}
 	}
 #endif
-	return(1);
+	return 1;
 }
 
 /*
  * close the history file and free the space
  */
-void hist_close(register History_t *hp)
+void hist_close(History_t *hp)
 {
 	sfclose(hp->histfp);
 #if SHOPT_AUDIT
 	if(hp->auditfp)
 	{
 		if(hp->tty)
-			free((void*)hp->tty);
+			free(hp->tty);
 		sfclose(hp->auditfp);
 	}
 #endif /* SHOPT_AUDIT */
-	free((char*)hp);
+	free(hp);
 	hist_ptr = 0;
 	sh.hist_ptr = 0;
 #if SHOPT_ACCTFILE
@@ -388,13 +394,13 @@ void hist_close(register History_t *hp)
 /*
  * check history file format to see if it begins with special byte
  */
-static int hist_check(register int fd)
+static int hist_check(int fd)
 {
 	unsigned char magic[2];
-	lseek(fd,(off_t)0,SEEK_SET);
+	lseek(fd,0,SEEK_SET);
 	if((read(fd,(char*)magic,2)!=2) || (magic[0]!=HIST_UNDO))
-		return(1);
-	return(0);
+		return 1;
+	return 0;
 }
 
 /*
@@ -403,7 +409,7 @@ static int hist_check(register int fd)
 static int hist_clean(int fd)
 {
 	struct stat statb;
-	return(fstat(fd,&statb)>=0 && (time((time_t*)0)-statb.st_mtime) >= HIST_RECENT);
+	return fstat(fd,&statb)>=0 && (time(NULL)-statb.st_mtime) >= HIST_RECENT;
 }
 
 /*
@@ -411,37 +417,16 @@ static int hist_clean(int fd)
  */
 static History_t* hist_trim(History_t *hp, int n)
 {
-	register char *cp;
-	register int incmd=1, c=0;
-	register History_t *hist_new, *hist_old = hp;
-	char *buff, *endbuff, *tmpname=0;
+	char *cp;
+	int incmd=1, c=0;
+	History_t *hist_new, *hist_old = hp;
+	char *buff, *endbuff;
 	off_t oldp,newp;
 	struct stat statb;
-	unlink(hist_old->histname);
-	if(access(hist_old->histname,F_OK) >= 0)
+	if(unlink(hist_old->histname) < 0)
 	{
-		/* The unlink can fail on Windows 95 */
-		int fd;
-		char *last, *name=hist_old->histname;
-		sh_close(sffileno(hist_old->histfp));
-		tmpname = (char*)sh_malloc(strlen(name)+14);
-		if(last = strrchr(name,'/'))
-		{
-			*last = 0;
-			pathtmp(tmpname,name,"hist",NIL(int*));
-			*last = '/';
-		}
-		else
-			pathtmp(tmpname,e_dot,"hist",NIL(int*));
-		if(rename(name,tmpname) < 0)
-		{
-			free(tmpname);
-			tmpname = name;
-		}
-		fd = open(tmpname,O_RDONLY|O_cloexec);
-		sfsetfd(hist_old->histfp,fd);
-		if(tmpname==name)
-			tmpname = 0;
+		errormsg(SH_DICT,ERROR_warn(0),"cannot trim history file %s; make sure parent directory is writable",hist_old->histname);
+		return hist_ptr = hist_old;
 	}
 	hist_ptr = 0;
 	if(fstat(sffileno(hist_old->histfp),&statb)>=0)
@@ -478,7 +463,7 @@ static History_t* hist_trim(History_t *hp, int n)
 			if(newp <=oldp)
 				break;
 		}
-		if(!(buff=(char*)sfreserve(hist_old->histfp,SF_UNBOUND,0)))
+		if(!(buff=(char*)sfreserve(hist_old->histfp,SFIO_UNBOUND,0)))
 			break;
 		*(endbuff=(cp=buff)+sfvalue(hist_old->histfp)) = 0;
 		/* copy to null byte */
@@ -496,61 +481,56 @@ static History_t* hist_trim(History_t *hp, int n)
 	}
 	hist_cancel(hist_new);
 	sfclose(hist_old->histfp);
-	if(tmpname)
-	{
-		unlink(tmpname);
-		free(tmpname);
-	}
-	free((char*)hist_old);
+	free(hist_old);
 	return hist_ptr = hist_new;
 }
 
 /*
- * position history file at size and find next command number 
+ * position history file at size and find next command number
  */
-static int hist_nearend(History_t *hp, Sfio_t *iop, register off_t size)
+static int hist_nearend(History_t *hp, Sfio_t *iop, off_t size)
 {
-        register unsigned char *cp, *endbuff;
-        register int n, incmd=1;
-        unsigned char *buff, marker[4];
+	unsigned char *cp, *endbuff;
+	int n, incmd=1;
+	unsigned char *buff, marker[4];
 	if(size <= 2L || sfseek(iop,size,SEEK_SET)<0)
 		goto begin;
 	/* skip to marker command and return the number */
 	/* numbering commands occur after a null and begin with HIST_CMDNO */
-        while(cp=buff=(unsigned char*)sfreserve(iop,SF_UNBOUND,SF_LOCKR))
-        {
+	while(cp=buff=(unsigned char*)sfreserve(iop,SFIO_UNBOUND,SFIO_LOCKR))
+	{
 		n = sfvalue(iop);
-                *(endbuff=cp+n) = 0;
-                while(1)
-                {
+		*(endbuff=cp+n) = 0;
+		while(1)
+		{
 			/* check for marker */
-                        if(!incmd && *cp++==HIST_CMDNO && *cp==0)
-                        {
-                                n = cp+1 - buff;
-                                incmd = -1;
-                                break;
-                        }
-                        incmd = 0;
-                        while(*cp++);
-                        if(cp>endbuff)
-                        {
-                                incmd = 1;
-                                break;
-                        }
-                        if(*cp==0 && ++cp>endbuff)
-                                break;
-                }
-                size += n;
+			if(!incmd && *cp++==HIST_CMDNO && *cp==0)
+			{
+				n = cp+1 - buff;
+				incmd = -1;
+				break;
+			}
+			incmd = 0;
+			while(*cp++);
+			if(cp>endbuff)
+			{
+				incmd = 1;
+				break;
+			}
+			if(*cp==0 && ++cp>endbuff)
+				break;
+		}
+		size += n;
 		sfread(iop,(char*)buff,n);
 		if(incmd < 0)
-                {
+		{
 			if((n=sfread(iop,(char*)marker,4))==4)
 			{
 				n = (marker[0]<<16)|(marker[1]<<8)|marker[2];
 				if(n < size/2)
 				{
 					hp->histmarker = hp->histcnt = size+4;
-					return(n);
+					return n;
 				}
 				n=4;
 			}
@@ -562,7 +542,7 @@ static int hist_nearend(History_t *hp, Sfio_t *iop, register off_t size)
 begin:
 	sfseek(iop,(off_t)2,SEEK_SET);
 	hp->histmarker = hp->histcnt = 2L;
-	return(1);
+	return 1;
 }
 
 /*
@@ -574,13 +554,13 @@ begin:
  * unless it is followed by 0.  If followed by 0 then it cancels
  * the previous command.
  */
-void hist_eof(register History_t *hp)
+void hist_eof(History_t *hp)
 {
-	register char *cp,*first,*endbuff;
-	register int incmd = 0;
-	register off_t count = hp->histcnt;
-	int oldind,n,skip=0;
-	off_t last = sfseek(hp->histfp,(off_t)0,SEEK_END);
+	char *cp,*first,*endbuff;
+	int incmd = 0;
+	off_t count = hp->histcnt;
+	int oldind=0,n,skip=0;
+	off_t last = sfseek(hp->histfp,0,SEEK_END);
 	if(last < count)
 	{
 		last = -1;
@@ -591,7 +571,7 @@ void hist_eof(register History_t *hp)
 	}
 again:
 	sfseek(hp->histfp,count,SEEK_SET);
-        while(cp=(char*)sfreserve(hp->histfp,SF_UNBOUND,0))
+	while(cp=(char*)sfreserve(hp->histfp,SFIO_UNBOUND,0))
 	{
 		n = sfvalue(hp->histfp);
 		*(endbuff = cp+n) = 0;
@@ -687,9 +667,9 @@ again:
 /*
  * This routine will cause the previous command to be cancelled
  */
-void hist_cancel(register History_t *hp)
+void hist_cancel(History_t *hp)
 {
-	register int c;
+	int c;
 	if(!hp)
 		return;
 	sfputc(hp->histfp,HIST_UNDO);
@@ -703,12 +683,12 @@ void hist_cancel(register History_t *hp)
 /*
  * flush the current history command
  */
-void hist_flush(register History_t *hp)
+void hist_flush(History_t *hp)
 {
-	register char *buff;
+	char *buff;
 	if(hp)
 	{
-		if(buff=(char*)sfreserve(hp->histfp,0,SF_LOCKR))
+		if(buff=(char*)sfreserve(hp->histfp,0,SFIO_LOCKR))
 		{
 			hp->histflush = sfvalue(hp->histfp)+1;
 			sfwrite(hp->histfp,buff,0);
@@ -730,20 +710,20 @@ void hist_flush(register History_t *hp)
  * When called from hist_flush(), trailing newlines are deleted and
  * a zero byte.  Line sequencing is added as required
  */
-static ssize_t hist_write(Sfio_t *iop,const void *buff,register size_t insize,Sfdisc_t* handle)
+static ssize_t hist_write(Sfio_t *iop,const void *buff,size_t insize,Sfdisc_t* handle)
 {
-	register History_t *hp = (History_t*)handle;
-	register char *bufptr = ((char*)buff)+insize;
-	register int c,size = insize;
-	register off_t cur;
+	History_t *hp = (History_t*)handle;
+	char *bufptr = ((char*)buff)+insize;
+	int c,size = insize;
+	off_t cur;
 	int saved=0;
 	char saveptr[HIST_MARKSZ];
 	if(!hp->histflush)
-		return(write(sffileno(iop),(char*)buff,size));
-	if((cur = lseek(sffileno(iop),(off_t)0,SEEK_END)) <0)
+		return write(sffileno(iop),(char*)buff,size);
+	if((cur = lseek(sffileno(iop),0,SEEK_END)) <0)
 	{
 		errormsg(SH_DICT,2,"hist_flush: EOF seek failed errno=%d",errno);
-		return(-1);
+		return -1;
 	}
 	hp->histcnt = cur;
 	/* remove whitespace from end of commands */
@@ -759,17 +739,17 @@ static ssize_t hist_write(Sfio_t *iop,const void *buff,register size_t insize,Sf
 	}
 	/* don't count empty lines */
 	if(++bufptr <= (char*)buff)
-		return(insize);
+		return insize;
 	*bufptr++ = '\n';
 	*bufptr++ = 0;
 	size = bufptr - (char*)buff;
 #if	 SHOPT_AUDIT
 	if(hp->auditfp)
 	{
-		time_t	t=time((time_t*)0);
-		sfprintf(hp->auditfp, "%u;%lu;%s;%*s%c",
+		time_t	t=time(NULL);
+		sfprintf(hp->auditfp, "%u;%ju;%s;%*s%c",
 			 sh_isoption(SH_PRIVILEGED) ? sh.euserid : sh.userid,
-			 (unsigned long)t, hp->tty, size, buff, 0);
+			 (Sfulong_t)t, hp->tty, size, buff, 0);
 		sfsync(hp->auditfp);
 	}
 #endif	/* SHOPT_AUDIT */
@@ -777,13 +757,13 @@ static ssize_t hist_write(Sfio_t *iop,const void *buff,register size_t insize,Sf
 	if(acctfd)
 	{
 		int timechars, offset;
-		offset = staktell();
-		stakputs(buff);
-		stakseek(staktell() - 1);
-		timechars = sfprintf(staksp, "\t%s\t%x\n",logname,time(NIL(long *)));
-		lseek(acctfd, (off_t)0, SEEK_END);
-		write(acctfd, stakptr(offset), size - 2 + timechars);
-		stakseek(offset);
+		offset = stktell(sh.stk);
+		sfputr(sh.stk,buff,-1);
+		stkseek(sh.stk,stktell(sh.stk) - 1);
+		timechars = sfprintf(sh.stk, "\t%s\t%x\n",logname,time(NULL));
+		lseek(acctfd, 0, SEEK_END);
+		write(acctfd, stkptr(sh.stk,offset), size - 2 + timechars);
+		stkseek(sh.stk,offset);
 
 	}
 #endif /* SHOPT_ACCTFILE */
@@ -797,7 +777,7 @@ static ssize_t hist_write(Sfio_t *iop,const void *buff,register size_t insize,Sf
 	hp->histcmds[c] = hp->histcnt;
 	if(hp->histflush>HIST_MARKSZ && hp->histcnt > hp->histmarker+HIST_BSIZE/2)
 	{
-		memcpy((void*)saveptr,(void*)bufptr,HIST_MARKSZ);
+		memcpy(saveptr,bufptr,HIST_MARKSZ);
 		saved=1;
 		hp->histcnt += HIST_MARKSZ;
 		hist_marker(bufptr,hp->histind);
@@ -807,20 +787,20 @@ static ssize_t hist_write(Sfio_t *iop,const void *buff,register size_t insize,Sf
 	errno = 0;
 	size = write(sffileno(iop),(char*)buff,size);
 	if(saved)
-		memcpy((void*)bufptr,(void*)saveptr,HIST_MARKSZ);
+		memcpy(bufptr,saveptr,HIST_MARKSZ);
 	if(size>=0)
 	{
 		hp->histwfail = 0;
-		return(insize);
+		return insize;
 	}
-	return(-1);
+	return -1;
 }
 
 /*
  * Put history sequence number <n> into buffer <buff>
  * The buffer must be large enough to hold HIST_MARKSZ chars
  */
-static void hist_marker(register char *buff,register long cmdno)
+static void hist_marker(char *buff,long cmdno)
 {
 	*buff++ = HIST_CMDNO;
 	*buff++ = 0;
@@ -833,19 +813,19 @@ static void hist_marker(register char *buff,register long cmdno)
 /*
  * return byte offset in history file for command <n>
  */
-off_t hist_tell(register History_t *hp, int n)
+off_t hist_tell(History_t *hp, int n)
 {
-	return(hp->histcmds[hist_ind(hp,n)]);
+	return hp->histcmds[hist_ind(hp,n)];
 }
 
 /*
  * seek to the position of command <n>
  */
-off_t hist_seek(register History_t *hp, int n)
+off_t hist_seek(History_t *hp, int n)
 {
 	if(!(n >= hist_min(hp) && n < hist_max(hp)))
-		return(-1);
-	return(sfseek(hp->histfp,hp->histcmds[hist_ind(hp,n)],SEEK_SET));
+		return -1;
+	return sfseek(hp->histfp,hp->histcmds[hist_ind(hp,n)],SEEK_SET);
 }
 
 /*
@@ -853,10 +833,10 @@ off_t hist_seek(register History_t *hp, int n)
  * if character <last> appears before newline it is deleted
  * each new-line character is replaced with string <nl>.
  */
-void hist_list(register History_t *hp,Sfio_t *outfile, off_t offset,int last, char *nl)
+void hist_list(History_t *hp,Sfio_t *outfile, off_t offset,int last, char *nl)
 {
-	register int oldc=0;
-	register int c;
+	int oldc=0;
+	int c;
 	if(offset<0 || !hp)
 	{
 		sfputr(outfile,sh_translate(e_unknown),'\n');
@@ -883,9 +863,9 @@ void hist_list(register History_t *hp,Sfio_t *outfile, off_t offset,int last, ch
  * If flag==0 then line must begin with string
  * direction < 1 for backwards search
 */
-Histloc_t hist_find(register History_t*hp,char *string,register int index1,int flag,int direction)
+Histloc_t hist_find(History_t*hp,char *string,int index1,int flag,int direction)
 {
-	register int index2;
+	int index2;
 	off_t offset;
 	int *coffset=0;
 	Histloc_t location;
@@ -893,7 +873,7 @@ Histloc_t hist_find(register History_t*hp,char *string,register int index1,int f
 	location.hist_char = 0;
 	location.hist_line = 0;
 	if(!hp)
-		return(location);
+		return location;
 	/* leading ^ means beginning of line unless escaped */
 	if(flag)
 	{
@@ -915,10 +895,10 @@ Histloc_t hist_find(register History_t*hp,char *string,register int index1,int f
 		if(index2<1)
 			index2 = 1;
 		if(index1 <= index2)
-			return(location);
+			return location;
 	}
 	else if(index1 >= index2)
-		return(location);
+		return location;
 	while(index1!=index2)
 	{
 		direction>0?++index1:--index1;
@@ -926,13 +906,13 @@ Histloc_t hist_find(register History_t*hp,char *string,register int index1,int f
 		if((location.hist_line=hist_match(hp,offset,string,coffset))>=0)
 		{
 			location.hist_command = index1;
-			return(location);
+			return location;
 		}
 		/* allow a search to be aborted */
 		if(sh.trapnote & SH_SIGSET)
 			break;
 	}
-	return(location);
+	return location;
 }
 
 /*
@@ -940,14 +920,14 @@ Histloc_t hist_find(register History_t*hp,char *string,register int index1,int f
  * If coffset==0 then line must begin with string
  * returns the line number of the match if successful, otherwise -1
  */
-int hist_match(register History_t *hp,off_t offset,char *string,int *coffset)
+int hist_match(History_t *hp,off_t offset,char *string,int *coffset)
 {
-	register unsigned char *first, *cp;
-	register int m,n,c=1,line=0;
+	unsigned char *first, *cp;
+	int m,n,c=1,line=0;
 	mbinit();
 	sfseek(hp->histfp,offset,SEEK_SET);
 	if(!(cp = first = (unsigned char*)sfgetr(hp->histfp,0,0)))
-		return(-1);
+		return -1;
 	m = sfvalue(hp->histfp);
 	n = (int)strlen(string);
 	while(m > n)
@@ -956,7 +936,7 @@ int hist_match(register History_t *hp,off_t offset,char *string,int *coffset)
 		{
 			if(coffset)
 				*coffset = (cp-first);
-			return(line);
+			return line;
 		}
 		if(!coffset)
 			break;
@@ -967,7 +947,7 @@ int hist_match(register History_t *hp,off_t offset,char *string,int *coffset)
 		cp += c;
 		m -= c;
 	}
-	return(-1);
+	return -1;
 }
 
 
@@ -982,13 +962,13 @@ int hist_match(register History_t *hp,off_t offset,char *string,int *coffset)
  */
 int hist_copy(char *s1,int size,int command,int line)
 {
-	register int c;
-	register History_t *hp = sh.hist_ptr;
-	register int count = 0;
+	int c;
+	History_t *hp = sh.hist_ptr;
+	int count = 0;
 	char *const s1orig = s1;
-	char *const s1max = s1 + size;
+	char *const s1max = s1 ? s1 + size : NULL;
 	if(!hp)
-		return(-1);
+		return -1;
 	hist_seek(hp,command);
 	while ((c = sfgetc(hp->histfp)) && c!=EOF)
 	{
@@ -996,7 +976,7 @@ int hist_copy(char *s1,int size,int command,int line)
 		{
 			if(count++ ==line)
 				break;
-			else if(line >= 0)	
+			else if(line >= 0)
 				continue;
 		}
 		if(s1 && (line<0 || line==count))
@@ -1009,13 +989,23 @@ int hist_copy(char *s1,int size,int command,int line)
 			*s1++ = c;
 		}
 	}
-	sfseek(hp->histfp,(off_t)0,SEEK_END);
+	sfseek(hp->histfp,0,SEEK_END);
 	if(s1==0)
-		return(count);
+		return count;
 	if(count && s1 > s1orig && (c = *(s1 - 1)) == '\n')
 		s1--;
 	*s1 = '\0';
-	return(count);
+	return count;
+}
+
+/*
+ * return true if c is a word boundary character, i.e. the
+ * character following c is considered to start a new word
+ */
+
+int hist_iswordbndry(char c)
+{
+	return isspace(c) || strchr("|&;()`<>",c);
 }
 
 /*
@@ -1023,27 +1013,27 @@ int hist_copy(char *s1,int size,int command,int line)
  */
 char *hist_word(char *string,int size,int word)
 {
-	register int c;
-	register int is_space;
-	register int quoted;
-	register char *s1 = string;
-	register unsigned char *cp = (unsigned char*)s1;
-	register int flag = 0;
+	int c;
+	int is_boundary;
+	int quoted;
+	char *s1 = string;
+	unsigned char *cp = (unsigned char*)s1;
+	int flag = 0;
 	History_t *hp = hist_ptr;
 	if(!hp)
-		return(NIL(char*));
+		return NULL;
 	hist_copy(string,size,(int)hp->histind-1,-1);
 	for(quoted=0;c = *cp;cp++)
 	{
-		is_space = isspace(c) && !quoted;
-		if(is_space && flag)
+		is_boundary = !quoted && hist_iswordbndry(c);
+		if(is_boundary && flag)
 		{
 			*cp = 0;
 			if(--word==0)
 				break;
 			flag = 0;
 		}
-		else if(is_space==0 && flag==0)
+		else if(is_boundary==0 && flag==0)
 		{
 			s1 = (char*)cp;
 			flag++;
@@ -1058,13 +1048,18 @@ char *hist_word(char *string,int size,int word)
 			for(cp++;*cp && (*cp != c || quoted);cp++)
 				quoted = *cp=='\\' ? !quoted : 0;
 		}
+		else if (c=='$' && cp[1]=='\'' && !quoted)
+		{
+			for(cp+=2; *cp && (*cp != '\'' || quoted); cp++)
+				quoted = *cp=='\\' ? !quoted : 0;
+		}
 		quoted = *cp=='\\' ? !quoted : 0;
 	}
 	*cp = 0;
 	if(s1 != string)
 		/* We can't use strcpy() because the two buffers may overlap. */
 		strcopy(string,s1);
-	return(string);
+	return string;
 }
 
 #endif	/* SHOPT_ESH */
@@ -1075,7 +1070,7 @@ char *hist_word(char *string,int size,int word)
  * and number of lines back or forward,
  * compute the new command and line number.
  */
-Histloc_t hist_locate(History_t *hp,register int command,register int line,int lines)
+Histloc_t hist_locate(History_t *hp,int command,int line,int lines)
 {
 	Histloc_t next;
 	line += lines;
@@ -1086,10 +1081,10 @@ Histloc_t hist_locate(History_t *hp,register int command,register int line,int l
 	}
 	if(lines > 0)
 	{
-		register int count;
+		int count;
 		while(command <= hp->histind)
 		{
-			count = hist_copy(NIL(char*),0, command,-1);
+			count = hist_copy(NULL,0, command,-1);
 			if(count > line)
 				goto done;
 			line -= count;
@@ -1098,21 +1093,21 @@ Histloc_t hist_locate(History_t *hp,register int command,register int line,int l
 	}
 	else
 	{
-		register int least = (int)hp->histind-hp->histsize;
+		int least = (int)hp->histind-hp->histsize;
 		while(1)
 		{
 			if(line >=0)
 				goto done;
 			if(--command < least)
 				break;
-			line += hist_copy(NIL(char*),0, command,-1);
+			line += hist_copy(NULL,0, command,-1);
 		}
 		command = -1;
 	}
 done:
 	next.hist_line = line;
 	next.hist_command = command;
-	return(next);
+	return next;
 }
 #endif	/* SHOPT_ESH */
 
@@ -1122,24 +1117,24 @@ done:
  */
 static int hist_exceptf(Sfio_t* fp, int type, void *data, Sfdisc_t *handle)
 {
-	register int newfd,oldfd;
+	int newfd,oldfd;
 	History_t *hp = (History_t*)handle;
 	NOT_USED(data);
-	if(type==SF_WRITE)
+	if(type==SFIO_WRITE)
 	{
 		if(errno==ENOSPC || hp->histwfail++ >= 10)
-			return(0);
+			return 0;
 		/* write failure could be NFS problem, try to reopen */
 		sh_close(oldfd=sffileno(fp));
 		if((newfd=open(hp->histname,O_BINARY|O_APPEND|O_CREAT|O_RDWR|O_cloexec,S_IRUSR|S_IWUSR)) >= 0)
 		{
 			if(sh_fcntl(newfd, F_dupfd_cloexec, oldfd) != oldfd)
-				return(-1);
+				return -1;
 			fcntl(oldfd,F_SETFD,FD_CLOEXEC);
 			close(newfd);
-			if(lseek(oldfd,(off_t)0,SEEK_END) < hp->histcnt)
+			if(lseek(oldfd,0,SEEK_END) < hp->histcnt)
 			{
-				register int index = hp->histind;
+				int index = hp->histind;
 				lseek(oldfd,(off_t)2,SEEK_SET);
 				hp->histcnt = 2;
 				hp->histind = 1;
@@ -1148,10 +1143,14 @@ static int hist_exceptf(Sfio_t* fp, int type, void *data, Sfdisc_t *handle)
 				hp->histmarker = hp->histcnt;
 				hp->histind = index;
 			}
-			return(1);
+			return 1;
 		}
 		errormsg(SH_DICT,2,"History file write error-%d %s: file unrecoverable",errno,hp->histname);
-		return(-1);
+		return -1;
 	}
-	return(0);
+	return 0;
 }
+
+#else
+NoN(history)
+#endif /* !SHOPT_SCRIPTONLY */

@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,9 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#                Govind Kamat <govind_kamat@yahoo.com>                 #
+#               K. Eugene Carlson <kvngncrlsn@gmail.com>               #
+#                      Phi <phi.debian@gmail.com>                      #
 #                                                                      #
 ########################################################################
 
@@ -28,9 +31,10 @@
 # the trickiest part of the tests is avoiding typeahead
 # in the pty dialogue
 
+((!SHOPT_SCRIPTONLY)) || { warning "interactive shell was compiled out -- tests skipped"; exit 0; }
 whence -q pty || { warning "pty command not found -- tests skipped"; exit 0; }
-case $(uname -s) in
-Darwin | FreeBSD | Linux )
+case $(uname -s; [[ $HOSTTYPE == android.* ]] && echo _no_) in
+Darwin | DragonFly | FreeBSD | Linux | MidnightBSD )
 	;;
 * )	warning "pty not confirmed to work correctly on this system -- tests skipped"
 	exit 0 ;;
@@ -96,6 +100,14 @@ then	warning "pty command hangs on $bintrue -- tests skipped"
 	exit 0
 fi
 
+# ksh invokes tput(1) to get terminal escape sequences necessary for multiline editing.
+# If tput is not available, tests requiring multiline editing would fail.
+typeset -si multiline
+command -pv tput >/dev/null
+if	! let "multiline = ! $?"
+then	warning "tput(1) not available on default path; tests that require multiline editing are skipped"
+fi
+
 tst $LINENO <<"!"
 L POSIX sh 026(C)
 
@@ -127,6 +139,7 @@ L POSIX sh 028(C)
 # SIGTTIN signal then the <state> field in the output message is set to
 # Stopped(SIGTTIN) or Suspended(SIGTTIN).
 
+d 15
 I ^\r?\n$
 p :test-1:
 w sleep 60 &
@@ -149,6 +162,7 @@ L POSIX sh 029(C)
 # SIGTTOU signal then the <state> field in the output message is set to
 # Stopped(SIGTTOU) or Suspended(SIGTTOU).
 
+d 15
 I ^\r?\n$
 p :test-1:
 w sleep 60 &
@@ -186,6 +200,7 @@ L POSIX sh 093(C)
 # command line editing is supported:  After termination of a previous
 # command, sh is entered in insert mode.
 
+d 15
 w echo hello\E
 u ^hello\r?\n$
 c echo goo
@@ -201,6 +216,7 @@ L POSIX sh 094(C)
 # command line editing is supported:  When in insert mode an <ESC>
 # switches sh into command mode.
 
+d 15
 c echo he\E
 s 400
 w allo
@@ -220,6 +236,7 @@ L POSIX sh 096(C)
 # terminal and to reset the command history so that the command that
 # was interrupted is not entered in the history.
 
+d 15
 I ^\r?\n$
 p :test-1:
 w echo first
@@ -264,6 +281,7 @@ L POSIX sh 099(C)
 # and to reset the command history so that the command that was
 # interrupted is not entered in the history.
 
+d 15
 I ^\r?\n$
 p :test-1:
 w echo first
@@ -290,6 +308,7 @@ L POSIX sh 100(C)
 # command line editing is supported:  When in insert mode the kill
 # character clears all the characters from the input line.
 
+d 15
 p :test-1:
 w stty kill ^X
 p :test-2:
@@ -350,6 +369,7 @@ L POSIX sh 104(C)
 # end-of-file at the beginning of an input line is interpreted as the
 # end of input.
 
+d 15
 p :test-1:
 w trap 'echo done >&2' EXIT
 p :test-2:
@@ -370,6 +390,7 @@ L POSIX sh 111(C)
 # line to be treated as a comment and the line is entered in the
 # command history.
 
+d 15
 p :test-1:
 c echo save\E
 s 400
@@ -392,6 +413,7 @@ L POSIX sh 251(C)
 # command N repeats the most recent / or ? command, reversing the
 # direction of the search.
 
+d 15
 p :test-1:
 w echo repeat-1
 u ^repeat-1\r?\n$
@@ -433,6 +455,7 @@ whence -q less &&
 TERM=vt100 tst $LINENO <<"!"
 L process/terminal group exercise
 
+d 15
 w m=yes; while true; do echo $m-$m; done | less
 u :$|:\E|lines
 c \cZ
@@ -443,14 +466,15 @@ u yes-yes
 disabled
 
 # Test file name completion in vi mode
-if((SHOPT_VSH)); then
-mkdir "/tmp/fakehome_$$" && tst $LINENO <<!
+if((SHOPT_VSH)) && mkdir "/tmp/fakehome_$$" 2>/dev/null; then
+tst $LINENO <<!
 L vi mode file name completion
 
 # Completing a file name in vi mode that contains '~' and has a
 # base name the same length as the home directory's parent directory
 # shouldn't fail.
 
+d 15
 w set -o vi; HOME=/tmp/fakehome_$$; touch ~/testfile_$$
 w echo ~/tes\t
 u ^/tmp/fakehome_$$/testfile_$$\r?\n$
@@ -467,6 +491,7 @@ L raw Bourne mode literal tab characters
 # handled by ed_viread() in vi.c (even though vi mode is off); it expands tab
 # characters to spaces on the command line. See slowread() in io.c.
 
+d 15
 p :test-1:
 w set +o emacs 2>/dev/null
 p :test-2:
@@ -481,6 +506,7 @@ L raw Bourne mode backslash handling
 # The escaping backslash feature should be disabled in the raw Bourne mode.
 # This is tested with both erase and kill characters.
 
+d 15
 p :test-1:
 w set +o emacs 2>/dev/null
 p :test-2:
@@ -503,7 +529,7 @@ L escaping backslashes in $mode mode
 # Backslashes should only be escaped if the previous input was a backslash.
 # Other backslashes stored in the input buffer should be erased normally.
 
-d 15
+d 40
 p :test-1:
 w stty erase ^H
 p :test-2:
@@ -563,8 +589,8 @@ got=$(test -t 1 >/dev/tty && echo ok) && [[ $got == ok ]] && echo OK11 || echo '
 EOF
 tst $LINENO <<"!"
 L test -t 1 inside command substitution
+d 40
 p :test-1:
-d 15
 w . ./test_t.sh
 r ^:test-1: \. \./test_t\.sh\r\n$
 r ^OK0\r\n$
@@ -588,8 +614,8 @@ L race condition while launching external commands
 # Test for bug in ksh binaries that use posix_spawn() while job control is active.
 # See discussion at: https://github.com/ksh93/ksh/issues/79
 
+d 40
 p :test-1:
-d 15
 w printf '%s\\n' 1 2 3 4 5 | while read; do ls /dev/null; done
 r ^:test-1: printf '%s\\n' 1 2 3 4 5 | while read; do ls /dev/null; done\r\n$
 r ^/dev/null\r\n$
@@ -616,7 +642,7 @@ r ^:test-2: \r\n$
 ((SHOPT_ESH)) && tst $LINENO <<"!"
 L emacs backslash escaping
 
-d 15
+d 40
 p :test-1:
 w set -o emacs
 
@@ -669,7 +695,7 @@ L syntax error added to history file
 
 # https://github.com/ksh93/ksh/issues/209
 
-d 15
+d 40
 p :test-1:
 w do something
 r ^:test-1: do something\r\n$
@@ -682,6 +708,7 @@ r \tdo something\r\n$
 tst $LINENO <<"!"
 L value of $? after the shell uses a variable with a discipline function
 
+d 15
 w PS1.get() { true; }; PS2.get() { true; }; false
 u PS1.get\(\) \{ true; \}; PS2.get\(\) \{ true; \}; false
 w echo "Exit status is: $?"
@@ -708,7 +735,7 @@ L crash after switching from emacs to vi mode
 # In ksh93r using the vi 'r' command after switching from emacs mode could
 # trigger a memory fault: https://bugzilla.opensuse.org/show_bug.cgi?id=179917
 
-d 15
+d 40
 p :test-1:
 w exec "$SHELL" -o emacs
 r ^:test-1: exec "\$SHELL" -o emacs\r\n$
@@ -728,6 +755,7 @@ L value of $? after tilde expansion in tab completion
 # Make sure that a .sh.tilde.set discipline function
 # cannot influence the exit status.
 
+d 15
 w .sh.tilde.set() { true; }
 w HOME=/tmp
 w false ~\t
@@ -746,7 +774,7 @@ tst $LINENO <<"!"
 L autocomplete should not fill partial multibyte characters
 # https://github.com/ksh93/ksh/issues/223
 
-d 15
+d 40
 p :test-1:
 w : XX\t
 r ^:test-1: : XXX\r\n$
@@ -756,7 +784,7 @@ r ^:test-1: : XXX\r\n$
 L Using b, B, w and W commands in vi mode
 # https://github.com/att/ast/issues/1467
 
-d 15
+d 40
 p :test-1:
 w set -o vi
 r ^:test-1: set -o vi\r\n$
@@ -780,7 +808,7 @@ ENV=$tmp/synerror tst $LINENO <<"!"
 L syntax error in profile causes exit on startup
 # https://github.com/ksh93/ksh/issues/281
 
-d 15
+d 40
 r /synerror: syntax error: `\(' unmatched\r\n$
 p :test-1:
 w echo ok
@@ -792,7 +820,7 @@ r ^ok\r\n$
 L split on quoted whitespace when extracting words from command history
 # https://github.com/ksh93/ksh/pull/291
 
-d 15
+d 40
 p :test-1:
 w true ls One\\ "Two Three"$'Four Five'.mp3
 r ^:test-1: true ls One\\ "Two Three"\$'Four Five'\.mp3\r\n$
@@ -801,11 +829,12 @@ w :\E_
 r ^:test-2: : One\\ "Two Three"\$'Four Five'\.mp3\r\n$
 !
 
-((SHOPT_VSH)) && tst $LINENO <<"!"
+# needs non-dumb terminal for multiline editing
+((multiline && SHOPT_VSH)) && TERM=vt100 tst $LINENO <<"!"
 L crash when entering comment into history file (vi mode)
 # https://github.com/att/ast/issues/798
 
-d 15
+d 40
 p :test-1:
 c foo \E#
 r ^:test-1: #foo\r\n$
@@ -820,7 +849,7 @@ L tab completion while expanding ${.sh.*} variables
 # https://github.com/att/ast/issues/1461
 # also tests $'...' string: https://github.com/ksh93/ksh/issues/462
 
-d 15
+d 40
 p :test-1:
 w test \$'foo\\'bar' \$\{.sh.level\t
 r ^:test-1: test \$'foo\\'bar' \$\{.sh.level\}\r\n$
@@ -831,7 +860,7 @@ L tab completion executes command substitutions
 # https://github.com/ksh93/ksh/issues/268
 # https://github.com/ksh93/ksh/issues/462#issuecomment-1038482307
 
-d 15
+d 40
 p :test-1:
 w $(echo true)\t
 r ^:test-1: \$\(echo true\)\r\n$
@@ -854,7 +883,8 @@ w $'`/dev\t
 r ^:test-5: \$'`/dev[[:blank:]]*\r\n$
 !
 
-((SHOPT_ESH)) && VISUAL=emacs tst $LINENO <<"!"
+# needs non-dumb terminal for multiline editing
+((multiline && SHOPT_ESH)) && VISUAL=emacs TERM=vt100 tst $LINENO <<"!"
 L emacs: keys with repeat parameters repeat extra steps
 # https://github.com/ksh93/ksh/issues/292
 
@@ -877,6 +907,8 @@ tst $LINENO <<"!"
 L crash with KEYBD trap after entering multi-line command substitution
 # https://www.mail-archive.com/ast-users@lists.research.att.com/msg00313.html
 
+d 15
+p :test-1:
 w trap : KEYBD
 w : $(
 w true); echo "Exit status is $?"
@@ -887,7 +919,7 @@ tst $LINENO <<"!"
 L interrupted PS2 discipline function
 # https://github.com/ksh93/ksh/issues/347
 
-d 15
+d 40
 p :test-1:
 w PS2.get() { trap --bad-option 2>/dev/null; .sh.value="NOT REACHED"; }
 p :test-2:
@@ -908,7 +940,7 @@ r one two three end
 L tab completion of '.' and '..'
 # https://github.com/ksh93/ksh/issues/372
 
-d 15
+d 40
 
 # typing '.' followed by two tabs should show a menu that includes "number) ../"
 p :test-1:
@@ -922,11 +954,16 @@ w : ..\t
 r : \.\./\r\n$
 !
 
-tst $LINENO <<"!"
+((SHOPT_VSH)) && tst $LINENO <<"!"
 L Ctrl+C with SIGINT ignored
 # https://github.com/ksh93/ksh/issues/343
+# Fix improved on 2024-02-12.
+# Note: without emacs, the Ctrl+C should be echoed as ^C.
+#
+# TODO: a bug in the regex engine seems to make it impossible to match a
+# literal '^' in any way, so we substitute a '.' metacharacter for now.
 
-d 15
+d 40
 
 # SIGINT ignored by child
 p :test-1:
@@ -934,20 +971,16 @@ w PS1=':child-!: ' "$SHELL"
 p :child-1:
 w trap '' INT
 p :child-2:
-c \\\cC
-r :child-2:
-w echo "OK $PS1"
-u ^OK :child-!: \r\n$
+w : lorem\cCipsum
+r ^:child-2: : lorem.Cipsum\r\n$
 w exit
 
 # SIGINT ignored by parent
 p :test-2:
 w (trap '' INT; ENV=/./dev/null PS1=':child-!: ' "$SHELL")
 p :child-1:
-c \\\cC
-r :child-1:
-w echo "OK $PS1"
-u ^OK :child-!: \r\n$
+w : lorem\cCipsum
+r ^:child-1: : lorem.Cipsum\r\n$
 w exit
 
 # SIGINT ignored by parent, trapped in child
@@ -956,20 +989,19 @@ w (trap '' INT; ENV=/./dev/null PS1=':child-!: ' "$SHELL")
 p :child-1:
 w trap 'echo test' INT
 p :child-2:
-c \\\cC
-r :child-2:
-w echo "OK $PS1"
-u ^OK :child-!: \r\n$
+w : lorem\cCipsum
+r ^:child-2: : lorem.Cipsum\r\n$
 w exit
 !
 
 touch "$tmp/foo bar"
-((SHOPT_VSH || SHOPT_ESH)) && tst $LINENO <<!
+# needs non-dumb terminal for multiline editing
+((multiline && (SHOPT_VSH || SHOPT_ESH))) && TERM=vt100 tst $LINENO <<!
 L tab completion with space in string and -o noglob on
 # https://github.com/ksh93/ksh/pull/413
 # Amended to test that completion keeps working after -o noglob
 
-d 15
+d 40
 p :test-1:
 w set -o noglob
 p :test-2:
@@ -981,7 +1013,7 @@ r ^$tmp/foo bar\\r\\n$
 ((SHOPT_HISTEXPAND)) && HISTFILE=$tmp/tmp_histfile tst $LINENO <<!
 L history expansion of an out-of-range event
 
-d 15
+d 40
 p :test-1:
 w set -H
 p :test-2:
@@ -995,7 +1027,7 @@ tst $LINENO <<"!"
 L suspend a blocked write to a FIFO
 # https://github.com/ksh93/ksh/issues/464
 
-d 15
+d 40
 p :test-1:
 w echo >testfifo
 r echo
@@ -1043,6 +1075,329 @@ u : !non_existent: event not found
 p :test-4:
 w echo @ !non_existent
 u @ !non_existent\r\n$
+!
+
+((SHOPT_VSH)) && tst $LINENO <<"!"
+L reverse search isn't canceled after an interrupt in vi mode
+# note: must unignore SIGINT with undocumented 'trap + INT'
+
+d 15
+p :test-1:
+w trap + INT; echo WRONG
+r echo WRONG
+r WRONG
+p :test-2:
+w print CORREC
+r print CORREC
+r CORREC
+p :test-3:
+w echo foo
+r echo foo
+r foo
+p :test-4:
+w sleep 0
+r sleep 0
+p :test-5:
+c e\E[A\E[A\cC\E[A\E[A\E[A
+w $aT
+r :test-5:
+r :test-5: print CORRECT
+!
+
+((SHOPT_ESH)) && VISUAL=emacs tst $LINENO <<"!"
+L failure to start new reverse search in emacs mode
+# https://github.com/ksh93/ksh/commit/b5e52703
+
+d 15
+p :test-1:
+w echo WRON
+p :test-2:
+w print CORREC
+p :test-3:
+w e\E[AG
+u WRONG
+p :test-4:
+w p\E[AT
+u CORRECT
+!
+
+((SHOPT_VSH)) && tst $LINENO <<"!"
+L backwards reverse search in vi mode
+
+d 15
+p :test-1:
+w print bar
+p :test-2:
+w print foo
+p :test-3:
+w echo WRONG
+p :test-4:
+w print Correc
+p :test-5:
+c p\E[A\E[A\E[A\E[B\E[B
+w $at
+u Correct
+!
+
+((SHOPT_ESH)) && VISUAL=emacs tst $LINENO <<"!"
+L backwards reverse search in emacs mode
+
+d 15
+p :test-1:
+w print bar
+p :test-2:
+w print foo
+p :test-3:
+w echo WRONG
+p :test-4:
+w print Correc
+p :test-5:
+c p\E[A\E[A\E[A\E[B\E[B
+w t
+u Correct
+!
+
+# needs non-dumb terminal for multiline editing
+((multiline && SHOPT_ESH)) && mkdir -p fullcomplete/foe && VISUAL=emacs TERM=vt100 tst $LINENO <<"!"
+L full-word completion in emacs mode
+# https://github.com/ksh93/ksh/pull/580
+
+d 15
+p :test-1:
+w true fullcomplete/foi\cb\t
+r ^:test-1: true fullcomplete/foi\r\n
+p :test-2:
+w true fullcomplete/foi\cb=
+r ^:test-2: true fullcomplete/foi\r\n
+p :test-3:
+w true fullcomplete/foi\cb*
+r ^:test-3: true fullcomplete/foi\r\n
+!
+
+# needs non-dumb terminal for multiline editing
+((multiline && SHOPT_VSH)) && mkdir -p fullcomplete/fov && VISUAL=vi TERM=vt100 tst $LINENO <<"!"
+L full-word completion in vi mode
+# https://github.com/ksh93/ksh/pull/580
+
+d 40
+p :test-1:
+w true fullcomplete/foi\Eh\\a
+r ^:test-1: true fullcomplete/foi\r\n
+p :test-2:
+w true fullcomplete/foi\Eh=a
+r ^:test-2: true fullcomplete/foi\r\n
+p :test-3:
+w true fullcomplete/foi\Eh*a
+r ^:test-3: true fullcomplete/foi\r\n
+!
+
+((SHOPT_VSH && SHOPT_MULTIBYTE)) &&
+[[ ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} =~ [Uu][Tt][Ff]-?8 ]] &&
+mkdir -p vitest/aあb && VISUAL=vi tst $LINENO <<"!"
+L vi completion from wide produces corrupt characters
+# https://github.com/ksh93/ksh/issues/571
+
+d 40
+p :test-1:
+w cd vitest/aあ\t
+r ^:test-1: cd vitest/aあb/\r\n$
+!
+
+((SHOPT_HISTEXPAND && (SHOPT_VSH || SHOPT_ESH))) &&
+mkdir -p 'chrtest/aa#b' && tst $LINENO <<"!"
+L tab-completing with first histchar
+
+d 40
+p :test-1:
+w histchars='#^!'
+p :test-2:
+w set +o histexpand
+p :test-3:
+w ls chrtest/a\t
+r ^:test-3: ls chrtest/aa#b/\r\n$
+p :test-4:
+w set -o histexpand
+p :test-5:
+w ls chrtest/a\t
+r ^:test-5: ls chrtest/aa\\#b/\r\n$
+p :test-6:
+w unset histchars
+!
+
+((SHOPT_HISTEXPAND && (SHOPT_VSH || SHOPT_ESH))) &&
+mkdir -p 'chrtest2/@a@b' && tst $LINENO <<"!"
+L tab-completing with third histchar
+
+d 40
+p :test-1:
+w histchars='!^@'
+p :test-2:
+w cd chrtest2
+p :test-3:
+w set +o histexpand
+p :test-4:
+w ls \t
+r ^:test-4: ls @a@b/\r\n$
+p :test-5:
+w set -o histexpand
+p :test-6:
+w ls \t
+r ^:test-6: ls \\@a@b/\r\n$
+!
+
+((SHOPT_VSH || SHOPT_ESH)) &&
+mkdir -p 'chrtest3/~ab' && tst $LINENO <<"!"
+L tab-completing with escaped ~
+
+d 40
+p :test-1:
+w cd chrtest3; .sh.tilde.get() { print -n WRONG_TILDE_EXPANSION >&2; };
+p :test-2:
+w ls \\~\t
+r ^:test-2: ls \\~ab/\r\n$
+p :test-3:
+w ls '~\t
+r ^:test-3: ls \\~ab/\r\n$
+p :test-4:
+w ls "~\t
+r ^:test-4: ls \\~ab/\r\n$
+p :test-5:
+w ls $'~\t
+r ^:test-5: ls \\~ab/\r\n$
+!
+
+((SHOPT_VSH || SHOPT_ESH)) &&
+chmod +x cmd_complete_me >cmd_complete_me &&
+PATH=.:$PATH tst $LINENO <<"!"
+L command completion after init and after TERM change
+# https://github.com/ksh93/ksh/issues/642
+
+d 40
+p :test-1:
+w cmd_complet\t
+r cmd_complete_me \r\n$
+# also try after TERM change
+p :test-2:
+w TERM=ansi
+p :test-3:
+w cmd_complet\t
+r cmd_complete_me \r\n$
+!
+
+((SHOPT_VSH || SHOPT_ESH)) &&
+echo "function _ksh_93u_m_cmdcomplete_test_ { echo RUN; }" > _ksh_93u_m_cmdcomplete_test_ &&
+FPATH=$PWD tst $LINENO <<"!"
+L function and builtin completion when a function is undefined
+# https://github.com/ksh93/ksh/issues/650
+
+d 40
+p :test-1:
+w _ksh_93u_m_cmdcomplete_test_; autoload _a_nonexistent_function_
+u ^RUN\r\n$
+p :test-2:
+w _ksh_93u_m_cmdcompl\t
+r :test-2: _ksh_93u_m_cmdcomplete_test_ \r\n$
+!
+
+tst $LINENO <<"!"
+L terminate interactive shell using the kill built-in
+
+d 40
+p :test-1:
+w PS1=':child-!: ' "$SHELL"
+p :child-1:
+w kill -s HUP \$\$
+r ^:child-1: kill -s HUP \$\$\r\n$
+r ^Hangup\r\n$
+!
+
+((SHOPT_VSH)) && HISTFILE=$tmp/tmp_histfile tst $LINENO <<"!"
+L 'read -s' reads from history file on first go
+
+d 40
+p :test-1:
+w "$SHELL" -o vi -c 'read -s "foo?:prompt: "'
+p :prompt:
+c \Ek
+r ^:prompt: "\$SHELL" -o vi -c 'read -s "foo\?:prompt: "'$
+!
+
+tst $LINENO <<"!"
+L crash when attempting to cancel a heredoc in an interactive shell
+# https://github.com/ksh93/ksh/pull/721
+
+d 40
+p :test-1:
+w "$SHELL"
+p :test-2:
+w cat << EOS
+p :test-3:
+w \cD
+p :test-4:
+w print Exit status $?
+u ^Exit status 0\r\n$
+!
+
+tst $LINENO << "!"
+L crash when discipline functions exit with an error
+# https://github.com/ksh93/ksh/issues/346
+
+d 40
+w "$SHELL"
+w PS1.get() {; printf '$ '; trap --invalid-flag 2>/dev/null; }
+w PS2.get() {; printf '> '; trap --invalid-flag 2>/dev/null; }
+w .sh.tilde.set() {
+w case ${.sh.value} in
+w '~ret') .sh.value='Exit status is' ;;
+w esac
+w trap --invalid-flag 2>/dev/null
+w }
+w echo ~
+w echo ~ret
+w echo ~
+w echo ~ret $?
+u ^Exit status is 0\r\n$
+!
+
+((multiline && (SHOPT_VSH || SHOPT_ESH))) && TERM=vt100 tst $LINENO <<"!"
+L crash when TERM is undefined
+# https://github.com/ksh93/ksh/issues/722
+
+d 40
+p :test-1:
+w unset TERM
+p :test-2:
+w "$SHELL"
+p :test-3:
+w print Exit status $?
+u ^Exit status 0\r\n$
+!
+
+((SHOPT_VSH)) && tst $LINENO <<"!"
+L 'k' skips over history entries starting with whitespace
+# https://github.com/ksh93/ksh/issues/799
+
+d 40
+p :test-1:
+w   true
+p :test-2:
+c \Ek
+r :test-2:   true
+!
+
+((SHOPT_ESH)) && VISUAL=emacs tst $LINENO <<"!"
+L emacs: repeat count sticks after ESC commands
+# a bug introduced on 2020-09-17 and fixed on 2024-12-21
+
+d 15
+# The 'P' command sets an automatic 'p' before every 'w', delaying writing until a match is read.
+P :test-.:
+w false bad rigt wrong
+# Insert 'print '; recall 3rd word 'rigt' (ESC 3 ESC _); cursor back one position (^B); insert 'h'.
+# (With the bug, the repeat count of 3 sticks and ^B goes back 3 positions, resulting in 'rhigt'.)
+w print \E3\E_\cBh
+I print
+r right
 !
 
 # ======

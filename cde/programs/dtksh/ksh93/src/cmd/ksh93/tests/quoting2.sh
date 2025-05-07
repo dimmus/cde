@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2011 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #          atheik <14833674+atheik@users.noreply.github.com>           #
+#            Johnothan King <johnothanking@protonmail.com>             #
 #                                                                      #
 ########################################################################
 
@@ -325,10 +326,19 @@ exp=BUGFREE
 got=${exp%"$*"}		# the quoted "*" in "F*" should not act as a wildcard
 [[ $got == "$exp" ]] || err_exit 'BUG_IGSGLOBS reproducer 1' \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=${exp%$*}		# the unquoted * in F* should act as a wildcard
+exp=BUG
+[[ $got == "$exp" ]] || err_exit 'BUG_IGSGLOBS reproducer 1b' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 case BUGFREE in
 BUG"$*")	err_exit 'BUG_IFSGLOBS reproducer 2' ;;
 BUGFREE)	;;
 *)		err_exit 'BUG_IFSGLOBS reproducer 2 fails badly' ;;
+esac
+case BUGFAIL in
+BUG$*)		;;
+BUGFAIL)	err_exit 'BUG_IFSGLOBS reproducer 2b' ;;
+*)		err_exit 'BUG_IFSGLOBS reproducer 2b fails badly' ;;
 esac
 
 IFS=?
@@ -352,7 +362,30 @@ esac
 [[ opt2 == @("${arr[*]}") ]] && err_exit 'BUG_IFSGLOBS reproducer 7'
 unset arr
 
+# https://github.com/ksh93/ksh/issues/832
+got=$(set --glob -- a '' b '' c; IFS=''; echo "$*")  # "$*" must be in a context that may allow patterns
+exp=abc
+[[ $got == "$exp" ]] || err_exit 'BUG_IFSGLOBS regression, bug 832' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
 IFS=$' \t\n'
+
+# ======
+# test quoting of additive assignments and namespace variable assignments in generated function definitions
+case ${.sh.version} in
+*93u+m/1.0.*)
+	;;
+*93u+m/*)
+	got=$(f() { foo+=bar\ baz; }; typeset -f f)
+	exp=$'f()\n{\tfoo+='\'bar\ baz\'$'\n}'
+	[[ $got == "$exp" ]] || err_exit 'print function definition with additive assignment' \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+	got=$(f() { .namespace.foo='bar baz'; }; typeset -f f)
+	exp=$'f()\n{\t.namespace.foo='\'bar\ baz\'$'\n}'
+	[[ $got == "$exp" ]] || err_exit 'print function definition with namespace assignment' \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+	;;
+esac
 
 # ======
 exit $((Errors<125?Errors:125))

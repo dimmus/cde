@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -81,14 +81,14 @@
 #include <hashpart.h>
 
 #define hashclear(t,f)		((t)->flags &= ~((f) & ~HASH_INTERNAL))
-#define hashcover(b)		(((b)->hash&HASH_HIDES)?(Hash_bucket_t*)((b)->name):(Hash_bucket_t*)0)
-#define hashdel(t,n)		hashlook(t, (char*)(n), HASH_DELETE, (char*)0)
-#define hashget(t,n)		hashlook(t, (char*)(n), HASH_LOOKUP|HASH_VALUE, (char*)0)
+#define hashcover(b)		(((b)->hash&HASH_HIDES)?(Hash_bucket_t*)((b)->name):NULL)
+#define hashdel(t,n)		hashlook(t, (char*)(n), HASH_DELETE, NULL)
+#define hashget(t,n)		hashlook(t, (char*)(n), HASH_LOOKUP|HASH_VALUE, NULL)
 #define hashgetbucket(s)	((Hash_bucket_t*)((s)-((sizeof(Hash_bucket_t)+sizeof(char*)-1)/sizeof(char*))*sizeof(char*)))
 #define hashkeep(b)		((b)->hash|=HASH_KEEP)
 #define hashname(b)		((((b)->hash&HASH_HIDES)?((Hash_bucket_t*)((b)->name)):(b))->name)
 #define hashput(t,n,v)		hashlook(t, (char*)(n), HASH_CREATE|HASH_VALUE, (char*)(v))
-#define hashref(t,n)		hashlook(t, (char*)(n), HASH_LOOKUP|HASH_INTERNAL|HASH_VALUE, (char*)0)
+#define hashref(t,n)		hashlook(t, (char*)(n), HASH_LOOKUP|HASH_INTERNAL|HASH_VALUE, NULL)
 #define hashscope(t)		((t)->scope)
 #define hashset(t,f)		((t)->flags |= ((f) & ~HASH_INTERNAL))
 

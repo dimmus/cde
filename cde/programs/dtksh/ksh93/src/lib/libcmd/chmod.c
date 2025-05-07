@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -24,7 +25,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: chmod (AT&T Research) 2012-04-20 $\n]"
+"[-?\n@(#)$Id: chmod (ksh 93u+m) 2022-08-30 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?chmod - change the access permissions of files]"
 "[+DESCRIPTION?\bchmod\b changes the permission of each file "
@@ -92,7 +93,7 @@ static const char usage[] =
 	"pathname, the numeric mode, and the resulting permission bits as "
 	"would be displayed by the \bls\b command.]"
 
-"[+?For backwards compatibility, if an invalid option is given that is a valid "
+"[+?For backward compatibility, if an invalid option is given that is a valid "
 	"symbolic mode specification, \bchmod\b treats this as a mode "
 	"specification rather than as an option specification.]"
 
@@ -101,7 +102,7 @@ static const char usage[] =
 "[L:logical|follow?Follow symbolic links when traversing directories.]"
 "[P:physical|nofollow?Don't follow symbolic links when traversing directories.]"
 "[R:recursive?Change the mode for files in subdirectories recursively.]"
-"[c:changes?Describe only files whose permission actually change.]"
+"[c:changes?Describe only files whose permissions actually change.]"
 "[f:quiet|silent?Do not report files whose permissions fail to change.]"
 "[h|l:symlink?Change the mode of symbolic links on systems that "
     "support \blchmod\b(2). Implies \b--physical\b.]"
@@ -143,12 +144,12 @@ extern int	lchmod(const char*, mode_t);
 int
 b_chmod(int argc, char** argv, Shbltin_t* context)
 {
-	register int	mode;
-	register int	force = 0;
-	register int	flags;
-	register char*	amode = 0;
-	register FTS*	fts;
-	register FTSENT*ent;
+	int		mode = 0;
+	int		force = 0;
+	int		flags;
+	char*		amode = 0;
+	FTS*		fts;
+	FTSENT*		ent;
 	char*		last;
 	int		(*chmodf)(const char*, mode_t);
 	int		logical = 1;
@@ -215,15 +216,16 @@ b_chmod(int argc, char** argv, Shbltin_t* context)
 			logical = 0;
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || !*argv || !amode && !*(argv + 1))
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (chlink)
@@ -250,7 +252,7 @@ b_chmod(int argc, char** argv, Shbltin_t* context)
 			UNREACHABLE();
 		}
 	}
-	if (!(fts = fts_open(argv, flags, NiL)))
+	if (!(fts = fts_open(argv, flags, NULL)))
 	{
 		if (ignore)
 			umask(ignore);

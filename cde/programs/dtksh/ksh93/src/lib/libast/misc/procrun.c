@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -36,7 +36,7 @@ procrun(const char* path, char** argv, int flags)
 	{
 		char	buf[PATH_MAX];
 
-		return pathpath(path, NiL, PATH_REGULAR|PATH_EXECUTE, buf, sizeof(buf)) ? 0 : -1;
+		return pathpath(path, NULL, PATH_REGULAR|PATH_EXECUTE, buf, sizeof(buf)) ? 0 : -1;
 	}
-	return procclose(procopen(path, argv, NiL, NiL, flags|PROC_FOREGROUND|PROC_GID|PROC_UID));
+	return procclose(procopen(path, argv, NULL, NULL, flags|PROC_FOREGROUND|PROC_GID|PROC_UID));
 }

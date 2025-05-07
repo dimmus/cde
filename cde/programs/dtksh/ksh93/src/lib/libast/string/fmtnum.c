@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,14 +28,14 @@
 #include <ast.h>
 
 char*
-fmtnum(register unsigned long n, int m)
+fmtnum(unsigned long n, int m)
 {
-	register int		i;
-	register unsigned long	r;
-	char*			buf;
-	int			z;
+	int		i;
+	unsigned long	r;
+	char*		buf;
+	int		z;
 
-	char			suf[2];
+	char		suf[2];
 
 	if (m > 1)
 	{

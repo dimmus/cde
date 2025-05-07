@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2011 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -18,16 +18,23 @@
 
 . "${SHTESTS_COMMON:-${0%/*}/_common}"
 
+# flag Android/Termux execve(3) breakage killing 'exec -a'
+typeset -i execve_ignores_argv0
+[[ $( (exec -a foo true) 2>&1 ) == *'not supported'* ]]
+if	((execve_ignores_argv0 = ! $?))
+then	warning "execve(3) broken on this system; tests involving 'exec -a' are skipped"
+fi
+
 function abspath
 {
-        base=$(basename $SHELL)
-        cd ${SHELL%/$base}
-        newdir=$(pwd)
-        cd ~-
-        print $newdir/$base
+	base=$(basename $SHELL)
+	cd ${SHELL%/$base}
+	newdir=$(pwd)
+	cd ~-
+	print $newdir/$base
 }
 # test for proper exit of shell
-if builtin getconf 2> /dev/null; then
+if ((!execve_ignores_argv0)) && builtin getconf 2>/dev/null; then
 	ABSHELL=$(abspath)
 	print exit 0 >.profile
 	${ABSHELL}  <<!
@@ -42,9 +49,9 @@ if builtin getconf 2> /dev/null; then
 			eval [[ \$$v ]] && eval print -n \" \"\$v=\"\$$v\"
 		done
 	) \
-	exec -c -a -ksh ${ABSHELL} -c "exit 1" 1>/dev/null 2>&1
+	LD_LIBRARY_PATH=\$LD_LIBRARY_PATH LIBPATH=\$LIBPATH SHLIB_PATH=\$SHLIB_PATH DYLD_LIBRARY_PATH=\$DYLD_LIBRARY_PATH exec -c -a -ksh ${ABSHELL} -c "exit 1" 1>/dev/null 2>&1
 !
-	status=$(echo $?)
+	status=$?
 	if	[[ -o noprivileged && $status != 0 ]]
 	then	err_exit 'exit in .profile is ignored'
 	elif	[[ -o privileged && $status == 0 ]]
@@ -199,6 +206,50 @@ status=$?
 exp=0
 (( exp == status )) || err_exit 'without pipefail, non-zero exit in pipeline causes command substitution to fail' \
 	"(expected '$exp', got '$status')"
+
+# ======
+# trap/signal exit status tests
+
+unset exp got
+typeset -i exp got
+sig=TERM
+
+exp=$((${ kill -l "$sig";}+256))
+{ "$SHELL" -c "trap : EXIT; kill -s $sig \$$; exit 42"; } 2>/dev/null
+(((got=$?)==exp)) || err_exit "SIG$sig exit status with EXIT trap failed (got $got, expected $exp)"
+
+exp=123
+"$SHELL" -c "trap 'exit 123' EXIT; kill -s $sig \$$; exit 42"
+(((got=$?)==exp)) || err_exit "SIG$sig exit status with EXIT trap failed (got $got, expected $exp)"
+
+exp=42
+"$SHELL" -c "trap : $sig; kill -s $sig \$$; exit 42"
+(((got=$?)==exp)) || err_exit "exit status with $sig trap failed (got $got, expected $exp)"
+
+exp=123
+"$SHELL" -c "trap 'exit 123' $sig; kill -s $sig \$$; exit 42"
+(((got=$?)==exp)) || err_exit "exit status with $sig trap failed (got $got, expected $exp)"
+
+unset exp got sig
+
+# ======
+# trap status tests
+
+exp=0
+(trap 'false; exit' EXIT; true; exit)
+let "(got=$?)==exp" || err_exit "pre-trap exit status not preserved (got $got, expected $exp)"
+
+exp=1
+(trap 'true; exit' EXIT; false; exit)
+let "(got=$?)==exp" || err_exit "pre-trap exit status not preserved (got $got, expected $exp)"
+
+exp=7
+(trap 'false; exit 7' EXIT; exit 9)
+let "(got=$?)==exp" || err_exit "explicit exit status in trap not honoured (got $got, expected $exp)"
+
+exp=9
+(trap 'false; exit' EXIT; exit 9)
+let "(got=$?)==exp" || err_exit "explicit exit status outside trap not honoured (got $got, expected $exp)"
 
 # ======
 exit $((Errors<125?Errors:125))

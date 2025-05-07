@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,7 +28,6 @@
 #include	"shnodes.h"
 #include	"path.h"
 #include	"io.h"
-#include	<ccode.h>
 
 static int p_comlist(const struct dolnod*);
 static int p_arg(const struct argnod*);
@@ -43,118 +42,105 @@ static Sfio_t *outfile;
 int sh_tdump(Sfio_t *out, const Shnode_t *t)
 {
 	outfile = out;
-	return(p_tree(t));
-}
-
-/*
- *  convert to ASCII to write and back again if needed
- */
-static int outstring(Sfio_t *out, const char *string, int n)
-{
-	int r;
-	char *cp = (char*)string;
-	ccmaps(cp, n, CC_NATIVE, CC_ASCII);
-	r = sfwrite(out,cp,n);
-	ccmaps(cp, n, CC_ASCII, CC_NATIVE);
-	return(r);
+	return p_tree(t);
 }
 
 /*
  * print script corresponding to shell tree <t>
  */
-static int p_tree(register const Shnode_t *t)
+static int p_tree(const Shnode_t *t)
 {
 	if(!t)
-		return(sfputl(outfile,-1));
+		return sfputl(outfile,-1);
 	if(sfputl(outfile,t->tre.tretyp)<0)
-		return(-1);
+		return -1;
 	switch(t->tre.tretyp&COMMSK)
 	{
 		case TTIME:
 		case TPAR:
-			return(p_tree(t->par.partre)); 
+			return p_tree(t->par.partre);
 		case TCOM:
-			return(p_comarg((struct comnod*)t));
+			return p_comarg((struct comnod*)t);
 		case TSETIO:
 		case TFORK:
 			if(sfputu(outfile,t->fork.forkline)<0)
-				return(-1);
+				return -1;
 			if(p_tree(t->fork.forktre)<0)
-				return(-1);
-			return(p_redirect(t->fork.forkio));
+				return -1;
+			return p_redirect(t->fork.forkio);
 		case TIF:
 			if(p_tree(t->if_.iftre)<0)
-				return(-1);
+				return -1;
 			if(p_tree(t->if_.thtre)<0)
-				return(-1);
-			return(p_tree(t->if_.eltre));
+				return -1;
+			return p_tree(t->if_.eltre);
 		case TWH:
 			if(t->wh.whinc)
 			{
 				if(p_tree((Shnode_t*)(t->wh.whinc))<0)
-					return(-1);
+					return -1;
 			}
 			else
 			{
 				if(sfputl(outfile,-1)<0)
-					return(-1);
+					return -1;
 			}
 			if(p_tree(t->wh.whtre)<0)
-				return(-1);
-			return(p_tree(t->wh.dotre));
+				return -1;
+			return p_tree(t->wh.dotre);
 		case TLST:
 		case TAND:
 		case TORF:
 		case TFIL:
 			if(p_tree(t->lst.lstlef)<0)
-				return(-1);
-			return(p_tree(t->lst.lstrit));
+				return -1;
+			return p_tree(t->lst.lstrit);
 		case TARITH:
 			if(sfputu(outfile,t->ar.arline)<0)
-				return(-1);
-			return(p_arg(t->ar.arexpr));
+				return -1;
+			return p_arg(t->ar.arexpr);
 		case TFOR:
 			if(sfputu(outfile,t->for_.forline)<0)
-				return(-1);
+				return -1;
 			if(p_tree(t->for_.fortre)<0)
-				return(-1);
+				return -1;
 			if(p_string(t->for_.fornam)<0)
-				return(-1);
-			return(p_tree((Shnode_t*)t->for_.forlst));
+				return -1;
+			return p_tree((Shnode_t*)t->for_.forlst);
 		case TSW:
 			if(sfputu(outfile,t->sw.swline)<0)
-				return(-1);
+				return -1;
 			if(p_arg(t->sw.swarg)<0)
-				return(-1);
-			return(p_switch(t->sw.swlst));
+				return -1;
+			return p_switch(t->sw.swlst);
 		case TFUN:
 			if(sfputu(outfile,t->funct.functline)<0)
-				return(-1);
+				return -1;
 			if(p_string(t->funct.functnam)<0)
-				return(-1);
+				return -1;
 			if(p_tree(t->funct.functtre)<0)
-				return(-1);
-			return(p_tree((Shnode_t*)t->funct.functargs));
+				return -1;
+			return p_tree((Shnode_t*)t->funct.functargs);
 		case TTST:
 			if(sfputu(outfile,t->tst.tstline)<0)
-				return(-1);
+				return -1;
 			if((t->tre.tretyp&TPAREN)==TPAREN)
-				return(p_tree(t->lst.lstlef)); 
+				return p_tree(t->lst.lstlef);
 			else
 			{
 				if(p_arg(&(t->lst.lstlef->arg))<0)
-					return(-1);
+					return -1;
 				if((t->tre.tretyp&TBINARY))
-					return(p_arg(&(t->lst.lstrit->arg)));
-				return(0);
+					return p_arg(&(t->lst.lstrit->arg));
+				return 0;
 			}
 	}
-	return(-1);
+	return -1;
 }
 
-static int p_arg(register const struct argnod *arg)
+static int p_arg(const struct argnod *arg)
 {
-	register int n;
+	int n;
 	struct fornod *fp;
 	while(arg)
 	{
@@ -169,10 +155,10 @@ static int p_arg(register const struct argnod *arg)
 		if(fp)
 		{
 			sfputc(outfile,0);
-			outstring(outfile,fp->fornam,n-1);
+			sfwrite(outfile,fp->fornam,n-1);
 		}
 		else
-			outstring(outfile,arg->argval,n);
+			sfwrite(outfile,arg->argval,n);
 		sfputc(outfile,arg->argflag);
 		if(fp)
 		{
@@ -183,10 +169,10 @@ static int p_arg(register const struct argnod *arg)
 			p_tree((Shnode_t*)arg->argchn.ap);
 		arg = arg->argnxt.ap;
 	}
-	return(sfputu(outfile,0));
+	return sfputu(outfile,0);
 }
 
-static int p_redirect(register const struct ionod *iop)
+static int p_redirect(const struct ionod *iop)
 {
 	while(iop)
 	{
@@ -211,26 +197,26 @@ static int p_redirect(register const struct ionod *iop)
 			p_string(iop->iovname);
 		iop = iop->ionxt;
 	}
-	return(sfputl(outfile,-1));
+	return sfputl(outfile,-1);
 }
 
-static int p_comarg(register const struct comnod *com)
+static int p_comarg(const struct comnod *com)
 {
 	p_redirect(com->comio);
 	p_arg(com->comset);
-	if(!com->comarg)
+	if(!com->comarg.ap)
 		sfputl(outfile,-1);
 	else if(com->comtyp&COMSCAN)
-		p_arg(com->comarg);
+		p_arg(com->comarg.ap);
 	else
-		p_comlist((struct dolnod*)com->comarg);
-	return(sfputu(outfile,com->comline));
+		p_comlist(com->comarg.dp);
+	return sfputu(outfile,com->comline);
 }
 
 static int p_comlist(const struct dolnod *dol)
 {
-	register char *cp, *const*argv;
-	register int n;
+	char *cp, *const*argv;
+	int n;
 	argv = dol->dolval+ARG_SPARE;
 	while(cp = *argv)
 		argv++;
@@ -239,10 +225,10 @@ static int p_comlist(const struct dolnod *dol)
 	argv = dol->dolval+ARG_SPARE;
 	while(cp  = *argv++)
 		p_string(cp);
-	return(sfputu(outfile,0));
+	return sfputu(outfile,0);
 }
 
-static int p_switch(register const struct regnod *reg)
+static int p_switch(const struct regnod *reg)
 {
 	while(reg)
 	{
@@ -251,13 +237,13 @@ static int p_switch(register const struct regnod *reg)
 		p_tree(reg->regcom);
 		reg = reg->regnxt;
 	}
-	return(sfputl(outfile,-1));
+	return sfputl(outfile,-1);
 }
 
-static int p_string(register const char *string)
+static int p_string(const char *string)
 {
-	register size_t n=strlen(string);
+	size_t n=strlen(string);
 	if(sfputu(outfile,n+1)<0)
-		return(-1);
-	return(outstring(outfile,string,n));
+		return -1;
+	return sfwrite(outfile,string,n);
 }

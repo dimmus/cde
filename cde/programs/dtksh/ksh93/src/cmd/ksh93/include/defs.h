@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,8 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
 *            Johnothan King <johnothanking@protonmail.com>             *
+*         hyenias <58673227+hyenias@users.noreply.github.com>          *
+*                 Harald van Dijk <harald@gigawatt.nl>                 *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -32,30 +34,22 @@
 #endif
 
 #include	<ast.h>
-#if !defined(AST_VERSION) || AST_VERSION < 20220801
-#error libast version 20220801 or later is required
-#endif
-#if !_lib_fork
-#error In 2021, ksh joined the 21st century and started requiring fork(2).
+#if !defined(AST_VERSION) || AST_VERSION < 20240811
+#error libast version 20240811 or later is required
 #endif
 
 #include	<sfio.h>
 #include	<error.h>
 #include	"FEATURE/externs"
-#include	"FEATURE/options"
 #include	<cdt.h>
 #include	"argnod.h"
 #include	"name.h"
 #include	<ctype.h>
 
-#ifndef pointerof
-#define pointerof(x)		((void*)((char*)0+(x)))
-#endif
-
 #define Empty			((char*)(e_sptbnl+3))
 #define AltEmpty		((char*)(e_dot+1))	/* alternative pointer to empty string */
 
-#define	env_change()		(++ast.env_serial)
+#define env_change()		(++ast.env_serial)
 
 extern char*	sh_getenv(const char*);
 extern char*	sh_setenviron(const char*);
@@ -68,15 +62,13 @@ extern char*	sh_setenviron(const char*);
 #include	<shell.h>
 
 #include	"shtable.h"
-#include	"regress.h"
 
-/* error exits from various parts of shell */
-#define	NIL(type)	((type)0)
+#define NIL(type)	NULL		/* for backward compatibility */
 
 #define exitset()	(sh.savexit=sh.exitval)
 
 #ifndef SH_DICT
-#define SH_DICT		(void*)e_dict
+#define SH_DICT		e_dict
 #endif
 
 #ifndef SH_CMDLIB_DIR
@@ -113,9 +105,9 @@ extern void		sh_assignok(Namval_t*,int);
 extern struct dolnod	*sh_arguse(void);
 extern char		*sh_checkid(char*,char*);
 extern void		sh_chktrap(void);
+extern void		sh_deparse(Sfio_t*,const Shnode_t*,int,int);
 extern int		sh_debug(const char*,const char*,const char*,char *const[],int);
 extern char 		**sh_envgen(void);
-extern void 		sh_envnolocal(Namval_t*,void*);
 extern Sfdouble_t	sh_arith(const char*);
 extern void		*sh_arithcomp(char*);
 extern pid_t 		sh_fork(int,int*);
@@ -132,7 +124,7 @@ extern int		sh_outtype(Sfio_t*);
 extern char 		*sh_mactry(char*);
 extern int		sh_mathstd(const char*);
 extern void		sh_printopts(Shopt_t,int,Shopt_t*);
-extern int 		sh_readline(char**,volatile int,int,ssize_t,long);
+extern int 		sh_readline(char**,volatile int,int,ssize_t,Sflong_t);
 extern Sfio_t		*sh_sfeval(char*[]);
 extern void		sh_setmatch(const char*,int,int,int[],int);
 extern void             sh_scope(struct argnod*, int);
@@ -143,11 +135,17 @@ extern void		sh_subjobcheck(pid_t);
 extern int		sh_subsavefd(int);
 extern void		sh_subtmpfile(void);
 extern char 		*sh_substitute(const char*,const char*,char*);
+extern void		sh_timetraps(void);
 extern const char	*_sh_translate(const char*);
 extern int		sh_trace(char*[],int);
 extern void		sh_trim(char*);
 extern int		sh_type(const char*);
 extern void             sh_unscope(void);
+#if _lib_openat
+    extern int		sh_diropenat(int,const char *);
+    extern void		sh_pwdupdate(int);
+    extern int		sh_validate_subpwdfd(void);
+#endif /* _lib_openat */
 #if SHOPT_NAMESPACE
     extern Namval_t	*sh_fsearch(const char *,int);
 #endif /* SHOPT_NAMESPACE */
@@ -169,23 +167,35 @@ extern char		*sh_getcwd(void);
 #endif
 #define sh_translate(s)	_sh_translate(ERROR_dictionary(s))
 
-#define WBITS		(sizeof(long)*8)
+#define WBITS		(sizeof(uint64_t)*8)
 #define WMASK		(0xff)
 
-#define is_option(s,x)	((s)->v[((x)&WMASK)/WBITS] & (1L << ((x) % WBITS)))
-#define on_option(s,x)	((s)->v[((x)&WMASK)/WBITS] |= (1L << ((x) % WBITS)))
-#define off_option(s,x)	((s)->v[((x)&WMASK)/WBITS] &= ~(1L << ((x) % WBITS)))
+#if SHOPT_SCRIPTONLY
+#define is_option(s,x)	((x)==SH_INTERACTIVE || (x)==SH_HISTORY ? 0 : ((s)->v[((x)&WMASK)/WBITS] & ((uint64_t)1 << ((x) % WBITS))) )
+#define on_option(s,x)	( (x)==SH_INTERACTIVE || (x)==SH_HISTORY ? errormsg(SH_DICT,ERROR_exit(1),e_scriptonly) : ((s)->v[((x)&WMASK)/WBITS] |= ((uint64_t)1 << ((x) % WBITS))) )
+#define off_option(s,x)	((x)==SH_INTERACTIVE || (x)==SH_HISTORY ? 0 : ((s)->v[((x)&WMASK)/WBITS] &= ~((uint64_t)1 << ((x) % WBITS))) )
+#else
+#define is_option(s,x)	((s)->v[((x)&WMASK)/WBITS] & ((uint64_t)1 << ((x) % WBITS)))
+#define on_option(s,x)	((s)->v[((x)&WMASK)/WBITS] |= ((uint64_t)1 << ((x) % WBITS)))
+#define off_option(s,x)	((s)->v[((x)&WMASK)/WBITS] &= ~((uint64_t)1 << ((x) % WBITS)))
+#endif /* SHOPT_SCRIPTONLY */
 #define sh_isoption(x)	is_option(&sh.options,x)
 #define sh_onoption(x)	on_option(&sh.options,x)
 #define sh_offoption(x)	off_option(&sh.options,x)
 
 
 #define sh_state(x)	( 1<<(x))
-#define	sh_isstate(x)	(sh.st.states&sh_state(x))
-#define	sh_onstate(x)	(sh.st.states |= sh_state(x))
-#define	sh_offstate(x)	(sh.st.states &= ~sh_state(x))
-#define	sh_getstate()	(sh.st.states)
-#define	sh_setstate(x)	(sh.st.states = (x))
+#if SHOPT_SCRIPTONLY
+#define sh_isstate(x)	( (x)==SH_INTERACTIVE || (x)==SH_HISTORY ? 0 : (sh.st.states&sh_state(x)) )
+#define sh_onstate(x)	( (x)==SH_INTERACTIVE || (x)==SH_HISTORY ? 0 : (sh.st.states |= sh_state(x)) )
+#define sh_offstate(x)	( (x)==SH_INTERACTIVE || (x)==SH_HISTORY ? 0 : (sh.st.states &= ~sh_state(x)) )
+#else
+#define sh_isstate(x)	(sh.st.states&sh_state(x))
+#define sh_onstate(x)	(sh.st.states |= sh_state(x))
+#define sh_offstate(x)	(sh.st.states &= ~sh_state(x))
+#endif /* SHOPT_SCRIPTONLY */
+#define sh_getstate()	(sh.st.states)
+#define sh_setstate(x)	(sh.st.states = (x))
 
 #define sh_sigcheck()	do { if(sh.trapnote & SH_SIGSET) sh_exit(SH_EXITSIG); } while(0)
 
@@ -193,6 +203,9 @@ extern int32_t		sh_mailchk;
 extern const char	e_dict[];	/* error message catalog */
 extern const char	e_sptbnl[];	/* default IFS: " \t\n" */
 extern const char	e_dot[];	/* default path & name of dot command: "." */
+#if SHOPT_SCRIPTONLY
+extern const char	e_scriptonly[];
+#endif
 
 /* sh_printopts() mode flags -- set --[no]option by default */
 

@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#                  Lev Kujawski <int21h@mailbox.org>                   #
 #                                                                      #
 ########################################################################
 
@@ -145,7 +146,7 @@ then	err_exit 'cd inside nested subshell changes $PWD'
 fi
 fun() "$bin_echo" hello
 if	[[ $(fun) != hello ]]
-then	err_exit one line functions not working
+then	err_exit "'fun() simple_command' not working"
 fi
 cat > $tmp/script <<-\!
 	print -r -- "$1"
@@ -208,13 +209,13 @@ fi
 unset -f foo bar
 function bar
 {
-        print "$y"
+	print "$y"
 }
 
 function foo
 {
-        typeset x=3
-        y=$x bar
+	typeset x=3
+	y=$x bar
 }
 x=1
 if	[[ $(foo) != 3 ]]
@@ -256,16 +257,16 @@ function winpath
 	done
 	print done
 }
-if	[[ $( (winpath --man 2>/dev/null); print ok) != ok ]]
+if	[[ $( (winpath --man 2>&1); print ok) != Usage:\ winpath*ok ]]
 then	err_exit 'getopts --man in functions not working'
 fi
-if	[[ $( (winpath -z 2>/dev/null); print ok) != ok ]]
+if	[[ $( (winpath -z 2>&1); print ok) != *unknown\ option*ok ]]
 then	err_exit 'getopts with bad option in functions not working'
 fi
 unset -f x
 function x
 {
-        print "$@"
+	print "$@"
 }
 typeset -ft x
 if      [[ $(x x=y 2>/dev/null) != x=y ]]
@@ -364,11 +365,11 @@ then	err_exit 'attributes on unset variables not saved/restored'
 fi
 function xpd {
 	typeset i j=$1
-                for i
-                        do print i=$i j=$j
-                        [[ $i == a ]] && xpd b
-                        done
-                }
+		for i
+			do print i=$i j=$j
+			[[ $i == a ]] && xpd b
+			done
+		}
 if	[[ $(xpd a c) != $'i=a j=a\ni=b j=b\ni=c j=a' ]]
 then	err_exit 'for loop function optimization error'
 fi
@@ -405,7 +406,7 @@ cd $dir || { err_exit "cd $dir failed"; exit 1; }
 	} > /dev/null
 	typeset -ft a b
 	PS4=X
-	b 
+	b
 ) > file 2>&1
 [[ $(<file) == *'Xprint 2'* ]] ||  err_exit 'function trace disabled by function call'
 rm -f file
@@ -457,9 +458,9 @@ eval "$x"  || err_exit 'typeset -f generates syntax error'
 unset -f a b c
 a()
 {
-        b
-        b
-        print ${.sh.fun}
+	b
+	b
+	print ${.sh.fun}
 }
 b() { : ;}
 [[ $(a) == a ]] || err_exit '.sh.fun not set correctly in a function'
@@ -866,12 +867,12 @@ main
 optind=$OPTIND
 sub()
 {
-        (
-                OPTIND=1
-                while getopts :abc OPTION "$@"
-                do      print OPTIND=$OPTIND
-                done
-        )
+	(
+		OPTIND=1
+		while getopts :abc OPTION "$@"
+		do      print OPTIND=$OPTIND
+		done
+	)
 }
 [[ $(sub -a) == OPTIND=2 ]] || err_exit 'OPTIND should be 2'
 [[ $(sub -a) == OPTIND=2 ]] || err_exit 'OPTIND should be 2 again'
@@ -942,6 +943,16 @@ def()
 [[ $(def) == def ]] || err_exit '.sh.fun.set not capturing name()'
 unset -f .sh.fun.set
 
+# the traceback function above has set .sh.level in a loop; this should not break 'break'/'continue'
+for i in 1
+do	break
+	err_exit "'break' broken after setting .sh.level in a loop"
+done
+for i in 1
+do	continue
+	err_exit "'continue' broken after setting .sh.level in a loop"
+done
+
 # tests for debug functions
 basefile=${.sh.file}
 integer baseline
@@ -1005,8 +1016,9 @@ set -- $(bar)
 {
 got=$(
 s=$(ulimit -s)
-if	[[ $s == +([[:digit:]]) ]] && (( s < 16384 ))
-then	ulimit -s 16384 2>/dev/null
+if	[[ $s == +([[:digit:]]) ]] && (( s < 32768 ))
+then	# stack size doubled from 16384 to make this test pass under AddressSanitizer
+	ulimit -s 32768 2>/dev/null
 fi
 $SHELL << \+++
 f()
@@ -1111,17 +1123,17 @@ foo sub
 
 function A
 {
-        trap "> /dev/null;print TRAP A" EXIT
+	trap "> /dev/null;print TRAP A" EXIT
 	# (( stderr )) && print >&2
 }
 
 function B
 {
-        trap "> /dev/null;print TRAP B" EXIT
-        A
+	trap "> /dev/null;print TRAP B" EXIT
+	A
 }
-            
-x=$(B)      
+	
+x=$(B)
 [[ $x == $'TRAP A\nTRAP B' ]] || err_exit "trap from functions in subshells fails got" $x
 
 function foo
@@ -1197,7 +1209,7 @@ function foo
 		esac
 	done
 	shift $((OPTIND - 1))
-	(( OPTIND == 4 )) || err_exit "OPTIND is $OPTIND at end of function foo; it should be 4"  
+	(( OPTIND == 4 )) || err_exit "OPTIND is $OPTIND at end of function foo; it should be 4"
 	[[ $1 == foo2 ]] || err_exit "\$1 is $1, not foo after getopts in function"
 }
 OPTIND=6 OPTARG=xxx
@@ -1207,7 +1219,10 @@ foo -h -i foobar foo2
 
 if	[[ ! $compiled ]]
 then	function foo { getopts --man; }
-	[[ $(typeset -f foo) == 'function foo { getopts --man; }' ]] || err_exit 'typeset -f not work for function with getopts'
+	got=$(typeset -f foo)
+	exp=$'function foo\n{\tgetopts --man\n}'
+	[[ $got == "$exp" ]] || err_exit 'typeset -f does not work for function with getopts' \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 fi
 
 function foo
@@ -1254,7 +1269,7 @@ actual=$(
 	print 'function cd { echo "Func cd called with |$*|"; command cd "$@"; }' >"$prefix/functions/cd"
 	typeset -fu cd
 
-	PATH=$tmp/arglebargle:$PATH:$tmp/usr/bin:$tmp/bin
+	PATH=$tmp/arglebargle:$tmp/usr/bin:$tmp/bin
 	cd "$tmp/usr"
 	pwd
 )
@@ -1302,7 +1317,7 @@ got=$(
 	num=3.25+4.5 f1
 	typeset -p num
 )
-[[ $got == "$exp" ]] || echo 'assignment preceding POSIX function call is not correctly exported or propagated' \
+[[ $got == "$exp" ]] || err_exit 'assignment preceding POSIX function call is not correctly exported or propagated' \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
 # ======
@@ -1409,7 +1424,7 @@ fi
 # ======
 # funcname.ksh crashed
 # https://github.com/ksh93/ksh/issues/212
-cat >$tmp/funcname.ksh <<-'EOF'
+cat >$tmp/funcname.ksh <<'EOF'
 # tweaked version of funname.ksh by Daniel Douglas
 # https://gist.github.com/ormaaj/12874b68acd06ee98b59
 # Used by permission: "Consider all my gists MIT / do whatever."
@@ -1500,6 +1515,72 @@ f-----------'
 got=$(set +x; { "$SHELL" -c '. ./funcname.ksh' ;} 2>&1)
 [[ $got == "$exp" ]] || err_exit 'funcname.ksh crash (dot)' \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# in 'funcname() simple_command' definitions, the first command word was sometimes corrupted with trailing garbage
+# https://github.com/ksh93/ksh/issues/203
+# (do not change this test; even indenting may cause the bug to fail to be triggered)
+m="command word corruption in 'fun() simple_command'"
+v2=:
+f() "$v2" hello
+f || err_exit "$m"
+v23=:
+f() "$v23" hello
+f || err_exit "$m"
+v234=:
+f() "$v234" hello
+f || err_exit "$m"
+v2345=:
+f() "$v2345" hello
+f || err_exit "$m"
+v23456=:
+f() "$v23456" hello
+f || err_exit "$m"
+v234567=:
+f() "$v234567" hello
+f || err_exit "$m"
+v2345678=:
+f() "$v2345678" hello
+f || err_exit "$m"
+v23456789=:
+f() "$v23456789" hello
+f || err_exit "$m"
+v234567890=:
+f() "$v234567890" hello
+f || err_exit "$m"
+unset -f f
+unset -v "${!v2@}"
+
+# ======
+# Test 'unset -f' in subshell
+# https://github.com/ksh93/ksh/issues/646
+# NOTE: for ast commands, '--version' is expected to exit with status 2 on 93u+m/1.0, 0 on 93u+m/1.1 and up
+case ${.sh.version} in
+*93u+m/1.[!0]* | 93u+m/[2-9].* | 93u+m/?[!.]*)
+	s=0 ;;
+*)	s=2 ;;
+esac
+exp='^  version         [[:alpha:]]{2,} (.*) ....-..-..$'
+for b in cd disown fg getopts printf pwd read ulimit umask whence
+do	got=$(unset -f "$b"; PATH=/dev/null; "$b" --version 2>&1)
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (1a)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+	# the extra 'exit' is needed to avoid optimising out the subshell
+	got=$("$SHELL" -c "(unset -f $b; PATH=/dev/null; $b --version); exit" 2>&1)
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (1b)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+	eval "$b() { echo BAD; }"
+	got=$(unset -f "$b"; PATH=/dev/null; "$b" --version 2>&1)
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (2a)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+	unset -f "$b"
+
+	got=$("$SHELL" -c "$b() { :; }; (unset -f $b; PATH=/dev/null; $b --version); exit" 2>&1)
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (2b)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+done
 
 # ======
 exit $((Errors<125?Errors:125))

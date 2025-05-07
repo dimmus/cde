@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -25,11 +25,11 @@
 #include <hashkey.h>
 
 long
-strkey(register const char* s)
+strkey(const char* s)
 {
-	register long	x = 0;
-	register int	n = 0;
-	register int	c;
+	long	x = 0;
+	int	n = 0;
+	int	c;
 
 	while (n++ < HASHKEYMAX)
 	{

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -36,16 +37,16 @@
 #include <modex.h>
 
 int
-strperm(const char* aexpr, char** e, register int perm)
+strperm(const char* aexpr, char** e, int perm)
 {
-	register char*	expr = (char*)aexpr;
-	register int	c;
-	register int	typ;
-	register int	who;
-	int		num;
-	int		op;
-	int		mask;
-	int		masked;
+	char*	expr = (char*)aexpr;
+	int	c;
+	int	typ;
+	int	who;
+	int	num;
+	int	op;
+	int	mask;
+	int	masked;
 
 	if (perm == -1)
 	{

@@ -24,7 +24,7 @@
 .de EX		\" start example
 .ta 1i 2i 3i 4i 5i 6i
 .PP
-.RS 
+.RS
 .PD 0
 .ft 5
 .nf
@@ -52,11 +52,9 @@ combines
 and
 .IR setsid (2)
 into a single call.
-If one of either
+If
 .IR posix_spawn (3)
-or
-.IR vfork (2)
-is available, those functions are preferred over
+is available, that function is preferred over
 .IR fork .
 .PP
 .LR command ,
@@ -70,10 +68,11 @@ controls the new process group and session:
 .TP
 .L -1
 The new process becomes a session leader.
-It is called in the child context.
+.IR setsid (2)
+is called in the child context.
 .TP
 .L 0
-The new process is in the callers process group.
+The new process is in the caller's process group.
 .TP
 .L 1
 The new process becomes a process group leader.
@@ -108,4 +107,4 @@ cannot make the new process a session leader when using the
 .I posix_spawn
 API.
 .SH "SEE ALSO"
-fork(2), vfork(2), posix_spawn(3), exec(2), setpgid(2), setsid(2), spawnve(2)
+fork(2), posix_spawn(3), exec(2), setpgid(2), setsid(2), spawnve(2)

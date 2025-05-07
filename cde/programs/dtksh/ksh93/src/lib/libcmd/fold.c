@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -46,8 +47,8 @@ static const char usage[] =
 		"column position \an\a, where \an\a modulo 8 equals 1.]"
 	"}"
 "[+?If no \afile\a is given, or if the \afile\a is \b-\b, \bfold\b "
-        "reads from standard input.   The start of the file is defined "
-        "as the current offset.]"
+	"reads from standard input.   The start of the file is defined "
+	"as the current offset.]"
 
 "[b:bytes?Count bytes rather than columns so that each carriage-return, "
 	"backspace, and tab counts as 1.]"
@@ -82,11 +83,11 @@ static const char usage[] =
 #define T_SP	5
 #define T_RET	6
 
-static void fold(Sfio_t *in, Sfio_t *out, register int width, const char *cont, size_t contsize, char *cols)
+static void fold(Sfio_t *in, Sfio_t *out, int width, const char *cont, size_t contsize, char *cols)
 {
-	register char *cp, *first;
-	register int n, col=0, x=0;
-	register char *last_space=0;
+	char *cp, *first;
+	int n, col=0, x=0;
+	char *last_space=0;
 	cols[0] = 0;
 	for (;;)
 	{
@@ -97,7 +98,7 @@ static void fold(Sfio_t *in, Sfio_t *out, register int width, const char *cont, 
 			x = cp[--n];
 			cp[n] = '\n';
 		}
-		/* special case -b since no column adjustment is needed */ 
+		/* special case -b since no column adjustment is needed */
 		if(cols['\b']==0 && (n=sfvalue(in))<=width)
 		{
 			sfwrite(out,cp,n);
@@ -132,7 +133,7 @@ static void fold(Sfio_t *in, Sfio_t *out, register int width, const char *cont, 
 				col = 0;
 				continue;
 			    case T_BS:
-				if((cp+(--col)-first)>0) 
+				if((cp+(--col)-first)>0)
 					col--;
 				continue;
 			    case T_TAB:
@@ -165,9 +166,9 @@ static void fold(Sfio_t *in, Sfio_t *out, register int width, const char *cont, 
 int
 b_fold(int argc, char** argv, Shbltin_t* context)
 {
-	register int n, width=WIDTH;
-	register Sfio_t *fp;
-	register char *cp;
+	int n, width=WIDTH;
+	Sfio_t *fp;
+	char *cp;
 	char *cont="\n";
 	size_t contsize = 1;
 	char cols[1<<CHAR_BIT];
@@ -206,8 +207,9 @@ b_fold(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
@@ -215,7 +217,7 @@ b_fold(int argc, char** argv, Shbltin_t* context)
 	argc -= opt_info.index;
 	if(error_info.errors)
 	{
-		error(ERROR_usage(2),"%s", optusage(NiL));
+		error(ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if(cp = *argv)
@@ -224,7 +226,7 @@ b_fold(int argc, char** argv, Shbltin_t* context)
 	{
 		if(!cp || streq(cp,"-"))
 			fp = sfstdin;
-		else if(!(fp = sfopen(NiL,cp,"r")))
+		else if(!(fp = sfopen(NULL,cp,"r")))
 		{
 			error(ERROR_system(0),"%s: cannot open",cp);
 			error_info.errors = 1;
@@ -235,5 +237,5 @@ b_fold(int argc, char** argv, Shbltin_t* context)
 			sfclose(fp);
 	}
 	while(cp= *argv++);
-	return(error_info.errors);
+	return error_info.errors;
 }

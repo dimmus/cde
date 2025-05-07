@@ -21,7 +21,7 @@
  * 3. Neither the name of the copyright holder nor the names of contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTOR(S) ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -37,10 +37,8 @@
 
 /*
  * ASSERT NOTE:
- * Some sanity checking code is included using assert().  On my FreeBSD
- * system, this additional code can be removed by compiling with NDEBUG
- * defined.  Check your own system's man page on assert() to see how to
- * compile WITHOUT the sanity checking code on your system.
+ * Some sanity checking code is included using assert().
+ * It can be removed by compiling with NDEBUG defined. 
  *
  * UNROLLED TRANSFORM LOOP NOTE:
  * You can define SHA2_UNROLL_TRANSFORM to use the unrolled transform
@@ -57,8 +55,6 @@
 
 /*** SHA-256/384/512 Machine Architecture Definitions *****************/
 
-#if _PACKAGE_ast
-
 #ifndef __USE_BSD
 #define __undef__USE_BSD
 #define __USE_BSD
@@ -73,76 +69,14 @@ typedef  uint8_t sha2_byte;	/* Exactly 1 byte */
 typedef uint32_t sha2_word32;	/* Exactly 4 bytes */
 typedef uint64_t sha2_word64;	/* Exactly 8 bytes */
 
-#define assert(x)
+#if _AST_release
+#define NDEBUG
+#endif
+#include <assert.h>
 
 #undef	R
 #undef	S32
 #undef	S64
-
-#else /* _PACKAGE_ast */
-
-/*
- * BYTE_ORDER NOTE:
- *
- * Please make sure that your system defines BYTE_ORDER.  If your
- * architecture is little-endian, make sure it also defines
- * LITTLE_ENDIAN and that the two (BYTE_ORDER and LITTLE_ENDIAN) are
- * equivalent.
- *
- * If your system does not define the above, then you can do so by
- * hand like this:
- *
- *   #define LITTLE_ENDIAN 1234
- *   #define BIG_ENDIAN    4321
- *
- * And for little-endian machines, add:
- *
- *   #define BYTE_ORDER LITTLE_ENDIAN 
- *
- * Or for big-endian machines:
- *
- *   #define BYTE_ORDER BIG_ENDIAN
- *
- * The FreeBSD machine this was written on defines BYTE_ORDER
- * appropriately by including <sys/types.h> (which in turn includes
- * <machine/endian.h> where the appropriate definitions are actually
- * made).
- */
-
-#if !defined(BYTE_ORDER) || (BYTE_ORDER != LITTLE_ENDIAN && BYTE_ORDER != BIG_ENDIAN)
-#error Define BYTE_ORDER to be equal to either LITTLE_ENDIAN or BIG_ENDIAN
-#endif
-
-/*
- * Define the following sha2_* types to types of the correct length on
- * the native architecture.   Most BSD systems and Linux define u_intXX_t
- * types.  Machines with very recent ANSI C headers, can use the
- * uintXX_t definitions from inttypes.h by defining SHA2_USE_INTTYPES_H
- * during compile or in the sha.h header file.
- *
- * Machines that support neither u_intXX_t nor inttypes.h's uintXX_t
- * will need to define these three typedefs below (and the appropriate
- * ones in sha.h too) by hand according to their system architecture.
- *
- * Thank you, Jun-ichiro itojun Hagino, for suggesting using u_intXX_t
- * types and pointing out recent ANSI C support for uintXX_t in inttypes.h.
- */
-
-#ifdef SHA2_USE_INTTYPES_H
-
-typedef uint8_t  sha2_byte;	/* Exactly 1 byte */
-typedef uint32_t sha2_word32;	/* Exactly 4 bytes */
-typedef uint64_t sha2_word64;	/* Exactly 8 bytes */
-
-#else /* SHA2_USE_INTTYPES_H */
-
-typedef u_int8_t  sha2_byte;	/* Exactly 1 byte */
-typedef u_int32_t sha2_word32;	/* Exactly 4 bytes */
-typedef u_int64_t sha2_word64;	/* Exactly 8 bytes */
-
-#endif /* SHA2_USE_INTTYPES_H */
-
-#endif /* _PACKAGE_ast */
 
 /*** SHA-256/384/512 Various Length Definitions ***********************/
 
@@ -210,7 +144,7 @@ typedef u_int64_t sha2_word64;	/* Exactly 8 bytes */
 
 #if !defined(SHA2_USE_MEMSET_MEMCPY) && !defined(SHA2_USE_BZERO_BCOPY)
 /* Default to memset()/memcpy() if no option is specified */
-#define	SHA2_USE_MEMSET_MEMCPY	1
+#define SHA2_USE_MEMSET_MEMCPY	1
 #endif
 #if defined(SHA2_USE_MEMSET_MEMCPY) && defined(SHA2_USE_BZERO_BCOPY)
 /* Abort with an error if BOTH options are defined */
@@ -233,8 +167,8 @@ typedef u_int64_t sha2_word64;	/* Exactly 8 bytes */
  *
  *   NOTE:  The naming of R and S appears backwards here (R is a SHIFT and
  *   S is a ROTATION) because the SHA-256/384/512 description document
- *   (see http://csrc.nist.gov/cryptval/shs/sha256-384-512.pdf) uses this
- *   same "backwards" definition.
+ *   uses this same "backwards" definition:
+ *   https://web.archive.org/web/20050907174740/http://csrc.nist.gov/cryptval/shs/sha256-384-512.pdf
  */
 
 /* Shift-right (used in SHA-256, SHA-384, and SHA-512): */
@@ -460,7 +394,7 @@ typedef struct Sha256_s
 #define ROUND256_0_TO_15(a,b,c,d,e,f,g,h)	\
 	REVERSE32(*data++, W256[j]); \
 	T1 = (h) + Sigma1_256(e) + Ch((e), (f), (g)) + \
-             K256[j] + W256[j]; \
+	     K256[j] + W256[j]; \
 	(d) += T1; \
 	(h) = T1 + Sigma0_256(a) + Maj((a), (b), (c)); \
 	j++
@@ -591,11 +525,11 @@ static void SHA256_Transform(SHA256_CTX* sha, const sha2_word32* data) {
 		/* Part of the message block expansion: */
 		s0 = W256[(j+1)&0x0f];
 		s0 = sigma0_256(s0);
-		s1 = W256[(j+14)&0x0f];	
+		s1 = W256[(j+14)&0x0f];
 		s1 = sigma1_256(s1);
 
 		/* Apply the SHA-256 compression function to update a..h */
-		T1 = h + Sigma1_256(e) + Ch(e, f, g) + K256[j] + 
+		T1 = h + Sigma1_256(e) + Ch(e, f, g) + K256[j] +
 		     (W256[j&0x0f] += s1 + W256[(j+9)&0x0f] + s0);
 		T2 = Sigma0_256(a) + Maj(a, b, c);
 		h = g;
@@ -627,7 +561,7 @@ static void SHA256_Transform(SHA256_CTX* sha, const sha2_word32* data) {
 #endif /* SHA2_UNROLL_TRANSFORM */
 
 static int
-sha256_block(register Sum_t* p, const void* s, size_t len)
+sha256_block(Sum_t* p, const void* s, size_t len)
 {
 	Sha256_t*	sha = (Sha256_t*)p;
 	sha2_byte*	data = (sha2_byte*)s;
@@ -677,7 +611,7 @@ sha256_block(register Sum_t* p, const void* s, size_t len)
 static int
 sha256_init(Sum_t* p)
 {
-	register Sha256_t*	sha = (Sha256_t*)p;
+	Sha256_t*	sha = (Sha256_t*)p;
 
 	MEMCPY_BCOPY(sha->state, sha256_initial_hash_value, SHA256_DIGEST_LENGTH);
 	MEMSET_BZERO(sha->buffer, SHA256_BLOCK_LENGTH);
@@ -705,10 +639,10 @@ sha256_done(Sum_t* p)
 {
 	Sha256_t*	sha = (Sha256_t*)p;
 	unsigned int	usedspace;
-	register int	i;
+	int		i;
 
 	/* Sanity check: */
-	assert(sha != (SHA256_CTX*)0);
+	assert(sha != NULL);
 
 	usedspace = (sha->bitcount >> 3) % SHA256_BLOCK_LENGTH;
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -771,12 +705,13 @@ sha256_done(Sum_t* p)
 }
 
 static int
-sha256_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
+sha256_print(Sum_t* p, Sfio_t* sp, int flags, size_t scale)
 {
-	register Sha256_t*	sha = (Sha256_t*)p;
-	register sha2_byte*	d;
-	register sha2_byte*	e;
+	Sha256_t*	sha = (Sha256_t*)p;
+	sha2_byte*	d;
+	sha2_byte*	e;
 
+	NOT_USED(scale);
 	d = (flags & SUM_TOTAL) ? sha->digest_sum : sha->digest;
 	e = d + SHA256_DIGEST_LENGTH;
 	while (d < e)
@@ -787,7 +722,7 @@ sha256_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
 static int
 sha256_data(Sum_t* p, Sumdata_t* data)
 {
-	register Sha256_t*	sha = (Sha256_t*)p;
+	Sha256_t*	sha = (Sha256_t*)p;
 
 	data->size = SHA256_DIGEST_LENGTH;
 	data->num = 0;
@@ -828,7 +763,7 @@ typedef struct Sha512_s
 #define ROUND512_0_TO_15(a,b,c,d,e,f,g,h)	\
 	REVERSE64(*data++, W512[j]); \
 	T1 = (h) + Sigma1_512(e) + Ch((e), (f), (g)) + \
-             K512[j] + W512[j]; \
+	     K512[j] + W512[j]; \
 	(d) += T1, \
 	(h) = T1 + Sigma0_512(a) + Maj((a), (b), (c)), \
 	j++
@@ -838,7 +773,7 @@ typedef struct Sha512_s
 
 #define ROUND512_0_TO_15(a,b,c,d,e,f,g,h)	\
 	T1 = (h) + Sigma1_512(e) + Ch((e), (f), (g)) + \
-             K512[j] + (W512[j] = *data++); \
+	     K512[j] + (W512[j] = *data++); \
 	(d) += T1; \
 	(h) = T1 + Sigma0_512(a) + Maj((a), (b), (c)); \
 	j++
@@ -851,7 +786,7 @@ typedef struct Sha512_s
 	s1 = W512[(j+14)&0x0f]; \
 	s1 = sigma1_512(s1); \
 	T1 = (h) + Sigma1_512(e) + Ch((e), (f), (g)) + K512[j] + \
-             (W512[j&0x0f] += s1 + W512[(j+9)&0x0f] + s0); \
+	     (W512[j&0x0f] += s1 + W512[(j+9)&0x0f] + s0); \
 	(d) += T1; \
 	(h) = T1 + Sigma0_512(a) + Maj((a), (b), (c)); \
 	j++
@@ -990,7 +925,7 @@ static void SHA512_Transform(SHA512_CTX* sha, const sha2_word64* data) {
 #endif /* SHA2_UNROLL_TRANSFORM */
 
 static int
-sha512_block(register Sum_t* p, const void* s, size_t len)
+sha512_block(Sum_t* p, const void* s, size_t len)
 {
 	Sha512_t*	sha = (Sha512_t*)p;
 	sha2_byte*	data = (sha2_byte*)s;
@@ -1040,7 +975,7 @@ sha512_block(register Sum_t* p, const void* s, size_t len)
 static int
 sha512_init(Sum_t* p)
 {
-	register Sha512_t*	sha = (Sha512_t*)p;
+	Sha512_t*	sha = (Sha512_t*)p;
 
 	MEMCPY_BCOPY(sha->state, sha512_initial_hash_value, SHA512_DIGEST_LENGTH);
 	MEMSET_BZERO(sha->buffer, SHA512_BLOCK_LENGTH);
@@ -1068,7 +1003,7 @@ sha512_done(Sum_t* p)
 {
 	Sha512_t*	sha = (Sha512_t*)p;
 	unsigned int	usedspace;
-	register int	i;
+	int		i;
 
 	usedspace = (sha->bitcount[1] >> 3) % SHA512_BLOCK_LENGTH;
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -1132,12 +1067,13 @@ sha512_done(Sum_t* p)
 }
 
 static int
-sha512_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
+sha512_print(Sum_t* p, Sfio_t* sp, int flags, size_t scale)
 {
-	register Sha512_t*	sha = (Sha512_t*)p;
-	register sha2_byte*	d;
-	register sha2_byte*	e;
+	Sha512_t*	sha = (Sha512_t*)p;
+	sha2_byte*	d;
+	sha2_byte*	e;
 
+	NOT_USED(scale);
 	d = (flags & SUM_TOTAL) ? sha->digest_sum : sha->digest;
 	e = d + SHA512_DIGEST_LENGTH;
 	while (d < e)
@@ -1148,7 +1084,7 @@ sha512_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
 static int
 sha512_data(Sum_t* p, Sumdata_t* data)
 {
-	register Sha512_t*	sha = (Sha512_t*)p;
+	Sha512_t*	sha = (Sha512_t*)p;
 
 	data->size = SHA512_DIGEST_LENGTH;
 	data->num = 0;
@@ -1177,7 +1113,7 @@ sha512_data(Sum_t* p, Sumdata_t* data)
 static int
 sha384_init(Sum_t* p)
 {
-	register Sha384_t*	sha = (Sha384_t*)p;
+	Sha384_t*	sha = (Sha384_t*)p;
 
 	MEMCPY_BCOPY(sha->state, sha384_initial_hash_value, SHA512_DIGEST_LENGTH);
 	MEMSET_BZERO(sha->buffer, SHA384_BLOCK_LENGTH);
@@ -1201,12 +1137,13 @@ sha384_open(const Method_t* method, const char* name)
 }
 
 static int
-sha384_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
+sha384_print(Sum_t* p, Sfio_t* sp, int flags, size_t scale)
 {
-	register Sha384_t*	sha = (Sha384_t*)p;
-	register sha2_byte*	d;
-	register sha2_byte*	e;
+	Sha384_t*	sha = (Sha384_t*)p;
+	sha2_byte*	d;
+	sha2_byte*	e;
 
+	NOT_USED(scale);
 	d = (flags & SUM_TOTAL) ? sha->digest_sum : sha->digest;
 	e = d + SHA384_DIGEST_LENGTH;
 	while (d < e)
@@ -1217,7 +1154,7 @@ sha384_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
 static int
 sha384_data(Sum_t* p, Sumdata_t* data)
 {
-	register Sha384_t*	sha = (Sha384_t*)p;
+	Sha384_t*	sha = (Sha384_t*)p;
 
 	data->size = SHA384_DIGEST_LENGTH;
 	data->num = 0;

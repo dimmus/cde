@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
@@ -52,9 +53,9 @@ ssize_t sfpkrd(int	fd,	/* file descriptor */
 				   =2: same as >0, but always use select(2)
 				*/
 {
-	reg ssize_t	r;
-	reg int		ntry, t;
-	reg char	*buf = (char*)argbuf, *endbuf;
+	ssize_t		r;
+	int		ntry, t;
+	char		*buf = (char*)argbuf, *endbuf;
 
 	if(rc < 0 && tm < 0 && action <= 0)
 		return read(fd,buf,n);
@@ -76,7 +77,7 @@ ssize_t sfpkrd(int	fd,	/* file descriptor */
 			pbuf.flags = 0;
 			pbuf.ctlbuf.maxlen = -1;
 			pbuf.ctlbuf.len = 0;
-			pbuf.ctlbuf.buf = NIL(char*);
+			pbuf.ctlbuf.buf = NULL;
 			pbuf.databuf.maxlen = n;
 			pbuf.databuf.buf = buf;
 			pbuf.databuf.len = 0;
@@ -122,13 +123,13 @@ ssize_t sfpkrd(int	fd,	/* file descriptor */
 				FD_ZERO(&rd);
 				FD_SET(fd,&rd);
 				if(tm < 0)
-					tmp = NIL(struct timeval*);
+					tmp = NULL;
 				else
 				{	tmp = &tmb;
 					tmb.tv_sec = tm/SECOND;
 					tmb.tv_usec = (tm%SECOND)*SECOND;
 				}
-				r = select(fd+1,&rd,NIL(fd_set*),NIL(fd_set*),tmp);
+				r = select(fd+1,&rd,NULL,NULL,tmp);
 				if(r < 0)
 				{	if(errno == EINTR)
 						return -1;
@@ -202,7 +203,7 @@ ssize_t sfpkrd(int	fd,	/* file descriptor */
 
 	/* successful peek, find the record end */
 	if(rc >= 0)
-	{	reg char*	sp;	
+	{	char*	sp;
 
 		t = action == 0 ? 1 : action < 0 ? -action : action;
 		for(endbuf = (sp = buf)+r; sp < endbuf; )

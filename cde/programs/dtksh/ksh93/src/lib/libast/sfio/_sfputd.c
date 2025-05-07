@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -26,13 +26,13 @@
 int _sfputd(Sfio_t* f, Sfdouble_t v)
 {
 #define N_ARRAY		(16*sizeof(Sfdouble_t))
-	reg ssize_t	n, w;
-	reg uchar	*s, *ends;
+	ssize_t		n, w;
+	uchar		*s, *ends;
 	int		exp;
 	uchar		c[N_ARRAY];
 	Sfdouble_t	x;
 
-	if(!f || (f->mode != SF_WRITE && _sfmode(f,SF_WRITE,0) < 0))
+	if(!f || (f->mode != SFIO_WRITE && _sfmode(f,SFIO_WRITE,0) < 0))
 		return -1;
 	SFLOCK(f,0);
 
@@ -63,21 +63,21 @@ int _sfputd(Sfio_t* f, Sfdouble_t v)
 
 	s = (ends = &c[0])+sizeof(c);
 	while(s > ends)
-	{	/* get 2^SF_PRECIS precision at a time */
-		n = (int)(x = ldexpl(v,SF_PRECIS));
-		*--s = n|SF_MORE;
+	{	/* get 2^SFIO_PRECIS precision at a time */
+		n = (int)(x = ldexpl(v,SFIO_PRECIS));
+		*--s = n|SFIO_MORE;
 		v = x-n;
 		if(v <= 0.)
 			break;
 	}
 
-	/* last byte is not SF_MORE */
+	/* last byte is not SFIO_MORE */
 	ends = &c[0] + sizeof(c) -1;
-	*ends &= ~SF_MORE;
+	*ends &= ~SFIO_MORE;
 
 	/* write out coded bytes */
 	n = ends - s + 1;
-	w = SFWRITE(f,(void*)s,n) == n ? w+n : -1;
+	w = SFWRITE(f,s,n) == n ? w+n : -1;
 
 	SFOPEN(f,0);
 	return w;

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -33,11 +33,11 @@ static const char usage[] =
     "%[-+]][\awidth\a[.\aprecis\a[.\abase\a]]]]]](\aid\a)\achar\a. The "
     "supported \aid\as are:]:[format:=" FORMAT "]"
     "{"
-        "[+pid?The process ID.]"
-        "[+pgid?The process group ID.]"
-        "[+ppid?The parent process ID.]"
-        "[+tid|tty?The controlling terminal ID.]"
-        "[+sid?The session ID.]"
+	"[+pid?The process ID.]"
+	"[+pgid?The process group ID.]"
+	"[+ppid?The parent process ID.]"
+	"[+tid|tty?The controlling terminal ID.]"
+	"[+sid?The session ID.]"
     "}"
 "[+SEE ALSO?\bgetpid\b(2), \bgetppid\b(2), \bgetpgrp\b(2), "
     "\btcgetpgrp\b(3), \bgetsid\b(2)]"
@@ -55,10 +55,11 @@ static const char usage[] =
 static int
 key(void* handle, Sffmt_t* fp, const char* arg, char** ps, Sflong_t* pn)
 {
-	register char*	s;
-	int		fd;
-	long		tid;
+	char*	s;
+	int	fd;
+	pid_t	tid;
 
+	NOT_USED(arg);
 	if (!(s = fp->t_str) || streq(s, "pid"))
 		*pn = getpid();
 	else if (streq(s, "pgid"))
@@ -102,8 +103,9 @@ b_pids(int argc, char** argv, Shbltin_t* context)
 			format = opt_info.arg;
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
@@ -113,12 +115,12 @@ b_pids(int argc, char** argv, Shbltin_t* context)
 	argv += opt_info.index;
 	if (error_info.errors || *argv)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (!format)
 		format = FORMAT;
-	sfkeyprintf(sfstdout, format, format, key, NiL);
+	sfkeyprintf(sfstdout, format, format, key, NULL);
 	sfprintf(sfstdout, "\n");
 	return 0;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -64,9 +65,9 @@ static const char usage[] =
 "\n"
 "[+EXIT STATUS?]"
     "{"
-        "[+0?The files or portions compared are identical.]"
-        "[+1?The files are different.]"
-        "[+>1?An error occurred.]"
+	"[+0?The files or portions compared are identical.]"
+	"[+1?The files are different.]"
+	"[+>1?An error occurred.]"
     "}"
 "[+SEE ALSO?\bcomm\b(1), \bdiff\b(1), \bcat\b(1)]"
 ;
@@ -74,7 +75,6 @@ static const char usage[] =
 #include <cmd.h>
 #include <ls.h>
 #include <ctype.h>
-#include <ccode.h>
 
 #define CMP_VERBOSE	0x01
 #define CMP_SILENT	0x02
@@ -84,7 +84,6 @@ static const char usage[] =
 static void
 pretty(Sfio_t *out, int o, int delim, int flags)
 {
-	int	c;
 	int	m;
 	char*	s;
 	char	buf[10];
@@ -99,16 +98,15 @@ pretty(Sfio_t *out, int o, int delim, int flags)
 		*s++ = '0' + ((o >> 3) & 07);
 		*s++ = '0' + (o & 07);
 	}
+	/* ASCII assumed below */
 	if (flags & CMP_CHARS)
 	{
 		*s++ = ' ';
-		c = ccmapc(o, CC_NATIVE, CC_ASCII);
-		if (c & 0x80)
+		if (o & 0x80)
 		{
 			m = 1;
 			*s++ = 'M';
-			c &= 0x7f;
-			o = ccmapc(c, CC_ASCII, CC_NATIVE);
+			o &= 0x7f;
 		}
 		else
 			m = 0;
@@ -117,8 +115,7 @@ pretty(Sfio_t *out, int o, int delim, int flags)
 			if (!m)
 				*s++ = ' ';
 			*s++ = '^';
-			c ^= 0x40;
-			o = ccmapc(c, CC_ASCII, CC_NATIVE);
+			o ^= 0x40;
 		}
 		else if (m)
 			*s++ = '-';
@@ -140,17 +137,17 @@ pretty(Sfio_t *out, int o, int delim, int flags)
 static int
 cmp(const char* file1, Sfio_t* f1, const char* file2, Sfio_t* f2, int flags, Sfoff_t count, Sfoff_t differences)
 {
-	register int		c1;
-	register int		c2;
-	register unsigned char*	p1 = 0;
-	register unsigned char*	p2 = 0;
-	register Sfoff_t	lines = 1;
-	register unsigned char*	e1 = 0;
-	register unsigned char*	e2 = 0;
-	Sfoff_t			pos = 0;
-	int			n1 = 0;
-	int			ret = 0;
-	unsigned char*		last;
+	int		c1;
+	int		c2;
+	unsigned char*	p1 = 0;
+	unsigned char*	p2 = 0;
+	Sfoff_t	lines = 1;
+	unsigned char*	e1 = 0;
+	unsigned char*	e2 = 0;
+	Sfoff_t		pos = 0;
+	int		n1 = 0;
+	int		ret = 0;
+	unsigned char*	last;
 
 	for (;;)
 	{
@@ -158,14 +155,14 @@ cmp(const char* file1, Sfio_t* f1, const char* file2, Sfio_t* f2, int flags, Sfo
 		{
 			if (count > 0 && !(count -= n1))
 				return ret;
-			if (!(p1 = (unsigned char*)sfreserve(f1, SF_UNBOUND, 0)) || (c1 = sfvalue(f1)) <= 0)
+			if (!(p1 = (unsigned char*)sfreserve(f1, SFIO_UNBOUND, 0)) || (c1 = sfvalue(f1)) <= 0)
 			{
 				if (sferror(f1))
 				{
 					error(ERROR_exit(2), "read error on %s", file1);
 					UNREACHABLE();
 				}
-				if ((e2 - p2) > 0 || sfreserve(f2, SF_UNBOUND, 0) && sfvalue(f2) > 0)
+				if ((e2 - p2) > 0 || sfreserve(f2, SFIO_UNBOUND, 0) && sfvalue(f2) > 0)
 				{
 					ret = 1;
 					if (!(flags & CMP_SILENT))
@@ -188,7 +185,7 @@ cmp(const char* file1, Sfio_t* f1, const char* file2, Sfio_t* f2, int flags, Sfo
 		}
 		if ((c2 = e2 - p2) <= 0)
 		{
-			if (!(p2 = (unsigned char*)sfreserve(f2, SF_UNBOUND, 0)) || (c2 = sfvalue(f2)) <= 0)
+			if (!(p2 = (unsigned char*)sfreserve(f2, SFIO_UNBOUND, 0)) || (c2 = sfvalue(f2)) <= 0)
 			{
 				if (sferror(f2))
 				{
@@ -251,7 +248,7 @@ cmp(const char* file1, Sfio_t* f1, const char* file2, Sfio_t* f2, int flags, Sfo
 }
 
 int
-b_cmp(int argc, register char** argv, Shbltin_t* context)
+b_cmp(int argc, char** argv, Shbltin_t* context)
 {
 	char*		s;
 	char*		e;
@@ -310,21 +307,22 @@ b_cmp(int argc, register char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || !(file1 = *argv++) || !(file2 = *argv++))
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	n = 2;
 	if (streq(file1, "-"))
 		f1 = sfstdin;
-	else if (!(f1 = sfopen(NiL, file1, "r")))
+	else if (!(f1 = sfopen(NULL, file1, "r")))
 	{
 		if (!(flags & CMP_SILENT))
 			error(ERROR_system(0), "%s: cannot open", file1);
@@ -332,7 +330,7 @@ b_cmp(int argc, register char** argv, Shbltin_t* context)
 	}
 	if (streq(file2, "-"))
 		f2 = sfstdin;
-	else if (!(f2 = sfopen(NiL, file2, "r")))
+	else if (!(f2 = sfopen(NULL, file2, "r")))
 	{
 		if (!(flags & CMP_SILENT))
 			error(ERROR_system(0), "%s: cannot open", file2);
@@ -357,7 +355,7 @@ b_cmp(int argc, register char** argv, Shbltin_t* context)
 		}
 		if (*argv)
 		{
-			error(ERROR_usage(0), "%s", optusage(NiL));
+			error(ERROR_usage(0), "%s", optusage(NULL));
 			goto done;
 		}
 	}

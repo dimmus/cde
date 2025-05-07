@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #ifndef _SHNODES_H
@@ -45,7 +46,6 @@
 #define TTEST		(010<<COMBITS)
 #define TPAREN		(TBINARY|TUNARY)
 #define TSHIFT		(COMBITS+4)
-#define TNSPACE		(TFUN|COMSCAN)
 
 #define TCOM	0
 #define TPAR	1
@@ -62,9 +62,12 @@
 #define TFOR	11
 #define TSELECT	(TFOR|COMSCAN)
 #define TARITH	12
-#define	TTIME	13
+#define TTIME	13
 #define TSETIO	14
 #define TFUN	15
+#if SHOPT_NAMESPACE
+#define TNSPACE	(TFUN|COMSCAN)
+#endif
 
 /* this node is a proforma for those that follow */
 
@@ -143,7 +146,7 @@ struct lstnod
 struct tstnod
 {
 	struct lstnod	tstlst;
-	int		tstline;	
+	int		tstline;
 };
 
 struct functnod
@@ -152,7 +155,6 @@ struct functnod
 	char		*functnam;
 	Shnode_t	*functtre;
 	int		functline;
-	off_t		functloc;
 	struct slnod	*functstak;
 	struct comnod	*functargs;
 };
@@ -181,7 +183,7 @@ struct arithnod
 #define IOVNM		0x10000	/* iovname field is non-zero */
 #define IOLSEEK		0x20000	/* seek operators <# or >#  */
 #define IOARITH		0x40000	/* arithmetic seek <# ((expr))  */
-#define IOREWRITE	0x80000	/* arithmetic seek <# ((expr))  */
+#define IOREWRITE	0x80000	/* rewrite/truncate upon command success: >;word <>;word */
 #define IOCOPY		IOCLOB	/* copy skipped lines onto standard output */
 #define IOPROCSUB	IOARITH	/* process substitution redirection */
 

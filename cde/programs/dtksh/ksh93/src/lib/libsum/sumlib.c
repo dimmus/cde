@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1996-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -20,8 +21,6 @@
  *
  * man this is sum library
  */
-
-static const char id[] = "\n@(#)$Id: sumlib (AT&T Research) 2009-09-28 $\0\n";
 
 #define _SUM_PRIVATE_	\
 			struct Method_s*	method;	\
@@ -64,7 +63,7 @@ typedef struct Map_s
 #define _INTEGRAL_PRIVATE_ \
 	uint32_t	sum; \
 	uint32_t	total_sum;
-	
+
 typedef struct Integral_s
 {
 	_SUM_PUBLIC_
@@ -95,7 +94,7 @@ long_init(Sum_t* p)
 static int
 long_done(Sum_t* p)
 {
-	register Integral_t*	x = (Integral_t*)p;
+	Integral_t*	x = (Integral_t*)p;
 
 	x->total_sum ^= (x->sum &= 0xffffffff);
 	return 0;
@@ -104,19 +103,19 @@ long_done(Sum_t* p)
 static int
 short_done(Sum_t* p)
 {
-	register Integral_t*	x = (Integral_t*)p;
+	Integral_t*	x = (Integral_t*)p;
 
 	x->total_sum ^= (x->sum &= 0xffff);
 	return 0;
 }
 
 static int
-long_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
+long_print(Sum_t* p, Sfio_t* sp, int flags, size_t scale)
 {
-	register Integral_t*	x = (Integral_t*)p;
-	register uint32_t	c;
-	register uintmax_t	z;
-	register size_t		n;
+	Integral_t*	x = (Integral_t*)p;
+	uint32_t	c;
+	uintmax_t	z;
+	size_t		n;
 
 	c = (flags & SUM_TOTAL) ? x->total_sum : x->sum;
 	sfprintf(sp, "%.*I*u", (flags & SUM_LEGACY) ? 5 : 1, sizeof(c), c);
@@ -135,7 +134,7 @@ long_print(Sum_t* p, Sfio_t* sp, register int flags, size_t scale)
 static int
 long_data(Sum_t* p, Sumdata_t* data)
 {
-	register Integral_t*	x = (Integral_t*)p;
+	Integral_t*	x = (Integral_t*)p;
 
 	data->size = sizeof(data->num);
 	data->num = x->sum;
@@ -233,9 +232,9 @@ static const Map_t	maps[] =
  */
 
 static int
-match(register const char* s, register const char* p)
+match(const char* s, const char* p)
 {
-	register const char*	b = s;
+	const char*	b = s;
 
 	for (;;)
 	{
@@ -267,9 +266,9 @@ match(register const char* s, register const char* p)
  */
 
 Sum_t*
-sumopen(register const char* name)
+sumopen(const char* name)
 {
-	register int	n;
+	int	n;
 
 	if (!name || !name[0] || name[0] == '-' && !name[1])
 		name = "default";
@@ -282,7 +281,7 @@ sumopen(register const char* name)
 	for (n = 0; n < elementsof(methods); n++)
 		if (match(name, methods[n].match))
 			return (*methods[n].open)(&methods[n], name);
-	return 0;
+	return NULL;
 }
 
 /*
@@ -357,8 +356,8 @@ sumclose(Sum_t* p)
 int
 sumusage(Sfio_t* sp)
 {
-	register int	i;
-	register int	n;
+	int	i;
+	int	n;
 
 	for (i = n = 0; i < elementsof(methods); i++)
 	{

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1996-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -49,11 +49,11 @@ typedef struct Prng_s
 static Sum_t*
 prng_open(const Method_t* method, const char* name)
 {
-	register Prng_t*	sum;
-	register const char*	s;
-	register const char*	t;
-	register const char*	v;
-	register int		i;
+	Prng_t*	sum;
+	const char*	s;
+	const char*	t;
+	const char*	v;
+	int		i;
 
 	if (sum = newof(0, Prng_t, 1, 0))
 	{
@@ -68,11 +68,11 @@ prng_open(const Method_t* method, const char* name)
 				v = s;
 		i = (v ? v : s) - t;
 		if (isdigit(*t) || v && strneq(t, "mpy", i) && (t = v + 1))
-			sum->mpy = strtoul(t, NiL, 0);
+			sum->mpy = strtoul(t, NULL, 0);
 		else if (strneq(t, "add", i))
-			sum->add = v ? strtoul(v + 1, NiL, 0) : ~sum->add;
+			sum->add = v ? strtoul(v + 1, NULL, 0) : ~sum->add;
 		else if (strneq(t, "init", i))
-			sum->init = v ? strtoul(v + 1, NiL, 0) : ~sum->init;
+			sum->init = v ? strtoul(v + 1, NULL, 0) : ~sum->init;
 		if (*s == '-')
 			s++;
 	}
@@ -98,9 +98,9 @@ static int
 prng_block(Sum_t* p, const void* s, size_t n)
 {
 	Prng_t*			sum = (Prng_t*)p;
-	register Prngnum_t	c = sum->sum;
-	register unsigned char*	b = (unsigned char*)s;
-	register unsigned char*	e = b + n;
+	Prngnum_t	c = sum->sum;
+	unsigned char*	b = (unsigned char*)s;
+	unsigned char*	e = b + n;
 
 	while (b < e)
 		c = c * sum->mpy + sum->add + *b++;

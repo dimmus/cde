@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -39,17 +39,17 @@
  */
 
 int
-strtoip4(register const char* s, char** e, uint32_t* paddr, unsigned char* pbits)
+strtoip4(const char* s, char** e, uint32_t* paddr, unsigned char* pbits)
 {
-	register int		c;
-	register unsigned int	n;
-	register uint32_t	addr;
-	register int		part;
-	register unsigned char	bits;
-	uint32_t		z;
-	int			old;
-	int			r;
-	const char*		b;
+	int		c;
+	unsigned int	n;
+	uint32_t	addr;
+	int		part;
+	unsigned char	bits;
+	uint32_t	z;
+	int		old;
+	int		r;
+	const char*	b;
 
 	r = -1;
 	while (isspace(*s))

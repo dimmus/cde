@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -49,7 +49,7 @@ tvgettime(Tv_t* tv)
 	static time_t			s;
 	static uint32_t			n;
 
-	if ((tv->tv_sec = time(NiL)) != s)
+	if ((tv->tv_sec = time(NULL)) != s)
 	{
 		s = tv->tv_sec;
 		n = 0;

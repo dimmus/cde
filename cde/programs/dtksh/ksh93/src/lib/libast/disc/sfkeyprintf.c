@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -68,17 +68,17 @@ typedef union
 #define initfield(f,s)	((f)->first = (f)->delimiter = *((f)->next = (s)))
 
 static char*
-getfield(register Field_t* f, int restore)
+getfield(Field_t* f, int restore)
 {
-	register char*	s;
-	register int	n;
-	register int	c;
-	register int	lp;
-	register int	rp;
-	char*		b;
+	char*	s;
+	int	n;
+	int	c;
+	int	lp;
+	int	rp;
+	char*	b;
 
 	if (!f->delimiter)
-		return 0;
+		return NULL;
 	s = f->next;
 	if (f->first)
 		f->first = 0;
@@ -133,9 +133,9 @@ getfield(register Field_t* f, int restore)
 static int
 getfmt(Sfio_t* sp, void* vp, Sffmt_t* dp)
 {
-	register Fmt_t*	fp = (Fmt_t*)dp;
+	Fmt_t*		fp = (Fmt_t*)dp;
 	Value_t*	value = (Value_t*)vp;
-	register char*	v;
+	char*		v;
 	char*		t;
 	char*		b;
 	char*		a = 0;
@@ -148,6 +148,7 @@ getfmt(Sfio_t* sp, void* vp, Sffmt_t* dp)
 	Field_t		f;
 	regmatch_t	match[10];
 
+	NOT_USED(sp);
 	fp->level++;
 	if (fp->fmt.t_str && fp->fmt.n_str > 0 && (v = fmtbuf(fp->fmt.n_str + 1)))
 	{
@@ -218,17 +219,17 @@ getfmt(Sfio_t* sp, void* vp, Sffmt_t* dp)
 	case 'd':
 	case 'i':
 		fp->fmt.size = sizeof(Sflong_t);
-		value->q = (Sflong_t)(s ? strtoll(s, NiL, 0) : n);
+		value->q = (Sflong_t)(s ? strtoll(s, NULL, 0) : n);
 		break;
 	case 'o':
 	case 'u':
 	case 'x':
 		fp->fmt.size = sizeof(Sflong_t);
-		value->q = s ? (Sflong_t)strtoull(s, NiL, 0) : n;
+		value->q = s ? (Sflong_t)strtoull(s, NULL, 0) : n;
 		break;
 	case 'p':
 		if (s)
-			n = strtoll(s, NiL, 0);
+			n = strtoll(s, NULL, 0);
 		value->p = pointerof(n);
 		break;
 	case 'q':
@@ -287,7 +288,7 @@ getfmt(Sfio_t* sp, void* vp, Sffmt_t* dp)
 					if (regcomp(fp->re[x], f.next, REG_DELIMITED|REG_NULL))
 						break;
 					f.next += fp->re[x]->re_npat;
-					if (regsubcomp(fp->re[x], f.next, NiL, 0, 0))
+					if (regsubcomp(fp->re[x], f.next, NULL, 0, 0))
 						break;
 					f.next += fp->re[x]->re_npat;
 					if (!regexec(fp->re[x], s, elementsof(match), match, 0) && !regsubexec(fp->re[x], s, elementsof(match), match))
@@ -336,7 +337,7 @@ getfmt(Sfio_t* sp, void* vp, Sffmt_t* dp)
 int
 sfkeyprintf(Sfio_t* sp, void* handle, const char* format, Sf_key_lookup_t lookup, Sf_key_convert_t convert)
 {
-	register int	i;
+	int		i;
 	int		r;
 	Fmt_t		fmt;
 
@@ -368,7 +369,7 @@ sfkeyprintf(Sfio_t* sp, void* handle, const char* format, Sf_key_lookup_t lookup
 int
 sfkeyprintf_20000308(Sfio_t* sp, void* handle, const char* format, Sf_key_lookup_t lookup, Sf_key_convert_t convert)
 {
-	register int	i;
+	int		i;
 	int		r;
 	Fmt_t		fmt;
 

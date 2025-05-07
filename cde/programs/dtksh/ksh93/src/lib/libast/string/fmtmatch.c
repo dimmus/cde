@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -29,19 +30,19 @@
 char*
 fmtmatch(const char* as)
 {
-	register char*	s = (char*)as;
-	register int	c;
-	register char*	t;
-	register char**	p;
-	register char*	b;
-	char*		x;
-	char*		y;
-	char*		z;
-	int		a;
-	int		e;
-	int		n;
-	char*		buf;
-	char*		stack[32];
+	char*	s = (char*)as;
+	int	c;
+	char*	t;
+	char**	p;
+	char*	b;
+	char*	x;
+	char*	y;
+	char*	z;
+	int	a;
+	int	e;
+	int	n;
+	char*	buf;
+	char*	stack[32];
 
 	c = 3 * (strlen(s) + 1);
 	buf = fmtbuf(c);
@@ -58,7 +59,7 @@ fmtmatch(const char* as)
 			break;
 		case '\\':
 			if (!(c = *s++))
-				return 0;
+				return NULL;
 			switch (*s)
 			{
 			case '*':
@@ -105,7 +106,7 @@ fmtmatch(const char* as)
 			for (;;)
 			{
 				if (!(*t++ = c))
-					return 0;
+					return NULL;
 				if (c == '\\')
 					*t++ = c;
 				if ((c = *s++) == ']')
@@ -130,7 +131,7 @@ fmtmatch(const char* as)
 			continue;
 		case '(':
 			if (p >= &stack[elementsof(stack)])
-				return 0;
+				return NULL;
 			*p++ = t;
 			if (*s == '?')
 			{
@@ -151,7 +152,7 @@ fmtmatch(const char* as)
 			continue;
 		case ')':
 			if (p == stack)
-				return 0;
+				return NULL;
 			p--;
 			*t++ = c;
 			switch (*s)
@@ -175,7 +176,7 @@ fmtmatch(const char* as)
 			case '{':
 				for (z = s; *z != '}'; z++)
 					if (!*z)
-						return 0;
+						return NULL;
 				n = z - s;
 				if (*++z == '?')
 					n++;
@@ -227,13 +228,13 @@ fmtmatch(const char* as)
 		case '{':
 			n = *(t - 1);
 			if (t == b || n == '(' || n == '|')
-				return 0;
+				return NULL;
 			*(t - 1) = c;
 			if (c == '{')
 			{
 				for (z = s; *z != '}'; z++)
 					if (!*z)
-						return 0;
+						return NULL;
 				for (; s <= z; *t++ = *s++);
 			}
 			if (*s == '?')
@@ -248,10 +249,10 @@ fmtmatch(const char* as)
 		case '|':
 		case '&':
 			if (t == b || *(t - 1) == '(')
-				return 0;
+				return NULL;
 		logical:
 			if (!*s || *s == ')')
-				return 0;
+				return NULL;
 			if (p == stack && b == buf + 3)
 			{
 				*--b = '(';
@@ -270,7 +271,7 @@ fmtmatch(const char* as)
 		break;
 	}
 	if (p != stack)
-		return 0;
+		return NULL;
 	if (b != buf + 3)
 		*t++ = ')';
 	if (!a && (*b != '*' || *(b + 1) == '(' || (*(b + 1) == '-' || *(b + 1) == '~') && *(b + 2) == '('))

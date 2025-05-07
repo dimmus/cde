@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -53,13 +53,13 @@ typedef struct _dosdisc
 	int		bsize;
 } Dosdisc_t;
 
-static void addmapping(register Dosdisc_t *dp)
+static void addmapping(Dosdisc_t *dp)
 {
-	register int n;
+	int n;
 	if((n=dp->maptop++)>=dp->mapsize)
 	{
 		dp->mapsize *= 2;
-		if(!(dp->maptable=(struct map*)realloc((void*)dp->maptable,(dp->mapsize+1)*sizeof(struct map))))
+		if(!(dp->maptable=(struct map*)realloc(dp->maptable,(dp->mapsize+1)*sizeof(struct map))))
 		{
 			dp->maptop--;
 			dp->mapsize *= 2;
@@ -71,40 +71,40 @@ static void addmapping(register Dosdisc_t *dp)
 	dp->maptable[dp->maptop].logical=0;
 }
 
-static struct map *getmapping(Dosdisc_t *dp, Sfoff_t offset, register int whence)
+static struct map *getmapping(Dosdisc_t *dp, Sfoff_t offset, int whence)
 {
-	register struct map *mp;
+	struct map *mp;
 	static struct map dummy;
 	if(offset <= dp->begin)
 	{
 		dummy.logical = dummy.physical = offset;
-		return(&dummy);
+		return &dummy;
 	}
 	if(!(mp=dp->maptable))
 	{
 		dummy.logical = dp->begin;
 		dummy.physical = dummy.logical+1;
-		return(&dummy);
+		return &dummy;
 	}
 	while((++mp)->logical && (whence==SEEK_CUR?mp->physical:mp->logical) <= offset);
-	return(mp-1);
+	return mp-1;
 }
 
 static ssize_t dos_read(Sfio_t *iop, void *buff, size_t size, Sfdisc_t* disc)
 {
-	register Dosdisc_t *dp = (Dosdisc_t*)disc;
-	register char *cp = (char*)buff, *first, *cpmax;
-	register int n, count, m;
+	Dosdisc_t *dp = (Dosdisc_t*)disc;
+	char *cp = (char*)buff, *first, *cpmax;
+	int n, count, m;
 	if(dp->extra)
 	{
 		dp->extra=0;
 		*cp = dp->last;
-		return(1);
+		return 1;
 	}
 	while(1)
 	{
 		if((n = sfrd(iop,buff,size,disc)) <= 0)
-			return(n);
+			return n;
 		dp->plast=dp->phere;
 		dp->phere +=n;
 		dp->llast = dp->lhere;
@@ -119,7 +119,7 @@ static ssize_t dos_read(Sfio_t *iop, void *buff, size_t size, Sfdisc_t* disc)
 		if(dp->last!='\r')
 		{
 			dp->lhere++;
-			return(1);
+			return 1;
 		}
 	}
 	if(dp->last=='\r')
@@ -157,16 +157,8 @@ static ssize_t dos_read(Sfio_t *iop, void *buff, size_t size, Sfdisc_t* disc)
 		}
 	}
 	/* save original discipline inside buffer */
-	if(count>dp->bsize)
-	{
-		if(dp->bsize==0)
-			dp->buff = malloc(count);
-		else
-			dp->buff = realloc(dp->buff,count);
-		dp->bsize = count;
-		if(!dp->buff)
-			return(-1);
-	}
+	if(count > dp->bsize && !(dp->buff = realloc(dp->buff, dp->bsize = count)))
+		return -1;
 	memcpy(dp->buff, cp, count);
 	count=1;
 	while(1)
@@ -194,7 +186,7 @@ done:
 		if(dp->maptable && dp->lmax > dp->maptable[dp->maptop-1].logical+CHUNK)
 			addmapping(dp);
 	}
-	return(n-count);
+	return n-count;
 }
 
 /*
@@ -203,10 +195,10 @@ done:
  * if <whence> is SEEK_CUR, physical offset converted to logical offset
  *  otherwise, logical offset is converted to physical offset
  */
-static Sfoff_t cur_offset(Dosdisc_t *dp, Sfoff_t offset,Sfio_t *iop,register int whence)
+static Sfoff_t cur_offset(Dosdisc_t *dp, Sfoff_t offset,Sfio_t *iop,int whence)
 {
-	register Sfoff_t n,m=0;
-	register char *cp;
+	Sfoff_t n,m=0;
+	char *cp;
 
 	if(whence==SEEK_CUR)
 	{
@@ -238,27 +230,27 @@ static Sfoff_t cur_offset(Dosdisc_t *dp, Sfoff_t offset,Sfio_t *iop,register int
 	}
 	if(whence<0)
 		iop->next += m;
-	return(offset+m);
+	return offset+m;
 }
 
-static Sfoff_t dos_seek(Sfio_t *iop, Sfoff_t offset, register int whence, Sfdisc_t* disc)
+static Sfoff_t dos_seek(Sfio_t *iop, Sfoff_t offset, int whence, Sfdisc_t* disc)
 {
-	register Dosdisc_t *dp = (Dosdisc_t*)disc;
+	Dosdisc_t *dp = (Dosdisc_t*)disc;
 	struct map dummy, *mp=0;
 	Sfoff_t physical;
-	register int n,size;
+	int n,size;
 retry:
 	switch(whence)
 	{
 	    case SEEK_CUR:
-		offset = sfsk(iop, (Sfoff_t)0,SEEK_CUR,disc);
+		offset = sfsk(iop, 0,SEEK_CUR,disc);
 		if(offset<=dp->begin)
-			return(offset);
+			return offset;
 		/* check for seek outside buffer */
 		if(offset==dp->phere)
-			return(dp->lhere);
+			return dp->lhere;
 		else if(offset==dp->plast)
-			return(dp->llast);
+			return dp->llast;
 		else if(offset<dp->plast || offset>dp->phere)
 			mp = getmapping(dp,offset,whence);
 		break;
@@ -269,7 +261,7 @@ retry:
 		break;
 	    case SEEK_END:
 		if(!dp->maptable)
-			return(sfsk(iop,offset,SEEK_END,disc));
+			return sfsk(iop,offset,SEEK_END,disc);
 		mp = &dummy;
 		mp->physical = dp->plast;
 		mp->logical = dp->llast;
@@ -285,7 +277,7 @@ retry:
 		dp->phere = mp->physical;
 		dp->lhere = mp->logical;
 		if((*disc->readf)(iop,iop->data,size,disc)<0)
-			return(-1);
+			return -1;
 	}
 	while(1)
 	{
@@ -295,7 +287,7 @@ retry:
 			break;
 		n=(*disc->readf)(iop,iop->data,size,disc);
 		if(n < 0)
-			return(-1);
+			return -1;
 		if(n==0)
 		{
 			if(whence==SEEK_END && offset<0)
@@ -321,21 +313,23 @@ retry:
 		else
 			offset = physical;
 	}
-	return(offset);
+	return offset;
 }
 
 static int dos_except(Sfio_t *iop, int type, void *arg, Sfdisc_t *disc)
 {
-	register Dosdisc_t *dp = (Dosdisc_t*)disc;
-	if(type==SF_DPOP || type==SF_FINAL)
+	Dosdisc_t *dp = (Dosdisc_t*)disc;
+	NOT_USED(iop);
+	NOT_USED(arg);
+	if(type==SFIO_DPOP || type==SFIO_FINAL)
 	{
 		if(dp->bsize>0)
-			free((void*)dp->buff);
+			free(dp->buff);
 		if(dp->mapsize)
-			free((void*)dp->maptable);
-		free((void*)disc);
+			free(dp->maptable);
+		free(disc);
 	}
-	return(0);
+	return 0;
 }
 
 int sfdcdos(Sfio_t *f)
@@ -343,15 +337,15 @@ int sfdcdos(Sfio_t *f)
 	Dosdisc_t *dos;
 
 	/* this is a readonly discipline */
-	if(sfset(f,0,0)&SF_WRITE)
-		return(-1);
+	if(sfset(f,0,0)&SFIO_WRITE)
+		return -1;
 
 	if(!(dos = (Dosdisc_t*)malloc(sizeof(Dosdisc_t))) )
 		return -1;
 	memset(dos,'\0',sizeof(Dosdisc_t));
 
 	dos->disc.readf = dos_read;
-	dos->disc.writef = NIL(Sfwrite_f);
+	dos->disc.writef = NULL;
 	dos->disc.seekf = dos_seek;
 	dos->disc.exceptf = dos_except;
 
@@ -360,5 +354,5 @@ int sfdcdos(Sfio_t *f)
 		return -1;
 	}
 
-	return(0);
+	return 0;
 }

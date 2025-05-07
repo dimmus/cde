@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -89,7 +90,7 @@ static const char usage[] =
 	"[+length\b \astring\a?The number of characters in \astring\a.]"
 	"[+quote\b \atoken\a?Treat \atoken\a as a string operand.]"
 	"}"
-"[+?For backwards compatibility, unrecognized options beginning with "
+"[+?For backward compatibility, unrecognized options beginning with "
 	"a \b-\b will be treated as operands.  Portable applications "
 	"should use \b--\b to indicate end of options.]"
 
@@ -103,7 +104,7 @@ static const char usage[] =
 	"[+2?Invalid expressions.]"
 	"[+>2?An error occurred.]"
 	"}"
-"[+SEE ALSO?\bregcomp\b(3), \bgrep\b(1), \bsh\b(1)]"
+"[+SEE ALSO?\bregex\b(3), \bgrep\b(1), \bsh\b(1)]"
 ;
 
 #include	<cmd.h>
@@ -180,13 +181,13 @@ static int expr_or(State_t*, Node_t*);
 
 static int getnode(State_t* state, Node_t *np)
 {
-	register char*	sp;
-	register char*	cp;
-	register int	i;
-	register int	j;
-	register int	k;
-	register int	tok;
-	char*		ep;
+	char*	sp;
+	char*	cp;
+	int	i;
+	int	j;
+	int	k;
+	int	tok;
+	char*	ep;
 
 	if (!(cp = *state->arglist++))
 	{
@@ -319,7 +320,7 @@ static int getnode(State_t* state, Node_t *np)
 
 static int expr_cond(State_t* state, Node_t *np)
 {
-	register int	tok = getnode(state, np);
+	int	tok = getnode(state, np);
 
 	while (tok==':')
 	{
@@ -370,7 +371,7 @@ static int expr_cond(State_t* state, Node_t *np)
 
 static int expr_mult(State_t* state, Node_t *np)
 {
-	register int	tok = expr_cond(state, np);
+	int	tok = expr_cond(state, np);
 
 	while ((tok&~T_OP)==T_MULT)
 	{
@@ -405,7 +406,7 @@ static int expr_mult(State_t* state, Node_t *np)
 
 static int expr_add(State_t* state, Node_t *np)
 {
-	register int	tok = expr_mult(state, np);
+	int	tok = expr_mult(state, np);
 
 	while ((tok&~T_OP)==T_ADD)
 	{
@@ -428,12 +429,12 @@ static int expr_add(State_t* state, Node_t *np)
 
 static int expr_cmp(State_t* state, Node_t *np)
 {
-	register int	tok = expr_add(state, np);
+	int	tok = expr_add(state, np);
 
 	while ((tok&~T_OP)==T_CMP)
 	{
 		Node_t rp;
-		register char *left,*right;
+		char *left = NULL, *right = NULL;
 		char buff1[36],buff2[36];
 		int op = (tok&T_OP);
 		tok = expr_add(state, &rp);
@@ -496,7 +497,7 @@ static int expr_cmp(State_t* state, Node_t *np)
 
 static int expr_and(State_t* state, Node_t *np)
 {
-	register int	tok = expr_cmp(state, np);
+	int	tok = expr_cmp(state, np);
 	while (tok=='&')
 	{
 		Node_t rp;
@@ -512,7 +513,7 @@ static int expr_and(State_t* state, Node_t *np)
 
 static int expr_or(State_t* state, Node_t *np)
 {
-	register int	tok = expr_and(state, np);
+	int	tok = expr_and(state, np);
 	while (tok=='|')
 	{
 		Node_t rp;
@@ -543,8 +544,9 @@ b_expr(int argc, char** argv, Shbltin_t* context)
 		 */
 		if(n=='?')
 		{
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		if (opt_info.option[1] != '?')
 			break;
@@ -553,7 +555,7 @@ b_expr(int argc, char** argv, Shbltin_t* context)
 	}
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2),"%s",optusage((char*)0));
+		error(ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	state.arglist = argv+opt_info.index;

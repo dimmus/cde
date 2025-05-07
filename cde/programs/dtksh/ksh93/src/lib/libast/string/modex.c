@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -32,13 +32,13 @@
 #undef	modex
 
 int
-modex(register int i)
+modex(int i)
 {
 #if _S_IDPERM && _S_IDTYPE
-	return(i);
+	return i;
 #else
-	register int	x;
-	register int	c;
+	int	x;
+	int	c;
 
 	x = 0;
 #if _S_IDPERM
@@ -66,6 +66,6 @@ modex(register int i)
 	else if (S_ISSOCK(i)) x |= X_IFSOCK;
 #endif
 #endif
-	return(x);
+	return x;
 #endif
 }

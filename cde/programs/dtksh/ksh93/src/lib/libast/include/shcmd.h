@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -68,7 +69,7 @@ struct Shbltin_s
 #if defined(shell_h_defined) || defined(defs_h_defined)
 #   undef Shell_t
 #   undef Namval_t
-#else 
+#else
 #   define sh_context(c)	((Shbltin_t*)(c))
 #   define sh_run(c, ac, av)	((c)?(*sh_context(c)->shrun)(ac,av):-1)
 #   define sh_system(c,str)	((c)?(*sh_context(c)->shtrap)(str,0):system(str))
@@ -84,7 +85,7 @@ struct Shbltin_s
 #     ifndef ERROR_NOTIFY
 #       define ERROR_NOTIFY	1
 #     endif
-#     define cmdinit(ac,av,c,cat,flg)		do { if((ac)<=0) return(0); \
+#     define cmdinit(ac,av,c,cat,flg)		do { if((ac)<=0) return 0; \
 	(sh_context(c)->notify = ((flg)&ERROR_NOTIFY)?1:0);} while(0)
 #   endif
 #endif

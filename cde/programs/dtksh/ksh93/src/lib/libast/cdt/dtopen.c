@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -17,7 +17,6 @@
 *                                                                      *
 ***********************************************************************/
 #include	"dthdr.h"
-static char*     Version = "\n@(#)$Id: cdt (AT&T Labs - Research) 2011-11-11 $\0\n";
 
 /* 	Make a new dictionary
 **
@@ -39,10 +38,10 @@ Dt_t* _dtopen(Dtdisc_t* disc, Dtmethod_t* meth, unsigned long version)
 	int		ev, type;
 
 	if(!disc || !meth)
-		return NIL(Dt_t*);
+		return NULL;
 
-	dt = NIL(Dt_t*);
-	data = NIL(Dtdata_t*);
+	dt = NULL;
+	data = NULL;
 	type = meth->type;
 
 	memset(&pdt, 0, sizeof(Dt_t));
@@ -51,13 +50,13 @@ Dt_t* _dtopen(Dtdisc_t* disc, Dtmethod_t* meth, unsigned long version)
 	dtdisc(&pdt,disc,0); /* note that this sets pdt.memoryf */
 
 	if(disc->eventf)
-	{	if((ev = (*disc->eventf)(&pdt,DT_OPEN,(void*)(&data),disc)) < 0)
-			return NIL(Dt_t*); /* something bad happened */
+	{	if((ev = (*disc->eventf)(&pdt,DT_OPEN,(&data),disc)) < 0)
+			return NULL; /* something bad happened */
 		else if(ev > 0)
 		{	if(data) /* shared data are being restored */
 			{	if((data->type & DT_METHODS) != meth->type)
 				{	DTERROR(&pdt, "Error in matching methods to restore dictionary");
-					return NIL(Dt_t*);
+					return NULL;
 				}
 				pdt.data = data;
 			}
@@ -69,17 +68,17 @@ Dt_t* _dtopen(Dtdisc_t* disc, Dtmethod_t* meth, unsigned long version)
 	}
 
 	if(!pdt.data) /* allocate method-specific data */
-		if((*meth->eventf)(&pdt, DT_OPEN, NIL(void*)) < 0 || !pdt.data )
-			return NIL(Dt_t*);
+		if((*meth->eventf)(&pdt, DT_OPEN, NULL) < 0 || !pdt.data )
+			return NULL;
 	pdt.data->type |= type;
 
 	/* now allocate/initialize the actual dictionary structure */
 	if(pdt.data->type&DT_INDATA)
 		dt = &pdt.data->dict;
 	else if(!(dt = (Dt_t*) malloc(sizeof(Dt_t))) )
-	{	(void)(*meth->eventf)(&pdt, DT_CLOSE, NIL(void*));
+	{	(void)(*meth->eventf)(&pdt, DT_CLOSE, NULL);
 		DTERROR(&pdt, "Error in allocating a new dictionary");
-		return NIL(Dt_t*);
+		return NULL;
 	}
 
 	*dt = pdt;
@@ -87,7 +86,7 @@ Dt_t* _dtopen(Dtdisc_t* disc, Dtmethod_t* meth, unsigned long version)
 	dt->user = &dt->data->user; /* space allocated for application usage */
 
 	if(disc->eventf) /* signal opening is done */
-		(void)(*disc->eventf)(dt, DT_ENDOPEN, (void*)0, disc);
+		(void)(*disc->eventf)(dt, DT_ENDOPEN, NULL, disc);
 
 	/* set mapping of operation bits between versions as needed */
 	if(version < 20111111L)
@@ -110,13 +109,13 @@ Dtlink_t* _dtmake(Dt_t* dt, void* obj, int type)
 
 	/* if obj is a prototype, make a real one */
 	if(!(type&DT_ATTACH) && disc->makef && !(obj = (*disc->makef)(dt, obj, disc)) )
-		return NIL(Dtlink_t*);
+		return NULL;
 
 	if(disc->link >= 0) /* holder is embedded in obj itself */
 		return _DTLNK(disc, obj);
 
 	/* create a holder to hold obj */
-	if((h = (Dthold_t*)(dt->memoryf)(dt, NIL(void*), sizeof(Dthold_t), disc)) )
+	if((h = (Dthold_t*)(dt->memoryf)(dt, NULL, sizeof(Dthold_t), disc)) )
 		h->obj = obj;
 	else
 	{	DTERROR(dt, "Error in allocating an object holder");
@@ -135,5 +134,5 @@ void _dtfree(Dt_t* dt, Dtlink_t* l, int type)
 		(void)(*disc->freef)(dt, _DTOBJ(disc,l), disc);
 
 	if(disc->link < 0) /* free holder */
-		(void)(*dt->memoryf)(dt, (void*)l, 0, disc);
+		(void)(*dt->memoryf)(dt, l, 0, disc);
 }

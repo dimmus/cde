@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -23,10 +23,10 @@
  *  waiting for job completion.
  *  The previous waitevent hook function is returned
  */
-void	*sh_waitnotify(int(*newevent)(int,long,int))
+Shwait_f sh_waitnotify(Shwait_f newevent)
 {
-	int (*old)(int,long,int);
+	Shwait_f old;
 	old = sh.waitevent;
 	sh.waitevent = newevent;
-	return((void*)old);
+	return old;
 }

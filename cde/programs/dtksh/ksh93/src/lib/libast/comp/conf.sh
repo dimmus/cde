@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1985-2011 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -14,6 +14,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                   Phong Vo <kpv@research.att.com>                    #
 #                  Martijn Dekker <martijn@inlv.org>                   #
+#            Johnothan King <johnothanking@protonmail.com>             #
 #                                                                      #
 ########################################################################
 : generate getconf and limits info
@@ -116,7 +117,7 @@ esac
 cat > $tmp.c <<!
 ${head}
 int
-main()
+main(void)
 {
 #if _ast_intmax_long
 	return 1;
@@ -135,7 +136,7 @@ fi
 cat > $tmp.c <<!
 ${head}
 int
-main()
+main(void)
 {
 #if _ast_intmax_long
 	return 1;
@@ -158,7 +159,7 @@ fi
 cat > $tmp.c <<!
 ${head}
 int
-main()
+main(void)
 {
 	unsigned int	u = 1U;
 	unsigned int	ul = 1UL;
@@ -248,9 +249,6 @@ case $append$extra in
 					esac
 					;;
 				*)	values=$values$sp$1
-					case $1 in
-					$sym)	echo "$1" >> $tmp.v ;;
-					esac
 					;;
 				esac
 			done
@@ -333,14 +331,7 @@ CONF_getconf=
 CONF_getconf_a=
 IFS=':'; set -f
 for d in \
-	/run/current-system/sw/bin \
-	/usr/xpg7/bin \
-	/usr/xpg6/bin \
-	/usr/xpg4/bin \
-	/usr/bin \
-	/bin \
-	/usr/sbin \
-	/sbin \
+	$DEFPATH \
 	$PATH
 do	case $d in
 	/*)	;;
@@ -380,7 +371,7 @@ sed \
 	-e 's/[^ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789]/ /g' \
 	-e 's/[ 	][ 	]*/%/g' \
 	`cat $tmp.f` 2>/dev/null | tr '%' '\n' | \
-	egrep '^(SI|_(CS|PC|SC|SI))_.'
+	grep -E '^(SI|_(CS|PC|SC|SI))_.'
 	case $CONF_getconf_a in
 	?*)	$CONF_getconf $CONF_getconf_a | sed 's,[=:    ].*,,'
 		;;
@@ -395,7 +386,7 @@ sed \
 		;;
 	esac 2>/dev/null
 } |
-egrep -v '^_[ABCDEFGHIJKLMNOPQRSTUVWXYZ]+_(COUNT|LAST|N|STR)$' |
+grep -E -v '^_[ABCDEFGHIJKLMNOPQRSTUVWXYZ]+_(COUNT|LAST|N|STR)$' |
 sort -u > $tmp.g
 {
 	grep '^_' $tmp.g
@@ -798,8 +789,6 @@ do	eval name=\"'$'CONF_name_$key\"
 done > $tmp.q
 sort -u < $tmp.q > $tmp.t
 mv $tmp.t $tmp.q
-sort -u < $tmp.v > $tmp.t
-mv $tmp.t $tmp.v
 case $debug in
 -d4)	exit ;;
 esac
@@ -834,7 +823,7 @@ unsigned int conf[] = {
 		grep '^[_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz][_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*$' |
 		sort -u > $tmp.n
 		cmp -s $tmp.n $tmp.p && break
-		fgrep -x -v -f $tmp.n $1 > $tmp.y
+		grep -F -x -v -f $tmp.n $1 > $tmp.y
 		mv $tmp.y $1
 		mv $tmp.n $tmp.p
 	done
@@ -852,7 +841,7 @@ ${tail}
 	$cc -E $tmp.c 2>/dev/null |
 	sed -e '/conf[ 	]*".*"[ 	]*=[ 	]*/!d' -e '/[_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789][ 	]*(/!d' -e 's/.*"\(.*\)".*/\1/' > $tmp.n
 	if	test -s $tmp.n
-	then	fgrep -x -v -f $tmp.n $1 > $tmp.y
+	then	grep -F -x -v -f $tmp.n $1 > $tmp.y
 		mv $tmp.y $1
 	fi
 }
@@ -861,7 +850,6 @@ case $verbose in
 1)	echo "$command: check macros/enums as static initializers" >&2 ;;
 esac
 defined $tmp.q
-defined $tmp.v
 case $debug in
 -d5)	exit ;;
 esac
@@ -869,10 +857,6 @@ esac
 # mark the constant macros/enums
 
 exec < $tmp.q
-while	read line
-do	eval CONF_const_${line}=1
-done
-exec < $tmp.v
 while	read line
 do	eval CONF_const_${line}=1
 done
@@ -1060,13 +1044,8 @@ do	eval name=\"'$'CONF_name_$key\"
 	conf_limit=0
 	case $flags in
 	*[Ll]*)	d=
-		case ${conf_name} in
-		LONG_MAX|SSIZE_MAX)
-			x=
-			;;
-		*)	eval x='$'CONF_const_${conf_name}
-			;;
-		esac
+		# always probe, even if a CONF_const_${conf_name} variable exists
+		x=
 		case $x in
 		'')	for s in ${values}
 			do	case $s in
@@ -1109,7 +1088,7 @@ do	eval name=\"'$'CONF_name_$key\"
 						x=`./$tmp.sh 2>/dev/null`
 						;;
 					'')	case $conf_name in
-						SIZE_*|U*|*_MAX)	
+						SIZE_*|U*|*_MAX)
 							f="%${LL_format}u"
 							t="unsigned _ast_intmax_t"
 							;;
@@ -1125,7 +1104,7 @@ ${head}
 #include <unistd.h>$systeminfo$headers
 ${tail}
 int
-main()
+main(void)
 {
 	printf("$f\n", ($t)$conf_name);
 	return 0;
@@ -1369,7 +1348,7 @@ ${script}
 				;;
 			esac
 			;;
-		-*[2468])	
+		-*[2468])
 			case $shell in
 			ksh)	p=${conf_limit%?}
 				s=${conf_limit#$p}
@@ -1404,7 +1383,7 @@ ${script}
 				;;
 			esac
 			;;
-		-*[2468])	
+		-*[2468])
 			case $shell in
 			ksh)	p=${conf_minmax%?}
 				s=${conf_minmax#$p}
@@ -1480,7 +1459,7 @@ ${generated}
 #define prefix_elements	_ast_conf_nprefix
 
 #define CONF_nop	0
-#define	CONF_confstr	1
+#define CONF_confstr	1
 #define CONF_pathconf	2
 #define CONF_sysconf	3
 #define CONF_sysinfo	4

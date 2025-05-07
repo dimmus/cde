@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -33,10 +34,10 @@
 Time_t
 tmxleap(Time_t t)
 {
-	register Tm_leap_t*	lp;
+	Tm_leap_t*	lp;
 	uint32_t		sec;
 
-	tmset(tm_info.zone);
+	tmset(tm_info.zone, time(NULL), 0);
 	if (tm_info.flags & TM_ADJUST)
 	{
 		sec = tmxsec(t);

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -33,10 +34,10 @@
  */
 
 Tm_t*
-tmxtm(register Tm_t* tm, Time_t t, Tm_zone_t* zone)
+tmxtm(Tm_t* tm, Time_t t, Tm_zone_t* zone, const char newzone)
 {
-	register struct tm*	tp;
-	register Tm_leap_t*	lp;
+	struct tm*		tp;
+	Tm_leap_t*		lp;
 	Time_t			x;
 	time_t			now;
 	int			leapsec;
@@ -48,7 +49,7 @@ tmxtm(register Tm_t* tm, Time_t t, Tm_zone_t* zone)
 	uint32_t		i;
 #endif
 
-	tmset(tm_info.zone);
+	tmset(tm_info.zone, tmxsec(t), newzone);
 	leapsec = 0;
 	if ((tm_info.flags & (TM_ADJUST|TM_LEAP)) == (TM_ADJUST|TM_LEAP) && (n = tmxsec(t)))
 	{
@@ -132,5 +133,5 @@ tmxmake(Time_t t)
 {
 	static Tm_t		ts;
 
-	return tmxtm(&ts, t, NiL);
+	return tmxtm(&ts, t, NULL, 0);
 }

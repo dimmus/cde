@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -24,9 +25,7 @@
 #include	"shopt.h"
 #include	"defs.h"
 
-#if !SHOPT_MKSERVICE
-NoN(mkservice)
-#else
+#if SHOPT_MKSERVICE
 
 static const char mkservice_usage[] =
 "[-?\n@(#)$Id: mkservice (AT&T Research) 2001-06-13 $\n]"
@@ -52,7 +51,7 @@ static const char mkservice_usage[] =
 		"to be read from one of the active connections.  It is "
 		"called with the file descriptor number that has data "
 		"to be read.  If the function returns a non-zero "
-		"value, this connection will be closed.]" 
+		"value, this connection will be closed.]"
 	"[+close?This function is invoked when the connection is closed.]"
 	"}"
 "[+?If \avarname\a is unset, then all active connection, and the service "
@@ -62,8 +61,8 @@ static const char mkservice_usage[] =
 "\nvarname service_path\n"
 "\n"
 "[+EXIT STATUS?]{"
-        "[+0?Success.]"
-        "[+>0?An error occurred.]"
+	"[+0?Success.]"
+	"[+>0?An error occurred.]"
 "}"
 "[+SEE ALSO?\beloop\b(1)]"
 ;
@@ -82,8 +81,8 @@ static const char eloop_usage[] =
 "\n"
 "[+EXIT STATUS?If no timeout is specified, \beloop\b will not return "
 	"unless interrupted.  Otherwise]{"
-        "[+0?The specified timeout interval occurred.]"
-        "[+>0?An error occurred.]"
+	"[+0?The specified timeout interval occurred.]"
+	"[+>0?An error occurred.]"
 "}"
 "[+SEE ALSO?\bmkservice\b(1)]"
 ;
@@ -134,9 +133,9 @@ static int		nready;
 static int		ready;
 static int		(*covered_fdnotify)(int, int);
 
-static int fdclose(Service_t *sp, register int fd)
+static int fdclose(Service_t *sp, int fd)
 {
-	register int i;
+	int i;
 	service_list[fd] = 0;
 	if(sp->fd==fd)
 		sp->fd = -1;
@@ -147,10 +146,10 @@ static int fdclose(Service_t *sp, register int fd)
 			file_list[i] = file_list[npoll--];
 			if(sp->actionf)
 				(*sp->actionf)(sp, fd, 1);
-			return(1);
+			return 1;
 		}
 	}
-	return(0);
+	return 0;
 }
 
 static int fdnotify(int fd1, int fd2)
@@ -160,7 +159,7 @@ static int fdnotify(int fd1, int fd2)
 		(*covered_fdnotify)(fd1, fd2);
 	if(fd2!=SH_FDCLOSE)
 	{
-		register int i;
+		int i;
 		service_list[fd2] = service_list[fd1];
 		service_list[fd1] = 0;
 		for(i=0; i < npoll; i++)
@@ -168,7 +167,7 @@ static int fdnotify(int fd1, int fd2)
 			if(file_list[i]==fd1)
 			{
 				file_list[i] = fd2;
-				return(0);
+				return 0;
 			}
 		}
 	}
@@ -176,9 +175,9 @@ static int fdnotify(int fd1, int fd2)
 	{
 		fdclose(sp,fd1);
 		if(--sp->refcount==0)
-			nv_unset(sp->node);
+			nv_unset(sp->node,0);
 	}
-	return(0);
+	return 0;
 }
 
 static void process_stream(Sfio_t* iop)
@@ -208,11 +207,11 @@ static void process_stream(Sfio_t* iop)
 			close(fd);
 	}
 }
-				
+
 static int waitnotify(int fd, long timeout, int rw)
 {
-	Sfio_t *special=0, **pstream;
-	register int	i;
+	Sfio_t	*special=0, **pstream;
+	int	i;
 
 	if (fd >= 0)
 		special = sh_fd2sfio(fd);
@@ -229,7 +228,7 @@ static int waitnotify(int fd, long timeout, int rw)
 				*pstream++ = sh_fd2sfio(file_list[i]);
 		}
 		for(i=0; i < pstream-poll_list; i++)
-			sfset(poll_list[i],SF_WRITE,0);
+			sfset(poll_list[i],SFIO_WRITE,0);
 		nready = ready = 0;
 		errno = 0;
 #ifdef DEBUG
@@ -246,13 +245,13 @@ static int waitnotify(int fd, long timeout, int rw)
 		sfputc(sfstderr,'\n');
 #endif
 		for(i=0; i < pstream-poll_list; i++)
-			sfset(poll_list[i],SF_WRITE,1);
+			sfset(poll_list[i],SFIO_WRITE,1);
 		if(nready<=0)
-			return(errno? -1: 0);
+			return errno? -1: 0;
 		if(special && poll_list[0]==special)
 		{
 			ready = 1;
-			return(fd);
+			return fd;
 		}
 	}
 }
@@ -265,7 +264,7 @@ static int service_init(void)
 	service_list = sh_newof(NULL,Service_t*,n,0);
 	covered_fdnotify = sh_fdnotify(fdnotify);
 	sh_waitnotify(waitnotify);
-	return(1);
+	return 1;
 }
 
 void service_add(Service_t *sp)
@@ -277,10 +276,10 @@ void service_add(Service_t *sp)
 	file_list[npoll++] = sp->fd;
 }
 
-static int Accept(register Service_t *sp, int accept_fd)
+static int Accept(Service_t *sp, int accept_fd)
 {
-	register Namval_t*	nq = sp->disc[ACCEPT];
-	int			fd;
+	Namval_t*	nq = sp->disc[ACCEPT];
+	int		fd;
 
 	fd = fcntl(accept_fd, F_DUPFD, 10);
 	if (fd >= 0)
@@ -301,14 +300,14 @@ static int Accept(register Service_t *sp, int accept_fd)
 			}
 		}
 	}
-	sfsync(NiL);
+	sfsync(NULL);
 	return fd;
 }
 
 static int Action(Service_t *sp, int fd, int close)
 {
-	register Namval_t*	nq;
-	int			r=0;
+	Namval_t*	nq;
+	int		r=0;
 
 	if(close)
 		nq = sp->disc[CLOSE];
@@ -324,30 +323,30 @@ static int Action(Service_t *sp, int fd, int close)
 		sfsprintf(buff, sizeof(buff), "%d", fd);
 		r=sh_fun(nq, sp->node, av);
 	}
-	sfsync(NiL);
+	sfsync(NULL);
 	return r > 0 ? -1 : 1;
 }
 
 static int Error(Service_t *sp, int level, const char* arg, ...)
 {
-	va_list			ap;
+	va_list		ap;
 
 	va_start(ap, arg);
 	if(sp->node)
-		nv_unset(sp->node);
-	free((void*)sp);
-        errorv(NiL, ERROR_exit(1), ap);
-        va_end(ap);
+		nv_unset(sp->node,0);
+	free(sp);
+	errorv(NULL, ERROR_exit(1), ap);
+	va_end(ap);
 	return 0;
 }
 
 static char* setdisc(Namval_t* np, const char* event, Namval_t* action, Namfun_t* fp)
 {
-	register Service_t*	sp = (Service_t*)fp;
-	register const char*	cp;
-	register int		i;
-	register int		n = strlen(event) - 1;
-	register Namval_t*	nq;
+	Service_t*	sp = (Service_t*)fp;
+	const char*	cp;
+	int		i;
+	int		n = strlen(event) - 1;
+	Namval_t*	nq;
 
 	for (i = 0; cp = disctab[i]; i++)
 	{
@@ -358,7 +357,7 @@ static char* setdisc(Namval_t* np, const char* event, Namval_t* action, Namfun_t
 		else
 		{
 			if (nq = sp->disc[i])
-				free((void*)nq);
+				free(nq);
 			if (action)
 				sp->disc[i] = action;
 			else
@@ -372,13 +371,13 @@ static char* setdisc(Namval_t* np, const char* event, Namval_t* action, Namfun_t
 
 static void putval(Namval_t* np, const char* val, int flag, Namfun_t* fp)
 {
-	register Service_t* sp = (Service_t*)fp;
+	Service_t* sp = (Service_t*)fp;
 	if (!val)
-		fp = nv_stack(np, NiL);
+		fp = nv_stack(np, NULL);
 	nv_putv(np, val, flag, fp);
 	if (!val)
 	{
-		register int i;
+		int i;
 		for(i=0; i< sh.lim.open_max; i++)
 		{
 			if(service_list[i]==sp)
@@ -388,7 +387,7 @@ static void putval(Namval_t* np, const char* val, int flag, Namfun_t* fp)
 					break;
 			}
 		}
-		free((void*)fp);
+		free(fp);
 		return;
 	}
 }
@@ -404,11 +403,11 @@ static const Namdisc_t servdisc =
 
 int	b_mkservice(int argc, char** argv, Shbltin_t *context)
 {
-	register char*		var;
-	register char*		path;
-	register Namval_t*	np;
-	register Service_t*	sp;
-	register int		fd;
+	char*		var;
+	char*		path;
+	Namval_t*	np;
+	Service_t*	sp;
+	int		fd;
 
 	NOT_USED(argc);
 	for (;;)
@@ -421,15 +420,16 @@ int	b_mkservice(int argc, char** argv, Shbltin_t *context)
 			error(2, opt_info.arg);
 			continue;
 		case '?':
-			error(ERROR_usage(2), opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || !(var = *argv++) || !(path = *argv++) || *argv)
 	{
-		error(ERROR_usage(2), optusage(NiL));
+		error(ERROR_usage(2), optusage(NULL));
 		UNREACHABLE();
 	}
 	sp = sh_newof(0, Service_t, 1, 0);
@@ -442,7 +442,7 @@ int	b_mkservice(int argc, char** argv, Shbltin_t *context)
 	sp->fun.disc = &servdisc;
 	if((fd = sh_open(path, O_SERVICE|O_RDWR))<=0)
 	{
-		free((void*)sp);
+		free(sp);
 		error(ERROR_exit(1), "%s: cannot start service", path);
 		UNREACHABLE();
 	}
@@ -452,15 +452,15 @@ int	b_mkservice(int argc, char** argv, Shbltin_t *context)
 		sp->fd = fd;
 	np = nv_open(var,sh.var_tree,NV_ARRAY|NV_VARNAME);
 	sp->node = np;
-	nv_putval(np, path, 0); 
+	nv_putval(np, path, 0);
 	nv_stack(np, (Namfun_t*)sp);
 	service_add(sp);
-	return(0);
+	return 0;
 }
 
 int	b_eloop(int argc, char** argv, Shbltin_t *context)
 {
-	register long	timeout = -1;
+	long	timeout = -1;
 	NOT_USED(argc);
 	NOT_USED(context);
 	for (;;)
@@ -476,15 +476,16 @@ int	b_eloop(int argc, char** argv, Shbltin_t *context)
 			error(2, opt_info.arg);
 			continue;
 		case '?':
-			error(ERROR_usage(2), opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors  || *argv)
 	{
-		error(ERROR_usage(2), optusage(NiL));
+		error(ERROR_usage(2), optusage(NULL));
 		UNREACHABLE();
 	}
 	while(1)
@@ -493,7 +494,9 @@ int	b_eloop(int argc, char** argv, Shbltin_t *context)
 			break;
 		sfprintf(sfstderr,"interrupted\n");
 	}
-	return(errno != 0);
+	return errno != 0;
 }
 
+#else
+NoN(mkservice)
 #endif /* SHOPT_MKSERVICE */

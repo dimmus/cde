@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1997-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -86,7 +86,7 @@ dllplugin(const char* lib, const char* name, const char* ver, unsigned long rel,
 						}
 					}
 #endif
-					errorf("dll", NiL, 1, "dllplugin: %s dlopen failed: %s", dle->path, dllerror(1));
+					errorf("dll", NULL, 1, "dllplugin: %s dlopen failed: %s", dle->path, dllerror(1));
 					err = state.error;
 				}
 			}
@@ -118,5 +118,5 @@ dllplugin(const char* lib, const char* name, const char* ver, unsigned long rel,
 extern void*
 dllplug(const char* lib, const char* name, const char* ver, int flags, char* path, size_t size)
 {
-	return dllplugin(lib, name, ver, 0, NiL, flags, path, size);
+	return dllplugin(lib, name, ver, 0, NULL, flags, path, size);
 }

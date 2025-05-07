@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -49,9 +49,10 @@ static int whence(char**, int);
  * In this case return 0 when -v or -V or unknown option, otherwise
  *   the shift count to the command is returned
  */
-int	b_command(register int argc,char *argv[],Shbltin_t *context)
+int	b_command(int argc,char *argv[],Shbltin_t *context)
 {
-	register int n, flags=0;
+	int n, flags=0;
+	NOT_USED(context);
 	opt_info.index = opt_info.offset = 0;
 	while((n = optget(argv,sh_optcommand))) switch(n)
 	{
@@ -74,32 +75,35 @@ int	b_command(register int argc,char *argv[],Shbltin_t *context)
 		break;
 	    case ':':
 		if(argc==0)
-			return(0);
+			return 0;
 		errormsg(SH_DICT,2, "%s", opt_info.arg);
 		break;
 	    case '?':
 		if(argc==0)
-			return(0);
-		errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-		UNREACHABLE();
+			return 0;
+		/* self-doc: write to standard output */
+		error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+		return 0;
 	}
 	argv += opt_info.index;
 	if(argc==0)
 	{
 		if((flags & (X_FLAG|V_FLAG)) || !*argv)
-			return(0);	/* return no offset now; sh_exec() will treat command -v/-V/(null) as normal builtin */
+			return 0;	/* return no offset now; sh_exec() will treat command -v/-V/(null) as normal builtin */
 		if(flags & P_FLAG)
 			sh_onstate(SH_XARG);
-		return(opt_info.index); /* offset for sh_exec() to remove 'command' prefix + options */
+		return opt_info.index; /* offset for sh_exec() to remove 'command' prefix + options */
 	}
 	if(error_info.errors)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s", optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if(!*argv)
-		return((flags & (X_FLAG|V_FLAG)) != 0 ? 2 : 0);
-	return(whence(argv, flags));
+		return (flags & (X_FLAG|V_FLAG)) != 0 ? 2 : 0;
+	if(flags & P_FLAG)
+		sh_onstate(SH_XARG);
+	return whence(argv, flags);
 }
 
 /*
@@ -107,8 +111,9 @@ int	b_command(register int argc,char *argv[],Shbltin_t *context)
  */
 int	b_whence(int argc,char *argv[],Shbltin_t *context)
 {
-	register int flags=0, n;
+	int flags=0, n;
 	NOT_USED(argc);
+	NOT_USED(context);
 	if(*argv[0]=='t')
 		flags = V_FLAG;  /* <t>ype == whence -v */
 	while((n = optget(argv,sh_optwhence))) switch(n)
@@ -135,27 +140,28 @@ int	b_whence(int argc,char *argv[],Shbltin_t *context)
 		errormsg(SH_DICT,2, "%s", opt_info.arg);
 		break;
 	    case '?':
-		errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-		UNREACHABLE();
+		/* self-doc: write to standard output */
+		error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+		return 0;
 	}
 	if(flags&(P_FLAG|T_FLAG))
 		flags &= ~V_FLAG;
 	argv += opt_info.index;
 	if(error_info.errors || !*argv)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),optusage(NULL));
 		UNREACHABLE();
 	}
-	return(whence(argv, flags));
+	return whence(argv, flags);
 }
 
-static int whence(char **argv, register int flags)
+static int whence(char **argv, int flags)
 {
-	register const char *name;
-	register Namval_t *np;
-	register const char *cp;
-	register int aflag, ret = 0;
-	register const char *msg;
+	const char *name;
+	Namval_t *np;
+	const char *cp;
+	int aflag, ret = 0;
+	const char *msg;
 	Namval_t *nq;
 	char *notused;
 	Pathcomp_t *pp;
@@ -184,7 +190,7 @@ static int whence(char **argv, register int flags)
 		/* non-tracked aliases */
 		if((np=nv_search(name,sh.alias_tree,0))
 			&& !nv_isnull(np) && !nv_isattr(np,NV_TAGGED)
-			&& (cp=nv_getval(np))) 
+			&& (cp=nv_getval(np)))
 		{
 			if(flags&V_FLAG)
 			{
@@ -206,8 +212,7 @@ static int whence(char **argv, register int flags)
 		{
 			if(flags&Q_FLAG)
 				continue;
-			if(!(flags&T_FLAG))
-				sfputr(sfstdout,name,-1);
+			sfputr(sfstdout, flags&T_FLAG?"function":name, -1);
 			if(flags&V_FLAG)
 			{
 				if(nv_isnull(np))
@@ -216,14 +221,12 @@ static int whence(char **argv, register int flags)
 					pp = 0;
 					while(!path_search(name,&pp,3) && pp && (pp = pp->next))
 						;
-					if(*stakptr(PATH_OFFSET)=='/')
-						sfprintf(sfstdout,sh_translate(e_autoloadfrom),sh_fmtq(stakptr(PATH_OFFSET)));
+					if(*stkptr(sh.stk,PATH_OFFSET)=='/')
+						sfprintf(sfstdout,sh_translate(e_autoloadfrom),sh_fmtq(stkptr(sh.stk,PATH_OFFSET)));
 				}
 				else
 					sfprintf(sfstdout,sh_translate(is_function));
 			}
-			else if(flags&T_FLAG)
-				sfprintf(sfstdout,"function");
 			sfputc(sfstdout,'\n');
 			if(!aflag)
 				continue;
@@ -270,7 +273,7 @@ static int whence(char **argv, register int flags)
 			}
 			else
 			{
-				cp = stakptr(PATH_OFFSET);
+				cp = stkptr(sh.stk,PATH_OFFSET);
 				if(*cp==0)
 					cp = 0;
 			}
@@ -278,7 +281,7 @@ static int whence(char **argv, register int flags)
 			{
 				/* Since -q ignores -a, return on the first non-match */
 				if(!cp)
-					return(1);
+					return 1;
 			}
 			else if(maybe_undef_fn)
 			{
@@ -286,13 +289,11 @@ static int whence(char **argv, register int flags)
 				if(!nv_search(cp,sh.fun_tree,0))
 				{
 					/* Undefined/autoloadable function on FPATH */
-					sfputr(sfstdout,sh_fmtq(cp),-1);
-					if(flags&T_FLAG)
-						sfprintf(sfstdout,"function");
-					else if(flags&V_FLAG)
+					sfputr(sfstdout, flags&T_FLAG?"function":sh_fmtq(cp), -1);
+					if(flags&V_FLAG)
 					{
 						sfprintf(sfstdout,sh_translate(is_ufunction));
-						sfprintf(sfstdout,sh_translate(e_autoloadfrom),sh_fmtq(stakptr(PATH_OFFSET)));
+						sfprintf(sfstdout,sh_translate(e_autoloadfrom),sh_fmtq(stkptr(sh.stk,PATH_OFFSET)));
 					}
 					sfputc(sfstdout,'\n');
 				}
@@ -314,10 +315,7 @@ static int whence(char **argv, register int flags)
 							msg = sh_translate(is_builtver);
 					}
 					/* tracked aliases next */
-					else if(!sh_isstate(SH_DEFPATH)
-					&& (np = nv_search(name,sh.track_tree,0))
-					&& !nv_isattr(np,NV_NOALIAS)
-					&& strcmp(cp,nv_getval(np))==0)
+					else if((np = path_gettrackedalias(name)) && strcmp(cp,nv_getval(np))==0)
 						msg = sh_translate(is_talias);
 					else
 						msg = sh_translate("is");
@@ -328,9 +326,9 @@ static int whence(char **argv, register int flags)
 					sfputr(sfstdout,is_pathbound_builtin ? "builtin" : "file",'\n');
 				else
 					sfputr(sfstdout,sh_fmtq(cp),'\n');
-				free((char*)cp);
+				free((void*)cp);
 			}
-			else if(aflag<=1) 
+			else if(aflag<=1)
 			{
 				ret = 1;
 				if(flags&V_FLAG)
@@ -348,5 +346,5 @@ static int whence(char **argv, register int flags)
 				pp = 0;
 		} while(pp);
 	}
-	return(ret);
+	return ret;
 }

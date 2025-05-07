@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -12,10 +12,16 @@
 #                                                                      #
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
+#            Johnothan King <johnothanking@protonmail.com>             #
 #                                                                      #
 ########################################################################
 
 . "${SHTESTS_COMMON:-${0%/*}/_common}"
+
+# Some systems (at least Android) don't allow inheriting stdout in closed state.
+# Disable the tests that rely on this on these systems.
+sh -c 'exec 3>&1' 1>&- 2>/dev/null
+typeset -si can_close_stdout=$?
 
 unset HISTFILE
 
@@ -150,7 +156,7 @@ exec 3>&- 4>&-
 	        read -r line; print -r -- "$line"
 	) & wait
 	while	read -r line
-        do	print -r -- "$line"
+	do	print -r -- "$line"
 	done
  } << !
 line 1
@@ -256,6 +262,8 @@ then	{ redirect {n}<#((EOF)) ;} 2> /dev/null || err_exit '{n}<# not working'
 	else	err_exit 'not able to parse {n}</dev/null'
 	fi
 fi
+
+if((!SHOPT_SCRIPTONLY));then
 $SHELL -ic '
 {
     print -u2  || exit 2
@@ -269,9 +277,13 @@ $SHELL -ic '
 }  3> /dev/null 4> /dev/null 5> /dev/null 6> /dev/null 7> /dev/null 8> /dev/null 9> /dev/null' > /dev/null 2>&1
 exitval=$?
 (( exitval ))  && err_exit  "print to unit $exitval failed"
+fi # !SHOPT_SCRIPTONL~Y
+
 $SHELL -c "{ > $tmp/1 ; date;} >&- 2> /dev/null" > $tmp/2
 [[ -s $tmp/1 || -s $tmp/2 ]] && err_exit 'commands with standard output closed produce output'
-$SHELL -c "$SHELL -c ': 3>&1' 1>&- 2>/dev/null" && err_exit 'closed standard output not passed to subshell'
+if ((can_close_stdout)); then
+$SHELL -c "$SHELL -c ': 3>&1' 1>&- 2>/dev/null" && err_exit 'closed standard output not passed to child shell'
+fi # can_close_stdout
 [[ $(cat  <<- \EOF | $SHELL
 	do_it_all()
 	{
@@ -470,7 +482,7 @@ print hello there world > $tmp/foobar
 sed  -e 's/there //' $tmp/foobar  >; $tmp/foobar
 [[ $(<$tmp/foobar) == 'hello world' ]] || err_exit '>; redirection not working on simple command'
 print hello there world > $tmp/foobar
-{ sed  -e 's/there //' $tmp/foobar;print done;} >; $tmp/foobar 
+{ sed  -e 's/there //' $tmp/foobar;print done;} >; $tmp/foobar
 [[ $(<$tmp/foobar) == $'hello world\ndone' ]] || err_exit '>; redirection not working for compound command'
 print hello there world > $tmp/foobar
 $SHELL -c "sed  -e 's/there //' $tmp/foobar  >; $tmp/foobar"
@@ -588,10 +600,12 @@ result=$("$SHELL" -c 'echo ok > >(sed s/ok/good/); wait' 2>&1)
 
 # Process substitution in an interactive shell or profile script shouldn't
 # print the process ID of the asynchronous process.
+if((!SHOPT_SCRIPTONLY));then
 echo 'false >(false)' > "$tmp/procsub-envtest"
 result=$(set +x; ENV=$tmp/procsub-envtest "$SHELL" -ic 'true >(true)' 2>&1)
 [[ -z $result ]] || err_exit 'interactive shells and/or profile scripts print a PID during process substitution' \
 				"(expected '', got $(printf %q "$result"))"
+fi # !SHOPT_SCRIPTONLY
 
 # ======
 # Out of range file descriptors shouldn't cause 'read -u' to segfault
@@ -698,6 +712,7 @@ got=$(command -x cat <(command -x echo foo) 2>&1) || err_exit "process substitut
 
 # ======
 # A redirection with a null command could crash under certain circumstances (rhbz#1200534)
+if((!SHOPT_SCRIPTONLY));then
 "$SHELL" -i >/dev/null 2>&1 -c '
 	function dlog
 	{
@@ -711,6 +726,7 @@ got=$(command -x cat <(command -x echo foo) 2>&1) || err_exit "process substitut
 ' empty_redir_crash_test "$tmp"
 ((!(e = $?))) || err_exit 'crash on null-command redirection with DEBUG trap' \
 	"(got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"), $(printf %q "$got"))"
+fi # !SHOPT_SCRIPTONLY
 
 # ======
 # stdout was misdirected if an EXIT/ERR trap handler was defined in a -c script
@@ -785,8 +801,10 @@ got=$(export tmp; "$SHELL" -ec \
 	}
 	consumer <(producer) > /dev/null
 } & pid=$!
-(sleep 5; kill -HUP $pid) 2> /dev/null &
+(sleep 30; kill -HUP $pid) 2> /dev/null &
+pid2=$!
 wait $pid 2> /dev/null || err_exit "process substitution hangs"
+kill $pid2 2> /dev/null
 
 # ======
 # Test for looping or lingering process substitution processes
@@ -807,7 +825,7 @@ if kill -0 "$procsub_pid" 2>/dev/null; then
 	err_exit "process substitutions loop or linger after parent shell finishes"
 fi
 (true <(true) >(true) <(true) >(true); wait) &
-sleep .1
+sleep .2
 if kill -0 $! 2> /dev/null; then
 	kill -TERM $!
 	err_exit "process substitutions linger when unused"
@@ -846,8 +864,15 @@ fi
 # file descriptor inside of the command substitution.
 exp='Foo bar'
 { got=$(echo 'Foo bar' 2>/dev/null); } >&-
-[[ $exp == $got ]] || err_exit "BUG_CSUBSTDO: Closing stdout outside of command substitution breaks stdout inside of command substitution" \
+[[ $got == "$exp" ]] || err_exit "\$(Comsub) with closed stdout doesn't reopen stdout" \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+{ got=${ print 'Foo bar' 2>/dev/null; }; } >&-
+[[ $got == "$exp" ]] || err_exit "\${ Comsub; } with closed stdout doesn't reopen stdout" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+{ got=`print 'Foo bar' 2>/dev/null`; } >&-
+[[ $got == "$exp" ]] || err_exit "\`Comsub\` with closed stdout doesn't reopen stdout" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
 
 # ======
 # In shcomp, process substitution did not work when used as the file name to a redirection.
@@ -888,13 +913,14 @@ got=$(< dir1/dir2/x)
 # ======
 # ksh misbehaved when stdout is closed
 # https://github.com/ksh93/ksh/issues/314
+if ((can_close_stdout)); then
 "$SHELL" -c 'pwd; echo "$?" >&2; echo test; echo "$?" > file' >&- 2>stderr
 exp='1'
 [[ $(<file) == "$exp" ]] || err_exit "ksh misbehaves when stdout is closed (1)" \
 	"(expected $(printf %q "$exp"), got $(printf %q "$(<file)"))"
-exp='0'
-[[ $(<stderr) == "$exp" ]] || err_exit "ksh misbehaves when stdout is closed (2)" \
-	"(expected $(printf %q "$exp"), got $(printf %q "$(<stderr)"))"
+exp='0'  # TODO: exp=$'pwd: write failed \\[.*\\]\n1'
+[[ $(<stderr) =~ $exp ]] || err_exit "ksh misbehaves when stdout is closed (2)" \
+	"(expected match of $(printf %q "$exp"), got $(printf %q "$(<stderr)"))"
 for cmd in echo print printf
 do	"$cmd" hi >&- && err_exit "'$cmd' does not detect closed stdout (simple redirection)"
 	"$SHELL" -c "$cmd hi" >&- && err_exit "'$cmd' does not detect closed stdout (inherited FD)"
@@ -905,11 +931,11 @@ then	for cmd in echo print printf
 		"$SHELL" -c "$cmd hi" >/dev/full && err_exit "'$cmd' does not detect disk full (inherited FD)"
 	done
 fi
+fi # can_close_stdout
 
 # ======
 # Command substitution hangs, writing infinite zero bytes, when redirecting standard output on a built-in that forks
 # https://github.com/ksh93/ksh/issues/416
-exp='line'
 "$SHELL" -c 'echo "$(ulimit -t unlimited >/dev/null 2>&1; echo "ok $$")"' >out 2>&1 &
 pid=$!
 (sleep 1; kill -9 "$pid") 2>/dev/null &
@@ -918,6 +944,37 @@ then	kill "$!"  # the sleep process
 	[[ $(<out) == "ok $pid" ]] || err_exit "comsub fails after fork with stdout redirection" \
 		"(expected 'ok $pid', got $(printf %q "$(<out)"))"
 else	err_exit "comsub hangs after fork with stdout redirection"
+fi
+
+# https://github.com/ksh93/ksh/issues/416#issuecomment-1008866883
+exp='line'
+"$SHELL" -c 'alias foo=bar; echo $(alias foo >/dev/null; echo "$1")' "$0" "$exp" >out 2>&1 &
+pid=$!
+(sleep 1; kill -9 "$pid") 2>/dev/null &
+if	wait "$pid" 2>/dev/null
+then	kill "$!"  # the sleep process
+	[[ $(<out) == "$exp" ]] || err_exit "comsub fails after stdout redirection" \
+		"(expected '$exp', got '$(<out)')"
+else	err_exit "comsub hangs after stdout redirection"
+fi
+
+# same bug for compound/block commands: https://github.com/ksh93/ksh/issues/784
+exp=$'funA\nA'
+"$SHELL" -c '
+	BugFunction() {
+	  { echo "funA" >&2; } >&2
+	  echo A
+	}
+	Result=$(BugFunction)
+	echo $Result
+' >out 2>&1 &
+pid=$!
+(sleep 1; kill -9 "$pid") 2>/dev/null &
+if	wait "$pid" 2>/dev/null
+then	kill "$!"  # the sleep process
+	[[ $(<out) == "$exp" ]] || err_exit "double redirection in command substitution" \
+		"(expected $(printf %q "$exp"), got $(printf %q "$(<out)"))"
+else	err_exit "double redirection in command substitution causes shell hang"
 fi
 
 # ======
@@ -999,6 +1056,20 @@ got=$(set +x; eval 'cat >out <(echo OK)' 2>&1; echo ===; cat out)
 exp=$'===\nOK'
 [[ $got == "$exp" ]] || err_exit "process substitution nixes output redirection" \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/591
+(ulimit -n 2147483648; "$SHELL" --version) >/dev/null 2>&1
+let "$? <= 128" || err_exit "crash on huge RLIMIT_NOFILE"
+(ulimit -n 8; "$SHELL" --version) >/dev/null 2>&1
+let "$? <= 128" || err_exit "crash on tiny RLIMIT_NOFILE"
+
+
+# ======
+got=$(eval ': >>&2' 2>&1)
+[[ e=$? -eq 3 && $got == *'syntax error'* ]] || err_exit ">>&2 should be a syntax error (got \$?==$e, $(printf %q "$got"))"
+got=$(eval ': <<&2' 2>&1)
+[[ e=$? -eq 3 && $got == *'syntax error'* ]] || err_exit "<<&2 should be a syntax error (got \$?==$e, $(printf %q "$got"))"
 
 # ======
 exit $((Errors<125?Errors:125))

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -22,7 +22,7 @@
 #include	<cmd.h>
 #include	<rev.h>
 
-#define BUFSIZE			SF_BUFSIZE
+#define BUFSIZE			SFIO_BUFSIZE
 #define rounddown(n,size)	(((n)-1)&~((size)-1))
 
 /*
@@ -31,24 +31,24 @@
  */
 int rev_line(Sfio_t *in, Sfio_t *out, off_t start)
 {
-	register char *cp, *cpold;
-	register int n, nleft=0;
+	char *cp, *cpold;
+	int n, nleft=0;
 	char buff[BUFSIZE];
 	off_t offset;
-	if(sfseek(in,(off_t)0,SEEK_CUR) < 0)
+	if(sfseek(in,0,SEEK_CUR) < 0)
 	{
-		Sfio_t *tmp = sftmp(4*SF_BUFSIZE);
+		Sfio_t *tmp = sftmp(4*SFIO_BUFSIZE);
 		if(!tmp)
-			return(-1);
-		if(start>0 && sfmove(in, (Sfio_t*)0, start, -1) != start)
-			return(-1);
-		if(sfmove(in, tmp, SF_UNBOUND, -1) < 0 || !sfeof(in) || sferror(tmp))
-			return(-1);
+			return -1;
+		if(start>0 && sfmove(in, NULL, start, -1) != start)
+			return -1;
+		if(sfmove(in, tmp, SFIO_UNBOUND, -1) < 0 || !sfeof(in) || sferror(tmp))
+			return -1;
 		in = tmp;
 		start=0;
 	}
-	if((offset = sfseek(in,(off_t)0,SEEK_END)) <= start)
-		return(0);
+	if((offset = sfseek(in,0,SEEK_END)) <= start)
+		return 0;
 	offset = rounddown(offset,BUFSIZE);
 	while(1)
 	{
@@ -84,13 +84,13 @@ int rev_line(Sfio_t *in, Sfio_t *out, off_t start)
 			else
 				cp++;
 			if(sfwrite(out,cp,cpold-cp) < 0)
-				return(-1);
+				return -1;
 			if(nleft)
 			{
 				if(nleft==1)
 					sfputc(out,'\n');
 				else if(sfmove(in,out,nleft,-1) != nleft)
-					return(-1);
+					return -1;
 				nleft = 0;
 			}
 		}
@@ -102,7 +102,7 @@ int rev_line(Sfio_t *in, Sfio_t *out, off_t start)
 	{
 		sfseek(in, start, SEEK_SET);
 		if(sfmove(in,out,nleft,-1) != nleft)
-			return(-1);
+			return -1;
 	}
-	return(0);
+	return 0;
 }

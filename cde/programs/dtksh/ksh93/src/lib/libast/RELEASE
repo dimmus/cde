@@ -254,7 +254,7 @@ ____
 09-06-05 port/astconf.c: fix 'UNIVERSE = value' synthesize logic
 09-05-25 tm/tmxduration.c: add
 09-05-08 comp/syslog.c: add _UWIN /var/log/syslog preference
-09-05-01 comp/setlocale.c: fix _UWIN intercepts to return NiL on unknown locales
+09-05-01 comp/setlocale.c: fix _UWIN intercepts to return NULL on unknown locales
 09-04-27 sfio/sfpool.c: fix bug that did not return pool on delete
 09-04-22 include/regex.h,regex/regcomp.c: add REG_REGEXP <regexp.h> compatibility
 09-04-15 tm/tmxdate.c: handle "4th thursday in november"
@@ -731,7 +731,7 @@ ____
 	 features/botched: add Cygwin _stat => _stat64
 03-08-15 include/ast.h: map out BSD strmode()
 	 features/common: add interix _ast_intmax_t workarounds
-	 misc/fs3d.c: 3d mount test now uses "" instead of NiL (or Cygwin dumps)
+	 misc/fs3d.c: 3d mount test now uses "" instead of NULL (or Cygwin dumps)
 03-08-11 string/fmtesc.c: fix optional quoting checks
 	 tm/tmdate.c: fix > 1 year of seconds arithmetic
 	 tm/tmfix.c: fix leap year adjustments
@@ -766,7 +766,7 @@ ____
 	 vmalloc/vmbest.c: set /dev/zero mmap fd FD_CLOEXEC
 	 features/mmap: fix ancient read() vs. mmap() time arithmetic typo
 	 vmalloc/malloc.c: _AST_std_malloc==1 to force standard malloc
-03-06-09 comp/omitted.c: add _imp__FUNCTION sybols for __CYGWIN__ static link
+03-06-09 comp/omitted.c: add _imp__FUNCTION symbols for __CYGWIN__ static link
 	 vmalloc/vmbest.c: handle systems with sbrk() but no brk()
 03-06-04 port/astconf.c: drop non-standard diagnostics
 03-06-03 comp/conf.sh: rework symbol collision logic
@@ -1394,7 +1394,7 @@ ____
 	 optget: embedded `-' optional in long options, prefix={0,1,2}
 99-02-14 fastfind: fix dir format bug that emitted wrong paths
 	 astconf: fix redef off by one bug
-99-02-11 pathcanon(): don't cache astconf("PATH_LEADING_SLASHES", NiL, NiL)
+99-02-11 pathcanon(): don't cache astconf("PATH_LEADING_SLASHES", NULL, NULL)
 99-01-23 optget: move <old_opt.h> back into <option.h>, no open-close
 	 optget: add "[index:long-name:description]" for --long-name
 	 comp/gross: add weak __libc_attr for IRIX < 6.5 compatibility
@@ -1489,11 +1489,11 @@ ____
 	 Makefile,state.c: move forced header generation state.c => Makefile
 	 sfio: update including SF_WHOLE
 97-10-01 sfdostext: add \r\n => \n sfio discipline
-	 stropt: NiL table => p=name for all name=value
+	 stropt: NULL table => p=name for all name=value
 97-08-11 pathtmp: check PID to note forks
 	 procopen: FD_CLOEXEC rfd && wfd
 	 fts: fts_close() after fts_children() with no fts_read() now works
-97-07-17 error: sfsync(sfstdin,sfstdout,sfstderr) instead of sfsync(NiL)
+97-07-17 error: sfsync(sfstdin,sfstdout,sfstderr) instead of sfsync(NULL)
 	 _sfcvinit: add sfio internal interface to base conversion tables
 	 strton: use _Sfcv* base conversion tables instead of sfsscanf()
 	 sfvscanf: use _Sfcv* base conversion tables
@@ -1524,7 +1524,7 @@ ____
 	 system: cmd==0 means check for shell access (X/Open)
 	 sfhdr.h: fix sfrsrv prototype
 	 add __libc_malloc etc for GNU/Linux
-	 astconf(NiL,path,name) == astconf(name,path,NiL) + no liberror
+	 astconf(NULL,path,name) == astconf(name,path,NULL) + no liberror
 	 fts_open: if toplist() stat fails return 0
 	 ftwalk: handle fts_open()==0 via one phony userf() call
 	 sfmode: S_ISFIFO default is SF_SHARE=0
@@ -1606,7 +1606,7 @@ ____
 	 hsearch,nftw,realpath,strftime,strptime,swab,tempnam: add
 	 tsearch,wordexp: add
 	 getcwd: cache last path for easy test
-96-07-17 error: sfsync(NiL) ... write ... sfsync(sfstderr)
+96-07-17 error: sfsync(NULL) ... write ... sfsync(sfstderr)
 	 astconf: handle readonly *(DEV|DIR) vars
 96-04-01 swapop: fix stupid return value bug
 	 features/int.c: fix int_swap generation bug

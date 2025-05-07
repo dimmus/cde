@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,12 +13,37 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#         hyenias <58673227+hyenias@users.noreply.github.com>          #
+#                  Lev Kujawski <int21h@mailbox.org>                   #
+#                      Phi <phi.debian@gmail.com>                      #
 #                                                                      #
 ########################################################################
 
 . "${SHTESTS_COMMON:-${0%/*}/_common}"
 ((!.sh.level))||err_exit ".sh.level should be 0 after dot script, is ${.sh.level}"
 
+# ======
+# The following tests are run in parallel because they are slow; they are checked at the end
+
+# setting TMOUT in a virtual subshell removes its special meaning
+# https://github.com/ksh93/ksh/issues/782
+(
+	typeset -F s=SECONDS
+	"$SHELL" -c 'TMOUT=2; (TMOUT=3); TMOUT=1; read v' </dev/tty
+	((SECONDS < s + 2))
+) &
+parallel_1=$!
+
+# TMOUT applies to 'read' from a non-terminal
+# https://github.com/ksh93/ksh/issues/783
+(
+	typeset -F s=SECONDS
+	"$SHELL" -c 'TMOUT=1; { sleep 1.1; print; } | read a'
+	(($? == 0 || SECONDS > s + 1.05))
+) &
+parallel_2=$!
+
+# ======
 [[ ${.sh.version} == "$KSH_VERSION" ]] || err_exit '.sh.version != KSH_VERSION'
 unset ss
 [[ ${@ss} ]] && err_exit '${@ss} should be empty string when ss is unset'
@@ -122,6 +147,12 @@ got=$(RANDOM=1; print $RANDOM; :& print $RANDOM)
 [[ $got == "$exp" ]] || err_exit "Background job influences reproducible $RANDOM sequence" \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
+# Seeding with an arithmetic expression should be identical to seeding using a shell assignment
+RANDOM=12345; exp="$RANDOM $RANDOM $RANDOM $RANDOM"
+let "RANDOM = 12345"; got="$RANDOM $RANDOM $RANDOM $RANDOM"
+[[ $got == "$exp" ]] || err_exit "Seeding RANDOM using arithmetic expression fails" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
 # SECONDS
 float secElapsed=0.0 secSleep=0.001
 let SECONDS=$secElapsed
@@ -129,7 +160,7 @@ sleep $secSleep
 secElapsed=SECONDS
 if	(( secElapsed < secSleep ))
 then	err_exit "slept ${secElapsed} seconds instead of ${secSleep}: " \
-                 "either 'sleep' or \$SECONDS not working"
+		 "either 'sleep' or \$SECONDS not working"
 fi
 unset -v secElapsed secSleep
 # _
@@ -246,7 +277,7 @@ fi
 ACCESS=0
 function COUNT.set
 {
-        (( ACCESS++ ))
+	(( ACCESS++ ))
 }
 COUNT=0
 (( COUNT++ ))
@@ -305,7 +336,7 @@ done
 kill -s 0 $! || err_exit '$! does not point to latest asynchronous process'
 kill $!
 unset x
-cd /tmp || exit
+cd /dev || exit
 CDPATH=/
 x=$(cd ${tmp#/})
 if	[[ $x != $tmp ]]
@@ -323,19 +354,19 @@ fi
 unset CDPATH
 cd "${tmp#/}" >/dev/null 2>&1 && err_exit "CDPATH not deactivated after unset"
 cd "$tmp" || exit
-TMOUT=100
-(TMOUT=20)
-if	(( TMOUT !=100 ))
+
+if	"$SHELL" -c 'TMOUT=100; (TMOUT=20); (( TMOUT != 100 ))'
 then	err_exit 'setting TMOUT in subshell affects parent'
 fi
+
 unset y
 function setdisc # var
 {
-        eval function $1.get'
-        {
-                .sh.value=good
-        }
-        '
+	eval function $1.get'
+	{
+		.sh.value=good
+	}
+	'
 }
 y=bad
 setdisc y
@@ -658,6 +689,8 @@ function dave.unset
 unset dave
 [[ $(typeset +f) == *dave.* ]] && err_exit 'unset discipline not removed'
 
+# ======
+
 x=$(
 	dave=dave
 	function dave.unset
@@ -665,7 +698,28 @@ x=$(
 		print dave.unset
 	}
 )
-[[ $x == dave.unset ]] || err_exit 'unset discipline not called with subset completion'
+[[ -n $x ]] && err_exit "unset discipline wrongly called upon subshell completion (got '$x')"
+
+x=$(
+	v="still set"
+	v.unset()
+	{
+		print UNSET
+	}
+	ulimit -c 0
+	print "$v"
+)
+[[ $x == 'still set' ]] || err_exit "incorrect behaviour of unset discipline in forked subshell (got $(printf %q "$x"))"
+
+echo 'echo ok' >script
+v.unset() { echo UNSET; }
+v=1
+./script >out
+{ unset v; } >/dev/null
+got=$(<out)
+[[ $got = ok ]]  || err_exit "incorrect behaviour of unset discipline when running #!-less script (got $(printf %q "$got"))"
+
+# ======
 
 print 'print ${VAR}' > $tmp/script
 unset VAR
@@ -896,6 +950,10 @@ $SHELL -c "$cmd" 2>/dev/null || err_exit "'$cmd' exit status $?, expected 0"
 SHLVL=1
 level=$($SHELL -c $'$SHELL -c \'print -r "$SHLVL"\'')
 [[ $level  == 3 ]]  || err_exit "SHLVL should be 3 not $level"
+echo 'print -r "$SHLVL"' >script
+chmod +x script
+level=$($SHELL -c '$SHELL ./script')
+[[ $level == 3 ]] || err_exit "SHLVL should be 3 not $level"
 
 [[ $($SHELL -c '{ x=1; : ${x.};print ok;}' 2> /dev/null) == ok ]] || err_exit '${x.} where x is a simple variable causes shell to abort'
 
@@ -931,6 +989,18 @@ actual=$(_test_isset var)
 [[ "$actual" = "$expect" ]] || err_exit "\${var+s} expansion fails in loops (expected '$expect', got '$actual')"
 actual=$(_test_isset IFS)
 [[ "$actual" = "$expect" ]] || err_exit "\${IFS+s} expansion fails in loops (expected '$expect', got '$actual')"
+
+got=$(
+	unset -v var
+	for i in 1 2 3 4 5; do
+		case ${var+s} in
+		( s )   print -n S; unset -v var;;
+		( '' )  print -n U; var.get() { : ; };;
+		esac
+	done
+)
+exp='USUSU'
+[[ $got == "$exp" ]] || err_exit "loop variants optimizer vs. discipline function (expected '$exp', got '$got')"
 
 # [[ -v var ]] within a loop.
 _test_v() { eval "
@@ -1102,7 +1172,7 @@ $SHELL -c '
 	PS2=$PS1 PS3=$PS1 PS4=$PS1 OPTARG=$PS1 IFS=$PS1 FPATH=$PS1 FIGNORE=$PS1
 	for var
 	do	case $var in
-		RANDOM | HISTCMD | _ | SECONDS | LINENO | JOBMAX | .sh.stats | .sh.match)
+		RANDOM | SRANDOM | HISTCMD | _ | SECONDS | LINENO | JOBMAX | .sh.stats | .sh.match)
 			# these are expected to fail below as their values change; just test against crashing
 			typeset -u "$var"
 			typeset -l "$var"
@@ -1155,8 +1225,8 @@ $SHELL -c '
 
 # ${.sh.pid} should be the PID of the running job
 echo ${.sh.pid} > "$tmp/jobpid" &
-wait
-[[ $(cat "$tmp/jobpid") == ${.sh.pid} ]] && err_exit "\${.sh.pid} is not set to a job's PID (expected $!, got $(cat "$tmp/jobpid"))"
+wait "$!"
+[[ $(<$tmp/jobpid) == $! ]] || err_exit "\${.sh.pid} is not set to a job's PID (expected $!, got $(<$tmp/jobpid))"
 
 # ${.sh.pid} should be the same as $$ in the parent shell
 [[ $$ == ${.sh.pid} ]] || err_exit "\${.sh.pid} and \$$ differ in the parent shell (expected $$, got ${.sh.pid})"
@@ -1459,6 +1529,232 @@ do
 		[[ -z $got ]] || err_exit "-$type array with .$disc discipline fails to be unset (got $(printf %q "$got"))"
 	done
 done
+
+# ======
+# A regression introduced in ksh93u+ 2012-04-23 caused LINENO to have
+# the wrong value after parsing a multi-line compound assignment.
+# https://github.com/ksh93/ksh/issues/484
+exp=3
+got=$("$SHELL" <<-\EOF
+	x=(typeset -a x=(
+	                [1]=))
+	echo $LINENO
+	EOF
+)
+((exp == got)) || err_exit 'LINENO is wrong after a multi-line compound assignment' \
+	"(expected $exp, got $(printf %q "$got"))"
+
+# ======
+# The += operator shouldn't copy variables outside of a function's scope
+# https://github.com/ksh93/ksh/issues/533
+unset v foo bar
+v=outside
+function f {
+	typeset v
+	print -n "$v"
+	v+="inside"
+	print "$v"
+}
+function foo {
+	echo $bar
+}
+function bar {
+	bar=bar_
+	bar+=foo foo
+	bar+=foo "$SHELL" -c 'echo $bar'
+	bar+=foo
+	echo $bar
+}
+exp='inside
+bar_foo
+bar_foo
+bar_foo'
+got=$(f && bar)
+[[ $exp == "$got" ]] || err_exit "+= operator used in function copies variable from outside of the function's scope" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+unset var
+function three {
+	:
+}
+function two {
+	var+='wrong ' sh -c 'true'
+	var+='wrong ' true
+	var+='wrong ' three
+	echo $var
+}
+function one {
+	var=one_ two
+}
+exp=one_
+got=$(one)
+[[ $exp == "$got" ]] || err_exit "+= operator in a nested function appends variable in the wrong scope" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/543
+got=$("$SHELL" -c $':\nLINENO=$LINENO true\nprint "Line 3 is $LINENO"')
+exp='Line 3 is 3'
+[[ $got == "$exp" ]] || err_exit "LINENO is wrong after being set in an invocation-local scope" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/545
+got=$({ "$SHELL" -uc $'a=A; function a.get { : $z; }\necho $a'; } 2>&1)
+let "(e=$?)==0" || err_exit "unset variable access in discipline function" \
+	"(got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"), $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/553
+unset NOTSET
+IFS=' '
+set -- ${NOTSET:-echo -e foo}
+IFS=/
+got=$#,$*
+exp=3,echo/-e/foo
+[[ $got == "$exp" ]] || err_exit "Field-split fallback string containing dash (1)" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+IFS=' '
+set -- ${NOTSET:-a b c xxx-xxx d e f}
+IFS=/
+got=$#,$*
+exp=7,a/b/c/xxx-xxx/d/e/f
+[[ $got == "$exp" ]] || err_exit "Field-split fallback string containing dash (2)" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+IFS=' '
+set -- ${NOTSET:-[a - b]}
+IFS=/
+got=$#,$*
+exp=3,[a/-/b]
+[[ $got == "$exp" ]] || err_exit "Field-split fallback string containing brackets and a dash" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+IFS=$' \t\n'  # restore default
+
+# ======
+# 'read' mistakenly parsed assignment-arguments instead of variable names
+# https://github.com/ksh93/ksh/issues/606#issuecomment-1474858962
+exp=': read: foo=bar: invalid variable name'
+got=$(set +x; { read foo=bar; } <<<baz 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit 'read foo=bar' \
+	"(expected status 1, *$(printf %q "$exp"); got status $e, $(printf %q "$got"))"
+
+# ======
+# Corruption of $_ causing crash when running subshell + discipline functions + shared-state comsub
+# https://github.com/ksh93/ksh/issues/616
+exp=$'OK1\nOK2'
+got=$(set +x; { "$SHELL" -c '
+	foo.get()
+	{
+		.sh.value=foo;
+	}
+	bar.get()
+	{
+		.sh.value=${ echo foo; }
+	}
+	: OK1
+	(
+		: $bar
+		: $foo
+	)
+	echo "$_"
+	: OK2
+	echo "$_"
+';} 2>&1)
+[[ e=$? -eq 0 && $got == "$exp" ]] || err_exit '$_ corruption' \
+	"(expected status 0, $(printf %q "$exp");" \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"), $(printf %q "$got"))"
+
+# ======
+got=${ typeset -p SRANDOM; }
+exp='typeset -u -i SRANDOM='
+[[ $got == "$exp"* ]] || err_exit "SRANDOM is the wrong type" \
+	"(expected match of $(printf %q "$exp")*, got $(printf %q "$got"))"
+
+case ${SRANDOM+s},${SRANDOM-} in
+, )	err_exit "SRANDOM not set" ;;
+s, | s,*[!0123456789]* )
+	err_exit "SRANDOM has an invalid value"  ;;
+s,* )	case $SRANDOM,$SRANDOM,$SRANDOM,$SRANDOM in
+	"$SRANDOM,$SRANDOM,$SRANDOM,$SRANDOM" )
+		err_exit "SRANDOM not working" ;;
+	esac ;;
+esac
+
+typeset -ui i=0 got=0 bound=100
+SRANDOM=bound
+for ((i=0; i<bound; i++))
+do	if	let "got = SRANDOM, got >= bound"
+	then	err_exit "SRANDOM upper bound not working ($got >= $bound)"
+		break
+	fi
+done
+env "SRANDOM=$bound" "$SHELL" -c 'typeset -i i
+	for ((i=0; i<100; i++))
+	do	print $SRANDOM
+	done' |
+while	read i
+do	((got = i>=bound)) && break
+done
+((got)) || err_exit "SRANDOM upper bound inherited from environment"
+# SRANDOM upper bound leaks out of virtual subshells
+for i in 0 10000; do
+	(SRANDOM=$i)
+	for ((i=0; i<bound; i++))
+	do	if	let "got = SRANDOM, got >= bound"
+		then	err_exit "SRANDOM upper bound leaks out of virtual subshells ($got >= $bound)"
+			break
+		fi
+	done
+done
+unset i got bound
+SRANDOM=0
+
+# ======
+# https://github.com/ksh93/ksh/issues/435
+"$SHELL" <<\EOF >/dev/null 2>&1; (((e=$?)==1)) || err_exit "getn/get discipline crash" \
+	"(expected status 1, got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"))"
+unset nonexistent_var
+foo=nonexistent_var
+foo.getn() { :; }
+foo.get() { :; }
+unset -f foo.getn
+trap 'echo $((foo))' EXIT   # throw the echo $((foo)) 'unset parameter' error twice
+echo $((foo))
+EOF
+
+# ======
+# exec after unset SHLVL
+# https://github.com/ksh93/ksh/issues/788
+{ "$SHELL" -c 'unset SHLVL; exec true'; } 2>/dev/null
+(((e=$?)==0)) || err_exit "crash after unsetting SHLVL" \
+	"(expected status 0, got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"))"
+
+# ======
+# checks for tests run in parallel (see top)
+wait "$parallel_1" || err_exit 'setting TMOUT in a virtual subshell removes its special meaning'
+wait "$parallel_2" || err_exit "TMOUT applies to 'read' from a non-terminal"
+
+# ======
+# TODO: fix to support > 4 year digits well before the year 10,000 :)
+got=$((.sh.version))
+exp='^[[:digit:]]{8}$'
+[[ $got =~ $exp ]] || err_exit '$((.sh.version)) does not yield YYYYMMDD digits' \
+	"(expected match of ERE $exp, got '$got')"
+
+# ======
+# As of 93u+m/1.1, $RANDOM uses nrand48(3) which should use the same pseudorandom
+# generator on all systems, producing a known sequence for a given seed value.
+case ${.sh.version} in
+*93u+m/1.0.*)
+	;;
+*93u+m/*)
+	RANDOM=123
+	exp='24979 26943 1328 1988 6255 23944 24547 11971 6923 8339'
+	got="$RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM"
+	[[ $got == "$exp" ]] || err_exit "RANDOM does not seem to use the expected pseudorandom generator" \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+	;;
+esac
 
 # ======
 exit $((Errors<125?Errors:125))

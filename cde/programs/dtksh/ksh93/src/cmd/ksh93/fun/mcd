@@ -1,0 +1,50 @@
+########################################################################
+#                                                                      #
+#               This software is part of the ast package               #
+#          Copyright (c) 1982-2012 AT&T Intellectual Property          #
+#          Copyright (c) 2020-2023 Contributors to ksh 93u+m           #
+#                      and is licensed under the                       #
+#                 Eclipse Public License, Version 2.0                  #
+#                                                                      #
+#                A copy of the License is available at                 #
+#      https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.html      #
+#         (with md5 checksum 84283fa8859daf213bdda5a9f8d1be1d)         #
+#                                                                      #
+#                  David Korn <dgk@research.att.com>                   #
+#                  Martijn Dekker <martijn@inlv.org>                   #
+#               K. Eugene Carlson <kvngncrlsn@gmail.com>               #
+#                                                                      #
+########################################################################
+#
+# mcd: menu-driven command for changing the directory.
+# For use in conjunction with 'cd', 'dirs', 'pushd', 'popd'.
+
+# Use cd wrapper from .../fun/cd
+autoload cd
+
+# Non-destructively initialize global parameters for directory stack.
+# Default stack size is 32, or $CDSTACK if set before init.
+integer _push_max=${_push_max:-${CDSTACK:-32}}
+integer _push_top=${_push_top:-${CDSTACK:-32}}
+typeset -a _push_stack
+
+# Menu driven change directory command
+function mcd
+{
+	typeset dir=${PWD#"$HOME/"} PS3='Select by number or enter a name: '
+	# display $HOME as ~
+	case $dir in
+	"$HOME")dir=\~ ;;
+	/*)	;;
+	*)	dir=\~/$dir ;;
+	esac
+	select dir in "$dir" "${_push_stack[@]}"
+	do	# change ~ back to $HOME
+		case $REPLY in
+		\~*)	REPLY=$HOME${REPLY#\~} ;;
+		esac
+		# change directory using autoloaded cd wrapper function;
+		# if it fails, redisplay menu
+		cd "$REPLY" && return
+	done
+}

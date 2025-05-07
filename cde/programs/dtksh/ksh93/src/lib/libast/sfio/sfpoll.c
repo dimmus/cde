@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
@@ -26,12 +27,12 @@
 */
 
 int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
-	   reg int n,	/* number of streams in array		*/
+	   int n,	/* number of streams in array		*/
 	   int tm)	/* time in milliseconds for select/poll	*/
 {
-	reg int		r, c, m, np, eintr;
-	reg Sfio_t*	f;
-	reg int		*status, *check;
+	int		r, c, m, np, eintr;
+	Sfio_t*		f;
+	int		*status, *check;
 
 	if(n <= 0 || !fa)
 		return -1;
@@ -40,12 +41,12 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 		return -1;
 	check = status+n; /* streams that need polling */
 
-	/* a SF_READ stream is ready if there is buffered read data */
-#define RDREADY(f)	(((f->mode&SF_READ) && f->next < f->endb) || \
-			 ((f->mode&SF_WRITE) && f->proc && f->proc->ndata > 0) )
+	/* a SFIO_READ stream is ready if there is buffered read data */
+#define RDREADY(f)	(((f->mode&SFIO_READ) && f->next < f->endb) || \
+			 ((f->mode&SFIO_WRITE) && f->proc && f->proc->ndata > 0) )
 
-	/* a SF_WRITE stream is ready if there is no write data */
-#define WRREADY(f)	(!(f->mode&SF_WRITE) || f->next == f->data)
+	/* a SFIO_WRITE stream is ready if there is no write data */
+#define WRREADY(f)	(!(f->mode&SFIO_WRITE) || f->next == f->data)
 
 #define HASAUXFD(f)	(f->proc && f->proc->file >= 0 && f->proc->file != f->file)
 
@@ -54,28 +55,28 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 		status[r] = 0;
 
 		/* terminate poll on interrupt? */
-		if(f->flags&SF_IOINTR)
+		if(f->flags&SFIO_IOINTR)
 			eintr++;
 		/* check accessibility */
-		m = f->mode&SF_RDWR;
+		m = f->mode&SFIO_RDWR;
 		if((int)f->mode != m && _sfmode(f,m,0) < 0)
 			continue;
 
-		if((f->flags&SF_READ) && RDREADY(f))
-			status[r] |= SF_READ;
+		if((f->flags&SFIO_READ) && RDREADY(f))
+			status[r] |= SFIO_READ;
 
-		if((f->flags&SF_WRITE) && WRREADY(f))
-			status[r] |= SF_WRITE;
+		if((f->flags&SFIO_WRITE) && WRREADY(f))
+			status[r] |= SFIO_WRITE;
 
-		if((f->flags&SF_RDWR) == status[r])
+		if((f->flags&SFIO_RDWR) == status[r])
 			continue;
 
 		/* has discipline, ask its opinion */
 		if(f->disc && f->disc->exceptf)
-		{	if((m = (*f->disc->exceptf)(f,SF_DPOLL,&tm,f->disc)) < 0)
+		{	if((m = (*f->disc->exceptf)(f,SFIO_DPOLL,&tm,f->disc)) < 0)
 				continue;
 			else if(m > 0)
-			{	status[r] = m&SF_RDWR;
+			{	status[r] = m&SFIO_RDWR;
 				continue;
 			}
 		}
@@ -83,13 +84,13 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 		if(f->extent < 0) /* unseekable stream, must poll/select */
 			check[c++] = r;
 		else /* seekable streams are always ready */
-		{	if(f->flags&SF_READ)
-				status[r] |= SF_READ;
-			if(f->flags&SF_WRITE)
-				status[r] |= SF_WRITE;
+		{	if(f->flags&SFIO_READ)
+				status[r] |= SFIO_READ;
+			if(f->flags&SFIO_WRITE)
+				status[r] |= SFIO_WRITE;
 		}
 	}
-	/* terminate poll on interrupt only if all streams marked SF_IOINTR */
+	/* terminate poll on interrupt only if all streams marked SFIO_IOINTR */
 	eintr = eintr == n ? -1 : EINTR;
 
 	np = -1;
@@ -112,12 +113,12 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 			fds[m].fd = f->file;
 			fds[m].events = fds[m].revents = 0;
 
-			if((f->flags&SF_WRITE) && !WRREADY(f) )
+			if((f->flags&SFIO_WRITE) && !WRREADY(f) )
 				fds[m].events |= POLLOUT;
 
-			if((f->flags&SF_READ)  && !RDREADY(f) )
+			if((f->flags&SFIO_READ)  && !RDREADY(f) )
 			{	/* a sfpopen situation with two file descriptors */
-				if((f->mode&SF_WRITE) && HASAUXFD(f))
+				if((f->mode&SFIO_WRITE) && HASAUXFD(f))
 				{	m += 1;
 					fds[m].fd = f->proc->file;
 					fds[m].revents = 0;
@@ -138,20 +139,20 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 		for(m = 0, r = 0; r < np; ++r, ++m)
 		{	f = fa[check[r]];
 
-			if((f->flags&SF_WRITE) && !WRREADY(f) )
+			if((f->flags&SFIO_WRITE) && !WRREADY(f) )
 			{	if(fds[m].revents&(POLLOUT|POLLHUP|POLLERR))
-					status[check[r]] |= SF_WRITE;
+					status[check[r]] |= SFIO_WRITE;
 			}
 
-			if((f->flags&SF_READ)  && !RDREADY(f))
-			{	if((f->mode&SF_WRITE) && HASAUXFD(f))
+			if((f->flags&SFIO_READ)  && !RDREADY(f))
+			{	if((f->mode&SFIO_WRITE) && HASAUXFD(f))
 					m += 1;
 				if(fds[m].revents&(POLLIN|POLLHUP|POLLERR))
-					status[check[r]] |= SF_READ;
+					status[check[r]] |= SFIO_READ;
 			}
 		}
 
-		free((void*)fds);
+		free(fds);
 	}
 #endif /*_lib_poll*/
 
@@ -169,11 +170,11 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 			if(f->file > m)
 				m = f->file;
 
-			if((f->flags&SF_WRITE) && !WRREADY(f))
+			if((f->flags&SFIO_WRITE) && !WRREADY(f))
 				FD_SET(f->file,&wr);
 
-			if((f->flags&SF_READ)  && !RDREADY(f))
-			{	if((f->mode&SF_WRITE) && HASAUXFD(f))
+			if((f->flags&SFIO_READ)  && !RDREADY(f))
+			{	if((f->mode&SFIO_WRITE) && HASAUXFD(f))
 				{	if(f->proc->file > m)
 						m = f->proc->file;
 					FD_SET(f->proc->file, &rd);
@@ -182,14 +183,14 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 			}
 		}
 		if(tm < 0)
-			tmp = NIL(struct timeval*);
+			tmp = NULL;
 		else
 		{	tmp = &tmb;
 			tmb.tv_sec = tm/SECOND;
 			tmb.tv_usec = (tm%SECOND)*SECOND;
 		}
 
-		while((np = select(m+1,&rd,&wr,NIL(fd_set*),tmp)) < 0 )
+		while((np = select(m+1,&rd,&wr,NULL,tmp)) < 0 )
 		{	if(errno == eintr)
 				errno = 0;
 			else	goto report;
@@ -200,19 +201,19 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 		for(r = 0; r < np; ++r)
 		{	f = fa[check[r]];
 
-			if((f->flags&SF_WRITE) && !WRREADY(f) )
+			if((f->flags&SFIO_WRITE) && !WRREADY(f) )
 			{	if(FD_ISSET(f->file,&wr) )
-					status[check[r]] |= SF_WRITE;
+					status[check[r]] |= SFIO_WRITE;
 			}
 
-			if((f->flags&SF_READ) && !RDREADY(f) )
-			{	if((f->mode&SF_WRITE) && HASAUXFD(f) )
+			if((f->flags&SFIO_READ) && !RDREADY(f) )
+			{	if((f->mode&SFIO_WRITE) && HASAUXFD(f) )
 				{	if(FD_ISSET(f->proc->file, &rd) )
-						status[check[r]] |= SF_READ;
+						status[check[r]] |= SFIO_READ;
 				}
 				else
 				{	if(FD_ISSET(f->file,&rd) )
-						status[check[r]] |= SF_READ;
+						status[check[r]] |= SFIO_READ;
 				}
 			}
 		}
@@ -229,7 +230,7 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 
 		/* announce status */
 		if(f->disc && f->disc->exceptf)
-			(*f->disc->exceptf)(f,SF_READY,(void*)(long)status[c],f->disc);
+			(*f->disc->exceptf)(f,SFIO_READY,(void*)(long)status[c],f->disc);
 
 		if(c > r) /* move to front of list */
 		{	fa[c] = fa[r];
@@ -238,6 +239,6 @@ int sfpoll(Sfio_t** fa,	/* array of streams to poll		*/
 		r += 1;
 	}
 
-	free((void*)status);
+	free(status);
 	return r ? r : np < 0 ? -1 : 0;
 }

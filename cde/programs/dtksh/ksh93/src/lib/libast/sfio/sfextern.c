@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -25,18 +25,18 @@
 /* global variables used internally to the package */
 Sfextern_t _Sfextern =
 {	0,						/* _Sfpage	*/
-	{ NIL(Sfpool_t*), 0, 0, 0, NIL(Sfio_t**) },	/* _Sfpool	*/
-	NIL(int(*)(Sfio_t*,int)),			/* _Sfpmove	*/
-	NIL(Sfio_t*(*)(Sfio_t*, Sfio_t*)),		/* _Sfstack	*/
-	NIL(void(*)(Sfio_t*, int, void*)),		/* _Sfnotify	*/
-	NIL(int(*)(Sfio_t*)),				/* _Sfstdsync	*/
-	{ NIL(Sfread_f),				/* _Sfudisc	*/
-	  NIL(Sfwrite_f),
-	  NIL(Sfseek_f),
-	  NIL(Sfexcept_f),
-	  NIL(Sfdisc_t*)
+	{ NULL, 0, 0, 0, NULL },			/* _Sfpool	*/
+	NULL,						/* _Sfpmove	*/
+	NULL,						/* _Sfstack	*/
+	NULL,						/* _Sfnotify	*/
+	NULL,						/* _Sfstdsync	*/
+	{ NULL,						/* _Sfudisc	*/
+	  NULL,
+	  NULL,
+	  NULL,
+	  NULL
 	},
-	NIL(void(*)(void)),				/* _Sfcleanup	*/
+	NULL,						/* _Sfcleanup	*/
 	0,						/* _Sfexiting	*/
 	0,						/* _Sfdone	*/
 };
@@ -44,9 +44,9 @@ Sfextern_t _Sfextern =
 ssize_t	_Sfi = -1;		/* value for a few fast macro functions	*/
 ssize_t	_Sfmaxr = 0;		/* default (unlimited) max record size	*/
 
-Sfio_t	_Sfstdin  = SFNEW(NIL(char*),-1,0,(SF_READ |SF_STATIC),NIL(Sfdisc_t*));
-Sfio_t	_Sfstdout = SFNEW(NIL(char*),-1,1,(SF_WRITE|SF_STATIC),NIL(Sfdisc_t*));
-Sfio_t	_Sfstderr = SFNEW(NIL(char*),-1,2,(SF_WRITE|SF_STATIC),NIL(Sfdisc_t*));
+Sfio_t	_Sfstdin  = SFNEW(NULL,-1,0,(SFIO_READ |SFIO_STATIC),NULL);
+Sfio_t	_Sfstdout = SFNEW(NULL,-1,1,(SFIO_WRITE|SFIO_STATIC),NULL);
+Sfio_t	_Sfstderr = SFNEW(NULL,-1,2,(SFIO_WRITE|SFIO_STATIC),NULL);
 
 #undef	sfstdin
 #undef	sfstdout

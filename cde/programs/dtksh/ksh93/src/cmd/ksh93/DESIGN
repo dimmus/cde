@@ -31,17 +31,17 @@ Directory layout:
 
 	The directory tests contains a number of regression tests.
 	In most cases, when a bug gets fixed, a test is added to
-	one of these files.  The regression tests can be run by
-	going to this directory and running
-		SHELL=shell_path shell_path shtests
-	where shell_path is an absolute pathname for the shell to
-	be tested.
+	one of these files.  The ksh regression tests can be run by
+	invoking the shtests script in the top-level bin directory;
+	see 'bin/shtests --man' for documentation about the options.
+	They are also run with default options via 'bin/package tests'
+	as part of a complete test suite run that also includes tests
+	for the build system itself.
 
-	The top level directory contains the nmake Makefile, the
-        RELEASE file, the ksh93 man file (sh.1) and nval.3 and shell.3
-        documentation files. The RELEASE file contains the list of bug
-	fixes and new features since the original ksh93 release.  The file
-	COMPATIBILITY is a list of all known incompatibilities with ksh88.
+	The top level directory contains the mamake Mamfile, the ksh93
+	manual page (sh.1) and the nval.3 and shell.3 documentation files.
+	The file COMPATIBILITY is a list of all known incompatibilities
+	with previous AT&T releases.
 
 Include directory:
 	1.	argnod.h contains the type definitions for command
@@ -106,7 +106,8 @@ sh directory:
 	3.	array.c contains the code for indexed and associative
 		arrays.
 	4.	defs.c contains the data definitions for global symbols.
-	5.	(removed)
+	5.	deparse.c contains code to generate shell script from
+		a parse tree.
 	6.	expand.c contains code for file name expansion and
 		pathname expansion.
 	7.	fault.c contains code for signal processing, trap
@@ -114,7 +115,7 @@ sh directory:
 	8.	fcin.c contains code for reading and writing a character
 		at a time from a file or string.
 	9.	init.c contains initialization code and callbacks
-		for get and set functions for built-in variables.	
+		for get and set functions for built-in variables.
 	10.	io.o contains code for redirections and managing file
 		descriptors and file streams.
 	11.	jobs.c contains the code for job management.
@@ -145,17 +146,15 @@ sh directory:
 	25.	subshell.c contains the code to save and restore
 		environments so that subshells can run without creating
 		a new process.
-	26.	suid_exec.c contains the program from running execute
-		only and/or setuid/setgid scripts.
-	27.	tdump.c contains the code to dump a parse tree into
+	26.	tdump.c contains the code to dump a parse tree into
 		a file.
-	28.	timers.c contains code for multiple event timeouts.
-	29.	trestore contains the code for restoring the parse
+	27.	timers.c contains code for multiple event timeouts.
+	28.	trestore contains the code for restoring the parse
 		tree from the file created by tdump.
-	30.	waitevent.c contains the sh_waitnotify function so
+	29.	waitevent.c contains the sh_waitnotify function so
 		that builtins can handle processing events when the
 		shell is waiting for input or for process completion.
-	31.	xec.c is the main shell execution loop.
+	30.	xec.c is the main shell execution loop.
 
 edit directory:
 	1.      completion.c contains code for command and file generation and

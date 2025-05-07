@@ -27,6 +27,12 @@ The options have the following defaults and meanings:
     ACCTFILE     off Enable per user accounting info.
                      See README-AUDIT.md.
 
+    ALL_LIBCMD   off Includes all the available /opt/ast/bin path-bound
+                     built-in commands from libcmd in the statically linked ksh
+                     binary, instead of a selection of them. (See builtins.c
+                     for that selection.) All of them are always available in
+                     the dynamically linked ksh binary (on supported systems).
+
     AUDIT        on  For auditing specific users.
                      Noted by "A" in the version string when enabled.
                      See README-AUDIT.md.
@@ -59,18 +65,7 @@ The options have the following defaults and meanings:
     DEVFD            Use the more secure /dev/fd mechanism instead of FIFOs for
                      process substitutions. On by default on OSs with /dev/fd.
 
-    DYNAMIC      off Dynamic loading of builtins. Requires dlopen() interface
-                     and dynamic libshell, libdll and libast libraries.
-
     ECHOPRINT    off Make echo equivalent to print.
-
-    EDPREDICT    off Enables history pattern search menu. As you begin a line
-                     with a #, the following characters are treated as a shell
-                     pattern and cause matching lines from the history file to
-                     be displayed as a numbered list as you type. You can
-                     scroll up and down this list or you can use <ESC>nTAB to
-                     make this the current line (n defaults to 1 if omitted).
-                     Experimental. Bugs: https://github.com/ksh93/ksh/issues/233
 
     ESH          on  Compile with emacs command line editing.  The original
                      emacs line editor code was provided by Mike Veach at IH.
@@ -123,32 +118,33 @@ The options have the following defaults and meanings:
     NOECHOE      off Disable the '-e' option to the 'echo' command,
                      unless SHOPT_ECHOPRINT is enabled.
 
-    OLDTERMIO    off Use either termios or termio at runtime.
+    OPTIMIZE     on  Optimize loop invariants in 'for' and 'while' loops.
 
-    OPTIMIZE     on  Optimize loop invariants for with for and while loops.
+    PRINTF_LEGACY    The printf built-in accepts a format operand that starts
+                     with '-' without the standard preceding '--' options
+                     terminator. This is for compatibility with local scripts.
+                     Enabled by default if the OS's printf(1) is POSIX-ignorant.
 
     P_SUID       0   If set, all real UIDs greater than or equal to this value
                      will require the -p option to run the shell setuid/setgid.
 
-    RAWONLY      on  Turn on if the vi line mode doesn't work right unless
-                     you do a set -o viraw.
-
-    REGRESS      off Enable the __regress__ built-in command and instrumented
-                     intercepts for testing.
-
     REMOTE       off Set --rc (read profile scripts) even if ksh was invoked
                      with standard input on a socket, i.e. as a remote shell.
+
+    SCRIPTONLY   off Compile out the interactive shell, resulting in a smaller
+                     ksh binary that can only run scripts. Noted by "s" in the
+                     version string when enabled. The option makes it an error
+                     to invoke ksh as an interactive shell. The command history
+                     mechanism, the fc/hist built-in, and the '-s' options to
+                     the 'read' and 'print' built-ins are also compiled out.
 
     SPAWN        on  Use posix_spawn(3) as combined fork/exec if job control
                      is not active. Improves speed.
 
     STATS        on  Add .sh.stats compound variable.
 
-    SUID_EXEC    on  Execute /etc/suid_exec for setuid, setgid script.
-
-    SYSRC            Source /etc/ksh.kshrc on initializing an interactive
-                     shell. This is on by default if /etc/ksh.kshrc or
-                     /etc/bash.bashrc exists at compile time.
+    SYSRC        on  Source /etc/ksh.kshrc on initializing an interactive
+                     shell.
 
     TEST_L           Add 'test -l' as an alias for 'test -L'. This is on by
                      default if the OS's external 'test' command supports it.
@@ -222,19 +218,6 @@ a script.  ksh93 is able to recognize files in this format and process
 them as scripts.  You can use shcomp to send out scripts when you
 don't want to give away the original script source.
 
-To be able to run setuid/setgid shell scripts, or scripts without read
-permission, the SUID_EXEC compile option must be on, and ksh must be installed
-in the /bin directory, the /usr/bin directory, the /usr/lbin directory,
-or the /usr/local/bin directory and the name must end in sh. The program
-suid_exec must be installed in the /etc directory, must be owned by root,
-and must be an SUID program.  If you must install ksh in some other directory
-and want to be able to run setuid/setgid and execute only scripts, then
-you will have to change the source code file sh/suid_exec.c explicitly.
-If you do not have ksh in one of these secure locations, /bin/sh will
-be invoked with the -p options and will fail when you execute a setuid/setgid
-and/or execute only script.  Note that ksh does not read the .profile
-or $ENV file when the real and effective user/group IDs are not equal.
-
 #### TESTING KSH ####
 
 The tests subdirectory contains a number of regression tests for ksh.
@@ -269,8 +252,9 @@ failures (crashes, and/or important functionality does not work).
 
 *	AIX 7.1 on RISC (PowerPC)
 *	DragonFly BSD 5.8 on x86_64
+*	DragonFly BSD 6.4 on x86_64
 	FreeBSD 12.2 on x86_64
-	FreeBSD 13.0 on x86_64
+	FreeBSD 13.2 on x86_64
 	FreeBSD 12.2 on arm64 (thanks to hyenias for donating access to a Pi)
 	GNU/Linux: Alpine 3.12.3 (musl C library) on x86_64
 	GNU/Linux: CentOS 8.2 on x86_64
@@ -282,17 +266,18 @@ failures (crashes, and/or important functionality does not work).
 	GNU/Linux: Ubuntu 18.04 on armv7l (32-bit)
 	GNU/Linux: Ubuntu 20.04 on arm64
 	GNU/Linux: Void Linux (musl C library) on x86_64
-***	Haiku R1/beta3 on x86_64
+	GNU/Linux: Arch Linux on x86_64
+***	Haiku R1/beta4 on x86_64
 ***	HP-UX B.11.11 on pa-risc
 *	illumos: OmniOS 2020-08-19 (gcc) on x86_64
-	illumos: OmniOS r151040 (gcc) on x86_64
+	illumos: OmniOS r151046 (gcc) on x86_64
 	macOS 10.13.6 (High Sierra) on x86_64
 	macOS 10.14.6 (Mojave) on x86_64
 *	macOS 12.0.1 (Monterey) on arm64
 *	NetBSD 8.1 on x86_64
-*	NetBSD 9.2 on x86_64
+*	NetBSD 9.3 on x86_64
 *	OpenBSD 6.8 on x86_64
-	OpenBSD 7.0 on x86_64
+	OpenBSD 7.3 on x86_64
 *	QNX Neutrino 6.5.0 on i386
 *	Solaris 11.4 (gcc) on x86_64
 	Solaris 11.4 (Solaris Studio 12.5 cc) on x86_64

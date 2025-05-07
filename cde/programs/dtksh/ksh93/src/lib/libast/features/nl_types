@@ -12,7 +12,7 @@ tst	output{
 	#endif
 
 	int
-	main()
+	main(void)
 	{
 		printf("#include <limits.h>\n");
 	#if _hdr_nl_types && defined(_nxt_nl_types_str)
@@ -57,4 +57,7 @@ tst	output{
 		printf("\n");
 		return 0;
 	}
+}end fail{
+	echo "$0: Output block failed to compile. Export IFFEFLAGS=-d1 to debug." >&2
+	exit 1
 }end

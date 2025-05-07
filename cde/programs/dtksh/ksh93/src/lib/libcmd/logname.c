@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -36,8 +37,8 @@ static const char usage[] =
 "\n\n"
 "\n"
 "[+EXIT STATUS?]{"
-        "[+0?Successful completion.]"
-        "[+>0?An error occurred.]"
+	"[+0?Successful completion.]"
+	"[+>0?An error occurred.]"
 "}"
 "[+SEE ALSO?\bgetlogin\b(2)]"
 ;
@@ -48,7 +49,7 @@ static const char usage[] =
 int
 b_logname(int argc, char** argv, Shbltin_t* context)
 {
-	register char*	logname;
+	char*	logname;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	for (;;)
@@ -59,14 +60,15 @@ b_logname(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (!(logname = getlogin()))

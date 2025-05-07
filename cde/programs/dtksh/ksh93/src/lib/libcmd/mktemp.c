@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -28,10 +29,10 @@ static const char usage[] =
     "will have mode \brwx------\b, subject to \bumask\b(1). Generated paths "
     "have these attributes:]"
     "{"
-        "[+*?Lower case to avoid clashes on case ignorant filesystems.]"
-        "[+*?Pseudo-random part to deter denial of service attacks.]"
-        "[+*?Default pseudo-random part (no specific \bX...\b template) "
-            "formatted to accommodate 8.3 filesystems.]"
+	"[+*?Lower case to avoid clashes on case ignorant filesystems.]"
+	"[+*?Pseudo-random part to deter denial of service attacks.]"
+	"[+*?Default pseudo-random part (no specific \bX...\b template) "
+	    "formatted to accommodate 8.3 filesystems.]"
     "}"
 "[+?A consecutive trailing sequence of \bX\b's in \aprefix\a is replaced "
     "by the pseudo-random part. If there are no \bX\b's then the "
@@ -104,22 +105,23 @@ b_mktemp(int argc, char** argv, Shbltin_t* context)
 			fdp = 0;
 			continue;
 		case 'R':
-			if (!pathtemp(NiL, 0, opt_info.arg, "/seed", NiL))
+			if (!pathtemp(NULL, 0, opt_info.arg, "/seed", NULL))
 				error(2, "%s: regression test initialization failed", opt_info.arg);
 			continue;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || (pfx = *argv++) && *argv)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	mask = umask(0);

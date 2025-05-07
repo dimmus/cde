@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -46,7 +46,7 @@ optctx(Opt_t* p, Opt_t* o)
 		else
 			freecontext = o;
 		if (!p)
-			return 0;
+			return NULL;
 	}
 	if (p)
 	{
@@ -58,7 +58,7 @@ optctx(Opt_t* p, Opt_t* o)
 		if (o = freecontext)
 			freecontext = 0;
 		else if (!(o = newof(0, Opt_t, 1, 0)))
-			return 0;
+			return NULL;
 		memset(o, 0, sizeof(Opt_t));
 		o->state = _opt_infop_->state;
 	}

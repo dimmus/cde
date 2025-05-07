@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -27,7 +28,7 @@
 #include <ast.h>
 
 char*
-strtape(register const char* s, register char** e)
+strtape(const char* s, char** e)
 {
 	int		mtunit = '0';
 	int		mtdensity = 0;
@@ -77,11 +78,11 @@ strtape(register const char* s, register char** e)
 
 		if (!mtdensity) mtdensity = 'm';
 		sfsprintf(tapefile, sizeof(tapefile), "/dev/rmt/ctape%c%s", mtunit, mtrewind);
-		if (!access(tapefile, F_OK)) return(tapefile);
+		if (!access(tapefile, F_OK)) return tapefile;
 		for (;;)
 		{
 			sfsprintf(tapefile, sizeof(tapefile), "/dev/rmt/%c%c%s%s", mtunit, mtdensity, mtbehavior, mtrewind);
-			if (!access(tapefile, F_OK)) return(tapefile);
+			if (!access(tapefile, F_OK)) return tapefile;
 			if (!mtbehavior[0]) break;
 			mtbehavior[0] = 0;
 		}
@@ -140,5 +141,5 @@ strtape(register const char* s, register char** e)
 		}
 		sfsprintf(tapefile, sizeof(tapefile), "/dev/rmt%d", mtunit);
 	}
-	return(tapefile);
+	return tapefile;
 }

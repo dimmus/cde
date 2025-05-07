@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -38,10 +38,10 @@
 Hash_table_t*
 hashview(Hash_table_t* top, Hash_table_t* bot)
 {
-	register Hash_bucket_t*		b;
-	register Hash_bucket_t*		p;
-	register Hash_bucket_t**	sp;
-	register Hash_bucket_t**	sx;
+	Hash_bucket_t*		b;
+	Hash_bucket_t*		p;
+	Hash_bucket_t**	sp;
+	Hash_bucket_t**	sx;
 
 	if (!top || top->frozen)
 		bot = 0;
@@ -57,7 +57,7 @@ hashview(Hash_table_t* top, Hash_table_t* bot)
 			sp = &top->table[0];
 			while (sp < sx)
 				for (b = *sp++; b; b = b->next)
-					if (p = (Hash_bucket_t*)hashlook(bot, b->name, HASH_LOOKUP, NiL))
+					if (p = (Hash_bucket_t*)hashlook(bot, b->name, HASH_LOOKUP, NULL))
 					{
 						b->name = (p->hash & HASH_HIDES) ? p->name : (char*)b;
 						b->hash |= HASH_HIDES;
@@ -80,5 +80,5 @@ hashview(Hash_table_t* top, Hash_table_t* bot)
 		top->scope = 0;
 		bot->frozen--;
 	}
-	return(bot);
+	return bot;
 }

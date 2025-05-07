@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#                      Phi <phi.debian@gmail.com>                      #
 #                                                                      #
 ########################################################################
 
@@ -168,8 +169,8 @@ xx='a:b'
 str='(){}[]*?|&^%$#@l'
 for ((i=0 ; i < ${#str}; i++))
 do      [[ $(eval print -r -- \"\${xx//:/\\${str:i:1}}\") == "a${str:i:1}b" ]] || err_exit "substitution of \\${str:i:1}} failed"
-        [[ $(eval print -rn -- \"\${xx//:/\'${str:i:1}\'}\") == "a${str:i:1}b" ]] || err_exit "substitution of '${str:i:1}' failed"
-        [[ $(eval print -r -- \"\${xx//:/\"${str:i:1}\"}\") == "a${str:i:1}b" ]] || err_exit "substitution of \"${str:i:1}\" failed"
+	[[ $(eval print -rn -- \"\${xx//:/\'${str:i:1}\'}\") == "a${str:i:1}b" ]] || err_exit "substitution of '${str:i:1}' failed"
+	[[ $(eval print -r -- \"\${xx//:/\"${str:i:1}\"}\") == "a${str:i:1}b" ]] || err_exit "substitution of \"${str:i:1}\" failed"
 done
 [[ ${xx//:/\\n} == 'a\nb' ]]  || err_exit "substitution of \\\\n failed"
 [[ ${xx//:/'\n'} == 'a\nb' ]] || err_exit "substitution of '\\n' failed"
@@ -639,7 +640,7 @@ Errors=$?
 unset v
 typeset -a arr=( 0 1 2 3 4 )
 for v in "${arr[@]:5}"
-do	err_exit "\${arr[@]:5} should not generate $v" 
+do	err_exit "\${arr[@]:5} should not generate $v"
 	break
 done
 for v in "${arr[@]:1:0}"
@@ -653,7 +654,7 @@ done
 
 set 1 2 3 4
 for v in "${@:5}"
-do	err_exit "\${@:5} should not generate $v" 
+do	err_exit "\${@:5} should not generate $v"
 	break
 done
 for v in "${@:1:0}"
@@ -698,6 +699,170 @@ typeset -m co.array=.sh.match
 [[ $x == "$(print -v co.array)" ]] || err_exit 'typeset -m for .sh.match to compound variable not working (1)'
 : "${x//~(X)([345])|([012])/}"
 [[ $x == "$(print -v co.array)" ]] || err_exit 'typeset -m for .sh.match to compound variable not working (2)'
+
+# ======
+# Out-of-range \n back-references were left unexpanded instead of yielding empty
+# https://github.com/ksh93/ksh/issues/447
+
+x='AB'
+got=${x/@(A)B/\0:\1:\2}
+exp='AB:A:'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='AB'
+got=${x/@(A)/:\0:\1:\2}
+exp=':A:A:B'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='ab'
+got=${x//@(@(a)|b)/<\1+\2>}
+exp='<a+a><b+>'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='bc'
+got=${x//@(@(a)|b)@(c)/<\2,\3>}
+exp='<,c>'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='a1b2'
+got=${x//@(@(a)|b)@(?)/[1:<\1> 2:<\2> 3:<\3>]}
+exp='[1:<a> 2:<a> 3:<1>][1:<b> 2:<> 3:<2>]'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='ab'
+got=${x//@(@(a)|@(b))/<\1+\2>}
+exp='<a+a><b+>'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='ab'
+got=${x//@(@(a)|@(b))/<\1+\2+\3>}
+exp='<a+a+><b++b>'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+x='ab'
+got=${x//~(E:(a)|b)/<\1>}
+exp='<a><>'
+[[ $got == "$exp" ]] || err_exit "back-reference (got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+# ======
+# Anchored empty pattern should match in replacement, e.g. "${@/#/replacement}"
+# https://github.com/ksh93/ksh/issues/558
+set one two three
+exp=Xone/Xtwo/Xthree
+got=$(IFS=/; echo "${*/#/X}")
+[[ $got == "$exp" ]] || err_exit "#-anchored empty pattern vector replacement" \
+	"(got $(printf %q "$got"), expected $(printf %q "$exp"))"
+exp=oneX/twoX/threeX
+got=$(IFS=/; echo "${*/%/X}")
+[[ $got == "$exp" ]] || err_exit "%-anchored empty pattern vector replacement" \
+	"(got $(printf %q "$got"), expected $(printf %q "$exp"))"
+
+# ======
+# In ${expression:offset[:length]}, the arithmetic expressions (offset and length) could not
+# contain ( ) & | as these were internally backslash-escaped, causing a spurious syntax error.
+exp=cde
+got=$(x=abcdefg; set +x; eval 'echo ${x:(10-9)+1:((1&&1)|2)}' 2>&1)
+[[ e=$? -eq 0 && $got == "$exp" ]] || err_exit '${expression:offset:length} with arith containing ( ) & |' \
+	"(expected status 0 and $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/833
+string2=aaaaa
+if	[[ ${string2%%a} != "aaaa" ]]
+then	err_exit "string2%%a"
+fi
+if	[[ ${string2%%aa} != "aaa" ]]
+then	err_exit "string2%%a"
+fi
+if	[[ ${string2%%aaa} != "aa" ]]
+then	err_exit "string2%%a"
+fi
+if	[[ ${string2%%aaaa} != "a" ]]
+then	err_exit "string2%%a"
+fi
+if	[[ ${string2%%aaaaa} != "" ]]
+then	err_exit "string2%%a"
+fi
+if	[[ ${string2%%aaaaaa} != "aaaaa" ]]
+then	err_exit "string2%%a"
+fi
+
+# ======
+# case modification tests
+
+if	[[ ${.sh.version} == *93u+m/* && ${.sh.version} != *93u+m/1.0.* ]] && ((.sh.version >= 20250426))
+then
+	# https://github.com/ksh93/ksh/discussions/846#discussioncomment-12936650
+
+	unset v
+	for op in '#' '##' % %% ^ ^^ , ,,
+	do	eval "got=\${v${op}WRONG}"
+		[[ -z $got ]] || err_exit "\${v${op}WRONG} not empty for unset v (got $(printf %q "$got"))"
+	done
+
+	# https://github.com/ksh93/ksh/discussions/846#discussioncomment-12941578
+
+	unset value test exp got
+	while IFS=';' read -r value test exp
+	do
+		eval "got=$test" || { err_exit "$test doesn't eval"; continue; }
+		[[ $got == "$exp" ]] || err_exit "$test for value $(printf %q "$value"): expected $(printf %q "$exp"), got $(printf %q "$got")"
+	done <<-"EOF"
+		abcdef;${value};abcdef
+		abcdef;${value^};Abcdef
+		abcdef;${value^?};Abcdef
+		abcdef;${value^????};ABCDef
+		abcdef;${value^*};ABCDEF
+		abcdef;${value^^};ABCDEF
+		abcdef;${value^^+(?)};ABCDEF
+		abcdef;${value^+([a-cA-C])};ABCdef
+		abcdef;${value^[a-e]};Abcdef
+		abcdef;${value^[b-e]};abcdef
+		abcdef;${value^^+([a-cA-C])};ABCdef
+		abcdef;${value^^+(?[bd])};ABCDef
+		abcdef;${value^^ab+([^ef])};ABCDef
+		abcdef;${value^^[a-e]};ABCDEf
+		abcdef;${value^^[b-e]};aBCDEf
+		abc def ghi;${value^};Abc def ghi
+		abc def ghi;${value^^};ABC DEF GHI
+		abcdef;${value,?};abcdef
+		abcdef;${value,????};abcdef
+		abcdef;${value,+([a-cA-C])};abcdef
+		abcdef;${value,,+([a-cA-C])};abcdef
+		CAPITALS;${value};CAPITALS
+		CAPITALS;${value,?};cAPITALS
+		CAPITALS;${value,????};capiTALS
+		CAPITALS;${value,+([a-cA-C])};caPITALS
+		CAPITALS;${value,,+([a-cA-C])};caPITaLS
+	EOF
+
+	unset arr test exp got
+	typeset -a arr=(Arrr thar be PIRATES!)
+	oIFS=${IFS-$' \t\n'}
+	IFS=/
+	while IFS=';' read -r test exp
+	do
+		eval "got=$test" || { err_exit "$test doesn't eval"; continue; }
+		[[ $got == "$exp" ]] || err_exit "$test: expected $(printf %q "$exp"), got $(printf %q "$got")"
+	done <<-"EOF"
+		${arr[*]};Arrr/thar/be/PIRATES!
+		${arr[*]^?};Arrr/Thar/Be/PIRATES!
+		${arr[*]^^?};ARRR/THAR/BE/PIRATES!
+		${arr[*]^*};ARRR/THAR/BE/PIRATES!
+		${arr[*]^^*};ARRR/THAR/BE/PIRATES!
+		${arr[*],?};arrr/thar/be/pIRATES!
+		${arr[*],,?};arrr/thar/be/pirates!
+		${arr[*],*};arrr/thar/be/pirates!
+		${arr[*],,*};arrr/thar/be/pirates!
+		${arr[*]^????};ARRR/THAR/be/PIRATES!
+		${arr[*],????};arrr/thar/be/piraTES!
+		${arr[*],,*([A-Ma-m])};arrr/thar/be/PiRaTeS!
+		${arr[*],,[A-Oa-o]};arrr/thar/be/PiRaTeS!
+	EOF
+	IFS=$oIFS
+else
+	warning 'ksh too old for case modification expansions; skipping those tests'
+fi
 
 # ======
 exit $((Errors<125?Errors:125))

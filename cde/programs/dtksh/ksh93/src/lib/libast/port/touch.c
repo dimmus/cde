@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -66,5 +66,5 @@ touch(const char* path, time_t at, time_t mt, int flags)
 		mv.tv_nsec = 0;
 		mp = &mv;
 	}
-	return tvtouch(path, ap, mp, NiL, flags & 1);
+	return tvtouch(path, ap, mp, NULL, flags & 1);
 }

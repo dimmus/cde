@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,7 +28,7 @@
  */
 
 typedef struct
-{	
+{
 	Sfdisc_t	disc;		/* sfio discipline		*/
 	size_t		length;		/* prefix length		*/
 	size_t		empty;		/* empty line prefix length	*/
@@ -40,15 +40,15 @@ typedef struct
  * prefix write
  */
 
-static ssize_t pfxwrite(Sfio_t* f, const void* buf, register size_t n, Sfdisc_t* dp)
+static ssize_t pfxwrite(Sfio_t* f, const void* buf, size_t n, Sfdisc_t* dp)
 {
-	register Prefix_t*	pfx = (Prefix_t*)dp;
-	register char*		b;
-	register char*		s;
-	register char*		e;
-	register char*		t;
-	register ssize_t	w;
-	int			skip;
+	Prefix_t*	pfx = (Prefix_t*)dp;
+	char*		b;
+	char*		s;
+	char*		e;
+	char*		t;
+	ssize_t		w;
+	int		skip;
 
 	skip = 0;
 	w = 0;
@@ -81,7 +81,9 @@ static ssize_t pfxwrite(Sfio_t* f, const void* buf, register size_t n, Sfdisc_t*
 
 static int pfxexcept(Sfio_t* f, int type, void* data, Sfdisc_t* dp)
 {
-	if (type == SF_FINAL || type == SF_DPOP)
+	NOT_USED(f);
+	NOT_USED(data);
+	if (type == SFIO_FINAL || type == SFIO_DPOP)
 		free(dp);
 	return 0;
 }
@@ -92,15 +94,15 @@ static int pfxexcept(Sfio_t* f, int type, void* data, Sfdisc_t* dp)
 
 int sfdcprefix(Sfio_t* f, const char* prefix)
 {
-	register Prefix_t*	pfx;
-	register char*		s;
+	Prefix_t*	pfx;
+	char*		s;
 	size_t			n;
 
 	/*
 	 * this is a writeonly discipline
 	 */
 
-	if (!prefix || !(n = strlen(prefix)) || !(sfset(f, 0, 0) & SF_WRITE))
+	if (!prefix || !(n = strlen(prefix)) || !(sfset(f, 0, 0) & SFIO_WRITE))
 		return -1;
 	if (!(pfx = (Prefix_t*)malloc(sizeof(Prefix_t) + n)))
 		return -1;
@@ -118,7 +120,7 @@ int sfdcprefix(Sfio_t* f, const char* prefix)
 	pfx->empty = n;
 
 	if (sfdisc(f, &pfx->disc) != &pfx->disc)
-	{	
+	{
 		free(pfx);
 		return -1;
 	}

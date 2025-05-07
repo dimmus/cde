@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -38,21 +38,21 @@ int dtclose(Dt_t* dt)
 		return -1;
 
 	if(dt->view) /* turn off viewing at this point */
-		dtview(dt,NIL(Dt_t*));
+		dtview(dt,NULL);
 
 	type = dt->data->type; /* save before memory is freed */
 	memcpy(&pdt, dt, sizeof(Dt_t));
 
 	if(ev == 0 ) /* release all allocated data */
-	{	(void)(*(dt->meth->searchf))(dt,NIL(void*),DT_CLEAR);
-		(void)(*dt->meth->eventf)(dt, DT_CLOSE, (void*)0);
+	{	(void)(*(dt->meth->searchf))(dt,NULL,DT_CLEAR);
+		(void)(*dt->meth->eventf)(dt, DT_CLOSE, NULL);
 		/**/DEBUG_ASSERT(!dt->data);
 	}
 	if(!(type&DT_INDATA) )
 		(void)free(dt);
 
 	if(disc && disc->eventf) /* announce end of closing activities */
-		(void)(*disc->eventf)(&pdt, DT_ENDCLOSE, (void*)0, disc);
+		(void)(*disc->eventf)(&pdt, DT_ENDCLOSE, NULL, disc);
 
 	return 0;
 }

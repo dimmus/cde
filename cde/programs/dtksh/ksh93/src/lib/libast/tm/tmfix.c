@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*                      Phi <phi.debian@gmail.com>                      *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -38,12 +39,12 @@
  */
 
 Tm_t*
-tmfix(register Tm_t* tm)
+tmfix(Tm_t* tm)
 {
-	register int	n;
-	register int	w;
-	Tm_t*		p;
-	time_t		t;
+	int	n;
+	int	w;
+	Tm_t*	p;
+	time_t	t;
 
 	/*
 	 * check for special case that adjusts tm_wday at the end
@@ -95,6 +96,8 @@ tmfix(register Tm_t* tm)
 	{
 		tm->tm_mday -= (23 - n) / 24;
 		tm->tm_hour = 24 - (-n) % 24;
+		if (tm->tm_hour >= 24)
+			tm->tm_hour = 0;
 	}
 	else if (n >= 24)
 	{
@@ -108,12 +111,10 @@ tmfix(register Tm_t* tm)
 	}
 	else if (tm->tm_mon < 0)
 	{
-		tm->tm_year--;
-		if ((tm->tm_mon += 12) < 0)
-		{
-			tm->tm_year += tm->tm_mon / 12;
-			tm->tm_mon = (-tm->tm_mon) % 12;
-		}
+		tm->tm_year += tm->tm_mon / 12 - 1;
+		tm->tm_mon = tm->tm_mon % 12 + 12;
+		if (tm->tm_mon >= 12)
+			tm->tm_year++, tm->tm_mon = 0;
 	}
 	while (tm->tm_mday < -365)
 	{

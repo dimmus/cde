@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #ifndef _CDT_H
@@ -36,12 +37,7 @@
 #endif
 #define CDT_PLUGIN_VERSION	AST_PLUGIN_VERSION(20111111L)
 
-#if _PACKAGE_ast
 #include	<ast_std.h>
-#else
-#include	<ast_common.h>
-#include	<string.h>
-#endif
 
 /* commonly used integers */
 #define DT_ZERO		((unsigned int)0)  /* all zero bits	*/
@@ -77,7 +73,7 @@ struct _dtuser_s /* for application to access and use */
 };
 
 struct _dtlink_s
-{	
+{
 #if CDT_VERSION < 20111111L
 	Dtlink_t*	right;	/* right child		*/
 	union
@@ -103,7 +99,7 @@ struct _dthold_s
 };
 
 /* method to manipulate dictionary structure */
-struct _dtmethod_s 
+struct _dtmethod_s
 {	Dtsearch_f	searchf; /* search function	*/
 	unsigned int	type;	 /* type of operation	*/
 	int		(*eventf)(Dt_t*, int, void*);
@@ -133,7 +129,7 @@ struct _dtdisc_s
 #ifdef offsetof
 #define DTOFFSET(struct_s, member)	offsetof(struct_s, member)
 #else
-#define DTOFFSET(struct_s, member)	((int)(&((struct_s*)0)->member))
+#define DTOFFSET(struct_s, member)	((int)(&(NULL)->member))
 #endif
 
 /* the dictionary structure itself */
@@ -151,7 +147,7 @@ struct _dt_s
 };
 
 /* structure to get status of a dictionary */
-#define DT_MAXRECURSE	1024	/* limit to avoid stack overflow	*/ 
+#define DT_MAXRECURSE	1024	/* limit to avoid stack overflow	*/
 #define DT_MAXSIZE	256	/* limit for size of below arrays	*/
 struct _dtstat_s
 {	unsigned int	meth;	/* method type				*/
@@ -238,23 +234,12 @@ extern Dtmethod_t*	Dtstack;
 extern Dtmethod_t*	Dtqueue;
 extern Dtmethod_t*	Dtdeque;
 
-#if _PACKAGE_ast /* dtplugin() for proprietary and non-standard methods -- requires -ldll */
+/* dtplugin() for proprietary and non-standard methods -- requires -ldll */
 
 #define dtplugin(name)	((Dtmethod_t*)dllmeth("cdt", name, CDT_PLUGIN_VERSION))
 
 #define Dtrhbag		dtplugin("rehash:Dtrhbag")
 #define Dtrhset		dtplugin("rehash:Dtrhset")
-
-#else
-
-#if CDTPROPRIETARY
-
-extern Dtmethod_t*	Dtrhset;
-extern Dtmethod_t*	Dtrhbag;
-
-#endif /*CDTPROPRIETARY*/
-
-#endif /*_PACKAGE_ast*/
 
 extern Dt_t*		dtopen(Dtdisc_t*, Dtmethod_t*);
 extern int		dtclose(Dt_t*);
@@ -272,7 +257,7 @@ extern int		dtuserevent(Dt_t*, int, void*);
 extern Dt_t*		_dtopen(Dtdisc_t*, Dtmethod_t*, unsigned long);
 #define dtopen(dc,mt)	_dtopen((dc), (mt), CDT_VERSION)
 
-#if _PACKAGE_ast && !defined(_CDTLIB_H)
+#if !defined(_CDTLIB_H)
 extern void*		dllmeth(const char*, const char*, unsigned long);
 #endif
 
@@ -285,7 +270,7 @@ extern void*		dllmeth(const char*, const char*, unsigned long);
 #define _DTOBJ(dc,l)	((dc)->link >= 0 ? _DTO(dc,l) : ((Dthold_t*)(l))->obj )
 
 #define _DTK(dc,o)	((char*)(o) + (dc)->key) /* get key from object */
-#define _DTKEY(dc,o)	(void*)((dc)->size >= 0 ? _DTK(dc,o) : *((char**)_DTK(dc,o)) ) 
+#define _DTKEY(dc,o)	(void*)((dc)->size >= 0 ? _DTK(dc,o) : *((char**)_DTK(dc,o)) )
 
 #define _DTCMP(dt,k1,k2,dc) \
 			((dc)->comparf  ? (*(dc)->comparf)((dt), (k1), (k2), (dc)) : \

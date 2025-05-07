@@ -1,221 +1,118 @@
-Announcing: KornShell 93u+m/1.0.3
-https://github.com/ksh93/ksh
+******************************** WARNING *********************************
+* This is the ANNOUNCE file from the development branch. It's not in a   *
+* finished state and some information may be missing, obsolete or wrong. *
+**************************************************************************
 
-This is the third bugfix release in the ksh 93u+m/1.0 series. Many thanks to
-all contributors for their hard work! Compared to an unpatched ksh 93u+
-2012-08-01, this release has roughly a thousand bugs fixed. It incorporates
-a fair number of enhancements as well.
+The announcement text for ksh 93u+m/1.1 is under development.
 
-### CONTRIBUTORS ###
-
-Work on ksh 93u+m started in May 2020.
-Main developers: Martijn Dekker, Johnothan King, hyenias
-
-Direct contributors: Andy Fiddaman, Anuradha Weeraman, atheik, Chase,
-Govind Kamat, Harald van Dijk, K. Eugene Carlson, Lev Kujawski, Marc
-Wilson, Ryan Schmidt, Sterling Jensen, Trey Valenta, Vincent Mihalkovic
-
-Also includes backported contributions by: David Korn, Glenn Fowler,
-Lefteris Koutsofios, Siteshwar Vashisht, Kurtis Rader, Roland Mainz,
-Finnbarr P. Murphy, Lijo George, OpenSUSE ksh 93u+ patch authors, Red Hat
-ksh 93u+ path authors, Solaris ksh 93u+ patch authors, Debian ksh 93u+
-patch authors, Apple ksh 93u+ patch authors, Graphviz maintainers
-
-Many fixes have also been backported from the AT&T 93v- beta as well as
-the former ksh2020 project lead by Kurtis Rader and Siteshwar Vashisht;
-we appreciate and benefit from their work. Many thanks also to Siteshwar
-for graciously donating his 'ksh93' GitHub organisation account!
-
-### HOW TO GET IT ###
-
-Please download the source code tarball from our GitHub releases page:
-https://github.com/ksh93/ksh/releases
-To build, follow the instructions in README.md or src/cmd/ksh93/README.
-
-Or ask your distribution package manager to upgrade ksh93 to this version.
-
-### HOW TO GET INVOLVED ###
-
-To report a bug, please open an issue at our GitHub page (see above).
-Alternatively, email me at martijn@inlv.org with your report.
-To get involved in development, read the brief policy information in
-README.md and then jump right in with a pull request or email a patch.
-See the TODO file in the top-level directory for a to-do list.
-
-### MAIN CHANGES between ksh 93u+m 1.0.2 and 1.0.3 ###
-
-This point release fixes the following:
-- An old bug in history expansion (set -H) where any use of the history
-  comment character caused processing to be aborted as if it were an invalid
-  history expansion.
-- A bug in command line options processing that caused short-form
-  option equivalents on some built-in commands to be ignored after one use,
-  e.g., the new read -a equivalent of read -A.
-- Ksh freezing or using excessive memory if HISTSIZE is assigned a
-  pathologically large value.
-- A bug that caused ksh in the vi editor mode to crash or produce invalid
-  completions if ESC = was used at the beginning of a line.
-
-### MAIN CHANGES between ksh 93u+m 1.0.1 and 1.0.2 ###
-
-This bugfix release fixes the interactive shell crashing when one of the
-predefined aliases (currently 'history' and 'r') is redefined, whether from
-a profile/kshrc script or manually. This crash occurred in two scenarios:
-1. when redefining and then unsetting a predefined alias;
-2. when redefining a predefined alias and then executing a shell script that
-   does not begin with a #! path.
-
-### MAIN CHANGES between ksh 93u+m 1.0.0 and 1.0.1 ###
-
-This is an urgent bugfix release that removes an incorrect exec
-optimization that was capable of terminating the execution of scripts
-prematurely in certain corner cases. It is known to make the build scripts
-of GNU binutils produce corrupted results if ksh is used as /bin/sh.
-See https://github.com/ksh93/ksh/issues/507 for more information.
-
-### MAIN CHANGES between ksh 93u+ 2012-08-01 and 93u+m/1.0.0 ###
-
-Roughly a thousand bugs have been fixed, including many serious/critical
-bugs. See the NEWS file for more information, and the git commit log for
-complete documentation of every fix. Incompatible changes have been
-minimised, but not at the expense of fixing bugs. For a list of
-potentially incompatible changes, see src/cmd/ksh93/COMPATIBILITY.
-
-Though there was a "no new features, bugfixes only" policy, some new
-features were found necessary, either to fix serious design flaws or to
-complete functionality that was evidently intended, but not finished.
-Below is a summary of these new features.
+### MAIN CHANGES between ksh 93u+m/1.0.x and 93u+m/1.1.0 ###
 
 New command line editor features:
 
-- The forward-delete and End keys are now handled as expected in the
-  emacs and vi built-in line editors.
+- In the emacs and vi line editors, the PageUp and PageDown keys now perform
+  a reverse search and backwards reverse search based on the current line.
+  The arrow-up and arrow-down keys now act like PageUp and PageDown, unless
+  the new --arrowkeysearch option is turned off (see below).
 
-- In the vi and emacs line editors, repeat counts can now also be used for
-  arrow keys and the forward-delete key, e.g., <ESC> 7 <left-arrow> works.
+- In the emacs line editor, pressing ^U (kill) twice no longer causes further
+  ^U presses to start a new line (this was a feature for paper terminals).
 
-- Various keys on extended PC keyboards are now handled as expected in the
-  emacs and vi built-in line editors.
+- The ^X^E (emacs mode) and v (vi mode) commands will now only execute the
+  command line that was loaded into the editor if the temporary file is
+  saved before exiting the editor. This removes the need to empty the file
+  and save just to cancel execution.
+
+- The emacs mode now accepts a numeric repeat count parameter for:
+  * ordinary character insertion (e.g., ESC 10 x now inserts 'x' 10 times);
+  * the ^Y command (e.g., ESC 10 Ctrl+Y will now "yank" or paste the latest
+    sequence of deletions 10 times).
 
 New shell language features:
 
-- Pathname expansion (a.k.a. globbing) now never matches the special names
-  '.' (current directory) and '..' (parent directory). This change makes a
-  pattern like .* useful; it now matches all hidden files (dotfiles) in the
-  current directory, without the harmful inclusion of '.' and '..'.
+- The 'case' compound command now supports the ;;& control operator as on
+  bash 4.0+. The ;;& operator falls through like ;& but executes the next
+  matching list instead of simply executing the next list.
 
-- Tilde expansion can now be extended or modified by defining a .sh.tilde.get
-  or .sh.tilde.set discipline function. See the manual for details.
+- The appending redirection operator &>>FILE is now available. It is a
+  shorthand for: >>FILE 2>&1
 
-- The &>file redirection shorthand (for >file 2>&1) is now available for all
-  scripts and interactive sessions and not only for profile/login scripts.
+- Ksh now supports the bash-like case modification expansions
+  ${var^pattern}, ${var^^pattern}, ${var,pattern} and ${var,,pattern}.
+  These change alphabetic characters in the variable to upper or lower case.
+  Unlike in bash, the pattern may match any number of characters.
 
-- Arithmetic expressions in native ksh mode no longer interpret a number
-  with a leading zero as octal in any context. Use 8#octalnumber instead
-  (e.g. 8#400 == 256). Arithmetic expressions now also behave identically
-  within and outside ((...)) and $((...)). If the POSIX mode is turned on,
-  a leading zero now denotes an octal number in all arithmetic contexts.
+- The 'time' reserved word now outputs timings in a precision of 3 digits
+  after the decimal point if the TIMEFORAMT variable is not set. See also
+  TIMEFORMAT under 'New features in shell variables' below.
+
+- With in 'typeset -T' type declarations, the '_' automatic self-reference
+  variable now always refers to the type variable, even within discipline
+  function (such as .get or .getn) that are set for its subvariables.
 
 New features in built-in commands:
 
-- Usage error messages now show the --help/--man self-documentation options.
+- Self-documentation output from any command's --man, --help, and other
+  options is no longer written to standard error with exit status 2, but
+  now goes to standard output and sets exit status 0. For an overview of
+  self-documentation features, type 'print "--???"'.
 
-- Path-bound built-ins (such as /opt/ast/bin/cat) can now be executed by
-  invoking the canonical path, so the following will now work as expected:
-	$ /opt/ast/bin/cat --version
-	  version         cat (AT&T Research) 2012-05-31
+- When printing a function definition, 'typeset -f function_name' now
+  regenerates and reformats the code instead of dumping it from a fixed
+  offset in the original source file. The output is no longer corrupted
+  when the source file changes after the function was defined.
 
-- 'cd' now supports an -e option that, when combined with -P, verifies
-  that $PWD is correct after changing directories; this helps detect
-  access permission problems. See:
-  https://www.austingroupbugs.net/view.php?id=253
+- A new 'alarm' built-in command allows executing any commands at regular
+  intervals. TODO: https://github.com/ksh93/ksh/issues/422
 
-- 'command -x' now looks for external commands only, skipping built-ins.
-  In addition, its xargs-like functionality no longer freezes the shell on
-  Linux and macOS, making it effectively a new feature on these systems.
+- The 'hash' and 'alias -t' commands now issue an error message for each
+  command given that was not found on PATH, and return a non-zero exit
+  status if any of the commands given were not found.
 
-- 'printf' now supports a -v option as in bash. This assigns formatted
-  output directly to variables, which is very fast and will not strip
-  final newline (\n) characters.
+- The 'fc'/'hist' command has a new -E option. If given and a full-screen
+  editor is launched, the command line that was loaded into the editor will
+  only be executed if the temporary file is saved before exiting the editor.
+  This removes the need to empty the file and save just to cancel execution.
+  People who want the new behaviour as a default for the fc/hist command
+  where available (i.e., for ksh 93u+m/1.1 and later) can add the following
+  to their ~/.kshrc or other profile script:
+	case ${KSH_VERSION-} in
+	*93u+m/1.0.*)	;;
+	*93u+m/*)	alias fc='fc -E' hist='fc -E' ;;
+	esac
 
-- 'redirect' now checks if all arguments are valid redirections before
-  performing them. If an error occurs, it issues an error message instead
-  of terminating the shell.
-
-- 'return', when used to return from a function, can now return any
-  status value in the 32-bit signed integer range, like on zsh. However,
-  due to a traditional Unix kernel limitation, $? is still trimmed to its
-  least significant 8 bits whenever a shell or subshell exits.
-
-- 'suspend' now refuses to suspend a login shell, as there is probably no
-  parent shell to return to and the login session would freeze.
-
-- 'test'/'[' now supports all the same operators as [[ (including =~,
-  \<, \>) except for the different 'and'/'or' operators. Note that
-  'test'/'[' remains deprecated due to its unfixable pitfalls;
-  [[ ... ]] is recommended instead.
-
-- 'times' now gives high precision output in a POSIX compliant format.
-
-- 'type'/'whence': Two bash-like flags were backported from ksh 93v-:
-  - 'whence -P/type -P' is an alias to the existing -p flag.
-  - 'whence -t/type -t' will print only the type of a command in a
-    simple format that is designed to be easy to use for scripts.
-
-- 'typeset' has a new '-g' flag that forces variables to be created or
-  modified at the global scope regardless of context, as on bash 4.2+.
-
-- 'typeset' now gives an informative error message if an incompatible
-  combination of options is given.
-
-- 'ulimit': Added three options inspired by bash:
-  - 'ulimit -k' sets the maximum number of kqueues.
-  - 'ulimit -P' sets the maximum number of pseudo-terminals.
-  - 'ulimit -R' sets the maximum time in microseconds a real-time process
-    can run before blocking.
-  Note that not all operating systems support the limits set by these options.
-
-- 'whence -v/-a' now reports the location of autoloadable functions.
+- grep(1) has been added as a path-bound built-in command. It is now
+  available by default on ksh linked against dynamic libcmd, and may
+  optionally be included in ksh linked against static libcmd. This grep
+  supports eight kinds of regex, including sh and ksh glob patterns.
 
 New features in shell options:
 
-- When the -b/--notify shell option is on and the vi or emacs/gmacs shell
-  line editor is in use, 'Done' and similar notifications from completed
-  background jobs are now inserted directly above the line you're typing,
-  without affecting your command line display.
+- A new --arrowkeysearch option, on by default, causes the up and down arrow
+  keys to act like PgDp and PgDown -- see 'New command line editor features'
+  above. When turned off, the up arrow key now does not perform any search
+  (note that, in the old behaviour, the down arrow key never searched).
 
-- A new --functrace long-form shell option causes the -x/--xtrace option's
-  state and the DEBUG trap action to be inherited by function scopes instead
-  of being reset to default. Changes made to them within a function scope
-  still do not propagate back to the parent scope. Similarly, this option
-  also causes the DEBUG trap action to be inherited by subshells.
+- A new --globex shell option allows pathname expansion of extended patterns
+  (those with a syntax involving parentheses) from fields resulting from
+  field splitting (e.g., unquoted variables as command arguments). This
+  remains disabled by default for compatibility with POSIX and ksh88.
 
-- A new --globcasedetect shell option is added on operating systems where
-  we can check for a case-insensitive file system (currently Linux, macOS,
-  QNX 7.0+, and Windows/Cygwin). When this option is turned on, pathname
-  expansion (globbing), as well as tab completion on interactive shells,
-  automatically become case-insensitive depending on the file system.
-  This is separately determined for each pathname component.
+New features in shell variables:
 
-- Enhancement to -G/--globstar: symbolic links to directories are now
-  followed if they match a normal (non-**) glob pattern. For example, if
-  '/lnk' is a symlink to a directory, '/lnk/**' and '/l?k/**' now work as
-  you would expect.
+- Added SRANDOM, a secure random number generator. It uses the operating
+  system's arc4random(3) library function or, absent that, an integrated
+  OpenBSD-based implementation that uses the ChaCha20 cipher. An upper bound
+  can be set by assigning its value to SRANDOM; subsequent numbers will be
+  uniformly distributed between 0 and the value of the upper bound minus
+  one, in a way that avoids "modulo bias".
 
-- The new --histreedit and --histverify options modify history expansion
-  (--histexpand). If --histreedit is on and a history expansion fails, the
-  command line is reloaded into the next prompt's edit buffer, allowing
-  corrections. If --histverify is on, the results of a history expansion are
-  not immediately executed but instead loaded into the next prompt's edit
-  buffer, allowing further changes.
+- TIMEFORMAT supports a new %C format directive that yields the total number
+  of CPU seconds, i.e. the sum of the time spent in user and system mode.
 
-- A new --nobackslashctrl shell option disables the special escaping
-  behaviour of the backslash character in the emacs and vi built-in editors.
-  Particularly in the emacs editor, this makes it much easier to go back,
-  insert a forgotten backslash into a command, and then continue editing
-  without having your next arrow key replace your backslash with garbage.
+- TIMEFORMAT now supports a precision of up to six places after the decimal
+  point. The default precision for format directives remains 3.
 
-- A new --posix shell option has been added to ksh 93u+m that makes the
-  ksh language more compatible with other shells by following the POSIX
-  standard more closely. See the manual page for details. It is enabled by
-  default if ksh is invoked as sh, otherwise it is disabled by default.
+- The $RANDOM pseudorandom numbers are now generated by nrand48(3) instead
+  of rand_r(3). Since POSIX specifies a particular pseudorandom generator
+  for nrand48, this means the same pseudorandom sequence should now be
+  generated on all platforms if RANDOM is assigned the same seed value.

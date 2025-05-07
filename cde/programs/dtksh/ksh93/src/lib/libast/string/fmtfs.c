@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -52,10 +52,10 @@ typedef struct Id_s
 char*
 fmtfs(struct stat* st)
 {
-	register Id_t*		ip;
-	register void*		mp;
-	register Mnt_t*		mnt;
-	register char*		s;
+	Id_t*		ip;
+	void*		mp;
+	Mnt_t*		mnt;
+	char*		s;
 	struct stat		rt;
 	char*			buf;
 
@@ -71,7 +71,7 @@ fmtfs(struct stat* st)
 	else if (ip = (Id_t*)dtmatch(dict, &st->st_dev))
 		return ip->name;
 	s = FS_default;
-	if (mp = mntopen(NiL, "r"))
+	if (mp = mntopen(NULL, "r"))
 	{
 		while ((mnt = mntread(mp)) && (stat(mnt->dir, &rt) || rt.st_dev != st->st_dev));
 		if (mnt && mnt->type)

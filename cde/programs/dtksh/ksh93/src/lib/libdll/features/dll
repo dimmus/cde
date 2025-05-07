@@ -7,7 +7,7 @@ tst	dll_DYNAMIC link{
 	#include <link.h>
 	extern struct link_dynamic _DYNAMIC;
 	int
-	main()
+	main(void)
 	{
 		return _DYNAMIC.ld_version;
 	}
@@ -52,7 +52,7 @@ tst	run{
 	esac
 	case $lib in
 	/usr/lib64/*|/usr/lib/*)
-		case `package` in
+		case ${HOSTTYPE?} in
 		sgi.mips3)
 			abi=/lib32
 			;;
@@ -87,7 +87,7 @@ tst	- -lm - - output{
 	#include <rld_interface.h>
 	#endif
 	int
-	main()
+	main(void)
 	{
 		int		i;
 	#if _hdr_rld_interface

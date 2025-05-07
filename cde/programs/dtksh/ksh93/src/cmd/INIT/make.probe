@@ -3,7 +3,7 @@
 # Glenn Fowler
 # AT&T Research
 #
-# @(#)make.probe (AT&T Research) 2011-06-01
+# @(#)make.probe (ksh 93u+m) 2024-08-13
 #
 # C probe for make
 #
@@ -21,6 +21,7 @@ probe_export_dynamic="-rdynamic -export-dynamic -Wl,-export-dynamic -Wl,-E -bexp
 probe_gcc_optimize="-Os"
 probe_gcc_version="*[Gg][Cc][Cc]*"
 probe_include_local="'-ignore-source-dir -iquote' -iquote -I-"
+probe_ldasneeded="-Wl,-as-needed -Wl,-no-as-needed"
 probe_ldlazy='-zlazyload -znolazyload -Wl,-zlazyload -Wl,-znolazyload'
 probe_ldlib="LD_LIBRARY_PATH LIBPATH LPATH"
 probe_ldmap="'-Wl,-M' '-Qoption ld -M' '-Wl,-m' '-m'"
@@ -37,14 +38,10 @@ probe_nmflags="'' -p -B"
 probe_optimize="-Os -O"
 probe_pic="-Kpic -KPIC -fpic -fPIC -pic -PIC +z +Z"
 probe_no_protect="'-fno-stack-protector -fno-stack-protector-all' -GS-"
+probe_no_strict_aliasing="-fno-strict-aliasing"
 probe_readonly="-R -Krodata -xMerge -Wa,-r"
 probe_shared="'' -G -b -c -shared -Wl,dll"
 probe_shared_name="-Wl,-soname= -h"
-probe_shared_nostart="-nostartfiles"
-case `gcc -v 2>&1 | egrep gcc.version` in
-*version' '[0123456].*) ;;
-*) probe_shared_nostart= ;;  # gcc 7+
-esac
 probe_shared_registry='"-update_registry $probe_shared_registry_file"'
 probe_shared_registry_file='registry.ld'
 probe_shared_registry_path="\$(LIBDIR)/$probe_shared_registry_file"
@@ -55,29 +52,29 @@ probe_warn="-Wall -fullwarn -w3 '-A -A' +w1"
 
 echo '#pragma pp:version' > libpp.$src
 echo '#define dDflag on' > dDflag.$src
-echo 'int main(){return 0;}' > doti.$src
-echo 'int code(){return 0;} int main(){return code();}' > export.$src
+echo 'int main(void){return 0;}' > doti.$src
+echo 'int code(void){return 0;} int main(void){return code();}' > export.$src
 echo '#include <stdio.h>' > imstd.$src
 echo '#include "_i_.h"' > imusr.$src
 echo 'int x;' > _i_.h
 mkdir im
 echo '(' > im/stdio.h
 echo '#include "implc_x.h"
-int main(){f(1);return 0;}' > implc.$src
+int main(void){f(1);return 0;}' > implc.$src
 echo 'template <class T> void f(T){}' > implc_x.$src
 echo 'template <class T> void f(T);' > implc_x.h
-echo 'extern int NotalL(){return(0);}' > notall.$src
+echo 'extern int NotalL(void) { return 0; }' > notall.$src
 echo '#include <stdio.h>
 extern int i;
 int i = 1;
-extern int f(){return(!i);}
-int main(){FILE* fp=stdin;return(f());}' > pic.$src
-echo 'int prefix(){return 0;}' > prefix.$src
+extern int f(void) { return !i; }
+int main(void) { FILE* fp=stdin; return f(); }' > pic.$src
+echo 'int prefix(void){return 0;}' > prefix.$src
 echo 'template<class T> int gt(T a, T b);
 template<class T> int gt(T a, T b) { return a > b; }
-int main () { return gt(2,1); }' > ptr.$src
-echo 'int main(){return 0;}' > require.$src
-echo '#if mips && !sgi || __CYGWIN__
+int main (void) { return gt(2,1); }' > ptr.$src
+echo 'int main(void){return 0;}' > require.$src
+echo '#if mips && !sgi || __CYGWIN__ || __HAIKU__ || __APPLE__
 ( /* some systems choke on this probe */
 #else
 #if test_const
@@ -86,29 +83,28 @@ echo '#if mips && !sgi || __CYGWIN__
 #define CONST
 #endif
 CONST char x[]={1,2,3,4,5,6,7,8,9,0};
-int main(){*(char*)x=0; return x[0];}
+int main(void){*(char*)x=0; return x[0];}
 #endif' > readonly.$src
-# NOTE:	sfclose() defined on UWIN, not defined on all other systems
-echo 'extern int sfclose(); extern int ShareD(){return(sfclose());}' > shared.$src
+echo 'extern int sfclose(void); extern int ShareD(void) { return sfclose(); }' > shared.$src
 echo '#define g(a,b) a ## b
 volatile int a;
 const int g(x,y)=1;
 extern int c(int);' > stdc.$src
-echo 'extern int f(); int main() { return f(); }' > sovmain.$src
-echo 'int f() { return 0; }' > sovlib.$src
+echo 'extern int f(void); int main(void) { return f(); }' > sovmain.$src
+echo 'int f(void) { return 0; }' > sovlib.$src
 echo '#include <stdio.h>
 int i;
-int main(){int j;j = i * 10;return j;}' > strip.$src
+int main(void){int j;j = i * 10;return j;}' > strip.$src
 echo 'template <class T> void f(T){}
-int main(){f(1);return 0;}' > toucho.$src
+int main(void){f(1);return 0;}' > toucho.$src
 echo 'extern type call(int);
-int main() {call(0);return(0);}' > tstlib.$src
-echo 'int main(){return 0;}' > warn.$src
-echo 'int f(){return 0;}' > warn1.$src
-echo 'int f(){}' > warn2.$src
-echo 'int f(){int i; return 0;}' > warn3.$src
-echo 'int f(){int i; return i;}' > warn4.$src
-echo 'int f(){return g();}' > warn5.$src
+int main(void) { call(0); return 0; }' > tstlib.$src
+echo 'int main(void){return 0;}' > warn.$src
+echo 'int f(void){return 0;}' > warn1.$src
+echo 'int f(void){}' > warn2.$src
+echo 'int f(void){int i; return 0;}' > warn3.$src
+echo 'int f(void){int i; return i;}' > warn4.$src
+echo 'int f(void){return g();}' > warn5.$src
 warn_enum="1 2 3 4 5"
 
 chmod -w *.$src
@@ -130,6 +126,7 @@ export_dynamic=
 gnu=
 implicitc=
 include_local=
+ldasneeded=
 lddynamic=
 ldlazy=
 ldnolazy=
@@ -150,6 +147,7 @@ makeoptions=
 nmedit=
 nmflags=
 no_protect=
+no_strict_aliasing=
 optimize=
 prefix_archive=lib
 prefix_dynamic=
@@ -164,7 +162,6 @@ runpath=
 shared=
 shared_name=
 shared_registry=
-shellmagic=
 soversion=
 stdc=
 strict=
@@ -372,8 +369,8 @@ then	e=`wc -l e`
 	case $hosted:$cc_pic in
 	1:?*)   if	./pic.$exe
 		then	# this catches lynxos.ppc gcc that dumps -fpic and not -mshared
-			echo 'static int* f() { static int v; return &v; }
-int main() { f(); return 0; }' > picok.$src
+			echo 'static int* f(void) { static int v; return &v; }
+int main(void) { f(); return 0; }' > picok.$src
 			$cc $cc_pic -o picok.$exe picok.$src && ./picok.$exe || cc_pic=
 		else	cc_pic=
 		fi
@@ -559,6 +556,20 @@ then	eval set x x $probe_ldlazy
 		ldnorecord=$2
 		break
 	done
+	eval set x x $probe_ldasneeded
+	while	:
+	do	shift
+		shift
+		case $# in
+		0)	break ;;
+		esac
+		rm -f strip.$exe
+		$cc -o strip.$exe $1 strip.$obj $2 2>f && test -f strip.$exe || continue
+		cmp -s e f || continue
+		ldasneeded=$1
+		ldnoasneeded=$2
+		break
+	done
 fi
 
 case $cc_dll:$cc_pic:$so:$dynamic:$static in
@@ -566,7 +577,7 @@ case $cc_dll:$cc_pic:$so:$dynamic:$static in
 	: last chance dynamic checks
 	while	:
 	do
-		echo '__declspec(dllexport) int fun() { return 0; }' > exp.$src
+		echo '__declspec(dllexport) int fun(void) { return 0; }' > exp.$src
 		if	$cc -c $cc_dll_def exp.$src
 		then	rm -f xxx.dll xxx.lib
 			if	$cc -shared -Wl,--enable-auto-image-base -Wl,--out-implib=xxx.lib -o xxx.dll exp.$obj &&
@@ -603,7 +614,7 @@ case $cc_dll:$cc_pic:$so:$dynamic:$static in
 				# UNDENT ...
 
 	if	$xx $1 -o xxx$dll shared.$obj 2>e && test -r xxx$dll
-	then	if	test -s e && egrep -i 'unknown|invalid|option' e > /dev/null
+	then	if	test -s e && grep -E -i 'unknown|invalid|option' e > /dev/null
 		then	continue
 		fi
 		case `PATH=/bin:/usr/bin:$PATH file xxx$dll` in
@@ -613,7 +624,7 @@ case $cc_dll:$cc_pic:$so:$dynamic:$static in
 			;;
 		*ELF*|*elf*)
 			$executable xxx$dll || continue
-			case `strings xxx$dll | sed -e 's,.*[ |],,' | sort -u | egrep -i '^([._](dynamic|dynstr|dynsym))$'` in
+			case `strings xxx$dll | sed -e 's,.*[ |],,' | sort -u | grep -E -i '^([._](dynamic|dynstr|dynsym))$'` in
 			[012])	continue ;;
 			esac
 			;;
@@ -625,34 +636,6 @@ case $cc_dll:$cc_pic:$so:$dynamic:$static in
 		esac
 		dld=$xx
 		shared=$1
-		# does -nostartfiles make sense?
-		z=`wc -c < xxx$dll`
-		eval set x $probe_shared_nostart
-		while	:
-		do	shift
-			case $# in
-			0)	break ;;
-			esac
-			rm -f xxx$dll
-			if	$dld $shared $1 -o xxx$dll shared.$obj 2>e && test -r xxx$dll
-			then	case `wc -c < xxx$dll` in
-				$z)	;;
-				*)	if	test -s e
-					then	case `cat e` in
-						*[Ee][Rr][Rr][Oo][Rr]*|*[Ww][Aa][Rr][Nn][Ii][Nn][Gg]*|*[Oo][Pp][Tt][Ii][Oo][Nn]*)
-							continue
-							;;
-						esac
-					fi
-					case $shared in
-					'')	shared=$1 ;;
-					*)	shared="$shared $1" ;;
-					esac
-					break
-					;;
-				esac
-			fi
-		done
 		case $cc_dll in
 		"")	cc_dll=$cc_dll_def ;;
 		esac
@@ -945,10 +928,10 @@ case $shared in
 	esac
 	;;
 *)	case $lib_dll in
-	symbol)	echo 'extern int f();
-	int main() { f(); return 0; }' > main.$src
+	symbol)	echo 'extern int f(void);
+	int main(void) { f(); return 0; }' > main.$src
 		echo '#include <stdio.h>
-	int f() { printf("hello world"); return 0; }' > member.$src
+	int f(void) { printf("hello world"); return 0; }' > member.$src
 		if	$cc -c main.$src && $cc -c member.$src
 		then	echo f > lib.exp
 			rm -f lib.$obj main.exe
@@ -996,7 +979,8 @@ case " $cc_dll " in
 esac
 
 case $hosttype in
-win32.*|cygwin.*|os2.*)
+cygwin.*|os2.*)
+	sd=.dll
 	Lflag=1
 	;;
 *)	if	$cc -c doti.$src
@@ -1018,14 +1002,14 @@ option)	case $hosttype in
 SYMBOL)	lib_dll=symbol
 	;;
 symbol)	echo "#include <stdio.h>
-extern int fun()
+extern int fun(void)
 {
 	puts(\"fun\");
 	return 0;
 }" > dllib.$src
-	echo "extern int fun();
+	echo "extern int fun(void);
 int
-main()
+main(void)
 {
 	return fun();
 }" > dlmain.$src
@@ -1261,7 +1245,7 @@ case $stdlib in
 		*)	case " $stdlib " in
 			*\ $d\ *)
 				;;
-			*)	if	ls $d ${PREROOT+$PREROOT/../$d} > tmp.tmp && test -s tmp.tmp
+			*)	if	ls $d > tmp.tmp && test -s tmp.tmp
 				then	for i in $probe_lib $obj
 					do	if	grep -i "\\.$i\$" tmp.tmp >/dev/null
 						then	case " $probe_lib_append " in
@@ -1330,9 +1314,9 @@ case $stdlib in
 	for f in $probe_libdir
 	do	for d in $stdlib $libstd $tstlib
 		do	if	test -d ${d}${f}
-			then	ls ${d}${f} ${PREROOT:+$PREROOT/../${d}${f}} |
+			then	ls ${d}${f} |
 				while read i
-				do	for j in ${d}${f}/${i} ${PREROOT:+$PREROOT/../${d}${f}/${i}}
+				do	for j in ${d}${f}/${i}
 					do	if	test -f $j -a -r $j -a -s $j
 						then	echo $i
 							break
@@ -1340,9 +1324,9 @@ case $stdlib in
 					done
 				done > tmp.tmp
 				if	test -s tmp.tmp
-				then	if	egrep -i "^${prefix_archive}[abcdefghijklmnopqrstuvwxyz0123456789_][abcdefghijklmnopqrstuvwxyz0123456789_]*\\.$lib\$" tmp.tmp >lib.tmp ||
-						egrep -i "\\.$obj\$" tmp.tmp >/dev/null ||
-						egrep -i "^${prefix_shared}[abcdefghijklmnopqrstuvwxyz0123456789_][abcdefghijklmnopqrstuvwxyz0123456789_]*\\$so(.[0-9]+)*\$" tmp.tmp >>lib.tmp
+				then	if	grep -E -i "^${prefix_archive}[abcdefghijklmnopqrstuvwxyz0123456789_][abcdefghijklmnopqrstuvwxyz0123456789_]*\\.$lib\$" tmp.tmp >lib.tmp ||
+						grep -E -i "\\.$obj\$" tmp.tmp >/dev/null ||
+						grep -E -i "^${prefix_shared}[abcdefghijklmnopqrstuvwxyz0123456789_][abcdefghijklmnopqrstuvwxyz0123456789_]*\\$so(.[0-9]+)*\$" tmp.tmp >>lib.tmp
 					then	if	test -s lib.tmp
 						then	sed -e "s,.*/,," -e 's,^'${prefix_archive}'\(.*\)\.'$lib'$,\1,g' -e 's,^'${prefix_shared}'\(.*\)\'$so'[.0-9]*,\1,g' lib.tmp | sort -u > tmp.tmp
 							xs=`sort all.tmp all.tmp tmp.tmp | uniq -u`
@@ -1356,8 +1340,8 @@ case $stdlib in
 								esac
 								if	$cc -o doti.$exe doti.$obj -l$x 2>e
 								then	ok=1
-								else	if	test -s e && egrep -i ":.*[ 	](find|found|locate|search|-l$x)[ 	]" e > /dev/null
-									then	if	egrep -i ":.*[ 	](access|permission)[ 	]" e
+								else	if	test -s e && grep -E -i ":.*[ 	](find|found|locate|search|-l$x)[ 	]" e > /dev/null
+									then	if	grep -E -i ":.*[ 	](access|permission)[ 	]" e
 										then	: maybe
 										else	ok=0
 											break
@@ -1454,6 +1438,19 @@ then	e=`wc -c < e`
 		$cc $1 -c warn.$src 2>e && test -f warn.$obj || continue
 		case `wc -c < e` in
 		$e)	no_protect=$1; break ;;
+		esac
+	done
+
+	eval set x $probe_no_strict_aliasing
+	while	:
+	do	shift
+		case $# in
+		0)	break ;;
+		esac
+		rm -f warn.$obj
+		$cc $1 -c warn.$src 2>e && test -f warn.$obj || continue
+		case $(wc -c < e) in
+		$e)	no_strict_aliasing=$1; break ;;
 		esac
 	done
 
@@ -1773,36 +1770,11 @@ int lib(int** def, int** ref, int** ext)
 	;;
 esac
 
-# shellmagic defined if installed shell scripts need magic
-
-echo ': got magic :
-echo ok' > ok
-chmod +x ok
-case `(eval ./ok | /bin/sh) 2>/dev/null` in
-ok)	;;
-*)	echo '#!/bin/env sh
-: got magic :
-echo ok' > ok
-	chmod +x ok
-	case `(eval ./ok | /bin/sh) 2>/dev/null` in
-	ok)	shellmagic='$("#")!/bin/env sh'
-		;;
-	*)	for i in /emx/bin/bash.exe /emx/bin/sh.exe
-		do	if	test -x $i
-			then	shellmagic='$("#")!'$i
-				break
-			fi
-		done
-		;;
-	esac
-	;;
-esac
-
 #
 # path cleanup
 #
 
-for i in ar ccnative dld ld nm size stdinclude stdlib strip 
+for i in ar ccnative dld ld nm size stdinclude stdlib strip
 do	eval o='$'$i
 	v=$o
 	case $v in
@@ -1931,6 +1903,27 @@ case $keepstdlib in
 esac
 
 #
+# determine the need for any API version targets to add to the compiler flags
+#
+
+CC_TARGET=
+case $hosttype in
+android.*)
+	# get current default API level
+	cat >_android_test.c <<-EOF
+	#include <stdio.h>
+	int main(void) { printf("%d\n", __ANDROID_API__); return 0; }
+	EOF
+	$cc -o _android_test _android_test.c
+	got=$(./_android_test)
+	(set +f; exec rm -rf _android_test*) &
+	# check for minimum required; we need API 26 for catopen(3) et al
+	if	test -n "$got" && test "$got" -lt 26
+	then	CC_TARGET="--target=$(uname -m)-linux-android26"
+	fi ;;
+esac
+
+#
 # set up for local override
 #
 
@@ -1968,6 +1961,8 @@ CC_DYNAMIC=$dynamic
 CC_EXPORT_DYNAMIC=$export_dynamic
 CC_INCLUDE_LOCAL=$include_local
 CC_LD=$ld
+CC_LD_ASNEEDED=$ldasneeded
+CC_LD_NOASNEEDED=$ldnoasneeded
 CC_LD_DYNAMIC=$lddynamic
 CC_LD_LAZY=$ldlazy
 CC_LD_NOLAZY=$ldnolazy
@@ -1985,6 +1980,7 @@ CC_NM=$nm
 CC_NMEDIT=$nmedit
 CC_NMFLAGS=$nmflags
 CC_NOPROTECT=$no_protect
+CC_NOSTRICTALIASING=$no_strict_aliasing
 CC_OPTIMIZE=$optimize
 CC_READONLY=$readonly
 CC_REPOSITORY=$repository
@@ -1995,7 +1991,6 @@ CC_SHARED_LD=$dld
 CC_SHARED_NAME=$shared_name
 CC_SHARED_REGISTRY=$shared_registry
 CC_SHARED_REGISTRY_PATH=$probe_shared_registry_path
-CC_SHELLMAGIC=$shellmagic
 CC_SIZE=$size
 CC_STATIC=$static
 CC_STDINCLUDE=$stdinclude
@@ -2060,19 +2055,14 @@ echo CC.DLL.VARIANTS = $CC_DLL_VARIANTS
 echo CC.DYNAMIC = $CC_DYNAMIC
 echo CC.EXPORT.DYNAMIC = $CC_EXPORT_DYNAMIC
 echo CC.INCLUDE.LOCAL = $CC_INCLUDE_LOCAL
-#
-# 2004-02-14 release workaround
-#
 case $CC_SHARED_LD in
-$CC_CC)	echo if LDSHARED
-	echo CC.LD = $CC_LD
-	echo else
-	echo CC.LD = $CC_CC
-	echo end
+$CC_CC)	echo CC.LD = $CC_CC
 	;;
 *)	echo CC.LD = $CC_LD
 	;;
 esac
+echo CC.LD.ASNEEDED = $CC_LD_ASNEEDED
+echo CC.LD.NOASNEEDED = $CC_LD_NOASNEEDED
 echo CC.LD.DYNAMIC = $CC_LD_DYNAMIC
 echo CC.LD.LAZY = $CC_LD_LAZY
 echo CC.LD.NOLAZY = $CC_LD_NOLAZY
@@ -2093,6 +2083,7 @@ esac
 echo CC.NMEDIT ="$CC_NMEDIT"
 echo CC.NMFLAGS = $CC_NMFLAGS
 echo CC.NOPROTECT = $CC_NOPROTECT
+echo CC.NOSTRICTALIASING = $CC_NOSTRICTALIASING
 echo CC.OPTIMIZE = $CC_OPTIMIZE
 echo CC.PICBIG = $CC_PICBIG
 echo CC.PICSMALL = $CC_PICSMALL
@@ -2108,7 +2099,6 @@ echo CC.SHARED.LD = $CC_SHARED_LD
 echo CC.SHARED.NAME = $CC_SHARED_NAME
 echo CC.SHARED.REGISTRY = $CC_SHARED_REGISTRY
 echo CC.SHARED.REGISTRY.PATH = $CC_SHARED_REGISTRY_PATH
-echo CC.SHELLMAGIC = $CC_SHELLMAGIC
 echo CC.SIZE = $CC_SIZE
 echo CC.STATIC = $CC_STATIC
 echo CC.STDINCLUDE = $CC_STDINCLUDE
@@ -2129,6 +2119,7 @@ echo CC.SUFFIX.OBJECT = $CC_SUFFIX_OBJECT
 echo CC.SUFFIX.SHARED = $CC_SUFFIX_SHARED
 echo CC.SUFFIX.SOURCE = $CC_SUFFIX_SOURCE
 echo CC.SUFFIX.STATIC = $CC_SUFFIX_STATIC
+echo CC.TARGET = $CC_TARGET
 echo CC.VERSION = $CC_VERSION
 case $CC_VERSION_STRING in
 *\"*)	i=`echo " $CC_VERSION_STRING" | sed -e 's,",\\\\",g' -e 's,^ ,,' -e 's,.*,"&",'` ;;
@@ -2143,3 +2134,6 @@ echo CC.WARN = $CC_WARN
 for i in $CC_ATTRIBUTES
 do	eval echo CC.$i = \$$i
 done
+
+# for backward compat
+echo CC.SHELLMAGIC =

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -57,8 +58,8 @@ strptime(const char* s, const char* format, struct tm* ts)
 	t = tmtime(&tm, TM_LOCALZONE);
 	t = tmscan(s, &e, format, &f, &t, 0);
 	if (e == (char*)s || *f)
-		return 0;
-	tmxtm(&tm, tmxclock(&t), NiL);
+		return NULL;
+	tmxtm(&tm, tmxsns(t,0), NULL, 0);
 	ts->tm_sec = tm.tm_sec;
 	ts->tm_min = tm.tm_min;
 	ts->tm_hour = tm.tm_hour;

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -33,8 +33,8 @@
 intmax_t
 swapget(int op, const void* b, int n)
 {
-	register unsigned char*	p;
-	register unsigned char*	d;
+	unsigned char*	p;
+	unsigned char*	d;
 	intmax_t		v;
 	unsigned char		tmp[sizeof(intmax_t)];
 

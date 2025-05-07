@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #ifndef S_BREAK
@@ -45,7 +46,6 @@
 #define S_ENDCH	28	/* macro expansion terminator */
 #define S_SLASH	29	/* / character terminates ~ expansion */
 #define S_COLON	30	/* for character : */
-#define S_LABEL	31	/* for goto label */
 #define S_EDOL	32	/* ends $identifier */
 #define S_BRACE	33	/* left brace */
 #define S_DOT	34	/* . char */
@@ -54,6 +54,7 @@
 #define S_DELIM	S_RES	/* IFS delimiter characters */
 #define S_MBYTE S_NAME	/* IFS first byte of multi-byte char */
 #define S_BLNK	36	/* space or tab */
+#define S_BRAOP	S_RES	/* potentially a glob pattern bracket expression operator (!, ^, -) */
 /* The following must be the highest numbered states */
 #define S_QUOTE	37	/* double quote character */
 #define S_GRAVE	38	/* old comsub character */
@@ -107,34 +108,38 @@
 #if SHOPT_MULTIBYTE
 #   define LEN		_Fcin.fclen
 #   define SETLEN(x)	(_Fcin.fclen = x)
-#   define isaname(c)	((c)>0x7f?isalpha(c): sh_lexstates[ST_NAME][(c)]==0)
-#   define isaletter(c)	((c)>0x7f?isalpha(c): sh_lexstates[ST_DOL][(c)]==S_ALP && (c)!='.')
+#   define isaname(c)	((c) < 0 ? 0 : ((c) > 0x7f ? isalpha(c) : sh_lexstates[ST_NAME][(c)] == 0))
+#   define isaletter(c)	((c) < 0 ? 0 : ((c) > 0x7f ? isalpha(c) : sh_lexstates[ST_DOL][(c)] == S_ALP && (c) != '.'))
 #else
 #   undef mbwide
 #   define mbwide()	(0)
 #   define LEN		1
 #   define SETLEN(x)	(x)
-#   define isaname(c)	(sh_lexstates[ST_NAME][c]==0)
-#   define isaletter(c)	(sh_lexstates[ST_DOL][c]==S_ALP && (c)!='.')
+#   define isaname(c)	(((c) < 0 || (c) > 255) ? 0 : sh_lexstates[ST_NAME][c] == 0)
+#   define isaletter(c)	(((c) < 0 || (c) > 255) ? 0 : (sh_lexstates[ST_DOL][c] == S_ALP && (c) != '.'))
 #endif
-#define STATE(s,c)	(s[mbwide()?((c=fcmbget(&LEN)),LEN>1?'a':c):(c=fcget())])
-#define isadigit(c)	(sh_lexstates[ST_DOL][c]==S_DIG)
-#define isastchar(c)	((c)=='@' || (c)=='*')
-#define isexp(c)	(sh_lexstates[ST_MACRO][c]==S_PAT||(c)=='$'||(c)=='`')
-#define ismeta(c)	(sh_lexstates[ST_NAME][c]==S_BREAK)
+#define STATE(s,c)	(s[mbwide() ? ((c = fcmbget(&LEN)), LEN > 1 ? 'a' : c) : (c = fcget())])
+#define isadigit(c)	(((c) < 0 || (c) > 255) ? 0 : sh_lexstates[ST_DOL][c] == S_DIG)
+#define isastchar(c)	((c) == '@' || (c) == '*')
+#define isexp(c)	(((c) < 0 || (c) > 255) ? 0 : (sh_lexstates[ST_MACRO][c] == S_PAT || (c) == '$' || (c) == '`'))
+#define ismeta(c)	(((c) < 0 || (c) > 255) ? 0 : sh_lexstates[ST_NAME][c] == S_BREAK)
 
-extern char *sh_lexstates[ST_NONE];
-extern const char *sh_lexrstates[ST_NONE];
+extern const char *sh_lexstates[ST_NONE];
 extern const char e_lexversion[];
 extern const char e_lexspace[];
 extern const char e_lexslash[];
-extern const char e_lexlabignore[];
-extern const char e_lexlabunknown[];
-extern const char e_lexsyntax1[];
-extern const char e_lexsyntax2[];
-extern const char e_lexsyntax3[];
-extern const char e_lexsyntax4[];
-extern const char e_lexsyntax5[];
+
+extern const char e_syntaxerror[];
+extern const char e_syntaxerror_at[];
+extern const char e_unexpected[];
+extern const char e_unmatched[];
+extern const char e_emptysubscr[];
+extern const char e_badreflist[];
+extern const char e_heredoccomsub[];
+extern const char e_lexzerobyte[];
+extern const char e_endoffile[];
+extern const char e_newline[];
+
 extern const char e_lexwarnvar[];
 extern const char e_lexarithwarn[];
 extern const char e_lexobsolete1[];
@@ -143,7 +148,6 @@ extern const char e_lexobsolete3[];
 extern const char e_lexobsolete4[];
 extern const char e_lexobsolete5[];
 extern const char e_lexobsolete6[];
-extern const char e_lexnonstandard[];
 extern const char e_lexusebrace[];
 extern const char e_lexusequote[];
 extern const char e_lexescape[];
@@ -152,7 +156,6 @@ extern const char e_lexnested[];
 extern const char e_lexbadchar[];
 extern const char e_lexlongquote[];
 extern const char e_lexfuture[];
-extern const char e_lexzerobyte[];
 extern const char e_lexemptyfor[];
 extern const char e_lextypeset[];
 extern const char e_lexcharclass[];

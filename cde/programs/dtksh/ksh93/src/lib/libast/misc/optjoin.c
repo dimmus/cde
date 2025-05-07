@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -45,18 +45,18 @@ typedef int (*Optpass_f)(char**, int);
 int
 optjoin(char** argv, ...)
 {
-	va_list			ap;
-	register Optpass_f	fun;
-	register Optpass_f	rep;
-	Optpass_f		err;
-	Optstate_t*		state;
-	int			r;
-	int			more;
-	int			user;
-	int			last_index;
-	int			last_offset;
-	int			err_index;
-	int			err_offset;
+	va_list		ap;
+	Optpass_f	fun;
+	Optpass_f	rep;
+	Optpass_f	err;
+	Optstate_t*	state;
+	int		r;
+	int		more;
+	int		user;
+	int		last_index;
+	int		last_offset;
+	int		err_index = 0;
+	int		err_offset = 0;
 
 	state = optstate(&opt_info);
 	err = rep = 0;

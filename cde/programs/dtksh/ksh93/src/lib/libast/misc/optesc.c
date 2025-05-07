@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,10 +28,10 @@
 #include <ctype.h>
 
 int
-optesc(Sfio_t* sp, register const char* s, int esc)
+optesc(Sfio_t* sp, const char* s, int esc)
 {
-	register const char*	m;
-	register int		c;
+	const char*	m;
+	int		c;
 
 	if (*s == '[' && *(s + 1) == '+' && *(s + 2) == '?')
 	{

@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#         hyenias <58673227+hyenias@users.noreply.github.com>          #
 #                                                                      #
 ########################################################################
 
@@ -88,11 +89,14 @@ fi
 if	[[ $($SHELL -c 'echo $x') != export ]]
 then	err_exit export fails
 fi
-if	[[ $($SHELL -c 'xi=xi+4;echo $xi') != 24 ]]
-then	err_exit export attributes fails
+if	[[ $($SHELL -c 'xi=xi+4;echo $xi') != "xi+4" ]]
+then	err_exit "attributes exported"
 fi
 if	[[ -o ?posix && $(set -o posix; "$SHELL" -c 'xi=xi+4;echo $xi') != "xi+4" ]]
 then	err_exit "attributes exported despite posix mode (-o posix)"
+fi
+if	[[ $("$SHELL" -c 'xi=xi+4;echo $xi') != "xi+4" ]]
+then	err_exit "attributes imported"
 fi
 if	[[ -o ?posix && $("$SHELL" -o posix -c 'xi=xi+4;echo $xi') != "xi+4" ]]
 then	err_exit "attributes imported despite posix mode (-o posix)"
@@ -150,10 +154,10 @@ typeset -Z  LAST=00
 unset -f foo
 function foo
 {
-        if [[ $1 ]]
-        then    LAST=$1
-        else    ((LAST++))
-        fi
+	if [[ $1 ]]
+	then    LAST=$1
+	else    ((LAST++))
+	fi
 }
 foo 1
 if	(( ${#LAST} != 2 ))
@@ -180,16 +184,16 @@ fi
 if	[[ $(typeset | grep PS2) == PS2 ]]
 then	err_exit 'typeset without arguments outputs names without attributes'
 fi
+
+# ======
+# typeet -b tests (ASCII assumed)
+
 unset a z q x
 w1=hello
 w2=world
 t1="$w1 $w2"
-if	(( 'a' == 97 ))
-then	b1=aGVsbG8gd29ybGQ=
-	b2=aGVsbG8gd29ybGRoZWxsbyB3b3JsZA==
-else	b1=iIWTk5ZAppaZk4Q=
-	b2=iIWTk5ZAppaZk4SIhZOTlkCmlpmThA==
-fi
+b1=aGVsbG8gd29ybGQ=
+b2=aGVsbG8gd29ybGRoZWxsbyB3b3JsZA==
 z=$b1
 typeset -b x=$b1
 [[ $x == "$z" ]] || err_exit "binary variable not expanding correctly ($(printf %q "$x") != $(printf %q "$z"))"
@@ -211,6 +215,9 @@ typeset -b -Z20 z=$b1
 } << !
 hello worldhello worldhello world
 !
+
+# ======
+
 [[ $v1 == "$b1" ]] || err_exit "v1=$v1 should be $b1"
 [[ $v2 == "$x" ]] || err_exit "v1=$v2 should be $x"
 if	env '!=1' >/dev/null 2>&1
@@ -338,11 +345,11 @@ unset foo
 typeset  -b -A foo
 read -N10 foo[4] <<< 'abcdefghijklmnop'
 [[ ${foo[4]} == "$expected" ]] || err_exit 'read -N10 foo, where foo is "typeset  -b -A" foo not working'
+[[ $(printf %B foo[4]) == abcdefghij ]] || err_exit 'printf %B for binary associative array element not working'
 unset foo
 typeset  -b -a foo
 read -N10 foo[4] <<< 'abcdefghijklmnop'
 [[ ${foo[4]} == "$expected" ]] || err_exit 'read -N10 foo, where foo is "typeset  -b -a" foo not working'
-[[ $(printf %B foo[4]) == abcdefghij ]] || err_exit 'printf %B for binary associative array element not working'
 [[ $(printf %B foo[4]) == abcdefghij ]] || err_exit 'printf %B for binary indexed array element not working'
 unset foo
 
@@ -386,9 +393,9 @@ typeset -H v=/dev/null
 [[ $v == *[Nn]ul* ]] || err_exit "typeset -H for /dev/null not working (got $(printf %q "$v"))"
 
 unset x
-(typeset +C x) 2> /dev/null && err_exit 'typeset +C should be an error' 
-(typeset +A x) 2> /dev/null && err_exit 'typeset +A should be an error' 
-(typeset +a x) 2> /dev/null && err_exit 'typeset +a should be an error' 
+(typeset +C x) 2> /dev/null && err_exit 'typeset +C should be an error'
+(typeset +A x) 2> /dev/null && err_exit 'typeset +A should be an error'
+(typeset +a x) 2> /dev/null && err_exit 'typeset +a should be an error'
 
 unset x
 {
@@ -422,7 +429,7 @@ fi
 { $SHELL  <<-  \EOF
 	compound -a a1
 	for ((i=1 ; i < 100 ; i++ ))
-        do	[[ "$( typeset + a1[$i] )" == '' ]] && a1[$i].text='hello'
+	do	[[ "$( typeset + a1[$i] )" == '' ]] && a1[$i].text='hello'
 	done
 	[[ ${a1[70].text} == hello ]]
 EOF
@@ -796,13 +803,13 @@ got=${got/ -x/}
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
 # ======
-# Check import of float attribute/value from environment
-exp='typeset -x -F 5 num=7.75000'
+# Check non-import of float attribute/value from environment
+exp='typeset -x num=7.75000'
 got=$(typeset -xF5 num=7.75; "$SHELL" -c 'typeset -p num')
 [[ $got == "$exp" ]] || err_exit "floating '.' attribute/value not imported correctly" \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 # try again with AST debug locale which has the comma as the radix point
-exp='typeset -x -F 5 num=7,75000'
+exp='typeset -x num=7,75000'
 got=$(export LC_NUMERIC=debug; typeset -xF5 num=7,75; "$SHELL" -c 'typeset -p num')
 [[ $got == "$exp" ]] || err_exit "floating ',' attribute/value not imported correctly" \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
@@ -810,10 +817,11 @@ got=$(export LC_NUMERIC=debug; typeset -xF5 num=7,75; "$SHELL" -c 'typeset -p nu
 # ======
 # Check that assignments preceding commands correctly honour existing attributes
 # https://github.com/ksh93/ksh/issues/465
-exp='typeset -x -F 5 num=7.75000'
+exp='typeset -x num=7.75000'
 got=$(typeset -F5 num; num=3.25+4.5 "$SHELL" -c 'typeset -p num')
 [[ $got == "$exp" ]] || err_exit 'assignment preceding external command call does not honour pre-set attributes' \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+exp='typeset -x -F 5 num=7.75000'
 got=$(typeset -F5 num; num=3.25+4.5 command eval 'typeset -p num')
 [[ $got == "$exp" ]] || err_exit 'assignment preceding built-in command call does not honour pre-set attributes' \
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
@@ -828,6 +836,29 @@ unset foo
 	typeset -Z foo=
 	typeset -i foo
 ) || err_exit 'failed to convert from -Z to -i'
+
+# ======
+# Bug in the 'for' loop optimizer which could falsely treat 'typeset -b' variables as loop invariants
+# Fix backported from ksh 93v- 2013-03-18
+# (hint: use 'base64 -d' to decode base64-encoded values)
+unset var i
+exp='dGhyZWV0'
+typeset -bZ6 var
+for i in first second
+do	read -r -N6 var
+	set -- "$var"
+	[[ $i == first ]] && continue
+	got=$1
+	[[ $got == "$exp" ]] || err_exit "loop optimization bug with 'typeset -b' variables (expected '$exp', got '$got')"
+done <<< 'twotowthreetfourro'
+
+# ======
+# control characters should not be counted for default justification` width
+# https://github.com/ksh93/ksh/issues/189
+exp='typeset -L 5 s=$'\''1\n2\a3\t4\x[0b]5'\'
+got=$(s=$'1\n2\a3\t4\v5'; typeset -L s; typeset -p s)
+[[ $got == "$exp" ]] || err_exit "default terminal width for typeset -L incorrect" \
+	"(expected $(printf %q "$exp"); got $(printf %q "$got"))"
 
 # ======
 exit $((Errors<125?Errors:125))

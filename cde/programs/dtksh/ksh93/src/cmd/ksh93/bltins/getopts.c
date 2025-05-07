@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -33,6 +34,8 @@
 static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 {
 	Stk_t	*stkp = sh.stk;
+	NOT_USED(op);
+	NOT_USED(dp);
 #if SHOPT_NAMESPACE
 	if((sh.namespace && sh_fsearch(s,0)) || nv_search(s,sh.fun_tree,0))
 #else
@@ -40,27 +43,29 @@ static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 #endif /* SHOPT_NAMESPACE */
 	{
 		int savtop = stktell(stkp);
-		char *savptr = stkfreeze(stkp,0);
+		void *savptr = stkfreeze(stkp,0);
 		sfputc(stkp,'$');
 		sfputc(stkp,'(');
 		sfputr(stkp,s,')');
 		sfputr(sp,sh_mactry(stkfreeze(stkp,1)),-1);
 		stkset(stkp,savptr,savtop);
 	}
-        return(1);
+	return 1;
 }
 
 int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 {
-	register char *options=error_info.context->id;
-	register Namval_t *np;
-	register int flag, mode;
+	char *options=error_info.context->id;
+	Namval_t *np;
+	int flag, mode;
 	char value[2], key[2];
 	int jmpval;
 	volatile int extended, r= -1;
 	struct checkpt buff, *pp;
 	Optdisc_t disc;
-        memset(&disc, 0, sizeof(disc));
+
+	NOT_USED(context);
+	memset(&disc, 0, sizeof(disc));
 	disc.version = OPT_VERSION;
 	disc.infof = infof;
 	value[1] = 0;
@@ -74,14 +79,15 @@ int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 		errormsg(SH_DICT,2, "%s", opt_info.arg);
 		break;
 	    case '?':
-		errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-		UNREACHABLE();
+		/* self-doc for getopts itself: write to standard output */
+		error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+		return 0;
 	}
 	argv += opt_info.index;
 	argc -= opt_info.index;
 	if(error_info.errors || argc<2)
 	{
-		errormsg(SH_DICT,ERROR_usage(2), "%s", optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	error_info.context->flags |= ERROR_SILENT;
@@ -110,10 +116,10 @@ int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 		sh_popcontext(&buff);
 		sh.st.opterror = 1;
 		if(r==0)
-			return(2);
+			return 2;
 		pp = (struct checkpt*)sh.jmplist;
 		pp->mode = SH_JMPERREXIT;
-		sh_exit(2);
+		sh_exit(r==-2 ? 0 : 2);
 	}
 	opt_info.disc = &disc;
 	switch(opt_info.index>=0 && opt_info.index<=argc?(opt_info.num= LONG_MIN,flag=optget(argv,options)):0)
@@ -121,8 +127,10 @@ int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 	    case '?':
 		if(mode==0)
 		{
-			errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* a ksh script's self-doc: write to standard output and force script to exit with status 0 */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			r = -2;
+			siglongjmp(*sh.jmplist,SH_JMPERREXIT);  /* back to if(jmpval) above */
 		}
 		opt_info.option[1] = '?';
 		/* FALLTHROUGH */
@@ -158,7 +166,7 @@ int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 			opt_info.index = flag;
 			if(!mode && strchr(options,' '))
 			{
-				errormsg(SH_DICT,ERROR_usage(2), "%s", optusage((char*)0));
+				errormsg(SH_DICT,ERROR_usage(2), "%s", optusage(NULL));
 				UNREACHABLE();
 			}
 		}
@@ -177,7 +185,7 @@ int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 	sh.st.optindex = opt_info.index;
 	sh.st.optchar = opt_info.offset;
 	nv_putval(np, options, 0);
-	np = nv_open(nv_name(OPTARGNOD),sh.var_tree,0);
+	np = sh_scoped(OPTARGNOD);
 	if(opt_info.num == LONG_MIN)
 		nv_putval(np, opt_info.arg, NV_RDONLY);
 	else if (opt_info.arg && opt_info.num > 0 && isalpha((char)opt_info.num) && !isdigit(opt_info.arg[0]) && opt_info.arg[0] != '-' && opt_info.arg[0] != '+')
@@ -195,6 +203,6 @@ int	b_getopts(int argc,char *argv[],Shbltin_t *context)
 	else
 		nv_putval(np, opt_info.arg, NV_RDONLY);
 	sh_popcontext(&buff);
-        opt_info.disc = 0;
-	return(r);
+	opt_info.disc = 0;
+	return r;
 }

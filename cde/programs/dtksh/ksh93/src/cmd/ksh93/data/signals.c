@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -18,10 +18,6 @@
 #include	"shopt.h"
 #include	"defs.h"
 #include	"jobs.h"
-
-#if defined(SIGCLD) && !defined(SIGCHLD)
-#   define SIGCHLD	SIGCLD
-#endif
 
 #define VAL(sig,mode)	((sig+1)|((mode)<<SH_SIGBITS))
 #define TRAP(n)		(((n)|SH_TRAP)-1)
@@ -61,16 +57,7 @@ const struct shtable2 shtab_signals[] =
 	"CANCEL",	VAL(SIGCANCEL,SH_SIGIGNORE), 			S("Thread cancellation"),
 #endif /*SIGCANCEL */
 #ifdef SIGCHLD
-	"CHLD",		VAL(SIGCHLD,SH_SIGFAULT), 			S("Death of Child"),
-#   ifdef SIGCLD
-#	if SIGCLD!=SIGCHLD
-	    "CLD",	VAL(SIGCLD,SH_SIGFAULT),			S("Death of Child"),
-#	endif
-#   endif	/* SIGCLD */
-#else
-#   ifdef SIGCLD
-	"CLD",		VAL(SIGCLD,SH_SIGFAULT),			S("Death of Child"),
-#   endif	/* SIGCLD */
+	"CHLD",		VAL(SIGCHLD,SH_SIGFAULT), 			S("Child process terminated or stopped"),
 #endif	/* SIGCHLD */
 #ifdef SIGCONT
 	"CONT",		VAL(SIGCONT,SH_SIGIGNORE),			S("Stopped process continued"),
@@ -102,11 +89,7 @@ const struct shtable2 shtab_signals[] =
 #endif /* SIGGRANT */
 	"HUP",		VAL(SIGHUP,SH_SIGDONE),				S("Hangup"),
 	"ILL",		VAL(SIGILL,SH_SIGDONE),				S("Illegal instruction"),
-#ifdef JOBS
 	"INT",		VAL(SIGINT,SH_SIGINTERACTIVE),			S("Interrupt"),
-#else
-	"INT",		VAL(SIGINT,SH_SIGINTERACTIVE),			"",
-#endif /* JOBS */
 #ifdef SIGINFO
 	"INFO",		VAL(SIGINFO,SH_SIGIGNORE),			S("Information request"),
 #endif	/* SIGINFO */
@@ -148,11 +131,7 @@ const struct shtable2 shtab_signals[] =
 	"PHONE",	VAL(SIGPHONE,0),				S("Phone interrupt"),
 #endif	/* SIGPHONE */
 #ifdef SIGPIPE
-#ifdef JOBS
 	"PIPE",		VAL(SIGPIPE,SH_SIGDONE),			S("Broken Pipe"),
-#else
-	"PIPE",		VAL(SIGPIPE,SH_SIGDONE),	 		"",
-#endif /* JOBS */
 #endif /* SIGPIPE */
 #ifdef SIGPOLL
 	"POLL",		VAL(SIGPOLL,SH_SIGDONE),			S("Polling alarm"),
@@ -201,11 +180,7 @@ const struct shtable2 shtab_signals[] =
 	"THAW",		VAL(SIGTHAW,SH_SIGIGNORE),			S("Special signal used by CPR"),
 #endif	/* SIGTHAW */
 #ifdef SIGTINT
-#   ifdef JOBS
 	"TINT",		VAL(SIGTINT,0),					S("Interrupt"),
-#   else
-	"TINT",		VAL(SIGTINT,0),					"",
-#   endif /* JOBS */
 #endif	/* SIGTINT */
 #ifdef SIGTRAP
 	"TRAP",		VAL(SIGTRAP,SH_SIGDONE),			S("Trace/BPT trap"),

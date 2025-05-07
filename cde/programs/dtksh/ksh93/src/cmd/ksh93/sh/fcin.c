@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -33,33 +34,33 @@ Fcin_t _Fcin = {0};
 /*
  * open stream <f> for fast character input
  */
-int	fcfopen(register Sfio_t* f)
+int	fcfopen(Sfio_t* f)
 {
-	register int	n;
-	char		*buff;
-	Fcin_t		save;
+	int	n;
+	char	*buff;
+	Fcin_t	save;
 	errno = 0;
 	_Fcin.fcbuff = _Fcin.fcptr;
 	_Fcin._fcfile = f;
 	fcsave(&save);
-	if(!(buff=(char*)sfreserve(f,SF_UNBOUND,SF_LOCKR)))
+	if(!(buff=(char*)sfreserve(f,SFIO_UNBOUND,SFIO_LOCKR)))
 	{
 		fcrestore(&save);
 		_Fcin.fcchar = 0;
 		_Fcin.fcptr = _Fcin.fcbuff = &_Fcin.fcchar;
 		_Fcin.fclast = 0;
-		_Fcin._fcfile = (Sfio_t*)0;
-		return(EOF);
+		_Fcin._fcfile = NULL;
+		return EOF;
 	}
 	n = sfvalue(f);
 	fcrestore(&save);
 	sfread(f,buff,0);
-	_Fcin.fcoff = sftell(f);;
-	buff = (char*)sfreserve(f,SF_UNBOUND,SF_LOCKR);
+	_Fcin.fcoff = sftell(f);
+	buff = (char*)sfreserve(f,SFIO_UNBOUND,SFIO_LOCKR);
 	_Fcin.fclast = (_Fcin.fcptr=_Fcin.fcbuff=(unsigned char*)buff)+n;
 	if(sffileno(f) >= 0)
 		*_Fcin.fclast = 0;
-	return(n);
+	return n;
 }
 
 
@@ -72,9 +73,9 @@ int	fcfopen(register Sfio_t* f)
  */
 int	fcfill(void)
 {
-	register int		n;
-	register Sfio_t	*f;
-	register unsigned char	*last=_Fcin.fclast, *ptr=_Fcin.fcptr;
+	int	n;
+	Sfio_t	*f;
+	unsigned char	*last=_Fcin.fclast, *ptr=_Fcin.fcptr;
 	if(!(f=fcfile()))
 	{
 		/* see whether pointer has passed null byte */
@@ -82,12 +83,12 @@ int	fcfill(void)
 			_Fcin.fcptr=ptr;
 		else
 			_Fcin.fcoff = 0;
-		return(0);
+		return 0;
 	}
 	if(last)
 	{
 		if( ptr<last && ptr>_Fcin.fcbuff && *(ptr-1)==0)
-			return(0);
+			return 0;
 		if(_Fcin.fcchar)
 			*last = _Fcin.fcchar;
 		if(ptr > last)
@@ -99,10 +100,10 @@ int	fcfill(void)
 	_Fcin.fcoff +=n;
 	_Fcin._fcfile = 0;
 	if(!last)
-		return(0);
+		return 0;
 	else if(fcfopen(f) < 0)
-		return(EOF);
-	return(*_Fcin.fcptr++);
+		return EOF;
+	return *_Fcin.fcptr++;
 }
 
 /*
@@ -110,16 +111,16 @@ int	fcfill(void)
  */
 int fcclose(void)
 {
-	register unsigned char *ptr;
+	unsigned char *ptr;
 	if(_Fcin.fclast==0)
-		return(0);
+		return 0;
 	if((ptr=_Fcin.fcptr)>_Fcin.fcbuff && *(ptr-1)==0)
 		_Fcin.fcptr--;
 	if(_Fcin.fcchar)
 		*_Fcin.fclast = _Fcin.fcchar;
 	_Fcin.fclast = 0;
 	_Fcin.fcleft = 0;
-	return(fcfill());
+	return fcfill();
 }
 
 /*
@@ -146,7 +147,7 @@ extern void fcrestore(Fcin_t *fp)
 #if SHOPT_MULTIBYTE
 int _fcmbget(short *len)
 {
-	register int		c;
+	int	c;
 	switch(*len = mbsize(_Fcin.fcptr))
 	{
 	    case -1:
@@ -159,6 +160,6 @@ int _fcmbget(short *len)
 	    default:
 		c = mbchar(_Fcin.fcptr);
 	}
-	return(c);
-} 
+	return c;
+}
 #endif /* SHOPT_MULTIBYTE */

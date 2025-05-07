@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -36,11 +36,11 @@ static void* dtmemory(Dt_t* 	dt,	/* dictionary			*/
 	if(addr)
 	{	if(size == 0)
 		{	free(addr);
-			return NIL(void*);
+			return NULL;
 		}
 		else	return realloc(addr,size);
 	}
-	else	return size > 0 ? malloc(size) : NIL(void*);
+	else	return size > 0 ? malloc(size) : NULL;
 }
 
 Dtdisc_t* dtdisc(Dt_t* dt, Dtdisc_t* disc, int type)
@@ -58,12 +58,12 @@ Dtdisc_t* dtdisc(Dt_t* dt, Dtdisc_t* disc, int type)
 	if(!disc) /* only want to know current discipline */
 		return old;
 
-	if(old->eventf && (*old->eventf)(dt,DT_DISC,(void*)disc,old) < 0)
-		return NIL(Dtdisc_t*);
+	if(old->eventf && (*old->eventf)(dt,DT_DISC,disc,old) < 0)
+		return NULL;
 
 	if((type & (DT_SAMEHASH|DT_SAMECMP)) != (DT_SAMEHASH|DT_SAMECMP) )
 		list = dtextract(dt); /* grab the list of objects if any */
-	else	list = NIL(Dtlink_t*);
+	else	list = NULL;
 
 	dt->disc = disc;
 	if(!(dt->memoryf = disc->memoryf) )

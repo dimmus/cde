@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -23,7 +23,7 @@
  */
 
 static const char usage[] =
-"[-?@(#)$Id: stty (ksh 93u+m) 2021-11-23 $\n]"
+"[-?\n@(#)$Id: stty (ksh 93u+m) 2021-11-23 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?stty - set or get terminal modes]"
 "[+DESCRIPTION?\bstty\b sets certain terminal I/O modes for the device "
@@ -50,20 +50,16 @@ static const char usage[] =
     "{\fabc\f}"
 "[+EXIT STATUS?]"
     "{"
-        "[+0?All modes reported or set successfully.]"
-        "[+>0?Standard input not a terminal or one or more modes "
-            "failed.]"
+	"[+0?All modes reported or set successfully.]"
+	"[+>0?Standard input not a terminal or one or more modes "
+	    "failed.]"
     "}"
 "[+SEE ALSO?\btegetattr\b(2), \btcsetattr\b(2), \bioctl\b(2)]"
 ;
 
 #include	<cmd.h>
-#include	<ccode.h>
 #include	<ctype.h>
 #include	<ast_tty.h>
-#if _sys_ioctl
-#include	<sys/ioctl.h>
-#endif
 
 #define C(x)	ERROR_catalog(x)
 
@@ -75,7 +71,7 @@ static const char usage[] =
 #   ifdef NCC
 #	define NCCS	NCC
 #   else
-#	define NCCS	elementsof(((struct termio*)0)->c_cc)
+#	define NCCS	elementsof((NULL)->c_cc)
 #   endif
 #endif
 
@@ -124,7 +120,7 @@ typedef struct tty_s
 	unsigned long	mask;
 	unsigned long	val;
 	const char	description[76];
-} Tty_t; 
+} Tty_t;
 
 static const Tty_t Ttable[] =
 {
@@ -192,7 +188,7 @@ static const Tty_t Ttable[] =
 #ifdef VLNEXT
 { "lnext",	CHAR,	T_CHAR,	NL|SS,	VLNEXT, 'V', C("Enter the next input character literally") },
 #endif /* VLNEXT */
-	
+
 #if _mem_c_line_termios
 { "line",	NUM,	C_LINE,	0,	0, 0, C("Line discipline number") },
 #endif
@@ -218,7 +214,7 @@ static const Tty_t Ttable[] =
 { "crtscts",	BIT,	C_FLAG,	0,	CRTSCTS, CRTSCTS, C("Enable (disable) RTS/CTS handshaking") },
 #endif /* CRTSCTS */
 { "clocal",	BIT,	C_FLAG,	NL,	CLOCAL, CLOCAL, C("Disable (enable) modem control signals") },
-	
+
 { "ignbrk",	BIT,	I_FLAG,	US,	IGNBRK, IGNBRK, C("Ignore (do not ignore) break characters") },
 { "brkint",	BIT,	I_FLAG,	SS,	BRKINT, BRKINT, C("Generate (do not generate) INTR signal on break") },
 { "ignpar",	BIT,	I_FLAG,	0,	IGNPAR, IGNPAR, C("Ignore (do not ignore) characters with parity errors") },
@@ -240,7 +236,7 @@ static const Tty_t Ttable[] =
 { "imaxbel",	BIT,	I_FLAG,	SS,	IMAXBEL, IMAXBEL, C("Beep (do not beep) if a character arrives with full input buffer") },
 #endif /* IMAXBEL */
 { "icrnl",	BIT,	I_FLAG,	NL|SS,	ICRNL, ICRNL, C("Translate (do not translate) carriage return to newline") },
-	
+
 { "isig",	BIT,	L_FLAG,	SS,	ISIG, ISIG, C("Enable (disable) \bintr\b, \bquit\b, and \bsusp\b special characters") },
 { "icanon",	BIT,	L_FLAG,	SS,	ICANON, ICANON, C("Enable (disable) \berase\b, \bkill\b, \bwerase\b, and \brprnt\b special characters") },
 { "icannon",	BIT,	L_FLAG,	SS,	ICANON, ICANON },
@@ -339,7 +335,7 @@ static const Tty_t Ttable[] =
 { "ff1",	BITS,	O_FLAG,	US,	FFDLY, FF1 },
 #endif
 { "",		MIXED,	O_FLAG,	NL|IG },
-	
+
 { "evenp",	MIXED,	C_FLAG,	IG,	PARENB, 0, C("Same as \bparenb -parodd cs7\b") },
 { "oddp",	MIXED,	C_FLAG,	IG,	PARODD, 0, C("Same as \bparenb parodd cs7\b") },
 { "parity",	MIXED,	C_FLAG,	IG,	0, 0, C("Same as parenb \b-parodd cs7\b") },
@@ -351,15 +347,11 @@ static const Tty_t Ttable[] =
 { "LCASE",	CASE,	C_FLAG,	IG,	0 , 0, C("Same as \blcase\b") }
 };
 
-#if CC_NATIVE == CC_ASCII
-#define cntl(x)		(((x)=='?')?0177:((x)&037))
-#else
-#define cntl(x)		(((x)=='?')?ccmapc(0177,CC_ASCII,CC_NATIVE):ccmapc(ccmapc(x,CC_NATIVE,CC_ASCII)&037,CC_ASCII,CC_NATIVE))
-#endif
+#define cntl(x)		(((x)=='?')?0177:((x)&037))	/* assumes ASCII */
 
-static void sane(register struct termios *sp)
+static void sane(struct termios *sp)
 {
-	register const Tty_t*	tp;
+	const Tty_t*	tp;
 
 	for (tp = Ttable; tp < &Ttable[elementsof(Ttable)]; tp++)
 		if (tp->flags & (SS|US))
@@ -403,49 +395,49 @@ static void sane(register struct termios *sp)
 
 static int gin(char *arg,struct termios *sp)
 {
-	register int i;
+	int i;
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	sp->c_iflag = strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	sp->c_oflag = strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	sp->c_cflag = strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	sp->c_lflag = strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	for(i=0;i< NCCS; i++)
 	{
 		sp->c_cc[i] = strtol(arg,&arg,16);
 		if(*arg++ != ':')
-			return(0);
+			return 0;
 	}
 #if _mem_c_line_termios
 	sp->c_line =
 #endif
 		strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	i = strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	cfsetispeed(sp, i);
 	i = strtol(arg,&arg,16);
 	if(*arg++ != ':')
-		return(0);
+		return 0;
 	cfsetospeed(sp, i);
 	if(*arg)
-		return(0);
-	return(1);
+		return 0;
+	return 1;
 }
 
 static void gout(struct termios *sp)
 {
-	register int i;
+	int i;
 	sfprintf(sfstdout,":%x",sp->c_iflag);
 	sfprintf(sfstdout,":%x",sp->c_oflag);
 	sfprintf(sfstdout,":%x",sp->c_cflag);
@@ -466,8 +458,8 @@ static void output(struct termios *sp, int flags)
 {
 	const Tty_t *tp;
 	struct termios tty;
-	register int delim = ' ';
-	register int i,off,off2;
+	int delim = ' ';
+	int i,off,off2;
 	char schar[2];
 	unsigned int ispeed = cfgetispeed(sp);
 	unsigned int ospeed = cfgetospeed(sp);
@@ -540,14 +532,7 @@ static void output(struct termios *sp, int flags)
 			else if(isprint(off&0xff))
 				sfprintf(sfstdout,"%s = %c;%c",tp->name,off,delim);
 			else
-#if CC_NATIVE == CC_ASCII
-			sfprintf(sfstdout,"%s = ^%c;%c",tp->name,off==0177?'?':(off^0100),delim);
-#else
-			{
-				off = ccmapc(off, CC_NATIVE, CC_ASCII);
-				sfprintf(sfstdout,"%s = ^%c;%c",tp->name,off==0177?'?':ccmapc(off^0100,CC_ASCII,CC_NATIVE),delim);
-			}
-#endif
+				sfprintf(sfstdout,"%s = ^%c;%c",tp->name,off==0177?'?':(off^0100),delim);  /* assumes ASCII */
 			delim = ' ';
 			break;
 		    case SIZE:
@@ -587,51 +572,51 @@ static void output(struct termios *sp, int flags)
 
 static const Tty_t *lookup(const char *name)
 {
-	register int i;
+	int i;
 	for(i=0; i < elementsof(Ttable); i++)
 	{
 		if(strcmp(Ttable[i].name,name)==0)
-			return(&Ttable[i]);
+			return &Ttable[i];
 	}
-	return(0);
+	return NULL;
 }
 
 static const Tty_t *getspeed(unsigned long val)
 {
-	register int i;
+	int i;
 	for(i=0; i < elementsof(Ttable); i++)
 	{
 		if(Ttable[i].type==SPEED && Ttable[i].mask==val)
-			return(&Ttable[i]);
+			return &Ttable[i];
 	}
-	return(0);
+	return NULL;
 }
 
-static int gettchar(register const char *cp)
+static int gettchar(const char *cp)
 {
 	if(*cp==0)
-		return(-1);
+		return -1;
 	if(cp[1]==0)
-		return((unsigned)cp[0]);
+		return (unsigned)cp[0];
 	if(*cp=='^' && cp[1] && cp[2]==0)
 	{
 		switch(cp[1])
 		{
 		    case '-':
-			return(-1);
+			return -1;
 		    default:
-			return(cntl(cp[1]));
+			return cntl(cp[1]);
 		}
 	}
 	if(streq(cp,"undef") || streq(cp,"<undef>"))
-		return(-1);
-	return(*((unsigned char*)cp));
+		return -1;
+	return *((unsigned char*)cp);
 }
 
 static void set(char *argv[], struct termios *sp)
 {
 	const Tty_t *tp;
-	register int c,off;
+	int c,off;
 	char *cp;
 	char *ep;
 	while(cp = *argv++)
@@ -925,24 +910,15 @@ static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 	listmode(sp,"tabs");
 	listmode(sp,"LCASE");
 	sfputc(sp,'}');
-	return(1);
+	return 1;
 }
-
-#ifndef _lib_tcgetpgrp
-#  ifdef TIOCGPGRP
-	   static int _i_;
-#	   define tcgetpgrp(a) (ioctl(a, TIOCGPGRP, &_i_)>=0?_i_:-1)	
-#  else
-#	   define tcgetpgrp(a) (-1)
-#  endif /* TIOCGPGRP */
-#endif /* _lib_tcgetpgrp */
 
 int
 b_stty(int argc, char** argv, Shbltin_t* context)
 {
 	struct termios		tty;
-	register int		n;
-	register int		flags = 0;
+	int			n;
+	int			flags = 0;
 	int			fd = 0;
 	const Tty_t*		tp;
 	Optdisc_t		disc;
@@ -989,15 +965,16 @@ b_stty(int argc, char** argv, Shbltin_t* context)
 			}
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || (flags && *argv) || (flags&(flags-1)))
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (tcgetattr(fd, &tty) < 0)

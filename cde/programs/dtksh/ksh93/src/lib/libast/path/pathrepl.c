@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -39,18 +39,18 @@ pathrepl(char* path, const char* match, const char* replace)
 #include <ast_api.h>
 
 char*
-pathrepl_20100601(register char* path, size_t size, const char* match, register const char* replace)
+pathrepl_20100601(char* path, size_t size, const char* match, const char* replace)
 {
-	register const char*	m = match;
-	register const char*	r;
-	char*			t;
+	const char*	m = match;
+	const char*	r;
+	char*		t;
 
 	if (!match)
 		match = "";
 	if (!replace)
 		replace = "";
 	if (streq(match, replace))
-		return(path + strlen(path));
+		return path + strlen(path);
 	if (!size)
 		size = strlen(path) + 1;
 	for (;;)
@@ -63,7 +63,7 @@ pathrepl_20100601(register char* path, size_t size, const char* match, register 
 			while (*m && *m++ == *path) path++;
 			if (!*m && *path == '/')
 			{
-				register char*	p;
+				char*	p;
 
 				p = t;
 				r = replace;
@@ -71,7 +71,7 @@ pathrepl_20100601(register char* path, size_t size, const char* match, register 
 				if (p < path) while (*p++ = *path++);
 				else if (*r && p >= path)
 				{
-					register char*	u;
+					char*	u;
 
 					t = path + strlen(path);
 					u = t + strlen(r);
@@ -79,11 +79,11 @@ pathrepl_20100601(register char* path, size_t size, const char* match, register 
 					while (*r) *p++ = *r++;
 				}
 				else p += strlen(p) + 1;
-				return(p - 1);
+				return p - 1;
 			}
 			path = t;
 			m = match;
 		}
 	}
-	return(path);
+	return path;
 }

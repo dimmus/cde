@@ -1,3 +1,21 @@
+/***********************************************************************
+*                                                                      *
+*               This software is part of the ast package               *
+*          Copyright (c) 1995-2011 AT&T Intellectual Property          *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
+*                      and is licensed under the                       *
+*                 Eclipse Public License, Version 2.0                  *
+*                                                                      *
+*                A copy of the License is available at                 *
+*      https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.html      *
+*         (with md5 checksum 84283fa8859daf213bdda5a9f8d1be1d)         *
+*                                                                      *
+*                 Glenn Fowler <gsf@research.att.com>                  *
+*                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*                  Lev Kujawski <int21h@mailbox.org>                   *
+*                                                                      *
+***********************************************************************/
 
 /*
  * workarounds to bring the native interface close to POSIX and X/Open
@@ -18,7 +36,7 @@
 
 #if _win32_botch
 
-#define	OMITTED	1
+#define OMITTED	1
 
 #include <ls.h>
 #include <utime.h>
@@ -80,11 +98,6 @@ extern ssize_t		_write(int, const void*, size_t);
 #define sysaccess		_access
 #else
 #define sysaccess		access
-#endif
-#if _win32_botch_alarm
-#define sysalarm		_alarm
-#else
-#define sysalarm		alarm
 #endif
 #if _win32_botch_chmod
 #define syschmod		_chmod
@@ -161,17 +174,17 @@ extern ssize_t		_write(int, const void*, size_t);
 #endif
 
 static char*
-suffix(register const char* path)
+suffix(const char* path)
 {
-	register const char*	s = path + strlen(path);
-	register int		c;
+	const char*	s = path + strlen(path);
+	int		c;
 
 	while (s > path)
 		if ((c = *--s) == '.')
 			return (char*)s + 1;
 		else if (c == '/' || c == '\\')
 			break;
-	return 0;
+	return NULL;
 }
 
 static int
@@ -269,28 +282,6 @@ access(const char* path, int op)
 
 #endif
 
-#if _win32_botch_alarm
-
-extern unsigned int
-alarm(unsigned int s)
-{
-	unsigned int		n;
-	unsigned int		r;
-
-	static unsigned int	a;
-
-	n = (unsigned int)time(NiL);
-	if (a <= n)
-		r = 0;
-	else
-		r = a - n;
-	a = n + s - 1;
-	(void)sysalarm(s);
-	return r;
-}
-
-#endif
-
 #if _win32_botch_chmod
 
 extern int
@@ -311,7 +302,7 @@ chmod(const char* path, mode_t mode)
 	    (strlen(path) + 4) < sizeof(buf))
 	{
 		oerrno = errno;
-		if (!magic(path, NiL))
+		if (!magic(path, NULL))
 		{
 			snprintf(buf, sizeof(buf), "%s.exe", path);
 			sysrename(path, buf);
@@ -362,11 +353,11 @@ static int		convertinit;
 static const char*	convertvars[] = { "DOSPATHVARS", "PATH" };
 
 static int
-convert(register const char* d, const char* s)
+convert(const char* d, const char* s)
 {
-	register const char*	t;
-	register const char*	v;
-	int			i;
+	const char*	t;
+	const char*	v;
+	int		i;
 
 	for (i = 0; i < elementsof(convertvars); i++)
 	{
@@ -392,12 +383,12 @@ convert(register const char* d, const char* s)
 uid_t
 getuid(void)
 {
-	register char*		d;
-	register char*		s;
-	register char*		t;
-	register char**		e;
-	int			n;
-	int			m;
+	char*		d;
+	char*		s;
+	char*		t;
+	char**		e;
+	int		n;
+	int		m;
 
 	if (!convertinit++ && (d = getenv(convertvars[0])))
 		for (e = environ; s = *e; e++)
@@ -423,9 +414,9 @@ getuid(void)
 static pid_t
 runve(int mode, const char* path, char* const* argv, char* const* envv)
 {
-	register char*	s;
-	register char**	p;
-	register char**	v;
+	char*	s;
+	char**	p;
+	char**	v;
 
 	void*		m1;
 	void*		m2;
@@ -536,7 +527,7 @@ runve(int mode, const char* path, char* const* argv, char* const* envv)
 				s += 5;
 				do
 				{
-					s = pathcat(s, ':', NiL, "", tmp, sizeof(tmp));
+					s = pathcat(s, ':', NULL, "", tmp, sizeof(tmp));
 					if (streq(tmp, "/usr/bin/") || streq(tmp, "/bin/"))
 					{
 						n = 0;
@@ -724,7 +715,7 @@ extern ssize_t
 write(int fd, const void* buf, size_t n)
 {
 	if (fd >= 0 && fd < elementsof(exe) && exe[fd] && exe[fd]->test < 0)
-		exe[fd]->test = n >= 2 && ((unsigned char*)buf)[1] == 0x5a && (((unsigned char*)buf)[0] == 0x4c || ((unsigned char*)buf)[0] == 0x4d) && !lseek(fd, (off_t)0, SEEK_CUR);
+		exe[fd]->test = n >= 2 && ((unsigned char*)buf)[1] == 0x5a && (((unsigned char*)buf)[0] == 0x4c || ((unsigned char*)buf)[0] == 0x4d) && !lseek(fd, 0, SEEK_CUR);
 	return syswrite(fd, buf, n);
 }
 
@@ -922,7 +913,7 @@ unlink(const char* path)
 	 * otherwise directory readers may choke on phantom entries
 	 */
 
-	base = ((getuid() & 0xffff) << 16) | (time(NiL) & 0xffff);
+	base = ((getuid() & 0xffff) << 16) | (time(NULL) & 0xffff);
 	suffix = (getpid() & 0xfff) + count++;
 	snprintf(tmp, sizeof(tmp), deleted, drive, base, suffix);
 	if (!sysrename(path, tmp))
@@ -1081,7 +1072,7 @@ utime(const char* path, const struct utimbuf* ut)
  * own BSD-like macros
  */
 
-#if !_lib_bzero
+#if !_lib_bzero && !defined(bzero)
 
 void
 bzero(void* b, size_t n)
@@ -1109,7 +1100,7 @@ bzero(void* b, size_t n)
 #endif
 
 int
-getpagesize()
+getpagesize(void)
 {
 	return _AST_PAGESIZE;
 }
@@ -1121,6 +1112,10 @@ getpagesize()
  * Removal of this will break IEEE floating point on the SVR4 platforms.
  */
 #if _need_ast_pow_funs
+# ifndef OMITTED
+#  define OMITTED	1
+# endif
+
 # if _lib_powf
 float (*volatile _ast_ppowf)(float,float) = &powf;
 float _ast_powf(float x, float y)

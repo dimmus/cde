@@ -1,57 +1,5 @@
 # SHOPT_* option probe
-
-tst	note{ SHOPT_* option probe }end cross{
-	: check for shell magic #!
-	cat > "$EXECROOT/file$$" <<!
-	#! /usr/bin/env true
-	exit 1
-	!
-	chmod 755 "$EXECROOT/file$$"
-	if	"$EXECROOT/file$$" 2>/dev/null
-	then	echo "#define SHELLMAGIC	1"
-	fi
-	rm -f "$EXECROOT/file$$"
-	
-	option() # name value
-	{
-		case $2 in
-		0)	echo "#ifndef SHOPT_$1"
-			echo "#   define SHOPT_$1	1"
-			echo "#endif"
-			;;
-		*)	echo "#undef  SHOPT_$1"
-			;;
-		esac
-	}
-	
-	# if /dev/fd/n exposes file descriptor n, make SHOPT_DEVFD use this for
-	# process substitutions instead of FIFOs, which are not as secure
-	ls /dev/fd/9 9<&0 >/dev/null 2>&1
-	option DEVFD $?
-
-	# test for multibyte support
-	case  `echo a | tr a '\012' | wc -l` in
-	*1*)	option MULTIBYTE 0 ;;
-	esac
-
-	# if external 'test' supports lowercase -l as equivalent to -L, enable
-	# SHOPT_TEST_L so ksh supports it for compatibility with local scripts
-	ln -s /dev/null "$EXECROOT/link$$"
-	env test -l "$EXECROOT/link$$" 2>/dev/null && env test ! -l . 2>/dev/null
-	[ $? = 0 ] && option TEST_L 0
-	rm -f "$EXECROOT/link$$"
-
-	# if one of these exists, make SHOPT_SYSRC load /etc/ksh.kshrc by default
-	if	test -f /etc/ksh.kshrc || test -f /etc/bash.bashrc
-	then	option SYSRC 0
-	fi
-}end
-
-cat{
-	#if !_PACKAGE_ast && ( (MB_LEN_MAX-1)<=0 || !defined(_lib_mbtowc) )
-	#   undef SHOPT_MULTIBYTE
-	#endif
-}end
+# More (shell script-based) probes are in src/cmd/ksh93/Mamfile
 
 tst	note{ can we probe file system case insensitivity }end output{
 	#include <ast.h>
@@ -68,38 +16,5 @@ tst	note{ can we probe file system case insensitivity }end output{
 	}
 }end
 
-tst	note{ determining size of PID variables }end output{
-	#include <ast.h>
-	#include <sfio.h>
-	int main(void)
-	{
-		const int s = sizeof(pid_t);
-		char *a;
-		Sfio_t *b;
-		/*
-		 * For $$, $PPID, ${.sh.pid} and ${.sh.ppid} to work correctly, the size
-		 * of pid_t must be one of the integer sizes supported by nv_getval().
-		 * If there is ever a system where this test returns 1, then both this
-		 * test and nv_getval() must learn a new integer size attribute.
-		 */
-		if(s==sizeof(int16_t))		/* union Value: sp */
-			a="NV_INTEGER|NV_SHORT";
-		else if(s==sizeof(int32_t))	/* union Value: lp */
-			a="NV_INTEGER";
-		else if(s==sizeof(Sflong_t))	/* union Value: llp */
-			a="NV_INTEGER|NV_LONG";
-		else
-			return 1;
-		/* write NV_PID attribute definition */
-		sfprintf(sfstdout,"#define NV_PID\t(%s)\t/* integer attribute(s) corresponding to sizeof(pid_t)==%d */\n",a,s);
-		/* show nice test result output on FD 9 */
-		b = sfstropen();
-		sfprintf(b," %s (%d bytes) ... ",a,s);
-		a = sfstruse(b);
-		write(9,a,strlen(a));
-		return 0;
-	}
-}end fail{
-	echo "$0: cannot determine size of PID variables" >&2
-	exit 1
-}end
+# for SHOPT_ACCT:
+sys	acct

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -27,7 +28,6 @@
 
 #include	"shopt.h"
 #include	"defs.h"
-#include	<stak.h>
 #include	<error.h>
 #include	"variables.h"
 #include	"path.h"
@@ -39,22 +39,44 @@
 /*
  * Invalidate path name bindings to relative paths
  */
-static void rehash(register Namval_t *np,void *data)
+static void rehash(Namval_t *np,void *data)
 {
-	Pathcomp_t *pp = (Pathcomp_t*)np->nvalue.cp;
+	Pathcomp_t *pp = np->nvalue;
 	if(pp && *pp->name!='/')
 		nv_rehash(np,data);
 }
 
+#if _lib_openat
+/*
+ * Obtain a file handle to the directory "path" relative to directory "dir"
+ */
+int sh_diropenat(int dir, const char *path)
+{
+	int fd,shfd;
+	if((fd = openat(dir, path, O_DIRECTORY|O_NONBLOCK|O_cloexec)) < 0)
+#if O_SEARCH
+		if(errno != EACCES || (fd = openat(dir, path, O_SEARCH|O_DIRECTORY|O_NONBLOCK|O_cloexec)) < 0)
+#endif
+			return fd;
+	/* Move fd to a number > 10 and register the fd number with the shell */
+	shfd = sh_fcntl(fd, F_dupfd_cloexec, 10);
+	close(fd);
+	return shfd;
+}
+#endif /* _lib_openat */
+
 int	b_cd(int argc, char *argv[],Shbltin_t *context)
 {
-	register char *dir;
+	char *dir;
 	Pathcomp_t *cdpath = 0;
-	register const char *dp;
+	const char *dp;
 	int saverrno=0;
 	int rval,pflag=0,eflag=0,ret=1;
-	char *oldpwd;
+	char *oldpwd, *cp;
 	Namval_t *opwdnod, *pwdnod;
+#if _lib_openat
+	int newdirfd;
+#endif /* _lib_openat */
 	NOT_USED(context);
 	while((rval = optget(argv,sh_optcd))) switch(rval)
 	{
@@ -75,8 +97,9 @@ int	b_cd(int argc, char *argv[],Shbltin_t *context)
 		case '?':
 			if(sh_isoption(SH_RESTRICTED))
 				break;
-			errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	if(pflag && eflag)
 		ret = 2;  /* exit status is 2 if -eP are both on and chdir failed */
@@ -91,7 +114,7 @@ int	b_cd(int argc, char *argv[],Shbltin_t *context)
 	dir =  argv[0];
 	if(error_info.errors>0 || argc>2)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	oldpwd = path_pwd();
@@ -106,7 +129,7 @@ int	b_cd(int argc, char *argv[],Shbltin_t *context)
 	if(argc==2)
 		dir = sh_substitute(oldpwd,dir,argv[1]);
 	else if(!dir)
-		dir = nv_getval(HOME);
+		dir = nv_getval(sh_scoped(HOME));
 	else if(*dir == '-' && dir[1]==0)
 		dir = nv_getval(opwdnod);
 	if(!dir || *dir==0)
@@ -118,13 +141,13 @@ int	b_cd(int argc, char *argv[],Shbltin_t *context)
 	 * If sh_subshell() in subshell.c cannot use fchdir(2) to restore the PWD using a saved file descriptor,
 	 * we must fork any virtual subshell now to avoid the possibility of ending up in the wrong PWD on exit.
 	 */
-	if(sh.subshell && !sh.subshare)
-	{
-#if _lib_fchdir
-		if(!test_inode(sh.pwd,e_dot))
-#endif
-			sh_subfork();
-	}
+#if _lib_openat
+	if(sh.subshell && !sh.subshare && (!sh_validate_subpwdfd() || !test_inode(sh.pwd,e_dot)))
+		sh_subfork();
+#else
+	if(sh.subshell && !sh.subshare && !test_inode(sh.pwd,e_dot))
+		sh_subfork();
+#endif /* _lib_openat */
 	/*
 	 * Do $CDPATH processing, except if the path is absolute or the first component is '.' or '..'
 	 */
@@ -135,16 +158,15 @@ int	b_cd(int argc, char *argv[],Shbltin_t *context)
 	&& !(dir[0]=='.' && (dir[1]=='/' || dir[1]==0))
 	&& !(dir[0]=='.' && dir[1]=='.' && (dir[2]=='/' || dir[2]==0)))
 	{
-		if((dp=sh_scoped(CDPNOD)->nvalue.cp) && !(cdpath = (Pathcomp_t*)sh.cdpathlist))
+		if((dp=sh_scoped(CDPNOD)->nvalue) && !(cdpath = (Pathcomp_t*)sh.cdpathlist))
 		{
-			if(cdpath=path_addpath((Pathcomp_t*)0,dp,PATH_CDPATH))
-				sh.cdpathlist = (void*)cdpath;
+			if(cdpath=path_addpath(NULL,dp,PATH_CDPATH))
+				sh.cdpathlist = cdpath;
 		}
 	}
 	if(*dir!='/')
 	{
 		/* check for leading .. */
-		char *cp;
 		sfprintf(sh.strbuf,"%s",dir);
 		cp = sfstruse(sh.strbuf);
 		pathcanon(cp, 0);
@@ -163,45 +185,83 @@ int	b_cd(int argc, char *argv[],Shbltin_t *context)
 		dp = cdpath?cdpath->name:"";
 		cdpath = path_nextcomp(cdpath,dir,0);
 #if _WINIX
-		if(*stakptr(PATH_OFFSET+1)==':' && isalpha(*stakptr(PATH_OFFSET)))
+		if(*stkptr(sh.stk,PATH_OFFSET+1)==':' && isalpha(*stkptr(sh.stk,PATH_OFFSET)))
 		{
-			*stakptr(PATH_OFFSET+1) = *stakptr(PATH_OFFSET);
-			*stakptr(PATH_OFFSET)='/';
+			*stkptr(sh.stk,PATH_OFFSET+1) = *stkptr(sh.stk,PATH_OFFSET);
+			*stkptr(sh.stk,PATH_OFFSET)='/';
 		}
 #endif /* _WINIX */
-		if(*stakptr(PATH_OFFSET)!='/')
+		if(*stkptr(sh.stk,PATH_OFFSET)!='/')
 		{
-			char *last=(char*)stakfreeze(1);
-			stakseek(PATH_OFFSET);
-			stakputs(oldpwd);
-			/* don't add '/' of oldpwd is / itself */
+			char *last = stkfreeze(sh.stk,1);
+			stkseek(sh.stk,PATH_OFFSET);
+			sfputr(sh.stk,oldpwd,-1);
+			/* don't add '/' if oldpwd is / itself */
 			if(*oldpwd!='/' || oldpwd[1])
-				stakputc('/');
-			stakputs(last+PATH_OFFSET);
-			stakputc(0);
+				sfputc(sh.stk,'/');
+			sfputr(sh.stk,last+PATH_OFFSET,0);
 		}
 		if(!pflag)
 		{
-			register char *cp;
-			stakseek(PATH_MAX+PATH_OFFSET);
-			if(*(cp=stakptr(PATH_OFFSET))=='/')
+			stkseek(sh.stk,PATH_MAX+PATH_OFFSET);
+			if(*(cp=stkptr(sh.stk,PATH_OFFSET))=='/')
 				if(!pathcanon(cp,PATH_DOTDOT))
 					continue;
 		}
-		if((rval=chdir(path_relative(stakptr(PATH_OFFSET)))) >= 0)
+#if _lib_openat
+		cp = path_relative(stkptr(sh.stk,PATH_OFFSET));
+		rval = newdirfd = sh_diropenat((sh.pwdfd>0)?sh.pwdfd:AT_FDCWD,cp);
+		if(newdirfd>0)
+		{
+			/* chdir for directories on HSM/tapeworms may take minutes */
+			if((rval=fchdir(newdirfd)) >= 0)
+			{
+				sh_pwdupdate(newdirfd);
+				goto success;
+			}
+			sh_close(newdirfd);
+		}
+#if !O_SEARCH
+		else if((rval=chdir(cp)) >= 0)
+			sh_pwdupdate(sh_diropenat(AT_FDCWD,cp));
+#endif
+		if(saverrno==0)
+			saverrno=errno;
+#else
+		if((rval=chdir(path_relative(stkptr(sh.stk,PATH_OFFSET)))) >= 0)
 			goto success;
 		if(errno!=ENOENT && saverrno==0)
 			saverrno=errno;
+#endif /* _lib_openat */
 	}
 	while(cdpath);
-	if(rval<0 && *dir=='/' && *(path_relative(stakptr(PATH_OFFSET)))!='/')
+	if(rval<0 && *dir=='/' && *(path_relative(stkptr(sh.stk,PATH_OFFSET)))!='/')
+	{
+#if _lib_openat
+		rval = newdirfd = sh_diropenat((sh.pwdfd>0)?sh.pwdfd:AT_FDCWD,dir);
+		if(newdirfd>0)
+		{
+			/* chdir for directories on HSM/tapeworms may take minutes */
+			if((rval=fchdir(newdirfd)) >= 0)
+			{
+				sh_pwdupdate(newdirfd);
+				goto success;
+			}
+			sh_close(newdirfd);
+		}
+#if !O_SEARCH
+		else if((rval=chdir(dir)) >= 0)
+			sh_pwdupdate(sh_diropenat(AT_FDCWD,dir));
+#endif
+#else
 		rval = chdir(dir);
-	/* use absolute chdir() if relative chdir() fails */
+#endif /* _lib_openat */
+	}
 	if(rval<0)
 	{
 		if(saverrno)
 			errno = saverrno;
-		errormsg(SH_DICT,ERROR_system(ret),"%s:",dir);
+		errormsg(SH_DICT,ERROR_exit(ret),"%s: %s",dir,strerror(errno));
 		UNREACHABLE();
 	}
 success:
@@ -209,20 +269,20 @@ success:
 		dp = dir;	/* print out directory for cd - */
 	if(pflag)
 	{
-		dir = stakptr(PATH_OFFSET);
+		dir = stkptr(sh.stk,PATH_OFFSET);
 		if (!(dir=pathcanon(dir,PATH_PHYSICAL)))
 		{
-			dir = stakptr(PATH_OFFSET);
-			errormsg(SH_DICT,ERROR_system(ret),"%s:",dir);
+			dir = stkptr(sh.stk,PATH_OFFSET);
+			errormsg(SH_DICT,ERROR_exit(ret),"%s: %s",dir,strerror(errno));
 			UNREACHABLE();
 		}
-		stakseek(dir-stakptr(0));
+		stkseek(sh.stk,dir-stkptr(sh.stk,0));
 	}
-	dir = (char*)stakfreeze(1)+PATH_OFFSET;
+	dir = (char*)stkfreeze(sh.stk,1) + PATH_OFFSET;
 	if(*dp && (*dp!='.'||dp[1]) && strchr(dir,'/'))
 		sfputr(sfstdout,dir,'\n');
 	nv_putval(opwdnod,oldpwd,NV_RDONLY);
-	free((void*)sh.pwd);
+	free(sh.pwd);
 	if(*dir == '/')
 	{
 		size_t len = strlen(dir);
@@ -237,7 +297,7 @@ success:
 	{
 		/* pathcanon() failed to canonicalize the directory, which happens when 'cd' is invoked from a
 		   nonexistent PWD with a relative path as the argument. Reinitialize $PWD as it will be wrong. */
-		sh.pwd = NIL(const char*);
+		sh.pwd = NULL;
 		path_pwd();
 		if(*sh.pwd != '/')
 		{
@@ -245,21 +305,21 @@ success:
 			UNREACHABLE();
 		}
 	}
-	nv_scan(sh_subtracktree(1),rehash,(void*)0,NV_TAGGED,NV_TAGGED);
+	nv_scan(sh_subtracktree(1),rehash,NULL,NV_TAGGED,NV_TAGGED);
 	path_newdir(sh.pathlist);
 	path_newdir(sh.cdpathlist);
 	if(pflag && eflag)
 	{
 		/* Verify the current working directory matches $PWD */
-		return(!test_inode(e_dot,nv_getval(pwdnod)));
+		return !test_inode(e_dot,nv_getval(pwdnod));
 	}
-	return(0);
+	return 0;
 }
 
 int	b_pwd(int argc, char *argv[],Shbltin_t *context)
 {
-	register int n, flag = 0;
-	register char *cp;
+	int n, flag = 0;
+	char *cp;
 	NOT_USED(argc);
 	NOT_USED(context);
 	while((n = optget(argv,sh_optpwd))) switch(n)
@@ -274,12 +334,13 @@ int	b_pwd(int argc, char *argv[],Shbltin_t *context)
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	if(error_info.errors)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	if(*(cp = path_pwd()) != '/' || !test_inode(cp,e_dot))
@@ -289,9 +350,9 @@ int	b_pwd(int argc, char *argv[],Shbltin_t *context)
 	}
 	if(flag)
 	{
-		cp = strcpy(stakseek(strlen(cp)+PATH_MAX),cp);
+		cp = strcpy(stkseek(sh.stk,strlen(cp)+PATH_MAX),cp);
 		pathcanon(cp,PATH_PHYSICAL);
 	}
 	sfputr(sfstdout,cp,'\n');
-	return(0);
+	return 0;
 }

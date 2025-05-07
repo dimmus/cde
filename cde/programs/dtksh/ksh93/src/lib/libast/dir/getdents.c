@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -52,9 +52,9 @@ getdents(int fd, void* buf, size_t siz)
 	if (siz < DIRBLKSIZ)
 	{
 		errno = EINVAL;
-		return(-1);
+		return -1;
 	}
-	if (fstat(fd, &st)) return(-1);
+	if (fstat(fd, &st)) return -1;
 	if (!S_ISDIR(st.st_mode))
 	{
 #ifdef ENOTDIR
@@ -62,27 +62,27 @@ getdents(int fd, void* buf, size_t siz)
 #else
 		errno = EBADF;
 #endif
-		return(-1);
+		return -1;
 	}
 #if _lib_getdirentries
 	{
 		long		off;
-		return(getdirentries(fd, buf, siz, &off));
+		return getdirentries(fd, buf, siz, &off);
 	}
 #else
 #if _lib_dirread
 	{
-		register char*		sp;	/* system */
-		register struct dirent*	up;	/* user */
-		char*			u;
-		int			n;
-		int			m;
-		int			i;
+		char*		sp;	/* system */
+		struct dirent*	up;	/* user */
+		char*		u;
+		int		n;
+		int		m;
+		int		i;
 
 		m = (siz * 6) / 10;
 		m = roundof(m, 8);
 		sp = (char*)buf + siz - m - 1;
-		if (!(n = dirread(fd, sp, m))) return(0);
+		if (!(n = dirread(fd, sp, m))) return 0;
 		if (n > 0)
 		{
 			up = (struct dirent*)buf;
@@ -104,24 +104,24 @@ getdents(int fd, void* buf, size_t siz)
 					up = (struct dirent*)((char*)up + up->d_reclen);
 				}
 			}
-			return((char*)up - (char*)buf);
+			return (char*)up - (char*)buf;
 		}
 	}
 #else
 #if _mem_d_reclen_direct
-	return(read(fd, buf, siz));
+	return read(fd, buf, siz);
 #else
 	{
 
 #define MAXREC	roundof(sizeof(*up)-sizeof(up->d_name)+sizeof(sp->d_name)+1,8)
 
-		register struct direct*	sp;	/* system */
-		register struct dirent*	up;	/* user */
-		register char*		s;
-		register char*		u;
-		int			n;
-		int			m;
-		char			tmp[sizeof(sp->d_name) + 1];
+		struct direct*	sp;	/* system */
+		struct dirent*	up;	/* user */
+		char*		s;
+		char*		u;
+		int		n;
+		int		m;
+		char		tmp[sizeof(sp->d_name) + 1];
 
 		/*
 		 * we assume sizeof(struct dirent) > sizeof(struct direct)
@@ -152,7 +152,7 @@ getdents(int fd, void* buf, size_t siz)
 				sp++;
 			}
 		} while (up == (struct dirent*)buf);
-		return((char*)up - (char*)buf);
+		return (char*)up - (char*)buf;
 	}
 #endif
 #endif

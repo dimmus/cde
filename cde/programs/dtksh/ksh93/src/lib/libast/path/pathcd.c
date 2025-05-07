@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -59,11 +59,11 @@ vchdir(const char* path)
 int
 pathcd(const char* path, const char* home)
 {
-	register char*	p = (char*)path;
-	register char*	s;
-	register int	n;
-	int		i;
-	int		r;
+	char*	p = (char*)path;
+	char*	s;
+	int	n;
+	int	i;
+	int	r;
 
 	r = 0;
 	for (;;)

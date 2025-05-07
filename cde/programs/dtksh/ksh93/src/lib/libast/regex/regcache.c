@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -57,7 +58,7 @@ static State_t	matchstate;
 static void
 flushcache(void)
 {
-	register int		i;
+	int		i;
 
 	for (i = matchstate.size; i--;)
 		if (matchstate.cache[i] && matchstate.cache[i]->keep)
@@ -74,13 +75,13 @@ flushcache(void)
 regex_t*
 regcache(const char* pattern, regflags_t reflags, int* status)
 {
-	register Cache_t*	cp;
-	register int		i;
-	char*			s;
-	int			empty;
-	int			unused;
-	int			old;
-	Key_t			key;
+	Cache_t*	cp;
+	int		i;
+	char*		s;
+	int		empty;
+	int		unused;
+	int		old;
+	Key_t		key;
 
 	/*
 	 * 0 pattern flushes the cache and reflags>0 extends cache
@@ -102,12 +103,12 @@ regcache(const char* pattern, regflags_t reflags, int* status)
 		}
 		if (status)
 			*status = i;
-		return 0;
+		return NULL;
 	}
 	if (!matchstate.cache)
 	{
 		if (!(matchstate.cache = newof(0, Cache_t*, CACHE, 0)))
-			return 0;
+			return NULL;
 		matchstate.size = CACHE;
 	}
 
@@ -117,7 +118,7 @@ regcache(const char* pattern, regflags_t reflags, int* status)
 	 * persistent setlocale() return values
 	 */
 
-	if ((s = setlocale(LC_CTYPE, NiL)) != matchstate.locale)
+	if ((s = setlocale(LC_CTYPE, NULL)) != matchstate.locale)
 	{
 		matchstate.locale = s;
 		flushcache();
@@ -155,7 +156,7 @@ regcache(const char* pattern, regflags_t reflags, int* status)
 		{
 			if (status)
 				*status = REG_ESPACE;
-			return 0;
+			return NULL;
 		}
 		if (cp->keep)
 		{
@@ -169,7 +170,7 @@ regcache(const char* pattern, regflags_t reflags, int* status)
 			{
 				if (status)
 					*status = REG_ESPACE;
-				return 0;
+				return NULL;
 			}
 		}
 		strcpy(cp->pattern, pattern);
@@ -180,7 +181,7 @@ regcache(const char* pattern, regflags_t reflags, int* status)
 		{
 			if (status)
 				*status = i;
-			return 0;
+			return NULL;
 		}
 		cp->keep = 1;
 		cp->reflags = reflags;

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -24,12 +25,12 @@
  */
 
 #include	"shopt.h"
-#include	<ast.h>	
-#include	<sfio.h>	
-#include	<error.h>	
-#include	<ctype.h>	
-#include	<ls.h>	
-#include	<shell.h>	
+#include	<ast.h>
+#include	<sfio.h>
+#include	<error.h>
+#include	<ctype.h>
+#include	<ls.h>
+#include	<shell.h>
 #include	"builtins.h"
 #ifndef SH_DICT
 #   define SH_DICT	"libshell"
@@ -37,8 +38,8 @@
 
 int	b_umask(int argc,char *argv[],Shbltin_t *context)
 {
-	register char *mask;
-	register int flag = 0, sflag = 0;
+	char *mask;
+	int flag = 0, sflag = 0;
 	NOT_USED(context);
 	while((argc = optget(argv,sh_optumask))) switch(argc)
 	{
@@ -49,24 +50,25 @@ int	b_umask(int argc,char *argv[],Shbltin_t *context)
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(2), "%s",opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	if(error_info.errors)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	argv += opt_info.index;
 	if(mask = *argv)
 	{
-		register int c;	
+		int c;
 		if(isdigit(*mask))
 		{
 			while(c = *mask++)
 			{
-				if (c>='0' && c<='7')	
-					flag = (flag<<3) + (c-'0');	
+				if (c>='0' && c<='7')
+					flag = (flag<<3) + (c-'0');
 				else
 				{
 					errormsg(SH_DICT,ERROR_exit(1),e_number,*argv);
@@ -87,8 +89,8 @@ int	b_umask(int argc,char *argv[],Shbltin_t *context)
 			}
 			flag = (~c&0777);
 		}
-		umask(flag);	
-	}	
+		umask(flag);
+	}
 	else
 	{
 		umask(flag=umask(0));
@@ -97,5 +99,5 @@ int	b_umask(int argc,char *argv[],Shbltin_t *context)
 		else
 			sfprintf(sfstdout,"%0#4o\n",flag);
 	}
-	return(0);
+	return 0;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,9 +28,9 @@ NoN(fgetws)
 wchar_t*
 fgetws(wchar_t* s, int n, Sfio_t* f)
 {
-	register wchar_t*	p = s;
-	register wchar_t*	e = s + n - 1;
-	register wint_t		c;
+	wchar_t*	p = s;
+	wchar_t*	e = s + n - 1;
+	wint_t		c;
 
 	FWIDE(f, 0);
 	while (p < e && (c = fgetwc(f)) != WEOF && (*p++ = c) != '\n');
@@ -41,9 +41,9 @@ fgetws(wchar_t* s, int n, Sfio_t* f)
 wchar_t*
 getws(wchar_t* s)
 {
-	register wchar_t*	p = s;
-	register wchar_t*	e = s + BUFSIZ - 1;
-	register wint_t		c;
+	wchar_t*	p = s;
+	wchar_t*	e = s + BUFSIZ - 1;
+	wint_t		c;
 
 	FWIDE(sfstdin, 0);
 	while (p < e && (c = fgetwc(sfstdin)) != WEOF && (*p++ = c) != '\n');

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -21,7 +22,7 @@
  * POSIX regex error message handler
  */
 
-static const char id[] = "\n@(#)$Id: regex (AT&T Research) 2012-09-27 $\0\n";
+static const char id[] = "\n@(#)$Id: regex (ksh 93u+m) 2025-04-10 $\0\n";
 
 #include "reglib.h"
 
@@ -83,9 +84,9 @@ fatal(regdisc_t* disc, int code, const char* pattern)
 	if (disc->re_errorf)
 	{
 		if (pattern)
-			(*disc->re_errorf)(NiL, disc, disc->re_errorlevel, "regular expression: %s: %s", pattern, reg_error[code+1]);
+			(*disc->re_errorf)(NULL, disc, disc->re_errorlevel, "regular expression: %s: %s", pattern, reg_error[code+1]);
 		else
-			(*disc->re_errorf)(NiL, disc, disc->re_errorlevel, "regular expression: %s", reg_error[code+1]);
+			(*disc->re_errorf)(NULL, disc, disc->re_errorlevel, "regular expression: %s", reg_error[code+1]);
 	}
 	return code;
 }

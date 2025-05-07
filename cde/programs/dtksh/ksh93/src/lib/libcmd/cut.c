@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -24,7 +24,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: cut (ksh 93u_m) 2022-08-20 $\n]"
+"[-?\n@(#)$Id: cut (ksh 93u+m) 2022-08-30 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?cut - cut out selected columns or fields of each line of a file]"
 "[+DESCRIPTION?\bcut\b bytes, characters, or character-delimited fields "
@@ -42,8 +42,8 @@ static const char usage[] =
 	"output is that of the input.]"
 "[+?One and only one of \b-b\b, \b-c\b, or \b-f\b must be specified.]"
 "[+?If no \afile\a is given, or if the \afile\a is \b-\b, \bcut\b "
-        "cuts from standard input.   The start of the file is defined "
-        "as the current offset.]"
+	"cuts from standard input.   The start of the file is defined "
+	"as the current offset.]"
 "[b:bytes]:[list?\bcut\b based on a list of byte counts.]"
 "[c:characters]:[list?\bcut\b based on a list of character counts.]"
 "[d:delimiter]:[delim?The field character for the \b-f\b option is set "
@@ -115,7 +115,7 @@ typedef struct Cut_s
  */
 
 static int
-mycomp(register const void* a, register const void* b)
+mycomp(const void* a, const void* b)
 {
 	if (*((int*)a) < *((int*)b))
 		return -1;
@@ -127,14 +127,14 @@ mycomp(register const void* a, register const void* b)
 static Cut_t*
 cutinit(int mode, char* str, Delim_t* wdelim, Delim_t* ldelim, size_t reclen)
 {
-	register int*	lp;
-	register int	c;
-	register int	n = 0;
-	register int	range = 0;
-	register char*	cp = str;
-	Cut_t*		cut;
+	int*	lp;
+	int	c;
+	int	n = 0;
+	int	range = 0;
+	char*	cp = str;
+	Cut_t*	cut;
 
-	if (!(cut = (Cut_t*)stakalloc(sizeof(Cut_t) + strlen(cp) * sizeof(int))))
+	if (!(cut = stkalloc(stkstd, sizeof(Cut_t) + strlen(cp) * sizeof(int))))
 	{
 		error(ERROR_SYSTEM|ERROR_PANIC, "out of memory");
 		UNREACHABLE();
@@ -186,7 +186,7 @@ cutinit(int mode, char* str, Delim_t* wdelim, Delim_t* ldelim, size_t reclen)
 			}
 			if(c==0)
 			{
-				register int *dp;
+				int *dp;
 				*lp = HUGE;
 				n = 1 + (lp-cut->list)/2;
 				qsort(lp=cut->list,n,2*sizeof(*lp),mycomp);
@@ -260,14 +260,14 @@ cutinit(int mode, char* str, Delim_t* wdelim, Delim_t* ldelim, size_t reclen)
 static void
 cutcols(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 {
-	register int		c;
-	register int		len;
-	register int		ncol = 0;
-	register const int*	lp = cut->list;
-	register char*		bp;
-	register int		skip; /* non-zero for don't copy */
-	int			must;
-	const char*		xx;
+	int		c;
+	int		len;
+	int		ncol = 0;
+	const int*	lp = cut->list;
+	char*		bp;
+	int		skip; /* non-zero for don't copy */
+	int		must;
+	const char*	xx;
 
 	for (;;)
 	{
@@ -275,7 +275,7 @@ cutcols(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 			bp = sfreserve(fdin, len, -1);
 		else
 			bp = sfgetr(fdin, '\n', 0);
-		if (!bp && !(bp = sfgetr(fdin, 0, SF_LASTR)))
+		if (!bp && !(bp = sfgetr(fdin, 0, SFIO_LASTR)))
 			break;
 		len = sfvalue(fdin);
 		xx = 0;
@@ -286,9 +286,9 @@ cutcols(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 		{
 			if (cut->nosplit)
 			{
-				register const char*	s = bp;
-				register int		w = len < ncol ? len : ncol;
-				register int		z;
+				const char*	s = bp;
+				int		w = len < ncol ? len : ncol;
+				int		z;
 
 				while (w > 0)
 				{
@@ -317,9 +317,9 @@ cutcols(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 			}
 			else if (cut->cflag)
 			{
-				register const char*	s = bp;
-				register int		w = len;
-				register int		z;
+				const char*	s = bp;
+				int		w = len;
+				int		z;
 
 				while (w > 0 && ncol > 0)
 				{
@@ -328,7 +328,7 @@ cutcols(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 						z = 1;
 					s += z;
 					w -= z;
-					
+
 				}
 				c = s - bp;
 				ncol = !w && (ncol || !skip);
@@ -372,22 +372,22 @@ cutcols(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 static void
 cutfields(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 {
-	register unsigned char *sp = cut->space;
-	register unsigned char *cp;
-	register unsigned char *wp;
-	register int c, nfields;
-	register const int *lp = cut->list;
-	register unsigned char *copy;
-	register int nodelim, empty, inword=0;
-	register unsigned char *ep;
-	unsigned char *bp, *first;
+	unsigned char *sp = cut->space;
+	unsigned char *cp;
+	unsigned char *wp;
+	int c, nfields=0;
+	const int *lp = cut->list;
+	unsigned char *copy;
+	int nodelim=0, empty=0, inword=0;
+	unsigned char *ep;
+	unsigned char *bp, *first=NULL;
 	int lastchar;
 	wchar_t w;
 	Sfio_t *fdtmp = 0;
 	long offset = 0;
 	unsigned char mb[8];
 	/* process each buffer */
-	while ((bp = (unsigned char*)sfreserve(fdin, SF_UNBOUND, -1)) && (c = sfvalue(fdin)) > 0)
+	while ((bp = (unsigned char*)sfreserve(fdin, SFIO_UNBOUND, -1)) && (c = sfvalue(fdin)) > 0)
 	{
 		cp = bp;
 		ep = cp + --c;
@@ -444,7 +444,7 @@ cutfields(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 									}
 									for (i = 0; i <= (ep - cp); i++)
 										mb[i] = cp[i];
-									if (!(bp = (unsigned char*)sfreserve(fdin, SF_UNBOUND, -1)) || (c = sfvalue(fdin)) <= 0)
+									if (!(bp = (unsigned char*)sfreserve(fdin, SFIO_UNBOUND, -1)) || (c = sfvalue(fdin)) <= 0)
 										goto failed;
 									cp = bp;
 									ep = cp + --c;
@@ -519,7 +519,7 @@ cutfields(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 					if (!sp[lastchar])
 						break;
 				}
-				nodelim = 0;	
+				nodelim = 0;
 				if (--nfields > 0)
 					continue;
 				nfields = *++lp;
@@ -544,7 +544,7 @@ cutfields(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 						{
 							if (offset)
 							{
-								sfseek(fdtmp,(Sfoff_t)0,SEEK_SET);
+								sfseek(fdtmp,0,SEEK_SET);
 								sfmove(fdtmp,fdout,offset,-1);
 							}
 							copy = first;
@@ -577,15 +577,15 @@ cutfields(Cut_t* cut, Sfio_t* fdin, Sfio_t* fdout)
 int
 b_cut(int argc, char** argv, Shbltin_t* context)
 {
-	register char*		cp = 0;
-	register Sfio_t*	fp;
-	char*			s;
-	int			n;
-	Cut_t*			cut;
-	int			mode = 0;
-	Delim_t			wdelim;
-	Delim_t			ldelim;
-	size_t			reclen = 0;
+	char*		cp = 0;
+	Sfio_t*		fp;
+	char*		s;
+	int		n;
+	Cut_t*		cut;
+	int		mode = 0;
+	Delim_t		wdelim;
+	Delim_t		ldelim;
+	size_t		reclen = 0;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	wdelim.chr = '\t';
@@ -666,21 +666,22 @@ b_cut(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2), "%s",optusage(NiL));
+		error(ERROR_usage(2), "%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	if(!cp)
 	{
 		error(2, "b, c or f option must be specified");
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if(!*cp)
@@ -694,7 +695,7 @@ b_cut(int argc, char** argv, Shbltin_t* context)
 	{
 		if(!cp || streq(cp,"-"))
 			fp = sfstdin;
-		else if(!(fp = sfopen(NiL,cp,"r")))
+		else if(!(fp = sfopen(NULL,cp,"r")))
 		{
 			error(ERROR_system(0),"%s: cannot open",cp);
 			continue;

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -70,7 +71,14 @@ static int Notdigit(int c) { return !iswdigit(c); }
 static int  Isgraph(int c) { return  iswgraph(c); }
 static int  Islower(int c) { return  iswlower(c); }
 static int  Isprint(int c) { return  iswprint(c); }
-static int  Ispunct(int c) { return  iswpunct(c); }
+static int  Ispunct(int c)
+{
+#if _iswpunct_broken && CC_NATIVE == CC_ASCII
+	if (c < 128)
+		return ispunct(c);
+#endif
+	return iswpunct(c);
+}
 static int  Isspace(int c) { return  iswspace(c); }
 static int Notspace(int c) { return !iswspace(c); }
 static int  Isupper(int c) { return  iswupper(c); }
@@ -171,7 +179,7 @@ static int Is_wc_16(int c) { return iswctype(c, ctype[CTYPES+15].wtype); }
  * return pointer to ctype function for :class:] in s
  * s points to the first char after the initial [
  * dynamic wctype classes are locale-specific
- * dynamic entry locale is punned in Ctype_t.next 
+ * dynamic entry locale is punned in Ctype_t.next
  * the search does a lazy (one entry at a time) flush on locale mismatch
  * if e!=0 it points to next char in s
  * 0 returned on error
@@ -180,24 +188,24 @@ static int Is_wc_16(int c) { return iswctype(c, ctype[CTYPES+15].wtype); }
 regclass_t
 regclass(const char* s, char** e)
 {
-	register Ctype_t*	cp;
-	register int		c;
-	register size_t		n;
-	register const char*	t;
-	Ctype_t*		lc;
-	Ctype_t*		xp;
-	Ctype_t*		zp;
+	Ctype_t*	cp;
+	int		c;
+	size_t		n;
+	const char*	t;
+	Ctype_t*	lc;
+	Ctype_t*	xp;
+	Ctype_t*	zp;
 
 	if (!(c = *s++))
-		return 0;
+		return NULL;
 	for (t = s; *t && (*t != c || *(t + 1) != ']'); t++);
 	if (*t != c || !(n = t - s))
-		return 0;
+		return NULL;
 	for (cp = ctypes; cp; cp = cp->next)
 		if (n == cp->size && strneq(s, cp->name, n))
 			goto found;
 	xp = zp = 0;
-	lc = (Ctype_t*)setlocale(LC_CTYPE, NiL);
+	lc = (Ctype_t*)setlocale(LC_CTYPE, NULL);
 	for (cp = ctype; cp < &ctype[elementsof(ctype)]; cp++)
 	{
 #if _lib_wctype
@@ -216,26 +224,26 @@ regclass(const char* s, char** e)
 	if (!(cp = zp))
 	{
 		if (!(cp = xp))
-			return 0;
+			return NULL;
 		cp->size = 0;
 		if (!streq(cp->name, s))
 		{
-			free((char*)cp->name);
+			free((void*)cp->name);
 			cp->name = 0;
 		}
 	}
 	if (!cp->name)
 	{
 		if (!(cp->name = (const char*)memdup(s, n + 1)))
-			return 0;
+			return NULL;
 		*((char*)cp->name + n) = 0;
 	}
 	/* mvs.390 needs the (char*) cast -- barf */
 	if (!(cp->wtype = wctype((char*)cp->name)))
 	{
-		free((char*)cp->name);
+		free((void*)cp->name);
 		cp->name = 0;
-		return 0;
+		return NULL;
 	}
 	cp->size = n;
 	cp->next = lc;
@@ -253,9 +261,9 @@ regclass(const char* s, char** e)
 int
 regaddclass(const char* name, regclass_t fun)
 {
-	register Ctype_t*	cp;
-	register Ctype_t*	np;
-	register size_t		n;
+	Ctype_t*	cp;
+	Ctype_t*	np;
+	size_t		n;
 
 	n = strlen(name);
 	for (cp = ctypes; cp; cp = cp->next)
@@ -290,5 +298,5 @@ classfun(int type)
 	case T_SPACE:		return  Isspace;
 	case T_SPACE_NOT:	return Notspace;
 	}
-	return 0;
+	return NULL;
 }

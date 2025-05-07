@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1997-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -46,11 +46,11 @@ dllnames(const char* id, const char* name, Dllnames_t* names)
 
 	n = strlen(id);
 	if (strneq(name, id, n) && (streq(name + n, "_s") || streq(name + n, "_t")))
-		return 0;
+		return NULL;
 	if (!names)
 	{
 		s = fmtbuf(sizeof(Dllnames_t*) + sizeof(names) - 1);
-		if (n = (s - (char*)0) % sizeof(names))
+		if (n = (uintptr_t)s % sizeof(names))
 			s += sizeof(names) - n;
 		names = (Dllnames_t*)s;
 	}
@@ -114,7 +114,7 @@ dll_lib(Dllnames_t* names, unsigned long version, Dllerror_f dllerrorf, void* di
 	static Dll_lib_t*	loaded;
 
 	if (!names)
-		return 0;
+		return NULL;
 
 	/*
 	 * check if plugin already loaded
@@ -131,13 +131,13 @@ dll_lib(Dllnames_t* names, unsigned long version, Dllerror_f dllerrorf, void* di
 	 * load
 	 */
 
-	if (!(dll = dllplugin(names->id, names->name, NiL, version, NiL, RTLD_LAZY, names->path, names->data + sizeof(names->data) - names->path)) && (streq(names->name, names->base) || !(dll = dllplugin(names->id, names->base, NiL, version, NiL, RTLD_LAZY, names->path, names->data + sizeof(names->data) - names->path))))
+	if (!(dll = dllplugin(names->id, names->name, NULL, version, NULL, RTLD_LAZY, names->path, names->data + sizeof(names->data) - names->path)) && (streq(names->name, names->base) || !(dll = dllplugin(names->id, names->base, NULL, version, NULL, RTLD_LAZY, names->path, names->data + sizeof(names->data) - names->path))))
 	{
 		if (dllerrorf)
-			(*dllerrorf)(NiL, disc, 2, "%s: library not found", names->name);
+			(*dllerrorf)(NULL, disc, 2, "%s: library not found", names->name);
 		else
-			errorf("dll", NiL, -1, "dll_lib: %s version %lu library not found", names->name, version);
-		return 0;
+			errorf("dll", NULL, -1, "dll_lib: %s version %lu library not found", names->name, version);
+		return NULL;
 	}
 
 	/*
@@ -148,10 +148,10 @@ dll_lib(Dllnames_t* names, unsigned long version, Dllerror_f dllerrorf, void* di
 	if (!(libf = (Dll_lib_f)dlllook(dll, sym)))
 	{
 		if (dllerrorf)
-			(*dllerrorf)(NiL, disc, 2, "%s: %s: initialization function not found in library", names->path, sym);
+			(*dllerrorf)(NULL, disc, 2, "%s: %s: initialization function not found in library", names->path, sym);
 		else
-			errorf("dll", NiL, -1, "dll_lib: %s version %lu initialization function %s not found in library", names->name, version, sym);
-		return 0;
+			errorf("dll", NULL, -1, "dll_lib: %s version %lu initialization function %s not found in library", names->name, version, sym);
+		return NULL;
 	}
 
 	/*
@@ -165,7 +165,7 @@ dll_lib(Dllnames_t* names, unsigned long version, Dllerror_f dllerrorf, void* di
 		strcpy(lib->path = lib->base + n + 1, names->path);
 		lib->next = loaded;
 		loaded = lib;
-		errorf("dll", NiL, -1, "dll_lib: %s version %lu loaded from %s", names->name, version, lib->path);
+		errorf("dll", NULL, -1, "dll_lib: %s version %lu loaded from %s", names->name, version, lib->path);
 	}
  init:
 	return (*libf)(names->path, disc, names->type);

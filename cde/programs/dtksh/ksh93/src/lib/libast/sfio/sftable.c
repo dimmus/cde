@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,8 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*                      Phi <phi.debian@gmail.com>                      *
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
@@ -25,7 +27,7 @@
 */
 
 static char* sffmtint(const char* str, int* v)
-{	
+{
 	for(*v = 0; isdigit(*str); ++str)
 		*v = *v * 10 + (*str - '0');
 	*v -= 1;
@@ -41,15 +43,19 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 	int		v, n, skip, dollar, decimal, thousand;
 	Sffmt_t		savft;
 	Fmtpos_t*	fp;	/* position array of arguments	*/
-	int		argp, argn, maxp, need[FP_INDEX];
+	int		argp, maxp, need[FP_INDEX];
+	int		nargs;	/* the argv[] index of the last seen sequential % format (% or *) */
+	int		xargs;	/* highest (max) argv[] index see in an indexed format (%x$ *x$)  */
+	int		nextarg = 0;
 	SFMBDCL(fmbs)
 
 	if(type < 0)
-		fp = NIL(Fmtpos_t*);
+		fp = NULL;
 	else if(!(fp = sffmtpos(f,form,args,ft,-1)) )
-		return NIL(Fmtpos_t*);
+		return NULL;
 
-	dollar = decimal = thousand = 0; argn = maxp = -1;
+	dollar = decimal = thousand = 0;
+	nargs = xargs = -1;
 	SFMBCLR(&fmbs);
 	while((n = *form) )
 	{	if(n != '%') /* collect the non-pattern chars */
@@ -80,12 +86,13 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 			if(*sp == '$')
 			{	dollar = 1;
 				form = sp+1;
+				if(argp > xargs)
+					xargs = argp;
 			}
-			else	argp = -1;
 		}
 
 		flags = dot = 0;
-		t_str = NIL(char*); n_str = 0;
+		t_str = NULL; n_str = 0;
 		size = width = precis = base = -1;
 		for(n = 0; n < FP_INDEX; ++n)
 			need[n] = -1;
@@ -100,7 +107,7 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 				{
 				case 0 :	/* not balanceable, retract */
 					form = t_str;
-					t_str = NIL(char*);
+					t_str = NULL;
 					n_str = 0;
 					goto loop_flags;
 				case LEFTP :	/* increasing nested level */
@@ -113,10 +120,12 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 					if(*t_str == '*')
 					{	t_str = sffmtint(t_str+1,&n);
 						if(*t_str == '$')
-							dollar = 1;
-						else	n = -1;
-						if((n = FP_SET(n,argn)) > maxp)
-							maxp = n;
+						{	dollar = 1;
+							if(n > xargs)
+								xargs = n;
+						}
+						if(n < 0)
+							n = ++nargs;
 						if(fp && fp[n].ft.fmt == 0)
 						{	fp[n].ft.fmt = LEFTP;
 							fp[n].ft.form = (char*)form;
@@ -169,10 +178,11 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 			if(*form == '$' )
 			{	dollar = 1;
 				form += 1;
+				if(n > xargs)
+					xargs = n;
 			}
-			else	n = -1;
-			if((n = FP_SET(n,argn)) > maxp)
-				maxp = n;
+			if(n < 0)
+				n = ++nargs;
 			if(fp && fp[n].ft.fmt == 0)
 			{	fp[n].ft.fmt = '.';
 				fp[n].ft.size = dot;
@@ -207,10 +217,11 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 				if(*form == '$' )
 				{	dollar = 1;
 					form += 1;
+					if(n > xargs)
+						xargs=n;
 				}
-				else	n = -1;
-				if((n = FP_SET(n,argn)) > maxp)
-					maxp = n;
+				if(n < 0)
+					n = ++nargs;
 				if(fp && fp[n].ft.fmt == 0)
 				{	fp[n].ft.fmt = 'I';
 					fp[n].ft.size = sizeof(int);
@@ -252,9 +263,11 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 					size = sizeof(char);
 				else if(flags&SFFMT_TFLAG)
 					size = sizeof(ptrdiff_t);
-				else if(flags&SFFMT_ZFLAG) 
+				else if(flags&SFFMT_ZFLAG)
 					size = sizeof(size_t);
-				else if(flags&(SFFMT_LLONG|SFFMT_JFLAG) )
+				else if(flags&SFFMT_LLONG)
+					size = sizeof(long long);
+				else if(flags&SFFMT_JFLAG)
 					size = sizeof(Sflong_t);
 				else if(flags&SFFMT_IFLAG)
 				{	if(size <= 0 ||
@@ -292,11 +305,11 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 		if(skip)
 			continue;
 
-		if((argp = FP_SET(argp,argn)) > maxp)
-			maxp = argp;
+		if(argp < 0)
+			argp = ++nargs;
 
 		if(dollar && fmt == '!')
-			return NIL(Fmtpos_t*);
+			return NULL;
 
 		if(fp && fp[argp].ft.fmt == 0)
 		{	fp[argp].ft.form = (char*)form;
@@ -313,9 +326,10 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 		}
 	}
 
+	maxp = nargs > xargs ? nargs : xargs;
 	if(!fp) /* constructing position array only */
 	{	if(!dollar || !(fp = (Fmtpos_t*)malloc((maxp+1)*sizeof(Fmtpos_t))) )
-			return NIL(Fmtpos_t*);
+			return NULL;
 		for(n = 0; n <= maxp; ++n)
 			fp[n].ft.fmt = 0;
 		return fp;
@@ -323,10 +337,13 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 
 	/* get value for positions */
 	if(ft)
+	{	if(ft->reloadf)
+			nextarg = (*ft->reloadf)(0, 0, NULL, ft);
 		memcpy(&savft, ft, sizeof(*ft));
+	}
 	for(n = 0; n <= maxp; ++n)
-	{	if(fp[n].ft.fmt == 0) /* gap: pretend it's a 'd' pattern */
-		{	fp[n].ft.fmt = 'd';
+	{	if(fp[n].ft.fmt == 0) /* gap: pretend it's a 'c' pattern */
+		{	fp[n].ft.fmt = 'c';
 			fp[n].ft.width = 0;
 			fp[n].ft.precis = 0;
 			fp[n].ft.base = 0;
@@ -342,6 +359,7 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 		{	fp[n].ft.version = ft->version;
 			fp[n].ft.extf = ft->extf;
 			fp[n].ft.eventf = ft->eventf;
+			fp[n].ft.reloadf = ft->reloadf;
 			if((v = fp[n].need[FP_WIDTH]) >= 0 && v < n)
 				fp[n].ft.width = fp[v].argv.i;
 			if((v = fp[n].need[FP_PRECIS]) >= 0 && v < n)
@@ -356,12 +374,12 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 			memcpy(ft,&fp[n].ft,sizeof(Sffmt_t));
 			va_copy(ft->args,args);
 			ft->flags |= SFFMT_ARGPOS;
-			v = (*ft->extf)(f, (void*)(&fp[n].argv), ft);
+			v = (*ft->extf)(f, &fp[n].argv, ft);
 			va_copy(args,ft->args);
 			memcpy(&fp[n].ft,ft,sizeof(Sffmt_t));
 			if(v < 0)
 			{	memcpy(ft,&savft,sizeof(Sffmt_t));
-				ft = NIL(Sffmt_t*);
+				ft = NULL;
 			}
 
 			if(!(fp[n].ft.flags&SFFMT_VALUE) )
@@ -396,7 +414,7 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 					memcpy(ft,&savft,sizeof(Sffmt_t));
 				fp[n].argv.ft = ft = va_arg(args, Sffmt_t*);
 				if(ft->form)
-					ft = NIL(Sffmt_t*);
+					ft = NULL;
 				if(ft)
 					memcpy(&savft,ft,sizeof(Sffmt_t));
 			}
@@ -446,26 +464,20 @@ static Fmtpos_t* sffmtpos(Sfio_t* f,const char* form,va_list args,Sffmt_t* ft,in
 	}
 
 	if(ft)
+	{	if(ft->reloadf)
+			(*ft->reloadf)(nextarg, 0, NULL, ft);
 		memcpy(ft,&savft,sizeof(Sffmt_t));
+	}
 	return fp;
 }
 
-static const unsigned char	flt_nan[] = { _ast_flt_nan_init };
-static const unsigned char	flt_inf[] = { _ast_flt_inf_init };
-static const unsigned char	dbl_nan[] = { _ast_dbl_nan_init };
-static const unsigned char	dbl_inf[] = { _ast_dbl_inf_init };
-#ifdef _ast_ldbl_nan_init
-static const unsigned char	ldbl_nan[] = { _ast_ldbl_nan_init };
-static const unsigned char	ldbl_inf[] = { _ast_ldbl_inf_init };
-#endif
-
 /* function to initialize conversion tables */
-static int sfcvinit()
-{	reg int		d, l;
+static int sfcvinit(void)
+{	int		d, l;
 
-	for(d = 0; d <= SF_MAXCHAR; ++d)
-	{	_Sfcv36[d] = SF_RADIX;
-		_Sfcv64[d] = SF_RADIX;
+	for(d = 0; d <= SFIO_MAXCHAR; ++d)
+	{	_Sfcv36[d] = SFIO_RADIX;
+		_Sfcv64[d] = SFIO_RADIX;
 	}
 
 	/* [0-9] */
@@ -487,7 +499,7 @@ static int sfcvinit()
 	}
 
 	/* remaining digits */
-	for(; d < SF_RADIX; ++d)
+	for(; d < SFIO_RADIX; ++d)
 	{	_Sfcv36[(uchar)_Sfdigits[d]] = d;
 		_Sfcv64[(uchar)_Sfdigits[d]] = d;
 	}
@@ -502,20 +514,6 @@ static int sfcvinit()
 #if _has_multibyte
 	_Sftype['S'] = SFFMT_POINTER;
 	_Sftype['C'] = SFFMT_CHAR;
-#endif
-
-	/* IEEE floating point computed constants */
-
-	memcpy((char*)&_Sffnan, (char*)flt_nan, sizeof(_Sffnan));
-	memcpy((char*)&_Sffinf, (char*)flt_inf, sizeof(_Sffinf));
-	memcpy((char*)&_Sfdnan, (char*)dbl_nan, sizeof(_Sfdnan));
-	memcpy((char*)&_Sfdinf, (char*)dbl_inf, sizeof(_Sfdinf));
-#ifdef _ast_ldbl_nan_init
-	memcpy((char*)&_Sflnan, (char*)ldbl_nan, sizeof(_Sflnan));
-	memcpy((char*)&_Sflinf, (char*)ldbl_inf, sizeof(_Sflinf));
-#else
-	memcpy((char*)&_Sflnan, (char*)dbl_nan, sizeof(_Sfdnan));
-	memcpy((char*)&_Sflinf, (char*)dbl_inf, sizeof(_Sfdinf));
 #endif
 
 	return 1;

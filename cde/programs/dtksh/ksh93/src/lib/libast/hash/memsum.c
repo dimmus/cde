@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -35,15 +35,15 @@
  */
 
 unsigned long
-memsum(const void* ap, int n, register unsigned long c)
+memsum(const void* ap, int n, unsigned long c)
 {
-	register const unsigned char*	p = (const unsigned char*)ap;
-	register const unsigned char*	e = p + n;
+	const unsigned char*	p = (const unsigned char*)ap;
+	const unsigned char*	e = p + n;
 
 	while (p < e) HASHPART(c, *p++);
 #if LONG_MAX > 2147483647
-	return(c & 0xffffffff);
+	return c & 0xffffffff;
 #else
-	return(c);
+	return c;
 #endif
 }

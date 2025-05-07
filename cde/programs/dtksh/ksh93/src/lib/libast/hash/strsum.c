@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -35,15 +35,15 @@
  */
 
 unsigned long
-strsum(const char* as, register unsigned long c)
+strsum(const char* as, unsigned long c)
 {
-	register const unsigned char*	s = (const unsigned char*)as;
-	register int			n;
+	const unsigned char*	s = (const unsigned char*)as;
+	int			n;
 
 	while (n = *s++) HASHPART(c, n);
 #if LONG_MAX > 2147483647
-	return(c & 0xffffffff);
+	return c & 0xffffffff;
 #else
-	return(c);
+	return c;
 #endif
 }

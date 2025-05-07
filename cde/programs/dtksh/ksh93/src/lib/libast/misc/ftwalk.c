@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -48,16 +48,16 @@ ftscompare(Ftw_t* const* pf1, Ftw_t* const* pf2)
 int
 ftwalk(const char* path, int (*userf)(Ftw_t*), int flags, int (*comparf)(Ftw_t*, Ftw_t*))
 {
-	register FTS*		f;
-	register FTSENT*	e;
-	register int		children;
-	register int		rv;
-	int			oi;
-	int			ns;
-	int			os;
-	int			nd;
-	FTSENT*			x;
-	FTSENT*			dd[2];
+	FTS*		f;
+	FTSENT*		e;
+	int		children;
+	int		rv;
+	int		oi;
+	int		ns;
+	int		os;
+	int		nd;
+	FTSENT*		x;
+	FTSENT*		dd[2];
 
 	flags ^= FTS_ONEPATH;
 	if (flags & FTW_TWICE)

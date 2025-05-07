@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1994-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -33,11 +33,25 @@ esac
 set -o noglob
 
 command=iffe
-version=2022-01-09
+version=2025-05-01
+
+# DEFPATH should be inherited from package(1)
+case $DEFPATH in
+/*)	;;
+*)	DEFPATH=$(getconf PATH) ||
+	{
+		echo "$command: DEFPATH not set" >&2
+		exit 1
+	} ;;
+esac
 
 compile() # $cc ...
 {
-	"$@" 2>$tmp.err
+	case $debug in
+	1)	# level 1 doesn't xtrace, but compiler command lines are useful
+		(set -x; "$@") ;;
+	*)	"$@" ;;
+	esac 2>$tmp.err
 	_compile_status=$?
 	if	test -s $tmp.err
 	then	cat $tmp.err >&2
@@ -67,7 +81,16 @@ is_hdr() # [ - ] [ file.c ] hdr
 	*)	_is_hdr_file=$tmp.c ;;
 	esac
 	is hdr $1
-	compile $cc -c $_is_hdr_file <&$nullin >&$nullout 2>$tmp.e
+	case $1 in
+	sys/types.h | limits.h | stdio.h | unistd.h)
+		# These are often tested for repeatedly, especially sys/types.h.
+		# But POSIX has specified these since issue 1 (1988). It's 2023.
+		# Skip the compile to save time, but act like a positive test.
+		: 2>$tmp.e
+		;;
+	*)	compile $cc -c $_is_hdr_file <&$nullin >&$nullout 2>$tmp.e
+		;;
+	esac
 	_is_hdr_status=$?
 	case $_is_hdr_status in
 	0)	if	test -s $tmp.e
@@ -93,44 +116,7 @@ pkg() # package
 {
 	case $1 in
 	'')	# Determine default system path, store in $pth.
-		pth=$(
-			PATH=/run/current-system/sw/bin:/usr/xpg7/bin:/usr/xpg6/bin:/usr/xpg4/bin:/bin:/usr/bin:$PATH
-			exec getconf PATH 2>/dev/null
-		)
-		case $pth in
-		'' | [!/]* | *:[!/]* | *: )
-			pth="/bin /usr/bin /sbin /usr/sbin" ;;
-		*:*)	pth=$(echo "$pth" | sed 's/:/ /g') ;;
-		esac
-		# Fix for NixOS. Not all POSIX standard utilities come with the default system,
-		# e.g. 'bc', 'file', 'vi'. The command that NixOS recommends to get missing
-		# utilities, e.g. 'nix-env -iA nixos.bc', installs them in a default profile
-		# directory that is not in $(getconf PATH). So add this path to the standard path.
-		# See: https://github.com/NixOS/nixpkgs/issues/65512
-		if	test -e /etc/NIXOS &&
-			nix_profile_dir=/nix/var/nix/profiles/default/bin &&
-			test -d "$nix_profile_dir"
-		then	case " $pth " in
-			*" $nix_profile_dir "* )
-				# nothing to do
-				;;
-			* )	# insert the default profile directory as the second entry
-				pth=$(
-					set $pth
-					one=$1
-					shift
-					echo "$one $nix_profile_dir${1+ }$@"
-				) ;;
-			esac
-		fi
-		# Fix for AIX. At least as of version 7.1, the system default 'find', 'diff -u' and 'patch' utilities
-		# are broken and/or non-compliant in ways that make them incompatible with POSIX 2018. However, GNU
-		# utilities are commonly installed in /opt/freeware/bin, and under standard names (no g- prefix).
-		if	test -d /opt/freeware/bin
-		then	case $(uname) in
-			AIX )	pth="/opt/freeware/bin $pth" ;;
-			esac
-		fi
+		pth=$(echo "$DEFPATH" | sed 's/:/ /g')
 		return
 		;;
 	'<')	shift
@@ -590,36 +576,7 @@ reallystatictest=
 regress=
 static=.
 statictest=
-case $COTEMP in
-"")	case $HOSTNAME in
-	""|?|??|???|????|????)
-		tmp=${HOSTNAME}
-		;;
-	*)	tmp=${HOSTNAME%${HOSTNAME#????}}
-		;;
-	esac
-	tmp=${tmp}$$
-	;;
-*)	tmp=x${COTEMP}
-	;;
-esac
-COTEMP=${tmp}
-export COTEMP
-case $tmp in
-./*)	;;
-??????????*)
-	tmp=${tmp%${tmp#?????????}}
-	;;
-?????????)
-	;;
-????????)
-	tmp=F$tmp
-	;;
-esac
-case $tmp in
-./*)	;;
-*)	tmp=./$tmp ;;
-esac
+tmp=./$command.$$
 undef=0
 verbose=0
 vers=
@@ -638,8 +595,9 @@ case $( (getopts '[-][123:xyz]' opt --xyz; echo 0$opt) 2>/dev/null ) in
 ]
 [-author?Glenn Fowler <gsf@research.att.com>]
 [-author?Phong Vo <kpv@research.att.com>]
+[-author?Contributors to https://github.com/ksh93/ksh]
 [-copyright?(c) 1994-2012 AT&T Intellectual Property]
-[-copyright?(c) 2020-2021 Contributors to https://github.com/ksh93/ksh]
+[-copyright?(c) 2020-2025 Contributors to ksh 93u+m]
 [-license?https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.html]
 [+NAME?iffe - C compilation environment feature probe]
 [+DESCRIPTION?\biffe\b is a command interpreter that probes the C
@@ -655,7 +613,7 @@ case $( (getopts '[-][123:xyz]' opt --xyz; echo 0$opt) 2>/dev/null ) in
 	are fundamental differences. The latter tend to generate global
 	headers accessed by all components in a package, whereas \biffe\b is
 	aimed at localized, self contained feature testing.]
-[+?Output is generated in \bFEATURE/\b\atest\a by default, where \atest\a is
+[+?Output is generated in \b'"$dir"$'/\b\atest\a by default, where \atest\a is
 	the base name of \afile\a\b.iffe\b or the \biffe\b \brun\b
 	file operand. Output is first generated in a temporary file; the
 	output file is updated if it does not exist or if the temporary file
@@ -675,13 +633,13 @@ case $( (getopts '[-][123:xyz]' opt --xyz; echo 0$opt) 2>/dev/null ) in
 	upper case. \b--config\b is set by default if the command arguments
 	contain a \brun\b op on an input file with the base name \bconfig\b.]
 [d:debug?Sets the debug level. Level 0 inhibits most
-	error messages, level 1 shows compiler messages, and
+	error messages, level 1 shows compiler command lines and messages, and
 	level 2 traces internal \biffe\b \bsh\b(1) actions and does
 	not remove core dumps on exit.]#[level]
 [D:define?Successful test macro definitions are emitted. This is the default.]
 [E:explicit?Disable implicit test output.]
 [F:features?Sets the feature test header to \ahdr\a.  This header typically
-        defines *_SOURCE feature test macros.]:[hdr:=NONE]
+	defines *_SOURCE feature test macros.]:[hdr:=NONE]
 [i:input?Sets the input file name to \afile\a, which
 	must contain \biffe\b statements.]:[file]
 [I:include?Adds \b-I\b\adir\a to the C compiler flags.]:[dir]
@@ -759,14 +717,14 @@ case $( (getopts '[-][123:xyz]' opt --xyz; echo 0$opt) 2>/dev/null ) in
 	\bNOTE()\b should be called per test for readability. In addition to
 	all macro definitions generated by previous tests, all generated
 	code contains the following at the top:]{
-		[+ ?/* AST backwards compatibility macros */]
-		[+ ?#define _NIL_(x) ((x)0)]
+		[+ ?/* AST backward compatibility macros */]
+		[+ ?#define _NIL_(x) NULL]
 		[+ ?#define _STD_ 1]
 		[+ ?#define _ARG_(x) x]
 		[+ ?#define _VOID_ void]
 		[+ ?#define _BEGIN_EXTERNS_]
 		[+ ?#define _END_EXTERNS_]
-		[+ ?/* if/when available, "$INSTALLROOT/src/lib/libast/FEATURE/standards" is included here */]
+		[+ ?/* if/when available, "$INSTALLROOT/src/lib/libast/'"$dir"$'/standards" is included here */]
 		[+ ?/* then <stdio.h> is included, unless this was disabled using the "stdio" option */]
 	}
 [+?= \adefault\a may be specified for the \bkey\b, \blib\b, \bmac\b, \bmth\b
@@ -787,17 +745,12 @@ case $( (getopts '[-][123:xyz]' opt --xyz; echo 0$opt) 2>/dev/null ) in
 		[+--output=\afile\a?Output is \afile\a.]
 		[+set out \afile\a?Output is \afile\a.]
 		[+[run]] [\adirectory\a/]]\abase\a[\a.suffix\a]]?Output is
-			\bFEATURE/\b\abase\a.]
+			\b'"$dir"$'/\b\abase\a.]
 	}
 [+?Generated \biffe\b headers are often referenced in C source as:
-	\b#include "FEATURE/\b\afile\a". The \bnmake\b(1) base rules contain
-	metarules for generating \bFEATURE/\b\afile\a from
-	\bfeatures/\b\afile\a[\asuffix\a]], where \asuffix\a may be omitted,
-	\b.c\b, or \b.sh\b (see the \brun\b test below). Because
-	\b#include\b prerequisites are automatically detected, \bnmake\b(1)
-	ensures that all prerequisite \biffe\b headers are generated before
-	compilation. Note that the directories are deliberately named
-	\bFEATURE\b and \bfeatures\b to keep case-ignorant file systems
+	\b#include "'"$dir"$'/\b\afile\a".
+	Note that the directories are deliberately named
+	\b'"$dir"$'\b and \bfeatures\b to keep case-ignorant file systems
 	happy.]
 [+?The feature tests are:]{
 	[+# \acomment\a?Comment line - ignored.]
@@ -981,7 +934,7 @@ case $( (getopts '[-][123:xyz]' opt --xyz; echo 0$opt) 2>/dev/null ) in
 		\bendif\b } with unnamed \b{\b ... \b}\b blocks.]
 }
 [+SEE ALSO?\bautoconf\b(1), \bconfig\b(1), \bgetconf\b(1), \bcrossexec\b(1),
-	\bnmake\b(1), \bpackage\b(1), \bsh\b(1)]
+	\bpackage\b(1), \bsh\b(1)]
 '
 	while	getopts -a "$command" "$USAGE" OPT
 	do	case $OPT in
@@ -1211,8 +1164,8 @@ status=2
 
 # standard header for c source
 
-std='/* AST backwards compatibility macros */
-#define _NIL_(x)	((x)0)
+std='/* AST backward compatibility macros */
+#define _NIL_(x)	NULL
 #define _STD_		1
 #define _ARG_(x)	x
 #define _VOID_		void
@@ -1220,9 +1173,11 @@ std='/* AST backwards compatibility macros */
 #define _END_EXTERNS_'
 # To ensure the environment tested is the same as that used, add standards
 # compliance macros as probed by libast as soon as they are available.
-if	test -f "${INSTALLROOT}/src/lib/libast/FEATURE/standards"
-then	std=${std}${nl}$(cat "${INSTALLROOT}/src/lib/libast/FEATURE/standards")
-fi
+case $INSTALLROOT in
+/*)	if	test -f "${INSTALLROOT}/src/lib/libast/${dir}/standards"
+	then	std="${std}${nl}#include \"${INSTALLROOT}/src/lib/libast/${dir}/standards\""
+	fi ;;
+esac
 tst=
 ext="#include <stdio.h>"
 
@@ -2167,8 +2122,7 @@ int x;
 			t=$1
 			shift
 			is npt $x
-			copy $tmp.c "
-$std
+			copy $tmp.c "$std
 #include <sys/types.h>
 $usr
 struct _iffe_struct { int _iffe_member; };
@@ -2319,7 +2273,7 @@ int x;
 	# NOTE() support
 
 	case $ext in
-	*"<stdio.h>"*)	
+	*"<stdio.h>"*)
 		case $ext in
 		*"#define NOTE("*)
 			;;
@@ -2487,7 +2441,7 @@ int x;
 			lib=
 			p=
 			hit=0
-			echo "int main(){return(0);}" > $tmp.c
+			echo "int main(void){return(0);}" > $tmp.c
 			for x in $z
 			do	p=$x
 				case " $gotlib " in
@@ -2865,17 +2819,13 @@ int x;
 									sed 's,/\*[^/]*\*/, ,g' $x > $tmp.t
 									;;
 								esac
-								if	cmp -s $tmp.c $tmp.t
-								then	rm -f $tmp.h
-									case $verbose in
-									1)	echo "$command: $x: unchanged" >&$stderr ;;
-									esac
-									touch "$x"  # avoid rerunning test on subsequent runs
-								else	case $x in
-									${dir}[\\/]$cur)	test -d $dir || mkdir $dir || exit 1 ;;
-									esac
-									mv $tmp.h $x
-								fi
+								# to ensure correct dependency resolution, always move the new file
+								# over, to bump the timestamp even if the results haven't changed
+								case $x in
+								${dir}[\\/]$cur)
+									test -d $dir || mkdir $dir || exit ;;
+								esac
+								mv -f $tmp.h $x || exit
 								;;
 							esac
 							;;
@@ -2901,13 +2851,15 @@ int x;
 						*)	cur=$out
 							;;
 						esac
+						# for privacy and brevity, strip leading $PACKAGEROOT/ from header comments
+						x=${PACKAGEROOT:-/dev/null}
 						case $in in
 						""|-|+)	case $o in
-							run)	x=" from $a" ;;
+							run)	x=" from ${a#"$x"[\\/]}" ;;
 							*)	x= ;;
 							esac
 							;;
-						*)	x=" from $in"
+						*)	x=" from ${in#"$x"[\\/]}"
 							;;
 						esac
 
@@ -3166,7 +3118,7 @@ $src
 							'')	#UNDENT...
 
 			reallystatictest=.
-			echo "$tst$nl$ext${nl}int main(){printf("hello");return(0);}" > ${tmp}s.c
+			echo "$tst$nl$ext${nl}int main(void){printf("hello");return(0);}" > ${tmp}s.c
 			rm -f ${tmp}s.exe
 			if	compile $cc -c ${tmp}s.c <&$nullin >&$nullout &&
 				compile $cc -o ${tmp}s.exe ${tmp}s.o <&$nullin >&$nullout 2>${tmp}s.e &&
@@ -3286,22 +3238,21 @@ $src
 				dat|lib|mth|run)
 					case $statictest in
 					"")	statictest=FoobaR
-						copy $tmp.c "
+						copy $tmp.c "$std
 $tst
 $ext
-$std
 $usr
 extern int $statictest;
-int main(){char* i = (char*)&$statictest; return ((unsigned int)i)^0xaaaa;}
+int main(void){char* i = (char*)&$statictest; return ((unsigned int)i)^0xaaaa;}
 "
 						rm -f $tmp.exe
 						if	compile $cc -o $tmp.exe $tmp.c <&$nullin >&$nullout && $executable $tmp.exe
 						then	case $static in
 							.)	static=
-								copy $tmp.c "
+								copy $tmp.c "$std
 $tst
 $ext
-int main(){printf("hello");return(0);}
+int main(void){printf("hello");return(0);}
 "
 								rm -f $tmp.exe
 								if	compile $cc -c $tmp.c <&$nullin >&$nullout &&
@@ -3390,10 +3341,9 @@ int main(){printf("hello");return(0);}
 					?*)	continue ;;
 					esac
 					{
-					copy - "
+					copy - "$std
 $tst
 $ext
-$std
 $usr
 $pre
 "
@@ -3409,7 +3359,7 @@ $pre
 #else
 #define _REF_	&
 #endif
-int main(){char* i = (char*) _REF_ $v; return ((unsigned int)i)^0xaaaa;}"
+int main(void){char* i = (char*) _REF_ $v; return ((unsigned int)i)^0xaaaa;}"
 					} > $tmp.c
 					is $o $v
 					rm -f $tmp.exe
@@ -3422,7 +3372,8 @@ int main(){char* i = (char*) _REF_ $v; return ((unsigned int)i)^0xaaaa;}"
 					?*)	continue ;;
 					esac
 					is dfn $v
-					echo "$pre
+					echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3531,7 +3482,8 @@ $inc
 						esac
 						eval _$m=1
 						is $o $f
-						echo "$pre
+						echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3546,7 +3498,8 @@ $inc
 							[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ]:[\\/]*)
 								;;
 							*/*/*)	k=$(echo "$i" | sed 's,.*/\([^/]*/[^/]*\)$,../\1,')
-								echo "$pre
+								echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3560,7 +3513,8 @@ $inc
 									esac
 								fi
 								;;
-							*)	echo "$pre
+							*)	echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3632,7 +3586,7 @@ $inc
 						*" + $x "*)
 							success +
 							;;
-						*)	echo "
+						*)	echo "$std
 $tst
 $ext
 $allinc
@@ -3683,10 +3637,11 @@ $inc
 					w=$v
 					while	:
 					do	is $o $w
-						echo "$pre
+						echo "$std
+$pre
 $tst
 $ext
-int f(){int $w = 1;return($w);}" > $tmp.c
+int f(void){int $w = 1;return($w);}" > $tmp.c
 						if	compile $cc -c $tmp.c <&$nullin >&$nullout
 						then	failure
 							case $set in
@@ -3757,10 +3712,9 @@ int f(){int $w = 1;return($w);}" > $tmp.c
 					-)	continue ;;
 					esac
 					is $o $v
-					copy $tmp.c "
+					copy $tmp.c "$std
 $tst
 $ext
-$std
 $usr
 $pre
 $inc
@@ -3769,9 +3723,9 @@ $v i;
 #else
 typedef int (*_IFFE_fun)();
 #ifdef _IFFE_extern
-extern int $v();
+extern int $v(void);
 #endif
-static _IFFE_fun i=(_IFFE_fun)$v;int main(){return ((unsigned int)i)^0xaaaa;}
+static _IFFE_fun i=(_IFFE_fun)$v;int main(void){return ((unsigned int)i)^0xaaaa;}
 #endif
 "
 					d=-D_IFFE_extern
@@ -3803,15 +3757,14 @@ static _IFFE_fun i=(_IFFE_fun)$v;int main(){return ((unsigned int)i)^0xaaaa;}
 					else	if	compile $cc -D_IFFE_type -c $tmp.c <&$nullin >&$nullout
 						then	c=1
 						else	case $intrinsic in
-							'')	copy $tmp.c "
+							'')	copy $tmp.c "$std
 $tst
 $ext
-$std
 $usr
 $pre
 $inc
-extern int foo();
-static int ((*i)())=foo;int main(){return(i==0);}
+extern int foo(void);
+static int ((*i)())=foo;int main(void){return(i==0);}
 "
 								compile $cc -c $tmp.c <&$nullin >&$nullout
 								intrinsic=$?
@@ -3829,7 +3782,7 @@ static int ((*i)())=foo;int main(){return(i==0);}
 					?*)	continue ;;
 					esac
 					is mac $v
-					echo "
+					echo "$std
 $tst
 $ext
 $pre
@@ -3844,7 +3797,8 @@ $inc
 					?*)	eval i='$'_iffe_typedef_$p
 						case $i in
 						0|1)	;;
-						*)	echo "$pre
+						*)	echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3866,7 +3820,8 @@ int n = sizeof(i);" > $tmp.c
 						*)	i=- ;;
 						esac
 						is mem $v "$p"
-						echo "$pre
+						echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3879,7 +3834,8 @@ int n = sizeof(i.$v);" > $tmp.c
 						eval i='$'_iffe_typedef_$p
 						case $i in
 						0|1)	;;
-						*)	echo "$pre
+						*)	echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -3901,19 +3857,21 @@ int n = sizeof(i);" > $tmp.c
 						*)	i=- ;;
 						esac
 						is nos "$p"
-						echo "$pre
+						echo "$std
+$pre
 $tst
 $ext
 $inc
 static $p i;
 int n = sizeof(i);" > $tmp.c
 						if	compile $cc -c $tmp.c <&$nullin >&$nullout
-						then	echo "$pre
+						then	echo "$std
+$pre
 $tst
 $ext
 $inc
 static $p i;
-unsigned long f() { return (unsigned long)i; }" > $tmp.c
+unsigned long f(void) { return (unsigned long)i; }" > $tmp.c
 							if	compile $cc -c $tmp.c <&$nullin >&$nullout
 							then	c=1
 							else	c=0
@@ -3925,10 +3883,9 @@ unsigned long f() { return (unsigned long)i; }" > $tmp.c
 					;;
 				nop)	;;
 				npt)	is npt $v
-					copy $tmp.c "
+					copy $tmp.c "$std
 $tst
 $ext
-$std
 $usr
 $pre
 $inc
@@ -3944,10 +3901,9 @@ extern struct _iffe_struct* $v(struct _iffe_struct*);
 					report -$config $? 1 "$v() needs a prototype" "$v() does not need a prototype"
 					;;
 				num)	is num $v
-					copy $tmp.c "
+					copy $tmp.c "$std
 $tst
 $ext
-$std
 $usr
 $pre
 $inc
@@ -4076,9 +4032,9 @@ int _iffe_int = $v / 2;
 					case $a in
 					*.c)	rm -f $tmp.exe
 						{
-						echo "$tst
+						echo "$std
+$tst
 $ext
-$std
 $usr
 $inc"
 						cat $a
@@ -4117,12 +4073,13 @@ set \"cc='$cc' executable='$executable' id='$m' static='$static' tmp='$tmp'\" $o
 					{
 					case $p:$v in
 					long:*|*:*[_0123456789]int[_0123456789]*)
-						echo "$pre
+						echo "$std
+$pre
 $tst
 $ext
 $inc
 static $x$v i;
-$x$v f() {
+$x$v f(void) {
 $x$v v; i = 1; v = i;"
 						echo "i = v * i; i = i / v; v = v + i; i = i - v;"
 						case $v in
@@ -4131,21 +4088,22 @@ $x$v v; i = 1; v = i;"
 						esac
 						echo "return v; }"
 						;;
-					*)	echo "$pre
+					*)	echo "$std
+$pre
 $inc
 struct xxx { $x$v mem; };
 static struct xxx v;
-struct xxx* f() { return &v; }"
+struct xxx* f(void) { return &v; }"
 						;;
 					esac
 					case $x in
 					""|"struct "|"union ")
-						echo "int g() { return 0; }"
+						echo "int g(void) { return 0; }"
 						;;
-					*)	echo "int g() { return sizeof($x$v)<=sizeof($v); }" ;;
+					*)	echo "int g(void) { return sizeof($x$v)<=sizeof($v); }" ;;
 					esac
 					copy - "
-int main() {
+int main(void) {
 		f();
 		g();
 		printf(\"%u\\n\", sizeof($x$v));
@@ -4167,7 +4125,8 @@ int main() {
 					"")	x=$v ;;
 					*)	x=$test ;;
 					esac
-					echo "$pre
+					echo "$std
+$pre
 $tst
 $ext
 $inc
@@ -4209,12 +4168,13 @@ nam &/g' \
 					{
 					case $p:$v in
 					long:*|*:*[_0123456789]int[_0123456789]*)
-						echo "$pre
+						echo "$std
+$pre
 $tst
 $ext
 $inc
 static $x$v i;
-$x$v f() {
+$x$v f(void) {
 $x$v v; i = 1; v = i;"
 						echo "i = v * i; i = i / v; v = v + i; i = i - v;"
 						case $v in
@@ -4223,19 +4183,20 @@ $x$v v; i = 1; v = i;"
 						esac
 						echo "return v; }"
 						;;
-					*)	echo "$pre
+					*)	echo "$std
+$pre
 $tst
 $ext
 $inc
 struct xxx { $x$v mem; };
 static struct xxx v;
-struct xxx* f() { return &v; }"
+struct xxx* f(void) { return &v; }"
 						;;
 					esac
 					case $x in
 					""|"struct "|"union ")
-						echo "int main() { f(); return 0; }" ;;
-					*)	echo "int main() { f(); return sizeof($x$v)<=sizeof($v); }" ;;
+						echo "int main(void) { f(); return 0; }" ;;
+					*)	echo "int main(void) { f(); return sizeof($x$v)<=sizeof($v); }" ;;
 					esac
 					} > $tmp.c
 					rm -f $tmp.exe

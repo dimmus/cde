@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
 *            Johnothan King <johnothanking@protonmail.com>             *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 #ifndef shell_h_defined
@@ -23,6 +24,8 @@
  *
  * Interface definitions for shell command language
  *
+ * NOTE: this header defines a public libshell interface,
+ * unless _BLD_ksh is defined as nonzero
  */
 
 #define SH_VERSION	20220719
@@ -31,17 +34,17 @@
 #include	<cdt.h>
 #include	<history.h>
 #include	<stk.h>
-#ifdef defs_h_defined
+#if _BLD_ksh
 #   include	"name.h"
+#   include	"fault.h"
 #else
 #   include	<nval.h>
-#endif /* defs_h_defined */
-#include	"fault.h"
+#endif /* _BLD_ksh */
 
 /* options */
 typedef struct
 {
-	unsigned long v[4];
+	uint64_t v[4];
 }
 Shopt_t;
 
@@ -50,7 +53,7 @@ typedef struct Shell_s Shell_t;
 #include	<shcmd.h>
 
 /* get pointer to a built-in command's entry function */
-#define	funptr(n)	((Shbltin_f)(n)->nvalue.bfp)
+#define funptr(n)	((Shbltin_f)(n)->nvalue)
 
 typedef void	(*Shinit_f)(Shell_t*, int);
 #ifndef SH_wait_f_defined
@@ -66,8 +69,8 @@ typedef union Shnode_u Shnode_t;
  * See also shell options below. States 0-5 are also used as shell options.
  */
 #define SH_NOFORK	0	/* set when fork not necessary */
-#define	SH_FORKED	7	/* set when process has been forked */
-#define	SH_PROFILE	8	/* set when processing profiles */
+#define SH_FORKED	7	/* set when process has been forked */
+#define SH_PROFILE	8	/* set when processing profiles */
 #define SH_NOALIAS	9	/* do not expand non-exported aliases */
 #define SH_NOTRACK	10	/* set to disable sftrack() function */
 #define SH_STOPOK	11	/* set for stopable builtins */
@@ -76,10 +79,13 @@ typedef union Shnode_u Shnode_t;
 #define SH_DEFPATH	14	/* set when using default path */
 #define SH_INIT		15	/* set when initializing the shell */
 #define SH_TTYWAIT	16	/* waiting for keyboard input */
-#define	SH_FCOMPLETE	17	/* set for filename completion */
-#define	SH_PREINIT	18	/* set with SH_INIT before parsing options */
+#define SH_FCOMPLETE	17	/* set for filename completion */
+#define SH_LCINIT	18	/* set with SH_INIT while initializing locale */
 #define SH_COMPLETE	19	/* set for command completion */
 #define SH_XARG		21	/* set while in xarg (command -x) mode */
+#define SH_NOTILDEXP	22	/* set to disable tilde expansion */
+#define SH_EXEC		23	/* set while in exec(1) */
+#define SH_PROCSUB	24	/* set (also in parent shell) while executing process substitution */
 
 /*
  * Shell options (set -o). Used with sh_isoption(), sh_onoption(), sh_offoption().
@@ -89,13 +95,13 @@ typedef union Shnode_u Shnode_t;
  */
 #define SH_CFLAG	0
 #define SH_HISTORY	1	/* used also as a state */
-#define	SH_ERREXIT	2	/* used also as a state */
-#define	SH_VERBOSE	3	/* used also as a state */
+#define SH_ERREXIT	2	/* used also as a state */
+#define SH_VERBOSE	3	/* used also as a state */
 #define SH_MONITOR	4	/* used also as a state */
-#define	SH_INTERACTIVE	5	/* used also as a state */
-#define	SH_RESTRICTED	6
-#define	SH_XTRACE	7
-#define	SH_KEYWORD	8
+#define SH_INTERACTIVE	5	/* used also as a state */
+#define SH_RESTRICTED	6
+#define SH_XTRACE	7
+#define SH_KEYWORD	8
 #define SH_NOUNSET	9
 #define SH_NOGLOB	10
 #define SH_ALLEXPORT	11
@@ -104,15 +110,18 @@ typedef union Shnode_u Shnode_t;
 #define SH_NOCLOBBER	14
 #define SH_MARKDIRS	15
 #define SH_BGNICE	16
-#if SHOPT_VSH
+#if !_BLD_ksh || SHOPT_VSH
 #define SH_VI		17
 #define SH_VIRAW	18
 #endif
-#define	SH_TFLAG	19
+#define SH_TFLAG	19
 #define SH_TRACKALL	20
-#define	SH_SFLAG	21
-#define	SH_NOEXEC	22
-#if SHOPT_ESH
+#define SH_SFLAG	21
+#define SH_NOEXEC	22
+#if !_BLD_ksh || SHOPT_ESH || SHOPT_VSH
+#define SH_NOARROWSRCH	23
+#endif
+#if !_BLD_ksh || SHOPT_ESH
 #define SH_GMACS	24
 #define SH_EMACS	25
 #endif
@@ -120,32 +129,36 @@ typedef union Shnode_u Shnode_t;
 #define SH_NOLOG	28
 #define SH_NOTIFY	29
 #define SH_DICTIONARY	30
+#define SH_GLOBEX	31
 #define SH_PIPEFAIL	32
 #define SH_GLOBSTARS	33
-#if SHOPT_GLOBCASEDET
+#if !_BLD_ksh || SHOPT_GLOBCASEDET || !defined(SHOPT_GLOBCASEDET)
 #define SH_GLOBCASEDET	34
 #endif
 #define SH_RC		35
 #define SH_SHOWME	36
 #define SH_LETOCTAL	37
-#if SHOPT_BRACEPAT
+#if !_BLD_ksh || SHOPT_BRACEPAT
 #define SH_BRACEEXPAND	42
 #endif
-#if SHOPT_HISTEXPAND
+#if !_BLD_ksh || SHOPT_HISTEXPAND
 #define SH_HISTEXPAND	43
-#if SHOPT_ESH || SHOPT_VSH
+#if !_BLD_ksh || SHOPT_ESH || SHOPT_VSH
 #define SH_HISTREEDIT	44
 #define SH_HISTVERIFY	45
 #endif
 #endif
 #define SH_POSIX	46
-#if SHOPT_ESH || SHOPT_VSH
+#if !_BLD_ksh || SHOPT_ESH || SHOPT_VSH
 #define SH_MULTILINE	47
-#endif
 #define SH_NOBACKSLCTRL	48
+#endif
 #define SH_LOGIN_SHELL	67
+
+#if _BLD_ksh
 #define SH_NOUSRPROFILE	79	/* internal use only */
 #define SH_COMMANDLINE	0x100	/* bit flag for invocation-only options ('set -o' cannot change them) */
+#endif
 
 /*
  * passed as flags to builtins in Nambltin_t struct when BLT_OPTIM is on
@@ -180,6 +193,8 @@ typedef struct sh_scope
 	struct sh_scope	*self;
 } Shscope_t;
 
+#if _BLD_ksh
+
 /* Private interface to shell scope. The first members must match the public interface. */
 struct sh_scoped
 {
@@ -209,6 +224,7 @@ struct sh_scoped
 	char		**otrap;	/* save parent pseudosignals for v=$(trap) */
 	char		**trapcom;	/* EXIT and signals */
 	char		**otrapcom;	/* save parent EXIT and signals for v=$(trap) */
+	void		*timetrap;	/* for the 'alarm' built-in */
 	struct Ufunction *real_fun;	/* current 'function name' function */
 	int             repl_index;
 	char            *repl_arg;
@@ -220,6 +236,8 @@ struct limits
 	int		clk_tck;	/* number of ticks per second */
 	int		child_max;	/* maximum number of children */
 };
+
+#endif /* _BLD_ksh */
 
 /*
  * Saves the state of the shell
@@ -237,8 +255,8 @@ struct Shell_s
 	int		inlineno;	/* line number of current input file */
 	int		exitval;	/* exit status of the command currently being run */
 	int		savexit;	/* $? == exit status of the last command executed */
-
-	/* These are the former 'struct shared' (shgd) members. */
+#if _BLD_ksh
+	/* The rest are for ksh's internal use only */
 	struct limits	lim;
 	uid_t		userid;
 	uid_t		euserid;
@@ -259,20 +277,15 @@ struct Shell_s
 	void		*ed_context;
 	int		sigmax;
 	Shwait_f	waitevent;
-#if SHOPT_STATS
-	int		*stats;
-#endif
-
-	/* The following members are not considered to be part of the documented API.
-	 * Programs using libshell should not rely on them as they may change. */
 	int		subshell;	/* set for virtual subshell */
 	int		realsubshell;	/* ${.sh.subshell}, actual subshell level (including virtual and forked) */
+	char		nv_restore;	/* set while restoring variables upon terminating a virtual subshell */
+	int32_t		shlvl;		/* $SHLVL, non-subshell child shell level */
 	char		shcomp;		/* set when running shcomp */
 	unsigned char	trapnote;	/* set when trap/signal is pending */
 	struct sh_scoped st;		/* scoped information */
 	Stk_t		*stk;		/* stack pointer */
 	Sfio_t		*heredocs;	/* current here-doc temp file */
-	Sfio_t		*funlog;	/* for logging function definitions */
 	int		**fdptrs;	/* pointer to file numbers */
 	char		*lastarg;	/* $_ */
 	int		path_err;	/* last error on path search */
@@ -304,13 +317,17 @@ struct Shell_s
 	int		topfd;
 	int		savesig;
 	unsigned char	*sigflag;	/* pointer to signal states */
-	char		intrap;
+	char		intrap;		/* set while executing a trap action */
+	char		intrap_exit_n;	/* set if 'exit n' within trap */
+	uint32_t	srand_upper_bound;
 	char		forked;
 	char		binscript;
 	char		funload;
 	char		used_pos;	/* used positional parameter */
 	char		universe;
 	char		winch;		/* set upon window size change or 'set -b' notification */
+	unsigned short	lines;		/* current vertical terminal size */
+	unsigned short	columns;	/* current horizontal terminal size */
 	short		arithrecursion;	/* current arithmetic recursion level */
 	char		indebug; 	/* set when in debug trap */
 	unsigned char	ignsig;		/* ignored signal in subshell */
@@ -334,11 +351,12 @@ struct Shell_s
 	struct dolnod	*arglist;
 	int16_t		fn_depth;	/* scoped ksh-style function call depth */
 	int16_t		dot_depth;	/* dot-script and POSIX function call depth */
-	int		hist_depth;
+	char		invoc_local;	/* set when inside of an invocation-local scope */
 	int		xargmin;
 	int		xargmax;
 	int		xargexit;
-	int		nenv;
+	int		save_env_n;	/* number of saved pointers to environment variables with invalid names */
+	char		**save_env;	/* saved pointers to environment variables with invalid names */
 	mode_t		mask;
 	void		*init_context;
 	void		*mac_context;
@@ -346,9 +364,7 @@ struct Shell_s
 	void		*arg_context;
 	void		*pathlist;
 	void		*cdpathlist;
-	char		**argaddr;
 	char		cond_expan;	/* set while processing ${var=val}, ${var:=val}, ${var?err}, ${var:?err} */
-	void		*optlist;
 	struct sh_scoped global;
 	struct checkpt	checkbase;
 	Shinit_f	userinit;
@@ -357,7 +373,10 @@ struct Shell_s
 	int		offsets[10];
 	Sfio_t		**sftable;
 	unsigned char	*fdstatus;
-	const char	*pwd;
+	char		*pwd;
+#if _lib_openat
+	int		pwdfd;		/* file descriptor for pwd */
+#endif /* _lib_openat */
 	void		*jmpbuffer;
 	void		*mktype;
 	Sfio_t		*strbuf;
@@ -376,6 +395,19 @@ struct Shell_s
 	Namfun_t	nvfun;
 	char		*mathnodes;
 	char		*bltin_dir;
+	char		tilde_block;	/* set to block .sh.tilde.{get,set} discipline */
+	char		dont_optimize_builtins;
+	/* nv_putsub() hack for nv_create() to avoid double arithmetic evaluation */
+	char		nv_putsub_already_called_sh_arith;
+	int		nv_putsub_idx;	/* saves array index obtained by nv_putsub() using sh_arith() */
+	int16_t		level;		/* ${.sh.level} */
+#if SHOPT_STATS
+	int		*stats;
+#endif
+#if SHOPT_OPTIMIZE
+	char		**argaddr;	/* pointer to arguments for the loop invariants optimizer */
+	void		*optlist;	/* linked list of invariant nodes */
+#endif
 #if SHOPT_FILESCAN
 	char		*cur_line;
 #endif /* SHOPT_FILESCAN */
@@ -383,9 +415,7 @@ struct Shell_s
 	char		*fifo;		/* FIFO name for current process substitution */
 	Dt_t		*fifo_tree;	/* for cleaning up process substitution FIFOs */
 #endif /* !SHOPT_DEVFD */
-#if SHOPT_REGRESS
-	struct Regress_s *regress;
-#endif /* SHOPT_REGRESS */
+#endif /* _BLD_ksh */
 };
 
 /* used for builtins */
@@ -416,7 +446,7 @@ extern Libcomp_t *liblist;
 
 extern void		sh_subfork(void);
 extern Shell_t		*sh_init(int,char*[],Shinit_f);
-extern int		sh_reinit(char*[]);
+extern void		sh_reinit(void);
 extern int 		sh_eval(Sfio_t*,int);
 extern void 		sh_delay(double,int);
 extern void		*sh_parse(Sfio_t*,int);
@@ -447,13 +477,13 @@ extern ssize_t 		sh_write(int, const void*, size_t);
 extern off_t		sh_seek(int, off_t, int);
 extern int 		sh_pipe(int[]);
 extern mode_t 		sh_umask(mode_t);
-extern void		*sh_waitnotify(Shwait_f);
+extern Shwait_f		sh_waitnotify(Shwait_f);
 extern Shscope_t	*sh_getscope(int,int);
 extern Shscope_t	*sh_setscope(Shscope_t*);
 extern void		sh_sigcheck(void);
-extern unsigned long	sh_isoption(int);
-extern unsigned long	sh_onoption(int);
-extern unsigned long	sh_offoption(int);
+extern uint64_t		sh_isoption(int);
+extern uint64_t		sh_onoption(int);
+extern uint64_t		sh_offoption(int);
 extern int		sh_exec(const Shnode_t*,int);
 
 /*
@@ -461,7 +491,7 @@ extern int		sh_exec(const Shnode_t*,int);
  * sh_getinterp() is here for compatibility with the documented interface.
  */
 extern Shell_t		sh;
-#define	sh_getinterp()	(&sh)
+#define sh_getinterp()	(&sh)
 
 #define chdir(a)	sh_chdir(a)
 #define fchdir(a)	sh_fchdir(a)

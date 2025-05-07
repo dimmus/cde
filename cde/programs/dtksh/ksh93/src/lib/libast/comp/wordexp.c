@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,15 +14,16 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
  * POSIX 1003.2 wordexp implementation
- */ 
+ */
 
 #include	<ast.h>
 #include	<wordexp.h>
-#include	<stak.h>
+#include	<stk.h>
 
 struct list
 {
@@ -36,15 +37,15 @@ struct list
  */
 static int	sh_unquote(char* string)
 {
-	register char *sp=string, *dp;
-	register int c;
+	char *sp=string, *dp;
+	int c;
 	while((c= *sp) && c!='\'')
 		sp++;
 	if(c==0)
-		return(sp-string);
+		return sp-string;
 	if((dp=sp) > string && sp[-1]=='$')
 	{
-		register int n=stresc(sp+1);
+		int n=stresc(sp+1);
 		/* copy all but trailing ' */
 		while(--n>0)
 			*dp++ = *++sp;
@@ -55,18 +56,18 @@ static int	sh_unquote(char* string)
 			*dp++ = c;
 	}
 	*dp=0;
-	return(dp-string);
+	return dp-string;
 }
 
-int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
+int	wordexp(const char *string, wordexp_t *wdarg, int flags)
 {
-	register Sfio_t *iop;
-	register char *cp=(char*)string;
-	register int c,quoted=0,literal=0,ac=0;
+	Sfio_t *iop;
+	char *cp=(char*)string;
+	int c,quoted=0,literal=0,ac=0;
 	int offset;
 	char *savebase,**av;
-	if(offset=staktell())
-		savebase = stakfreeze(0);
+	if(offset=stktell(stkstd))
+		savebase = stkfreeze(stkstd,0);
 	if(flags&WRDE_REUSE)
 		wordfree(wdarg);
 	else if(!(flags&WRDE_APPEND))
@@ -75,12 +76,12 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 		wdarg->we_wordc = 0;
 	}
 	if(flags&WRDE_UNDEF)
-		stakwrite("set -u\n",7);
+		sfwrite(stkstd,"set -u\n",7);
 	if(!(flags&WRDE_SHOWERR))
-		stakwrite("exec 2> /dev/null\n",18);
-	stakwrite("print -f \"%q\\n\" ",16);
+		sfwrite(stkstd,"exec 2> /dev/null\n",18);
+	sfwrite(stkstd,"print -f \"%q\\n\" ",16);
 	if(*cp=='#')
-		stakputc('\\');
+		sfputc(stkstd,'\\');
 	while(c = *cp++)
 	{
 		if(c=='\'' && !quoted)
@@ -89,7 +90,7 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 		{
 			if(c=='\\' && (!quoted || strchr("\\\"`\n$",c)))
 			{
-				stakputc('\\');
+				sfputc(stkstd,'\\');
 				if(c= *cp)
 					cp++;
 				else
@@ -105,7 +106,7 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 					goto err;
 				}
 				/* only the shell can parse the rest */
-				stakputs(cp-1);
+				sfputr(stkstd,cp-1,-1);
 				break;
 			}
 			else if(!quoted && strchr("|&\n;<>"+ac,c))
@@ -116,15 +117,15 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 			else if(c=='(') /* allow | and & inside pattern */
 				ac=2;
 		}
-		stakputc(c);
+		sfputc(stkstd,c);
 	}
-	stakputc(0);
-	if(!(iop = sfpopen((Sfio_t*)0,stakptr(0),"r")))
+	sfputc(stkstd,0);
+	if(!(iop = sfpopen(NULL,stkptr(stkstd,0),"r")))
 	{
 		c = WRDE_NOSHELL;
 		goto err;
 	}
-	stakseek(0);
+	stkseek(stkstd,0);
 	ac = 0;
 	while((c=sfgetc(iop)) != EOF)
 	{
@@ -135,7 +136,7 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 			ac++;
 			c = 0;
 		}
-		stakputc(c);
+		sfputc(stkstd,c);
 	}
 	if(c=sfclose(iop))
 	{
@@ -149,17 +150,17 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 	if(flags&WRDE_DOOFFS)
 		c += wdarg->we_offs;
 	if(flags&WRDE_APPEND)
-		av = (char**)realloc((void*)&wdarg->we_wordv[-1], (wdarg->we_wordc+c)*sizeof(char*));
+		av = (char**)realloc(&wdarg->we_wordv[-1], (wdarg->we_wordc+c)*sizeof(char*));
 	else if(av = (char**)malloc(c*sizeof(char*)))
 	{
 		if(flags&WRDE_DOOFFS)
-			memset((void*)av,0,(wdarg->we_offs+1)*sizeof(char*));
+			memset(av,0,(wdarg->we_offs+1)*sizeof(char*));
 		else
 			av[0] = 0;
 	}
 	if(!av)
-		return(WRDE_NOSPACE);
-	c = staktell();
+		return WRDE_NOSPACE;
+	c = stktell(stkstd);
 	if(!(cp = (char*)malloc(sizeof(char*)+c)))
 	{
 		c=WRDE_NOSPACE;
@@ -174,7 +175,7 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 	wdarg->we_wordc += ac;
 	if(flags&WRDE_DOOFFS)
 		av += wdarg->we_offs;
-	memcpy((void*)cp,stakptr(offset),c);
+	memcpy(cp,stkptr(stkstd,offset),c);
 	while(ac-- > 0)
 	{
 		*av++ = cp;
@@ -185,16 +186,16 @@ int	wordexp(const char *string, wordexp_t *wdarg, register int flags)
 	c=0;
 err:
 	if(offset)
-		stakset(savebase,offset);
+		stkset(stkstd,savebase,offset);
 	else
-		stakseek(0);
-	return(c);
+		stkseek(stkstd,0);
+	return c;
 }
 
 /*
  * free fields in <wdarg>
  */
-int wordfree(register wordexp_t *wdarg)
+int wordfree(wordexp_t *wdarg)
 {
 	struct list *arg, *argnext;
 	if(wdarg->we_wordv)
@@ -203,11 +204,11 @@ int wordfree(register wordexp_t *wdarg)
 		while(arg=argnext)
 		{
 			argnext = arg->next;
-			free((void*)arg);
+			free(arg);
 		}
-		free((void*)&wdarg->we_wordv[-1]);
+		free(&wdarg->we_wordv[-1]);
 		wdarg->we_wordv = 0;
 	}
 	wdarg->we_wordc=0;
-	return(0);
+	return 0;
 }

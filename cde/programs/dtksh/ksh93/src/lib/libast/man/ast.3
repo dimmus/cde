@@ -24,7 +24,7 @@
 .de EX		\" start example
 .ta 1i 2i 3i 4i 5i 6i
 .PP
-.RS 
+.RS
 .PD 0
 .ft 5
 .nf
@@ -48,8 +48,8 @@ long           astconf_long(\fIarg\fP);
 unsigned long  astconf_ulong(\fIarg\fP);
 Ast_confdisc_t astconfdisc(Ast_confdisc_t new_notify);
 void           astconflist(Sfio_t* stream, const char* path, int flags);
-off_t          astcopy(int \fIrfd\fP, int \fIwfd\fP, off_t \fIn\fP);
 int            astquery(int \fIfd\fP, const char* \fIformat\fP , ...);
+void           astwinsize(int \fIfd\fP, int* \fIrows\fP, int* \fIcols\fP);
 .EE
 .SH DESCRIPTION
 .L astconf
@@ -100,7 +100,7 @@ is returned if
 has no configuration value.
 This simplifies the programming interface:
 .EX
-if (!strcmp(astconf("PATH_RESOLVE", NiL, NiL), "logical"))
+if (!strcmp(astconf("PATH_RESOLVE", NULL, NULL), "logical"))
 	/* the logical way ... */
 .EE
 If
@@ -223,29 +223,6 @@ snarfed for input to the
 .IR getconf (1)
 command.
 .PP
-.L astcopy
-efficiently copies up to
-.I n
-bytes from the file descriptor
-.I rfd
-to the file descriptor
-.IR wfd .
-The actual number of bytes copied is returned; \-1 is returned on error.
-If
-.I n
-is  0 then an optimal number of bytes (with respect to both
-.I rfd
-and
-.IR wfd )
-is copied.
-.PP
-If possible
-.IR mmap (2)
-is used to do the transfer.
-Some implementations may bypass user buffer copies usually required by the
-.IR read (2)- write (2)
-paradigm.
-.PP
 .L astquery
 outputs an
 .IR sfprintf (3)
@@ -272,8 +249,8 @@ The responses will eventually be locale specific.
 .L astwinsize
 returns the number of rows in
 .I *rows
-and the number of columns
-.I *col
+and the number of columns in
+.I *cols
 for the terminal file descriptor
 .IR fd .
 If the number of rows or columns cannot be determined or if

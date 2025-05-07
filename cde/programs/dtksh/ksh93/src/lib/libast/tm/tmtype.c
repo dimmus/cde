@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -36,18 +37,18 @@
  */
 
 Tm_zone_t*
-tmtype(register const char* s, char** e)
+tmtype(const char* s, char** e)
 {
-	register Tm_zone_t*	zp;
-	register char*		t;
+	Tm_zone_t*	zp;
+	char*		t;
 
-	tmset(tm_info.zone);
+	tmset(tm_info.zone, time(NULL), 0);
 	zp = tm_info.local;
 	do
 	{
-		if ((t = zp->type) && tmword(s, e, t, NiL, 0)) return(zp);
+		if ((t = zp->type) && tmword(s, e, t, NULL, 0)) return zp;
 		if (zp == tm_info.local) zp = tm_data.zone;
 		else zp++;
 	} while (zp->standard);
-	return(0);
+	return NULL;
 }

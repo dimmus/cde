@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -19,8 +20,6 @@
 #define __builtins_h_defined
 
 #include	<option.h>
-#include	"FEATURE/options"
-#include	"FEATURE/dynamic"
 #include	"shtable.h"
 
 /*
@@ -77,16 +76,10 @@ extern int b_unset(int, char*[],Shbltin_t*);
 extern int b_unalias(int, char*[],Shbltin_t*);
 
 /* The following are for job control */
-#if defined(SIGCLD) || defined(SIGCHLD)
-    extern int b_jobs(int, char*[],Shbltin_t*);
-    extern int b_kill(int, char*[],Shbltin_t*);
-#   ifdef SIGTSTP
-	extern int b_bg(int, char*[],Shbltin_t*);
-#   endif	/* SIGTSTP */
-#   ifdef SIGSTOP
-	extern int b_suspend(int, char*[],Shbltin_t*);
-#   endif	/* SIGSTOP */
-#endif
+extern int b_jobs(int, char*[],Shbltin_t*);
+extern int b_kill(int, char*[],Shbltin_t*);
+extern int b_bg(int, char*[],Shbltin_t*);
+extern int b_suspend(int, char*[],Shbltin_t*);
 
 /* The following utilities are built-in because of side-effects */
 extern int b_builtin(int, char*[],Shbltin_t*);
@@ -102,7 +95,7 @@ extern int b_let(int, char*[],Shbltin_t*);
 extern int b_read(int, char*[],Shbltin_t*);
 extern int b_ulimit(int, char*[],Shbltin_t*);
 extern int b_umask(int, char*[],Shbltin_t*);
-#ifdef _cmd_universe
+#if _cmd_universe
     extern int b_universe(int, char*[],Shbltin_t*);
 #endif /* _cmd_universe */
 extern int b_wait(int, char*[],Shbltin_t*);
@@ -127,11 +120,11 @@ extern const char	e_badfun[];
 extern const char	e_baddisc[];
 extern const char	e_nofork[];
 extern const char	e_nosignal[];
-extern const char	e_nolabels[];
 extern const char	e_notimp[];
 extern const char	e_nosupport[];
-extern const char	e_badbase[];
+extern const char	e_limit[];
 extern const char	e_overlimit[];
+extern const char	e_internal[];
 
 extern const char	e_eneedsarg[];
 extern const char	e_oneoperand[];
@@ -139,7 +132,7 @@ extern const char	e_toomanyops[];
 extern const char	e_toodeep[];
 extern const char	e_badname[];
 extern const char	e_badsyntax[];
-#ifdef _cmd_universe
+#if _cmd_universe
     extern const char	e_nouniverse[];
 #endif /* _cmd_universe */
 extern const char	e_histopen[];
@@ -175,13 +168,13 @@ extern const char sh_optbg[];
 extern const char sh_optdisown[];
 extern const char sh_optfg[];
 extern const char sh_opthash[];
+#if !SHOPT_SCRIPTONLY
 extern const char sh_opthist[];
+#endif /* !SHOPT_SCRIPTONLY */
 extern const char sh_optjobs[];
 extern const char sh_optkill[];
-#if defined(JOBS) && defined(SIGSTOP)
 extern const char sh_optstop[];
 extern const char sh_optsuspend[];
-#endif /* defined(JOBS) && defined(SIGSTOP) */
 extern const char sh_optksh[];
 extern const char sh_optlet[];
 extern const char sh_optprint[];
@@ -199,7 +192,7 @@ extern const char sh_optulimit[];
 extern const char sh_optumask[];
 extern const char sh_optunalias[];
 extern const char sh_optwait[];
-#ifdef _cmd_universe
+#if _cmd_universe
     extern const char sh_optuniverse[];
 #endif /* _cmd_universe */
 extern const char sh_optunset[];

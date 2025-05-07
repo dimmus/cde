@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -37,19 +37,19 @@
 #define NOCAT			((nl_catd)-1)
 #define GAP			100
 
-typedef	struct 
-{	
+typedef	struct
+{
 	Dtlink_t	link;		/* dictionary link		*/
 	Dt_t*		messages;	/* message dictionary handle	*/
 	nl_catd		cat;		/* message catalog handle	*/
 	int		debug;		/* special debug locale		*/
-	const char*	locale;		/* message catalog locale	*/	
-	const char*	nlspath;	/* message catalog NLSPATH	*/	
+	const char*	locale;		/* message catalog locale	*/
+	const char*	nlspath;	/* message catalog NLSPATH	*/
 	char		name[1];	/* catalog name			*/
 } Catalog_t;
 
 typedef struct
-{	
+{
 	Dtlink_t	link;		/* dictionary link		*/
 	Catalog_t*	cat;		/* current catalog pointer	*/
 	int		set;		/* set number			*/
@@ -134,7 +134,7 @@ find(const char* locale, const char* catalog)
 	{
 		if (locale == (const char*)lc_categories[AST_LC_MESSAGES].prev)
 			o = 0;
-		else if (o = setlocale(LC_MESSAGES, NiL))
+		else if (o = setlocale(LC_MESSAGES, NULL))
 		{
 			ast.locale.set |= AST_LC_internal;
 			setlocale(LC_MESSAGES, locale);
@@ -154,25 +154,25 @@ find(const char* locale, const char* catalog)
  */
 
 static Catalog_t*
-init(register char* s)
+init(char* s)
 {
-	register Catalog_t*	cp;
-	register int		n;
-	register int		m;
-	register int		set;
-	nl_catd			d;
+	Catalog_t*	cp;
+	int		n;
+	int		m;
+	int		set;
+	nl_catd		d;
 
 	/*
 	 * insert into the catalog dictionary
 	 */
 
 	if (!(cp = newof(0, Catalog_t, 1, strlen(s))))
-		return 0;
+		return NULL;
 	strcpy(cp->name, s);
 	if (!dtinsert(state.catalogs, cp))
 	{
 		free(cp);
-		return 0;
+		return NULL;
 	}
 	cp->cat = NOCAT;
 
@@ -225,8 +225,8 @@ init(register char* s)
 static Message_t*
 match(const char* cat, const char* msg)
 {
-	register char*	s;
-	register char*	t;
+	char*	s;
+	char*	t;
 	Catalog_t*	cp;
 	Message_t*	mp;
 	size_t		n;
@@ -257,7 +257,7 @@ match(const char* cat, const char* msg)
 			break;
 		s = t + 1;
 	}
-	return 0;
+	return NULL;
 }
 
 /*
@@ -274,28 +274,28 @@ match(const char* cat, const char* msg)
  * the translated message text is returned on success
  * otherwise the original msg is returned
  *
- * The first time translate() is called (for a non-C locale) 
+ * The first time translate() is called (for a non-C locale)
  * it creates the state.catalogs dictionary. A dictionary entry
  * (Catalog_t) is made each time translate() is called with a new
- * cmd:cat argument. 
- * 
- * The X/Open interface catgets() is used to obtain a translated 
+ * cmd:cat argument.
+ *
+ * The X/Open interface catgets() is used to obtain a translated
  * message. Its arguments include the message catalog name
- * and the set/sequence numbers within the catalog. An additional 
- * dictionary, with entries of type Message_t, is needed for 
- * mapping untranslated message strings to the set/sequence numbers 
+ * and the set/sequence numbers within the catalog. An additional
+ * dictionary, with entries of type Message_t, is needed for
+ * mapping untranslated message strings to the set/sequence numbers
  * needed by catgets().  A separate Message_t dictionary is maintained
  * for each Catalog_t.
- */   
+ */
 
 char*
 translate(const char* loc, const char* cmd, const char* cat, const char* msg)
 {
-	register char*	r;
+	char*		r;
 	char*		t;
 	int		p;
 	int		oerrno;
-	Catalog_t*	cp;
+	Catalog_t*	cp = NULL;
 	Message_t*	mp;
 
 	static uint32_t	serial;
@@ -348,7 +348,6 @@ translate(const char* loc, const char* cmd, const char* cat, const char* msg)
 #if DEBUG_trace > 1
 sfprintf(sfstderr, "AHA#%d:%s cmd %s cat %s:%s ID %s msg `%s'\n", __LINE__, __FILE__, cmd, cat, error_info.catalog, ast.id, msg);
 #endif
-		cp = 0;
 		goto done;
 	}
 

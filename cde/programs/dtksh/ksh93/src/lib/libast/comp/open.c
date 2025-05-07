@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -64,17 +64,17 @@ _ast_open(const char* path, int op, ...)
 				if ((op & O_EXCL) && !access(path, F_OK))
 				{
 					errno = EEXIST;
-					return(-1);
+					return -1;
 				}
 				if ((fd = creat(path, (op & O_EXCL) ? 0 : mode)) < 0)
-					return(-1);
+					return -1;
 				if (op & O_EXCL)
 				{
 					if (fstat(fd, &st) || (st.st_mode & S_IPERM))
 					{
 						errno = EEXIST;
 						close(fd);
-						return(-1);
+						return -1;
 					}
 #if _lib_fchmod
 					if (mode && fchmod(fd, mode))
@@ -97,7 +97,7 @@ _ast_open(const char* path, int op, ...)
 					op |= O_TRUNC;
 					continue;
 				}
-				return(-1);
+				return -1;
 			}
 			else if ((op & O_APPEND) && lseek(fd, 0L, SEEK_END) == -1L)
 				errno = save_errno;
@@ -109,7 +109,7 @@ _ast_open(const char* path, int op, ...)
 		}
 	}
 	else fd = open(path, op, mode);
-	return(fd);
+	return fd;
 }
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1997-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -38,5 +38,5 @@ dllfind(const char* lib, const char* ver, int flags, char* path, size_t size)
 
 	if ((id = error_info.id) && (dll = dllplug(id, lib, ver, flags, path, size)))
 		return dll;
-	return dllplug(NiL, lib, ver, flags, path, size);
+	return dllplug(NULL, lib, ver, flags, path, size);
 }

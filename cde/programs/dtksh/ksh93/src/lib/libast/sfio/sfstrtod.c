@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -29,7 +29,7 @@
 #define FPART		1	/* doing fractional part */
 #define EPART		2	/* doing exponent part */
 
-static Sfdouble_t sfpow10(reg int n)
+static Sfdouble_t sfpow10(int n)
 {
 	Sfdouble_t	dval;
 
@@ -57,11 +57,11 @@ static Sfdouble_t sfpow10(reg int n)
 	return dval;
 }
 
-Sfdouble_t _sfstrtod(reg const char*	s,	/* string to convert */
+Sfdouble_t _sfstrtod(const char*	s,	/* string to convert */
 		     char**		retp)	/* to return the remainder of string */
 {
-	reg int		n, c, m;
-	reg int		mode, fexp, sign, expsign;
+	int		n, c, m;
+	int		mode, fexp, sign, expsign;
 	Sfdouble_t	dval;
 #if _lib_locale
 	int		decpoint = 0;

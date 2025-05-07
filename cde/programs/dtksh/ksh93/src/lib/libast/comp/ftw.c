@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,7 +28,7 @@ static int	(*ftw_userf)(const char*, const struct stat*, int);
 static int
 ftw_user(Ftw_t* ftw)
 {
-	register int	n = ftw->info;
+	int	n = ftw->info;
 
 	if (n & (FTW_C|FTW_NX))
 		n = FTW_DNR;
@@ -42,5 +42,5 @@ ftw(const char* path, int(*userf)(const char*, const struct stat*, int), int dep
 {
 	NoP(depth);
 	ftw_userf = userf;
-	return ftwalk(path, ftw_user, FTW_DOT, NiL);
+	return ftwalk(path, ftw_user, FTW_DOT, NULL);
 }

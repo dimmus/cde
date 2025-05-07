@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -64,11 +65,11 @@
  */
 
 static int
-sub(const regex_t* p, register regsub_t* b, const char* ss, register regsubop_t* op, size_t nmatch, register regmatch_t* match)
+sub(const regex_t* p, regsub_t* b, const char* ss, regsubop_t* op, size_t nmatch, regmatch_t* match)
 {
-	register char*	s;
-	register char*	e;
-	register int	c;
+	char*	s;
+	char*	e;
+	int	c;
 
 	for (;; op++)
 	{
@@ -143,13 +144,13 @@ sub(const regex_t* p, register regsub_t* b, const char* ss, register regsubop_t*
 int
 regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
 {
-	register int		c;
-	register regsub_t*	b;
-	const char*		e;
-	int			m;
+	int		c;
+	regsub_t*	b;
+	const char*	e;
+	int		m;
 
 	if (!p->env->sub || (p->env->flags & REG_NOSUB) || !nmatch)
-		return fatal(p->env->disc, REG_BADPAT, NiL);
+		return fatal(p->env->disc, REG_BADPAT, NULL);
 	b = p->re_sub;
 	m = b->re_min;
 	b->re_cur = b->re_buf;
@@ -158,12 +159,12 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
 	for (;;)
 	{
 		if (--m > 0)
-			PUTS(p, b, s, match->rm_eo, return fatal(p->env->disc, c, NiL));
+			PUTS(p, b, s, match->rm_eo, return fatal(p->env->disc, c, NULL));
 		else
 		{
-			PUTS(p, b, s, match->rm_so, return fatal(p->env->disc, c, NiL));
+			PUTS(p, b, s, match->rm_so, return fatal(p->env->disc, c, NULL));
 			if (!c && (c = sub(p, b, s, b->re_ops, nmatch, match)))
-				return fatal(p->env->disc, c, NiL);
+				return fatal(p->env->disc, c, NULL);
 		}
 		s += match->rm_eo;
 		if (m <= 0 && !(b->re_flags & REG_SUB_ALL) || !*s)
@@ -171,7 +172,7 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
 		if (c = regnexec(p, s, e - s, nmatch, match, p->env->flags|(match->rm_so == match->rm_eo ? REG_ADVANCE : 0)))
 		{
 			if (c != REG_NOMATCH)
-				return fatal(p->env->disc, c, NiL);
+				return fatal(p->env->disc, c, NULL);
 			break;
 		}
 		if (!match->rm_so && !match->rm_eo && *s && m <= 1)
@@ -183,9 +184,9 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
 	while (s < e)
 	{
 		c = *s++;
-		PUTC(p, b, c, return fatal(p->env->disc, c, NiL));
+		PUTC(p, b, c, return fatal(p->env->disc, c, NULL));
 	}
-	NEED(p, b, 1, return fatal(p->env->disc, c, NiL));
+	NEED(p, b, 1, return fatal(p->env->disc, c, NULL));
 	*b->re_cur = 0;
 	b->re_len = b->re_cur - b->re_buf;
 	return 0;
@@ -196,9 +197,7 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
  */
 
 #undef	regsubexec
-#if _map_libc
 #define regsubexec	_ast_regsubexec
-#endif
 
 extern int
 regsubexec(const regex_t* p, const char* s, size_t nmatch, oldregmatch_t* oldmatch)
@@ -225,5 +224,5 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, oldregmatch_t* oldmat
 		free(match);
 		return r;
 	}
-	return regsubexec_20120528(p, s, 0, NiL);
+	return regsubexec_20120528(p, s, 0, NULL);
 }

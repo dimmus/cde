@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -40,13 +40,13 @@
  */
 
 Hash_position_t*
-hashscan(register Hash_table_t* tab, register int flags)
+hashscan(Hash_table_t* tab, int flags)
 {
-	register Hash_position_t*	pos;
+	Hash_position_t*	pos;
 
 	static Hash_bucket_t		empty;
 
-	if (!(pos = newof(0, Hash_position_t, 1, 0))) return(0);
+	if (!(pos = newof(0, Hash_position_t, 1, 0))) return NULL;
 	pos->tab = tab->root->last.table = tab;
 	pos->bucket = &empty;
 	pos->slot = tab->table - 1;
@@ -56,12 +56,12 @@ hashscan(register Hash_table_t* tab, register int flags)
 		pos->flags = HASH_SCOPE;
 		do
 		{
-			register Hash_bucket_t*	b;
+			Hash_bucket_t*	b;
 
 			if (tab->frozen)
 			{
-				register Hash_bucket_t**	sp = tab->table;
-				register Hash_bucket_t**	sx = tab->table + tab->size;
+				Hash_bucket_t**	sp = tab->table;
+				Hash_bucket_t**	sx = tab->table + tab->size;
 
 				while (sp < sx)
 					for (b = *sp++; b; b = b->next)
@@ -72,7 +72,7 @@ hashscan(register Hash_table_t* tab, register int flags)
 	}
 	else pos->flags = 0;
 	tab->frozen++;
-	return(pos);
+	return pos;
 }
 
 /*
@@ -80,11 +80,11 @@ hashscan(register Hash_table_t* tab, register int flags)
  */
 
 Hash_bucket_t*
-hashnext(register Hash_position_t* pos)
+hashnext(Hash_position_t* pos)
 {
-	register Hash_bucket_t*	b;
+	Hash_bucket_t*	b;
 
-	if (!pos) return(0);
+	if (!pos) return NULL;
 	b = pos->bucket;
 	for (;;)
 	{
@@ -95,7 +95,7 @@ hashnext(register Hash_position_t* pos)
 				if (++pos->slot >= pos->limit)
 				{
 					pos->tab->frozen--;
-					if (!pos->flags || !pos->tab->scope) return(0);
+					if (!pos->flags || !pos->tab->scope) return NULL;
 					pos->tab = pos->tab->scope;
 					pos->tab->root->last.table = pos->tab;
 					pos->limit = (pos->slot = pos->tab->table) + pos->tab->size;
@@ -106,7 +106,7 @@ hashnext(register Hash_position_t* pos)
 		if (!(b->hash & HASH_DELETED) && (!(pos->tab->flags & HASH_VALUE) || b->value) && (!pos->flags || !(b->hash & (HASH_HIDDEN|HASH_HIDES)))) break;
 		if (b->hash & HASH_HIDES)
 		{
-			register Hash_bucket_t*	h = (Hash_bucket_t*)b->name;
+			Hash_bucket_t*	h = (Hash_bucket_t*)b->name;
 
 			if (!(h->hash & HASH_HIDDEN))
 			{
@@ -116,7 +116,7 @@ hashnext(register Hash_position_t* pos)
 		}
 		else b->hash &= ~HASH_HIDDEN;
 	}
-	return(pos->tab->root->last.bucket = pos->bucket = b);
+	return pos->tab->root->last.bucket = pos->bucket = b;
 }
 
 /*
@@ -124,7 +124,7 @@ hashnext(register Hash_position_t* pos)
  */
 
 void
-hashdone(register Hash_position_t* pos)
+hashdone(Hash_position_t* pos)
 {
 	if (pos)
 	{

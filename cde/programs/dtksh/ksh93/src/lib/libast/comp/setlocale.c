@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -89,11 +89,11 @@ header(void)
 #endif
 
 #if !_lib_strcoll
-#define	strcoll		0
+#define strcoll		0
 #endif
 
 #if !_lib_strxfrm
-#define	strxfrm		0
+#define strxfrm		0
 #endif
 
 /*
@@ -171,13 +171,13 @@ static unsigned char debug_order[] =
 };
 
 static int
-debug_mbtowc(register wchar_t* p, register const char* s, size_t n)
+debug_mbtowc(wchar_t* p, const char* s, size_t n)
 {
-	register const char*	q;
-	register const char*	r;
-	register int		w;
-	register int		dr;
-	wchar_t			c;
+	const char*	q;
+	const char*	r;
+	int		w;
+	int		dr;
+	wchar_t		c;
 
 	if (n < 1)
 		return -1;
@@ -266,7 +266,7 @@ debug_wctomb(char* s, wchar_t c)
 static int
 debug_mblen(const char* s, size_t n)
 {
-	return debug_mbtowc(NiL, s, n);
+	return debug_mbtowc(NULL, s, n);
 }
 
 static int
@@ -286,14 +286,14 @@ debug_alpha(wchar_t c)
 }
 
 static size_t
-debug_strxfrm(register char* t, register const char* s, size_t n)
+debug_strxfrm(char* t, const char* s, size_t n)
 {
-	register const char*	q;
-	register const char*	r;
-	register char*		e;
-	char*			o;
-	register size_t		z;
-	register int		w;
+	const char*	q;
+	const char*	r;
+	char*		e;
+	char*		o;
+	size_t		z;
+	int		w;
 
 	o = t;
 	z = 0;
@@ -314,7 +314,7 @@ debug_strxfrm(register char* t, register const char* s, size_t n)
 				{
 					for (q = s + 2; q < r; q++)
 						if (t < e)
-							*t++ = debug_order[*q];
+							*t++ = debug_order[*((unsigned char*)q)];
 					while (w++ < DX)
 						if (t < e)
 							*t++ = 1;
@@ -329,9 +329,9 @@ debug_strxfrm(register char* t, register const char* s, size_t n)
 			if (t)
 			{
 				if (t < e)
-					*t++ = debug_order[s[0]];
+					*t++ = debug_order[((unsigned char*)s)[0]];
 				if (t < e)
-					*t++ = debug_order[s[1]];
+					*t++ = debug_order[((unsigned char*)s)[1]];
 				if (t < e)
 					*t++ = 1;
 				if (t < e)
@@ -346,11 +346,11 @@ debug_strxfrm(register char* t, register const char* s, size_t n)
 			if (t)
 			{
 				if (t < e)
-					*t++ = debug_order[s[0]];
+					*t++ = debug_order[((unsigned char*)s)[0]];
 				if (t < e)
-					*t++ = debug_order[s[1]];
+					*t++ = debug_order[((unsigned char*)s)[1]];
 				if (t < e)
-					*t++ = debug_order[s[2]];
+					*t++ = debug_order[((unsigned char*)s)[2]];
 				if (t < e)
 					*t++ = 1;
 			}
@@ -361,7 +361,7 @@ debug_strxfrm(register char* t, register const char* s, size_t n)
 		if (t)
 		{
 			if (t < e)
-				*t++ = debug_order[s[0]];
+				*t++ = debug_order[((unsigned char*)s)[0]];
 			if (t < e)
 				*t++ = 1;
 			if (t < e)
@@ -397,7 +397,7 @@ debug_strcoll(const char* a, const char* b)
 #define debug_mbtowc	0
 #define debug_wctomb	0
 #define debug_mblen	0
-#define	debug_wcwidth	0
+#define debug_wcwidth	0
 #define debug_alpha	0
 #define debug_strxfrm	0
 #define debug_strcoll	0
@@ -449,7 +449,7 @@ set_collate(Lc_category_t* cp)
 #define mb_state	((mbstate_t*)&ast.pad[sizeof(ast.pad)-sizeof(mbstate_t)])
 
 static int
-sjis_mbtowc(register wchar_t* p, register const char* s, size_t n)
+sjis_mbtowc(wchar_t* p, const char* s, size_t n)
 {
 	if (n && p && s && (*s == '\\' || *s == '~') && !memcmp(mb_state, mb_state_zero, sizeof(mbstate_t)))
 	{
@@ -464,7 +464,7 @@ sjis_mbtowc(register wchar_t* p, register const char* s, size_t n)
 #if !AST_NOMULTIBYTE
 
 static int
-utf8_wctomb(char* u, wchar_t w) 
+utf8_wctomb(char* u, wchar_t w)
 {
 	return u ? wc2utf8(u, w) : 0;
 }
@@ -503,11 +503,11 @@ static const signed char	utf8tab[256] =
 static int
 utf8_mbtowc(wchar_t* wp, const char* str, size_t n)
 {
-	register unsigned char*	sp = (unsigned char*)str;
-	register int		m;
-	register int		i;
-	register int		c;
-	register wchar_t	w = 0;
+	unsigned char*	sp = (unsigned char*)str;
+	int		m;
+	int		i;
+	int		c;
+	wchar_t		w = 0;
 
 	if (!sp || !n)
 		return 0;
@@ -2224,9 +2224,9 @@ set_ctype(Lc_category_t* cp)
 static int
 set_numeric(Lc_category_t* cp)
 {
-	register int		category = cp->internal;
-	struct lconv*		lp;
-	Lc_numeric_t*		dp;
+	int		category = cp->internal;
+	struct lconv*	lp;
+	Lc_numeric_t*	dp;
 
 	static Lc_numeric_t	default_numeric = { '.', -1 };
 	static Lc_numeric_t	eu_numeric = { ',', '.' };
@@ -2247,13 +2247,13 @@ set_numeric(Lc_category_t* cp)
 		}
 		else
 			dp = &default_numeric;
-		LCINFO(category)->data = (void*)dp;
+		LCINFO(category)->data = dp;
 	}
 	return 0;
 }
 
 /*
- * this table is indexed by AST_LC_[A-Z]*
+ * The order of this table must correspond to the numbers of the #defines in ast_std.h
  */
 
 Lc_category_t		lc_categories[] =
@@ -2269,7 +2269,6 @@ Lc_category_t		lc_categories[] =
 { "LC_ADDRESS",       LC_ADDRESS,       AST_LC_ADDRESS,       0               },
 { "LC_NAME",          LC_NAME,          AST_LC_NAME,          0               },
 { "LC_TELEPHONE",     LC_TELEPHONE,     AST_LC_TELEPHONE,     0               },
-{ "LC_XLITERATE",     LC_XLITERATE,     AST_LC_XLITERATE,     0               },
 { "LC_MEASUREMENT",   LC_MEASUREMENT,   AST_LC_MEASUREMENT,   0               },
 { "LC_PAPER",         LC_PAPER,         AST_LC_PAPER,         0               },
 };
@@ -2300,6 +2299,8 @@ static const Unamval_t	options[] =
 static int
 setopt(void* a, const void* p, int n, const char* v)
 {
+	NOT_USED(a);
+	NOT_USED(v);
 	if (p)
 	{
 		if (n)
@@ -2322,7 +2323,7 @@ default_setlocale(int category, const char* locale)
 	if (locale)
 	{
 		if (!(lc = lcmake(locale)) || !(lc->flags & LC_default))
-			return 0;
+			return NULL;
 		locales[0]->flags &= ~lc->flags;
 		locales[1]->flags &= ~lc->flags;
 		return lc->name;
@@ -2331,29 +2332,6 @@ default_setlocale(int category, const char* locale)
 }
 
 #endif
-
-/* <TODO> [2022-07-21]: remove this and _vmkeep? obsolete? */
-/*
- * workaround for Solaris and FreeBSD systems
- * they call free() with addresses that look like they came from the stack
- */
-
-extern int	_vmkeep(int);
-
-static char*
-_sys_setlocale(int category, const char* locale)
-{
-	char*	r;
-	int	k;
-
-	k = _vmkeep(1);
-	r = setlocale(category, locale);
-	(void)_vmkeep(k);
-	return r;
-}
-
-#define setlocale(a,b)	_sys_setlocale(a,b)
-/* </TODO> */
 
 /*
  * set a single AST_LC_* locale category
@@ -2383,7 +2361,7 @@ single(int category, Lc_t* lc, unsigned int flags)
 		}
 	}
 	if (!lc && (!(lc_categories[category].flags & LC_setlocale) || !(lc = lc_categories[category].prev)) && !(lc = lc_all) && !(lc = lc_categories[category].prev) && !(lc = lang))
-		lc = lcmake(NiL);
+		lc = lcmake(NULL);
 	sys = 0;
 	if (locales[category] != lc)
 	{
@@ -2397,7 +2375,7 @@ single(int category, Lc_t* lc, unsigned int flags)
 				}
 		}
 		else if (lc->flags & (LC_debug|LC_local))
-			sys = setlocale(lc_categories[category].external, lcmake(NiL)->name);
+			sys = setlocale(lc_categories[category].external, lcmake(NULL)->name);
 		else if (!(sys = setlocale(lc_categories[category].external, lc->name)) &&
 			 (streq(lc->name, lc->code) || !(sys = setlocale(lc_categories[category].external, lc->code))) &&
 			 !streq(lc->code, lc->language->code))
@@ -2415,20 +2393,20 @@ single(int category, Lc_t* lc, unsigned int flags)
 			{
 				char	path[PATH_MAX];
 
-				if (mcfind(lc->code, NiL, LC_MESSAGES, 0, path, sizeof(path)))
+				if (mcfind(lc->code, NULL, LC_MESSAGES, 0, path, sizeof(path)))
 					lc->flags |= LC_local;
 				lc->flags |= LC_checked;
 			}
 			if (!(lc->flags & LC_local))
-				return 0;
+				return NULL;
 			if (lc_categories[category].external != -lc_categories[category].internal)
-				setlocale(lc_categories[category].external, lcmake(NiL)->name);
+				setlocale(lc_categories[category].external, lcmake(NULL)->name);
 		}
 		locales[category] = lc;
 		if (lc_categories[category].setf && (*lc_categories[category].setf)(&lc_categories[category]))
 		{
 			locales[category] = lc_categories[category].prev;
-			return 0;
+			return NULL;
 		}
 		if ((lc->flags & LC_default) || category == AST_LC_MESSAGES && lc->name[0] == 'e' && lc->name[1] == 'n' && (lc->name[2] == 0 || lc->name[2] == '_' && lc->name[3] == 'U'))
 			ast.locale.set &= ~(1<<category);
@@ -2449,7 +2427,7 @@ single(int category, Lc_t* lc, unsigned int flags)
 	if ((ast.locale.set & (AST_LC_debug|AST_LC_setlocale)) && !(ast.locale.set & AST_LC_internal))
 	{
 		header();
-		sfprintf(sfstderr, "locale set  %17s %16s %16s %16s", lc_categories[category].name, lc->name, sys, lc_categories[category].prev ? lc_categories[category].prev->name : NiL);
+		sfprintf(sfstderr, "locale set  %17s %16s %16s %16s", lc_categories[category].name, lc->name, sys, lc_categories[category].prev ? lc_categories[category].prev->name : NULL);
 		if (category == AST_LC_CTYPE)
 			sfprintf(sfstderr, " MB_CUR_MAX=%d%s%s%s%s%s"
 				, ast.mb_cur_max
@@ -2488,19 +2466,19 @@ single(int category, Lc_t* lc, unsigned int flags)
  */
 
 static int
-composite(register const char* s, int initialize)
+composite(const char* s, int initialize)
 {
-	register const char*	t;
-	register int		i;
-	register int		j;
-	register int		k;
-	int			n;
-	int			m;
-	const char*		w;
-	Lc_t*			p;
-	int			cat[AST_LC_COUNT];
-	int			stk[AST_LC_COUNT];
-	char			buf[PATH_MAX / 2];
+	const char*	t;
+	int		i;
+	int		j;
+	int		k;
+	int		n;
+	int		m;
+	const char*	w;
+	Lc_t*		p;
+	int		cat[AST_LC_COUNT];
+	int		stk[AST_LC_COUNT];
+	char		buf[PATH_MAX / 2];
 
 	k = n = 0;
 	while (s[0] == 'L' && s[1] == 'C' && s[2] == '_')
@@ -2526,7 +2504,7 @@ composite(register const char* s, int initialize)
 		if (!*s)
 		{
 			for (i = 0; i < k; i++)
-				single(stk[i], NiL, 0);
+				single(stk[i], NULL, 0);
 			return -1;
 		}
 		w = ++s;
@@ -2553,7 +2531,7 @@ composite(register const char* s, int initialize)
 				if (!single(cat[i], p, 0))
 				{
 					for (i = 0; i < k; i++)
-						single(stk[i], NiL, 0);
+						single(stk[i], NULL, 0);
 					return -1;
 				}
 				stk[k++] = cat[i];
@@ -2580,7 +2558,7 @@ composite(register const char* s, int initialize)
 			if (!single(n, p, 0))
 			{
 				for (i = 1; i < n; i++)
-					single(i, NiL, 0);
+					single(i, NULL, 0);
 				return -1;
 			}
 		}
@@ -2604,9 +2582,9 @@ composite(register const char* s, int initialize)
 char*
 _ast_setlocale(int category, const char* locale)
 {
-	register char*		s;
-	register int		i;
-	register int		j;
+	char*			s;
+	int			i;
+	int			j;
 	int			k;
 	int			f;
 	Lc_t*			p;
@@ -2617,7 +2595,7 @@ _ast_setlocale(int category, const char* locale)
 	static const char	local[] = "local";
 
 	if ((category = lcindex(category, 0)) < 0)
-		return 0;
+		return NULL;
 	if (!locale)
 	{
 		/*
@@ -2628,7 +2606,7 @@ _ast_setlocale(int category, const char* locale)
 		if (category != AST_LC_ALL && category != AST_LC_LANG)
 			return (char*)locales[category]->name;
 		if (!sp && !(sp = sfstropen()))
-			return 0;
+			return NULL;
 		for (i = 1; i < AST_LC_COUNT; i++)
 			cat[i] = -1;
 		for (i = 1, k = 0; i < AST_LC_COUNT; i++)
@@ -2661,7 +2639,7 @@ _ast_setlocale(int category, const char* locale)
 	}
 	if (!ast.locale.serial++)
 	{
-		stropt(getenv("LC_OPTIONS"), options, sizeof(*options), setopt, NiL);
+		stropt(getenv("LC_OPTIONS"), options, sizeof(*options), setopt, NULL);
 		initialized = 0;
 	}
 	if ((ast.locale.set & (AST_LC_debug|AST_LC_setlocale)) && !(ast.locale.set & AST_LC_internal))
@@ -2672,7 +2650,7 @@ _ast_setlocale(int category, const char* locale)
 	if (ast.locale.set & AST_LC_setenv)
 	{
 		f = LC_setenv;
-		p = *locale ? lcmake(locale) : (Lc_t*)0;
+		p = *locale ? lcmake(locale) : NULL;
 	}
 	else if (*locale)
 	{
@@ -2684,7 +2662,6 @@ _ast_setlocale(int category, const char* locale)
 		if (!initialized)
 		{
 			char*	u;
-			char	tmp[256];
 
 			/*
 			 * initialize from the environment
@@ -2723,12 +2700,12 @@ _ast_setlocale(int category, const char* locale)
 				if (!single(i, lc_all && !(lc_categories[i].flags & LC_setlocale) ? lc_all : lc_categories[i].prev, 0))
 				{
 					while (i--)
-						single(i, NiL, 0);
-					return 0;
+						single(i, NULL, 0);
+					return NULL;
 				}
 			if (ast.locale.set & AST_LC_debug)
 				for (i = 1; i < AST_LC_COUNT; i++)
-					sfprintf(sfstderr, "locale env  %17s %16s %16s %16s\n", lc_categories[i].name, locales[i]->name, "", lc_categories[i].prev ? lc_categories[i].prev->name : (char*)0);
+					sfprintf(sfstderr, "locale env  %17s %16s %16s %16s\n", lc_categories[i].name, locales[i]->name, "", lc_categories[i].prev ? lc_categories[i].prev->name : NULL);
 			initialized = 1;
 		}
 		goto compose;
@@ -2750,8 +2727,8 @@ _ast_setlocale(int category, const char* locale)
 					if (!single(i, lc_categories[i].prev, 0))
 					{
 						while (i--)
-							single(i, NiL, 0);
-						return 0;
+							single(i, NULL, 0);
+						return NULL;
 					}
 		}
 	}
@@ -2764,7 +2741,7 @@ _ast_setlocale(int category, const char* locale)
 		return (char*)locales[category]->name;
 	}
 	else if (composite(locale, 0) < 0)
-		return 0;
+		return NULL;
 	else if (lc_all != p)
 	{
 		lc_all = p;
@@ -2772,8 +2749,8 @@ _ast_setlocale(int category, const char* locale)
 			if (!single(i, lc_all && !(lc_categories[i].flags & LC_setlocale) ? lc_all : lc_categories[i].prev, 0))
 			{
 				while (i--)
-					single(i, NiL, 0);
-				return 0;
+					single(i, NULL, 0);
+				return NULL;
 			}
 	}
 	goto compose;

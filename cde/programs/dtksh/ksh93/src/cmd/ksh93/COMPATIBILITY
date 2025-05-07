@@ -1,4 +1,39 @@
-		ksh 93u+m/1.0.0 vs. ksh 93u+
+		ksh 93u+m/1.1 vs. 93u+m/1.0
+
+The following is a list of changes between ksh 93u+m/1.1.* and the previous
+93u+m/1.0.* series that could cause incompatibilities in rare corner cases.
+For more details, see the NEWS file and for complete details, see the git log.
+
+0.	Self-documentation output from any command's --man, --help, and
+	other options is no longer written to standard error with exit
+	status 2, but now goes to standard output and sets exit status 0.
+
+1.	Type attributes of variables are no longer exported to or imported
+	from the environment. Any script that depends on this will need to
+	be changed to typeset the expected attributes itself.
+
+2.	Defining a function called '.sh.tilde' is an error. To customize tilde
+	expansion, use .sh.tilde.get instead (see the manual page for details).
+
+3.	The 'hash' and 'alias -t' commands now issue an error message for
+	each command given that was not found on PATH, and return a non-zero
+	exit status if any of the commands given were not found.
+
+4.	In printf formatters and C-style $'quoted' strings, \xNN is now
+	limited to two hexadecimal digits (yielding one byte). For
+	multi-byte characters, \u and \U should be used instead.
+
+5.	If a 'typeset -T' type declaration sets a discipline function for
+	one of its subvariables (such as var.get() or var.getn()), then,
+	within that discipline function, the automatic '_' nameref now
+	refers to the type variable and no longer to the subvariable that
+	the discipline function was set for. This means '_' now always
+	refers to the type variable when used in a type declaration.
+
+
+____________________________________________________________________________
+
+		ksh 93u+m/1.0.9 vs. ksh 93u+
 
 The following is a list of changes between ksh 93u+ 2012-08-01 and the new
 ksh 93u+m reboot that could cause incompatibilities in rare corner cases.
@@ -91,6 +126,8 @@ For more details, see the NEWS file and for complete details, see the git log.
 14.	The DEBUG trap has reverted to pre-93t behavior. It is now once again
 	reset like other traps upon entering a subshell or ksh-style function,
 	as documented, and it is no longer prone to crash or get corrupted.
+	A new --functrace shell option has been added that, when turned on,
+	makes subshells and functions correctly inherit the DEBUG trap.
 
 15.	'command -x' now always runs an external command, bypassing built-ins.
 
@@ -174,6 +211,35 @@ For more details, see the NEWS file and for complete details, see the git log.
 
 32.	The .sh.level variable is now read-only except inside a DEBUG trap.
 	The current level/scope is now restored when the DEBUG trap run ends.
+
+33.	The -e option of test/[/[[ no longer returns true for pseudodevices
+	that are only supported by the shell and do not in fact exist in the
+	file system, such as /dev/tcp/*.
+	(Post-1.0 fix introduced in ksh 93u+m/1.0.4)
+
+34.	Single and double quotes now work like backslashes to quote '!', '^'
+	and '-' in bracket expressions in shell glob patterns, e.g., the glob
+	pattern ["!a-z"] now matches !, a, - or z and is no longer misparsed
+	as [!a-z]. This restores compatibility with ksh88 and non-ksh shells.
+	(Post-1.0 fix introduced in ksh 93u+m/1.0.4)
+
+35.	In the ${parameter/pattern/string} search-and-replace expansion, an
+	anchored empty pattern will now match the beginning or the end of the
+	string, so that ${parameter/#/string} will prefix the string to the
+	parameter value and ${parameter/%/string} will append it. Previously,
+	these operations were no-ops (equivalent to ${parameter}).
+	(Post-1.0 fix introduced in ksh 93u+m/1.0.5)
+
+36.	An assignment within an arithmetic expression no longer triggers both
+	of the variable's 'set' and 'get' discipline functions (if set). Only
+	the 'set' discipline is now triggered, as it was always documented.
+	(Post-1.0 fix introduced in ksh 93u+m/1.0.9)
+
+37.	Non-base-10 signed negative integer values are now output as negative
+	numbers and no longer incorrectly treated as unsigned long integers
+	regardless of their type length. For example, 'typeset -i16 n=-12;
+	echo $n' now correctly prints -16#c instead of 16#fffffffffffffff4.
+	(Post-1.0 fix introduced in ksh 93u+m/1.0.9)
 
 ____________________________________________________________________________
 

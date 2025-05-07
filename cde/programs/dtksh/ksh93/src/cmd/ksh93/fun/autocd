@@ -1,8 +1,7 @@
 ########################################################################
 #                                                                      #
 #              This file is part of the ksh 93u+m package              #
-#          Copyright (c) 2021-2022 Contributors to ksh 93u+m           #
-#                    <https://github.com/ksh93/ksh>                    #
+#          Copyright (c) 2021-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -36,9 +35,9 @@ _do_autocd()
 	then	eval "set -- $1"
 	fi
 	# if the result is one word and it's not a command, then autocd
-	if      (($#==1)) && ! command -v "$1" >/dev/null && [[ -d $1 ]]
+	if      (($#==1)) && ! whence -q "$1" && [[ -d $1 ]]
 	then    printf 'cd -- %q\n' "$1" >&2
-		CDPATH= command cd -- "$1"
+		CDPATH= cd -- "$1"
 		return 2  # status 2 == do not execute original command
 	fi
 }
@@ -54,12 +53,10 @@ autocd()
 	fi
 }
 
-
 # Do a check at autoload time. This depends on a non-buggy DEBUG trap.
 # It is horribly broken in every latter-years AT&T version of ksh93.
-
-if ((.sh.version < 20210220)); then
-	print "WARNING: this may crash or break ksh ${.sh.version};" >&2
+if	((.sh.version < 20210220))
+then	print "WARNING: this may crash or break ksh ${.sh.version};" >&2
 	print "         autocd requires ksh 93u+m 2021-02-20 or later" >&2
 	sleep 1
 fi

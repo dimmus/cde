@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #define getpagesize	______getpagesize
@@ -43,20 +44,20 @@ struct stat
 #define fstat(fd,st)	(-1)
 #endif /*_sys_stat*/
 
-#if _PACKAGE_ast && !defined(SFSETLINEMODE)
+#if !defined(SFSETLINEMODE)
 #define SFSETLINEMODE		1
 #endif
 
 #if SFSETLINEMODE
 
-static int sfsetlinemode()
+static int sfsetlinemode(void)
 {	char*			astsfio;
 	char*			endw;
 
 	static int		modes = -1;
-	static const char	sf_line[] = "SF_LINE";
-	static const char	sf_maxr[] = "SF_MAXR=";
-	static const char	sf_wcwidth[] = "SF_WCWIDTH";
+	static const char	sf_line[] = "SFIO_LINE";
+	static const char	sf_maxr[] = "SFIO_MAXR=";
+	static const char	sf_wcwidth[] = "SFIO_WCWIDTH";
 
 #define ISSEPAR(c)	((c) == ',' || (c) == ' ' || (c) == '\t')
 	if (modes < 0)
@@ -69,17 +70,13 @@ static int sfsetlinemode()
 					;
 				if((endw-astsfio) > (sizeof(sf_line)-1) &&
 				   strncmp(astsfio,sf_line,sizeof(sf_line)-1) == 0)
-					modes |= SF_LINE;
+					modes |= SFIO_LINE;
 				else if((endw-astsfio) > (sizeof(sf_maxr)-1) &&
 				   strncmp(astsfio,sf_maxr,sizeof(sf_maxr)-1) == 0)
-#if _PACKAGE_ast
-					_Sfmaxr = (ssize_t)strtonll(astsfio+sizeof(sf_maxr)-1,NiL,NiL,0);
-#else
-					_Sfmaxr = (ssize_t)strtol(astsfio+sizeof(sf_maxr)-1,NiL,0);
-#endif
+					_Sfmaxr = (ssize_t)strtonll(astsfio+sizeof(sf_maxr)-1,NULL,NULL,0);
 				else if((endw-astsfio) > (sizeof(sf_wcwidth)-1) &&
 				   strncmp(astsfio,sf_wcwidth,sizeof(sf_wcwidth)-1) == 0)
-					modes |= SF_WCWIDTH;
+					modes |= SFIO_WCWIDTH;
 			}
 		}
 	}
@@ -92,55 +89,57 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 	       void*	buf,	/* new buffer */
 	       size_t	size)	/* buffer size, -1 for default size */
 {
-	int		sf_malloc, oflags, init, okmmap, local;
+	int		sf_malloc, oflags, init, local;
 	ssize_t		bufsize, blksz;
 	Sfdisc_t*	disc;
 	struct stat	st;
-	uchar*		obuf = NIL(uchar*);
+	uchar*		obuf = NULL;
 	ssize_t		osize = 0;
-
+#ifdef MAP_TYPE
+	int		okmmap;
+#endif
 
 	if(!f)
-		return NIL(void*);
+		return NULL;
 
 	GETLOCAL(f,local);
 
 	if(size == 0 && buf)
 	{	/* special case to get buffer info */
-		_Sfi = f->val = (f->bits&SF_MMAP) ? (f->endb-f->data) : f->size;
-		return (void*)f->data;
+		_Sfi = f->val = (f->bits&SFIO_MMAP) ? (f->endb-f->data) : f->size;
+		return f->data;
 	}
 
 	/* cleanup actions already done, don't allow write buffering any more */
-	if(_Sfexiting && !(f->flags&SF_STRING) && (f->mode&SF_WRITE))
-	{	buf = NIL(void*);
+	if(_Sfexiting && !(f->flags&SFIO_STRING) && (f->mode&SFIO_WRITE))
+	{	buf = NULL;
 		size = 0;
 	}
 
-	if((init = f->mode&SF_INIT) )
+	if((init = f->mode&SFIO_INIT) )
 	{	if(!f->pool && _sfsetpool(f) < 0)
-			return NIL(void*);
+			return NULL;
 	}
-	else if((f->mode&SF_RDWR) != SFMODE(f,local) && _sfmode(f,0,local) < 0)
-		return NIL(void*);
+	else if((f->mode&SFIO_RDWR) != SFMODE(f,local) && _sfmode(f,0,local) < 0)
+		return NULL;
 
 	if(init)
-		f->mode = (f->mode&SF_RDWR)|SF_LOCK;
+		f->mode = (f->mode&SFIO_RDWR)|SFIO_LOCK;
 	else
 	{	int	rv;
 
 		/* make sure there is no hidden read data */
-		if(f->proc && (f->flags&SF_READ) && (f->mode&SF_WRITE) &&
-		   _sfmode(f,SF_READ,local) < 0)
-			return NIL(void*);
+		if(f->proc && (f->flags&SFIO_READ) && (f->mode&SFIO_WRITE) &&
+		   _sfmode(f,SFIO_READ,local) < 0)
+			return NULL;
 
 		/* synchronize first */
 		SFLOCK(f,local); rv = SFSYNC(f); SFOPEN(f,local);
 		if(rv < 0)
-			return NIL(void*);
+			return NULL;
 
-		/* turn off the SF_SYNCED bit because buffer is changing */
-		f->mode &= ~SF_SYNCED;
+		/* turn off the SFIO_SYNCED bit because buffer is changing */
+		f->mode &= ~SFIO_SYNCED;
 	}
 
 	SFLOCK(f,local);
@@ -156,39 +155,39 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 			goto done;
 		}
 		else /* initialize stream as if in the default case */
-		{	buf = NIL(void*);
-			size = (size_t)SF_UNBOUND;
+		{	buf = NULL;
+			size = (size_t)SFIO_UNBOUND;
 		}
 	}
 
 	bufsize = 0;
 	oflags = f->flags;
 
-	/* see if memory mapping is possible (see sfwrite for SF_BOTH) */
-	okmmap = (buf || (f->flags&SF_STRING) || (f->flags&SF_RDWR) == SF_RDWR) ? 0 : 1;
+#ifdef MAP_TYPE
+	/* see if memory mapping is possible (see sfwrite for SFIO_BOTH) */
+	okmmap = (buf || (f->flags&SFIO_STRING) || (f->flags&SFIO_RDWR) == SFIO_RDWR) ? 0 : 1;
 
 	/* save old buffer info */
-#ifdef MAP_TYPE
-	if(f->bits&SF_MMAP)
+	if(f->bits&SFIO_MMAP)
 	{	if(f->data)
 		{	SFMUNMAP(f,f->data,f->endb-f->data);
-			f->data = NIL(uchar*);
+			f->data = NULL;
 		}
 	} else
 #endif
 	if(f->data == f->tiny)
-	{	f->data = NIL(uchar*);
+	{	f->data = NULL;
 		f->size = 0;
 	}
 	obuf  = f->data;
 	osize = f->size;
 
-	f->flags &= ~SF_MALLOC;
-	f->bits  &= ~SF_MMAP;
+	f->flags &= ~SFIO_MALLOC;
+	f->bits  &= ~SFIO_MMAP;
 
 	/* pure read/string streams must have a valid string */
-	if((f->flags&(SF_RDWR|SF_STRING)) == SF_RDSTR &&
-	   (size == (size_t)SF_UNBOUND || !buf))
+	if((f->flags&(SFIO_RDWR|SFIO_STRING)) == SFIO_RDSTR &&
+	   (size == (size_t)SFIO_UNBOUND || !buf))
 		size = 0;
 
 	/* set disc to the first discipline with a seekf */
@@ -196,17 +195,17 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 		if(disc->seekf)
 			break;
 
-	if((init || local) && !(f->flags&SF_STRING))
+	if((init || local) && !(f->flags&SFIO_STRING))
 	{	/* ASSERT(f->file >= 0) */
 		st.st_mode = 0;
 
 		/* if has discipline, set size by discipline if possible */
 		if(!_sys_stat || disc)
-		{	if((f->here = SFSK(f,(Sfoff_t)0,SEEK_CUR,disc)) < 0)
+		{	if((f->here = SFSK(f,0,SEEK_CUR,disc)) < 0)
 				goto unseekable;
 			else
 			{	Sfoff_t	e;
-				if((e = SFSK(f,(Sfoff_t)0,SEEK_END,disc)) >= 0)
+				if((e = SFSK(f,0,SEEK_END,disc)) >= 0)
 					f->extent = e > f->here ? e : f->here;
 				(void)SFSK(f,f->here,SEEK_SET,disc);
 				goto setbuf;
@@ -222,16 +221,20 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 			f->blksz = (size_t)st.st_blksize;
 #endif
 			bufsize = 64 * 1024;
-			if(S_ISDIR(st.st_mode) || (Sfoff_t)st.st_size < (Sfoff_t)SF_GRAIN)
+#ifdef MAP_TYPE
+			if(S_ISDIR(st.st_mode) || (Sfoff_t)st.st_size < (Sfoff_t)SFIO_GRAIN)
 				okmmap = 0;
+#endif
 			if(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))
-				f->here = SFSK(f,(Sfoff_t)0,SEEK_CUR,f->disc);
+				f->here = SFSK(f,0,SEEK_CUR,f->disc);
 			else	f->here = -1;
 
+#ifdef MAP_TYPE
 #if O_TEXT /* no memory mapping with O_TEXT because read()/write() alter data stream */
 			if(okmmap && f->here >= 0 &&
 			   (fcntl((int)f->file,F_GETFL,0) & O_TEXT) )
 				okmmap = 0;
+#endif
 #endif
 		}
 
@@ -241,7 +244,7 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 #if _lib_getpagesize
 			if((_Sfpage = (size_t)getpagesize()) <= 0)
 #endif
-				_Sfpage = SF_PAGE;
+				_Sfpage = SFIO_PAGE;
 		}
 
 #if SFSETLINEMODE
@@ -254,7 +257,7 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 
 			/* seekable std-devices are share-public by default */
 			if(f == sfstdin || f == sfstdout || f == sfstderr)
-				f->flags |= SF_SHARE|SF_PUBLIC;
+				f->flags |= SFIO_SHARE|SFIO_PUBLIC;
 		}
 		else
 		{
@@ -266,24 +269,24 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 			{	if(S_ISCHR(st.st_mode) )
 				{	int oerrno = errno;
 
-					bufsize = SF_GRAIN;
+					bufsize = SFIO_GRAIN;
 
 					/* set line mode for terminals */
-					if(!(f->flags&(SF_LINE|SF_WCWIDTH)) && isatty(f->file))
-						f->flags |= SF_LINE|SF_WCWIDTH;
+					if(!(f->flags&(SFIO_LINE|SFIO_WCWIDTH)) && isatty(f->file))
+						f->flags |= SFIO_LINE|SFIO_WCWIDTH;
 #if _sys_stat
 					else	/* special case /dev/null */
-					{	reg int	dev, ino;
+					{	int	dev, ino;
 						static int null_checked, null_dev, null_ino;
-						dev = (int)st.st_dev;	
-						ino = (int)st.st_ino;	
+						dev = (int)st.st_dev;
+						ino = (int)st.st_ino;
 						if(!null_checked)
 						{	if(stat(DEVNULL,&st) < 0)
 								null_checked = -1;
 							else
 							{	null_checked = 1;
-								null_dev = (int)st.st_dev;	
-								null_ino = (int)st.st_ino;	
+								null_dev = (int)st.st_dev;
+								null_ino = (int)st.st_ino;
 							}
 						}
 						if(null_checked >= 0 && dev == null_dev && ino == null_ino)
@@ -294,25 +297,25 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 				}
 
 				/* initialize side buffer for r+w unseekable streams */
-				if(!f->proc && (f->bits&SF_BOTH) )
+				if(!f->proc && (f->bits&SFIO_BOTH) )
 					(void)_sfpopen(f,-1,-1,1);
 			}
 		}
 	}
 
 #ifdef MAP_TYPE
-	if(okmmap && size && (f->mode&SF_READ) && f->extent >= 0 )
+	if(okmmap && size && (f->mode&SFIO_READ) && f->extent >= 0 )
 	{	/* see if we can try memory mapping */
 		if(!disc)
 			for(disc = f->disc; disc; disc = disc->disc)
 				if(disc->readf)
 					break;
 		if(!disc)
-		{	f->bits |= SF_MMAP;
-			if(size == (size_t)SF_UNBOUND)
+		{	f->bits |= SFIO_MMAP;
+			if(size == (size_t)SFIO_UNBOUND)
 			{	if(bufsize > _Sfpage)
-					size = bufsize * SF_NMAP;
-				else	size = _Sfpage * SF_NMAP;
+					size = bufsize * SFIO_NMAP;
+				else	size = _Sfpage * SFIO_NMAP;
 				if(size > 256*1024)
 					size = 256*1024;
 			}
@@ -322,69 +325,69 @@ void* sfsetbuf(Sfio_t*	f,	/* stream to be buffered */
 
 	/* get buffer space */
 setbuf:
-	if(size == (size_t)SF_UNBOUND)
+	if(size == (size_t)SFIO_UNBOUND)
 	{	/* define a default size suitable for block transfer */
 		if(init && osize > 0)
 			size = osize;
-		else if(f == sfstderr && (f->mode&SF_WRITE))
+		else if(f == sfstderr && (f->mode&SFIO_WRITE))
 			size = 0;
-		else if(f->flags&SF_STRING )
-			size = SF_GRAIN;
-		else if((f->flags&SF_READ) && !(f->bits&SF_BOTH) &&
+		else if(f->flags&SFIO_STRING )
+			size = SFIO_GRAIN;
+		else if((f->flags&SFIO_READ) && !(f->bits&SFIO_BOTH) &&
 			f->extent > 0 && f->extent < (Sfoff_t)_Sfpage )
-			size = (((size_t)f->extent + SF_GRAIN-1)/SF_GRAIN)*SF_GRAIN;
+			size = (((size_t)f->extent + SFIO_GRAIN-1)/SFIO_GRAIN)*SFIO_GRAIN;
 		else if((ssize_t)(size = _Sfpage) < bufsize)
 			size = bufsize;
 
-		buf = NIL(void*);
+		buf = NULL;
 	}
 
 	sf_malloc = 0;
-	if(size > 0 && !buf && !(f->bits&SF_MMAP))
+	if(size > 0 && !buf && !(f->bits&SFIO_MMAP))
 	{	/* try to allocate a buffer */
 		if(obuf && size == (size_t)osize && init)
-		{	buf = (void*)obuf;
-			obuf = NIL(uchar*);
-			sf_malloc = (oflags&SF_MALLOC);
+		{	buf = obuf;
+			obuf = NULL;
+			sf_malloc = (oflags&SFIO_MALLOC);
 		}
 		if(!buf)
 		{	/* do allocation */
 			while(!buf && size > 0)
-			{	if((buf = (void*)malloc(size)) )
+			{	if((buf = malloc(size)) )
 					break;
 				else	size /= 2;
 			}
 			if(size > 0)
-				sf_malloc = SF_MALLOC;
+				sf_malloc = SFIO_MALLOC;
 		}
 	}
 
-	if(size == 0 && !(f->flags&SF_STRING) && !(f->bits&SF_MMAP) && (f->mode&SF_READ))
+	if(size == 0 && !(f->flags&SFIO_STRING) && !(f->bits&SFIO_MMAP) && (f->mode&SFIO_READ))
 	{	/* use the internal buffer */
 		size = sizeof(f->tiny);
-		buf = (void*)f->tiny;
+		buf = f->tiny;
 	}
 
 	/* set up new buffer */
 	f->size = size;
 	f->next = f->data = f->endr = f->endw = (uchar*)buf;
-	f->endb = (f->mode&SF_READ) ? f->data : f->data+size;
-	if(f->flags&SF_STRING)
+	f->endb = buf ? ((f->mode&SFIO_READ) ? f->data : f->data+size) : NULL;
+	if(f->flags&SFIO_STRING)
 	{	/* these fields are used to test actual size - see sfseek() */
 		f->extent = (!sf_malloc &&
-			     ((f->flags&SF_READ) || (f->bits&SF_BOTH)) ) ? size : 0;
+			     ((f->flags&SFIO_READ) || (f->bits&SFIO_BOTH)) ) ? size : 0;
 		f->here = 0;
 
 		/* read+string stream should have all data available */
-		if((f->mode&SF_READ) && !sf_malloc)
-			f->endb = f->data+size;
+		if((f->mode&SFIO_READ) && !sf_malloc)
+			f->endb = f->data ? f->data+size : NULL;
 	}
 
-	f->flags = (f->flags & ~SF_MALLOC)|sf_malloc;
+	f->flags = (f->flags & ~SFIO_MALLOC)|sf_malloc;
 
-	if(obuf && obuf != f->data && osize > 0 && (oflags&SF_MALLOC))
-	{	free((void*)obuf);
-		obuf = NIL(uchar*);
+	if(obuf && obuf != f->data && osize > 0 && (oflags&SFIO_MALLOC))
+	{	free(obuf);
+		obuf = NULL;
 	}
 
 done:
@@ -396,12 +399,12 @@ done:
 	** blksz should also be a power-of-2 for optimal disk seeks.
 	*/
 	if(blksz <= 0 || (blksz & (blksz-1)) != 0 )
-		blksz = SF_GRAIN;
+		blksz = SFIO_GRAIN;
 	while(blksz > f->size/2)
 		blksz /= 2;
 	f->blksz = blksz;
 
 	SFOPEN(f,local);
 
-	return (void*)obuf;
+	return obuf;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -27,12 +27,12 @@
 #include "modelib.h"
 
 int
-strmode(register const char* s)
+strmode(const char* s)
 {
-	register int		c;
-	register char*		t;
-	register struct modeop*	p;
-	int			mode;
+	int		c;
+	char*		t;
+	struct modeop*	p;
+	int		mode;
 
 	mode = 0;
 	for (p = modetab; (c = *s++) && p < &modetab[MODELEN]; p++)
@@ -43,5 +43,5 @@ strmode(register const char* s)
 				mode |= (p->mask1 & (c << p->shift1)) | (p->mask2 & (c << p->shift2));
 				break;
 			}
-	return(mode);
+	return mode;
 }

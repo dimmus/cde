@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -48,14 +49,14 @@ static Tok_t*		freelist;
  */
 
 char*
-tokopen(register char* s, int f)
+tokopen(char* s, int f)
 {
-	register Tok_t*	p;
+	Tok_t*	p;
 
 	if (p = freelist)
 		freelist = freelist->ptr.nxt;
 	else if (!(p = newof(0, Tok_t, 1, 0)))
-		return 0;
+		return NULL;
 	p->chr = *(p->ptr.end = s);
 	p->flg = f ? FLG_RESTORE : 0;
 	return (char*)p;
@@ -69,7 +70,7 @@ tokopen(register char* s, int f)
 void
 tokclose(char* u)
 {
-	register Tok_t*	p = (Tok_t*)u;
+	Tok_t*	p = (Tok_t*)u;
 
 	if (p->flg == FLG_RESTORE && *p->ptr.end != p->chr)
 		*p->ptr.end = p->chr;
@@ -87,18 +88,18 @@ tokclose(char* u)
 char*
 tokread(char* u)
 {
-	register Tok_t*	p = (Tok_t*)u;
-	register char*	s;
-	register char*	r;
-	register int	q;
-	register int	c;
+	Tok_t*	p = (Tok_t*)u;
+	char*	s;
+	char*	r;
+	int	q;
+	int	c;
 
 	/*
 	 * restore string on each call
 	 */
 
 	if (!p->chr)
-		return 0;
+		return NULL;
 	s = p->ptr.end;
 	switch (p->flg)
 	{
@@ -125,7 +126,7 @@ tokread(char* u)
 	{
 		p->ptr.end = s;
 		p->chr = 0;
-		return 0;
+		return NULL;
 	}
 
 	/*

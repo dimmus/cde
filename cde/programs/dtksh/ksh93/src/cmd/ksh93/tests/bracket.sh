@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,8 +13,12 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#                  Lev Kujawski <int21h@mailbox.org>                   #
+#                      Phi <phi.debian@gmail.com>                      #
 #                                                                      #
 ########################################################################
+
+# Tests for the 'test' / '[' command and the [[ ... ]] construct
 
 . "${SHTESTS_COMMON:-${0%/*}/_common}"
 
@@ -161,9 +165,11 @@ if	[[ 3x > 4x ]]
 then	err_exit '3x < 4x'
 fi
 x='@(bin|dev|?)'
-cd /
-if	[[ $(print $x) != "$x" ]]
-then	err_exit 'extended pattern matching on command arguments'
+: >bin >dev >X
+got=$(print $x)
+exp=$x
+if	[[ $got != "$exp" ]]
+then	err_exit "extended pattern matching on command arguments (expected $(printf %q "$exp"), got $(printf %q "$got"))"
 fi
 if	[[ dev != $x ]]
 then	err_exit 'extended pattern matching not working on variables'
@@ -329,11 +335,6 @@ unset x y z foo bar
 
 { x=$($SHELL -c '[[ (( $# -eq 0 )) ]] && print ok') 2> /dev/null;}
 [[ $x == ok ]] || err_exit '((...)) inside [[ ... ]] not treated as nested ()'
-
-[[ -e /dev/fd/ ]] || err_exit '/dev/fd/ does not exist'
-[[ -e /dev/tcp/ ]] || err_exit '/dev/tcp/ does not exist'
-[[ -e /dev/udp/ ]] || err_exit '/dev/udp/ does not exist'
-[[ -e /dev/xxx/ ]] &&  err_exit '/dev/xxx/ exists'
 
 $SHELL 2> /dev/null -c '[[(-n foo)]]' || err_exit '[[(-n foo)]] should not require space in front of ('
 
@@ -514,6 +515,122 @@ if	((x != y))
 then	[[ x -eq y ]] && err_exit "comparing long floats fails"
 fi
 unset x y
+
+# ======
+# Shell quoting within bracket expressions in glob patterns had no effect
+# https://github.com/ksh93/ksh/issues/488
+
+[[ b == *[a'-'c]* ]] && err_exit 'BUG_BRACQUOT: 1A'
+[[ b == *['!'N]* ]] && err_exit 'BUG_BRACQUOT: 1B'
+[[ b == *['^'N]* ]] && err_exit 'BUG_BRACQUOT: 1C'
+[[ b == *[a$'-'c]* ]] && err_exit 'BUG_BRACQUOT: 2A'
+[[ b == *[$'!'N]* ]] && err_exit 'BUG_BRACQUOT: 2B'
+[[ b == *[$'^'N]* ]] && err_exit 'BUG_BRACQUOT: 2C'
+[[ b == *[a"-"c]* ]] && err_exit 'BUG_BRACQUOT: 3A'
+[[ b == *["!"N]* ]] && err_exit 'BUG_BRACQUOT: 3B'
+[[ b == *["^"N]* ]] && err_exit 'BUG_BRACQUOT: 3C'
+[[ b == *[a\-c]* ]] && err_exit 'BUG_BRACQUOT: 4A'
+[[ b == *[\!N]* ]] && err_exit 'BUG_BRACQUOT: 4B'
+[[ b == *[\^N]* ]] && err_exit 'BUG_BRACQUOT: 4C'
+p='*[a\-c]*'; [[ b == $p ]] && err_exit 'BUG_BRACQUOT: 5A'
+p='*[\!N]*'; [[ b == $p ]] && err_exit 'BUG_BRACQUOT: 5B'
+p='*[\^N]*'; [[ b == $p ]] && err_exit 'BUG_BRACQUOT: 5C'
+p='*[a\-c]*'; [[ - == $p ]] || err_exit 'BUG_BRACQUOT: 6A'
+p='*[\!N]*'; [[ \! == $p ]] || err_exit 'BUG_BRACQUOT: 6B'
+p='*[\^N]*'; [[ ^ == $p ]] || err_exit 'BUG_BRACQUOT: 6C'
+
+# quoting should also work for the end character ']'
+[[ b == [\]\-z] ]] && err_exit 'BUG_BRACQUOT: 7a'
+[[ b == [']-z'] ]] && err_exit 'BUG_BRACQUOT: 7b'
+[[ b == ["]-z"] ]] && err_exit 'BUG_BRACQUOT: 7c'
+
+# also test bracket expressions with ] as the first character, e.g. []abc]
+[[ b == *[]a'-'c]* ]] && err_exit 'BUG_BRACQUOT: B1'
+[[ b == *[]a$'-'c]* ]] && err_exit 'BUG_BRACQUOT: B2'
+[[ b == *[]a"-"c]* ]] && err_exit 'BUG_BRACQUOT: B3'
+[[ b == *[]a\-c]* ]] && err_exit 'BUG_BRACQUOT: B4'
+
+# make sure we didn't break extended regular expressions
+[[ \\ == [a"-"z] ]] && err_exit 'internal backslash escape incorrectly applied to glob [a"-"z]'
+[[ \\ =~ [a"-"z] ]] && err_exit 'internal backslash escape incorrectly applied to ERE [a"-"z]'
+[[ \\ == ~(E:[a"-"z]) ]] && err_exit 'internal backslash escape incorrectly applied to ERE via ksh glob ~(E:[a"-"z])'
+
+# ======
+# Test various backslash behaviours in glob patterns. Thanks to Daniel Douglas for these.
+# https://gist.github.com/ormaaj/6195070
+# https://github.com/ksh93/ksh/pull/556#issuecomment-1278528579
+# The cases that include unquoted ${p} in the pattern are unspecified by POSIX and shells vary widely,
+# so it may be acceptable to change them if necessary to implement another fix in a reasonable manner.
+# (True, '[[' is not specified in POSIX, but the glob patterns its '==' operator uses are.)
+p=\\
+[[ \\x == "${p}""${p}"x ]] &&	err_exit "match: ormaaj case test 1"
+[[ \\x == "${p}"${p}x ]] &&	warning "match: ormaaj case test 2 [unspecified]"
+[[ \\x == "${p}""\\"x ]] &&	err_exit "match: ormaaj case test 3"
+[[ \\x == "${p}"\\x ]] &&	err_exit "match: ormaaj case test 4"
+[[ \\x == ${p}"${p}"x ]] &&	warning "match: ormaaj case test 5 [unspecified]"
+[[ \\x != ${p}${p}x ]] &&	warning "non-match: ormaaj case test 6 [unspecified]"
+[[ \\x == ${p}"\\"x ]] &&	warning "match: ormaaj case test 7 [unspecified]"
+[[ \\x == ${p}\\x ]] &&		warning "match: ormaaj case test 8 [unspecified]"
+[[ \\x == "\\""${p}"x ]] &&	err_exit "match: ormaaj case test 9"
+[[ \\x == "\\"${p}x ]] &&	warning "match: ormaaj case test 10 [unspecified]"
+[[ \\x == "\\""\\"x ]] &&	err_exit "match: ormaaj case test 11"
+[[ \\x == "\\"\\x ]] &&		err_exit "match: ormaaj case test 12"
+[[ \\x == \\"${p}"x ]] &&	err_exit "match: ormaaj case test 13"
+[[ \\x == \\${p}x ]] &&		warning "match: ormaaj case test 14 [unspecified]"
+[[ \\x == \\"\\"x ]] &&		err_exit "match: ormaaj case test 15"
+[[ \\x == \\\\x ]] &&		err_exit "match: ormaaj case test 16"
+
+# ======
+# negator quoting
+[[ \\ == [!X] ]] || err_exit "negator ! not working"
+[[ \\ == [^X] ]] || err_exit "negator ^ not working"
+[[ \\ == [\!X] ]] && err_exit "\\ mismatches \\!"
+[[ \\ == [\^X] ]] && err_exit "\\ mismatches \\^"
+[[ \\ == ['!'X] ]] && err_exit "\\ mismatches '!'"
+[[ \\ == ['^'X] ]] && err_exit "\\ mismatches '^'"
+[[ \\ == ["!"X] ]] && err_exit "\\ mismatches \"!\""
+[[ \\ == ["^"X] ]] && err_exit "\\ mismatches \"^\""
+[[ \\ == [$'!'X] ]] && err_exit "\\ mismatches \$'!'"
+[[ \\ == [$'^'X] ]] && err_exit "\\ mismatches \$'^'"
+
+# ======
+# no error was detected in 'test a = a b'
+# https://github.com/ksh93/ksh/issues/739
+# https://bugs.debian.org/1068340
+# https://www.mail-archive.com/austin-group-l@opengroup.org/msg12484.html
+# Fix applied for POSIX mode in 93u+m/1.0.*, unconditionally in 93u+m/1.1.*
+unset p
+[[ ${.sh.version} == *93u+m/1.0.* ]] && p="posix mode: " && set --posix
+test a = a b 2>/dev/null
+(((e=$?)==2)) || err_exit "${p}test a = a b is not an error (got status $e)"
+[ a = a b ] 2>/dev/null
+(((e=$?)==2)) || err_exit "${p}[ a = a b ] is not an error (got status $e)"
+test -e /dev/null foo bar baz 2>/dev/null
+(((e=$?)==2)) || err_exit "${p}test -e /dev/null foo bar baz is not an error (got status $e)"
+[ -e /dev/null foo bar baz ] 2>/dev/null
+(((e=$?)==2)) || err_exit "${p}[ -e /dev/null foo bar baz ] is not an error (got status $e)"
+test t -a b = b 2>/dev/null
+(((e=$?)==0)) || err_exit "${p}test t -a b = b fails (got status $e)"
+[ t -a b = b ] 2>/dev/null
+(((e=$?)==0)) || err_exit "${p}[ t -a b = b ] fails (got status $e)"
+test -n -a -z 2>/dev/null
+(((e=$?)==0)) || err_exit "${p}test -n -a -z fails (got status $e)"
+[ -n -a -z ] 2>/dev/null
+(((e=$?)==0)) || err_exit "${p}[ -n -a -z ] fails (got status $e)"
+test b = b c -a "" 2>/dev/null
+(((e=$?)==2)) || err_exit "${p}test b = b c -a \"\" is not an error (got status $e)"
+[ b = b c -a "" ] 2>/dev/null
+(((e=$?)==2)) || err_exit "${p}[ b = b c -a \"\" ] is not an error (got status $e)"
+[[ -v p ]] && set --noposix && unset p
+
+# ======
+# https://github.com/ksh93/ksh/issues/833
+[[ aaaaa =~ a$      ]] || err_exit 'aaaaa =~ a$ not working' 
+[[ aaaaa =~ aa$     ]] || err_exit 'aaaaa =~ aa$ not working'
+[[ aaaaa =~ aaa$    ]] || err_exit 'aaaaa =~ aaa$ not working'
+[[ aaaaa =~ aaaa$   ]] || err_exit 'aaaaa =~ aaaa$ not working'
+[[ aaaaa =~ aaaaa$  ]] || err_exit 'aaaaa =~ aaaaa$ not working'
+[[ aaaaa =~ aaaaaa$ ]] && err_exit 'aaaaa =~ aaaaaa$ not working' 
 
 # ======
 exit $((Errors<125?Errors:125))

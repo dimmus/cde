@@ -26,7 +26,7 @@
  * the bigram encoding steals the eighth bit (that's why it's FF_old)
  * maybe one day we'll limit it to readonly:
  *
- * 0-2*FF_OFF	 likeliest differential counts + offset to make nonnegative 
+ * 0-2*FF_OFF	 likeliest differential counts + offset to make nonnegative
  * FF_ESC	 4 byte big-endian out-of-range count+FF_OFF follows
  * FF_MIN-FF_MAX ASCII residue
  * >=FF_MAX	 bigram codes
@@ -68,8 +68,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-static const char id[] = "\n@(#)$Id: fastfind (AT&T Research) 2002-10-02 $\0\n";
 
 static const char lib[] = "libast:fastfind";
 
@@ -114,10 +112,10 @@ static char*		findnames[] =
  */
 
 char*
-typefix(char* buf, size_t n, register const char* t)
+typefix(char* buf, const char* t)
 {
-	register int	c;
-	register char*	b = buf;
+	int	c;
+	char*	b = buf;
 
 	if ((*t == 'x' || *t == 'X') && *(t + 1) == '-')
 		t += 2;
@@ -139,25 +137,25 @@ typefix(char* buf, size_t n, register const char* t)
 Find_t*
 findopen(const char* file, const char* pattern, const char* type, Finddisc_t* disc)
 {
-	register Find_t*	fp;
-	register char*		p;
-	register char*		s;
-	register char*		b;
-	register int		i; 
-	register int		j;
-	char*			path;
-	int			brace = 0;
-	int			paren = 0;
-	int			k;
-	int			q;
-	int			fd;
-	int			uid;
-	Vmalloc_t*		vm;
-	Type_t*			tp;
-	struct stat		st;
+	Find_t*		fp = NULL;
+	char*		p;
+	char*		s;
+	char*		b;
+	int		i;
+	int		j;
+	char*		path;
+	int		brace = 0;
+	int		paren = 0;
+	int		k;
+	int		q;
+	int		fd;
+	int		uid;
+	Vmalloc_t*	vm;
+	Type_t*		tp;
+	struct stat	st;
 
 
-	if (!(vm = vmopen(Vmdcheap, Vmbest, 0)))
+	if (!(vm = vmopen()))
 		goto nomemory;
 
 	/*
@@ -171,7 +169,7 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 		findcodes[1] = getenv(FIND_CODES_ENV);
 	if (disc->flags & FIND_GENERATE)
 	{
-		if (!(fp = (Find_t*)vmnewof(vm, 0, Find_t, 1, sizeof(Encode_t) - sizeof(Code_t))))
+		if (!(fp = vmnewof(vm, 0, Find_t, 1, sizeof(Encode_t) - sizeof(Code_t))))
 			goto nomemory;
 		fp->vm = vm;
 		fp->id = lib;
@@ -301,7 +299,7 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 			}
 			if (s)
 				*s = '/';
-			if (!(fp->fp = sfnew(NiL, NiL, (size_t)SF_UNBOUND, fd, SF_WRITE)))
+			if (!(fp->fp = sfnew(NULL, NULL, (size_t)SFIO_UNBOUND, fd, SFIO_WRITE)))
 			{
 				if (fp->disc->errorf)
 					(*fp->disc->errorf)(fp, fp->disc, ERROR_SYSTEM|2, "%s: cannot open tmp file", fp->encode.temp);
@@ -355,10 +353,10 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 		if (!pattern || !*pattern)
 			pattern = "*";
 		i += (j = 2 * (strlen(pattern) + 1));
-		if (!(fp = (Find_t*)vmnewof(vm, 0, Find_t, 1, i)))
+		if (!(fp = vmnewof(vm, 0, Find_t, 1, i)))
 		{
 			vmclose(vm);
-			return 0;
+			return NULL;
 		}
 		fp->vm = vm;
 		fp->id = lib;
@@ -378,7 +376,7 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 							for (k = 0; k < elementsof(findnames); k++)
 							{
 								sfsprintf(fp->decode.path, sizeof(fp->decode.path), "%s/%s", path, findnames[k]);
-								if (fp->fp = sfopen(NiL, fp->decode.path, "r"))
+								if (fp->fp = sfopen(NULL, fp->decode.path, "r"))
 								{
 									path = fp->decode.path;
 									break;
@@ -387,11 +385,11 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 							if (fp->fp)
 								break;
 						}
-						else if (fp->fp = sfopen(NiL, path, "r"))
+						else if (fp->fp = sfopen(NULL, path, "r"))
 							break;
 					}
 				}
-				else if ((path = pathpath(path, "", PATH_REGULAR|PATH_READ, fp->decode.path, sizeof(fp->decode.path))) && (fp->fp = sfopen(NiL, path, "r")))
+				else if ((path = pathpath(path, "", PATH_REGULAR|PATH_READ, fp->decode.path, sizeof(fp->decode.path))) && (fp->fp = sfopen(NULL, path, "r")))
 					break;
 			}
 		if (!fp->fp)
@@ -410,7 +408,7 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 			setgid(getgid());
 		fp->stamp = st.st_mtime;
 		b = (s = fp->decode.temp) + 1;
-		for (i = 0; i < elementsof(fp->decode.bigram1); i++) 
+		for (i = 0; i < elementsof(fp->decode.bigram1); i++)
 		{
 			if ((j = sfgetc(fp->fp)) == EOF)
 				goto invalid;
@@ -428,7 +426,7 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 		{
 			if (type)
 			{
-				type = (const char*)typefix(fp->decode.bigram2, sizeof(fp->decode.bigram2), type);
+				type = (const char*)typefix(fp->decode.bigram2, type);
 				memset(fp->decode.bigram1, 0, sizeof(fp->decode.bigram1));
 			}
 			fp->method = FF_typ;
@@ -650,11 +648,11 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 	if (disc->errorf)
 		(*fp->disc->errorf)(fp, fp->disc, 2, "out of memory");
 	if (!vm)
-		return 0;
+		return NULL;
 	if (!fp)
 	{
 		vmclose(vm);
-		return 0;
+		return NULL;
 	}
 	goto drop;
  invalid:
@@ -666,7 +664,7 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
 	if (fp->fp)
 		sfclose(fp->fp);
 	vmclose(fp->vm);
-	return 0;
+	return NULL;
 }
 
 /*
@@ -675,23 +673,23 @@ findopen(const char* file, const char* pattern, const char* type, Finddisc_t* di
  */
 
 char*
-findread(register Find_t* fp)
+findread(Find_t* fp)
 {
-	register char*		p;
-	register char*		q;
-	register char*		s;
-	register char*		b;
-	register char*		e;
-	register int		c;
-	register int		n;
-	register int		m;
-	int			ignorecase;
-	int			t;
-	unsigned char		w[4];
-	struct stat		st;
+	char*		p = NULL;
+	char*		q;
+	char*		s;
+	char*		b;
+	char*		e;
+	int		c;
+	int		n;
+	int		m;
+	int		ignorecase;
+	int		t = 0;
+	unsigned char	w[4];
+	struct stat	st;
 
 	if (fp->generate)
-		return 0;
+		return NULL;
 	if (fp->decode.restore)
 	{
 		*fp->decode.restore = '/';
@@ -710,14 +708,14 @@ findread(register Find_t* fp)
 			goto grab;
 		case FF_gnu:
 			if ((c = sfgetc(fp->fp)) == EOF)
-				return 0;
+				return NULL;
 			if (c == 0x80)
 			{
 				if ((c = sfgetc(fp->fp)) == EOF)
-					return 0;
+					return NULL;
 				n = c << 8;
 				if ((c = sfgetc(fp->fp)) == EOF)
-					return 0;
+					return NULL;
 				n |= c;
 				if (n & 0x8000)
 					n = (n - 0xffff) - 1;
@@ -734,7 +732,7 @@ findread(register Find_t* fp)
 			do
 			{
 				if ((c = sfgetc(fp->fp)) == EOF)
-					return 0;
+					return NULL;
 			} while (*p++ = c);
 			p -= 2;
 			break;
@@ -742,12 +740,12 @@ findread(register Find_t* fp)
 			if (c == EOF)
 			{
 				fp->decode.peek = c;
-				return 0;
+				return NULL;
 			}
 			if (c == FF_ESC)
 			{
 				if (sfread(fp->fp, w, sizeof(w)) != sizeof(w))
-					return 0;
+					return NULL;
 				if (fp->decode.swap >= 0)
 				{
 					c = (int32_t)((w[0] << 24) | (w[1] << 16) | (w[2] << 8) | w[3]);
@@ -802,8 +800,8 @@ findread(register Find_t* fp)
 		if (fp->dirs)
 			for (;;)
 			{
-				if (!*fp->dirs)
-					return 0;
+				if (!*fp->dirs || !p)
+					return NULL;
 
 				/*
 				 * use the ordering and lengths to prune
@@ -874,7 +872,7 @@ findread(register Find_t* fp)
 					s--;
 				if (*fp->decode.pattern == '/' && b > fp->decode.path)
 					b--;
-				for (; s >= b; s--) 
+				for (; s >= b; s--)
 					if (*s == *fp->decode.end || ignorecase && tolower(*s) == *fp->decode.end)
 					{
 						if (ignorecase)
@@ -884,7 +882,7 @@ findread(register Find_t* fp)
 						if (!*e)
 						{
 							fp->decode.found = 1;
-							if (!fp->decode.match || strgrpmatch(fp->decode.path, fp->decode.pattern, NiL, 0, STR_MAXIMAL|STR_LEFT|STR_RIGHT|ignorecase))
+							if (!fp->decode.match || strgrpmatch(fp->decode.path, fp->decode.pattern, NULL, 0, STR_MAXIMAL|STR_LEFT|STR_RIGHT|ignorecase))
 							{
 								fp->decode.peek = c;
 								if (*p == '/')
@@ -896,7 +894,7 @@ findread(register Find_t* fp)
 						}
 					}
 			}
-			else if (!fp->decode.match || !(n = regexec(&fp->decode.re, fp->decode.path, 0, NiL, 0)))
+			else if (!fp->decode.match || !(n = regexec(&fp->decode.re, fp->decode.path, 0, NULL, 0)))
 			{
 				fp->decode.peek = c;
 				if (*p == '/' && p > fp->decode.path)
@@ -911,7 +909,7 @@ findread(register Find_t* fp)
 					regerror(n, &fp->decode.re, fp->decode.temp, sizeof(fp->decode.temp));
 					(*fp->disc->errorf)(fp, fp->disc, 2, "%s: %s", fp->decode.pattern, fp->decode.temp);
 				}
-				return 0;
+				return NULL;
 			}
 		}
 	}
@@ -923,15 +921,15 @@ findread(register Find_t* fp)
  */
 
 int
-findwrite(register Find_t* fp, const char* path, size_t len, const char* type)
+findwrite(Find_t* fp, const char* path, size_t len, const char* type)
 {
-	register unsigned char*	s;
-	register unsigned char*	e;
-	register unsigned char*	p;
-	register int		n;
-	register int		d;
-	register Type_t*	x;
-	register unsigned long	u;
+	unsigned char*	s;
+	unsigned char*	e;
+	unsigned char*	p;
+	int		n;
+	int		d;
+	Type_t*		x;
+	unsigned long	u;
 
 	if (!fp->generate)
 		return -1;
@@ -996,7 +994,7 @@ findwrite(register Find_t* fp, const char* path, size_t len, const char* type)
 	case FF_typ:
 		if (type)
 		{
-			type = (const char*)typefix((char*)fp->encode.bigram, sizeof(fp->encode.bigram), type);
+			type = (const char*)typefix((char*)fp->encode.bigram, type);
 			if (x = (Type_t*)dtmatch(fp->encode.namedict, type))
 				u = x->index;
 			else if (!(x = newof(0, Type_t, 1, strlen(type) + 1)))
@@ -1029,7 +1027,7 @@ findwrite(register Find_t* fp, const char* path, size_t len, const char* type)
  */
 
 static int
-finddone(register Find_t* fp)
+finddone(Find_t* fp)
 {
 	int	r;
 
@@ -1061,17 +1059,17 @@ finddone(register Find_t* fp)
  */
 
 static int
-findsync(register Find_t* fp)
+findsync(Find_t* fp)
 {
-	register char*		s;
-	register int		n;
-	register int		m;
-	register int		d;
-	register Type_t*	x;
-	char*			t;
-	int			b;
-	long			z;
-	Sfio_t*			sp;
+	char*		s;
+	int		n;
+	int		m;
+	int		d;
+	Type_t*		x;
+	char*		t;
+	int		b;
+	long		z;
+	Sfio_t*		sp;
 
 	switch (fp->method)
 	{
@@ -1127,16 +1125,16 @@ findsync(register Find_t* fp)
 					fp->encode.code[n][m] = 0;
 
 		/*
-		 * commit the real file 
+		 * commit the real file
 		 */
 
-		if (sfseek(fp->fp, (Sfoff_t)0, SEEK_SET))
+		if (sfseek(fp->fp, 0, SEEK_SET))
 		{
 			if (fp->disc->errorf)
 				(*fp->disc->errorf)(fp, fp->disc, ERROR_SYSTEM|2, "cannot rewind tmp file");
 			return -1;
 		}
-		if (!(sp = sfopen(NiL, fp->encode.file, "w")))
+		if (!(sp = sfopen(NULL, fp->encode.file, "w")))
 			goto badcreate;
 
 		/*
@@ -1187,7 +1185,7 @@ findsync(register Find_t* fp)
 	case FF_typ:
 		if (finddone(fp))
 			goto bad;
-		if (!(fp->fp = sfopen(NiL, fp->encode.temp, "r")))
+		if (!(fp->fp = sfopen(NULL, fp->encode.temp, "r")))
 		{
 			if (fp->disc->errorf)
 				(*fp->disc->errorf)(fp, fp->disc, ERROR_SYSTEM|2, "%s: cannot read tmp file", fp->encode.temp);
@@ -1199,7 +1197,7 @@ findsync(register Find_t* fp)
 		 * commit the output file
 		 */
 
-		if (!(sp = sfopen(NiL, fp->encode.file, "w")))
+		if (!(sp = sfopen(NULL, fp->encode.file, "w")))
 			goto badcreate;
 
 		/*
@@ -1221,7 +1219,7 @@ findsync(register Find_t* fp)
 		 * append the front compressed strings
 		 */
 
-		if (sfmove(fp->fp, sp, SF_UNBOUND, -1) < 0 || !sfeof(fp->fp))
+		if (sfmove(fp->fp, sp, SFIO_UNBOUND, -1) < 0 || !sfeof(fp->fp))
 		{
 			sfclose(sp);
 			if (fp->disc->errorf)
@@ -1254,7 +1252,7 @@ findsync(register Find_t* fp)
  */
 
 int
-findclose(register Find_t* fp)
+findclose(Find_t* fp)
 {
 	int	n = 0;
 

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1997-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -82,8 +82,8 @@ static char		lib[] = "lib";
 Dllinfo_t*
 dllinfo(void)
 {
-	register char*		s;
-	register char*		h;
+	char*			s;
+	char*			h;
 	char*			d;
 	char*			v;
 	char*			p;
@@ -97,13 +97,14 @@ dllinfo(void)
 	if (!info.sibling)
 	{
 		info.sibling = info.sib;
-		if (*(s = astconf("LIBPATH", NiL, NiL)))
+		if (*(s = astconf("LIBPATH", NULL, NULL)))
 		{
 			while (*s == ':' || *s == ',')
 				s++;
 			if (*s)
 			{
-				h = 0;
+				h = NULL;
+				vn = 0;
 				for (;;)
 				{
 					for (d = s; *s && *s != ':' && *s != ','; s++);
@@ -129,7 +130,7 @@ dllinfo(void)
 						p = 0;
 					}
 					while (*s && *s++ != ',');
-					if (!*s || !p || !h && !*(h = astconf("HOSTTYPE", NiL, NiL)))
+					if (!*s || !p || !h && !*(h = astconf("HOSTTYPE", NULL, NULL)))
 						break;
 					if (pn >= sizeof(pat))
 						pn = sizeof(pat) - 1;
@@ -145,6 +146,8 @@ dllinfo(void)
 				}
 				if (v && vn < sizeof(info.envbuf))
 				{
+					if(vn <= 0)
+						abort();
 					memcpy(info.envbuf, v, vn);
 					info.env = info.envbuf;
 				}
@@ -156,8 +159,8 @@ dllinfo(void)
 			info.sibling[1] = lib;
 		if (!info.env)
 			info.env = "LD_LIBRARY_PATH";
-		info.prefix = astconf("LIBPREFIX", NiL, NiL);
-		info.suffix = astconf("LIBSUFFIX", NiL, NiL);
+		info.prefix = astconf("LIBPREFIX", NULL, NULL);
+		info.suffix = astconf("LIBSUFFIX", NULL, NULL);
 		if (streq(info.suffix, ".dll"))
 			info.flags |= DLL_INFO_PREVER;
 		else
@@ -174,11 +177,11 @@ dllinfo(void)
 static int
 vercmp(FTSENT* const* ap, FTSENT* const* bp)
 {
-	register unsigned char*	a = (unsigned char*)(*ap)->fts_name;
-	register unsigned char*	b = (unsigned char*)(*bp)->fts_name;
-	register int		n;
-	register int		m;
-	char*			e;
+	unsigned char*	a = (unsigned char*)(*ap)->fts_name;
+	unsigned char*	b = (unsigned char*)(*bp)->fts_name;
+	int		n;
+	int		m;
+	char*		e;
 
 	for (;;)
 	{
@@ -208,8 +211,8 @@ vercmp(FTSENT* const* ap, FTSENT* const* bp)
 Dllscan_t*
 dllsopen(const char* lib, const char* name, const char* version)
 {
-	register char*	s;
-	register char*	t;
+	char*		s;
+	char*		t;
 	Dllscan_t*	scan;
 	Dllinfo_t*	info;
 	Vmalloc_t*	vm;
@@ -218,8 +221,8 @@ dllsopen(const char* lib, const char* name, const char* version)
 	int		k;
 	char		buf[32];
 
-	if (!(vm = vmopen(Vmdcheap, Vmlast, 0)))
-		return 0;
+	if (!(vm = vmopen()))
+		return NULL;
 	if (lib && *lib && (*lib != '-' || *(lib + 1)))
 	{
 		/*
@@ -240,7 +243,7 @@ dllsopen(const char* lib, const char* name, const char* version)
 	if (!(scan = vmnewof(vm, 0, Dllscan_t, 1, i)) || !(scan->tmp = sfstropen()))
 	{
 		vmclose(vm);
-		return 0;
+		return NULL;
 	}
 	scan->vm = vm;
 	info = dllinfo();
@@ -345,7 +348,7 @@ dllsopen(const char* lib, const char* name, const char* version)
 	return scan;
  bad:
 	dllsclose(scan);
-	return 0;
+	return NULL;
 }
 
 /*
@@ -373,17 +376,17 @@ dllsclose(Dllscan_t* scan)
  */
 
 Dllent_t*
-dllsread(register Dllscan_t* scan)
+dllsread(Dllscan_t* scan)
 {
-	register char*		p;
-	register char*		b;
-	register char*		t;
-	register Uniq_t*	u;
-	register int		n;
-	register int		m;
+	char*		p;
+	char*		b;
+	char*		t;
+	Uniq_t*		u;
+	int		n;
+	int		m;
 
 	if (scan->flags & DLL_MATCH_DONE)
-		return 0;
+		return NULL;
  again:
 	do
 	{
@@ -400,7 +403,7 @@ dllsread(register Dllscan_t* scan)
 			{
 				scan->sp = scan->sb;
 				if (!*scan->pe++)
-					return 0;
+					return NULL;
 				scan->pb = scan->pe;
 			}
 			for (p = scan->pp = scan->pb; *p && *p != ':'; p++)
@@ -416,7 +419,7 @@ dllsread(register Dllscan_t* scan)
 			{
 				sfprintf(scan->tmp, "/%s", scan->nam);
 				if (!(p = sfstruse(scan->tmp)))
-					return 0;
+					return NULL;
 				if (!eaccess(p, R_OK))
 				{
 					b = scan->nam;
@@ -429,7 +432,7 @@ dllsread(register Dllscan_t* scan)
 			{
 				sfstrseek(scan->tmp, scan->off, SEEK_SET);
 				if (!(t = sfstruse(scan->tmp)))
-					return 0;
+					return NULL;
 				if ((scan->fts = fts_open((char**)t, FTS_LOGICAL|FTS_NOPOSTORDER|FTS_ONEPATH, vercmp)) && (scan->ent = fts_read(scan->fts)) && (scan->ent = fts_children(scan->fts, FTS_NOSTAT)))
 					break;
 			}
@@ -439,7 +442,7 @@ dllsread(register Dllscan_t* scan)
 	sfstrseek(scan->tmp, scan->off, SEEK_SET);
 	sfprintf(scan->tmp, "/%s", b);
 	if (!(p = sfstruse(scan->tmp)))
-		return 0;
+		return NULL;
  found:
 	b = scan->buf + sfsprintf(scan->buf, sizeof(scan->buf), "%s", b + scan->prelen);
 	if (!(scan->flags & DLL_INFO_PREVER))
@@ -500,24 +503,24 @@ dllsread(register Dllscan_t* scan)
 			scan->disc.size = 0;
 			scan->disc.link = offsetof(Uniq_t, link);
 			if (!(scan->dict = dtopen(&scan->disc, Dtset)))
-				return 0;
+				return NULL;
 			dtinsert(scan->dict, scan->uniq);
 		}
 		if (dtmatch(scan->dict, b))
 			goto again;
 		if (!(u = vmnewof(scan->vm, 0, Uniq_t, 1, strlen(b))))
-			return 0;
+			return NULL;
 		strcpy(u->name, b);
 		dtinsert(scan->dict, u);
 	}
 	else if (!(scan->flags & DLL_MATCH_NAME))
 		scan->flags |= DLL_MATCH_DONE;
 	else if (!(scan->uniq = vmnewof(scan->vm, 0, Uniq_t, 1, strlen(b))))
-		return 0;
+		return NULL;
 	else
 		strcpy(scan->uniq->name, b);
 	scan->entry.name = b;
 	scan->entry.path = p;
-	errorf("dll", NiL, -1, "dllsread: %s bound to %s", b, p);
+	errorf("dll", NULL, -1, "dllsread: %s bound to %s", b, p);
 	return &scan->entry;
 }

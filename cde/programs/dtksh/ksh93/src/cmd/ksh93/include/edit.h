@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,8 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 #ifndef SEARCHSIZE
@@ -25,18 +27,15 @@
 
 #define SEARCHSIZE	80
 
-#include	"FEATURE/options"
+#include	"FEATURE/cmds"
 #include        "FEATURE/locale"
-#include	"FEATURE/setjmp"
 #include	"terminal.h"
 
 #define STRIP		0377
 #define LOOKAHEAD	80
 
 #if SHOPT_MULTIBYTE
-#   ifndef ESS_MAXCHAR
-#	include	"national.h"
-#   endif /* ESS_MAXCHAR */
+#   include	"national.h"
     typedef wchar_t genchar;
 #   define CHARSIZE	(sizeof(wchar_t)<=2?3:sizeof(wchar_t))
 #else
@@ -53,19 +52,6 @@ typedef struct _edit_pos
 	unsigned short line;
 	unsigned short col;
 } Edpos_t;
-
-#if SHOPT_EDPREDICT
-typedef struct Histmatch
-{
-	struct Histmatch	*next;
-	int			index;
-	short			len;
-	short			count;
-	char			data[1];
-} Histmatch_t;
-#endif /* SHOPT_EDPREDICT */
-
-
 
 typedef struct edit
 {
@@ -93,6 +79,9 @@ typedef struct edit
 	int	e_lookahead;	/* index in look-ahead buffer */
 	int	e_fcol;		/* first column */
 	int	e_wsize;	/* width of display window */
+#if SHOPT_MULTIBYTE
+	int	e_savedwidth;	/* saved width of a character */
+#endif /* SHOPT_MULTIBYTE */
 	char	*e_outbase;	/* pointer to start of output buffer */
 	char	*e_outptr;	/* pointer to position in output buffer */
 	char	*e_outlast;	/* pointer to end of output buffer */
@@ -105,15 +94,10 @@ typedef struct edit
 	int	e_fd;		/* file descriptor */
 	int	e_ttyspeed;	/* line speed, also indicates tty parameters are valid */
 	int	e_tabcount;
-#ifdef _hdr_utime
+#if _hdr_utime
 	ino_t	e_tty_ino;
 	dev_t	e_tty_dev;
 	char	*e_tty;
-#endif
-#if SHOPT_OLDTERMIO
-	char	e_echoctl;
-	char	e_tcgeta;
-	struct termio e_ott;
 #endif
 	int	*e_globals;	/* global variables */
 	genchar	*e_window;	/* display window image */
@@ -134,19 +118,9 @@ typedef struct edit
 #if SHOPT_ESH || SHOPT_VSH
 	int	e_multiline;	/* allow multiple lines for editing */
 #endif
-	int	e_winsz;	/* columns in window */ 
+	int	e_winsz;	/* columns in window */
 	Edpos_t	e_curpos;	/* cursor line and column */
 	Namval_t *e_default;	/* variable containing default value */
-	Namval_t *e_term;	/* TERM variable */
-	char 	e_termname[80];	/* terminal name */
-#if SHOPT_EDPREDICT
-	Histmatch_t	**hlist;
-	Histmatch_t	*hfirst;
-	unsigned short	nhlist;
-	unsigned short	hoff;
-	unsigned short	hmax;
-	char		hpat[40];
-#endif /* SHOPT_EDPREDICT */
 } Edit_t;
 
 #undef MAXWINDOW
@@ -154,23 +128,23 @@ typedef struct edit
 #define FAST	2
 #define SLOW	1
 #define ESC	cntl('[')
-#define	UEOF	-2			/* user eof char synonym */
-#define	UINTR	-3			/* user intr char synonym */
-#define	UERASE	-4			/* user erase char synonym */
-#define	UKILL	-5			/* user kill char synonym */
-#define	UWERASE	-6			/* user word erase char synonym */
-#define	ULNEXT	-7			/* user next literal char synonym */
+#define UEOF	-2			/* user eof char synonym */
+#define UINTR	-3			/* user intr char synonym */
+#define UERASE	-4			/* user erase char synonym */
+#define UKILL	-5			/* user kill char synonym */
+#define UWERASE	-6			/* user word erase char synonym */
+#define ULNEXT	-7			/* user next literal char synonym */
 
-#if ( 'a' == 97) /* ASCII? */
-#   define	cntl(x)		(x&037)
-#else
-#   define cntl(c) (c=='D'?55:(c=='E'?45:(c=='F'?46:(c=='G'?'\a':(c=='H'?'\b': \
-		(c=='I'?'\t':(c=='J'?'\n':(c=='T'?60:(c=='U'?61:(c=='V'?50: \
-		(c=='W'?38:(c=='Z'?63:(c=='['?39:(c==']'?29: \
-		(c<'J'?c+1-'A':(c+10-'J'))))))))))))))))
-#endif
+#define cntl(x)	(x&037)			/* assumes ASCII */
+
+/* required terminfo and termcap control sequences for multiline */
+#define TINF_CURSOR_UP	"cuu1"
+#define TINF_ERASE_EOS	"ed"
+#define TCAP_CURSOR_UP	"up"
+#define TCAP_ERASE_EOS	"cd"
 
 extern void	ed_putchar(Edit_t*, int);
+extern void	ed_putstring(Edit_t*, const char*);
 extern void	ed_ringbell(void);
 extern void	ed_setup(Edit_t*,int, int);
 extern void	ed_flush(Edit_t*);
@@ -183,7 +157,9 @@ extern int	ed_read(void*, int, char*, int, int);
 extern int	ed_emacsread(void*, int, char*, int, int);
 extern Edpos_t	ed_curpos(Edit_t*, genchar*, int, int, Edpos_t);
 extern int	ed_setcursor(Edit_t*, genchar*, int, int, int);
+#if SHOPT_ESH || SHOPT_VSH
 extern int	ed_macro(Edit_t*,int);
+#endif
 extern int	ed_expand(Edit_t*, char[],int*,int*,int,int);
 extern int	ed_fulledit(Edit_t*);
 extern void	*ed_open(void);
@@ -194,12 +170,6 @@ extern void	*ed_open(void);
 	extern void ed_genncpy(genchar*,const genchar*,int);
 	extern int ed_genlen(const genchar*);
 #endif /* SHOPT_MULTIBYTE */
-#if SHOPT_EDPREDICT
-    extern int	ed_histgen(Edit_t*, const char*);
-#   if SHOPT_ESH || SHOPT_VSH
-        extern void	ed_histlist(Edit_t*, int);
-#   endif /* SHOPT_ESH || SHOPT_VSH */
-#endif /* SHOPT_EDPREDICT */
 
 extern const char	e_runvi[];
 
@@ -207,27 +177,28 @@ extern const char	e_runvi[];
 
 /* flags */
 
-#define	HIST_EVENT	0x1	/* event designator seen */
+#define HIST_EVENT	0x1	/* event designator seen */
 #define HIST_QUESTION	0x2	/* question mark event designator */
-#define	HIST_HASH	0x4	/* hash event designator */
+#define HIST_HASH	0x4	/* hash event designator */
 #define HIST_WORDDSGN	0x8	/* word designator seen */
 #define HIST_QUICKSUBST	0x10	/* quick substitution designator seen */
 #define HIST_SUBSTITUTE	0x20	/* for substitution loop */
-#define	HIST_NEWLINE	0x40	/* newline in squashed white space */
+#define HIST_NEWLINE	0x40	/* newline in squashed white space */
 
 /* modifier flags */
 
-#define	HIST_PRINT		0x100	/* print new command */
-#define	HIST_QUOTE		0x200	/* quote resulting history line */
-#define	HIST_QUOTE_BR		0x400	/* quote every word on space break */
-#define	HIST_GLOBALSUBST	0x800	/* apply substitution globally */
+#define HIST_PRINT		0x100	/* print new command */
+#define HIST_QUOTE		0x200	/* quote resulting history line */
+#define HIST_QUOTE_BR		0x400	/* quote every word on space break */
+#define HIST_GLOBALSUBST	0x800	/* apply substitution globally */
 
-#define	HIST_ERROR		0x1000	/* an error occurred */
+#define HIST_ERROR		0x1000	/* an error occurred */
 
 /* flags to be returned */
 
-#define	HIST_FLAG_RETURN_MASK	(HIST_EVENT|HIST_PRINT|HIST_ERROR)
+#define HIST_FLAG_RETURN_MASK	(HIST_EVENT|HIST_PRINT|HIST_ERROR)
 
+extern void hist_setchars(char *);
 extern int hist_expand(const char *, char **);
 
 #endif /* SHOPT_HISTEXPAND */

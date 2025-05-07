@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,8 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*               Anuradha Weeraman <anuradha@debian.org>                *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -29,6 +31,8 @@
 #include <sys/ioctl.h>
 #endif
 
+#undef ioctl
+#undef sleep
 #define ioctl		______ioctl
 #define sleep		______sleep
 
@@ -57,7 +61,7 @@
 static int		ttctl(int, int, void*);
 
 void
-astwinsize(int fd, register int* rows, register int* cols)
+astwinsize(int fd, int* rows, int* cols)
 {
 #ifdef	TIOCGWINSZ
 #define NEED_ttctl
@@ -97,8 +101,8 @@ astwinsize(int fd, register int* rows, register int* cols)
 	{
 		char*		s;
 
-		if (rows) *rows = (s = getenv("LINES")) ? strtol(s, NiL, 0) : 0;
-		if (cols) *cols = (s = getenv("COLUMNS")) ? strtol(s, NiL, 0) : 0;
+		if (rows) *rows = (s = getenv("LINES")) ? strtol(s, NULL, 0) : 0;
+		if (cols) *cols = (s = getenv("COLUMNS")) ? strtol(s, NULL, 0) : 0;
 	}
 }
 
@@ -109,23 +113,23 @@ astwinsize(int fd, register int* rows, register int* cols)
  */
 
 static int
-ttctl(register int fd, int op, void* tt)
+ttctl(int fd, int op, void* tt)
 {
-	register int	v;
+	int	v;
 
 	if (fd < 0)
 	{
 		for (fd = 0; fd <= 2; fd++)
-			if (!ioctl(fd, op, tt)) return(0);
+			if (!ioctl(fd, op, tt)) return 0;
 		if ((fd = open("/dev/tty", O_RDONLY|O_cloexec)) >= 0)
 		{
 			v = ioctl(fd, op, tt);
 			close(fd);
-			return(v);
+			return v;
 		}
 	}
-	else if (!ioctl(fd, op, tt)) return(0);
-	return(-1);
+	else if (!ioctl(fd, op, tt)) return 0;
+	return -1;
 }
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -23,7 +24,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: getconf (ksh 93u+m) 2021-04-20 $\n]"
+"[-?\n@(#)$Id: getconf (ksh 93u+m) 2024-02-09 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?getconf - get configuration values]"
 "[+DESCRIPTION?\bgetconf\b displays the system configuration value for"
@@ -102,15 +103,15 @@ static const char usage[] =
 
 "[+ENVIRONMENT]"
     "{"
-        "[+_AST_FEATURES?Process local writable values that are "
-            "different from the default are stored in the \b_AST_FEATURES\b "
-            "environment variable. The \b_AST_FEATURES\b value is a "
-            "space-separated list of \aname\a \apath\a \avalue\a 3-tuples, "
-            "where \aname\a is the system configuration name, \apath\a is "
-            "the corresponding path, \b-\b if no path is applicable, and "
-            "\avalue\a is the system configuration value. \b_AST_FEATURES\b "
-            "is an implementation detail of process inheritance; it may "
-            "change or vanish in the future; don't rely on it.]"
+	"[+_AST_FEATURES?Process local writable values that are "
+	    "different from the default are stored in the \b_AST_FEATURES\b "
+	    "environment variable. The \b_AST_FEATURES\b value is a "
+	    "space-separated list of \aname\a \apath\a \avalue\a 3-tuples, "
+	    "where \aname\a is the system configuration name, \apath\a is "
+	    "the corresponding path, \b-\b if no path is applicable, and "
+	    "\avalue\a is the system configuration value. \b_AST_FEATURES\b "
+	    "is an implementation detail of process inheritance; it may "
+	    "change or vanish in the future; don't rely on it.]"
     "}"
 "[+SEE ALSO?\bpathchk\b(1), \bconfstr\b(3), \bpathconf\b(2),"
 "	\bsysconf\b(3), \bastgetconf\b(3)]"
@@ -129,20 +130,21 @@ typedef struct Path_s
 int
 b_getconf(int argc, char** argv, Shbltin_t* context)
 {
-	register char*		name;
-	register char*		path;
-	register char*		value;
-	register const char*	s;
+	char*			name;
+	char*			path = NULL;
+	char*			value;
+	const char*		s;
 	char*			pattern;
 	char*			native;
 	int			flags;
 	int			n;
 	char**			oargv;
+	char**			new_argv;
 	static const char	empty[] = "-";
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	oargv = argv;
-	if (*(native = astconf("GETCONF", NiL, NiL)) != '/')
+	if (*(native = astconf("GETCONF", NULL, NULL)) != '/')
 		native = 0;
 	flags = 0;
 	name = 0;
@@ -201,15 +203,15 @@ b_getconf(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
-	if (!(name = *argv))
-		path = 0;
-	else if (streq(name, empty))
+	name = *argv;
+	if (name && streq(name, empty))
 	{
 		name = 0;
 		if (path = *++argv)
@@ -221,7 +223,7 @@ b_getconf(int argc, char** argv, Shbltin_t* context)
 	}
 	if (error_info.errors || !name && *argv)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (!name)
@@ -274,8 +276,12 @@ b_getconf(int argc, char** argv, Shbltin_t* context)
 	/*
 	 * Run the external getconf command
 	 */
-	oargv[0] = native;
-	if ((n = sh_run(context, argc, oargv)) >= EXIT_NOEXEC)
+	new_argv = stkalloc(stkstd, (argc + 3) * sizeof(char*));
+	new_argv[0] = "command";
+	new_argv[1] = "-x";
+	new_argv[2] = native;
+	memcpy(new_argv + 3, oargv + 1, argc * sizeof(char*));
+	if ((n = sh_run(context, argc + 2, new_argv)) >= EXIT_NOEXEC)
 		error(ERROR_SYSTEM|2, "%s: exec error [%d]", native, n);
 	return n;
 }

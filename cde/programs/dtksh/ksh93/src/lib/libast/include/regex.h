@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -88,7 +88,7 @@
 
 #define REG_NOFREE	0x00000001	/* don't free			*/
 
-/* regsub flags */
+/* regsubcomp/regsubexec flags */
 
 #define REG_SUB_ALL	0x00000001	/* substitute all occurrences	*/
 #define REG_SUB_LOWER	0x00000002	/* substitute to lower case	*/
@@ -177,7 +177,6 @@ typedef struct regstat_s
 	regflags_t	re_flags;	/* REG_*			*/
 	ssize_t		re_min;		/* min anchored match length	*/
 	ssize_t		re_max;		/* max anchored match length	*/
-	ssize_t		re_record;	/* regrexec() match length	*/
 	regflags_t	re_info;	/* REG_* info			*/
 } regstat_t;
 
@@ -202,28 +201,17 @@ extern void	regfree(regex_t*);
 #define _REG_cache	1	/* have regcache()			*/
 #define _REG_class	1	/* have regclass()			*/
 #define _REG_collate	1	/* have regcollate(), regclass()	*/
-#define _REG_comb	1	/* have regcomb()			*/
-#define _REG_decomp	1	/* have regdecomp()			*/
-#define _REG_dup	1	/* have regdup()			*/
 #define _REG_fatal	1	/* have regfatal(), regfatalpat()	*/
-#define _REG_ncomp	1	/* have regncomp()			*/
 #define _REG_nexec	1	/* have regnexec()			*/
-#define _REG_rexec	1	/* have regrexec(), regrecord()		*/
 #define _REG_stat	1	/* have regstat()			*/
 #define _REG_subcomp	1	/* have regsubcomp(), regsubexec()	*/
 
 extern regclass_t regclass(const char*, char**);
 extern int	regaddclass(const char*, regclass_t);
 extern int	regcollate(const char*, char**, char*, size_t, wchar_t*);
-extern int	regcomb(regex_t*, regex_t*);
-extern size_t	regdecomp(regex_t*, regflags_t, char*, size_t);
-extern int	regdup(regex_t*, regex_t*);
-extern int	regncomp(regex_t*, const char*, size_t, regflags_t);
 extern int	regnexec(const regex_t*, const char*, size_t, size_t, regmatch_t*, regflags_t);
 extern void	regfatal(regex_t*, int, int);
 extern void	regfatalpat(regex_t*, int, int, const char*);
-extern int	regrecord(const regex_t*);
-extern int	regrexec(const regex_t*, const char*, size_t, size_t, regmatch_t*, regflags_t, int, void*, regrecord_t);
 extern regstat_t* regstat(const regex_t*);
 
 extern regex_t*	regcache(const char*, regflags_t, int*);
@@ -240,6 +228,9 @@ struct _sfio_s;
 #endif
 
 extern void	regalloc(void*, regresize_t, regflags_t);
-extern int	regsub(const regex_t*, struct _sfio_s*, const char*, const char*, size_t, regmatch_t*, regflags_t);
 
 #endif
+
+/* backward compat for removed functions */
+#define regrecord(re)			(re,0)
+#define regrexec(re,b,sz,n,m,f,s,h,r)	(re,b,sz,n,m,f,s,h,r,REG_BADPAT)

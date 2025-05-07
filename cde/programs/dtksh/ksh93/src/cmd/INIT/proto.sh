@@ -1,8 +1,7 @@
 ########################################################################
 #                                                                      #
 #              This file is part of the ksh 93u+m package              #
-#             Copyright (c) 2021 Contributors to ksh 93u+m             #
-#                    <https://github.com/ksh93/ksh>                    #
+#          Copyright (c) 2021-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -14,20 +13,27 @@
 #                                                                      #
 ########################################################################
 
-# proto(1) has been removed. This is a backwards compatibility stub that allows
+# proto(1) has been removed. This is a backward compatibility stub that allows
 # compiling older AST code (with Mamfiles containing proto commands) using the
 # current INIT system. This stub ignores all options, then invokes 'cat'.
 
+usage()
+{
+	echo 'Usage: proto [-dfhinprstvzP+S] [-C directory] [-e package] [-l file]'
+	echo '             [-o "name='\''value'\'' ..."] [-L file] file ...'
+	exit 2
+} >&2
+
 while	getopts ':dfhinprstvzPSC:e:l:o:L:' opt
 do	case $opt in
+	:)	usage
+		;;
 	\?)	case $OPTARG in
 		+)	;;
-		*)	echo "proto: $OPTARG: unknown option"
-			echo 'Usage: proto [-dfhinprstvzP+S] [-C directory] [-e package] [-l file]'
-			echo '             [-o "name='\''value'\'' ..."] [-L file] file ...'
-			exit 2
+		*)	echo "proto: $OPTARG: unknown option" >&2
+			usage
 			;;
-		esac >&2
+		esac
 		;;
 	esac
 done

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -34,28 +35,28 @@ static const char usage[] =
     "based on the underlying file system. A diagnostic is written to "
     "standard error for each pathname that:]"
     "{"
-        "[+-?Is longer than \b$(getconf PATH_MAX)\b bytes.]"
-        "[+-?Contains any component longer than \b$(getconf NAME_MAX)\b "
-            "bytes.]"
-        "[+-?Contains any directory component in a directory that is not "
-            "searchable.]"
-        "[+-?Contains any character in any component that is not valid "
-            "in its containing directory.]"
-        "[+-?Is empty.]"
+	"[+-?Is longer than \b$(getconf PATH_MAX)\b bytes.]"
+	"[+-?Contains any component longer than \b$(getconf NAME_MAX)\b "
+	    "bytes.]"
+	"[+-?Contains any directory component in a directory that is not "
+	    "searchable.]"
+	"[+-?Contains any character in any component that is not valid "
+	    "in its containing directory.]"
+	"[+-?Is empty.]"
     "}"
 "[p:components?Instead of performing length checks on the underlying "
     "file system, write a diagnostic for each pathname operand that:]"
     "{"
-        "[+-?Is longer than \b$(getconf _POSIX_PATH_MAX)\b bytes.]"
-        "[+-?Contains any component longer than \b$(getconf "
-            "_POSIX_NAME_MAX)\b bytes.]"
-        "[+-?Contains any character in any component that is not in the "
-            "portable filename character set.]"
+	"[+-?Is longer than \b$(getconf _POSIX_PATH_MAX)\b bytes.]"
+	"[+-?Contains any component longer than \b$(getconf "
+	    "_POSIX_NAME_MAX)\b bytes.]"
+	"[+-?Contains any character in any component that is not in the "
+	    "portable filename character set.]"
     "}"
 "[P:path?Write a diagnostic for each pathname operand that:]"
     "{"
-        "[+-?Contains any component with \b-\b as the first character.]"
-        "[+-?Is empty.]"
+	"[+-?Contains any component with \b-\b as the first character.]"
+	"[+-?Is empty.]"
     "}"
 "[a:all|portability?Equivalent to \b--components\b \b--path\b.]"
 "\n"
@@ -63,8 +64,8 @@ static const char usage[] =
 "\n"
 "[+EXIT STATUS?]"
     "{"
-        "[+0?All \apathname\a operands passed all of the checks.]"
-        "[+>0?An error occurred.]"
+	"[+0?All \apathname\a operands passed all of the checks.]"
+	"[+>0?An error occurred.]"
     "}"
 "[+SEE ALSO?\bgetconf\b(1), \bcreat\b(2), \bpathchk\b(2)]"
 ;
@@ -73,6 +74,13 @@ static const char usage[] =
 #include	<cmd.h>
 #include	<ls.h>
 
+#ifndef _POSIX_NAME_MAX
+#define _POSIX_NAME_MAX 14
+#endif
+#ifndef _POSIX_PATH_MAX
+#define _POSIX_PATH_MAX 256
+#endif
+
 #define COMPONENTS	0x1
 #define PATH	0x2
 
@@ -80,15 +88,15 @@ static const char usage[] =
 
 /*
  * call pathconf and handle unlimited sizes
- */ 
+ */
 static long mypathconf(const char *path, int op)
 {
-	register long			r;
+	long			r;
 
 	static const char* const	ops[] = { "NAME_MAX", "PATH_MAX" };
 
 	errno = 0;
-	if ((r = strtol(astconf(ops[op], path, NiL), NiL, 0)) < 0 && !errno)
+	if ((r = strtol(astconf(ops[op], path, NULL), NULL, 0)) < 0 && !errno)
 		return LONG_MAX;
 	return r;
 }
@@ -98,9 +106,9 @@ static long mypathconf(const char *path, int op)
  */
 static int pathchk(char* path, int mode)
 {
-	register char *cp=path, *cpold;
-	register int c;
-	register long r,name_max,path_max;
+	char *cp=path, *cpold;
+	int c;
+	long r,name_max,path_max;
 	char buf[2];
 
 	if(!*path)
@@ -128,7 +136,7 @@ static int pathchk(char* path, int mode)
 		{
 			if(name_max==0||path_max==0)
 			{
-				if(!(cpold = getcwd((char*)0, 0)) && errno == EINVAL && (cpold = newof(0, char, PATH_MAX, 0)) && !getcwd(cpold, PATH_MAX))
+				if(!(cpold = getcwd(NULL, 0)) && errno == EINVAL && (cpold = newof(0, char, PATH_MAX, 0)) && !getcwd(cpold, PATH_MAX))
 				{
 					free(cpold);
 					cpold = 0;
@@ -194,7 +202,7 @@ static int pathchk(char* path, int mode)
 	{
 		if((mode & PATH) && *cp == '-')
 		{
-			error(2,"%s: path component begins with '-'",path,fmtquote(buf, NiL, "'", 1, 0));
+			error(2,"%s: path component begins with '-'",path,fmtquote(buf, NULL, "'", 1, 0));
 			return -1;
 		}
 		while((c= *cp++) && c!='/')
@@ -202,7 +210,7 @@ static int pathchk(char* path, int mode)
 			{
 				buf[0] = c;
 				buf[1] = 0;
-				error(2,"%s: '%s' not in portable character set",path,fmtquote(buf, NiL, "'", 1, 0));
+				error(2,"%s: '%s' not in portable character set",path,fmtquote(buf, NULL, "'", 1, 0));
 				return -1;
 			}
 		if((cp-cpold) > name_max)
@@ -226,8 +234,8 @@ static int pathchk(char* path, int mode)
 int
 b_pathchk(int argc, char** argv, Shbltin_t* context)
 {
-	register int	mode = 0;
-	register char*	s;
+	int	mode = 0;
+	char*	s;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	for (;;)
@@ -247,15 +255,16 @@ b_pathchk(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (!*argv || error_info.errors)
 	{
-		error(ERROR_usage(2),"%s", optusage(NiL));
+		error(ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	while (s = *argv++)

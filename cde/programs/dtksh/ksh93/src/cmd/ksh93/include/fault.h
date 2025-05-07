@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #ifndef SH_SIGBITS
@@ -26,8 +27,6 @@
 #include	<setjmp.h>
 #include	<error.h>
 #include	<sfio.h>
-#include	"FEATURE/setjmp"
-#include	"FEATURE/sigfeatures"
 
 
 #ifndef SIGWINCH
@@ -47,7 +46,7 @@ typedef void (*SH_SIGTYPE)(int,void(*)(int));
 #define SH_TRAP			0200	/* bit for internal traps */
 #define SH_ERRTRAP		0	/* trap for non-zero exit status */
 #define SH_KEYTRAP		1	/* trap for keyboard event */
-#define SH_DEBUGTRAP		4	/* must be last internal trap */
+#define SH_DEBUGTRAP		2	/* must be last internal trap */
 
 #define SH_SIGBITS		8
 #define SH_SIGFAULT		1	/* signal handler is sh_fault */
@@ -58,6 +57,7 @@ typedef void (*SH_SIGTYPE)(int,void(*)(int));
 #define SH_SIGIGNORE		040	/* default is ignore signal */
 #define SH_SIGINTERACTIVE	0100	/* handle interactive specially */
 #define SH_SIGTSTP		0200	/* tstp signal received */
+#define SH_SIGALRM		0200	/* timer alarm received */
 #define SH_SIGTERM		SH_SIGOFF /* term signal received */
 #define SH_SIGRUNTIME		0400	/* runtime value */
 
@@ -111,15 +111,28 @@ struct checkpt
 	errorpop(&((bp)->err)) \
 )
 
+/* signal handling shorthands */
+#define sh_sigaction(s,action) \
+do { \
+	sigset_t ss; \
+	sigemptyset(&ss); \
+	if(s) \
+		sigaddset(&ss,(s)); \
+	sigprocmask(action,&ss,0); \
+} while(0)
+#define sigrelease(s)	sh_sigaction(s,SIG_UNBLOCK)
+#define sigblock(s)	sh_sigaction(s,SIG_BLOCK)
+#define sig_begin()	sh_sigaction(0,SIG_SETMASK)
+
 extern noreturn void 	sh_done(int);
 extern void 	sh_fault(int);
-extern void	sh_winsize(int*,int*);
+extern void	sh_winsize(void);
 extern void 	sh_sigclear(int);
 extern void 	sh_sigdone(void);
 extern void	sh_siginit(void);
 extern void 	sh_sigtrap(int);
 extern void 	sh_sigreset(int);
-extern void 	*sh_timeradd(unsigned long,int ,void (*)(void*),void*);
+extern void 	*sh_timeradd(Sfulong_t,int ,void (*)(void*),void*);
 extern void	sh_timerdel(void*);
 
 extern const char e_alarm[];

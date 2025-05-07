@@ -1,8 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *              This file is part of the ksh 93u+m package              *
-*          Copyright (c) 2021-2022 Contributors to ksh 93u+m           *
-*                    <https://github.com/ksh93/ksh>                    *
+*          Copyright (c) 2021-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -11,6 +10,7 @@
 *         (with md5 checksum 84283fa8859daf213bdda5a9f8d1be1d)         *
 *                                                                      *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -23,14 +23,14 @@
 #if _hdr_linux_msdos_fs
 #include <linux/msdos_fs.h>
 #endif
-#if _hdr_sys_ioctl
+#if _sys_ioctl
 #include <sys/ioctl.h>
 #endif
 
-#if _hdr_sys_ioctl && _hdr_linux_fs && defined(FS_IOC_GETFLAGS) && defined(FS_CASEFOLD_FL)
+#if _sys_ioctl && _hdr_linux_fs && defined(FS_IOC_GETFLAGS) && defined(FS_CASEFOLD_FL)
 #define _linux_casefold	1
 #endif
-#if _hdr_sys_ioctl && _hdr_linux_msdos_fs && defined(FAT_IOCTL_GET_ATTRIBUTES)
+#if _sys_ioctl && _hdr_linux_msdos_fs && defined(FAT_IOCTL_GET_ATTRIBUTES)
 #define _linux_fatfs	1
 #endif
 

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -34,7 +34,7 @@ NoN(eaccess)
 #else
 
 extern int
-eaccess(const char* path, register int flags)
+eaccess(const char* path, int flags)
 {
 #ifdef EFF_ONLY_OK
 	return access(path, flags|EFF_ONLY_OK);
@@ -42,7 +42,7 @@ eaccess(const char* path, register int flags)
 #if _lib_euidaccess
 	return euidaccess(path, flags);
 #else
-	register int	mode;
+	int		mode;
 	struct stat	st;
 
 	static int	init;
@@ -94,14 +94,14 @@ eaccess(const char* path, register int flags)
 	else
 	{
 #if _lib_getgroups
-		register int	n;
+		int	n;
 
 		static int	ngroups = -2;
-		static gid_t*	groups; 
+		static gid_t*	groups;
 
 		if (ngroups == -2)
 		{
-			if ((ngroups = getgroups(0, (gid_t*)0)) <= 0)
+			if ((ngroups = getgroups(0, NULL)) <= 0)
 				ngroups = (int)astconf_long(CONF_NGROUPS_MAX);
 			if (!(groups = newof(0, gid_t, ngroups + 1, 0)))
 				ngroups = -1;

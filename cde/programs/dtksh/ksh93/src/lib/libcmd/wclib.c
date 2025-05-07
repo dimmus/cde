@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -40,10 +41,10 @@
 
 #endif
 
-#define	WC_SP		0x08
-#define	WC_NL		0x10
-#define	WC_MB		0x20
-#define	WC_ERR		0x40
+#define WC_SP		0x08
+#define WC_NL		0x10
+#define WC_MB		0x20
+#define WC_ERR		0x40
 
 #define eol(c)		((c)&WC_NL)
 #define mbc(c)		((c)&WC_MB)
@@ -51,12 +52,12 @@
 
 Wc_t* wc_init(int mode)
 {
-	register int	n;
-	register int	w;
-	Wc_t*		wp;
+	int	n;
+	int	w;
+	Wc_t*	wp;
 
-	if (!(wp = (Wc_t*)stakalloc(sizeof(Wc_t))))
-		return 0;
+	if (!(wp = stkalloc(stkstd,sizeof(Wc_t))))
+		return NULL;
 	if (!mbwide())
 		wp->mb = 0;
 #if _hdr_wchar && _hdr_wctype && _lib_iswctype
@@ -108,7 +109,7 @@ static int invalid(const char *file, int nlines)
  * handle UTF space characters
  */
 
-static int chkstate(int state, register unsigned int c)
+static int chkstate(int state, unsigned int c)
 {
 	switch(state)
 	{
@@ -130,16 +131,16 @@ static int chkstate(int state, register unsigned int c)
 	case 6:
 		state = 0;
 		if(c==0xa0 || c==0xa1)
-			return(10);
+			return 10;
 		else if((c&0xf0)== 0x80)
 		{
 			if((c&=0xf)==7)
-				return(iswspace(0x2007)?10:0);
+				return iswspace(0x2007) ? 10 : 0;
 			if(c<=0xb)
-				return(10);
+				return 10;
 		}
 		else if(c==0xaf && iswspace(0x202f))
-			return(10);
+			return 10;
 		break;
 	case 7:
 		state = (c==0x9f?10:0);
@@ -156,25 +157,25 @@ static int chkstate(int state, register unsigned int c)
 
 int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 {
-	register char*		type = wp->type;
-	register unsigned char*	cp;
-	register Sfoff_t	nbytes;
-	register Sfoff_t	nchars;
-	register Sfoff_t	nwords;
-	register Sfoff_t	nlines;
-	register Sfoff_t	eline = -1;
-	register Sfoff_t	longest = 0;
-	register ssize_t	c;
-	register unsigned char*	endbuff;
-	register int		lasttype = WC_SP;
-	unsigned int		lastchar;
-	ssize_t			n;
-	ssize_t			o;
-	unsigned char*		buff;
-	wchar_t			x;
-	unsigned char		side[32];
+	char*		type = wp->type;
+	unsigned char*	cp;
+	Sfoff_t		nbytes;
+	Sfoff_t		nchars;
+	Sfoff_t		nwords;
+	Sfoff_t		nlines;
+	Sfoff_t		eline = -1;
+	Sfoff_t		longest = 0;
+	ssize_t		c;
+	unsigned char*	endbuff;
+	int		lasttype = WC_SP;
+	unsigned int	lastchar;
+	ssize_t		n;
+	ssize_t		o;
+	unsigned char*	buff;
+	wchar_t		x;
+	unsigned char	side[32];
 
-	sfset(fd,SF_WRITE,1);
+	sfset(fd,SFIO_WRITE,1);
 	nlines = nwords = nchars = nbytes = 0;
 	wp->longest = 0;
 	if (wp->mb < 0 && (wp->mode & (WC_MBYTE|WC_WORDS)))
@@ -195,7 +196,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 					else
 						o = 0;
 					cp = side + o;
-					if (!(buff = (unsigned char*)sfreserve(fd, SF_UNBOUND, 0)) || (n = sfvalue(fd)) <= 0)
+					if (!(buff = (unsigned char*)sfreserve(fd, SFIO_UNBOUND, 0)) || (n = sfvalue(fd)) <= 0)
 					{
 						if ((nchars - longest) > wp->longest)
 							wp->longest = nchars - longest;
@@ -251,7 +252,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 	{
 		if (!(wp->mode & (WC_MBYTE|WC_WORDS|WC_LONGEST)))
 		{
-			while ((cp = (unsigned char*)sfreserve(fd, SF_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
+			while ((cp = (unsigned char*)sfreserve(fd, SFIO_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
 			{
 				nchars += c;
 				endbuff = cp + c;
@@ -270,7 +271,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 		}
 		else
 		{
-			while ((cp = buff = (unsigned char*)sfreserve(fd, SF_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
+			while ((cp = buff = (unsigned char*)sfreserve(fd, SFIO_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
 			{
 				nchars += c;
 				/* check to see whether first character terminates word */
@@ -332,7 +333,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 		int		skip=0;
 		int		adjust=0;
 		int		state=0;
-		int		oldc;
+		int		oldc=0;
 		int		xspace;
 		int		wasspace = 1;
 		unsigned char*	start;
@@ -341,7 +342,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 		lastchar = 0;
 		start = (endbuff = side) + 1;
 		xspace = iswspace(0xa0) || iswspace(0x85);
-		while ((cp = buff = (unsigned char*)sfreserve(fd, SF_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
+		while ((cp = buff = (unsigned char*)sfreserve(fd, SFIO_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
 		{
 			nbytes += c;
 			nchars += c;
@@ -455,7 +456,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 						state = 0;
 						if(eline!=nlines && !(wp->mode & WC_QUIET))
 							eline = invalid(file, nlines);
-						while(mbc(c) && ((c|WC_ERR) || (c&7)==0)) 
+						while(mbc(c) && ((c|WC_ERR) || (c&7)==0))
 							c=type[*cp++];
 						if(eol(c) && (cp > endbuff))
 							goto eob;

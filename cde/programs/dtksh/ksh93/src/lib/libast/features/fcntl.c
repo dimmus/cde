@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -42,14 +43,14 @@
 
 #include "FEATURE/fs"
 
-#undef	getdtablesize   
+#undef	getdtablesize
 #undef	getpagesize
 #undef	ioctl
 
 #include "FEATURE/tty"
 
 int
-main()
+main(void)
 {
 	int		f_local = 0;
 	int		f_lck = 0;
@@ -292,6 +293,20 @@ main()
 #else
 	printf("#define O_cloexec		0\n");
 #endif
+#ifndef O_SEARCH
+#ifdef O_PATH
+	printf("#define O_SEARCH		O_PATH\n");
+#else
+	printf("#define O_SEARCH		0\n");
+#endif
+#endif
+#ifndef O_DIRECTORY
+#ifdef O_OPENDIR
+	printf("#define O_DIRECTORY		O_OPENDIR\n");
+#else
+	printf("#define O_DIRECTORY		0\n");
+#endif
+#endif
 #ifndef	O_TEMPORARY
 	printf("#define O_TEMPORARY		0\n");
 #endif
@@ -307,8 +322,5 @@ main()
 	printf("extern int	open(const char*, int, ...);\n");
 #endif
 #endif
-	printf("\n");
-	printf("#include <ast_fs.h>\n");
-
 	return 0;
 }

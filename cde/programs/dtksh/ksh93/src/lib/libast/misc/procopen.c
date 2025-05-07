@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -34,7 +34,7 @@
 #include <ast_tty.h>
 
 /*
- * not quite ready for _use_spawnveg 
+ * not quite ready for _use_spawnveg
  */
 
 #undef	_use_spawnveg
@@ -75,12 +75,26 @@ static const Namval_t		options[] =
 	0,		0
 };
 
+static int
+ast_setenv(const char* name, const char* value, int overwrite)
+{
+	char*	s;
+
+	if (overwrite || !getenv(name))
+	{
+		if (!(s = sfprints("%s=%s", name, value)) || !(s = strdup(s)))
+			return -1;
+		return setenviron(s) ? 0 : -1;
+	}
+	return 0;
+}
+
 /*
  * called by stropt() to set options
  */
 
 static int
-setopt(register void* a, register const void* p, register int n, const char* v)
+setopt(void* a, const void* p, int n, const char* v)
 {
 	NoP(v);
 	if (p)
@@ -126,8 +140,6 @@ typedef struct Mod_s
 
 #endif /* _use_spawnveg */
 
-#ifdef SIGPIPE
-
 /*
  * catch but ignore sig
  * avoids SIG_IGN being passed to children
@@ -138,8 +150,6 @@ ignoresig(int sig)
 {
 	signal(sig, ignoresig);
 }
-
-#endif /* SIGPIPE */
 
 /*
  * do modification op and save previous state for restore()
@@ -180,7 +190,7 @@ modify(Proc_t* proc, int forked, int op, long arg1, long arg2)
 					close(i);
 			arg2 = -1;
 #ifdef TIOCSCTTY
-			if (ioctl(arg1, TIOCSCTTY, NiL) < 0)
+			if (ioctl(arg1, TIOCSCTTY, NULL) < 0)
 				return -1;
 #else
 			if (!(s = ttyname(arg1)))
@@ -223,9 +233,9 @@ modify(Proc_t* proc, int forked, int op, long arg1, long arg2)
 #if _use_spawnveg
 	else
 	{
-		register Modify_t*	m;
+		Modify_t*	m;
 
-		if (!(m = newof(NiL, Modify_t, 1, 0)))
+		if (!(m = newof(NULL, Modify_t, 1, 0)))
 			return -1;
 		m->next = proc->mods;
 		proc->mods = m;
@@ -309,9 +319,9 @@ modify(Proc_t* proc, int forked, int op, long arg1, long arg2)
 static void
 restore(Proc_t* proc)
 {
-	register Modify_t*	m;
-	register Modify_t*	p;
-	int			oerrno;
+	Modify_t*	m;
+	Modify_t*	p;
+	int		oerrno;
 
 	NoP(proc);
 	oerrno = errno;
@@ -380,50 +390,45 @@ restore(Proc_t* proc)
  */
 
 Proc_t*
-procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
+procopen(const char* cmd, char** argv, char** envv, int64_t* modv, int flags)
 {
-	register Proc_t*	proc = 0;
-	register int		procfd;
-	register char**		p;
-	char**			v;
-	int			i;
-	int			forked = 0;
-	int			signalled = 0;
-	long			n;
-	char			path[PATH_MAX];
-	char			env[PATH_MAX + 2];
-	int			pio[2];
-	int			pop[2];
+	Proc_t*		proc = 0;
+	int		procfd = -1;
+	char**		p;
+	char**		v;
+	int		i;
+	int		forked = 0;
+	int		signalled = 0;
+	int64_t		n;
+	char		path[PATH_MAX];
+	char		env[PATH_MAX + 2];
+	int		pio[2];
+	int		pop[2];
 #if !_pipe_rw && !_lib_socketpair
-	int			poi[2];
+	int		poi[2];
 #endif /* !_pipe_rw && !_lib_socketpair */
-#if defined(SIGCHLD) && ( _lib_sigprocmask || _lib_sigsetmask )
-	Sig_mask_t		mask;
-#endif /* defined(SIGCHLD) && ( _lib_sigprocmask || _lib_sigsetmask ) */
+	sigset_t	mask;
 #if _use_spawnveg
-	int			newenv = 0;
+	int		newenv = 0;
 #endif /* _use_spawnveg */
 #if DEBUG_PROC
-	int			debug = PROC_OPT_EXEC;
+	int		debug = PROC_OPT_EXEC;
 #endif /* DEBUG_PROC */
 
 	if (!argv && (flags & (PROC_ORPHAN|PROC_OVERLAY)))
 	{
 		errno = ENOEXEC;
-		return 0;
+		return NULL;
 	}
 	pio[0] = pio[1] = -1;
 	pop[0] = pop[1] = -1;
 #if !_pipe_rw && !_lib_socketpair
 	poi[0] = poi[1] = -1;
 #endif /* !_pipe_rw && !_lib_socketpair */
-	if (cmd && (!*cmd || !pathpath(cmd, NiL, PATH_REGULAR|PATH_EXECUTE, path, sizeof(path))))
+	if (cmd && (!*cmd || !pathpath(cmd, NULL, PATH_REGULAR|PATH_EXECUTE, path, sizeof(path))))
 		goto bad;
 	switch (flags & (PROC_READ|PROC_WRITE))
 	{
-	case 0:
-		procfd = -1;
-		break;
 	case PROC_READ:
 		procfd = 1;
 		break;
@@ -443,10 +448,10 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 	proc->rfd = -1;
 	proc->wfd = -1;
 	proc->flags = flags;
-	sfsync(NiL);
+	sfsync(NULL);
 	if (environ && envv != (char**)environ && (envv || (flags & PROC_PARANOID) || argv && (environ[0][0] != '_' || environ[0][1] != '=')))
 	{
-		if (!setenviron(NiL))
+		if (!setenviron(NULL))
 			goto bad;
 #if _use_spawnveg
 		if (!(flags & PROC_ORPHAN))
@@ -491,20 +496,9 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 			signalled = 1;
 			proc->sigint = signal(SIGINT, SIG_IGN);
 			proc->sigquit = signal(SIGQUIT, SIG_IGN);
-#if defined(SIGCHLD)
-#if _lib_sigprocmask
 			sigemptyset(&mask);
 			sigaddset(&mask, SIGCHLD);
 			sigprocmask(SIG_BLOCK, &mask, &proc->mask);
-#else
-#if _lib_sigsetmask
-			mask = sigmask(SIGCHLD);
-			proc->mask = sigblock(mask);
-#else
-			proc->sigchld = signal(SIGCHLD, SIG_DFL);
-#endif /* _lib_sigsetmask */
-#endif /* _lib_sigprocmask */
-#endif /* defined(SIGCHLD) */
 		}
 		if ((flags & PROC_ORPHAN) && pipe(pop))
 			goto bad;
@@ -523,18 +517,7 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 				proc->sigquit = SIG_DFL;
 				signal(SIGQUIT, proc->sigquit);
 			}
-#if defined(SIGCHLD)
-#if _lib_sigprocmask
-			sigprocmask(SIG_SETMASK, &proc->mask, NiL);
-#else
-#if _lib_sigsetmask
-			sigsetmask(proc->mask);
-#else
-			if (proc->sigchld != SIG_IGN)
-				signal(SIGCHLD, SIG_DFL);
-#endif /* _lib_sigsetmask */
-#endif /* _lib_sigprocmask */
-#endif /* defined(SIGCHLD) */
+			sigprocmask(SIG_SETMASK, &proc->mask, NULL);
 		}
 		else if (proc->pid == -1)
 			goto bad;
@@ -577,26 +560,16 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 #endif /* DEBUG_PROC */
 		if (flags & PROC_DAEMON)
 		{
-#ifdef SIGHUP
 			modify(proc, forked, PROC_sig_ign, SIGHUP, 0);
-#endif /* SIGHUP */
 			modify(proc, forked, PROC_sig_dfl, SIGTERM, 0);
-#ifdef SIGTSTP
 			modify(proc, forked, PROC_sig_ign, SIGTSTP, 0);
-#endif /* SIGTSTP */
-#ifdef SIGTTIN
 			modify(proc, forked, PROC_sig_ign, SIGTTIN, 0);
-#endif /* SIGTTIN */
-#ifdef SIGTTOU
 			modify(proc, forked, PROC_sig_ign, SIGTTOU, 0);
-#endif /* SIGTTOU */
 		}
 		if (flags & (PROC_BACKGROUND|PROC_DAEMON))
 		{
 			modify(proc, forked, PROC_sig_ign, SIGINT, 0);
-#ifdef SIGQUIT
 			modify(proc, forked, PROC_sig_ign, SIGQUIT, 0);
-#endif /* SIGQUIT */
 		}
 		if (flags & (PROC_DAEMON|PROC_SESSION))
 			modify(proc, forked, PROC_sys_pgrp, -1, 0);
@@ -674,7 +647,7 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 			if (!setenviron(env))
 				goto cleanup;
 		}
-		if ((flags & PROC_PARANOID) && setenv("PATH", astconf("PATH", NiL, NiL), 1))
+		if ((flags & PROC_PARANOID) && ast_setenv("PATH", astconf("PATH", NULL, NULL), 1))
 			goto cleanup;
 		if ((p = envv) && p != (char**)environ)
 			while (*p)
@@ -730,7 +703,7 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 			*p = path;
 			*--p = "sh";
 		}
-		strcpy(env + 2, (flags & PROC_PARANOID) ? astconf("SH", NiL, NiL) : pathshell());
+		strcpy(env + 2, (flags & PROC_PARANOID) ? astconf("SH", NULL, NULL) : pathshell());
 		if (forked || (flags & PROC_OVERLAY))
 			execve(env + 2, p, environ);
 #if _use_spawnveg
@@ -771,20 +744,9 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 				signalled = 1;
 				proc->sigint = signal(SIGINT, SIG_IGN);
 				proc->sigquit = signal(SIGQUIT, SIG_IGN);
-#if defined(SIGCHLD)
-#if _lib_sigprocmask
 				sigemptyset(&mask);
 				sigaddset(&mask, SIGCHLD);
 				sigprocmask(SIG_BLOCK, &mask, &proc->mask);
-#else
-#if _lib_sigsetmask
-				mask = sigmask(SIGCHLD);
-				proc->mask = sigblock(mask);
-#else
-				proc->sigchld = signal(SIGCHLD, SIG_DFL);
-#endif /* _lib_sigsetmask */
-#endif /* _lib_sigprocmask */
-#endif /* defined(SIGCHLD) */
 			}
 		}
 		else if (modv)
@@ -809,7 +771,6 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 				}
 		if (procfd >= 0)
 		{
-#ifdef SIGPIPE
 			if ((flags & (PROC_WRITE|PROC_IGNORE)) == (PROC_WRITE|PROC_IGNORE))
 			{
 				Handler_t	handler;
@@ -817,7 +778,6 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 				if ((handler = signal(SIGPIPE, ignoresig)) != SIG_DFL && handler != ignoresig)
 					signal(SIGPIPE, handler);
 			}
-#endif /* SIGPIPE */
 			switch (procfd)
 			{
 			case 0:
@@ -860,18 +820,7 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 			signal(SIGINT, proc->sigint);
 		if (proc->sigquit != SIG_IGN)
 			signal(SIGQUIT, proc->sigquit);
-#if defined(SIGCHLD)
-#if _lib_sigprocmask
-		sigprocmask(SIG_SETMASK, &proc->mask, NiL);
-#else
-#if _lib_sigsetmask
-		sigsetmask(proc->mask);
-#else
-		if (proc->sigchld != SIG_DFL)
-			signal(SIGCHLD, proc->sigchld);
-#endif /* _lib_sigsetmask */
-#endif /* _lib_sigprocmask */
-#endif /* defined(SIGCHLD) */
+		sigprocmask(SIG_SETMASK, &proc->mask, NULL);
 	}
 	if ((flags & PROC_CLEANUP) && modv)
 		for (i = 0; n = modv[i]; i++)
@@ -900,5 +849,5 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 		close(poi[1]);
 #endif /* !_pipe_rw && !_lib_socketpair */
 	procfree(proc);
-	return 0;
+	return NULL;
 }

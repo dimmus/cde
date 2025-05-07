@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -27,7 +27,7 @@
  *	0ooo		octal
  *	0[xX]hhh	hexadecimal
  *	ddd		decimal
- *	n#ccc		base n, 2 <= b <= 36
+ *	n#ccc		base n, 2 <= b <= 64
  *
  * NOTE: all operands are evaluated as both the parse
  *	 and evaluation are done on the fly
@@ -40,7 +40,7 @@
 #define peekchr(ex)	(*(ex)->nextchr)
 #define ungetchr(ex)	((ex)->nextchr--)
 
-#define err(ex,msg)	return(seterror(ex,msg))
+#define err(ex,msg)	return seterror(ex,msg)
 
 typedef struct				/* expression handle		*/
 {
@@ -56,33 +56,33 @@ typedef struct				/* expression handle		*/
  */
 
 static long
-seterror(register Expr_t* ex, char* msg)
+seterror(Expr_t* ex, char* msg)
 {
 	if (!ex->errmsg) ex->errmsg = msg;
 	ex->errchr = ex->nextchr;
 	ex->nextchr = "";
-	return(0);
+	return 0;
 }
 
-/*   
+/*
  * evaluate a subexpression with precedence
  */
 
 static long
-expr(register Expr_t* ex, register int precedence)
+expr(Expr_t* ex, int precedence)
 {
-	register int	c;
-	register long	n;
-	register long	x;
-	char*		pos;
-	int		operand = 1;
+	int	c;
+	long	n;
+	long	x;
+	char*	pos;
+	int	operand = 1;
 
 	while (c = getchr(ex), isspace(c));
 	switch (c)
 	{
 	case 0:
 		ungetchr(ex);
-		if (!precedence) return(0);
+		if (!precedence) return 0;
 		err(ex, "more tokens expected");
 	case '-':
 		n = -expr(ex, 13);
@@ -240,18 +240,18 @@ expr(register Expr_t* ex, register int precedence)
 		default:
 			if (isspace(c)) continue;
 			pos = --ex->nextchr;
-			if (isdigit(c)) n = strton(ex->nextchr, &ex->nextchr, NiL, 0);
+			if (isdigit(c)) n = strton(ex->nextchr, &ex->nextchr, NULL, 0);
 			else if (ex->convert) n = (*ex->convert)(ex->nextchr, &ex->nextchr, ex->handle);
 			if (ex->nextchr == pos) err(ex, "syntax error");
 			goto gotoperand;
 		}
-		if (ex->errmsg) return(0);
+		if (ex->errmsg) return 0;
 		if (!operand) err(ex, "operand expected");
 	}
  done:
 	ungetchr(ex);
 	if (!operand) err(ex, "operand expected");
-	return(n);
+	return n;
 }
 
 /*
@@ -281,10 +281,10 @@ strexpr(const char* s, char** end, long(*convert)(const char*, char**, void*), v
 		seterror(&ex, "invalid use of :");
 	if (ex.errmsg)
 	{
-		if (convert) (*convert)(NiL, &ex.errmsg, handle);
+		if (convert) (*convert)(NULL, &ex.errmsg, handle);
 		ex.nextchr = ex.errchr;
 		n = 0;
 	}
 	if (end) *end = ex.nextchr;
-	return(n);
+	return n;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -22,8 +22,6 @@
  * string interface to confstr(),pathconf(),sysconf(),sysinfo()
  * extended to allow some features to be set per-process
  */
-
-static const char id[] = "\n@(#)$Id: getconf (AT&T Research) 2012-05-01 $\0\n";
 
 #include "univlib.h"
 
@@ -72,14 +70,14 @@ static const char id[] = "\n@(#)$Id: getconf (AT&T Research) 2012-05-01 $\0\n";
 #define CONF_GLOBAL	(CONF_USER<<3)
 
 #define DEFAULT(o)	((state.std||!dynamic[o].ast)?dynamic[o].std:dynamic[o].ast)
-#define INITIALIZE()	do{if(!state.data)synthesize(NiL,NiL,NiL);}while(0)
+#define INITIALIZE()	do{if(!state.data)synthesize(NULL,NULL,NULL);}while(0)
 #define STANDARD(v)	(streq(v,"standard")||streq(v,"strict")||streq(v,"posix")||streq(v,"xopen"))
 
 #define MAXVAL		256
 
 #if MAXVAL <= UNIV_SIZE
 #undef	MAXVAL
-#define	MAXVAL		(UNIV_SIZE+1)
+#define MAXVAL		(UNIV_SIZE+1)
 #endif
 
 #ifndef _UNIV_DEFAULT
@@ -302,13 +300,13 @@ buffer(char* s)
  */
 
 static char*
-synthesize(register Feature_t* fp, const char* path, const char* value)
+synthesize(Feature_t* fp, const char* path, const char* value)
 {
-	register char*		s;
-	register char*		d;
-	register char*		v;
-	register char*		p;
-	register int		n;
+	char*		s;
+	char*		d;
+	char*		v;
+	char*		p;
+	int		n;
 
 #if DEBUG_astconf
 	if (fp)
@@ -328,7 +326,7 @@ synthesize(register Feature_t* fp, const char* path, const char* value)
 			n += strlen(s) + 1;
 		n = roundof(n, 32);
 		if (!(state.data = newof(0, char, n, 0)))
-			return 0;
+			return NULL;
 		state.last = state.data + n - 1;
 		strcpy(state.data, state.name);
 		state.data += state.prefix - 1;
@@ -367,7 +365,7 @@ synthesize(register Feature_t* fp, const char* path, const char* value)
 	if (!state.last)
 	{
 		if (!value)
-			return 0;
+			return NULL;
 		n = strlen(value);
 		goto ok;
 	}
@@ -419,7 +417,7 @@ synthesize(register Feature_t* fp, const char* path, const char* value)
 			else
 				fp->value = null;
 		}
-		return 0;
+		return NULL;
 	}
 	if (!value[0])
 		value = "0";
@@ -436,7 +434,7 @@ synthesize(register Feature_t* fp, const char* path, const char* value)
 		c = n + state.last - state.data + 3 * MAXVAL;
 		c = roundof(c, 32);
 		if (!(state.data = newof(state.data, char, c, 0)))
-			return 0;
+			return NULL;
 		state.last = state.data + c - 1;
 		state.data += state.prefix;
 		d = state.data + i;
@@ -453,7 +451,7 @@ synthesize(register Feature_t* fp, const char* path, const char* value)
 #endif
 	setenviron(state.data - state.prefix);
 	if (state.notify)
-		(*state.notify)(NiL, NiL, state.data - state.prefix);
+		(*state.notify)(NULL, NULL, state.data - state.prefix);
 	n = s - (char*)value - 1;
  ok:
 	if (!(fp->flags & CONF_ALLOC))
@@ -479,10 +477,10 @@ synthesize(register Feature_t* fp, const char* path, const char* value)
  */
 
 static void
-initialize(register Feature_t* fp, const char* path, const char* command, const char* succeed, const char* fail)
+initialize(Feature_t* fp, const char* path, const char* command, const char* succeed, const char* fail)
 {
-	register char*	p;
-	register int	ok = 1;
+	char*	p;
+	int	ok = 1;
 
 #if DEBUG_astconf
 	error(-6, "astconf initialize name=%s path=%s command=%s succeed=%s fail=%s fp=%p%s", fp->name, path, command, succeed, fail, fp, state.synthesizing ? " SYNTHESIZING" : "");
@@ -510,8 +508,8 @@ initialize(register Feature_t* fp, const char* path, const char* command, const 
 	default:
 		if (p = getenv("PATH"))
 		{
-			register int	r = 1;
-			register char*	d = p;
+			int		r = 1;
+			char*		d = p;
 			Sfio_t*		tmp;
 
 #if DEBUG_astconf
@@ -598,14 +596,19 @@ initialize(register Feature_t* fp, const char* path, const char* command, const 
  */
 
 static char*
-format(register Feature_t* fp, const char* path, const char* value, unsigned int flags, Error_f conferror)
+format(Feature_t* fp, const char* path, const char* value, unsigned int flags, Error_f conferror)
 {
-	register Feature_t*	sp;
-	register int		n;
+	Feature_t*		sp;
+	int			n;
 	static struct utsname	uts;
 
+#ifndef UNIV_MAX
+	NOT_USED(conferror);
+#endif
 #if DEBUG_astconf
 	error(-6, "astconf format name=%s path=%s value=%s flags=%04x fp=%p%s", fp->name, path, value, flags, fp, state.synthesizing ? " SYNTHESIZING" : "");
+#else
+	NOT_USED(flags);
 #endif
 	if (value)
 		fp->flags &= ~CONF_GLOBAL;
@@ -631,7 +634,7 @@ format(register Feature_t* fp, const char* path, const char* value, unsigned int
 		if (state.synthesizing && value == (char*)fp->std)
 			fp->value = (char*)value;
 		else if (!synthesize(fp, path, value))
-			initialize(fp, path, NiL, fp->std, fp->value);
+			initialize(fp, path, NULL, fp->std, fp->value);
 #if DEBUG_astconf
 		error(-6, "state.std=%d %s [%s] std=%s ast=%s value=%s", state.std, fp->name, value, fp->std, fp->ast, fp->value);
 #endif
@@ -658,7 +661,7 @@ format(register Feature_t* fp, const char* path, const char* value, unsigned int
 		if (state.synthesizing && value == (char*)fp->std)
 			fp->value = (char*)value;
 		else if (!synthesize(fp, path, value))
-			initialize(fp, path, NiL, "logical", DEFAULT(OP_path_resolve));
+			initialize(fp, path, NULL, "logical", DEFAULT(OP_path_resolve));
 		break;
 
 	case OP_universe:
@@ -678,7 +681,7 @@ format(register Feature_t* fp, const char* path, const char* value, unsigned int
 			{
 				if (conferror)
 					(*conferror)(&state, &state, 2, "%s: %s: universe value too large", fp->name, value);
-				return 0;
+				return NULL;
 			}
 		}
 #ifdef ATT_UNIV
@@ -737,9 +740,9 @@ format(register Feature_t* fp, const char* path, const char* value, unsigned int
  */
 
 static char*
-feature(register Feature_t* fp, const char* name, const char* path, const char* value, unsigned int flags, Error_f conferror)
+feature(Feature_t* fp, const char* name, const char* path, const char* value, unsigned int flags, Error_f conferror)
 {
-	register int		n;
+	int		n;
 
 	if (value && (streq(value, "-") || streq(value, "0")))
 		value = null;
@@ -751,15 +754,15 @@ feature(register Feature_t* fp, const char* name, const char* path, const char* 
 	if (!fp)
 	{
 		if (!value)
-			return 0;
+			return NULL;
 		if (state.notify && !(*state.notify)(name, path, value))
-			return 0;
+			return NULL;
 		n = strlen(name);
 		if (!(fp = newof(0, Feature_t, 1, n + 1)))
 		{
 			if (conferror)
 				(*conferror)(&state, &state, 2, "%s: out of memory", name);
-			return 0;
+			return NULL;
 		}
 		fp->op = -1;
 		fp->name = (const char*)fp + sizeof(Feature_t);
@@ -775,10 +778,10 @@ feature(register Feature_t* fp, const char* name, const char* path, const char* 
 		{
 			if (conferror)
 				(*conferror)(&state, &state, 2, "%s: cannot set readonly symbol", fp->name);
-			return 0;
+			return NULL;
 		}
 		if (state.notify && !streq(fp->value, value) && !(*state.notify)(name, path, value))
-			return 0;
+			return NULL;
 	}
 	else
 		state.recent = fp;
@@ -790,17 +793,17 @@ feature(register Feature_t* fp, const char* name, const char* path, const char* 
  */
 
 static int
-lookup(register Lookup_t* look, const char* name, unsigned int flags)
+lookup(Lookup_t* look, const char* name, unsigned int flags)
 {
-	register Conf_t*	mid = (Conf_t*)conf;
-	register Conf_t*	lo = mid;
-	register Conf_t*	hi = mid + conf_elements;
-	register int		v;
-	register int		c;
-	char*			e;
-	const Prefix_t*		p;
+	Conf_t*		lo = (Conf_t*)conf;
+	Conf_t*		mid = lo;
+	Conf_t*		hi = lo + conf_elements - 1;
+	int		v = 0;
+	int		c;
+	char*		e;
+	const Prefix_t*	p;
 
-	static Conf_t		num;
+	static Conf_t	num;
 
 	look->flags = 0;
 	look->call = -1;
@@ -903,11 +906,11 @@ lookup(register Lookup_t* look, const char* name, unsigned int flags)
  */
 
 static char*
-fmtlower(register const char* s)
+fmtlower(const char* s)
 {
-	register int	c;
-	register char*	t;
-	char*		b;
+	int	c;
+	char*	t;
+	char*	b;
 
 	b = t = fmtbuf(strlen(s) + 1);
 	while (c = *s++)
@@ -927,22 +930,22 @@ fmtlower(register const char* s)
  */
 
 static char*
-print(Sfio_t* sp, register Lookup_t* look, const char* name, const char* path, int listflags, Error_f conferror)
+print(Sfio_t* sp, Lookup_t* look, const char* name, const char* path, int listflags, Error_f conferror)
 {
-	register Conf_t*	p = look->conf;
-	register unsigned int	flags = look->flags;
-	Feature_t*		fp;
-	char*			call;
-	char*			f;
-	const char*		s;
-	int			i;
-	int			n;
-	int			olderrno;
-	int			drop;
-	int			defined;
-	intmax_t		v;
-	char			buf[PATH_MAX];
-	char			flg[16];
+	Conf_t*		p = look->conf;
+	unsigned int	flags = look->flags;
+	Feature_t*	fp;
+	char*		call;
+	char*		f;
+	const char*	s;
+	int		i;
+	int		n;
+	int		olderrno;
+	int		drop;
+	int		defined;
+	intmax_t	v;
+	char		buf[PATH_MAX];
+	char		flg[16];
 
 	if (!name && !(p->flags & CONF_STRING) && (p->flags & (CONF_FEATURE|CONF_LIMIT|CONF_MINMAX)) && (p->flags & (CONF_LIMIT|CONF_PREFIXED)) != CONF_LIMIT)
 		flags |= CONF_PREFIXED;
@@ -1282,7 +1285,7 @@ print(Sfio_t* sp, register Lookup_t* look, const char* name, const char* path, i
 		if (call = sfstruse(sp))
 			call = buffer(call);
 		else
-			call = "[ out of space ]";
+			call = "[ out of memory ]";
 		sfclose(sp);
 		return call;
 	}
@@ -1291,7 +1294,7 @@ print(Sfio_t* sp, register Lookup_t* look, const char* name, const char* path, i
 		for (fp = state.features; fp; fp = fp->next)
 			if (streq(name, fp->name))
 				return format(fp, path, 0, listflags, conferror);
-	return (listflags & ASTCONF_error) ? (char*)0 : null;
+	return (listflags & ASTCONF_error) ? NULL : null;
 }
 
 /*
@@ -1304,7 +1307,7 @@ nativeconf(Proc_t** pp, const char* operand)
 {
 	Sfio_t*		sp;
 	char*		cmd[3];
-	long		ops[2];
+	int64_t		ops[2];
 
 #if DEBUG_astconf
 	error(-6, "astconf defer %s %s", _pth_getconf, operand);
@@ -1316,14 +1319,14 @@ nativeconf(Proc_t** pp, const char* operand)
 	ops[1] = 0;
 	if (*pp = procopen(_pth_getconf, cmd, environ, ops, PROC_READ))
 	{
-		if (sp = sfnew(NiL, NiL, SF_UNBOUND, (*pp)->rfd, SF_READ))
+		if (sp = sfnew(NULL, NULL, SFIO_UNBOUND, (*pp)->rfd, SFIO_READ))
 		{
-			sfdisc(sp, SF_POPDISC);
+			sfdisc(sp, SFIO_POPDISC);
 			return sp;
 		}
 		procclose(*pp);
 	}
-	return 0;
+	return NULL;
 }
 #endif
 
@@ -1335,11 +1338,11 @@ nativeconf(Proc_t** pp, const char* operand)
  * settable return values are in permanent store
  * non-settable return values copied to a tmp fmtbuf() buffer
  *
- *	if (streq(astgetconf("PATH_RESOLVE", NiL, NiL, 0, 0), "logical"))
+ *	if (streq(astgetconf("PATH_RESOLVE", NULL, NULL, 0, 0), "logical"))
  *		our_way();
  *
- *	universe = astgetconf("UNIVERSE", NiL, "att", 0, 0);
- *	astgetconf("UNIVERSE", NiL, universe, 0, 0);
+ *	universe = astgetconf("UNIVERSE", NULL, "att", 0, 0);
+ *	astgetconf("UNIVERSE", NULL, universe, 0, 0);
  *
  * if (flags&ASTCONF_error)!=0 then error return value is 0
  * otherwise 0 not returned
@@ -1350,7 +1353,7 @@ nativeconf(Proc_t** pp, const char* operand)
 char*
 astgetconf(const char* name, const char* path, const char* value, int flags, Error_f conferror)
 {
-	register char*	s;
+	char*		s;
 	int		n;
 	Lookup_t	look;
 	Sfio_t*		tmp;
@@ -1391,9 +1394,9 @@ astgetconf(const char* name, const char* path, const char* value, int flags, Err
 			errno = EINVAL;
 			if (conferror)
 				(*conferror)(&state, &state, 2, "%s: cannot set value", name);
-			return (flags & ASTCONF_error) ? (char*)0 : null;
+			return (flags & ASTCONF_error) ? NULL : null;
 		}
-		return print(NiL, &look, name, path, flags, conferror);
+		return print(NULL, &look, name, path, flags, conferror);
 	}
 	if ((n = strlen(name)) > 3 && n < (ALT + 3))
 	{
@@ -1431,9 +1434,9 @@ astgetconf(const char* name, const char* path, const char* value, int flags, Err
 					errno = EINVAL;
 					if (conferror)
 						(*conferror)(&state, &state, 2, "%s: cannot set value", altname);
-					return (flags & ASTCONF_error) ? (char*)0 : null;
+					return (flags & ASTCONF_error) ? NULL : null;
 				}
-				return print(NiL, &altlook, altname, path, flags, conferror);
+				return print(NULL, &altlook, altname, path, flags, conferror);
 			}
 			for (s = altname; *s; s++)
 				if (isupper(*s))
@@ -1461,7 +1464,7 @@ astgetconf(const char* name, const char* path, const char* value, int flags, Err
 	errno = EINVAL;
 	if (conferror && !(flags & ASTCONF_system))
 		(*conferror)(&state, &state, 2, "%s: unknown name", name);
-	return (flags & ASTCONF_error) ? (char*)0 : null;
+	return (flags & ASTCONF_error) ? NULL : null;
 }
 
 /*
@@ -1545,23 +1548,23 @@ astconflist(Sfio_t* sp, const char* path, int flags, const char* pattern)
 			{
 				if (flags & ASTCONF_matchcall)
 				{
-					if (regexec(&re, prefix[look.conf->call + CONF_call].name, 0, NiL, 0))
+					if (regexec(&re, prefix[look.conf->call + CONF_call].name, 0, NULL, 0))
 						continue;
 				}
 				else if (flags & ASTCONF_matchname)
 				{
-					if (regexec(&re, look.conf->name, 0, NiL, 0))
+					if (regexec(&re, look.conf->name, 0, NULL, 0))
 						continue;
 				}
 				else if (flags & ASTCONF_matchstandard)
 				{
-					if (regexec(&re, prefix[look.conf->standard].name, 0, NiL, 0))
+					if (regexec(&re, prefix[look.conf->standard].name, 0, NULL, 0))
 						continue;
 				}
 			}
 			look.standard = look.conf->standard;
 			look.section = look.conf->section;
-			print(sp, &look, NiL, path, flags, errorf);
+			print(sp, &look, NULL, path, flags, errorf);
 		}
 #ifdef _pth_getconf_a
 		if (pp = nativeconf(&proc, _pth_getconf_a))
@@ -1578,17 +1581,17 @@ astconflist(Sfio_t* sp, const char* path, int flags, const char* pattern)
 					{
 						if (flags & ASTCONF_matchcall)
 						{
-							if (regexec(&re, prefix[look.conf->call + CONF_call].name, 0, NiL, 0))
+							if (regexec(&re, prefix[look.conf->call + CONF_call].name, 0, NULL, 0))
 								continue;
 						}
 						else if (flags & ASTCONF_matchname)
 						{
-							if (regexec(&re, f, 0, NiL, 0))
+							if (regexec(&re, f, 0, NULL, 0))
 								continue;
 						}
 						else if (flags & ASTCONF_matchstandard)
 						{
-							if (regexec(&re, prefix[look.standard].name, 0, NiL, 0))
+							if (regexec(&re, prefix[look.standard].name, 0, NULL, 0))
 								continue;
 						}
 					}
@@ -1620,21 +1623,21 @@ astconflist(Sfio_t* sp, const char* path, int flags, const char* pattern)
 			{
 				if (flags & ASTCONF_matchcall)
 				{
-					if (regexec(&re, call, 0, NiL, 0))
+					if (regexec(&re, call, 0, NULL, 0))
 						continue;
 				}
 				else if (flags & ASTCONF_matchname)
 				{
-					if (regexec(&re, fp->name, 0, NiL, 0))
+					if (regexec(&re, fp->name, 0, NULL, 0))
 						continue;
 				}
 				else if (flags & ASTCONF_matchstandard)
 				{
-					if (regexec(&re, prefix[fp->standard].name, 0, NiL, 0))
+					if (regexec(&re, prefix[fp->standard].name, 0, NULL, 0))
 						continue;
 				}
 			}
-			if (!(s = feature(fp, 0, path, NiL, 0, 0)) || !*s)
+			if (!(s = feature(fp, 0, path, NULL, 0, 0)) || !*s)
 				s = "0";
 			if (flags & ASTCONF_table)
 			{

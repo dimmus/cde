@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,9 +14,10 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*         hyenias <58673227+hyenias@users.noreply.github.com>          *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
-#include	"FEATURE/standards"
 #include	"sfhdr.h"
 
 /*	Convert a floating point value to ASCII.
@@ -27,28 +28,10 @@
 static char		*lc_inf = "inf", *uc_inf = "INF";
 static char		*lc_nan = "nan", *uc_nan = "NAN";
 static char		*Zero = "0";
-#define SF_INF		((_Sfi = 3), strlcpy(buf, (format & SFFMT_UPPER) ? uc_inf : lc_inf, size), buf)
-#define SF_NAN		((_Sfi = 3), strlcpy(buf, (format & SFFMT_UPPER) ? uc_nan : lc_nan, size), buf)
-#define SF_ZERO		((_Sfi = 1), strlcpy(buf, Zero, size), buf)
-#define SF_INTPART	(SF_IDIGITS/2)
-
-#if !_lib_isnan
-#undef	isnan
-#undef	isnanl
-#if _lib_fpclassify
-#define isnan(n)	(fpclassify(n)==FP_NAN)
-#define isnanl(n)	(fpclassify(n)==FP_NAN)
-#else
-#error "This is an invalid test for NaN"
-#define isnan(n)	(memcmp((void*)&n,(void*)&_Sfdnan,sizeof(n))==0)
-#define isnanl(n)	(memcmp((void*)&n,(void*)&_Sflnan,sizeof(n))==0)
-#endif
-#else
-#if !_lib_isnanl
-#undef	isnanl
-#define isnanl(n)	isnan(n)
-#endif
-#endif
+#define SFIO_INF	((_Sfi = 3), strlcpy(buf, (format & SFFMT_UPPER) ? uc_inf : lc_inf, size), buf)
+#define SFIO_NAN	((_Sfi = 3), strlcpy(buf, (format & SFFMT_UPPER) ? uc_nan : lc_nan, size), buf)
+#define SFIO_ZERO	((_Sfi = 1), strlcpy(buf, Zero, size), buf)
+#define SFIO_INTPART	(SFIO_IDIGITS/2)
 
 #if defined(__ia64__) && defined(signbit)
 # if defined __GNUC__ && __GNUC__ >= 4
@@ -77,30 +60,20 @@ static int neg0d(double f)
 }
 #endif
 
-#if ULONG_DIG && ULONG_DIG < (DBL_DIG-1)
-#define CVT_LDBL_INT	long
-#define CVT_LDBL_MAXINT	LONG_MAX
-#else
-#if UINT_DIG && UINT_DIG < (DBL_DIG-1)
+#if UINT_DIG && UINT_DIG < (DBL_DIG-1) && !(ULONG_DIG && ULONG_DIG < (DBL_DIG-1))
 #define CVT_LDBL_INT	int
 #define CVT_LDBL_MAXINT	INT_MAX
 #else
 #define CVT_LDBL_INT	long
-#define CVT_LDBL_MAXINT	SF_MAXLONG
-#endif
+#define CVT_LDBL_MAXINT	LONG_MAX
 #endif
 
-#if ULONG_DIG && ULONG_DIG < (DBL_DIG-1)
-#define CVT_DBL_INT	long
-#define CVT_DBL_MAXINT	LONG_MAX
-#else
-#if UINT_DIG && UINT_DIG < (DBL_DIG-1)
+#if UINT_DIG && UINT_DIG < (DBL_DIG-1) && !(ULONG_DIG && ULONG_DIG < (DBL_DIG-1))
 #define CVT_DBL_INT	int
 #define CVT_DBL_MAXINT	INT_MAX
 #else
 #define CVT_DBL_INT	long
-#define CVT_DBL_MAXINT	SF_MAXLONG
-#endif
+#define CVT_DBL_MAXINT	LONG_MAX
 #endif
 
 char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
@@ -112,9 +85,9 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 	     int*	len,		/* return string length		*/
 	     int	format)		/* conversion format		*/
 {
-	reg char		*sp;
-	reg long		n, v;
-	reg char		*ep, *b, *endsp, *t;
+	char			*sp;
+	long			n, v;
+	char			*ep, *b, *endsp, *t;
 	int			x;
 	_ast_flt_unsigned_max_t	m;
 
@@ -127,28 +100,26 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 	if(format&SFFMT_LDOUBLE)
 	{	Sfdouble_t	f = *(Sfdouble_t*)vp;
 
-		if(isnanl(f))
-		{	
+		if (isnan(f))
+		{
 #if _lib_signbit
 			if (signbit(f))
 #else
 			if (f < 0)
 #endif
 				*sign = 1;
-			return SF_NAN;
+			return SFIO_NAN;
 		}
-#if _lib_isinf
 		if (n = isinf(f))
-		{	
+		{
 #if _lib_signbit
 			if (signbit(f))
 #else
 			if (n < 0 || f < 0)
 #endif
 				*sign = 1;
-			return SF_INF;
+			return SFIO_INF;
 		}
-#endif
 
 #if _lib_signbit
 		if (signbit(f))
@@ -160,9 +131,9 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		}
 
 		if(f < LDBL_MIN)
-			return SF_ZERO;
+			return SFIO_ZERO;
 		if(f > LDBL_MAX)
-			return SF_INF;
+			return SFIO_INF;
 
 		if(format & SFFMT_AFORMAT)
 		{	Sfdouble_t	g;
@@ -192,26 +163,26 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		n = 0;
 		if(f >= (Sfdouble_t)CVT_LDBL_MAXINT)
 		{	/* scale to a small enough number to fit an int */
-			v = SF_MAXEXP10-1;
+			v = SFIO_MAXEXP10-1;
 			do
 			{	if(f < _Sfpos10[v])
 					v -= 1;
 				else
 				{
 					f *= _Sfneg10[v];
-					if((n += (1<<v)) >= SF_IDIGITS)
-						return SF_INF;
+					if((n += (1<<v)) >= SFIO_IDIGITS)
+						return SFIO_INF;
 				}
 			} while(f >= (Sfdouble_t)CVT_LDBL_MAXINT);
 		}
 		else if(f > 0.0 && f < 0.1)
 		{	/* scale to avoid excessive multiply by 10 below */
-			v = SF_MAXEXP10-1;
+			v = SFIO_MAXEXP10-1;
 			do
 			{	if(f <= _Sfneg10[v])
 				{	f *= _Sfpos10[v];
-					if((n += (1<<v)) >= SF_IDIGITS)
-						return SF_INF;
+					if((n += (1<<v)) >= SFIO_IDIGITS)
+						return SFIO_INF;
 				}
 				else if (--v < 0)
 					break;
@@ -220,7 +191,7 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		}
 		*decpt = (int)n;
 
-		b = sp = buf + SF_INTPART;
+		b = sp = buf + SFIO_INTPART;
 		if((v = (CVT_LDBL_INT)f) != 0)
 		{	/* translate the integer part */
 			f -= (Sfdouble_t)v;
@@ -228,10 +199,10 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 			sfucvt(v,sp,n,ep,CVT_LDBL_INT,unsigned CVT_LDBL_INT);
 
 			n = b-sp;
-			if((*decpt += (int)n) >= SF_IDIGITS)
-				return SF_INF;
+			if((*decpt += (int)n) >= SFIO_IDIGITS)
+				return SFIO_INF;
 			b = sp;
-			sp = buf + SF_INTPART;
+			sp = buf + SFIO_INTPART;
 		}
 		else	n = 0;
 
@@ -244,7 +215,7 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		}
 
 		if((ep = (sp+n)) > (endsp = buf+(size-2)))
-			ep = endsp; 
+			ep = endsp;
 		if(sp > ep)
 			sp = ep;
 		else
@@ -278,27 +249,25 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 	{	double	f = *(double*)vp;
 
 		if(isnan(f))
-		{	
+		{
 #if _lib_signbit
 			if (signbit(f))
 #else
 			if (f < 0)
 #endif
 				*sign = 1;
-			return SF_NAN;
+			return SFIO_NAN;
 		}
-#if _lib_isinf
 		if (n = isinf(f))
-		{	
+		{
 #if _lib_signbit
 			if (signbit(f))
 #else
 			if (n < 0 || f < 0)
 #endif
 				*sign = 1;
-			return SF_INF;
+			return SFIO_INF;
 		}
-#endif
 
 #if _lib_signbit
 		if (signbit(f))
@@ -310,9 +279,9 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		}
 
 		if(f < DBL_MIN)
-			return SF_ZERO;
+			return SFIO_ZERO;
 		if(f > DBL_MAX)
-			return SF_INF;
+			return SFIO_INF;
 
 		if(format & SFFMT_AFORMAT)
 		{	double		g;
@@ -341,25 +310,25 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		n = 0;
 		if(f >= (double)CVT_DBL_MAXINT)
 		{	/* scale to a small enough number to fit an int */
-			v = SF_MAXEXP10-1;
+			v = SFIO_MAXEXP10-1;
 			do
 			{	if(f < _Sfpos10[v])
 					v -= 1;
 				else
 				{	f *= _Sfneg10[v];
-					if((n += (1<<v)) >= SF_IDIGITS)
-						return SF_INF;
+					if((n += (1<<v)) >= SFIO_IDIGITS)
+						return SFIO_INF;
 				}
 			} while(f >= (double)CVT_DBL_MAXINT);
 		}
 		else if(f > 0.0 && f < 0.1)
 		{	/* scale to avoid excessive multiply by 10 below */
-			v = SF_MAXEXP10-1;
+			v = SFIO_MAXEXP10-1;
 			do
 			{	if(f <= _Sfneg10[v])
 				{	f *= _Sfpos10[v];
-					if((n += (1<<v)) >= SF_IDIGITS)
-						return SF_INF;
+					if((n += (1<<v)) >= SFIO_IDIGITS)
+						return SFIO_INF;
 				}
 				else if(--v < 0)
 					break;
@@ -368,7 +337,7 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		}
 		*decpt = (int)n;
 
-		b = sp = buf + SF_INTPART;
+		b = sp = buf + SFIO_INTPART;
 		if((v = (CVT_DBL_INT)f) != 0)
 		{	/* translate the integer part */
 			f -= (double)v;
@@ -376,10 +345,10 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 			sfucvt(v,sp,n,ep,CVT_DBL_INT,unsigned CVT_DBL_INT);
 
 			n = b-sp;
-			if((*decpt += (int)n) >= SF_IDIGITS)
-				return SF_INF;
+			if((*decpt += (int)n) >= SFIO_IDIGITS)
+				return SFIO_INF;
 			b = sp;
-			sp = buf + SF_INTPART;
+			sp = buf + SFIO_INTPART;
 		}
 		else	n = 0;
 
@@ -392,13 +361,13 @@ char* _sfcvt(void*	vp,		/* pointer to value to convert	*/
 		}
 
 		if((ep = (sp+n)) > (endsp = buf+(size-2)))
-			ep = endsp; 
+			ep = endsp;
 		if(sp > ep)
 			sp = ep;
 		else
 		{
 			if((format&SFFMT_EFORMAT) && *decpt == 0 && f > 0.)
-			{	reg double	d;
+			{	double	d;
 				while((long)(d = f*10.) == 0)
 				{	f = d;
 					*decpt -= 1;

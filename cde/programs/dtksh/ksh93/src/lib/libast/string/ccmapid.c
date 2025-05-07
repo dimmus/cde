@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -122,7 +122,7 @@ static const Ccmap_t	maps[] =
 Ccmap_t*
 ccmaplist(Ccmap_t* mp)
 {
-	return !mp ? (Ccmap_t*)maps : (++mp)->name ? mp : (Ccmap_t*)0;
+	return !mp ? (Ccmap_t*)maps : (++mp)->name ? mp : NULL;
 }
 
 /*
@@ -132,11 +132,11 @@ ccmaplist(Ccmap_t* mp)
 int
 ccmapid(const char* name)
 {
-	register const Ccmap_t*	mp;
-	register int		c;
-	const Ccmap_t*		bp;
-	int			n;
-	ssize_t			sub[2];
+	const Ccmap_t*	mp;
+	int		c;
+	const Ccmap_t*	bp;
+	int		n;
+	ssize_t		sub[2];
 
 	bp = 0;
 	n = 0;
@@ -159,12 +159,12 @@ ccmapid(const char* name)
  */
 
 char*
-ccmapname(register int id)
+ccmapname(int id)
 {
-	register const Ccmap_t*	mp;
+	const Ccmap_t*	mp;
 
 	for (mp = maps; mp->name; mp++)
 		if (id == mp->ccode)
 			return (char*)mp->name;
-	return 0;
+	return NULL;
 }

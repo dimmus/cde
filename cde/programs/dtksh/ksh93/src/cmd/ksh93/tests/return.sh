@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2011 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -12,6 +12,7 @@
 #                                                                      #
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
+#            Johnothan King <johnothanking@protonmail.com>             #
 #                                                                      #
 ########################################################################
 # test the behavior of return and exit with functions
@@ -134,6 +135,8 @@ x=$( . $file)
 if	[[ $x != $0 ]]
 then	err_exit "\$0 in a dot script is $x. Should be $0"
 fi
+
+if((!SHOPT_SCRIPTONLY));then
 x=$($SHELL -i --norc 2> /dev/null <<\!
 typeset -i x=1/0
 print hello
@@ -142,6 +145,8 @@ print hello
 if	[[ $x != hello ]]
 then	err_exit "interactive shell terminates with error in bltin"
 fi
+fi # !SHOPT_SCRIPTONLY
+
 x=$( set -e
 	false
 	print bad
@@ -241,6 +246,48 @@ foo && err_exit "'exit' within { block; } with redirection does not preserve exi
 
 foo() { false; (exit); }
 foo && err_exit "'exit' within subshell does not preserve exit status"
+
+# ======
+if	let ".sh.version >= 20211208" && builtin getconf 2>/dev/null
+then	max=$(getconf INT_MAX) min=$(getconf INT_MIN) err=$tmp/stderr
+	exp=': out of range'
+	foo() { return $((max+1)); }
+	foo 2>$err
+	[[ e=$? -eq 128 && $(<$err) == *"$exp" ]] || err_exit 'return fails to warn for INT_MAX+1' \
+		"(expected status 128 and *$(printf %q "$exp"), got status $e and $(printf %q "$(<$err)"))"
+	foo() { return $((min-1)); }
+	foo 2>$err
+	[[ e=$? -eq 128 && $(<$err) == *"$exp" ]] || err_exit 'return fails to warn for INT_MIN-1' \
+		"(expected status 128 and *$(printf %q "$exp"), got status $e and $(printf %q "$(<$err)"))"
+	foo() { return $max; }
+	foo 2>$err
+	[[ e=$? -eq max && -z $got ]] || err_exit 'return fails for INT_MAX' \
+		"(expected status 128 and '', got status $e and $(printf %q "$(<$err)"))"
+	foo() { return $min; }
+	foo 2>$err
+	[[ e=$? -eq min && -z $got ]] || err_exit 'return fails for INT_MIN' \
+		"(expected status 128 and '', got status $e and $(printf %q "$(<$err)"))"
+fi
+
+# ======
+# old AT&T bug reintroduced in v1.0.8 (commit aea99158)
+f() { true; return; }
+trap 'f; echo $? >out' USR1
+(exit 13)
+kill -s USR1 ${.sh.pid}
+trap - USR1
+unset -f f
+[[ $(<out) == 0 ]] || err_exit "default return status in traps is broken (expected 0, got $(<out))"
+
+# ======
+print 'print "BUG TRIGGERED"' >eval
+chmod +x eval
+PATH=$PWD:$PATH
+foo() { return -1; }
+got=$(eval foo)
+[[ -z $got ]] || err_exit "negative return status from 'eval' triggers external 'eval' command (got $(printf %q "$got"))"
+PATH=${PATH%"$PWD:"}
+unset -f foo
 
 # ======
 exit $((Errors<125?Errors:125))

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -29,7 +29,7 @@ ssize_t dtstat(Dt_t* dt, Dtstat_t* dtst)
 	char	*str;
 	char	*end;
 
-	sz = (ssize_t)(*dt->meth->searchf)(dt, (void*)dtst, DT_STAT);
+	sz = (ssize_t)(*dt->meth->searchf)(dt, dtst, DT_STAT);
 
 	str = dtst->mesg;
 	end = &dtst->mesg[sizeof(dtst->mesg)] - 1;

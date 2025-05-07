@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -39,8 +40,8 @@ int
 astquery(int quit, const char* format, ...)
 {
 	va_list		ap;
-	register int	n;
-	register int	c;
+	int		n;
+	int		c;
 	int		r;
 	Sfio_t*		ip;
 	Sfio_t*		op;
@@ -58,11 +59,11 @@ astquery(int quit, const char* format, ...)
 		c = errno;
 		if (isatty(sffileno(sfstdin)))
 			rfp = sfstdin;
-		else if (!(rfp = sfopen(NiL, "/dev/tty", "r")))
+		else if (!(rfp = sfopen(NULL, "/dev/tty", "r")))
 			goto done;
 		if (isatty(sffileno(sfstderr)))
 			wfp = sfstderr;
-		else if (!(wfp = sfopen(NiL, "/dev/tty", "w")))
+		else if (!(wfp = sfopen(NULL, "/dev/tty", "w")))
 			goto done;
 		errno = c;
 	}

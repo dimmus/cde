@@ -2,8 +2,7 @@
 #                                                                      #
 #              This file is part of the ksh 93u+m package              #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2021-2022 Contributors to ksh 93u+m           #
-#                    <https://github.com/ksh93/ksh>                    #
+#          Copyright (c) 2021-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -11,7 +10,8 @@
 #      https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.html      #
 #         (with md5 checksum 84283fa8859daf213bdda5a9f8d1be1d)         #
 #                                                                      #
-#                              hyenias                                 #
+#         hyenias <58673227+hyenias@users.noreply.github.com>          #
+#                  Martijn Dekker <martijn@inlv.org>                   #
 #                                                                      #
 ########################################################################
 
@@ -336,11 +336,17 @@ unset i n got rtests
 # ======
 # readonly variables should still accept setting the readonly or export attributes
 # https://github.com/ksh93/ksh/issues/258
+unset v
 (readonly v=1; readonly v) 2>/dev/null || err_exit "readonly variable cannot be set readonly (1)"
 (readonly v=1; typeset -r v) 2>/dev/null || err_exit "readonly variable cannot be set readonly (2)"
 (readonly v=1; export v) 2>/dev/null || err_exit "readonly variable cannot be exported (1)"
 (readonly v=1; typeset -x v) 2>/dev/null || err_exit "readonly variable cannot be exported (2)"
 (readonly v=1; typeset -rx v) 2>/dev/null || err_exit "readonly variable cannot be set readonly and exported"
+# however, it should not be possible to turn those off again
+(readonly v=1; typeset +r v) 2>/dev/null && err_exit 'typeset allows turning off readonly on set readonly variable'
+(readonly v; typeset +r v) 2>/dev/null && err_exit 'typeset allows turning off readonly on unset readonly variable'
+(typeset -rx v=1; typeset +x v) 2>/dev/null && err_exit 'typeset allows turning off export on set readonly variable'
+(typeset -rx v; typeset +r v) 2>/dev/null && err_exit 'typeset allows turning off export on unset readonly variable'
 
 # ======
 # the environment list was not checked for readonly for commands that are not fork()ed

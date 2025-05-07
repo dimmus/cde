@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -36,13 +37,13 @@ static const regflags_t	submap[] =
 };
 
 int
-regsubflags(regex_t* p, register const char* s, char** e, int delim, register const regflags_t* map, int* pm, regflags_t* pf)
+regsubflags(regex_t* p, const char* s, char** e, int delim, const regflags_t* map, int* pm, regflags_t* pf)
 {
-	register int			c;
-	register const regflags_t*	m;
-	regflags_t			flags;
-	int				minmatch;
-	regdisc_t*			disc;
+	int			c;
+	const regflags_t*	m;
+	regflags_t		flags;
+	int			minmatch;
+	regdisc_t*		disc;
 
 	flags = pf ? *pf : 0;
 	minmatch = pm ? *pm : 0;
@@ -102,28 +103,28 @@ regsubflags(regex_t* p, register const char* s, char** e, int delim, register co
  */
 
 int
-regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmatch, regflags_t flags)
+regsubcomp(regex_t* p, const char* s, const regflags_t* map, int minmatch, regflags_t flags)
 {
-	register regsub_t*	sub;
-	register int		c;
-	register int		d;
-	register char*		t;
-	register regsubop_t*	op;
-	char*			e;
-	const char*		r;
-	int			sre;
-	int			f;
-	int			g;
-	int			n;
-	int			nops;
-	const char*		o;
-	regdisc_t*		disc;
+	regsub_t*	sub;
+	int		c;
+	int		d;
+	char*		t;
+	regsubop_t*	op;
+	char*		e;
+	const char*	r;
+	int		sre;
+	int		f;
+	int		g;
+	int		n;
+	int		nops;
+	const char*	o;
+	regdisc_t*	disc;
 
 	disc = p->env->disc;
 	if (p->env->flags & REG_NOSUB)
 	{
 		regfree(p);
-		return fatal(disc, REG_BADPAT, NiL);
+		return fatal(disc, REG_BADPAT, NULL);
 	}
 	if (!(sub = (regsub_t*)alloc(p->env->disc, 0, sizeof(regsub_t) + strlen(s))) || !(sub->re_ops = (regsubop_t*)alloc(p->env->disc, 0, (nops = 8) * sizeof(regsubop_t))))
 	{
@@ -287,7 +288,7 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 				if (!(sub->re_ops = (regsubop_t*)alloc(p->env->disc, sub->re_ops, (nops *= 2) * sizeof(regsubop_t))))
 				{
 					regfree(p);
-					return fatal(disc, REG_ESPACE, NiL);
+					return fatal(disc, REG_ESPACE, NULL);
 				}
 				op = sub->re_ops + n;
 			}
@@ -323,7 +324,7 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			if (!(sub->re_ops = (regsubop_t*)alloc(p->env->disc, sub->re_ops, (nops *= 2) * sizeof(regsubop_t))))
 			{
 				regfree(p);
-				return fatal(disc, REG_ESPACE, NiL);
+				return fatal(disc, REG_ESPACE, NULL);
 			}
 			op = sub->re_ops + n;
 		}
@@ -341,7 +342,7 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 		if (!(sub->re_ops = (regsubop_t*)alloc(p->env->disc, sub->re_ops, (nops *= 2) * sizeof(regsubop_t))))
 		{
 			regfree(p);
-			return fatal(disc, REG_ESPACE, NiL);
+			return fatal(disc, REG_ESPACE, NULL);
 		}
 		op = sub->re_ops + n;
 	}

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -35,10 +36,10 @@ static const char usage[] =
 	"\"\bnot on an active synchronous line\b\" is written.]"
 "[s:silent|quiet?Disable the terminal name line. Use \b[[ -t 0 ]]]]\b instead.]"
 "[+EXIT STATUS?]{"
-        "[+0?Standard input is a tty.]"
-        "[+1?Standard input is not a tty.]"
-        "[+2?Invalid arguments.]"
-        "[+3?A an error occurred.]"
+	"[+0?Standard input is a tty.]"
+	"[+1?Standard input is not a tty.]"
+	"[+2?Invalid arguments.]"
+	"[+3?A an error occurred.]"
 "}"
 ;
 
@@ -52,11 +53,11 @@ static const char usage[] =
 int
 b_tty(int argc, char** argv, Shbltin_t* context)
 {
-	register int	sflag = 0;
-	register int	lflag = 0;
-	register char*	tty;
+	int	sflag = 0;
+	int	lflag = 0;
+	char*	tty;
 #if _mac_STWLINE
-	int		n;
+	int	n;
 #endif
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
@@ -74,14 +75,15 @@ b_tty(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	if(error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if(!(tty=ttyname(0)))
@@ -100,5 +102,5 @@ b_tty(int argc, char** argv, Shbltin_t* context)
 #endif
 			error(ERROR_OUTPUT, 1, "not on an active synchronous line");
 	}
-	return(error_info.errors);
+	return error_info.errors;
 }

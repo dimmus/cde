@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -61,7 +62,7 @@ typedef struct
 #endif
 
 static void
-set(register Header_t* hp, const char* fs, const char* dir, const char* type, const char* options)
+set(Header_t* hp, const char* fs, const char* dir, const char* type, const char* options)
 {
 	const char*	x;
 
@@ -129,14 +130,6 @@ set(register Header_t* hp, const char* fs, const char* dir, const char* type, co
 
 /*
  * 4.4 BSD getmntinfo
- *
- * what a crappy interface
- * data returned in static buffer -- ok
- * big chunk of allocated memory that cannot be freed -- come on
- * *and* NetBSD changed the interface somewhere along the line
- * private interface? my bad -- public interface? par for the BSD course
- *
- * we assume getfsstat may suffer the same statfs/statvfs confusion
  */
 
 #include <sys/param.h>		/* expect some macro redefinitions here */
@@ -260,19 +253,19 @@ options[] =
 void*
 mntopen(const char* path, const char* mode)
 {
-	register Handle_t*	mp;
-	register int		n;
+	Handle_t*	mp;
+	int		n;
 
 	FIXARGS(path, mode, 0);
 #if _lib_getfsstat
-	if ((n = getfsstat(NiL, 0, MNT_WAIT)) <= 0)
-		return 0;
+	if ((n = getfsstat(NULL, 0, MNT_WAIT)) <= 0)
+		return NULL;
 	n = (n - 1) * sizeof(struct statfs);
 #else
 	n = 0;
 #endif
 	if (!(mp = newof(0, Handle_t, 1, n)))
-		return 0;
+		return NULL;
 #if _lib_getfsstat
 	n = getfsstat(mp->next = mp->buf, n + sizeof(struct statfs), MNT_WAIT);
 #else
@@ -281,19 +274,19 @@ mntopen(const char* path, const char* mode)
 	if (n <= 0)
 	{
 		free(mp);
-		return 0;
+		return NULL;
 	}
 	mp->last = mp->next + n;
-	return (void*)mp;
+	return mp;
 }
 
 Mnt_t*
 mntread(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
-	register int		i;
-	register int		n;
-	register unsigned long	flags;
+	Handle_t*	mp = (Handle_t*)handle;
+	int		i;
+	int		n;
+	unsigned long	flags;
 
 	if (mp->next < mp->last)
 	{
@@ -302,17 +295,17 @@ mntread(void* handle)
 		for (i = 0; i < elementsof(options); i++)
 			if (flags & options[i].flag)
 				n += sfsprintf(mp->opt + n, sizeof(mp->opt) - n - 1, ",%s", options[i].name);
-		set(&mp->hdr, mp->next->f_mntfromname, mp->next->f_mntonname, TYPE(mp->next), n ? (mp->opt + 1) : (char*)0);
+		set(&mp->hdr, mp->next->f_mntfromname, mp->next->f_mntonname, TYPE(mp->next), n ? (mp->opt + 1) : NULL);
 		mp->next++;
 		return &mp->hdr.mnt;
 	}
-	return 0;
+	return NULL;
 }
 
 int
 mntclose(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
+	Handle_t*	mp = (Handle_t*)handle;
 
 	if (!mp)
 		return -1;
@@ -350,27 +343,27 @@ typedef struct
 void*
 mntopen(const char* path, const char* mode)
 {
-	register Handle_t*	mp;
+	Handle_t*	mp;
 
 	FIXARGS(path, mode, 0);
 	if (!(mp = newof(0, Handle_t, 1, SIZE)))
-		return 0;
+		return NULL;
 	if ((mp->count = mntctl(MCTL_QUERY, sizeof(Handle_t) + SIZE, &mp->info)) <= 0)
 	{
 		free(mp);
-		return 0;
+		return NULL;
 	}
 	mp->next = mp->info;
-	return (void*)mp;
+	return mp;
 }
 
 Mnt_t*
 mntread(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
-	register char*		s;
-	register char*		t;
-	register char*		o;
+	Handle_t*	mp = (Handle_t*)handle;
+	char*		s;
+	char*		t;
+	char*		o;
 
 	if (mp->count > 0)
 	{
@@ -384,7 +377,7 @@ mntread(void* handle)
 		if (vmt2datasize(mp->next, VMT_ARGS))
 			o = vmt2dataptr(mp->next, VMT_ARGS);
 		else
-			o = NiL;
+			o = NULL;
 		switch (mp->next->vmt_gfstype)
 		{
 #ifdef MNT_AIX
@@ -431,13 +424,13 @@ mntread(void* handle)
 			mp->next = (struct vmount*)((char*)mp->next + mp->next->vmt_length);
 		return &mp->hdr.mnt;
 	}
-	return 0;
+	return NULL;
 }
 
 int
 mntclose(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
+	Handle_t*	mp = (Handle_t*)handle;
 
 	if (!mp)
 		return -1;
@@ -499,7 +492,7 @@ extern struct mntent*	getmntent(FILE*);
 #endif
 
 #ifdef __Lynx__
-#undef	MOUNTED 
+#undef	MOUNTED
 #define MOUNTED		"/etc/fstab"
 #define SEP		':'
 #endif
@@ -509,7 +502,7 @@ extern struct mntent*	getmntent(FILE*);
 #if _mem_mnt_opts_mntent
 #define OPTIONS(p)	((p)->mnt_opts)
 #else
-#define OPTIONS(p)	NiL
+#define OPTIONS(p)	NULL
 #endif
 
 typedef struct
@@ -521,37 +514,37 @@ typedef struct
 void*
 mntopen(const char* path, const char* mode)
 {
-	register Handle_t*	mp;
+	Handle_t*	mp;
 
 	FIXARGS(path, mode, MOUNTED);
 	if (!(mp = newof(0, Handle_t, 1, 0)))
-		return 0;
+		return NULL;
 	if (!(mp->fp = setmntent(path, mode)))
 	{
 		free(mp);
-		return 0;
+		return NULL;
 	}
-	return (void*)mp;
+	return mp;
 }
 
 Mnt_t*
 mntread(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
-	register struct mntent*	mnt;
+	Handle_t*	mp = (Handle_t*)handle;
+	struct mntent*	mnt;
 
 	if (mnt = getmntent(mp->fp))
 	{
 		set(&mp->hdr, mnt->mnt_fsname, mnt->mnt_dir, mnt->mnt_type, OPTIONS(mnt));
 		return &mp->hdr.mnt;
 	}
-	return 0;
+	return NULL;
 }
 
 int
 mntclose(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
+	Handle_t*	mp = (Handle_t*)handle;
 
 	if (!mp)
 		return -1;
@@ -576,7 +569,7 @@ mntclose(void* handle)
 #if _mem_mnt_opts_w_mntent
 #define OPTIONS(p)	((p)->mnt_opts)
 #else
-#define OPTIONS(p)	NiL
+#define OPTIONS(p)	NULL
 #endif
 
 #else
@@ -602,7 +595,7 @@ mntclose(void* handle)
 #if _mem_mnt_opts_mnttab
 #define OPTIONS(p)	((p)->mnt_opts)
 #else
-#define OPTIONS(p)	NiL
+#define OPTIONS(p)	NULL
 #endif
 
 #else
@@ -635,37 +628,37 @@ typedef struct
 void*
 mntopen(const char* path, const char* mode)
 {
-	register Handle_t*	mp;
+	Handle_t*	mp;
 
 	FIXARGS(path, mode, MOUNTED);
 	if (!(mp = newof(0, Handle_t, 1, 0)))
-		return 0;
+		return NULL;
 #if _lib_w_getmntent
 	if ((mp->count = w_getmntent(mp->buf, sizeof(mp->buf))) > 0)
 		mp->mnt = (struct mntent*)(((struct w_mnth*)mp->buf) + 1);
 	else
 #else
 	mp->mnt = (struct mntent*)mp->buf;
-	if (!(mp->fp = sfopen(NiL, path, mode)))
+	if (!(mp->fp = sfopen(NULL, path, mode)))
 #endif
 	{
 		free(mp);
-		return 0;
+		return NULL;
 	}
-	return (void*)mp;
+	return mp;
 }
 
 Mnt_t*
 mntread(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
+	Handle_t*	mp = (Handle_t*)handle;
 
 #if _lib_w_getmntent
 
 	if (mp->count-- <= 0)
 	{
 		if ((mp->count = w_getmntent(mp->buf, sizeof(mp->buf))) <= 0)
-			return 0;
+			return NULL;
 		mp->count--;
 		mp->mnt = (struct mntent*)(((struct w_mnth*)mp->buf) + 1);
 	}
@@ -691,16 +684,16 @@ mntread(void* handle)
 #endif
 			return &mp->hdr.mnt;
 		}
-	return 0;
+	return NULL;
 
 #else
 
-	register int		c;
-	register char*		s;
-	register char*		m;
-	register char*		b;
-	register int		q;
-	register int		x;
+	int		c;
+	char*		s;
+	char*		m;
+	char*		b;
+	int		q;
+	int		x;
 
  again:
 	q = 0;
@@ -710,7 +703,7 @@ mntread(void* handle)
 	for (;;) switch (c = sfgetc(mp->fp))
 	{
 	case EOF:
-		return 0;
+		return NULL;
 	case '"':
 	case '\'':
 		if (q == c)
@@ -769,7 +762,7 @@ mntread(void* handle)
 int
 mntclose(void* handle)
 {
-	register Handle_t*	mp = (Handle_t*)handle;
+	Handle_t*	mp = (Handle_t*)handle;
 
 	if (!mp)
 		return -1;

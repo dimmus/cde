@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -47,7 +47,7 @@ initconformance(void)
 	if (sp = sfstropen())
 	{
 		for (i = h = 0, j = 1; i < elementsof(conf); i++)
-			if (*(m = astconf(conf[i], NiL, NiL)) && (h |= (1<<i)) || !i && (m = "ast"))
+			if (*(m = astconf(conf[i], NULL, NULL)) && (h |= (1<<i)) || !i && (m = "ast"))
 			{
 				t = m;
 				while ((c = *m++) && c != '.')
@@ -144,5 +144,5 @@ conformance(const char* s, size_t n)
 		if (s < e)
 			s++;
 	} while (s < e);
-	return 0;
+	return NULL;
 }

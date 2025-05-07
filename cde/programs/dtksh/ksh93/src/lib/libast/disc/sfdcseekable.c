@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -39,6 +39,10 @@ static ssize_t skwrite(Sfio_t*		f,	/* stream involved */
 		       size_t		n,	/* number of bytes to read */
 		       Sfdisc_t*	disc)	/* discipline */
 {
+	NOT_USED(f);
+	NOT_USED(buf);
+	NOT_USED(n);
+	NOT_USED(disc);
 	return (ssize_t)(-1);
 }
 
@@ -57,7 +61,7 @@ static ssize_t skread(Sfio_t*	f,	/* stream involved */
 	if(sk->eof)
 		return sfread(sf,buf,n);
 
-	addr = sfseek(sf,(Sfoff_t)0,SEEK_CUR);
+	addr = sfseek(sf,0,SEEK_CUR);
 
 	if(addr+n <= sk->extent)
 		return sfread(sf,buf,n);
@@ -89,7 +93,7 @@ static Sfoff_t skseek(Sfio_t* f, Sfoff_t addr, int type, Sfdisc_t* disc)
 {
 	Seek_t*		sk;
 	Sfio_t*		sf;
-	char		buf[SF_BUFSIZE];
+	char		buf[SFIO_BUFSIZE];
 	ssize_t		r, w;
 
 	sk = (Seek_t*)disc;
@@ -143,12 +147,14 @@ static int skexcept(Sfio_t* f, int type, void* data, Sfdisc_t* disc)
 {
 	Seek_t*		sk;
 
+	NOT_USED(f);
+	NOT_USED(data);
 	sk = (Seek_t*)disc;
 
 	switch (type)
 	{
-	case SF_FINAL:
-	case SF_DPOP:
+	case SFIO_FINAL:
+	case SFIO_DPOP:
 		sfclose(sk->shadow);
 		free(disc);
 		break;
@@ -156,7 +162,7 @@ static int skexcept(Sfio_t* f, int type, void* data, Sfdisc_t* disc)
 		sk->eof = 0;
 		sk->discard += sk->extent;
 		sk->extent = 0;
-		sfseek(sk->shadow,(Sfoff_t)0,SEEK_SET);
+		sfseek(sk->shadow,0,SEEK_SET);
 		break;
 	}
 	return 0;
@@ -164,10 +170,10 @@ static int skexcept(Sfio_t* f, int type, void* data, Sfdisc_t* disc)
 
 int sfdcseekable(Sfio_t* f)
 {
-	reg Seek_t*	sk;
+	Seek_t*	sk;
 
 	/* see if already seekable */
-	if(sfseek(f,(Sfoff_t)0,SEEK_CUR) >= 0)
+	if(sfseek(f,0,SEEK_CUR) >= 0)
 		return 0;
 
 	if(!(sk = (Seek_t*)malloc(sizeof(Seek_t))) )
@@ -178,7 +184,7 @@ int sfdcseekable(Sfio_t* f)
 	sk->disc.writef = skwrite;
 	sk->disc.seekf = skseek;
 	sk->disc.exceptf = skexcept;
-	sk->shadow = sftmp(SF_BUFSIZE);
+	sk->shadow = sftmp(SFIO_BUFSIZE);
 	sk->discard = 0;
 	sk->extent = 0;
 	sk->eof = 0;

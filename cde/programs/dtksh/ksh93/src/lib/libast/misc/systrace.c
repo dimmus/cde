@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -29,12 +29,12 @@
 void
 systrace(const char* id)
 {
-	register int	n;
-	register char*	out;
+	int		n;
+	char*		out;
 	char*		s;
 	char		buf[PATH_MAX];
 	char*		av[7];
-	long		ov[2];
+	int64_t		ov[2];
 
 	static char*	trace[] = { "trace", "truss", "strace", "traces" };
 
@@ -56,7 +56,7 @@ systrace(const char* id)
 	ov[1] = 0;
 	sfsprintf(out, &buf[sizeof(buf)] - out, ".%d", getpid());
 	for (n = 0; n < elementsof(trace); n++)
-		if (!procfree(procopen(trace[n], av + 1, NiL, ov, PROC_ARGMOD|PROC_GID|PROC_UID|(n == (elementsof(trace) - 1) ? PROC_CLEANUP : 0))))
+		if (!procfree(procopen(trace[n], av + 1, NULL, ov, PROC_ARGMOD|PROC_GID|PROC_UID|(n == (elementsof(trace) - 1) ? PROC_CLEANUP : 0))))
 		{
 			sleep(1);
 			break;

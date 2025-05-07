@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -25,7 +25,7 @@
  */
 
 static const char usage_1[] =
-"[-?@(#)$Id: chgrp (AT&T Research) 2012-04-20 $\n]"
+"[-?\n@(#)$Id: chgrp (ksh 93u+m) 2022-08-30 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 ;
 
@@ -50,7 +50,7 @@ static const char usage_2[] =
     "\bmtime\b of \afile\a.]:[file]"
 "[c:changes?Describe only files whose ownership actually changes.]"
 "[f:quiet|silent?Do not report files whose ownership fails to change.]"
-"[h|l:symlink?Change the ownership of symbolic links on systems that "
+"[h|l:symlink|no-dereference?Change the ownership of symbolic links on systems that "
     "support \blchown\b(2). Implies \b--physical\b.]"
 "[m:map?The first operand is interpreted as a file that contains a map "
     "of space separated \afrom_uid:from_gid to_uid:to_gid\a pairs. The "
@@ -137,13 +137,13 @@ extern int	lchown(const char*, uid_t, gid_t);
  */
 
 static void
-getids(register char* s, char** e, Key_t* key, int options)
+getids(char* s, char** e, Key_t* key, int options)
 {
-	register char*	t;
-	register int	n;
-	register int	m;
-	char*		z;
-	char		buf[64];
+	char*	t;
+	int	n;
+	int	m;
+	char*	z;
+	char	buf[64];
 
 	key->uid = key->gid = -1;
 	while (isspace(*s))
@@ -208,17 +208,17 @@ getids(register char* s, char** e, Key_t* key, int options)
 int
 b_chgrp(int argc, char** argv, Shbltin_t* context)
 {
-	register int	options = 0;
-	register char*	s;
-	register Map_t*	m;
-	register FTS*	fts;
-	register FTSENT*ent;
-	register int	i;
+	int		options = 0;
+	char*		s;
+	Map_t*		m;
+	FTS*		fts;
+	FTSENT*		ent;
+	int		i;
 	Dt_t*		map = 0;
 	int		logical = 1;
 	int		flags;
-	int		uid;
-	int		gid;
+	int		uid = -1;
+	int		gid = -1;
 	char*		op;
 	char*		usage;
 	char*		t;
@@ -235,7 +235,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 	before = ~0;
 	if (!(sp = sfstropen()))
 	{
-		error(ERROR_SYSTEM|3, "out of space");
+		error(ERROR_SYSTEM|3, "out of memory");
 		UNREACHABLE();
 	}
 	sfputr(sp, usage_1, -1);
@@ -254,7 +254,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 	sfputr(sp, usage_3, -1);
 	if (!(usage = sfstruse(sp)))
 	{
-		error(ERROR_SYSTEM|3, "out of space");
+		error(ERROR_SYSTEM|3, "out of memory");
 		UNREACHABLE();
 	}
 	for (;;)
@@ -332,8 +332,9 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
@@ -341,7 +342,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 	argc -= opt_info.index;
 	if (error_info.errors || argc < 2)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	s = *argv;
@@ -357,7 +358,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 	{
 		if (streq(s, "-"))
 			sp = sfstdin;
-		else if (!(sp = sfopen(NiL, s, "r")))
+		else if (!(sp = sfopen(NULL, s, "r")))
 		{
 			error(ERROR_exit(1), "%s: cannot read", s);
 			UNREACHABLE();
@@ -367,7 +368,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 			getids(s, &t, &key, options);
 			if (!(m = (Map_t*)dtmatch(map, &key)))
 			{
-				if (!(m = (Map_t*)stakalloc(sizeof(Map_t))))
+				if (!(m = stkalloc(stkstd, sizeof(Map_t))))
 				{
 					error(ERROR_SYSTEM|ERROR_PANIC, "out of memory [id dictionary]");
 					UNREACHABLE();
@@ -376,7 +377,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 				m->to.uid = m->to.gid = -1;
 				dtinsert(map, m);
 			}
-			getids(t, NiL, &m->to, options);
+			getids(t, NULL, &m->to, options);
 		}
 		if (sp != sfstdin)
 			sfclose(sp);
@@ -384,7 +385,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 	}
 	else if (!(options & (OPT_UID|OPT_GID)))
 	{
-		getids(s, NiL, &key, options);
+		getids(s, NULL, &key, options);
 		if ((uid = key.uid) >= 0)
 			options |= OPT_UID;
 		if ((gid = key.gid) >= 0)
@@ -405,7 +406,7 @@ b_chgrp(int argc, char** argv, Shbltin_t* context)
 		s = "";
 		break;
 	}
-	if (!(fts = fts_open(argv + 1, flags, NiL)))
+	if (!(fts = fts_open(argv + 1, flags, NULL)))
 	{
 		error(ERROR_system(1), "%s: not found", argv[1]);
 		UNREACHABLE();

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -42,8 +43,8 @@ static const char usage[] =
 "\n[file ...]\n"
 "\n"
 "[+EXIT STATUS?]{"
-        "[+0?All files copies successfully.]"
-        "[+>0?An error occurred.]"
+	"[+0?All files copies successfully.]"
+	"[+>0?An error occurred.]"
 "}"
 "[+SEE ALSO?\bcat\b(1), \bsignal\b(2)]"
 ;
@@ -66,11 +67,11 @@ typedef struct Tee_s
 static ssize_t
 tee_write(Sfio_t* fp, const void* buf, size_t n, Sfdisc_t* handle)
 {
-	register const char*	bp;
-	register const char*	ep;
-	register int*		hp = ((Tee_t*)handle)->fd;
-	register int		fd = sffileno(fp);
-	register ssize_t	r;
+	const char*	bp;
+	const char*	ep;
+	int*		hp = ((Tee_t*)handle)->fd;
+	int		fd = sffileno(fp);
+	ssize_t		r;
 
 	do
 	{
@@ -87,29 +88,29 @@ tee_write(Sfio_t* fp, const void* buf, size_t n, Sfdisc_t* handle)
 }
 
 static void
-tee_cleanup(register Tee_t* tp)
+tee_cleanup(Tee_t* tp)
 {
-	register int*	hp;
-	register int	n;
+	int*	hp;
+	int	n;
 
 	if (tp)
 	{
-		sfdisc(sfstdout, NiL);
+		sfdisc(sfstdout, NULL);
 		if (tp->line >= 0)
-			sfset(sfstdout, SF_LINE, tp->line);
+			sfset(sfstdout, SFIO_LINE, tp->line);
 		for (hp = tp->fd; (n = *hp) >= 0; hp++)
 			close(n);
 	}
 }
 
 int
-b_tee(int argc, register char** argv, Shbltin_t* context)
+b_tee(int argc, char** argv, Shbltin_t* context)
 {
-	register Tee_t*		tp = 0;
-	register int		oflag = O_WRONLY|O_TRUNC|O_CREAT|O_BINARY|O_cloexec;
-	register int*		hp;
-	register char*		cp;
-	int			line;
+	Tee_t*		tp = 0;
+	int		oflag = O_WRONLY|O_TRUNC|O_CREAT|O_BINARY|O_cloexec;
+	int*		hp;
+	char*		cp;
+	int		line;
 
 	if (argc <= 0)
 	{
@@ -134,24 +135,25 @@ b_tee(int argc, register char** argv, Shbltin_t* context)
 			signal(SIGINT, SIG_IGN);
 			continue;
 		case 'l':
-			line = sfset(sfstdout, 0, 0) & SF_LINE;
+			line = sfset(sfstdout, 0, 0) & SFIO_LINE;
 			if ((line == 0) == (opt_info.num == 0))
 				line = -1;
 			else
-				sfset(sfstdout, SF_LINE, !!opt_info.num);
+				sfset(sfstdout, SFIO_LINE, !!opt_info.num);
 			continue;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	argv += opt_info.index;
@@ -166,7 +168,7 @@ b_tee(int argc, register char** argv, Shbltin_t* context)
 #endif
 	if (argc > 0)
 	{
-		if (tp = (Tee_t*)stakalloc(sizeof(Tee_t) + argc * sizeof(int)))
+		if (tp = stkalloc(stkstd, sizeof(Tee_t) + argc * sizeof(int)))
 		{
 			memset(&tp->disc, 0, sizeof(tp->disc));
 			tp->disc.writef = tee_write;
@@ -197,7 +199,7 @@ b_tee(int argc, register char** argv, Shbltin_t* context)
 			UNREACHABLE();
 		}
 	}
-	if ((sfmove(sfstdin, sfstdout, SF_UNBOUND, -1) < 0 || !sfeof(sfstdin)) && !ERROR_PIPE(errno) && errno != EINTR)
+	if ((sfmove(sfstdin, sfstdout, SFIO_UNBOUND, -1) < 0 || !sfeof(sfstdin)) && !ERROR_PIPE(errno) && errno != EINTR)
 		error(ERROR_system(0), "read error");
 	if (sfsync(sfstdout))
 		error(ERROR_system(0), "write error");

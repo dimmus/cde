@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,8 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -21,6 +23,9 @@
 
 #include	"shopt.h"
 #include	"defs.h"
+
+#if !SHOPT_SCRIPTONLY
+
 #include	<ast_wchar.h>
 #include	"lexstates.h"
 #include	"path.h"
@@ -30,30 +35,42 @@
 
 static char *fmtx(const char *string)
 {
-	register const char	*cp = string;
-	register int	 	n,c;
-	unsigned char 		*state = (unsigned char*)sh_lexstates[2]; 
-	int offset = staktell();
-	if(*cp=='#' || *cp=='~')
-		stakputc('\\');
+	const char	*cp = string;
+	int	 	n = 0, c;
+	int		pos = 0;
+	unsigned char 	*state = (unsigned char*)sh_lexstates[ST_NORM];
+	int		offset = stktell(sh.stk);
+	char		hc[3];
+#if SHOPT_HISTEXPAND
+	const char	hexp = sh_isoption(SH_HISTEXPAND)!=0;
+	if(hexp)
+		hist_setchars(hc);
+#else
+	const char	hexp = 0;
+#endif /* SHOPT_HISTEXPAND */
+	if((!hexp || (*cp!=hc[0] && *cp!=hc[2])) && (*cp=='#' || *cp=='~'))
+		sfputc(sh.stk,'\\');
 	mbinit();
-	while((c=mbchar(cp)),(c>UCHAR_MAX)||(n=state[c])==0 || n==S_EPAT);
+	while((c=mbchar(cp)),((c>UCHAR_MAX)||(n=state[c])==0 || n==S_EPAT)
+	&& (!hexp || ((c!=hc[0]) && (c!=hc[2] || string[0]!=hc[2]))) && c!='~')
+		;
 	if(n==S_EOF && *string!='#')
-		return((char*)string);
-	stakwrite(string,--cp-string);
+		return (char*)string;
+	sfwrite(sh.stk,string,--cp-string);
 	for(string=cp;c=mbchar(cp);string=cp)
 	{
 		if((n=cp-string)==1)
 		{
-			if((n=state[c]) && n!=S_EPAT)
-				stakputc('\\');
-			stakputc(c);
+			if(((n=state[c]) && n!=S_EPAT) || (hexp && ((c==hc[0]) || (c==hc[2] && !pos))))
+				sfputc(sh.stk,'\\');
+			sfputc(sh.stk,c);
 		}
 		else
-			stakwrite(string,n);
+			sfwrite(sh.stk,string,n);
+		pos++;
 	}
-	stakputc(0);
-	return(stakptr(offset));
+	sfputc(sh.stk,0);
+	return stkptr(sh.stk,offset);
 }
 
 #if !SHOPT_GLOBCASEDET
@@ -76,7 +93,7 @@ static int charcmp(int a, int b, int nocase)
 			b = tolower(b);
 		}
 	}
-	return(a==b);
+	return a==b;
 }
 #endif /* !SHOPT_GLOBCASEDET */
 
@@ -85,9 +102,9 @@ static int charcmp(int a, int b, int nocase)
  *  if <str> is equal to <newstr> returns  <str>+strlen(<str>)+1
  *  otherwise returns <str>+strlen(<str>)
  */
-static char *overlaid(register char *str,register const char *newstr,int nocase)
+static char *overlaid(char *str,const char *newstr,int nocase)
 {
-	register int c,d;
+	int c,d;
 	char *strnext;
 	mbinit();
 	while((strnext = str, c = mbchar(strnext)) && (d = mbchar(newstr), charcmp(c,d,nocase)))
@@ -96,7 +113,7 @@ static char *overlaid(register char *str,register const char *newstr,int nocase)
 		*str = 0;
 	else if(*newstr==0)
 		str++;
-	return(str);
+	return str;
 }
 
 
@@ -110,9 +127,9 @@ static char *overlaid(register char *str,register const char *newstr,int nocase)
  */
 static char *find_begin(char outbuff[], char *last, int endchar, int *type)
 {
-	register char	*cp=outbuff, *bp, *xp;
-	char		inquote = 0, dollarquote = 0, inassign = 0;
-	int		mode=*type, c;
+	char	*cp=outbuff, *bp, *xp;
+	char	inquote = 0, dollarquote = 0, inassign = 0;
+	int	mode=*type, c;
 	bp = outbuff;
 	*type = 0;
 	mbinit();
@@ -166,7 +183,7 @@ static char *find_begin(char outbuff[], char *last, int endchar, int *type)
 					if(c==dot || isaname(c))
 					{
 						*type='$';
-						return(++xp);
+						return ++xp;
 					}
 					if(c!='}')
 						bp = cp;
@@ -208,7 +225,7 @@ static char *find_begin(char outbuff[], char *last, int endchar, int *type)
 			/* FALLTHROUGH */
 		    default:
 			if(c && c==endchar)
-				return(xp);
+				return xp;
 			if(!inquote && ismeta(c))
 			{
 				bp = cp;
@@ -223,7 +240,7 @@ static char *find_begin(char outbuff[], char *last, int endchar, int *type)
 		*type = dollarquote ? -1 : inquote;
 		bp++;
 	}
-	return(bp);
+	return bp;
 }
 
 /*
@@ -239,7 +256,7 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 {
 	struct comnod	*comptr;
 	struct argnod	*ap;
-	register char	*out;
+	char		*out;
 	char 		*av[2], *begin , *dir=0;
 	int		addstar=0, rval=0, var=0, strip=1;
 	int 		nomarkdirs = !sh_isoption(SH_MARKDIRS);
@@ -249,37 +266,41 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 		if(mode=='=' && count>0)
 		{
 			if(count> ep->e_nlist)
-				return(-1);
+				return -1;
 			mode = '?';
 			av[0] = ep->e_clist[count-1];
 			av[1] = 0;
 		}
 		else
 		{
-			stakset(ep->e_stkptr,ep->e_stkoff);
+			stkset(sh.stk,ep->e_stkptr,ep->e_stkoff);
 			ep->e_nlist = 0;
 		}
 	}
-	comptr = (struct comnod*)stakalloc(sizeof(struct comnod));
-	ap = (struct argnod*)stakseek(ARGVAL);
+	comptr = stkalloc(sh.stk,sizeof(struct comnod));
+	ap = stkseek(sh.stk,ARGVAL);
 #if SHOPT_MULTIBYTE
 	{
-		register int c = *cur;
-		register genchar *cp;
+		int c = *cur;
+		genchar *cp;
 		/* adjust cur */
 		cp = (genchar *)outbuff + *cur;
 		c = *cp;
 		*cp = 0;
-		*cur = ed_external((genchar*)outbuff,(char*)stakptr(0));
+		*cur = ed_external((genchar*)outbuff,(char*)stkptr(sh.stk,0));
 		*cp = c;
 		*eol = ed_external((genchar*)outbuff,outbuff);
 	}
 #endif /* SHOPT_MULTIBYTE */
 #if SHOPT_VSH
 	out = outbuff + *cur + (sh_isoption(SH_VI)!=0);
+#if SHOPT_MULTIBYTE
+	if(sh_isoption(SH_VI) && ep->e_savedwidth > 0)
+		out += (ep->e_savedwidth - 1);
+#endif /* SHOPT_MULTIBYTE */
 #else
 	out = outbuff + *cur;
-#endif
+#endif /* SHOPT_VSH */
 	if(out[-1]=='"' || out[-1]=='\'')
 	{
 #if SHOPT_VSH
@@ -290,12 +311,12 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 		goto done;
 	}
 	comptr->comtyp = COMSCAN;
-	comptr->comarg = ap;
+	comptr->comarg.ap = ap;
 	ap->argflag = (ARG_MAC|ARG_EXP);
 	ap->argnxt.ap = 0;
 	ap->argchn.cp = 0;
 	{
-		register int c;
+		int c;
 		char *last = out;
 		c =  *(unsigned char*)out;
 		var = mode;
@@ -309,9 +330,9 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 		else if(var=='$')
 		{
 			/* expand ${!varname@} to complete variable name(s) */
-			stakputs("${!");
-			stakwrite(out,last-out);
-			stakputs("@}");
+			sfputr(sh.stk,"${!",-1);
+			sfwrite(sh.stk,out,last-out);
+			sfputr(sh.stk,"@}",-1);
 			out = last;
 		}
 		else
@@ -329,7 +350,7 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 						strip = 0;
 					dir = out+1;
 				}
-				stakputc(c);
+				sfputc(sh.stk,c);
 				out++;
 			}
 		}
@@ -337,24 +358,32 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 			mode = '*';
 		if(var!='$' && mode=='\\' && out[-1]!='*')
 			addstar = '*';
-		if(*begin=='~' && !strchr(begin,'/'))
-			addstar = 0;
-		stakputc(addstar);
-		ap = (struct argnod*)stakfreeze(1);
+		if(*begin=='~')
+		{
+			/* do not perform tilde expansion while completing a quoted string */
+			if(begin>outbuff && (begin[-1]=='"' || begin[-1]=='\''))
+				sh_onstate(SH_NOTILDEXP);
+			else if(!strchr(begin,'/'))
+				addstar = 0;
+		}
+		if(addstar)
+			sfputc(sh.stk,addstar);
+		ap = stkfreeze(sh.stk,1);
 	}
 	if(mode!='*')
 		sh_onoption(SH_MARKDIRS);
 	{
-		register char	**com;
-		char		*cp=begin, *left=0, *saveout=(char*)e_dot;
-		int	 	nocase=0,narg,cmd_completion=0;
-		register 	int size='x';
+		char	**com;
+		char	*cp=begin, *left=0, *saveout=(char*)e_dot;
+		int	nocase=0, narg, cmd_completion=0;
+		int	size='x';
 		while(cp>outbuff && ((size=cp[-1])==' ' || size=='\t'))
 			cp--;
 		if(!var && !strchr(ap->argval,'/') && (((cp==outbuff&&sh.nextprompt==1) || (strchr(";&|(",size)) && (cp==outbuff+1||size=='('||cp[-2]!='>') && *begin!='~' )))
 		{
 			cmd_completion=1;
 			sh_onstate(SH_COMPLETE);
+			sh_offstate(SH_DEFPATH);
 		}
 		if(ep->e_nlist)
 		{
@@ -375,7 +404,7 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 			}
 		}
 		sh_offstate(SH_COMPLETE);
-                /* allow a search to be aborted */
+		/* allow a search to be aborted */
 		if(sh.trapnote&SH_SIGSET)
 		{
 			rval = -1;
@@ -395,7 +424,7 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 		{
 			if (strip && !cmd_completion)
 			{
-				register char **ptrcom;
+				char **ptrcom;
 				for(ptrcom=com;*ptrcom;ptrcom++)
 					/* trim directory prefix */
 					*ptrcom = path_basename(*ptrcom);
@@ -445,7 +474,7 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 		}
 		/* save remainder of the buffer */
 		if(*out)
-			left=stakcopy(out);
+			left=stkcopy(sh.stk,out);
 		if(cmd_completion && mode=='\\')
 			out = strcopy(begin,path_basename(cp= *com++));
 		else if(mode=='*')
@@ -482,11 +511,10 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 			{
 				if(cmd_completion)
 				{
-					Namval_t *np;
 					/* add as tracked alias */
 					Pathcomp_t *pp;
-					if(*cp=='/' && (pp=path_dirfind(sh.pathlist,cp,'/')) && (np=nv_search(begin,sh.track_tree,NV_ADD)))
-						path_alias(np,pp);
+					if(*cp=='/' && (pp=path_dirfind(sh.pathlist,cp,'/')))
+						path_settrackedalias(begin,pp);
 					out = strcopy(begin,cp);
 				}
 				/* add quotes if necessary */
@@ -538,13 +566,14 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 	}
  done:
 	sh_offstate(SH_FCOMPLETE);
+	sh_offstate(SH_NOTILDEXP);
 	if(!ep->e_nlist)
-		stakset(ep->e_stkptr,ep->e_stkoff);
+		stkset(sh.stk,ep->e_stkptr,ep->e_stkoff);
 	if(nomarkdirs)
 		sh_offoption(SH_MARKDIRS);
 #if SHOPT_MULTIBYTE
 	{
-		register int c,n=0;
+		int c,n=0;
 		/* first re-adjust cur */
 		c = outbuff[*cur];
 		outbuff[*cur] = 0;
@@ -557,23 +586,24 @@ int ed_expand(Edit_t *ep, char outbuff[],int *cur,int *eol,int mode, int count)
 		*eol = ed_internal(outbuff,(genchar*)outbuff);
 	}
 #endif /* SHOPT_MULTIBYTE */
-	return(rval);
+	return rval;
 }
 
+#if SHOPT_ESH || SHOPT_VSH
 /*
  * look for edit macro named _i
  * if found, puts the macro definition into lookahead buffer and returns 1
  */
-int ed_macro(Edit_t *ep, register int i)
+int ed_macro(Edit_t *ep, int i)
 {
-	register char *out;
+	char *out;
 	Namval_t *np;
 	genchar buff[LOOKAHEAD+1];
 	if(i != '@')
 		ep->e_macro[1] = i;
-	/* undocumented feature, macros of the form <ESC>[c evoke alias __c */
+	/* macros of the form <ESC>[c evoke alias __c */
 	if(i=='_')
-		ep->e_macro[2] = ed_getchar(ep,1);
+		ep->e_macro[2] = i = ed_getchar(ep,1);
 	else
 		ep->e_macro[2] = 0;
 	if (isalnum(i)&&(np=nv_search(ep->e_macro,sh.alias_tree,0))&&(out=nv_getval(np)))
@@ -596,24 +626,25 @@ int ed_macro(Edit_t *ep, register int i)
 #endif /* SHOPT_MULTIBYTE */
 		while(i-- > 0)
 			ed_ungetchar(ep,buff[i]);
-		return(1);
-	} 
-	return(0);
+		return 1;
+	}
+	return 0;
 }
+#endif /* SHOPT_ESH || SHOPT_VSH */
 
 /*
  * Enter the fc command on the current history line
  */
 int ed_fulledit(Edit_t *ep)
 {
-	register char *cp;
+	char *cp;
 	if(!sh.hist_ptr)
-		return(-1);
+		return -1;
 	/* use EDITOR on current command */
 	if(ep->e_hline == ep->e_hismax)
 	{
 		if(ep->e_eol<0)
-			return(-1);
+			return -1;
 #if SHOPT_MULTIBYTE
 		ep->e_inbuf[ep->e_eol+1] = 0;
 		ed_external(ep->e_inbuf, (char *)ep->e_inbuf);
@@ -623,11 +654,15 @@ int ed_fulledit(Edit_t *ep)
 		hist_flush(sh.hist_ptr);
 	}
 	cp = strcopy((char*)ep->e_inbuf,e_runvi);
-	cp = strcopy(cp, fmtbase((intmax_t)ep->e_hline,10,0));
+	cp = strcopy(cp, fmtint(ep->e_hline,1));
 #if SHOPT_VSH
 	ep->e_eol = ((unsigned char*)cp - (unsigned char*)ep->e_inbuf)-(sh_isoption(SH_VI)!=0);
 #else
 	ep->e_eol = ((unsigned char*)cp - (unsigned char*)ep->e_inbuf);
 #endif
-	return(0);
+	return 0;
 }
+
+#else
+NoN(completion)
+#endif /* !SHOPT_SCRIPTONLY */

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -44,7 +44,7 @@ static Lc_t		default_lc =
 	&lc_languages[0],
 	&lc_territories[0],
 	&lc_charsets[0],
-	0, 
+	0,
 	LC_default|LC_checked|LC_local,
 	0,
 	{
@@ -53,8 +53,7 @@ static Lc_t		default_lc =
 		{ &default_lc, 0, 0 },
 		{ &default_lc, 0, 0 },
 		{ &default_lc, 0, 0 },
-		{ &default_lc, 0, (void*)&default_numeric },
-		{ &default_lc, 0, 0 },
+		{ &default_lc, 0, &default_numeric },
 		{ &default_lc, 0, 0 },
 		{ &default_lc, 0, 0 },
 		{ &default_lc, 0, 0 },
@@ -74,7 +73,7 @@ static Lc_t		debug_lc =
 	&lc_languages[1],
 	&lc_territories[1],
 	&lc_charsets[0],
-	0, 
+	0,
 	LC_debug|LC_checked|LC_local,
 	0,
 	{
@@ -83,8 +82,7 @@ static Lc_t		debug_lc =
 		{ &debug_lc, 0, 0 },
 		{ &debug_lc, 0, 0 },
 		{ &debug_lc, 0, 0 },
-		{ &debug_lc, 0, (void*)&debug_numeric },
-		{ &debug_lc, 0, 0 },
+		{ &debug_lc, 0, &debug_numeric },
 		{ &debug_lc, 0, 0 },
 		{ &debug_lc, 0, 0 },
 		{ &debug_lc, 0, 0 },
@@ -100,7 +98,6 @@ static Lc_t*		lcs = &debug_lc;
 
 Lc_t*			locales[] =
 {
-	&default_lc,
 	&default_lc,
 	&default_lc,
 	&default_lc,
@@ -139,7 +136,6 @@ lcindex(int category, int min)
 	case LC_PAPER:		return AST_LC_PAPER;
 	case LC_TELEPHONE:	return AST_LC_TELEPHONE;
 	case LC_TIME:		return AST_LC_TIME;
-	case LC_XLITERATE:	return AST_LC_XLITERATE;
 	}
 	return -1;
 }
@@ -159,10 +155,10 @@ lccategories(void)
  */
 
 Lc_info_t*
-lcinfo(register int category)
+lcinfo(int category)
 {
 	if ((category = lcindex(category, 0)) < 0)
-		return 0;
+		return NULL;
 	return LCINFO(category);
 }
 
@@ -173,12 +169,12 @@ lcinfo(register int category)
  */
 
 static int
-match(const char* s, register const char* p, int minimum, int standard)
+match(const char* s, const char* p, int minimum, int standard)
 {
-	register const char*	t;
-	const char*		x;
-	int			w;
-	int			z;
+	const char*	t;
+	const char*	x;
+	int		w;
+	int		z;
 
 	z = 0;
 	do
@@ -249,7 +245,7 @@ match(const char* s, register const char* p, int minimum, int standard)
  */
 
 static int
-match_charset(register const char* s, register const Lc_charset_t* cp)
+match_charset(const char* s, const Lc_charset_t* cp)
 {
 	return match(s, cp->code, 0, 1) || match(s, cp->alternates, 3, 1) || cp->ms && match(s, cp->ms, 0, 1);
 }
@@ -261,13 +257,13 @@ match_charset(register const char* s, register const Lc_charset_t* cp)
 static size_t
 canonical(const Lc_language_t* lp, const Lc_territory_t* tp, const Lc_charset_t* cp, const Lc_attribute_list_t* ap, unsigned long flags, char* buf, size_t siz)
 {
-	register int		c;
-	register int		u;
-	register char*		s;
-	register char*		e;
-	register const char*	t;
-	char*			p;
-	char*			r;
+	int		c;
+	int		u;
+	char*		s;
+	char*		e;
+	const char*	t;
+	char*		p;
+	char*		r;
 
 	if (!(flags & (LC_abbreviated|LC_default|LC_local|LC_qualified|LC_verbose)))
 		flags |= LC_abbreviated;
@@ -414,33 +410,33 @@ lccanon(Lc_t* lc, unsigned long flags, char* buf, size_t siz)
 Lc_t*
 lcmake(const char* name)
 {
-	register int			c;
-	register char*			s;
-	register char*			e;
-	register const char*		t;
-	const char*			a;
-	char*				w;
-	char*				language_name;
-	char*				territory_name;
-	char*				charset_name;
-	char*				attributes_name;
-	Lc_t*				lc;
-	const Lc_map_t*			mp;
-	const Lc_language_t*		lp;
-	const Lc_territory_t*		tp;
-	const Lc_territory_t*		tpb;
-	const Lc_territory_t*		primary;
-	const Lc_charset_t*		cp;
-	const Lc_charset_t*		ppa;
-	const Lc_attribute_t*		ap;
-	Lc_attribute_list_t*		ai;
-	Lc_attribute_list_t*		al;
-	int				i;
-	int				n;
-	int				z;
-	char				buf[PATH_MAX / 2];
-	char				tmp[PATH_MAX / 2];
-	Local_t				local[2];
+	int			c;
+	char*			s;
+	char*			e;
+	const char*		t;
+	const char*		a;
+	char*			w;
+	char*			language_name;
+	char*			territory_name;
+	char*			charset_name;
+	char*			attributes_name;
+	Lc_t*			lc;
+	const Lc_map_t*		mp;
+	const Lc_language_t*	lp;
+	const Lc_territory_t*	tp;
+	const Lc_territory_t*	tpb;
+	const Lc_territory_t*	primary;
+	const Lc_charset_t*	cp;
+	const Lc_charset_t*	ppa;
+	const Lc_attribute_t*	ap;
+	Lc_attribute_list_t*	ai;
+	Lc_attribute_list_t*	al;
+	int			i;
+	int			n;
+	int			z;
+	char			buf[PATH_MAX / 2];
+	char			tmp[PATH_MAX / 2];
+	Local_t			local[2];
 
 	if (!(t = name) || !*t)
 		return &default_lc;
@@ -607,7 +603,7 @@ lcmake(const char* name)
 				s = (char*)name;
 				z = strlen(s) + 1;
 				if (!(lp = newof(0, Lc_language_t, 1, z)))
-					return 0;
+					return NULL;
 				name = ((Lc_language_t*)lp)->code = ((Lc_language_t*)lp)->name = (const char*)(lp + 1);
 				memcpy((char*)lp->code, s, z - 1);
 				tp = &lc_territories[0];
@@ -771,7 +767,7 @@ lcmake(const char* name)
 			break;
 		}
 	if (!(lc = newof(0, Lc_t, 1, n + z)))
-		return 0;
+		return NULL;
 	strcpy((char*)(lc->name = (const char*)(lc + 1)), name);
 	lc->code = lc->name + n;
 	if (i >= 0)
@@ -784,7 +780,7 @@ lcmake(const char* name)
 		strcpy((char*)lc->code, s);
 	lc->language = lp ? lp : &lc_languages[0];
 	lc->territory = tp ? tp : &lc_territories[0];
-	lc->charset = cp ? cp : &lc_charsets[0];  
+	lc->charset = cp ? cp : &lc_charsets[0];
 	if (streq(lc->charset->code, "utf8"))
 		lc->flags |= LC_utf8;
 	lc->attributes = al;
@@ -828,12 +824,12 @@ typedef struct Lc_scan_s
 Lc_t*
 lcscan(Lc_t* lc)
 {
-	register Lc_scan_t*	ls;
+	Lc_scan_t*	ls;
 
 	if (!(ls = (Lc_scan_t*)lc))
 	{
 		if (!(ls = newof(0, Lc_scan_t, 1, 0)))
-			return 0;
+			return NULL;
 		ls->lc.code = ls->lc.name = ls->buf;
 		ls->territory = -1;
 		ls->language = elementsof(ls->lc.territory->languages);
@@ -846,7 +842,7 @@ lcscan(Lc_t* lc)
 			if (!lc_territories[++ls->territory].code)
 			{
 				free(ls);
-				return 0;
+				return NULL;
 			}
 			ls->lc.territory = &lc_territories[ls->territory];
 			ls->lc.language = ls->lc.territory->languages[ls->language = 0];
@@ -862,7 +858,7 @@ lcscan(Lc_t* lc)
 			ls->list.attribute = 0;
 		}
 	}
-	ls->lc.attributes = ls->list.attribute ? &ls->list : (Lc_attribute_list_t*)0;
+	ls->lc.attributes = ls->list.attribute ? &ls->list : NULL;
 #if _WINIX
 	if (!ls->lc.language || !ls->lc.language->index)
 		ls->lc.index = 0;

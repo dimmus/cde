@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -27,16 +27,16 @@ ssize_t sfnputc(Sfio_t*		f,	/* file to write */
 		int		c,	/* char to be written */
 		size_t		n)	/* number of time to repeat */
 {
-	reg uchar*	ps;
-	reg ssize_t	p, w;
-	uchar		buf[128];
-	reg int		local;
+	uchar*	ps;
+	ssize_t	p, w;
+	uchar	buf[128];
+	int	local;
 
 	if(!f)
 		return -1;
 
 	GETLOCAL(f,local);
-	if(SFMODE(f,local) != SF_WRITE && _sfmode(f,SF_WRITE,local) < 0)
+	if(SFMODE(f,local) != SFIO_WRITE && _sfmode(f,SFIO_WRITE,local) < 0)
 		return -1;
 
 	SFLOCK(f,local);
@@ -60,7 +60,7 @@ ssize_t sfnputc(Sfio_t*		f,	/* file to write */
 
 	for(;;)
 	{	/* hard write of data */
-		if((p = SFWRITE(f,(void*)ps,p)) <= 0 || (n -= p) <= 0)
+		if((p = SFWRITE(f,ps,p)) <= 0 || (n -= p) <= 0)
 		{	w -= n;
 			goto done;
 		}

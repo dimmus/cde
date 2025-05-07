@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -39,22 +39,22 @@ pathgetlink(const char* name, char* buf, int siz)
 {
 	int	n;
 
-	if ((n = readlink(name, buf, siz)) < 0) return(-1);
+	if ((n = readlink(name, buf, siz)) < 0) return -1;
 	if (n >= siz)
 	{
 		errno = EINVAL;
-		return(-1);
+		return -1;
 	}
 	buf[n] = 0;
 #ifdef UNIV_MAX
 	if (isspace(*buf))
 	{
-		register char*	s;
-		register char*	t;
-		register char*	u;
-		register char*	v;
-		int		match = 0;
-		char		tmp[PATH_MAX];
+		char*	s;
+		char*	t;
+		char*	u;
+		char*	v;
+		int	match = 0;
+		char	tmp[PATH_MAX];
 
 		s = buf;
 		t = tmp;
@@ -94,5 +94,5 @@ pathgetlink(const char* name, char* buf, int siz)
 		}
 	}
 #endif
-	return(n);
+	return n;
 }

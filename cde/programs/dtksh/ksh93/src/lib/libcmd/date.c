@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -67,7 +68,7 @@ static const char usage[] =
 "	an odd number of arguments then the last time argument is differenced"
 "	with the current time.]"
 "[f:format?Output the date according to the \bstrftime\b(3) \aformat\a."
-"	For backwards compatibility, a first argument of the form"
+"	For backward compatibility, a first argument of the form"
 "	\b+\b\aformat\a is equivalent to \b-f\b format."
 "	\aformat\a is in \bprintf\b(3) style, where %\afield\a names"
 "	a fixed size field, zero padded if necessary,"
@@ -170,9 +171,9 @@ static const char usage[] =
 "[T:rfc-3339?List date and time in RFC 3339 format according to "
     "\atype\a:]:[type]"
     "{"
-        "[d:date?(%Y-%m-%d)]"
-        "[s:seconds?(%Y-%m-%d %H:%M:%S%_z)]"
-        "[n:ns|nanoseconds?(%Y-%m-%d %H:%M:%S.%N%_z)]"
+	"[d:date?(%Y-%m-%d)]"
+	"[s:seconds?(%Y-%m-%d %H:%M:%S%_z)]"
+	"[n:ns|nanoseconds?(%Y-%m-%d %H:%M:%S.%N%_z)]"
     "}"
 "[s:show?Show the date without setting the system time.]"
 "[u:utc|gmt|zulu|universal?Output dates in \acoordinated universal time\a (UTC).]"
@@ -209,7 +210,7 @@ typedef struct Fmt
  */
 
 static int
-settime(Shbltin_t* context, const char* cmd, Time_t now, int adjust, int network)
+settime(Shbltin_t* context, Time_t now, int adjust, int network)
 {
 	char**		argv;
 	char*		args[7];
@@ -221,7 +222,7 @@ settime(Shbltin_t* context, const char* cmd, Time_t now, int adjust, int network
 	*argv++ = "command";
 	*argv++ = "-px";
 	*argv++ = "date";
-	if (streq(astconf("UNIVERSE", NiL, NiL), "att"))
+	if (streq(astconf("UNIVERSE", NULL, NULL), "att"))
 	{
 		tmxfmt(buf, sizeof(buf), "%m%d%H" "%M%Y.%S", now);
 		if (adjust)
@@ -251,7 +252,7 @@ settime(Shbltin_t* context, const char* cmd, Time_t now, int adjust, int network
  */
 
 static Time_t
-convert(register Fmt_t* f, char* s, Time_t now)
+convert(Fmt_t* f, char* s, Time_t now)
 {
 	char*	t;
 	char*	u;
@@ -268,11 +269,11 @@ convert(register Fmt_t* f, char* s, Time_t now)
 }
 
 int
-b_date(int argc, register char** argv, Shbltin_t* context)
+b_date(int argc, char** argv, Shbltin_t* context)
 {
-	register int	n;
-	register char*	s;
-	register Fmt_t*	f;
+	int		n;
+	char*		s;
+	Fmt_t*		f;
 	char*		t;
 	unsigned long	u;
 	Time_t		now;
@@ -284,7 +285,6 @@ b_date(int argc, register char** argv, Shbltin_t* context)
 	Fmt_t		fmt;
 	struct stat	st;
 
-	char*		cmd = argv[0];	/* original command path	*/
 	char*		format = 0;	/* tmxfmt() format		*/
 	char*		string = 0;	/* date string			*/
 	int		elapsed = 0;	/* args are start/stop pairs	*/
@@ -375,8 +375,9 @@ b_date(int argc, register char** argv, Shbltin_t* context)
 			listzones = tm_data.zone;
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			continue;
@@ -386,7 +387,7 @@ b_date(int argc, register char** argv, Shbltin_t* context)
 	argv += opt_info.index;
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	now = tmxgettime();
@@ -437,7 +438,7 @@ b_date(int argc, register char** argv, Shbltin_t* context)
 	{
 		if (!*argv)
 		{
-			error(ERROR_usage(2), "%s", optusage(NiL));
+			error(ERROR_usage(2), "%s", optusage(NULL));
 			UNREACHABLE();
 		}
 		n = argv[1] != 0;
@@ -480,7 +481,7 @@ b_date(int argc, register char** argv, Shbltin_t* context)
 		{
 			if (*argv && string)
 			{
-				error(ERROR_usage(2), "%s", optusage(NiL));
+				error(ERROR_usage(2), "%s", optusage(NULL));
 				UNREACHABLE();
 			}
 			now = convert(fmts, s, now);
@@ -505,7 +506,7 @@ b_date(int argc, register char** argv, Shbltin_t* context)
 			tmxfmt(buf, sizeof(buf), format, now);
 			sfprintf(sfstdout, "%s\n", buf);
 		}
-		else if (settime(context, cmd, now, increment, network))
+		else if (settime(context, now, increment, network))
 		{
 			error(ERROR_SYSTEM|3, "cannot set system time");
 			UNREACHABLE();

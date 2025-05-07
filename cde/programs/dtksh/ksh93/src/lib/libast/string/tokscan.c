@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -35,7 +35,7 @@
  * message support for %s and %v data
  *
  *	(5:12345)		fixed length strings, ) may be \t
- *	(null)			NiL
+ *	(null)			NULL
  *
  * "..." and '...' may span \n, and \\n is the line splice
  * quoted '\r' translated to '\n'
@@ -68,12 +68,12 @@ static char	empty[1];
  */
 
 static char*
-lextok(register char* s, register int c, char** p, int* n)
+lextok(char* s, int c, char** p, int* n)
 {
-	register char*	t;
-	register int	q;
-	char*		b;
-	char*		u;
+	char*	t;
+	int	q;
+	char*	b;
+	char*	u;
 
 	if (*s == '(' && (!c || c == ' ' || c == '\n'))
 	{
@@ -158,7 +158,7 @@ lextok(register char* s, register int c, char** p, int* n)
 		s++;
 	}
 	if (p) *p = b;
-	return(s);
+	return s;
 }
 
 /*
@@ -166,10 +166,10 @@ lextok(register char* s, register int c, char** p, int* n)
  */
 
 int
-tokscan(register char* s, char** nxt, const char* fmt, ...)
+tokscan(char* s, char** nxt, const char* fmt, ...)
 {
-	register int	c;
-	register char*	f;
+	int		c;
+	char*		f;
 	int		num = 0;
 	char*		skip = 0;
 	int		q;
@@ -365,5 +365,5 @@ tokscan(register char* s, char** nxt, const char* fmt, ...)
 	va_end(ap);
 	if (*s == '\n') *s++ = 0;
 	if (nxt) *nxt = skip ? skip : s;
-	return(num);
+	return num;
 }

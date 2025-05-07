@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -542,6 +542,64 @@ if builtin cat 2> /dev/null; then
 	got=$(cat <<<"foo bar baz" 3<&0 <<<"$(</dev/fd/3) bork blah blarg")
 	[[ $got == "$exp" ]] || '3<%0 does not work when 0 is <<< here-doc'
 fi
+
+# ======
+# on ksh 93v-/2020, 'exec cat' with a heredoc is broken
+# https://github.com/ksh93/ksh/pull/604
+exp=hello
+got=$( set +x; { "$SHELL" -c "exec cat <<_EOF
+$exp
+_EOF"; } 2>&1 )
+[[ e=$? -eq 0 && $got == "$exp" ]] || err_exit "'exec cat' with a heredoc" \
+	"(expected status 0, '$exp';" \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"), $(printf %q "$got"))"
+
+# ======
+# potential crash when here-documents and command substitutions are nested
+# https://github.com/ksh93/ksh/issues/823
+got=$(set +x; { "$SHELL" -c 'TEST_LINE1="Test line 1"
+TEST_LINE2="Test line 2"
+function1 () {
+cat << EOF
+	${TEST_LINE1}
+EOF
+}
+function2 () {
+cat << EOF
+	${TEST_LINE2}
+EOF
+}
+function3 () {
+cat << EOF
+	$(function1)
+EOF
+	function2
+}
+function3'; } 2>&1)
+exp=$'\t\tTest line 1\n\tTest line 2'
+[[ $got == "$exp" ]] || err_exit "processing a here-document from a command substitution in a here-document" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# $@ and $* in here-document
+# Note: POSIX sys that $@ has unspecified behaviour in this context because
+# field generation is not posible, but ksh's traditional behaviour is to pull
+# a space out of a hat and use it as the output field separator. Only $* makes
+# sense in a here-document. In any scalar context (in which field splittig is
+# not possible), POSIX specifies that $* uses the first character of $IFS as
+# the output field separator.
+got=$(
+	IFS=/
+	set ONE TWO THREE
+	cat <<-EOF
+		start$@end
+		start$*end
+	EOF
+)
+exp=$'startONE TWO THREEend\nstartONE/TWO/THREEend'
+[[ $got == "$exp" ]] || err_exit '$@ and $* in here-document' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
 
 # ======
 exit $((Errors<125?Errors:125))

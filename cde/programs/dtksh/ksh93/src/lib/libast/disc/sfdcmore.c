@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,14 +14,13 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #include "sfdchdr.h"
 
-#if _PACKAGE_ast
 #include <ast_tty.h>
 #include <signal.h>
-#endif
 
 /*
  * a simple but fast more style pager discipline
@@ -34,7 +33,7 @@
  */
 
 typedef struct
-{	
+{
 	Sfdisc_t	disc;		/* sfio discipline		*/
 	Sfio_t*		input;		/* tied with this input stream	*/
 	Sfio_t*		error;		/* tied with this error stream	*/
@@ -54,7 +53,7 @@ typedef struct
 
 static ssize_t moreread(Sfio_t* f, void* buf, size_t n, Sfdisc_t* dp)
 {
-	register More_t*	more = (More_t*)dp;
+	More_t*	more = (More_t*)dp;
 
 	more->match = 0;
 	more->row = 2;
@@ -69,7 +68,7 @@ static ssize_t moreread(Sfio_t* f, void* buf, size_t n, Sfdisc_t* dp)
 
 static int ttyquery(Sfio_t* rp, Sfio_t* wp, const char* label, Sfdisc_t* dp)
 {
-	register int	r;
+	int		r;
 	int		n;
 
 #ifdef TCSADRAIN
@@ -79,6 +78,8 @@ static int ttyquery(Sfio_t* rp, Sfio_t* wp, const char* label, Sfdisc_t* dp)
 	int		rfd = sffileno(rp);
 	int		wfd = sffileno(rp);
 
+	NOT_USED(wp);
+	NOT_USED(dp);
 	if (!label)
 		n = 0;
 	else if (n = strlen(label))
@@ -111,7 +112,7 @@ static int ttyquery(Sfio_t* rp, Sfio_t* wp, const char* label, Sfdisc_t* dp)
 		write(wfd, "\r", 1);
 	}
 #else
-	register char*	s;
+	char*	s;
 
 	if (label && (n = strlen(label)))
 		sfwr(wp, label, n, dp);
@@ -124,14 +125,14 @@ static int ttyquery(Sfio_t* rp, Sfio_t* wp, const char* label, Sfdisc_t* dp)
  * more write
  */
 
-static ssize_t morewrite(Sfio_t* f, const void* buf, register size_t n, Sfdisc_t* dp)
+static ssize_t morewrite(Sfio_t* f, const void* buf, size_t n, Sfdisc_t* dp)
 {
-	register More_t*	more = (More_t*)dp;
-	register char*		b;
-	register char*		s;
-	register char*		e;
-	register ssize_t	w;
-	register int		r;
+	More_t*	more = (More_t*)dp;
+	char*		b;
+	char*		s;
+	char*		e;
+	ssize_t		w;
+	int		r;
 
 	if (!more->row)
 		return n;
@@ -231,24 +232,25 @@ static ssize_t morewrite(Sfio_t* f, const void* buf, register size_t n, Sfdisc_t
 
 static int moreexcept(Sfio_t* f, int type, void* data, Sfdisc_t* dp)
 {
-	register More_t*	more = (More_t*)dp;
+	More_t*	more = (More_t*)dp;
 
-	if (type == SF_FINAL || type == SF_DPOP)
+	NOT_USED(data);
+	if (type == SFIO_FINAL || type == SFIO_DPOP)
 	{
 		if (f = more->input)
 		{
 			more->input = 0;
-			sfdisc(f, SF_POPDISC);
+			sfdisc(f, SFIO_POPDISC);
 		}
 		else if (f = more->error)
 		{
 			more->error = 0;
-			sfdisc(f, SF_POPDISC);
+			sfdisc(f, SFIO_POPDISC);
 		}
 		else
 			free(dp);
 	}
-	else if (type == SF_SYNC)
+	else if (type == SFIO_SYNC)
 	{
 		more->match = 0;
 		more->row = 1;
@@ -266,14 +268,14 @@ static int moreexcept(Sfio_t* f, int type, void* data, Sfdisc_t* dp)
 
 int sfdcmore(Sfio_t* f, const char* prompt, int rows, int cols)
 {
-	register More_t*	more;
+	More_t*	more;
 	size_t			n;
 
 	/*
 	 * this is a writeonly discipline for interactive io
 	 */
 
-	if (!(sfset(f, 0, 0) & SF_WRITE) || !isatty(sffileno(sfstdin)) || !isatty(sffileno(sfstdout)))
+	if (!(sfset(f, 0, 0) & SFIO_WRITE) || !isatty(sffileno(sfstdin)) || !isatty(sffileno(sfstdout)))
 		return -1;
 	if (!prompt)
 		prompt = "\033[7m More\033[m";
@@ -288,9 +290,7 @@ int sfdcmore(Sfio_t* f, const char* prompt, int rows, int cols)
 	memcpy(more->prompt, prompt, n);
 	if (!rows || !cols)
 	{
-#if _PACKAGE_ast
 		astwinsize(sffileno(sfstdin), &rows, &cols);
-#endif
 		if (!rows)
 			rows = 24;
 		if (!cols)
@@ -302,7 +302,7 @@ int sfdcmore(Sfio_t* f, const char* prompt, int rows, int cols)
 	more->col = 1;
 
 	if (sfdisc(f, &more->disc) != &more->disc)
-	{	
+	{
 		free(more);
 		return -1;
 	}
@@ -310,13 +310,13 @@ int sfdcmore(Sfio_t* f, const char* prompt, int rows, int cols)
 	{
 		if (sfdisc(sfstdin, &more->disc) != &more->disc)
 		{
-			sfdisc(f, SF_POPDISC);
+			sfdisc(f, SFIO_POPDISC);
 			return -1;
 		}
 		more->input = sfstdin;
 		if (sfdisc(sfstderr, &more->disc) != &more->disc)
 		{
-			sfdisc(f, SF_POPDISC);
+			sfdisc(f, SFIO_POPDISC);
 			return -1;
 		}
 		more->error = sfstdin;

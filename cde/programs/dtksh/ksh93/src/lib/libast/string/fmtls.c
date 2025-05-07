@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -45,9 +45,9 @@
  */
 
 char*
-fmtls(char* buf, const char* name, register struct stat* st, const char* info, const char* link, register int flags)
+fmtls(char* buf, const char* name, struct stat* st, const char* info, const char* link, int flags)
 {
-	register char*		s;
+	char*		s;
 	time_t			tm;
 	Sfoff_t			n;
 

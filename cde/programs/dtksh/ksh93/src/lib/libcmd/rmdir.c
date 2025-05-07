@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -41,8 +42,8 @@ static const char usage[] =
 "\ndirectory ...\n"
 "\n"
 "[+EXIT STATUS?]{"
-        "[+0?All directories deleted successfully.]"
-        "[+>0?One or more directories could not be deleted.]"
+	"[+0?All directories deleted successfully.]"
+	"[+>0?One or more directories could not be deleted.]"
 "}"
 "[+SEE ALSO?\bmkdir\b(1), \brm\b(1), \brmdir\b(2), \bunlink\b(2)]"
 ;
@@ -52,12 +53,12 @@ static const char usage[] =
 int
 b_rmdir(int argc, char** argv, Shbltin_t* context)
 {
-	register char*	dir;
-	register char*	end;
-	register int	n;
-	int		eflag = 0;
-	int		pflag = 0;
-	int		sflag = 0;
+	char*	dir;
+	char*	end;
+	int	n;
+	int	eflag = 0;
+	int	pflag = 0;
+	int	sflag = 0;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	for (;;)
@@ -77,15 +78,16 @@ b_rmdir(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || !*argv)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (!pflag)
@@ -120,5 +122,5 @@ b_rmdir(int argc, char** argv, Shbltin_t* context)
 		}
 	next:	;
 	}
-	return(error_info.errors != 0);
+	return error_info.errors != 0;
 }

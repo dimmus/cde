@@ -3,7 +3,7 @@
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
 #                    Copyright (c) 2012 Roland Mainz                   #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -15,6 +15,7 @@
 #                Roland Mainz <roland.mainz@nrubsig.org>               #
 #            Johnothan King <johnothanking@protonmail.com>             #
 #                  Martijn Dekker <martijn@inlv.org>                   #
+#                      Phi <phi.debian@gmail.com>                      #
 #                                                                      #
 ########################################################################
 
@@ -77,7 +78,10 @@
 [[ $'\cg' =~ [[:cntrl:]] ]] || err_exit 'pattern [[:cntrl:]] broken'
 [[ \$ =~ [[:graph:]] ]] || err_exit 'pattern [[:graph:]] broken'
 [[ ' ' =~ [[:graph:]] ]] && err_exit 'pattern [[:graph:]] broken'
-[[ \$ =~ [[:punct:]] ]] || err_exit 'pattern [[:punct:]] broken'
+for c in '!' '"' '#' '$' '%' '&' \' '(' ')' '*' '+' ',' '-' '.' '/' ':' ';' \
+		'<' '=' '>' '?' '@' '[' '\\' ']' '^' '_' '`' '{' '|' '}' '~'
+do	[[ $c =~ [[:punct:]] ]] || err_exit "pattern [[:punct:]] broken for $c"
+done
 [[ / =~ [[:punct:]] ]] || err_exit 'pattern [[:punct:]] broken'
 [[ ' ' =~ [[:punct:]] ]] && err_exit 'pattern [[:punct:]] broken'
 [[ x =~ [[:punct:]] ]] && err_exit 'pattern [[:punct:]] broken'
@@ -126,13 +130,6 @@ function test_xmlfragment1
 {
 	typeset -r testscript='test1_script.sh'
 cat >"${testscript}" <<-TEST1SCRIPT
-	# memory safeguards to prevent out-of-control memory consumption
-	{
-		ulimit -M \$(( 1024 * 1024 ))
-		ulimit -v \$(( 1024 * 1024 ))
-		ulimit -d \$(( 1024 * 1024 ))
-	} 2>/dev/null
-
 	# input text
 	xmltext="\$( < "\$1" )"
 
@@ -1070,6 +1067,21 @@ EOF
 	[[ $exp == "$got" ]] || err_exit "Compound variable \$context is not printed with 'print -v'." \
 		$'Diff follows:\n'"$(diff -u <(print -r -- "$exp") <(print -r -- "$got") | sed $'s/^/\t| /')"
 fi
+
+# ======
+
+# https://github.com/ksh93/ksh/issues/577
+# https://github.com/ksh93/ksh/pull/581
+[[ "[a] b [c] d" =~ ^\[[^]]+\] ]]
+[[ ${.sh.match} == '[a]' ]] || err_exit 'pattern ^\[[^]]+ broken'
+
+# Avoid printing excessive elements for .sh.match
+# https://github.com/ksh93/ksh/issues/308#issuecomment-1033259414
+# https://github.com/ksh93/ksh/pull/709
+exp='.sh.match .sh.match[1] .sh.match[2]'
+got=${ $SHELL -c 'print ${!.sh.match} ${!.sh.match[1]} ${!.sh.match[2]}' }
+[[ $exp == "$got" ]] || err_exit "'print \${!.sh.match}' should not print excessive elements" \
+	"(expected ${ printf %q "$exp" }, got ${ printf %q "$got" })"
 
 # ======
 exit $((Errors<125?Errors:125))

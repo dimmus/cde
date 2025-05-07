@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1994-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,20 +12,31 @@
 *                                                                      *
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
  * -lm test #6
+ *
+ * This program is compiled and linked by mkreq-maplib.sh via INIT/Mamfile
+ * but never actually run. It is only used to check if linking succeeds
+ * without or with -lm.
+ *
+ * For that test to work correctly, we must work around compiler optimization.
+ * The rand() call is to stop the result from being considered known at
+ * compile time, which would cause modern compilers to optimize out the probe
+ * calls, which would in turn cause linking to succeed where it shouldn't.
  */
 
 #define _ISOC99_SOURCE	1
 
+#include <stdlib.h>
 #include <math.h>
 
 int
-main()
+main(void)
 {
-	double	value = -0.0;
+	double	value = -((double)rand());
 
 	return !signbit(value);
 }

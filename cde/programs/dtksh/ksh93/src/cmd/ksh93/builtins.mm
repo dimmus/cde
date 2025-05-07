@@ -16,7 +16,7 @@ This feature only works on operating systems that have the ability
 to load and link code into the current process at run time.
 Some examples of the systems that have this feature
 are Linux, System V Release 4, Solaris, Sun OS, HP-UX Release 8 and above,
-AIX 3.2 and above, and Microsoft Windows systems. 
+AIX 3.2 and above, and Microsoft Windows systems.
 .P
 This memo describes how to write and compile programs
 that can be loaded into \f5ksh\fP at run time as built-in
@@ -24,7 +24,7 @@ commands.
 .AE   \" abstract end
 .H 1 INTRODUCTION
 A built-in command is executed without creating a separate process.
-Instead, the command is invoked as a C function by \f5ksh\fP. 
+Instead, the command is invoked as a C function by \f5ksh\fP.
 If this function has no side effects in the shell process,
 then the behavior of this built-in is identical to that of
 the equivalent stand-alone command.  The primary difference
@@ -70,7 +70,7 @@ Despite these drawbacks, in many cases extending
 \f5ksh\fP by adding built-in
 commands makes sense and allows reuse of the shell
 scripting ability in an application specific domain.
-This memo describes how to write \f5ksh\fP extensions. 
+This memo describes how to write \f5ksh\fP extensions.
 .H 1 "WRITING BUILT-IN COMMANDS"
 There is a development kit available for writing \f5ksh\fP
 built-ins as part of the AST (AT&T Software Technology) Toolkit.
@@ -143,7 +143,7 @@ No matter which way you add built-ins you should add the line
 of the built-in source file, where \fIidentifier\fP is any C identifier.
 This line provides version information to the shell \f5builtin\fP command
 that it uses to verify compatibility between the built-in and \f5ksh\fP
-implementation versions. \f5builtin\fP fails with a diagnostic on version 
+implementation versions. \f5builtin\fP fails with a diagnostic on version
 mismatch. The diagnostic helps determine whether \f5ksh\fP is out of
 date and requires an upgrade or the built-in is out of date and requires
 recompilation.
@@ -161,10 +161,10 @@ int b_hello(int argc, char *argv[], void *context)
         if(argc != 2)
         {
                 fprintf(stderr,"Usage: hello arg\en");
-                return(2);
+                return 2;
         }
         printf("hello %s\en",argv[1]);
-        return(0);
+        return 0;
 }
 SHLIB(hello)
 .EE
@@ -212,7 +212,7 @@ builtin -f hello hello
 .EE
 will automatically find, load and install the built-in on any system.
 Once this command has been invoked, you can invoke \f5hello\fP
-as you do any other command. 
+as you do any other command.
 If you are using \f5lib_init\fP method to add built-ins then no arguments
 follow the \f5\-f\fP option.
 .P
@@ -244,7 +244,7 @@ You should avoid using any global symbols beginning with
 .BR sh_ ,
 .BR nv_ ,
 and
-.B ed_ 
+.B ed_
 since these are used by \f5ksh\fP itself.
 \f5#define\fP constants in \f5ksh\fP interface
 files use symbols beginning with \f5SH_\fP and \f5NV_\fP,
@@ -273,7 +273,7 @@ Addison Wesley, xxxx
 .P
 The best thing to do is to include the header file \f5<shell.h>\fP.
 This header file causes the \f5<ast.h>\fP header, the
-\f5<error.h>\fP header and the \f5<stak.h>\fP
+\f5<error.h>\fP header and the \f5<stk.h>\fP
 header to be included as well as defining prototypes
 for functions that you can call to get shell
 services for your builtins.
@@ -295,7 +295,7 @@ You should include \f5<ast.h>\fP instead of one or more of
 these headers.
 The \f5<error.h>\fP header provides the interface to the error
 and option parsing routines defined below.
-The \f5<stak.h>\fP header provides the interface to the memory
+The \f5<stk.h>\fP header provides the interface to the memory
 allocation routines described below.
 .P
 Programs that want to use the information in \f5<sys/stat.h>\fP
@@ -415,7 +415,7 @@ preceding option argument is not required.
 .LI \f5[\fP...\f5]\fP
 After a \f5:\fP or \f5#\fP, the characters contained
 inside the brackets are used to identify the option
-argument when generating a \fIusage\fP message. 
+argument when generating a \fIusage\fP message.
 .LI \fIspace\fP
 The remainder of the string will only be used when generating
 usage messages.
@@ -451,8 +451,9 @@ while(1) switch(n=optget(argv,"xf:[file]"))
 		error(ERROR_exit(0), opt_info.arg);
 		break;
 	case '?':
-		error(ERROR_usage(2), opt_info.arg);
-		UNREACHABLE();
+		/* self-doc: write to standard output */
+		error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+		return 0;
 }
 .EE
 .H 2 "Storage Management"
@@ -465,22 +466,22 @@ be freed before returning from you built-in, because by default,
 interrupt and the memory will not be freed.
 .P
 The best way to allocate variable sized storage is
-through calls to the \fBstak\fP library
+through calls to the \fBstk\fP library
 which is included in \fBlibast\fP
 and which is used extensively by \f5ksh\fP itself.
-Objects allocated with the \f5stakalloc()\fP
+Objects allocated with the \f5stkalloc()\fP
 function are freed when you function completes
-or aborts. 
-The \fBstak\fP library provides a convenient way to
+or aborts.
+The \fBstk\fP library provides a convenient way to
 build variable length strings and other objects dynamically.
-The man page for the \fBstak\fP library is contained
+The man page for the \fBstk\fP library is contained
 in the Appendix.
 .P
 Before \f5ksh\fP calls each built-in command, it saves
 the current stack location and restores it after
 it returns.
 It is not necessary to save and restore the stack
-location in the \f5b_\fP entry function, 
+location in the \f5b_\fP entry function,
 but you may want to write functions that use this stack
 are restore it when leaving the function.
 The following coding convention will do this in
@@ -490,13 +491,13 @@ an efficient manner:
 {
         char	*savebase;
         int	saveoffset;
-        if(saveoffset=staktell())
-        	savebase = stakfreeze(0);
+        if(saveoffset=stktell(stkstd))
+        	savebase = stkfreeze(stkstd,0);
         \fR...\fP
         if(saveoffset)
-        	stakset(savebase,saveoffset);
+        	stkset(stkstd,savebase,saveoffset);
         else
-        	stakseek(0);
+        	stkseek(stkstd,0);
 }
 .EE
 .H 1 "CALLING \f5ksh\fP SERVICES"
@@ -521,7 +522,7 @@ All the functions provided by the \fBnval\fP library begin
 with the prefix \f5nv_\fP.
 Each shell variable is an object in an associative table
 that is referenced by name.
-The type \f5Namval_t*\fP is pointer to a shell variable. 
+The type \f5Namval_t*\fP is pointer to a shell variable.
 To operate on a shell variable, you first get a handle
 to the variable with the \f5nv_open()\fP function
 and then supply the handle returned as the first
@@ -561,7 +562,7 @@ with \f5getval()\fP.  However, it is possible to turn
 any node into an active entity by assigning functions
 to it that will be called whenever \f5nv_putval()\fP
 and/or \f5nv_getval()\fP is called.
-In fact there are up to five functions that can 
+In fact there are up to five functions that can
 associated with each variable to override the
 default actions.
 The type \f5Namfun_t\fP is used to define these functions.
@@ -639,7 +640,7 @@ The \f5sh_parse()\fP function returns a parse tree corresponding
 to a give file stream.  The tree can be executed by supplying
 it as the first argument to
 the \f5sh_trap()\fP function and giving a value of \f51\fP as the
-second argument. 
+second argument.
 Alternatively, the \f5sh_trap()\fP function can parse and execute
 a string by passing the string as the first argument and giving \f50\fP
 as the second argument.

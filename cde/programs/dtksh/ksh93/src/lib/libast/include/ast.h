@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -45,13 +45,10 @@
 #endif
 
 /*
- * workaround botched headers that assume <stdio.h>
+ * work around botched headers that assume <stdio.h>
  */
 
 #ifndef FILE
-#ifndef _SFIO_H
-struct _sfio_s;
-#endif
 #define FILE		struct _sfio_s
 #ifndef	__FILE_typedef
 #define __FILE_typedef	1
@@ -90,20 +87,25 @@ struct _sfio_s;
  * exit() support -- this matches shell exit codes
  */
 
-#define EXIT_BITS	8	/* # exit status bits	*/
+#define EXIT_BITS	8			/* # exit status bits	*/
 
-#define EXIT_USAGE	2	/* usage exit code	*/
-#define EXIT_QUIT	255	/* parent should quit	*/
-#define EXIT_NOTFOUND	127	/* command not found	*/
-#define EXIT_NOEXEC	126	/* other exec error	*/
+#define EXIT_USAGE	2			/* usage exit code	*/
+#define EXIT_QUIT	((1<<(EXIT_BITS))-1)	/* parent should quit	*/
+#define EXIT_NOTFOUND	((1<<(EXIT_BITS-1))-1)	/* command not found	*/
+#define EXIT_NOEXEC	((1<<(EXIT_BITS-1))-2)	/* other exec error	*/
 
-#define EXIT_CODE(x)	((x) & EXIT_QUIT)
-#define EXIT_CORE(x)	(EXIT_CODE(x) | 256 | 128)
-#define EXIT_TERM(x)	(EXIT_CODE(x) | 256)
+#define EXIT_CODE(x)	((x)&((1<<EXIT_BITS)-1))
+#define EXIT_CORE(x)	(EXIT_CODE(x)|(1<<EXIT_BITS)|(1<<(EXIT_BITS-1)))
+#define EXIT_TERM(x)	(EXIT_CODE(x)|(1<<EXIT_BITS))
 
-#define EXIT_STATUS(x)	(((x) & 63) ? (x) : EXIT_CODE((x) >> 8))
-#define EXITED_CORE(x)	(((x) & (256 | 128)) == (256 | 128) || ((x) & (128 | 64)) == (128 | 64))
-#define EXITED_TERM(x)	((x) & (256 | 128))
+/*
+ * NOTE: for compatibility the following work for EXIT_BITS={7,8}
+ */
+
+#define EXIT_STATUS(x)	(((x)&((1<<(EXIT_BITS-2))-1))?(x):EXIT_CODE((x)>>EXIT_BITS))
+
+#define EXITED_CORE(x)	(((x)&((1<<EXIT_BITS)|(1<<(EXIT_BITS-1))))==((1<<EXIT_BITS)|(1<<(EXIT_BITS-1)))||((x)&((1<<(EXIT_BITS-1))|(1<<(EXIT_BITS-2))))==((1<<(EXIT_BITS-1))|(1<<(EXIT_BITS-2))))
+#define EXITED_TERM(x)	((x)&((1<<EXIT_BITS)|(1<<(EXIT_BITS-1))))
 
 /*
  * astconflist() flags
@@ -140,7 +142,7 @@ struct _sfio_s;
 #define PATH_READ	004
 #define PATH_WRITE	002
 #define PATH_EXECUTE	001
-#define	PATH_REGULAR	010
+#define PATH_REGULAR	010
 #define PATH_ABSOLUTE	020
 
 /*
@@ -213,8 +215,8 @@ typedef struct
 #define mbcoll()	( ast.mb_xfrm != 0 )
 #define mbwide()	( mbmax() > 1 )
 
-#define mb2wc(w,p,n)	( *ast.mb_towc)(&w, (char*)p, n )
-#define	mbchar(p)	mbnchar(p, mbmax())
+#define mb2wc(w,p,n)	( (*ast.mb_towc)(&w, (char*)(p), n) )
+#define mbchar(p)	mbnchar(p, mbmax())
 #define mbnchar(p,n)	( mbwide() ? ( (ast.tmp_int = (*ast.mb_towc)(&ast.tmp_wchar, (char*)(p), n)) > 0 ? \
 				( (p+=ast.tmp_int),ast.tmp_wchar) : (p+=ast.mb_sync+1,ast.tmp_int) ) : (*(unsigned char*)(p++)) )
 #define mbinit()	( ast.mb_sync = 0 )
@@ -251,29 +253,29 @@ typedef struct
  */
 
 #define elementsof(x)	(sizeof(x)/sizeof(x[0]))
-#define integralof(x)	(((char*)(x))-((char*)0))
+#define integralof(x)	((intptr_t)(x))
 #define newof(p,t,n,x)	((p)?(t*)realloc((char*)(p),sizeof(t)*(n)+(x)):(t*)calloc(1,sizeof(t)*(n)+(x)))
 #define oldof(p,t,n,x)	((p)?(t*)realloc((char*)(p),sizeof(t)*(n)+(x)):(t*)malloc(sizeof(t)*(n)+(x)))
-#define pointerof(x)	((void*)((char*)0+(x)))
+#define pointerof(x)	((void*)((uintptr_t)(x)))
 #define roundof(x,y)	(((x)+(y)-1)&~((y)-1))
 #define ssizeof(x)	((int)sizeof(x))
 
-#define streq(a,b)	(*(a)==*(b)&&!strcmp(a,b))
-#define strneq(a,b,n)	(*(a)==*(b)&&!strncmp(a,b,n))
+#define streq(a,b)	(!strcmp(a,b))
+#define strneq(a,b,n)	(!strncmp(a,b,n))
 #define strsignal(s)	fmtsignal(s)
 
-#define NiL		0
+#define NiL		NULL			/* for backward compatibility */
 #define NoP(x)		do (void)(x); while(0)	/* for silencing "unused parameter" warnings */
 
 #if !defined(NoF)
-#define NoF(x)		void _DATA_ ## x () {}
+#define NoF(x)		void _DATA_ ## x (void) {}
 #if !defined(_DATA_)
 #define _DATA_
 #endif
 #endif
 
 #if !defined(NoN)
-#define NoN(x)		void _STUB_ ## x () {}
+#define NoN(x)		void _STUB_ ## x (void) {}
 #if !defined(_STUB_)
 #define _STUB_
 #endif
@@ -291,7 +293,6 @@ extern char*		astgetconf(const char*, const char*, const char*, int, Error_f);
 extern char*		astconf(const char*, const char*, const char*);
 extern Ast_confdisc_f	astconfdisc(Ast_confdisc_f);
 extern void		astconflist(Sfio_t*, const char*, int, const char*);
-extern off_t		astcopy(int, int, off_t);
 extern int		astquery(int, const char*, ...);
 extern void		astwinsize(int, int*, int*);
 #if _lib_sysconf
@@ -312,8 +313,8 @@ extern void		astwinsize(int, int*, int*);
 #define CONF_NGROUPS_MAX	"NGROUPS_MAX"
 #define CONF_OPEN_MAX		"OPEN_MAX"
 #define CONF_PAGESIZE		"PAGESIZE"
-#define astconf_long(x)		strtol(astconf(x,NiL,NiL),NiL,0)
-#define astconf_ulong(x)	strtoul(astconf(x,NiL,NiL),NiL,0)
+#define astconf_long(x)		strtol(astconf(x,NULL,NULL),NULL,0)
+#define astconf_ulong(x)	strtoul(astconf(x,NULL,NULL),NULL,0)
 #endif
 
 extern ssize_t		base64encode(const void*, size_t, void**, void*, size_t, void**);
@@ -322,12 +323,9 @@ extern int		chresc(const char*, char**);
 extern int		chrexp(const char*, char**, int*, int);
 extern int		chrtoi(const char*);
 extern char*		conformance(const char*, size_t);
-extern int		eaccess(const char*, int);
-extern char*		fmtbase(intmax_t, int, int);
 extern char*		fmtbuf(size_t);
 extern char*		fmtclock(Sfulong_t);
 extern char*		fmtelapsed(unsigned long, int);
-extern char*		fmterror(int);
 extern char*		fmtesc(const char*);
 extern char*		fmtesq(const char*, const char*);
 extern char*		fmtident(const char*);
@@ -348,7 +346,6 @@ extern char*		fmttime(const char*, time_t);
 extern char*		fmtuid(int);
 extern char*		fmtversion(unsigned long);
 extern void*		memdup(const void*, size_t);
-extern void		memfatal(void);
 extern unsigned int	memhash(const void*, int);
 extern unsigned long	memsum(const void*, int, unsigned long);
 extern char*		pathaccess(char*, const char*, const char*, const char*, int);
@@ -365,14 +362,10 @@ extern char*		pathfind(const char*, const char*, const char*, char*, size_t);
 extern int		pathgetlink(const char*, char*, int);
 extern int		pathicase(const char*);
 extern int		pathinclude(const char*);
-extern char*		pathkey(char*, char*, const char*, const char*, const char*);
-extern char*		pathkey_20100601(const char*, const char*, const char*, char*, size_t, char*, size_t);
 extern size_t		pathnative(const char*, char*, size_t);
 extern char*		pathpath(char*, const char*, const char*, int);
 extern char*		pathpath_20100601(const char*, const char*, int, char*, size_t);
 extern size_t		pathposix(const char*, char*, size_t);
-extern char*		pathprobe(char*, char*, const char*, const char*, const char*, int);
-extern char*		pathprobe_20100601(const char*, const char*, const char*, int, char*, size_t, char*, size_t);
 extern size_t		pathprog(const char*, char*, size_t);
 extern char*		pathrepl(char*, const char*, const char*);
 extern char*		pathrepl_20100601(char*, size_t, const char*, const char*);
@@ -381,6 +374,7 @@ extern char*		pathshell(void);
 extern char*		pathtemp(char*, size_t, const char*, const char*, int*);
 extern char*		pathtmp(char*, const char*, const char*, int*);
 extern char*		setenviron(const char*);
+extern pid_t		spawnveg(const char*, char* const[], char* const[], pid_t, int);
 extern int		stracmp(const char*, const char*);
 extern char*		strcopy(char*, const char*);
 extern unsigned long	strelapsed(const char*, char**, int);
@@ -425,29 +419,18 @@ extern int		strvcmp(const char*, const char*);
 extern int		wc2utf8(char*, uint32_t);
 
 /*
+ * backward compat
+ */
+#define fmterror(e)	strerror(e)
+
+/*
  * C library global data symbols not prototyped by <unistd.h>
  */
 
 #if !defined(environ) && defined(__DYNAMIC__)
-#define	environ		__DYNAMIC__(environ)
+#define environ		__DYNAMIC__(environ)
 #else
 extern char**		environ;
-#endif
-
-/*
- * really handy malloc()/free() (__FILE__,__LINE__,__FUNCTION__) tracing
- * make with VMDEBUG==1 or debug=1 or CCFLAGS=$(CC.DEBUG)
- * VMDEBUG==0 disables
- * at runtime export VMALLOC_OPTIONS per vmalloc.3
- * to list originating call locations
- */
-
-#if !_std_malloc && !defined(VMFL) && !defined(_VMHDR_H) && \
-	(VMDEBUG || !defined(VMDEBUG) && _BLD_DEBUG)
-
-#define VMFL	1
-#include <vmalloc.h>
-
 #endif
 
 #include <ast_api.h>

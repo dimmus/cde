@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -36,7 +36,7 @@ vfwprintf(Sfio_t* f, const wchar_t* fmt, va_list args)
 	Sfio_t*	t;
 
 	FWIDE(f, WEOF);
-	n = wcstombs(NiL, fmt, 0);
+	n = wcstombs(NULL, fmt, 0);
 	if (m = malloc(n + 1))
 	{
 		if (t = sfstropen())
@@ -48,7 +48,7 @@ vfwprintf(Sfio_t* f, const wchar_t* fmt, va_list args)
 				v = -1;
 			else
 			{
-				n = mbstowcs(NiL, x, 0);
+				n = mbstowcs(NULL, x, 0);
 				if (w = (wchar_t*)sfreserve(f, n * sizeof(wchar_t) + 1, 0))
 					v = mbstowcs(w, x, n + 1);
 				else

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #ifndef PATH_OFFSET
@@ -22,7 +23,6 @@
  *	These are the definitions for the lexical analyzer
  */
 
-#include	"FEATURE/options"
 #include	<nval.h>
 #include	"defs.h"
 
@@ -37,11 +37,10 @@
 #define PATH_CDPATH		0004
 #define PATH_BFPATH		0010
 #define PATH_SKIP		0020
-#define PATH_BUILTIN_LIB	0040
 #define PATH_STD_DIR		0100	/* directory is on  $(getconf PATH) */
 
 #define PATH_OFFSET	2		/* path offset for path_join */
-#define MAXDEPTH	(sizeof(char*)==2?64:1024) /* maximum recursion depth */
+#define MAXDEPTH	1024		/* maximum shell function recursion depth */
 
 /*
  * path component structure for path searching
@@ -72,11 +71,12 @@ extern Pathcomp_t	*path_unsetfpath(void);
 extern Pathcomp_t	*path_addpath(Pathcomp_t*,const char*,int);
 extern Pathcomp_t	*path_dup(Pathcomp_t*);
 extern void		path_delete(Pathcomp_t*);
-extern void 		path_alias(Namval_t*,Pathcomp_t*);
+extern void 		path_settrackedalias(const char*,Pathcomp_t*);
+extern Namval_t		*path_gettrackedalias(const char*);
 extern Pathcomp_t 	*path_absolute(const char*, Pathcomp_t*, int);
 extern char 		*path_basename(const char*);
 extern char 		*path_fullname(const char*);
-extern int 		path_expand(const char*, struct argnod**);
+extern int 		path_expand(const char*, struct argnod**, int);
 extern noreturn void 	path_exec(const char*,char*[],struct argnod*);
 extern pid_t		path_spawn(const char*,char*[],char*[],Pathcomp_t*,int);
 extern int		path_open(const char*,Pathcomp_t*);
@@ -87,7 +87,7 @@ extern int		path_search(const char*,Pathcomp_t**,int);
 extern char		*path_relative(const char*);
 extern int		path_complete(const char*, const char*,struct argnod**);
 #if SHOPT_BRACEPAT
-    extern int 		path_generate(struct argnod*,struct argnod**);
+    extern int 		path_generate(struct argnod*,struct argnod**, int);
 #endif /* SHOPT_BRACEPAT */
 
 #if SHOPT_DYNAMIC
@@ -107,9 +107,6 @@ extern const char e_mailmsg[];
 extern const char e_suidprofile[];
 extern const char e_sysprofile[];
 extern const char e_traceprompt[];
-#if SHOPT_SUID_EXEC
-    extern const char	e_suidexec[];
-#endif /* SHOPT_SUID_EXEC */
 extern const char is_alias[];
 extern const char is_builtin[];
 extern const char is_spcbuiltin[];
@@ -119,20 +116,12 @@ extern const char is_talias[];
 extern const char is_function[];
 extern const char is_ufunction[];
 extern const char e_autoloadfrom[];
-#ifdef SHELLMAGIC
-    extern const char e_prohibited[];
-#endif /* SHELLMAGIC */
 
 #if SHOPT_ACCT
-#   include	"FEATURE/acct"
-#   ifdef	_sys_acct
 	extern void sh_accinit(void);
 	extern void sh_accbegin(const char*);
 	extern void sh_accend(void);
 	extern void sh_accsusp(void);
-#   else
-#	undef	SHOPT_ACCT
-#   endif	/* _sys_acct */
 #endif /* SHOPT_ACCT */
 
 #endif /*! PATH_OFFSET */

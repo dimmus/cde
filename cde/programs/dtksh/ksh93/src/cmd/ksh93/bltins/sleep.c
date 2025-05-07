@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,8 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*                  Lev Kujawski <int21h@mailbox.org>                   *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -24,17 +26,16 @@
 
 #include	"shopt.h"
 #include	"defs.h"
-#include	<error.h>
-#include	<errno.h>
 #include	<tmx.h>
+#include	<ast_float.h>
 #include	"builtins.h"
 #include	"FEATURE/time"
 #include	"FEATURE/poll"
 
-int	b_sleep(register int argc,char *argv[],Shbltin_t *context)
+int	b_sleep(int argc,char *argv[],Shbltin_t *context)
 {
-	register char *cp;
-	register double d=0;
+	char *cp;
+	double d=0;
 	int sflag=0;
 	time_t tloc = 0;
 	char *last;
@@ -50,8 +51,9 @@ int	b_sleep(register int argc,char *argv[],Shbltin_t *context)
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	if(error_info.errors)
 	{
@@ -62,6 +64,8 @@ int	b_sleep(register int argc,char *argv[],Shbltin_t *context)
 	if(cp = *argv)
 	{
 		d = strtod(cp, &last);
+		if (isnan(d))
+			last = cp;  /* trigger error */
 		if(*last)
 		{
 			Time_t now,ns;
@@ -122,11 +126,11 @@ skip:
 		if(sflag || tloc==0 || errno!=EINTR || sh.lastsig)
 			break;
 		sh_sigcheck();
-		if(tloc < (now=time(NIL(time_t*))))
+		if(tloc < (now=time(NULL)))
 			break;
 		d = (double)(tloc-now);
 	}
-	return(0);
+	return 0;
 }
 
 /*
@@ -136,15 +140,41 @@ skip:
  */
 void sh_delay(double t, int sflag)
 {
-	int n = (int)t;
+	uint32_t n;
 	Tv_t ts, tx;
-
+	if (isinf(t))
+	{
+		while (1)
+		{
+			pause();
+			if (sh.trapnote & SH_SIGALRM)
+				sh_timetraps();
+			if ((sh.trapnote & (SH_SIGSET | SH_SIGTRAP)) || sflag)
+				return;
+		}
+	}
+	n = (uint32_t)t;
 	ts.tv_sec = n;
 	ts.tv_nsec = 1000000000 * (t - (double)n);
+#if __APPLE__ && __MACH__
+	/*
+	 * Bug in macOS: if sleep is invoked from the interactive command line and then suspended
+	 * (^Z), the forked ksh process freezes in the nanosleep(2) function in libsystem_c.dylib.
+	 * As a workaround, make it impossible to suspend sleep in that case, by ignoring SIGTSTP.
+	 */
+	if (sh_isstate(SH_INTERACTIVE))
+		signal(SIGTSTP,SIG_IGN);
+#endif
 	while(tvsleep(&ts, &tx) < 0)
 	{
+		if (sh.trapnote & SH_SIGALRM)
+			sh_timetraps();
 		if ((sh.trapnote & (SH_SIGSET | SH_SIGTRAP)) || sflag)
-			return;
+			break;
 		ts = tx;
 	}
+#if __APPLE__ && __MACH__
+	if (sh_isstate(SH_INTERACTIVE))
+		signal(SIGTSTP,SIG_DFL);
+#endif
 }

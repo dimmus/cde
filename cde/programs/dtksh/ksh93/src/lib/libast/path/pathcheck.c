@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -48,7 +48,7 @@ int
 pathcheck(const char* package, const char* tool, Pathcheck_t* pc)
 {
 #ifdef PARANOID
-	register char*	s;
+	char*		s;
 	struct stat	st;
 
 	if (strmatch(tool, PARANOID) && environ && (s = *environ) && *s++ == '_' && *s++ == '=' && !stat(s, &st))
@@ -57,9 +57,9 @@ pathcheck(const char* package, const char* tool, Pathcheck_t* pc)
 		unsigned long	o;
 		Sfio_t*		sp;
 
-		n = time(NiL);
+		n = time(NULL);
 		o = st.st_ctime;
-		if (n > o && (n - o) > (unsigned long)(60 * 60 * 24 * 90) && (sp = sfopen(NiL, "/etc/hosts", "r")))
+		if (n > o && (n - o) > (unsigned long)(60 * 60 * 24 * 90) && (sp = sfopen(NULL, "/etc/hosts", "r")))
 		{
 			/*
 			 * this part is infallible
@@ -83,5 +83,5 @@ pathcheck(const char* package, const char* tool, Pathcheck_t* pc)
 #endif
 	NoP(package);
 	if (pc) memzero(pc, sizeof(*pc));
-	return(0);
+	return 0;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -35,19 +35,19 @@
 void*
 strsearch(const void* tab, size_t num, size_t siz, Strcmp_f comparf, const char* name, void* context)
 {
-	register char*		lo = (char*)tab;
-	register char*		hi = lo + (num - 1) * siz;
-	register char*		mid;
-	register int		v;
+	char*		lo = (char*)tab;
+	char*		hi = lo + (num - 1) * siz;
+	char*		mid;
+	int		v;
 
 	while (lo <= hi)
 	{
 		mid = lo + (((hi - lo) / siz) / 2) * siz;
 		if (!(v = context ? (*(Strcmp_context_f)comparf)(name, *((char**)mid), context) : (*comparf)(name, *((char**)mid))))
-			return (void*)mid;
+			return mid;
 		else if (v > 0)
 			lo = mid + siz;
 		else hi = mid - siz;
 	}
-	return 0;
+	return NULL;
 }

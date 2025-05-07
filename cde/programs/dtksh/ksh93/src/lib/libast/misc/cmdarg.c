@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -34,6 +35,8 @@ static const char lib[] = "libast:cmdarg";
 static int
 cmdrun(int argc, char** argv, Cmddisc_t* disc)
 {
+	NOT_USED(argc);
+	NOT_USED(disc);
 	return procrun(argv[0], argv, PROC_ARGMOD|PROC_IGNOREPATH);
 }
 
@@ -90,18 +93,18 @@ cmdopen_20110505(char** argv, int argmax, int size, const char* argpat, int flag
 Cmdarg_t*
 cmdopen_20120411(char** argv, int argmax, int size, const char* argpat, Cmddisc_t* disc)
 {
-	register Cmdarg_t*	cmd;
-	register int		n;
-	register char**		p;
-	register char*		s;
-	char*			sh;
-	char*			exe;
-	int			c;
-	int			m;
-	int			argc;
-	long			x;
+	Cmdarg_t*	cmd;
+	int		n;
+	char**		p;
+	char*		s;
+	char*		sh;
+	char*		exe;
+	int		c;
+	int		m;
+	int		argc;
+	long		x;
 
-	char**			post = 0;
+	char**		post = 0;
 
 	n = sizeof(char**);
 	if (*argv)
@@ -133,8 +136,8 @@ cmdopen_20120411(char** argv, int argmax, int size, const char* argpat, Cmddisc_
 	if (size < m)
 	{
 		if (disc->errorf)
-			(*disc->errorf)(NiL, sh, 2, "size must be at least %d", m);
-		return 0;
+			(*disc->errorf)(NULL, sh, 2, "size must be at least %d", m);
+		return NULL;
 	}
 	if ((m = x / 10) > 2048)
 		m = 2048;
@@ -145,8 +148,8 @@ cmdopen_20120411(char** argv, int argmax, int size, const char* argpat, Cmddisc_
 	if (!(cmd = newof(0, Cmdarg_t, 1, n + m)))
 	{
 		if (disc->errorf)
-			(*disc->errorf)(NiL, sh, ERROR_SYSTEM|2, "out of memory");
-		return 0;
+			(*disc->errorf)(NULL, sh, ERROR_SYSTEM|2, "out of memory");
+		return NULL;
 	}
 	cmd->id = lib;
 	cmd->disc = disc;
@@ -169,15 +172,15 @@ cmdopen_20120411(char** argv, int argmax, int size, const char* argpat, Cmddisc_
 	}
 	else if (!(disc->flags & CMD_CHECKED))
 	{
-		if (!pathpath(exe, NiL, PATH_REGULAR|PATH_EXECUTE, s, n + m))
+		if (!pathpath(exe, NULL, PATH_REGULAR|PATH_EXECUTE, s, n + m))
 		{
 			n = EXIT_NOTFOUND;
 			if (cmd->errorf)
-				(*cmd->errorf)(NiL, cmd, ERROR_SYSTEM|2, "%s: command not found", exe);
+				(*cmd->errorf)(NULL, cmd, ERROR_SYSTEM|2, "%s: command not found", exe);
 			if (disc->flags & CMD_EXIT)
 				(*error_info.exit)(n);
 			free(cmd);
-			return 0;
+			return NULL;
 		}
 		exe = s;
 	}
@@ -206,7 +209,7 @@ cmdopen_20120411(char** argv, int argmax, int size, const char* argpat, Cmddisc_
 		{
 			while ((s = strchr(s, c)) && strncmp(cmd->insert, s, cmd->insertlen))
 				s++;
-			*p++ = s ? *argv : (char*)0;
+			*p++ = s ? *argv : NULL;
 			argv++;
 		}
 		*p++ = 0;
@@ -224,11 +227,11 @@ cmdopen_20120411(char** argv, int argmax, int size, const char* argpat, Cmddisc_
  */
 
 int
-cmdflush(register Cmdarg_t* cmd)
+cmdflush(Cmdarg_t* cmd)
 {
-	register char*	s;
-	register char**	p;
-	register int	n;
+	char*	s;
+	char**	p;
+	int	n;
 
 	if (cmd->flags & CMD_EMPTY)
 		cmd->flags &= ~CMD_EMPTY;
@@ -237,7 +240,7 @@ cmdflush(register Cmdarg_t* cmd)
 	if ((cmd->flags & CMD_MINIMUM) && cmd->argcount < cmd->argmax)
 	{
 		if (cmd->errorf)
-			(*cmd->errorf)(NiL, cmd, 2, "%d arg command would be too long", cmd->argcount);
+			(*cmd->errorf)(NULL, cmd, 2, "%d arg command would be too long", cmd->argcount);
 		return -1;
 	}
 	cmd->total.args += cmd->argcount;
@@ -292,7 +295,7 @@ cmdflush(register Cmdarg_t* cmd)
 		if (b >= e)
 		{
 			if (cmd->errorf)
-				(*cmd->errorf)(NiL, cmd, 2, "%s: command too large after insert", a);
+				(*cmd->errorf)(NULL, cmd, 2, "%s: command too large after insert", a);
 			return -1;
 		}
 	}
@@ -323,7 +326,7 @@ cmdflush(register Cmdarg_t* cmd)
 	{
 		n = EXIT_NOTFOUND - 1;
 		if (cmd->errorf)
-			(*cmd->errorf)(NiL, cmd, ERROR_SYSTEM|2, "%s: command exec error", *cmd->argv);
+			(*cmd->errorf)(NULL, cmd, ERROR_SYSTEM|2, "%s: command exec error", *cmd->argv);
 		if (cmd->flags & CMD_EXIT)
 			(*error_info.exit)(n);
 	}
@@ -347,7 +350,7 @@ cmdflush(register Cmdarg_t* cmd)
  */
 
 int
-cmdarg(register Cmdarg_t* cmd, const char* file, register int len)
+cmdarg(Cmdarg_t* cmd, const char* file, int len)
 {
 	int	i;
 	int	r;
@@ -360,7 +363,7 @@ cmdarg(register Cmdarg_t* cmd, const char* file, register int len)
 			if (cmd->nextarg == cmd->firstarg)
 			{
 				if (cmd->errorf)
-					(*cmd->errorf)(NiL, cmd, 2, "%s: path too long for exec args", file);
+					(*cmd->errorf)(NULL, cmd, 2, "%s: path too long for exec args", file);
 				return -1;
 			}
 			if (i = cmdflush(cmd))
@@ -395,7 +398,7 @@ cmdclose(Cmdarg_t* cmd)
 	if ((cmd->flags & CMD_EXACT) && cmd->argcount < cmd->argmax)
 	{
 		if (cmd->errorf)
-			(*cmd->errorf)(NiL, cmd, 2, "only %d arguments for last command", cmd->argcount);
+			(*cmd->errorf)(NULL, cmd, 2, "only %d arguments for last command", cmd->argcount);
 		n = -1;
 	}
 	else

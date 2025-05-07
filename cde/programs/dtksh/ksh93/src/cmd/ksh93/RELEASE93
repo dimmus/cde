@@ -1,5 +1,5 @@
-This file is of historic interest. For recent changes in both ksh 93u+m and
-the accompanying libraries, see the file NEWS in the top-level directory.
+This file is of historical interest only. For recent changes in both ksh 93u+m
+and the accompanying libraries, see the file NEWS in the top-level directory.
 ____
 
 This is a list of changes that have been made since the 12/28/93 version
@@ -418,7 +418,7 @@ of ksh.
 	    directory.
 	i.  There was a bug in the compile option that does not
 	    use fork() in which the current option settings where
-	    not propagated to sub-shells.
+	    not propagated to subshells.
 	j.  A bug in setting .sh.editchar during the KEYBD trap
 	    for the MULTIBYTE option was fixed in release 'h'.
 	k.  A bug in which the precision given as an argument

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,9 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*                     Cy Schubert <cy@FreeBSD.org>                     *
+*       hyousatsu <118750527+hyousatsu@users.noreply.github.com>       *
 *                                                                      *
 ***********************************************************************/
 
@@ -32,14 +35,6 @@
  *
  * hopefully stable by 2012-12-12
  */
-
-#if !_PACKAGE_ast
-
-#include <stdio.h>
-
-#define sfsprintf	snprintf
-
-#endif
 
 #if defined(_aso_casptr) && (defined(_aso_cas32) || defined(_aso_cas64))
 #define ASO_METHOD		(&_aso_meth_intrinsic)
@@ -105,6 +100,8 @@ static unsigned int		_aso_data_signal;
 static ssize_t
 _aso_lock_signal(void* data, ssize_t k, void volatile* p)
 {
+	NOT_USED(data);
+	NOT_USED(p);
 	if (k >= 0)
 	{
 		_aso_data_signal--;
@@ -180,7 +177,7 @@ _asometh(int type, void* data)
 		for (i = 0; i < elementsof(method) - 1; i++)
 			if (meth == method[i])
 				return method[i+1];
-		return 0;
+		return NULL;
 	}
 	if (type)
 	{
@@ -190,7 +187,7 @@ _asometh(int type, void* data)
 				method[i]->details = (char*)data;
 				return method[i];
 			}
-		return 0;
+		return NULL;
 	}
 	if (!(name = (char*)data))
 		return state.meth;
@@ -202,7 +199,7 @@ _asometh(int type, void* data)
 				method[i]->details = e + 1;
 			return method[i];
 		}
-	return 0;
+	return NULL;
 }
 
 /*

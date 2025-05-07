@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -42,10 +42,10 @@ static const Map_t	map[] =
 };
 
 extern int
-fnmatch(const char* pattern, const char* subject, register int flags)
+fnmatch(const char* pattern, const char* subject, int flags)
 {
-	register int		reflags = REG_SHELL|REG_LEFT;
-	register const Map_t*	mp;
+	int			reflags = REG_SHELL|REG_LEFT;
+	const Map_t*		mp;
 	regex_t			re;
 	regmatch_t		match;
 
@@ -64,7 +64,7 @@ fnmatch(const char* pattern, const char* subject, register int flags)
 	}
 	else if (!(reflags = regcomp(&re, pattern, reflags|REG_RIGHT)))
 	{
-		reflags = regexec(&re, subject, 0, NiL, 0);
+		reflags = regexec(&re, subject, 0, NULL, 0);
 		regfree(&re);
 	}
 	return reflags;

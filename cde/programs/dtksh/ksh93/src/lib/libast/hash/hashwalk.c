@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -30,18 +30,18 @@
  */
 
 int
-hashwalk(Hash_table_t* tab, int flags, register int (*walker)(const char*, char*, void*), void* handle)
+hashwalk(Hash_table_t* tab, int flags, int (*walker)(const char*, char*, void*), void* handle)
 {
-	register Hash_bucket_t*	b;
-	register int		v;
+	Hash_bucket_t*		b;
+	int			v;
 	Hash_position_t*	pos;
 
 	if (!(pos = hashscan(tab, flags)))
-		return(-1);
+		return -1;
 	v = 0;
 	while (b = hashnext(pos))
 		if ((v = (*walker)(hashname(b), (tab->flags & HASH_VALUE) ? b->value : (char*)b, handle)) < 0)
 			break;
 	hashdone(pos);
-	return(v);
+	return v;
 }

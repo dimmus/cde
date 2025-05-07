@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -43,10 +43,10 @@ setenviron(const char* akey)
 	static char	ok[] = "";	/* delete/optimization ok return*/
 
 	char*		key = (char*)akey;
-	register char**	v = environ;
-	register char**	p = envv;
-	register char*	s;
-	register char*	t;
+	char**		v = environ;
+	char**		p = envv;
+	char*		s;
+	char*		t;
 	int		n;
 
 	ast.env_serial++;
@@ -70,7 +70,7 @@ setenviron(const char* akey)
 		if (!p || (last - p + 1) < n)
 		{
 			if (!(p = newof(p, char*, n, 0)))
-				return 0;
+				return NULL;
 			last = p + n - 1;
 		}
 		envv = environ = p;
@@ -93,7 +93,7 @@ setenviron(const char* akey)
 	{
 		n = last - v + INCREMENT + 1;
 		if (!(p = newof(p, char*, n, 0)))
-			return 0;
+			return NULL;
 		last = p + n - 1;
 		next = last - INCREMENT;
 		envv = environ = p;
@@ -117,7 +117,7 @@ setenviron(const char* akey)
 						return ok;
 					}
 					*p = key;
-					return (s = strchr(key, '=')) ? s + 1 : (char*)0;
+					return (s = strchr(key, '=')) ? s + 1 : NULL;
 				}
 				break;
 			}

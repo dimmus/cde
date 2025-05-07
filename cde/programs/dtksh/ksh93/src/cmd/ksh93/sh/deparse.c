@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,6 +12,7 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -27,20 +28,21 @@
 #include	"shnodes.h"
 #include	"test.h"
 
+/* flags that can be specified with p_keyword() */
+#define BEGIN	(1 << 0)
+#define MIDDLE	(1 << 1)
+#define END	(1 << 2)
+#define NOTAB	(1 << 3)
 
-#define HUGE_INT	(((unsigned)-1)>>1)
-#define	BEGIN	0
-#define MIDDLE	1
-#define	END	2
+/* options that can be specified with p_arg() */
 #define PRE	1
 #define POST	2
-
 
 /* flags that can be specified with p_tree() */
 #define NO_NEWLINE	(1 << 0)
 #define NEED_BRACE	(1 << 1)
 #define NO_BRACKET	(1 << 2)
-#define PROCSUBST	(1 << 3)
+#define PROC_SUBST	(1 << 3)
 
 static void p_comlist(const struct dolnod*,int);
 static void p_arg(const struct argnod*, int endchar, int opts);
@@ -53,27 +55,35 @@ static void p_tree(const Shnode_t*,int);
 
 static int level;
 static int begin_line;
-static int end_line;
+static int end_line = '\n';
 static char io_op[7];
 static char un_op[3] = "-?";
 static const struct ionod *here_doc;
 static Sfio_t *outfile;
 static const char *forinit = "";
 
-void sh_deparse(Sfio_t *out, const Shnode_t *t,int tflags)
+void sh_deparse(Sfio_t *out, const Shnode_t *t,int tflags, int initlevel)
 {
+	int firstnodetype = t->tre.tretyp & COMMSK;
+	char needouterbrace = (tflags & NEED_BRACE) && firstnodetype != TLST && (!(tflags & NV_FPOSIX) || firstnodetype != TPAR);
 	outfile = out;
+	level = initlevel;
+	begin_line=1;
+	if(needouterbrace)
+		p_keyword("{",BEGIN);
 	p_tree(t,tflags);
+	if(needouterbrace)
+		p_keyword("}",(tflags & NO_NEWLINE) ? 0 : END);
 }
 /*
  * print script corresponding to shell tree <t>
  */
-static void p_tree(register const Shnode_t *t,register int tflags)
+static void p_tree(const Shnode_t *t,int tflags)
 {
-	register char *cp=0;
+	char *cp=0;
 	int save = end_line;
 	int needbrace = (tflags&NEED_BRACE);
-	int procsub = (tflags&PROCSUBST);
+	int procsub = (tflags&PROC_SUBST);
 	tflags &= ~NEED_BRACE;
 	if(tflags&NO_NEWLINE)
 		end_line = ' ';
@@ -85,12 +95,18 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 	{
 		case TTIME:
 			if(t->tre.tretyp&COMSCAN)
-				p_keyword("!",BEGIN);
+			{
+				p_keyword("!",MIDDLE|NOTAB);
+				if(t->par.partre)
+					p_tree(t->par.partre,tflags);
+			}
 			else
+			{
 				p_keyword("time",BEGIN);
-			if(t->par.partre)
-				p_tree(t->par.partre,tflags); 
-			level--;
+				if(t->par.partre)
+					p_tree(t->par.partre,tflags);
+				level--;
+			}
 			break;
 
 		case TCOM:
@@ -133,7 +149,7 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 				begin_line = 1;
 			}
 			break;
-	
+
 		case TIF:
 			p_keyword("if",BEGIN);
 			p_tree(t->if_.iftre,0);
@@ -149,20 +165,21 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 
 		case TWH:
 			if(t->wh.whinc)
-				cp = "for";
+				p_keyword("for",BEGIN|NOTAB);
 			else if(t->tre.tretyp&COMSCAN)
-				cp = "until";
+				p_keyword("until",BEGIN);
 			else
-				cp = "while";
-			p_keyword(cp,BEGIN);
+				p_keyword("while",BEGIN);
 			if(t->wh.whinc)
 			{
 				struct argnod *arg = (t->wh.whtre)->ar.arexpr;
-				sfprintf(outfile,"(( %s; ",forinit);
+				sfprintf(outfile,"((%s;",forinit);
 				forinit = "";
 				sfputr(outfile,arg->argval,';');
 				arg = (t->wh.whinc)->arexpr;
 				sfprintf(outfile," %s))\n",arg->argval);
+				if(level>1)
+					sfnputc(outfile,'\t',level-1);
 			}
 			else
 				p_tree(t->wh.whtre,0);
@@ -207,12 +224,13 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 				tflags |= NO_NEWLINE;
 				if(!(tflags&NO_BRACKET))
 				{
-					p_keyword("[[",BEGIN);
+					p_keyword("[[",BEGIN|NOTAB);
 					tflags |= NO_BRACKET;
 					bracket=1;
 				}
 			}
 			p_tree(t->lst.lstlef,NEED_BRACE|NO_NEWLINE|(tflags&NO_BRACKET));
+			begin_line = 0;
 			if(tflags&FALTPIPE)
 			{
 				Shnode_t *tt = t->lst.lstrit;
@@ -235,19 +253,22 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 			level--;
 			break;
 		}
-	
+
 		case TPAR:
-			p_keyword("(",BEGIN);
-			p_tree(t->par.partre,0); 
+		{
+			char indented_block = (begin_line || !level);
+			p_keyword("(", indented_block ? BEGIN : BEGIN|NOTAB);
+			p_tree(t->par.partre, indented_block ? 0 : NO_NEWLINE);
 			p_keyword(")",END);
 			break;
+		}
 
 		case TARITH:
 		{
-			register struct argnod *ap = t->ar.arexpr;
+			struct argnod *ap = t->ar.arexpr;
 			if(begin_line && level)
 				sfnputc(outfile,'\t',level);
-			sfprintf(outfile,"(( %s ))%c",ap->argval,end_line);
+			sfprintf(outfile,"((%s))%c",ap->argval,end_line);
 			if(!(tflags&NO_NEWLINE))
 				begin_line=1;
 			break;
@@ -255,7 +276,7 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 
 		case TFOR:
 			cp = ((t->tre.tretyp&COMSCAN)?"select":"for");
-			p_keyword(cp,BEGIN);
+			p_keyword(cp,BEGIN|NOTAB);
 			sfputr(outfile,t->for_.fornam,' ');
 			if(t->for_.forlst)
 			{
@@ -274,9 +295,9 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 			p_tree(t,0);
 			p_keyword("done",END);
 			break;
-	
+
 		case TSW:
-			p_keyword("case",BEGIN);
+			p_keyword("case",BEGIN|NOTAB);
 			p_arg(t->sw.swarg,' ',0);
 			if(t->sw.swlst)
 			{
@@ -290,39 +311,41 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 			p_keyword("esac",END);
 			break;
 
+		/* function definition */
 		case TFUN:
+			if(begin_line && level>0)
+				sfnputc(outfile,'\t',level);
 			if(t->tre.tretyp&FPOSIX)
-			{
-				sfprintf(outfile,"%s",t->funct.functnam);
-				p_keyword("()\n",BEGIN);
-			}
+				sfprintf(outfile,"%s()\n",t->funct.functnam);
 			else
 			{
-				p_keyword("function",BEGIN);
-				tflags = (t->funct.functargs?' ':'\n');
-				sfputr(outfile,t->funct.functnam,tflags);
+				sfprintf(outfile,"function %s",t->funct.functnam);
 				if(t->funct.functargs)
 				{
-					tflags = end_line;
+					/* function reference list (for .sh.math.* functions) */
+					int e = end_line;
+					sfputc(outfile,' ');
 					end_line = '\n';
 					p_comarg(t->funct.functargs);
-					end_line = tflags;
+					end_line = e;
 				}
+				else
+					sfputc(outfile,'\n');
 			}
 			begin_line = 1;
-			p_keyword("{\n",MIDDLE);
-			begin_line = 1;
-			p_tree(t->funct.functtre,0); 
+			p_keyword("{",BEGIN);
+			p_tree(t->funct.functtre,0);
 			p_keyword("}",END);
 			break;
+
 		/* new test compound command */
 		case TTST:
 			if(!(tflags&NO_BRACKET))
-				p_keyword("[[",BEGIN);
+				p_keyword("[[",BEGIN|NOTAB);
 			if((t->tre.tretyp&TPAREN)==TPAREN)
 			{
-				p_keyword("(",BEGIN);
-				p_tree(t->lst.lstlef,NO_BRACKET|NO_NEWLINE); 
+				p_keyword("(",BEGIN|NOTAB);
+				p_tree(t->lst.lstlef,NO_BRACKET|NO_NEWLINE);
 				p_keyword(")",END);
 			}
 			else
@@ -358,19 +381,19 @@ static void p_tree(register const Shnode_t *t,register int tflags)
 
 /*
  * print a keyword
- * increment indent level for flag==BEGIN
- * decrement indent level for flag==END
+ * increment indent level for flag & BEGIN
+ * decrement indent level for flag & END
  */
 static void p_keyword(const char *word,int flag)
 {
-	register int sep;
-	if(flag==END)
+	int sep;
+	if(flag & END)
 		sep = end_line;
-	else if(*word=='[' || *word=='(')
+	else if(flag & NOTAB)
 		sep = ' ';
 	else
 		sep = '\t';
-	if(flag!=BEGIN)
+	if(!(flag & BEGIN))
 		level--;
 	if(begin_line && level)
 		sfnputc(outfile,'\t',level);
@@ -379,14 +402,14 @@ static void p_keyword(const char *word,int flag)
 		begin_line=1;
 	else
 		begin_line=0;
-	if(flag!=END)
+	if(!(flag & END))
 		level++;
 }
 
-static void p_arg(register const struct argnod *arg,register int endchar,int opts)
+static void p_arg(const struct argnod *arg,int endchar,int opts)
 {
-	register const char *cp;
-	register int flag=0;
+	const char *cp;
+	int flag=0;
 	do
 	{
 		if(!arg->argnxt.ap)
@@ -394,7 +417,8 @@ static void p_arg(register const struct argnod *arg,register int endchar,int opt
 		else if(opts&PRE)
 		{
 			/* case alternation lists in reverse order */
-			p_arg(arg->argnxt.ap,'|',opts);
+			p_arg(arg->argnxt.ap,-1,opts);
+			sfprintf(outfile," | ");
 			flag = endchar;
 		}
 		else if(opts)
@@ -406,7 +430,8 @@ static void p_arg(register const struct argnod *arg,register int endchar,int opt
 			int c = (arg->argflag&ARG_RAW)?'>':'<';
 			sfputc(outfile,c);
 			sfputc(outfile,'(');
-			p_tree((Shnode_t*)arg->argchn.ap,PROCSUBST);
+			begin_line = 0;
+			p_tree((Shnode_t*)arg->argchn.ap,PROC_SUBST);
 		}
 		else if(*cp==0 && opts==POST && arg->argchn.ap)
 		{
@@ -430,10 +455,10 @@ static void p_arg(register const struct argnod *arg,register int endchar,int opt
 	return;
 }
 
-static void p_redirect(register const struct ionod *iop)
+static void p_redirect(const struct ionod *iop)
 {
-	register char *cp;
-	register int iof,iof2;
+	char *cp;
+	int iof, endc, endc2 = -1;
 	for(;iop;iop=iop->ionxt)
 	{
 		iof=iop->iofile;
@@ -478,59 +503,57 @@ static void p_redirect(register const struct ionod *iop)
 			here_doc  = iop;
 			io_op[2] = '<';
 		}
-		sfputr(outfile,cp,' ');
+		sfputr(outfile,cp,-1);
 		if(iop->ionxt)
-			iof = ' ';
+			endc = ' ';
 		else
 		{
-			if((iof=end_line)=='\n')
+			if((endc=end_line)=='\n')
 				begin_line = 1;
 		}
 		if((iof&IOLSEEK) && (iof&IOARITH))
-			iof2 = iof, iof = ' ';
-		if((iop->iofile & IOPROCSUB) && !(iop->iofile & IOLSEEK))
+			endc2 = endc, endc = ' ';
+		if((iof&IOPROCSUB) && !(iof&IOLSEEK))
 		{
 			/* process substitution as argument to redirection */
-			if(iop->iofile & IOPUT)
-				sfwrite(outfile,">(",2);
-			else
-				sfwrite(outfile,"<(",2);
-			p_tree((Shnode_t*)iop->ioname,PROCSUBST);
-			sfputc(outfile,iof);
+			sfprintf(outfile," %c(", (iof&IOPUT) ? '>' : '<');
+			begin_line = 0;
+			p_tree((Shnode_t*)iop->ioname,PROC_SUBST);
+			sfputc(outfile,endc);
 		}
 		else if(iop->iodelim)
 		{
-			if(!(iop->iofile&IODOC))
+			if(!(iof&IODOC))
 				sfwrite(outfile,"''",2);
-			sfputr(outfile,sh_fmtq(iop->iodelim),iof);
+			sfputr(outfile,sh_fmtq(iop->iodelim),endc);
 		}
-		else if(iop->iofile&IORAW)
-			sfputr(outfile,sh_fmtq(iop->ioname),iof);
+		else if(iof&IORAW)
+			sfputr(outfile,sh_fmtq(iop->ioname),endc);
 		else
 			sfputr(outfile,iop->ioname,iof);
 		if((iof&IOLSEEK) && (iof&IOARITH))
-			sfputr(outfile, "))", iof2);
+			sfputr(outfile, "))", endc2);
 	}
 	return;
 }
 
-static void p_comarg(register const struct comnod *com)
+static void p_comarg(const struct comnod *com)
 {
-	register int flag = end_line;
+	int flag = end_line;
 	if(com->comtyp&FAMP)
 		sfwrite(outfile,"& ",2);
-	if(com->comarg || com->comio)
+	if(com->comarg.ap || com->comio)
 		flag = ' ';
 	if(com->comset)
 		p_arg(com->comset,flag,POST);
-	if(com->comarg)
+	if(com->comarg.ap)
 	{
 		if(!com->comio)
 			flag = end_line;
 		if(com->comtyp&COMSCAN)
-			p_arg(com->comarg,flag,POST);
+			p_arg(com->comarg.ap,flag,POST);
 		else
-			p_comlist((struct dolnod*)com->comarg,flag);
+			p_comlist(com->comarg.dp,flag);
 	}
 	if(com->comio)
 		p_redirect(com->comio);
@@ -539,8 +562,8 @@ static void p_comarg(register const struct comnod *com)
 
 static void p_comlist(const struct dolnod *dol,int endchar)
 {
-	register char *cp, *const*argv;
-	register int flag = ' ', special;
+	char *cp, *const*argv;
+	int flag = ' ', special;
 	argv = dol->dolval+ARG_SPARE;
 	cp = *argv;
 	special = (*cp=='[' && cp[1]==0);
@@ -563,17 +586,20 @@ static void p_comlist(const struct dolnod *dol,int endchar)
 	return;
 }
 
-static void p_switch(register const struct regnod *reg)
+static void p_switch(const struct regnod *reg)
 {
 	if(level>1)
 		sfnputc(outfile,'\t',level-1);
 	p_arg(reg->regptr,')',PRE);
 	begin_line = 0;
-	sfputc(outfile,'\t');
+	sfputc(outfile,'\n');
+	sfnputc(outfile,'\t',level);
 	if(reg->regcom)
 		p_tree(reg->regcom,0);
 	level++;
-	if(reg->regflag)
+	if(reg->regflag > 1)
+		p_keyword(";;&",END);
+	else if(reg->regflag)
 		p_keyword(";&",END);
 	else
 		p_keyword(";;",END);
@@ -585,11 +611,11 @@ static void p_switch(register const struct regnod *reg)
 /*
  * output here documents
  */
-static void here_body(register const struct ionod *iop)
+static void here_body(const struct ionod *iop)
 {
 	Sfio_t *infile;
 	if(iop->iofile&IOSTRG)
-		infile = sfnew((Sfio_t*)0,iop->ioname,iop->iosize,-1,SF_STRING|SF_READ);
+		infile = sfnew(NULL,iop->ioname,iop->iosize,-1,SFIO_STRING|SFIO_READ);
 	else
 		sfseek(infile=sh.heredocs,iop->iooffset,SEEK_SET);
 	sfmove(infile,outfile,iop->iosize,-1);

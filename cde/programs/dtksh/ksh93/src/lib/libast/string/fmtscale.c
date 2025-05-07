@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,9 +28,9 @@
 #include <lclib.h>
 
 char*
-fmtscale(register Sfulong_t n, int k)
+fmtscale(Sfulong_t n, int k)
 {
-	register Sfulong_t	m;
+	Sfulong_t		m;
 	int			r;
 	int			z;
 	const char*		u;

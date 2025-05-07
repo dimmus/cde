@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -35,18 +35,18 @@
  */
 
 int
-regcollate(register const char* s, char** e, char* buf, size_t size, wchar_t* wc)
+regcollate(const char* s, char** e, char* buf, size_t size, wchar_t* wc)
 {
-	register int			c;
-	register char*			b;
-	register char*			x;
-	const char*			t;
-	int				i;
-	int				r;
-	int				term;
-	wchar_t				w;
-	char				xfm[256];
-	char				tmp[sizeof(xfm)];
+	int			c;
+	char*			b;
+	char*			x;
+	const char*		t;
+	int			i;
+	int			r;
+	int			term;
+	wchar_t			w;
+	char			xfm[256];
+	char			tmp[sizeof(xfm)];
 
 	if (size < 2 || (term = *s) != '.' && term != '=' || !*++s || *s == term && *(s + 1) == ']')
 		goto nope;

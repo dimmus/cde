@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -38,7 +38,7 @@
  *
  * root/administrator has its own test
  *
- * astconf("SH",NiL,NiL) is returned by default
+ * astconf("SH",NULL,NULL) is returned by default
  *
  * NOTE: csh is rejected because the bsh/csh differentiation is
  *       not done for `csh script arg ...'
@@ -53,7 +53,7 @@
 char*
 pathshell(void)
 {
-	register char*	sh;
+	char*		sh;
 	int		ru;
 	int		eu;
 	int		rg;
@@ -107,7 +107,7 @@ pathshell(void)
  defshell:
 	if (!(sh = val))
 	{
-		if (!*(sh = astconf("SH", NiL, NiL)) || *sh != '/' || eaccess(sh, X_OK) || !(sh = strdup(sh)))
+		if (!*(sh = astconf("SH", NULL, NULL)) || *sh != '/' || eaccess(sh, X_OK) || !(sh = strdup(sh)))
 			sh = "/bin/sh";
 		val = sh;
 	}

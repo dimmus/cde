@@ -1,8 +1,8 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 1985-2013 AT&T Intellectual Property          *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -33,15 +33,15 @@
 #include <regex.h>
 
 int
-chrexp(register const char* s, char** p, int* m, register int flags)
+chrexp(const char* s, char** p, int* m, int flags)
 {
-	register const char*	q;
-	register int		c;
-	const char*		e;
-	const char*		b;
-	char*			r;
-	int			n;
-	int			w;
+	const char*	q;
+	int		c;
+	const char*	e;
+	const char*	b;
+	char*		r;
+	int		n;
+	int		w;
 
 	w = 0;
 	for (;;)
@@ -147,14 +147,18 @@ chrexp(register const char* s, char** p, int* m, register int flags)
 				c = CC_vt;
 				break;
 			case 'u':
+				q = s + 4;
+				goto wex;
 			case 'U':
+				q = s + 8;
+			wex:
+				if (!(flags & FMT_EXP_WIDE))
+					goto noexpand;
+				w = 1;
+				goto hex;
 			case 'x':
-				if (q = c == 'u' ? (s + 4) : c == 'U' ? (s + 8) : (char*)0)
-				{
-					if (!(flags & FMT_EXP_WIDE))
-						goto noexpand;
-					w = 1;
-				}
+				q = s + 2;
+			hex:
 				b = e = s;
 				n = 0;
 				c = 0;
@@ -225,7 +229,7 @@ chrexp(register const char* s, char** p, int* m, register int flags)
 }
 
 int
-chresc(register const char* s, char** p)
+chresc(const char* s, char** p)
 {
-	return chrexp(s, p, NiL, FMT_EXP_CHAR|FMT_EXP_LINE|FMT_EXP_WIDE);
+	return chrexp(s, p, NULL, FMT_EXP_CHAR|FMT_EXP_LINE|FMT_EXP_WIDE);
 }

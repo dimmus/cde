@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -25,7 +25,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: uname (AT&T Research) 2007-04-19 $\n]"
+"[-?\n@(#)$Id: uname (ksh 93u+m) 2023-03-09 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?uname - identify the current system ]"
 "[+DESCRIPTION?By default \buname\b writes the operating system name to"
@@ -66,11 +66,6 @@ static const char usage[] =
 "	\bsysconf\b(3), \bsysinfo\b(2)]"
 ;
 
-#define getdomainname	______getdomainname
-#define gethostid	______gethostid
-#define gethostname	______gethostname
-#define sethostname	______sethostname
-
 #include <cmd.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -82,24 +77,6 @@ static const char usage[] =
 
 #if _lib_uname && _sys_utsname
 # include <sys/utsname.h>
-#endif
-
-#undef	getdomainname
-#undef	gethostid
-#undef	gethostname
-#undef	sethostname
-
-#if _lib_getdomainname
-extern int	getdomainname(char*, size_t);
-#endif
-#if _lib_gethostid
-extern long	gethostid(void);
-#endif
-#if _lib_gethostname
-extern int	gethostname(char*, size_t);
-#endif
-#if _lib_sethostname
-extern int	sethostname(const char*, size_t);
 #endif
 
 #ifndef HOSTTYPE
@@ -120,7 +97,7 @@ struct utsname
 };
 
 int
-uname(register struct utsname* ut)
+uname(struct utsname* ut)
 {
 #ifdef HOSTTYPE
 	char*		sys = 0;
@@ -142,7 +119,7 @@ uname(register struct utsname* ut)
 			sys = 0;
 	}
 #endif
-#ifdef _lib_gethostname
+#if _lib_gethostname
 	if (gethostname(ut->nodename, sizeof(ut->nodename) - 1))
 		return -1;
 #else
@@ -219,10 +196,10 @@ uname(register struct utsname* ut)
 int
 b_uname(int argc, char** argv, Shbltin_t* context)
 {
-	register long	flags = 0;
-	register int	sep = 0;
-	register int	n;
-	register char*	s;
+	long		flags = 0;
+	int		sep = 0;
+	int		n;
+	char*		s;
 	char*		t;
 	char*		e;
 	char*		sethost = 0;
@@ -297,7 +274,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 			continue;
 		case ':':
 			{
-				char **new_argv = (char **)stakalloc((argc + 3) * sizeof(char*));
+				char **new_argv = stkalloc(stkstd, (argc + 3) * sizeof(char*));
 				new_argv[0] = "command";
 				new_argv[1] = "-px";
 				for (n = 0; n <= argc; n++)
@@ -305,15 +282,16 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 				return sh_run(context, argc + 2, new_argv);
 			}
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	if (error_info.errors || *argv && (flags || sethost) || sethost && flags)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (sethost)
@@ -331,7 +309,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 		UNREACHABLE();
 	}
 	else if (list)
-		astconflist(sfstdout, NiL, ASTCONF_base|ASTCONF_defined|ASTCONF_lower|ASTCONF_quote|ASTCONF_matchcall, "CS|SI");
+		astconflist(sfstdout, NULL, ASTCONF_base|ASTCONF_defined|ASTCONF_lower|ASTCONF_quote|ASTCONF_matchcall, "CS|SI");
 	else if (*argv)
 	{
 		e = &buf[sizeof(buf)-1];
@@ -344,7 +322,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 			while (t < e && (n = *s++))
 				*t++ = islower(n) ? toupper(n) : n;
 			*t = 0;
-			sfprintf(sfstdout, "%s%c", *(t = astconf(buf, NiL, NiL)) ? t : *(t = astconf(buf+3, NiL, NiL)) ? t :  "unknown", *argv ? ' ' : '\n');
+			sfprintf(sfstdout, "%s%c", *(t = astconf(buf, NULL, NULL)) ? t : *(t = astconf(buf+3, NULL, NULL)) ? t :  "unknown", *argv ? ' ' : '\n');
 		}
 	}
 	else
@@ -389,10 +367,10 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 				if (strcmp(s, "i686") == 0)
 				{
 					char line[1024];
-					Sfio_t *io = sfopen((Sfio_t*)0, "/proc/cpuinfo", "r");
+					Sfio_t *io = sfopen(NULL, "/proc/cpuinfo", "r");
 					if (io)
 					{
-						while (fgets(line, sizeof(line), io) > 0)
+						while (fgets(line, sizeof(line), io))
 						{
 							if (strncmp(line, "vendor_id", 9) == 0)
 							{
@@ -406,7 +384,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 				}
 			}
 #endif
-			if (!s && !*(s = astconf("ARCHITECTURE", NiL, NiL)))
+			if (!s && !*(s = astconf("ARCHITECTURE", NULL, NULL)))
 				s = ut.machine;
 			output(OPT_processor, s, "processor");
 		}
@@ -421,7 +399,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 					s[1] = '3';
 			}
 #endif
-			if (!s && !*(s = astconf("PLATFORM", NiL, NiL)) && !*(s = astconf("HW_NAME", NiL, NiL)))
+			if (!s && !*(s = astconf("PLATFORM", NULL, NULL)) && !*(s = astconf("HW_NAME", NULL, NULL)))
 			{
 				if (t = strchr(hosttype, '.'))
 					t++;
@@ -433,7 +411,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 		}
 		if (flags & OPT_operating_system)
 		{
-			s = astconf("OPERATING_SYSTEM", NiL, NiL);
+			s = astconf("OPERATING_SYSTEM", NULL, NULL);
 			if (!*s)
 #ifdef _UNAME_os_DEFAULT
 				s = _UNAME_os_DEFAULT;
@@ -444,7 +422,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 		}
 		if (flags & OPT_extended_release)
 		{
-			s = astconf("RELEASE", NiL, NiL);
+			s = astconf("RELEASE", NULL, NULL);
 			output(OPT_extended_release, s, "extended-release");
 		}
 #if _mem_idnumber_utsname
@@ -452,7 +430,7 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 #else
 		if (flags & OPT_hostid)
 		{
-			if (!*(s = astconf("HW_SERIAL", NiL, NiL)))
+			if (!*(s = astconf("HW_SERIAL", NULL, NULL)))
 #if _lib_gethostid
 				sfsprintf(s = buf, sizeof(buf), "%08x", gethostid());
 #else
@@ -463,12 +441,12 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 #endif
 		if (flags & OPT_vendor)
 		{
-			s = astconf("HW_PROVIDER", NiL, NiL);
+			s = astconf("HW_PROVIDER", NULL, NULL);
 			output(OPT_vendor, s, "vendor");
 		}
 		if (flags & OPT_domain)
 		{
-			if (!*(s = astconf("SRPC_DOMAIN", NiL, NiL)))
+			if (!*(s = astconf("SRPC_DOMAIN", NULL, NULL)))
 			{
 #if _lib_getdomainname
 				getdomainname(buf, sizeof(buf));
@@ -482,13 +460,13 @@ b_uname(int argc, char** argv, Shbltin_t* context)
 #if _mem_m_type_utsname
 		s = ut.m_type;
 #else
-		s = astconf("MACHINE", NiL, NiL);
+		s = astconf("MACHINE", NULL, NULL);
 #endif
 		output(OPT_machine_type, s, "m_type");
 #if _mem_base_rel_utsname
 		s = ut.base_rel;
 #else
-		s = astconf("BASE", NiL, NiL);
+		s = astconf("BASE", NULL, NULL);
 #endif
 		output(OPT_base, s, "base_rel");
 		if (flags & OPT_extra)

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -111,7 +111,7 @@ static const Namval_t		options[] =
  */
 
 static int
-setopt(void* a, const void* p, register int n, register const char* v)
+setopt(void* a, const void* p, int n, const char* v)
 {
 	NoP(a);
 	if (p)
@@ -135,7 +135,7 @@ setopt(void* a, const void* p, register int n, register const char* v)
 					error_state.breakpoint = ERROR_PANIC;
 					break;
 				default:
-					error_state.breakpoint = strtol(v, NiL, 0);
+					error_state.breakpoint = strtol(v, NULL, 0);
 					break;
 				}
 			else
@@ -151,12 +151,12 @@ setopt(void* a, const void* p, register int n, register const char* v)
 			break;
 		case OPT_COUNT:
 			if (n)
-				error_state.count = strtol(v, NiL, 0);
+				error_state.count = strtol(v, NULL, 0);
 			else
 				error_state.count = 0;
 			break;
 		case OPT_FD:
-			error_info.fd = n ? strtol(v, NiL, 0) : -1;
+			error_info.fd = n ? strtol(v, NULL, 0) : -1;
 			break;
 		case OPT_LIBRARY:
 			if (n)
@@ -166,7 +166,7 @@ setopt(void* a, const void* p, register int n, register const char* v)
 			break;
 		case OPT_MASK:
 			if (n)
-				error_info.mask = strtol(v, NiL, 0);
+				error_info.mask = strtol(v, NULL, 0);
 			else
 				error_info.mask = 0;
 			break;
@@ -207,7 +207,7 @@ setopt(void* a, const void* p, register int n, register const char* v)
 			break;
 		case OPT_TRACE:
 			if (n)
-				error_info.trace = -strtol(v, NiL, 0);
+				error_info.trace = -strtol(v, NULL, 0);
 			else
 				error_info.trace = 0;
 			break;
@@ -220,18 +220,18 @@ setopt(void* a, const void* p, register int n, register const char* v)
  */
 
 static void
-print(register Sfio_t* sp, register char* name, char* delim)
+print(Sfio_t* sp, char* name, char* delim)
 {
 	if (mbwide())
 		sfputr(sp, name, -1);
 	else
 	{
 #if CC_NATIVE != CC_ASCII
-		register int		c;
-		register unsigned char*	n2a;
-		register unsigned char*	a2n;
-		register int		aa;
-		register int		as;
+		int		c;
+		unsigned char*	n2a;
+		unsigned char*	a2n;
+		int		aa;
+		int		as;
 
 		n2a = ccmap(CC_NATIVE, CC_ASCII);
 		a2n = ccmap(CC_ASCII, CC_NATIVE);
@@ -254,7 +254,7 @@ print(register Sfio_t* sp, register char* name, char* delim)
 			sfputc(sp, c);
 		}
 #else
-		register int		c;
+		int		c;
 
 		while (c = *name++)
 		{
@@ -283,18 +283,18 @@ print(register Sfio_t* sp, register char* name, char* delim)
 #define CONTEXT(f,p)	(((f)&ERROR_PUSH)?((Error_context_t*)&(p)->context->context):((Error_context_t*)(p)))
 
 static void
-context(register Sfio_t* sp, register Error_context_t* cp)
+context(Sfio_t* sp, Error_context_t* cp)
 {
 	if (cp->context)
 		context(sp, CONTEXT(cp->flags, cp->context));
 	if (!(cp->flags & ERROR_SILENT))
 	{
 		if (cp->id)
-			print(sp, cp->id, NiL);
+			print(sp, cp->id, NULL);
 		if (cp->line > ((cp->flags & ERROR_INTERACTIVE) != 0))
 		{
 			if (cp->file)
-				sfprintf(sp, ": \"%s\", %s %d", cp->file, ERROR_translate(NiL, NiL, ast.id, "line"), cp->line);
+				sfprintf(sp, ": \"%s\", %s %d", cp->file, ERROR_translate(NULL, NULL, ast.id, "line"), cp->line);
 			else
 				sfprintf(sp, "[%d]", cp->line);
 		}
@@ -311,14 +311,14 @@ error_break(void)
 {
 	char*	s;
 
-	if (error_state.tty || (error_state.tty = sfopen(NiL, "/dev/tty", "r+")))
+	if (error_state.tty || (error_state.tty = sfopen(NULL, "/dev/tty", "r+")))
 	{
 		sfprintf(error_state.tty, "error breakpoint: ");
 		if (s = sfgetr(error_state.tty, '\n', 1))
 		{
 			if (streq(s, "q") || streq(s, "quit"))
 				exit(0);
-			stropt(s, options, sizeof(*options), setopt, NiL);
+			stropt(s, options, sizeof(*options), setopt, NULL);
 		}
 	}
 }
@@ -329,14 +329,14 @@ error(int level, ...)
 	va_list	ap;
 
 	va_start(ap, level);
-	errorv(NiL, level, ap);
+	errorv(NULL, level, ap);
 	va_end(ap);
 }
 
 void
 errorv(const char* id, int level, va_list ap)
 {
-	register int	n;
+	int		n;
 	int		fd;
 	int		flags;
 	char*		s;
@@ -354,7 +354,7 @@ errorv(const char* id, int level, va_list ap)
 	if (!error_info.init)
 	{
 		error_info.init = 1;
-		stropt(getenv("ERROR_OPTIONS"), options, sizeof(*options), setopt, NiL);
+		stropt(getenv("ERROR_OPTIONS"), options, sizeof(*options), setopt, NULL);
 	}
 	if (level > 0)
 	{
@@ -422,7 +422,7 @@ errorv(const char* id, int level, va_list ap)
 			if (flags & ERROR_NOID)
 				sfprintf(stkstd, "       ");
 			else
-				sfprintf(stkstd, "%s: ", ERROR_translate(NiL, NiL, ast.id, "Usage"));
+				sfprintf(stkstd, "%s: ", ERROR_translate(NULL, NULL, ast.id, "Usage"));
 			if (file || opt_info.argv && (file = opt_info.argv[0]))
 				print(stkstd, file, " ");
 		}
@@ -439,13 +439,13 @@ errorv(const char* id, int level, va_list ap)
 					sfprintf(stkstd, "[");
 					if (flags & ERROR_CATALOG)
 						sfprintf(stkstd, "%s %s%s",
-							catalog ? catalog : ERROR_translate(NiL, NiL, ast.id, "DEFAULT"),
-							ERROR_translate(NiL, NiL, ast.id, "catalog"),
+							catalog ? catalog : ERROR_translate(NULL, NULL, ast.id, "DEFAULT"),
+							ERROR_translate(NULL, NULL, ast.id, "catalog"),
 							(flags & ERROR_LIBRARY) ? ", " : "");
 					if (flags & ERROR_LIBRARY)
 						sfprintf(stkstd, "%s %s",
 							library,
-							ERROR_translate(NiL, NiL, ast.id, "library"));
+							ERROR_translate(NULL, NULL, ast.id, "library"));
 					sfprintf(stkstd, "]: ");
 				}
 			}
@@ -453,7 +453,7 @@ errorv(const char* id, int level, va_list ap)
 			{
 				if (error_info.file && *error_info.file)
 					sfprintf(stkstd, "\"%s\", ", error_info.file);
-				sfprintf(stkstd, "%s %d: ", ERROR_translate(NiL, NiL, ast.id, "line"), error_info.line);
+				sfprintf(stkstd, "%s %d: ", ERROR_translate(NULL, NULL, ast.id, "line"), error_info.line);
 			}
 		}
 		if (error_info.time)
@@ -468,15 +468,15 @@ errorv(const char* id, int level, va_list ap)
 			flags &= ~ERROR_SYSTEM;
 			break;
 		case ERROR_WARNING:
-			sfprintf(stkstd, "%s: ", ERROR_translate(NiL, NiL, ast.id, "warning"));
+			sfprintf(stkstd, "%s: ", ERROR_translate(NULL, NULL, ast.id, "warning"));
 			break;
 		case ERROR_PANIC:
-			sfprintf(stkstd, "%s: ", ERROR_translate(NiL, NiL, ast.id, "panic"));
+			sfprintf(stkstd, "%s: ", ERROR_translate(NULL, NULL, ast.id, "panic"));
 			break;
 		default:
 			if (level < 0)
 			{
-				s = ERROR_translate(NiL, NiL, ast.id, "debug");
+				s = ERROR_translate(NULL, NULL, ast.id, "debug");
 				if (error_info.trace < -1)
 					sfprintf(stkstd, "%s%d:%s", s, level, level > -10 ? " " : "");
 				else
@@ -497,7 +497,7 @@ errorv(const char* id, int level, va_list ap)
 
 			file = va_arg(ap, char*);
 			line = va_arg(ap, int);
-			s = ERROR_translate(NiL, NiL, ast.id, "line");
+			s = ERROR_translate(NULL, NULL, ast.id, "line");
 			if (error_info.version)
 				sfprintf(stkstd, "(%s: \"%s\", %s %d) ", error_info.version, file, s, line);
 			else
@@ -506,7 +506,7 @@ errorv(const char* id, int level, va_list ap)
 		if (format || (format = va_arg(ap, char*)))
 		{
 			if (!(flags & ERROR_USAGE))
-				format = ERROR_translate(NiL, id, catalog, format);
+				format = ERROR_translate(NULL, id, catalog, format);
 			sfvprintf(stkstd, format, ap);
 		}
 		if (!(flags & ERROR_PROMPT))
@@ -518,7 +518,7 @@ errorv(const char* id, int level, va_list ap)
 
 			if ((flags & ERROR_SYSTEM) && errno && errno != error_info.last_errno)
 			{
-				sfprintf(stkstd, " [%s]", fmterror(errno));
+				sfprintf(stkstd, " [%s]", strerror(errno));
 				if (error_info.set & ERROR_SYSTEM)
 					errno = 0;
 				error_info.last_errno = (level >= 0) ? 0 : errno;
@@ -565,7 +565,7 @@ errorv(const char* id, int level, va_list ap)
 	}
 	else
 		s = 0;
-	if (level >= error_state.breakpoint && error_state.breakpoint && (!error_state.match || !regexec(error_state.match, s ? s : format, 0, NiL, 0)) && (!error_state.count || !--error_state.count))
+	if (level >= error_state.breakpoint && error_state.breakpoint && (!error_state.match || !regexec(error_state.match, s ? s : format, 0, NULL, 0)) && (!error_state.count || !--error_state.count))
 	{
 		if (error_info.core)
 		{
@@ -620,7 +620,7 @@ errorctx(Error_info_t* p, int op, int flags)
 			if (p = freecontext)
 				freecontext = freecontext->context;
 			else if (!(p = newof(0, Error_info_t, 1, 0)))
-				return 0;
+				return NULL;
 			*p = *_error_infop_;
 			p->errors = p->flags = p->line = p->warnings = 0;
 			p->catalog = p->file = 0;

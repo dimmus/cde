@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,10 +12,11 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
- * ulimit [-HSaMctdfkxlqenuPpmrRbiswTv] [limit]
+ * ulimit [-HSaMctdfkxlqenVuPpmrRbiswTv] [limit]
  *
  *   David Korn
  *   AT&T Labs
@@ -47,8 +48,11 @@
 
 static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 {
-	register const Limit_t*	tp;
+	const Limit_t*	tp;
 
+	NOT_USED(op);
+	NOT_USED(s);
+	NOT_USED(dp);
 	for (tp = shtab_limits; tp->option; tp++)
 	{
 		sfprintf(sp, "[%c=%d:%s?The %s", tp->option, tp - shtab_limits + 1, tp->name, tp->description);
@@ -56,7 +60,7 @@ static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 			sfprintf(sp, " in %ss", e_units[tp->type]);
 		sfprintf(sp, ".]");
 	}
-        return(1);
+	return 1;
 }
 
 #define HARD	2
@@ -64,22 +68,22 @@ static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 
 int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 {
-	register char *limit;
-	register int mode=0, n;
-	register unsigned long hit = 0;
-#ifdef _lib_getrlimit
+	char *limit;
+	int mode=0, n;
+	unsigned long hit = 0;
+#if _lib_getrlimit
 	struct rlimit rlp;
 #endif /* _lib_getrlimit */
 	const Limit_t* tp;
 	char* conf;
-	int label, unit, nosupport;
-	rlim_t i;
+	int label, unit, nosupport, ret=0;
+	rlim_t i=0;
 	char tmp[41];
-        Optdisc_t disc;
-        NOT_USED(context);
-        memset(&disc, 0, sizeof(disc));
-        disc.version = OPT_VERSION;
-        disc.infof = infof;
+	Optdisc_t disc;
+	NOT_USED(context);
+	memset(&disc, 0, sizeof(disc));
+	disc.version = OPT_VERSION;
+	disc.infof = infof;
 	opt_info.disc = &disc;
 	while((n = optget(argv,sh_optulimit))) switch(n)
 	{
@@ -102,8 +106,9 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	opt_info.disc = 0;
 	/* default to -f */
@@ -119,7 +124,7 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 	label = (hit&(hit-1));
 	if(error_info.errors || (limit && label) || argc>opt_info.index+1)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),optusage(NULL));
 		UNREACHABLE();
 	}
 	if(mode==0)
@@ -135,16 +140,16 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 			if(sh.subshell && !sh.subshare)
 				sh_subfork();
 			if(strcmp(limit,e_unlimited)==0)
-				i = INFINITY;
+				i = ULIMIT_INFINITY;
 			else
 			{
 				char *last;
 				/* an explicit suffix unit overrides the default */
-				if((i=strtol(limit,&last,0))!=INFINITY && !*last)
+				if((i=strtol(limit,&last,0))!=ULIMIT_INFINITY && !*last)
 					i *= unit;
-				else if((i=strton(limit,&last,NiL,0))==INFINITY || *last)
+				else if((i=strton(limit,&last,NULL,0))==ULIMIT_INFINITY || *last)
 				{
-					if((i=sh_strnum(limit,&last,2))==INFINITY || *last)
+					if((i=sh_strnum(limit,&last,2))==ULIMIT_INFINITY || *last)
 					{
 						errormsg(SH_DICT,ERROR_system(1),e_number,limit);
 						UNREACHABLE();
@@ -159,7 +164,7 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 			}
 			else
 			{
-#ifdef _lib_getrlimit
+#if _lib_getrlimit
 				if(getrlimit(n,&rlp) <0)
 				{
 					errormsg(SH_DICT,ERROR_system(1),e_number,limit);
@@ -187,25 +192,27 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 		{
 			if(!nosupport)
 			{
-#ifdef  _lib_getrlimit
-				if(getrlimit(n,&rlp) <0)
+#if _lib_getrlimit
+				if(getrlimit(n,&rlp)<0)
 				{
-					errormsg(SH_DICT,ERROR_system(1),e_number,limit);
-					UNREACHABLE();
+					errormsg(SH_DICT,ERROR_system(0),e_limit,tp->description);
+					ret++;
+					continue;
 				}
 				if(mode&HARD)
 					i = rlp.rlim_max;
 				if(mode&SOFT)
 					i = rlp.rlim_cur;
 #else
-#   ifdef _lib_ulimit
+#   if _lib_ulimit
 				n--;
 #   endif /* _lib_ulimit */
 				i = -1;
 				if((i=vlimit(n,i)) < 0)
 				{
-					errormsg(SH_DICT,ERROR_system(1),e_number,limit);
-					UNREACHABLE();
+					errormsg(SH_DICT,ERROR_system(0),e_limit,tp->description);
+					ret++;
+					continue;
 				}
 #endif /* _lib_getrlimit */
 			}
@@ -219,11 +226,11 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 			}
 			if(nosupport)
 			{
-				if(!tp->conf || !*(conf = astconf(tp->conf, NiL, NiL)))
+				if(!tp->conf || !*(conf = astconf(tp->conf, NULL, NULL)))
 					conf = (char*)e_nosupport;
 				sfputr(sfstdout,conf,'\n');
 			}
-			else if(i!=INFINITY)
+			else if(i!=ULIMIT_INFINITY)
 			{
 				i += (unit-1);
 				sfprintf(sfstdout,"%I*d\n",sizeof(i),i/unit);
@@ -232,6 +239,6 @@ int	b_ulimit(int argc,char *argv[],Shbltin_t *context)
 				sfputr(sfstdout,e_unlimited,'\n');
 		}
 	}
-	return(0);
+	return ret;
 }
 #endif /* _no_ulimit */

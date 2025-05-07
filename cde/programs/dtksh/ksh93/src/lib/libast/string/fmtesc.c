@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -43,25 +44,26 @@
 char*
 fmtquote(const char* as, const char* qb, const char* qe, size_t n, int flags)
 {
-	register unsigned char*	s = (unsigned char*)as;
-	register unsigned char*	e = s + n;
-	register char*		b;
-	register int		c;
-	register int		m;
-	register int		escaped;
-	register int		spaced;
-	register int		doublequote;
-	register int		singlequote;
-	int			shell;
-	char*			f;
-	char*			buf;
+	unsigned char*	s = (unsigned char*)as;
+	unsigned char*	e = s + n;
+	char*		b;
+	int		c;
+	int		m;
+	int		escaped;
+	int		spaced;
+	int		doublequote;
+	int		singlequote;
+	int		shell;
+	size_t		len;
+	char*		f;
+	char*		buf;
 
-	c = 4 * (n + 1);
+	len = 4 * (n + 1);
 	if (qb)
-		c += strlen((char*)qb);
+		len += strlen((char*)qb);
 	if (qe)
-		c += strlen((char*)qe);
-	b = buf = fmtbuf(c);
+		len += strlen((char*)qe);
+	b = buf = fmtbuf(len);
 	shell = 0;
 	doublequote = 0;
 	singlequote = 0;
@@ -134,8 +136,8 @@ fmtquote(const char* as, const char* qb, const char* qe, size_t n, int flags)
 				default:
 					if (!(flags & FMT_WIDE) || !(c & 0200))
 					{
-						*b++ = '0' + ((c >> 6) & 07);
-						*b++ = '0' + ((c >> 3) & 07);
+						*b++ = (char)('0' + ((c >> 6) & 07));
+						*b++ = (char)('0' + ((c >> 3) & 07));
 						c = '0' + (c & 07);
 					}
 					else
@@ -146,7 +148,7 @@ fmtquote(const char* as, const char* qb, const char* qe, size_t n, int flags)
 			else if (c == '\\')
 			{
 				escaped = 1;
-				*b++ = c;
+				*b++ = (char)c;
 				if (*s)
 					c = *s++;
 			}
@@ -197,7 +199,7 @@ fmtquote(const char* as, const char* qb, const char* qe, size_t n, int flags)
 			}
 			else if (!spaced && !escaped && (isspace(c) || ((flags & FMT_SHELL) || shell) && (strchr("\";~&|()<>[]*?", c) || c == '#' && (b == f || isspace(*(b - 1))))))
 				spaced = 1;
-			*b++ = c;
+			*b++ = (char)c;
 		}
 	}
 	if (qb)
@@ -220,7 +222,7 @@ fmtquote(const char* as, const char* qb, const char* qe, size_t n, int flags)
 char*
 fmtnesq(const char* as, const char* qs, size_t n)
 {
-	return fmtquote(as, NiL, qs, n, 0);
+	return fmtquote(as, NULL, qs, n, 0);
 }
 
 /*
@@ -230,7 +232,7 @@ fmtnesq(const char* as, const char* qs, size_t n)
 char*
 fmtesq(const char* as, const char* qs)
 {
-	return fmtquote(as, NiL, qs, strlen((char*)as), 0);
+	return fmtquote(as, NULL, qs, strlen((char*)as), 0);
 }
 
 /*
@@ -240,5 +242,5 @@ fmtesq(const char* as, const char* qs)
 char*
 fmtesc(const char* as)
 {
-	return fmtquote(as, NiL, NiL, strlen((char*)as), 0);
+	return fmtquote(as, NULL, NULL, strlen((char*)as), 0);
 }

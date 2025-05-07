@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -18,13 +18,11 @@
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
-#if _PACKAGE_ast
-# if defined(__linux__) && _lib_statfs
+#if defined(__linux__) && _lib_statfs
 #  include <sys/statfs.h>
 #  ifndef  TMPFS_MAGIC
 #   define TMPFS_MAGIC	0x01021994
 #  endif
-# endif
 #endif
 
 /*	Create a temporary stream for read/write.
@@ -36,7 +34,7 @@
 **	Written by David Korn and Kiem-Phong Vo.
 */
 
-#if _tmp_rmfail	
+#if _tmp_rmfail
 
 /* File not removable while there is an open file descriptor.
 ** To ensure that temp files are properly removed, we need:
@@ -60,16 +58,16 @@ static File_t*	File;		/* list pf temp files	*/
 
 static int _tmprmfile(Sfio_t* f, int type, void* val, Sfdisc_t* disc)
 {
-	reg File_t	*ff, *last;
+	File_t	*ff, *last;
 
-	NOTUSED(val);
+	NOT_USED(val);
 
-	if(type == SF_DPOP)	/* don't allow this to pop */
+	if(type == SFIO_DPOP)	/* don't allow this to pop */
 		return -1;
 
-	if(type == SF_CLOSING)
+	if(type == SFIO_CLOSING)
 	{
-		for(last = NIL(File_t*), ff = File; ff; last = ff, ff = ff->next)
+		for(last = NULL, ff = File; ff; last = ff, ff = ff->next)
 			if(ff->f == f)
 				break;
 		if(ff)
@@ -78,13 +76,13 @@ static int _tmprmfile(Sfio_t* f, int type, void* val, Sfdisc_t* disc)
 			else	last->next = ff->next;
 
 			if(_Sfnotify)
-				(*_Sfnotify)(f,SF_CLOSING,f->file);
+				(*_Sfnotify)(f,SFIO_CLOSING,f->file);
 			CLOSE(f->file);
 			f->file = -1;
 			while(remove(ff->name) < 0 && errno == EINTR)
 				errno = 0;
 
-			free((void*)ff);
+			free(ff);
 		}
 	}
 
@@ -92,23 +90,23 @@ static int _tmprmfile(Sfio_t* f, int type, void* val, Sfdisc_t* disc)
 }
 
 static void _rmfiles(void)
-{	reg File_t	*ff, *next;
+{	File_t	*ff, *next;
 
 	for(ff = File; ff; ff = next)
 	{	next = ff->next;
-		_tmprmfile(ff->f, SF_CLOSING, NIL(void*), ff->f->disc);
+		_tmprmfile(ff->f, SFIO_CLOSING, NULL, ff->f->disc);
 	}
 }
 
 static Sfdisc_t	Rmdisc =
-	{ NIL(Sfread_f), NIL(Sfwrite_f), NIL(Sfseek_f), _tmprmfile, NIL(Sfdisc_t*) };
+	{ NULL, NULL, NULL, _tmprmfile, NULL };
 
 #endif /*_tmp_rmfail*/
 
-static int _rmtmp(Sfio_t* f, char* file)
+static int _rmtmp(char* file)
 {
 #if _tmp_rmfail	/* remove only when stream is closed */
-	reg File_t*	ff;
+	File_t*	ff;
 
 	if(!File)
 		atexit(_rmfiles);
@@ -128,57 +126,12 @@ static int _rmtmp(Sfio_t* f, char* file)
 	return 0;
 }
 
-#if !_PACKAGE_ast
-#define		TMPDFLT		"/tmp"
-static char	**Tmppath, **Tmpcur;
-
-char** _sfgetpath(char* path)
-{	reg char	*p, **dirs;
-	reg int		n;
-
-	if(!(path = getenv(path)) )
-		return NIL(char**);
-
-	for(p = path, n = 0;;)	/* count number of directories */
-	{	while(*p == ':')
-			++p;
-		if(*p == 0)
-			break;
-		n += 1;
-		while(*p && *p != ':')	/* skip dir name */
-			++p;
-	}
-	if(n == 0 || !(dirs = (char**)malloc((n+1)*sizeof(char*))) )
-		return NIL(char**);
-	if(!(p = strdup(path)) )
-	{	free(dirs);
-		return NIL(char**);
-	}
-	for(n = 0;; ++n)
-	{	while(*p == ':')
-			++p;
-		if(*p == 0)
-			break;
-		dirs[n] = p;
-		while(*p && *p != ':')
-			++p;
-		if(*p == ':')
-			*p++ = 0;
-	}
-	dirs[n] = NIL(char*);
-
-	return dirs;
-}
-
-#endif /*!_PACKAGE_ast*/
-
-static int _tmpfd(Sfio_t* f)
+static int _tmpfd(void)
 {
-	reg char*	file;
-	int		fd;
+	char*	file;
+	int	fd;
 
-#if _PACKAGE_ast
-# if defined(__linux__) && _lib_statfs
+#if defined(__linux__) && _lib_statfs
 	/*
 	 * Use the area of POSIX shared memory objects for the new temporary file descriptor
 	 * that is do not access the HDD or SSD but only the memory based tmpfs of the POSIX SHM
@@ -189,151 +142,86 @@ static int _tmpfd(Sfio_t* f)
 	{
 		struct statfs fs;
 		if (statfs(shm, &fs) < 0 || fs.f_type != TMPFS_MAGIC || eaccess(shm, W_OK|X_OK))
-			shm = NiL;
+			shm = NULL;
 		doshm++;
 	}
-	if(!(file = pathtemp(NiL,PATH_MAX,shm,"sf",&fd)))
-# else
-	if(!(file = pathtemp(NiL,PATH_MAX,NiL,"sf",&fd)))
-# endif
+	if(!(file = pathtemp(NULL,PATH_MAX,shm,"sf",&fd)))
+#else
+	if(!(file = pathtemp(NULL,PATH_MAX,NULL,"sf",&fd)))
+#endif
 		return -1;
-	_rmtmp(f, file);
+	_rmtmp(file);
 	free(file);
-#else
-	int		t;
-
-	/* set up path of dirs to create temp files */
-	if(!Tmppath && !(Tmppath = _sfgetpath("TMPPATH")) )
-	{	if(!(Tmppath = (char**)malloc(2*sizeof(char*))) )
-			return -1;
-		if(!(file = getenv("TMPDIR")) )
-			file = TMPDFLT;
-		if(!(Tmppath[0] = strdup(file)) )
-		{	free(Tmppath);
-			Tmppath = NIL(char**);
-			return -1;
-		}
-		Tmppath[1] = NIL(char*);
-	}
-
-	/* set current directory to create this temp file */
-	if(Tmpcur)
-		Tmpcur += 1;
-	if(!Tmpcur || !Tmpcur[0])
-		Tmpcur = Tmppath;
-
-	fd = -1;
-	for(t = 0; t < 10; ++t)
-	{	/* compute a random name */
-		static ulong	Key, A;
-		if(A == 0 || t > 0)	/* get a quasi-random coefficient */
-		{	reg int	r;
-			A = (ulong)time(NIL(time_t*)) ^ (((ulong)(&t)) >> 3);
-			if(Key == 0)
-				Key = (A >> 16) | ((A&0xffff)<<16);
-			A ^= Key;
-			if((r = (A-1) & 03) != 0) /* Knuth vol.2, page.16, Thm.A */
-				A += 4-r;
-		}
-
-		Key = A*Key + 987654321;
-		file = sfprints("%s/sf%3.3.32lu.%3.3.32lu",
-				Tmpcur[0], (Key>>15)&0x7fff, Key&0x7fff);
-		if(!file)
-			return -1;
-#if _has_oflags
-		if((fd = open(file,O_RDWR|O_CREAT|O_EXCL|O_TEMPORARY,SF_CREATMODE)) >= 0)
-			break;
-#else
-		if((fd = open(file,O_RDONLY)) >= 0)
-		{	/* file already exists */
-			CLOSE(fd);
-			fd = -1;
-		}
-		else if((fd = creat(file,SF_CREATMODE)) >= 0)
-		{	/* reopen for read and write */
-			CLOSE(fd);
-			if((fd = open(file,O_RDWR)) >= 0)
-				break;
-
-			/* don't know what happened but must remove file */
-			while(remove(file) < 0 && errno == EINTR)
-				errno = 0;
-		}
-#endif /* _has_oflags */
-	}
-	if(fd >= 0)
-		_rmtmp(f, file);
-#endif /* _PACKAGE_ast */
 	return fd;
 }
 
 static int _tmpexcept(Sfio_t* f, int type, void* val, Sfdisc_t* disc)
 {
-	reg int		fd, m;
-	reg Sfio_t*	sf;
+	int		fd, m;
+	Sfio_t*		sf;
 	Sfio_t		newf, savf;
 	Sfnotify_f	notify = _Sfnotify;
 
-	NOTUSED(val);
+	NOT_USED(val);
+	NOT_USED(disc);
 
 	/* the discipline needs to change only under the following exceptions */
-	if(type != SF_WRITE && type != SF_SEEK &&
-	   type != SF_DPUSH && type != SF_DPOP && type != SF_DBUFFER)
+	if(type != SFIO_WRITE && type != SFIO_SEEK &&
+	   type != SFIO_DPUSH && type != SFIO_DPOP && type != SFIO_DBUFFER)
 		return 0;
 
 	/* try to create the temp file */
 	SFCLEAR(&newf);
-	newf.flags = SF_STATIC;
-	newf.mode = SF_AVAIL;
+	newf.flags = SFIO_STATIC;
+	newf.mode = SFIO_AVAIL;
 
-	if((fd = _tmpfd(f)) < 0 )
+	if((fd = _tmpfd()) < 0 )
 		return -1;
 
 	/* make sure that the notify function won't be called here since
 	   we are only interested in creating the file, not the stream */
 	_Sfnotify = 0;
-	sf = sfnew(&newf,NIL(void*),(size_t)SF_UNBOUND,fd,SF_READ|SF_WRITE);
+	sf = sfnew(&newf,NULL,(size_t)SFIO_UNBOUND,fd,SFIO_READ|SFIO_WRITE);
 	_Sfnotify = notify;
 	if(!sf)
 		return -1;
 
 	/* make sure that new stream has the same mode */
-	if((m = f->flags&(SF_READ|SF_WRITE)) != (SF_READ|SF_WRITE))
-		sfset(sf, ((~m)&(SF_READ|SF_WRITE)), 0);
-	sfset(sf, (f->mode&(SF_READ|SF_WRITE)), 1);
+	if((m = f->flags&(SFIO_READ|SFIO_WRITE)) != (SFIO_READ|SFIO_WRITE))
+		sfset(sf, ((~m)&(SFIO_READ|SFIO_WRITE)), 0);
+	sfset(sf, (f->mode&(SFIO_READ|SFIO_WRITE)), 1);
 
 	/* now remake the old stream into the new image */
-	memcpy((void*)(&savf), (void*)f, sizeof(Sfio_t));
-	memcpy((void*)f, (void*)sf, sizeof(Sfio_t));
+	memcpy(&savf, f, sizeof(Sfio_t));
+	memcpy(f, sf, sizeof(Sfio_t));
 	f->push = savf.push;
 	f->pool = savf.pool;
 	f->rsrv = savf.rsrv;
 	f->proc = savf.proc;
 	f->stdio = savf.stdio;
 
-	/* remove the SF_STATIC bit if it was only set above in making newf */
-	if(!(savf.flags&SF_STATIC) )
-		f->flags &= ~SF_STATIC;
+	/* remove the SFIO_STATIC bit if it was only set above in making newf */
+	if(!(savf.flags&SFIO_STATIC) )
+		f->flags &= ~SFIO_STATIC;
 
 	if(savf.data)
 	{	SFSTRSIZE(&savf);
-		if(!(savf.flags&SF_MALLOC) )
-			(void)sfsetbuf(f,(void*)savf.data,savf.size);
+		if(!(savf.flags&SFIO_MALLOC) )
+			(void)sfsetbuf(f,savf.data,savf.size);
 		if(savf.extent > 0)
-			(void)sfwrite(f,(void*)savf.data,(size_t)savf.extent);
+			(void)sfwrite(f,savf.data,(size_t)savf.extent);
 		(void)sfseek(f,(Sfoff_t)(savf.next - savf.data),SEEK_SET);
-		if((savf.flags&SF_MALLOC) )
-			free((void*)savf.data);
+		if((savf.flags&SFIO_MALLOC) )
+			free(savf.data);
 	}
 
 	/* announce change of status */
-	f->disc = NIL(Sfdisc_t*);
+	f->disc = NULL;
 	if(_Sfnotify)
-		(*_Sfnotify)(f, SF_SETFD, (void*)((long)f->file));
+		(*_Sfnotify)(f, SFIO_SETFD, (void*)((long)f->file));
 
 	/* erase all traces of newf */
-	newf.data = newf.endb = newf.endr = newf.endw = NIL(uchar*);
+	newf.data = newf.endb = newf.endr = newf.endw = NULL;
 	newf.file = -1;
 	_Sfnotify = 0;
 	sfclose(&newf);
@@ -347,37 +235,37 @@ Sfio_t* sftmp(size_t s)
 	Sfio_t		*f;
 	int		rv;
 	Sfnotify_f	notify = _Sfnotify;
-	static Sfdisc_t	Tmpdisc = 
-			{ NIL(Sfread_f), NIL(Sfwrite_f), NIL(Sfseek_f), _tmpexcept,
-#if _tmp_rmfail	
+	static Sfdisc_t	Tmpdisc =
+			{ NULL, NULL, NULL, _tmpexcept,
+#if _tmp_rmfail
 			  &Rmdisc
 #else
-			NIL(Sfdisc_t*)
+			NULL
 #endif
 			};
 
 	/* start with a memory resident stream */
 	_Sfnotify = 0; /* local computation so no notification */
-	f = sfnew(NIL(Sfio_t*),NIL(char*),s,-1,SF_STRING|SF_READ|SF_WRITE);
+	f = sfnew(NULL,NULL,s,-1,SFIO_STRING|SFIO_READ|SFIO_WRITE);
 	_Sfnotify = notify;
 	if(!f)
-		return NIL(Sfio_t*);
+		return NULL;
 
-	if(s != (size_t)SF_UNBOUND)	/* set up a discipline for out-of-bound, etc. */
+	if(s != (size_t)SFIO_UNBOUND)	/* set up a discipline for out-of-bound, etc. */
 		f->disc = &Tmpdisc;
 
 	if(s == 0) /* make the file now */
 	{	_Sfnotify = 0; /* local computation so no notification */
-		rv =  _tmpexcept(f,SF_DPOP,NIL(void*),f->disc);
+		rv =  _tmpexcept(f,SFIO_DPOP,NULL,f->disc);
 		_Sfnotify = notify;
 		if(rv < 0)
 		{	sfclose(f);
-			return NIL(Sfio_t*);
+			return NULL;
 		}
 	}
 
 	if(_Sfnotify)
-		(*_Sfnotify)(f, SF_NEW, (void*)((long)f->file));
+		(*_Sfnotify)(f, SFIO_NEW, (void*)((long)f->file));
 
 	return f;
 }

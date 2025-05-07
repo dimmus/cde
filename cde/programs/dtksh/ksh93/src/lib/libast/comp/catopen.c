@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -79,7 +80,7 @@ _ast_catopen(const char* name, int flag)
 #if DEBUG_trace
 sfprintf(sfstderr, "AHA#%d:%s %s LC_MESSAGES=%s:%s\n", __LINE__, __FILE__, name, _ast_setlocale(LC_MESSAGES, 0), setlocale(LC_MESSAGES, 0));
 #endif
-	if ((s = mcfind(NiL, name, LC_MESSAGES, flag, path, sizeof(path))) && (ip = sfopen(NiL, s, "r")))
+	if ((s = mcfind(NULL, name, LC_MESSAGES, flag, path, sizeof(path))) && (ip = sfopen(NULL, s, "r")))
 	{
 #if DEBUG_trace
 sfprintf(sfstderr, "AHA#%d:%s %s\n", __LINE__, __FILE__, s);
@@ -90,7 +91,7 @@ sfprintf(sfstderr, "AHA#%d:%s %s\n", __LINE__, __FILE__, s);
 			return (_ast_nl_catd)mc;
 	}
 #if _lib_catopen
-	if (strcmp(setlocale(LC_MESSAGES, NiL), "debug"))
+	if (strcmp(setlocale(LC_MESSAGES, NULL), "debug"))
 	{
 		Cc_t*		cc;
 		nl_catd		d;
@@ -149,7 +150,7 @@ _ast_catgets(_ast_nl_catd cat, int set, int num, const char* msg)
 		{
 			s = (char*)msg;
 			n = strlen(s);
-			iconv_write(((Cc_t*)cat)->cvt, ((Cc_t*)cat)->tmp, &s, &n, NiL);
+			iconv_write(((Cc_t*)cat)->cvt, ((Cc_t*)cat)->tmp, &s, &n, NULL);
 			if (s = sfstruse(((Cc_t*)cat)->tmp))
 				return s;
 		}

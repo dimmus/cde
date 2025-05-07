@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -32,11 +32,11 @@
  */
 
 void*
-swapmem(int op, const void* from, void* to, register size_t n)
+swapmem(int op, const void* from, void* to, size_t n)
 {
-	register char*	f = (char*)from;
-	register char*	t = (char*)to;
-	register int	c;
+	char*	f = (char*)from;
+	char*	t = (char*)to;
+	int	c;
 
 	switch (op & (n - 1))
 	{

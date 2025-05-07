@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -27,7 +28,7 @@
 #include <fcntl.h>
 
 static const char usage[] =
-"[-?\n@(#)$Id: cat (AT&T Research) 2012-05-31 $\n]"
+"[-?\n@(#)$Id: cat (ksh 93u+m) 2022-08-30 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?cat - concatenate files]"
 "[+DESCRIPTION?\bcat\b copies each \afile\a in sequence to the standard"
@@ -60,7 +61,7 @@ static const char usage[] =
 "[E:show-ends?Causes a \b$\b to be inserted before each new-line.]"
 "[R:regress?Regression test defaults: \b-v\b buffer size 4.]"
 "[S:silent?\bcat\b is silent about non-existent files.]"
-"[T:show-blank?Causes tabs to be copied as \b^I\b and formfeeds as \b^L\b.]"
+"[T:show-blank|show-tabs?Causes tabs to be copied as \b^I\b.]"
 
 "\n"
 "\n[file ...]\n"
@@ -117,25 +118,25 @@ regress(Sfio_t* sp, ssize_t n, int f)
  */
 
 static int
-vcat(register char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags)
+vcat(char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags)
 {
-	register unsigned char*	cp;
-	register unsigned char*	pp;
-	unsigned char*		cur;
-	unsigned char*		end;
-	unsigned char*		buf;
-	unsigned char*		nxt;
-	register int		n;
-	register int		line;
-	register int		raw;
-	int			last;
-	int			c;
-	int			m;
-	int			any;
-	int			header;
+	unsigned char*	cp;
+	unsigned char*	pp;
+	unsigned char*	cur;
+	unsigned char*	end;
+	unsigned char*	buf;
+	unsigned char*	nxt;
+	int		n;
+	int		line;
+	int		raw;
+	int		last;
+	int		c;
+	int		m;
+	int		any;
+	int		header;
 
-	unsigned char		meta[3];
-	unsigned char		tmp[32];
+	unsigned char	meta[3];
+	unsigned char	tmp[32];
 
 	meta[0] = 'M';
 	last = -1;
@@ -183,7 +184,7 @@ vcat(register char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags
 								else
 								{
 									memcpy(tmp, pp, c);
-									if (!(nxt = (unsigned char*)(*reserve)(ip, SF_UNBOUND, 0)))
+									if (!(nxt = (unsigned char*)(*reserve)(ip, SFIO_UNBOUND, 0)))
 									{
 										states[0] = sfvalue(ip) ? T_ERROR : T_EOF;
 										*(cp = end = tmp + sizeof(tmp) - 1) = 0;
@@ -267,7 +268,7 @@ vcat(register char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags
 				goto flush;
 			}
 			c = last;
-			if (!(nxt = (unsigned char*)(*reserve)(ip, SF_UNBOUND, 0)))
+			if (!(nxt = (unsigned char*)(*reserve)(ip, SFIO_UNBOUND, 0)))
 			{
 				*(cp = end = tmp + sizeof(tmp) - 1) = 0;
 				states[0] = (m = sfvalue(ip)) ? T_ERROR : T_EOF;
@@ -344,7 +345,7 @@ vcat(register char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags
 				{
 					if (cp < end || last != '\n')
 						break;
-					if (!(nxt = (unsigned char*)(*reserve)(ip, SF_UNBOUND, 0)))
+					if (!(nxt = (unsigned char*)(*reserve)(ip, SFIO_UNBOUND, 0)))
 					{
 						states[0] = sfvalue(ip) ? T_ERROR : T_EOF;
 						cp = end = tmp;
@@ -391,18 +392,18 @@ vcat(register char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags
 int
 b_cat(int argc, char** argv, Shbltin_t* context)
 {
-	register int		n;
-	register int		flags = 0;
-	register char*		cp;
-	register Sfio_t*	fp;
-	char*			mode;
-	Reserve_f		reserve = sfreserve;
-	int			att;
-	int			dovcat = 0;
-	char			states[UCHAR_MAX+1];
+	int		n;
+	int		flags = 0;
+	char*		cp;
+	Sfio_t*		fp;
+	char*		mode;
+	Reserve_f	reserve = sfreserve;
+	int		att;
+	int		dovcat = 0;
+	char		states[UCHAR_MAX+1];
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
-	att = !strcmp(astconf("UNIVERSE", NiL, NiL), "att");
+	att = !strcmp(astconf("UNIVERSE", NULL, NULL), "att");
 	mode = "r";
 	for (;;)
 	{
@@ -458,8 +459,9 @@ b_cat(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		if (!n)
 			break;
@@ -471,7 +473,7 @@ b_cat(int argc, char** argv, Shbltin_t* context)
 	argv += opt_info.index;
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	memset(states, 0, sizeof(states));
@@ -510,7 +512,7 @@ b_cat(int argc, char** argv, Shbltin_t* context)
 		dovcat = 1;
 	}
 	if (flags&d_FLAG)
-		sfopen(sfstdout, NiL, "wt");
+		sfopen(sfstdout, NULL, "wt");
 	if (cp = *argv)
 		argv++;
 	do
@@ -519,9 +521,9 @@ b_cat(int argc, char** argv, Shbltin_t* context)
 		{
 			fp = sfstdin;
 			if (flags&D_FLAG)
-				sfopen(fp, NiL, mode);
+				sfopen(fp, NULL, mode);
 		}
-		else if (!(fp = sfopen(NiL, cp, mode)))
+		else if (!(fp = sfopen(NULL, cp, mode)))
 		{
 			if (!(flags&F_FLAG))
 				error(ERROR_system(0), "%s: cannot open", cp);
@@ -529,10 +531,10 @@ b_cat(int argc, char** argv, Shbltin_t* context)
 			continue;
 		}
 		if (flags&U_FLAG)
-			sfsetbuf(fp, (void*)fp, -1);
+			sfsetbuf(fp, fp, -1);
 		if (dovcat)
 			n = vcat(states, fp, sfstdout, reserve, flags);
-		else if (sfmove(fp, sfstdout, SF_UNBOUND, -1) >= 0 && sfeof(fp))
+		else if (sfmove(fp, sfstdout, SFIO_UNBOUND, -1) >= 0 && sfeof(fp))
 			n = 0;
 		else
 			n = -1;
@@ -551,6 +553,6 @@ b_cat(int argc, char** argv, Shbltin_t* context)
 	if (sfsync(sfstdout))
 		error(ERROR_system(0), "write error");
 	if (flags&d_FLAG)
-		sfopen(sfstdout, NiL, "w");
+		sfopen(sfstdout, NULL, "w");
 	return error_info.errors;
 }

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -36,7 +37,7 @@
 #include <ctype.h>
 
 Recfmt_t
-recstr(register const char* s, char** e)
+recstr(const char* s, char** e)
 {
 	char*	t;
 	int	n;
@@ -69,7 +70,7 @@ recstr(register const char* s, char** e)
 	case '+':
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
-		n = strton(s, &t, NiL, 0);
+		n = strton(s, &t, NULL, 0);
 		if (n > 0 && t > (char*)s)
 		{
 			if (e)

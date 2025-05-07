@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,9 +14,9 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
-#pragma clang diagnostic ignored "-Wincompatible-library-redeclaration"
 /*
  * strtoll() implementation
  */
@@ -34,5 +34,10 @@
 #define S2I_function	strtoll
 #define S2I_number	intmax_t
 #define S2I_unumber	uintmax_t
+
+/* on macOS arm64, long == long long, causing a false-positive "incompatible library declaration" warning on clang */
+#if _ast_intmax_long && __clang__
+#pragma clang diagnostic ignored "-Wincompatible-library-redeclaration"
+#endif
 
 #include "strtoi.h"

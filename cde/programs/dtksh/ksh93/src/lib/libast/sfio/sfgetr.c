@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -33,21 +33,21 @@ char* sfgetr(Sfio_t*	f,	/* stream to read from	*/
 	int		found;
 	Sfrsrv_t*	rsrv;
 
-	if(!f || rc < 0 || (f->mode != SF_READ && _sfmode(f,SF_READ,0) < 0))
-		return NIL(char*);
+	if(!f || rc < 0 || (f->mode != SFIO_READ && _sfmode(f,SFIO_READ,0) < 0))
+		return NULL;
 	SFLOCK(f,0);
 
 	/* buffer to be returned */
-	rsrv = NIL(Sfrsrv_t*);
-	us = NIL(uchar*);
+	rsrv = NULL;
+	us = NULL;
 	un = 0;
 	found = 0;
 
 	/* compatibility mode */
-	type = type < 0 ? SF_LASTR : type == 1 ? SF_STRING : type;
+	type = type < 0 ? SFIO_LASTR : type == 1 ? SFIO_STRING : type;
 
-	if(type&SF_LASTR) /* return the broken record */
-	{	if((f->flags&SF_STRING) && (un = f->endb - f->next))
+	if(type&SFIO_LASTR) /* return the broken record */
+	{	if((f->flags&SFIO_STRING) && (un = f->endb - f->next))
 		{	us = f->next;
 			f->next = f->endb;
 			found = 1;
@@ -64,38 +64,32 @@ char* sfgetr(Sfio_t*	f,	/* stream to read from	*/
 		if((n = (ends = f->endb) - (s = f->next)) <= 0)
 		{	/* for unseekable devices, peek-read 1 record */
 			f->getr = rc;
-			f->mode |= SF_RC;
+			f->mode |= SFIO_RC;
 
 			/* fill buffer the conventional way */
 			if(SFRPEEK(f,s,n) <= 0)
-			{	us = NIL(uchar*);
+			{	us = NULL;
 				goto done;
 			}
 			else
 			{	ends = s+n;
-				if(f->mode&SF_RC)
+				if(f->mode&SFIO_RC)
 				{	s = ends[-1] == rc ? ends-1 : ends;
 					goto do_copy;
 				}
 			}
 		}
 
-#if _lib_memchr
 		if(!(s = (uchar*)memchr((char*)s,rc,n)))
 			s = ends;
-#else
-		while(*s != rc)
-			if((s += 1) == ends)
-				break;
-#endif
 	do_copy:
 		if(s < ends) /* found separator */
 		{	s += 1;		/* include the separator */
 			found = 1;
 
 			if(!us &&
-			   (!(type&SF_STRING) || !(f->flags&SF_STRING) ||
-			    ((f->flags&SF_STRING) && (f->bits&SF_BOTH) ) ) )
+			   (!(type&SFIO_STRING) || !(f->flags&SFIO_STRING) ||
+			    ((f->flags&SFIO_STRING) && (f->bits&SFIO_BOTH) ) ) )
 			{	/* returning data in buffer */
 				us = f->next;
 				un = s - f->next;
@@ -107,8 +101,8 @@ char* sfgetr(Sfio_t*	f,	/* stream to read from	*/
 		/* amount to be read */
 		n = s - f->next;
 
-		if(!found && (_Sfmaxr > 0 && un+n+1 >= _Sfmaxr || (f->flags&SF_STRING))) /* already exceed limit */
-		{	us = NIL(uchar*);
+		if(!found && (_Sfmaxr > 0 && un+n+1 >= _Sfmaxr || (f->flags&SFIO_STRING))) /* already exceed limit */
+		{	us = NULL;
 			goto done;
 		}
 
@@ -116,10 +110,10 @@ char* sfgetr(Sfio_t*	f,	/* stream to read from	*/
 		if(!rsrv || rsrv->size < un+n+1)
 		{	if(rsrv)
 				rsrv->slen = un;
-			if((rsrv = _sfrsrv(f,un+n+1)) != NIL(Sfrsrv_t*))
+			if((rsrv = _sfrsrv(f,un+n+1)) != NULL)
 				us = rsrv->data;
 			else
-			{	us = NIL(uchar*);
+			{	us = NULL;
 				goto done;
 			}
 		}
@@ -135,11 +129,11 @@ char* sfgetr(Sfio_t*	f,	/* stream to read from	*/
 done:
 	_Sfi = f->val = un;
 	f->getr = 0;
-	if(found && rc != 0 && (type&SF_STRING) )
+	if(found && rc != 0 && (type&SFIO_STRING) )
 	{	us[un-1] = '\0';
 		if(us >= f->data && us < f->endb)
 		{	f->getr = rc;
-			f->mode |= SF_GETR;
+			f->mode |= SFIO_GETR;
 		}
 	}
 
@@ -149,8 +143,8 @@ done:
 
 	SFOPEN(f,0);
 
-	if(us && (type&SF_LOCKR) )
-	{	f->mode |= SF_PEEK|SF_GETR;
+	if(us && (type&SFIO_LOCKR) )
+	{	f->mode |= SFIO_PEEK|SFIO_GETR;
 		f->endr = f->data;
 	}
 

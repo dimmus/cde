@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -34,18 +34,18 @@
 #undef	modei
 
 int
-modei(register int x)
+modei(int x)
 {
 #if _S_IDPERM
-	return(x & X_IPERM);
+	return x & X_IPERM;
 #else
-	register int	i;
-	register int	c;
+	int	i;
+	int	c;
 
 	i = 0;
 	for (c = 0; c < PERMLEN; c += 2)
 		if (x & permmap[c + 1])
 			i |= permmap[c];
-	return(i);
+	return i;
 #endif
 }

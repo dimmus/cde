@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#         hyenias <58673227+hyenias@users.noreply.github.com>          #
 #                                                                      #
 ########################################################################
 
@@ -49,14 +50,14 @@ then	err_exit ".foo.bar.child=${.foo.bar.child} != child"
 fi
 function func1
 {
-        nameref color=$1
-        func2 color
+	nameref color=$1
+	func2 color
 }
 
 function func2
 {
-        nameref color=$1
-        set -s -- ${!color[@]}
+	nameref color=$1
+	set -s -- ${!color[@]}
 	print -r -- "$@"
 }
 
@@ -174,7 +175,7 @@ do	typeset -n x=$i
 done) != ok ]] && err_exit 'invalid for loop optimization of name references'
 function setval # name value
 {
-        nameref arg=$1
+	nameref arg=$1
 	nameref var=arg.bar
 	var=$2
 }
@@ -183,8 +184,8 @@ setval foo 5
 (( foo.bar == 5)) || err_exit 'nested nameref not working'
 function selfref
 {
-        typeset -n ps=$1
-        print -r -- "${ps}"
+	typeset -n ps=$1
+	print -r -- "${ps}"
 }
 ps=(a=1 b=2)
 [[ $(selfref ps) == *a=1* ]] ||  err_exit 'local nameref cannot reference global variable of the same name'
@@ -212,8 +213,8 @@ unset fun i
 foo=(x=hi)
 function fun
 {
-        nameref i=$1
-        print -r -- "${i.x}"
+	nameref i=$1
+	print -r -- "${i.x}"
 }
 i=foo
 [[ $(fun $i) == hi ]] || err_exit 'nameref for compound variable with in function name of caller fails'
@@ -245,16 +246,18 @@ i=$($SHELL -c 'nameref foo=bar; bar[2]=(x=3 y=4); nameref x=foo[2].y;print -r --
 ) ==  *foo=hello* ]] || err_exit 'unable to display compound variable from name reference of local variable'
 #set -x
 for c in '=' '[' ']' '\' "'" '"' '<' '=' '('
-do	[[ $($SHELL 2> /dev/null <<- ++EOF++
+do	got=$($SHELL 2> /dev/null <<- ++EOF++
 	i=\\$c;typeset -A a; a[\$i]=foo;typeset -n x=a[\$i]; print "\$x"
 	++EOF++
-) != foo ]] && err_exit 'nameref x=a[$c] '"not working for c=$c"
+	)
+	[[ $got != foo ]] && err_exit 'nameref x=a[$c] '"not working for c=$c (expected 'foo', got $(printf %q "$got"))"
 done
 for c in '=' '[' ']' '\' "'" '"' '<' '=' '('
-do      [[ $($SHELL 2> /dev/null <<- ++EOF++
+do      got=$($SHELL 2> /dev/null <<- ++EOF++
 	i=\\$c;typeset -A a; a[\$i]=foo;b=a[\$i];typeset -n x=\$b; print "\$x"
 	++EOF++
-) != foo ]] && err_exit 'nameref x=$b with b=a[$c] '"not working for c=$c"
+	)
+	[[ $got != foo ]] && err_exit 'nameref x=$b with b=a[$c] '"not working for c=$c (expected 'foo', got $(printf %q "$got"))"
 done
 
 unset -n foo x
@@ -324,16 +327,16 @@ ref=x
 [[ $ref == 3 ]] || err_exit "\$ref is $ref, it should be 3"
 function foobar
 {
-        typeset fvar=()
-        typeset -n ref=fvar.foo
-        ref=ok
-        print -r $ref
+	typeset fvar=()
+	typeset -n ref=fvar.foo
+	ref=ok
+	print -r $ref
 }
 [[ $(foobar) ==  ok ]] 2> /dev/null  || err_exit 'nameref in function not creating variable in proper scope'
 function foobar
 {
-        nameref doc=docs
-        nameref bar=doc.num
+	nameref doc=docs
+	nameref bar=doc.num
 	[[ $bar == 2 ]] || err_exit 'nameref scoping error'
 }
 
@@ -343,7 +346,7 @@ foobar
 typeset +n x y
 unset x y
 typeset -A x
-x[a]=(b=c)  
+x[a]=(b=c)
 typeset -n y=x[a]
 [[ ${!y.@} == 'x[a].b' ]] || err_exit 'reference to array element not expanded with ${!y.@}'
 
@@ -384,7 +387,7 @@ typeset -T container_t=(
 function fun1
 {
 	container_t -S container
-	fun2 container 
+	fun2 container
 	[[ $container == *foo=bar* ]] || err_exit 'name references to static type variables in parent scope not working'
 }
 fun1
@@ -403,7 +406,7 @@ compound container
 fun3
 [[ $container == *foo=bar* ]] || err_exit 'name reference to a name reference variable in a function not working'
 
-typeset -A x=( [a]=1 ) 
+typeset -A x=( [a]=1 )
 nameref c=x[h]
 [[ -v x[h] ]] && err_exit 'creating reference to non-existent associative array element causes element to get added'
 
@@ -435,12 +438,12 @@ nameref z=ar[0]
 
 unset c x
 typeset +n c x
-compound c=( typeset -a x )  
+compound c=( typeset -a x )
 nameref x=c.x
 x[4]=1
 [[ ${ typeset -p c.x ;} == *-C* ]] && err_exit 'c.x should not have -C attributes'
 
-{ $SHELL 2> /dev/null  <<- \EOF 
+{ $SHELL 2> /dev/null  <<- \EOF
 	typeset -T xxx_t=(
 		float x=1 y=2
 		typeset name=abc
@@ -463,12 +466,12 @@ fi
 typeset +n nr
 unset c nr
 compound c
-compound -A c.a 
+compound -A c.a
 nameref nr=c.a[hello]
 [[ ${!nr} == "c.a[hello]" ]] || err_exit 'name reference nr to unset associative array instance does not expand ${!nr} correctly.'
 
 typeset +n nr
-compound -a c.b 
+compound -a c.b
 nameref nr=c.b[2]
 [[ ${!nr} == "c.b[2]" ]] || err_exit 'name reference nr to unset indexed array instance does not expand ${!nr} correctly.'
 
@@ -514,7 +517,7 @@ function add_file_to_tree
 	node.elements[/]=(filepath=foobar)
 }
 function main
-{	
+{
 	compound filetree
 	add_file_to_tree filetree
 }
@@ -591,7 +594,9 @@ function read_c
 }
 print "( typeset -i x=36 ) " | read_c ar[5][9][2]
 exp=$'(\n\ttypeset -a [5]=(\n\t\ttypeset -a [9]=(\n\t\t\t[2]=(\n\t\t\t\ttypeset -i x=36\n\t\t\t)\n\t\t)\n\t)\n)'
-[[ $(print -v ar) == "$exp" ]] || err_exit 'read into nameref of global array instance from within a function fails'
+got=$(print -v ar)
+[[ $got == "$exp" ]] || err_exit 'read into nameref of global array instance from within a function fails' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
 function read_c
 {
@@ -604,7 +609,9 @@ function main
 	nameref nar=ar
 	print "( typeset -i x=36 ) " | read_c nar[5][9][2]
 	exp=$'(\n\ttypeset -a [5]=(\n\t\ttypeset -a [9]=(\n\t\t\t[2]=(\n\t\t\t\ttypeset -i x=36\n\t\t\t)\n\t\t)\n\t)\n)'
-	[[ $(print -v nar) == "$exp" ]] || err_exit 'read from a nameref variable from calling scope fails'
+	got=$(print -v nar)
+	[[ $got == "$exp" ]] || err_exit 'read from a nameref variable from calling scope fails' \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 }
 main
 
@@ -625,7 +632,9 @@ function main
 	nameref l4=c.l[4]
 	printf "( typeset -a ar=( 1\n2\n3\n) b=1 )\n" | rf l4
 	exp=$'(\n\ttypeset -C -A l=(\n\t\t[4]=(\n\t\t\ttypeset -a ar=(\n\t\t\t\t1\n\t\t\t\t2\n\t\t\t\t3\n\t\t\t)\n\t\t\tb=1\n\t\t)\n\t)\n)'
-	[[ $(print -v c) == "$exp" ]] || err_exit 'read -C with nameref to array element fails'
+	got=$(print -v c)
+	[[ $got == "$exp" ]] || err_exit 'read -C with nameref to array element fails' \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 }
 main
 
@@ -682,7 +691,84 @@ typeset -n ref='arr[2]'
 
 $SHELL  2> /dev/null -c 'function x { nameref lv=gg ; compound -A lv.c=( [4]=( x=1 )) ; } ; compound gg ; x' || err_exit 'compound array assignment with nameref in a function failed'
 
-$SHELL -c 'unset -n KSH_VERSION' 2> /dev/null || err_exit 'Unable to unset nameref KSH_VERSION.'
+# ======
+exp=''
+got=$("$SHELL" -c 'unset -n KSH_VERSION; typeset -p KSH_VERSION' 2>&1)
+[[ e=$? -eq 0 && $got == "$exp" ]] || err_exit "unable to unset nameref KSH_VERSION" \
+	"(expected status 0 and $(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+# ======
+# bug introduced in ksh 93u 2010-11-22
+# https://github.com/ksh93/ksh/discussions/574
+exp=': d: invalid self reference'
+got=$(nameref a=b b=c c=d d=a 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit 'self-reference loop detection' \
+	"(expected status 1, *$(printf %q "$exp"); got status $e, $(printf %q "$got"))"
+
+# ======
+# test assigning array values to an unset nameref; this now produces a warning and should no longer crash
+# https://github.com/ksh93/ksh/issues/678
+
+exp=$': warning: unsetref: removing nameref attribute\ntypeset -C unsetref=()'
+got=$("$SHELL" -c 'nameref unsetref; unsetref+=(); typeset -p unsetref' 2>&1)
+[[ e=$? -eq 0 && $got == *"$exp" ]] || err_exit "unsetref+=() misbehaves" \
+	"(expected status 0 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$("$SHELL" -c 'nameref unsetref; unsetref=(); typeset -p unsetref' 2>&1)
+[[ e=$? -eq 0 && $got == *"$exp" ]] || err_exit "unsetref=() misbehaves" \
+	"(expected status 0 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+exp=$': warning: unsetref: removing nameref attribute\ntypeset -a unsetref=(foo bar)'
+got=$("$SHELL" -c 'nameref unsetref; unsetref+=(foo bar); typeset -p unsetref' 2>&1)
+[[ e=$? -eq 0 && $got == *"$exp" ]] || err_exit "unsetref+=(foo bar) misbehaves" \
+	"(expected status 0 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$("$SHELL" -c 'nameref unsetref; unsetref=(foo bar); typeset -p unsetref' 2>&1)
+[[ e=$? -eq 0 && $got == *"$exp" ]] || err_exit "unsetref=(foo bar) misbehaves" \
+	"(expected status 0 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+exp=$': warning: unsetref: removing nameref attribute\ntypeset -A unsetref=([x]=foo [y]=bar)'
+got=$("$SHELL" -c 'nameref unsetref; unsetref+=([x]=foo [y]=bar); typeset -p unsetref' 2>&1)
+[[ e=$? -eq 0 && $got == *"$exp" ]] || err_exit "unsetref+=([x]=foo [y]=bar) misbehaves" \
+	"(expected status 0 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$("$SHELL" -c 'nameref unsetref; unsetref=([x]=foo [y]=bar); typeset -p unsetref' 2>&1)
+[[ e=$? -eq 0 && $got == *"$exp" ]] || err_exit "unsetref=([x]=foo [y]=bar) misbehaves" \
+	"(expected status 0 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+# the following cases should remain errors
+
+exp=': unsetref: no reference name'
+got=$("$SHELL" -c 'nameref unsetref; echo foo $unsetref bar' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "\$unsetref misbehaves" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$("$SHELL" -c 'nameref unsetref; unsetref.foo=bar' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "unsetref.foo=bar misbehaves" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+got=$("$SHELL" -c 'nameref unsetref; unsetref[1]=bar' 2>&1)
+[[ e=$? -eq 1 && $got == *"$exp" ]] || err_exit "unsetref[1]=bar misbehaves" \
+	"(expected status 1 and match of *$(printf %q "$exp")," \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e") and $(printf %q "$got"))"
+
+# ======
+# https://github.com/ksh93/ksh/issues/704
+# test backported from ksh 93v- 2013-02-14
+unset one bar baz arr val vv
+one=1 bar=2 baz=3
+arr=(one bar baz)
+nameref vv
+val=$(
+	for vv in "${arr[@]}"
+	do	print -n -- "$vv"
+	done
+)
+[[ $val == 123 ]] || err_exit 'optimization bug with for loops with references'
 
 # ======
 exit $((Errors<125?Errors:125))

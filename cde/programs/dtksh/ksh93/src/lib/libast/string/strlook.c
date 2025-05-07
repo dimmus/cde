@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -33,14 +33,14 @@
  */
 
 void*
-strlook(const void* tab, size_t siz, register const char* name)
+strlook(const void* tab, size_t siz, const char* name)
 {
-	register char*	t = (char*)tab;
-	register char*	s;
-	register int	c = *name;
+	char*	t = (char*)tab;
+	char*	s;
+	int	c = *name;
 
 	for (; s = *((char**)t); t += siz)
 		if (*s == c && !strcmp(s, name))
-			return (void*)t;
-	return 0;
+			return t;
+	return NULL;
 }

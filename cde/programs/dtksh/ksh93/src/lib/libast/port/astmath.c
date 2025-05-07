@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,32 +14,39 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
  * used to test if -last requires -lm
  *
- *	arch		-last			-lm
- *	----		-----			---
- *	linux.sparc	sfdlen,sfputd		frexp,ldexp	
+ * This program is compiled and linked from a probe script in libast/Mamfile
+ * but never actually run. It is only used to check if linking succeeds
+ * without or with -lm.
+ *
+ * For that test to work correctly, we must work around compiler optimization.
+ * The rand() calls are to stop the result from being considered known at
+ * compile time, which would cause modern compilers to optimize out the probe
+ * calls, which would in turn cause linking to succeed where it shouldn't.
  */
 
 #if N >= 8
 #define _ISOC99_SOURCE	1
 #endif
 
+#include <stdlib.h>
 #include <math.h>
 
 int
-main()
+main(void)
 {
 #if N & 1
-	long double	value = 0;
+	long double	value = rand();
 #else
-	double		value = 0;
+	double		value = rand();
 #endif
 #if N < 5
-	int		exp = 0;
+	int		exp = rand();
 #endif
 
 #if N == 1

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -43,7 +43,7 @@ static double		pow2tab[DBL_MAX_EXP + 1];
 static int
 init(void)
 {
-	register int	x;
+	int		x;
 	double		g;
 
 	g = 1;
@@ -66,9 +66,9 @@ init(void)
 extern double
 frexp(double f, int* p)
 {
-	register int	k;
-	register int	x;
-	double		g;
+	int	k;
+	int	x;
+	double	g;
 
 	INIT();
 
@@ -132,7 +132,7 @@ frexp(double f, int* p)
 #if !_lib_ldexp
 
 extern double
-ldexp(double f, register int x)
+ldexp(double f, int x)
 {
 	INIT();
 	if (x < 0)

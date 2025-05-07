@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -150,9 +150,9 @@ openfile(const char* path, const char* mode)
 	if (!path || streq(path, "-") || streq(path, "/dev/stdin") || streq(path, "/dev/fd/0"))
 	{
 		sp = sfstdin;
-		sfopen(sp, NiL, mode);
+		sfopen(sp, NULL, mode);
 	}
-	else if (!(sp = sfopen(NiL, path, mode)))
+	else if (!(sp = sfopen(NULL, path, mode)))
 		error(ERROR_SYSTEM|2, "%s: cannot read", path);
 	return sp;
 }
@@ -174,10 +174,10 @@ closefile(Sfio_t* sp)
 static void
 pr(State_t* state, Sfio_t* op, Sfio_t* ip, char* file, int perm, struct stat* st, Sfio_t* check)
 {
-	register char*	p;
-	register char*	r;
-	register char*	e;
-	register int	peek;
+	char*		p;
+	char*		r;
+	char*		e;
+	int		peek;
 	struct stat	ss;
 
 	if (check)
@@ -194,7 +194,7 @@ pr(State_t* state, Sfio_t* op, Sfio_t* ip, char* file, int perm, struct stat* st
 	if (state->text)
 	{
 		peek = 0;
-		while (p = sfreserve(ip, SF_UNBOUND, 0))
+		while (p = sfreserve(ip, SFIO_UNBOUND, 0))
 		{
 			e = p + sfvalue(ip);
 			if (peek)
@@ -220,7 +220,7 @@ pr(State_t* state, Sfio_t* op, Sfio_t* ip, char* file, int perm, struct stat* st
 			sumblock(state->sum, "\r", 1);
 	}
 	else
-		while (p = sfreserve(ip, SF_UNBOUND, 0))
+		while (p = sfreserve(ip, SFIO_UNBOUND, 0))
 			sumblock(state->sum, p, sfvalue(ip));
 	if (sfvalue(ip))
 		error(ERROR_SYSTEM|2, "%s: read error", file);
@@ -252,15 +252,15 @@ pr(State_t* state, Sfio_t* op, Sfio_t* ip, char* file, int perm, struct stat* st
  */
 
 static void
-verify(State_t* state, register char* s, char* check, Sfio_t* rp)
+verify(State_t* state, char* s, char* check, Sfio_t* rp)
 {
-	register char*	t;
+	char*		t;
 	char*		e;
 	char*		file;
 	int		attr;
 	int		mode;
-	int		uid;
-	int		gid;
+	int		uid = -1;
+	int		gid = -1;
 	Sfio_t*		sp;
 	struct stat	st;
 
@@ -302,10 +302,10 @@ verify(State_t* state, register char* s, char* check, Sfio_t* rp)
 		}
 		if (sp = openfile(file, "rb"))
 		{
-			pr(state, rp, sp, file, -1, NiL, NiL);
+			pr(state, rp, sp, file, -1, NULL, NULL);
 			if (!(t = sfstruse(rp)))
 			{
-				error(ERROR_SYSTEM|3, "out of space");
+				error(ERROR_SYSTEM|3, "out of memory");
 				UNREACHABLE();
 			}
 			if (!streq(s, t))
@@ -403,15 +403,15 @@ verify(State_t* state, register char* s, char* check, Sfio_t* rp)
  */
 
 static void
-list(State_t* state, register Sfio_t* lp)
+list(State_t* state, Sfio_t* lp)
 {
-	register char*		file;
-	register Sfio_t*	sp;
+	char*		file;
+	Sfio_t*	sp;
 
 	while (file = sfgetr(lp, '\n', 1))
 		if (sp = openfile(file, state->check ? "rt" : "rb"))
 		{
-			pr(state, sfstdout, sp, file, state->permissions, NiL, state->check);
+			pr(state, sfstdout, sp, file, state->permissions, NULL, state->check);
 			closefile(sp);
 		}
 }
@@ -433,15 +433,17 @@ order(FTSENT* const* f1, FTSENT* const* f2)
 static int
 optinfo(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 {
+	NOT_USED(op);
+	NOT_USED(dp);
 	if (streq(s, "methods"))
 		return sumusage(sp);
 	return 0;
 }
 
 int
-b_cksum(int argc, register char** argv, Shbltin_t* context)
+b_cksum(int argc, char** argv, Shbltin_t* context)
 {
-	register int	flags;
+	int		flags;
 	char*		file;
 	char*		method;
 	Sfio_t*		sp;
@@ -474,7 +476,7 @@ b_cksum(int argc, register char** argv, Shbltin_t* context)
 			continue;
 		case 'c':
 			if (!(state.check = sfstropen()))
-				error(3, "out of space [check]");
+				error(3, "out of memory");
 			continue;
 		case 'h':
 			state.header = 1;
@@ -528,8 +530,9 @@ b_cksum(int argc, register char** argv, Shbltin_t* context)
 			state.text = 1;
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
@@ -539,7 +542,7 @@ b_cksum(int argc, register char** argv, Shbltin_t* context)
 	argv += opt_info.index;
 	if (error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 
@@ -549,8 +552,8 @@ b_cksum(int argc, register char** argv, Shbltin_t* context)
 
 	if (method && !(state.sum = sumopen(method)))
 		error(3, "%s: unknown checksum method", method);
-	if (!state.sum && !(state.sum = sumopen(error_info.id)) && !(state.sum = sumopen(astconf("UNIVERSE", NiL, NiL))))
-		state.sum = sumopen(NiL);
+	if (!state.sum && !(state.sum = sumopen(error_info.id)) && !(state.sum = sumopen(astconf("UNIVERSE", NULL, NULL))))
+		state.sum = sumopen(NULL);
 
 	/*
 	 * do it
@@ -584,14 +587,14 @@ b_cksum(int argc, register char** argv, Shbltin_t* context)
 					closefile(sp);
 				}
 		}
-		else if (sp = openfile(NiL, "rt"))
+		else if (sp = openfile(NULL, "rt"))
 		{
 			list(&state, sp);
 			closefile(sp);
 		}
 	}
 	else if (!*argv && !state.recursive)
-		pr(&state, sfstdout, sfstdin, "/dev/stdin", state.permissions, NiL, state.check);
+		pr(&state, sfstdout, sfstdin, "/dev/stdin", state.permissions, NULL, state.check);
 	else if (!(fts = fts_open(argv, flags, state.sort)))
 	{
 		error(ERROR_system(1), "%s: not found", *argv);
@@ -604,7 +607,7 @@ b_cksum(int argc, register char** argv, Shbltin_t* context)
 			{
 			case FTS_SL:
 				if (!(flags & FTS_PHYSICAL) || (flags & FTS_META) && ent->fts_level == 1)
-					fts_set(NiL, ent, FTS_FOLLOW);
+					fts_set(NULL, ent, FTS_FOLLOW);
 				break;
 			case FTS_F:
 				if (sp = openfile(ent->fts_accpath, "rb"))

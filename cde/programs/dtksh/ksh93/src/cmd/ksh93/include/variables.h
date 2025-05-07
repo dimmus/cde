@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -12,21 +12,21 @@
 *                                                                      *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*             dnewhall <dnewhall@users.noreply.github.com>             *
 *                                                                      *
 ***********************************************************************/
 
 #ifndef SH_VALNOD
 
 #include        <option.h>
-#include        "FEATURE/options"
-#include        "FEATURE/dynamic"
 #include	<nval.h>
 
 /* used for RANDNOD ($RANDOM) */
 struct rand
 {
 	Namfun_t	hdr;
-	unsigned int	rand_seed;
+	unsigned short	rand_seed[3];
 	int32_t		rand_last;
 };
 extern void sh_reseed_rand(struct rand *);
@@ -38,14 +38,14 @@ extern void sh_save_rand_seed(struct rand *, int);
 /* update ${.sh.level} and, if needed, restore the current scope */
 #define update_sh_level() \
 ( \
-	SH_LEVELNOD->nvalue.s = sh.fn_depth + sh.dot_depth, \
+	sh.level = sh.fn_depth + sh.dot_depth, \
 	sh.topscope != (Shscope_t*)sh.st.self ? sh_setscope(sh.topscope) : 0, \
 	1 \
 )
 
 /* The following defines must be kept synchronous with shtab_variables[] in data/variables.c */
 
-#define	PATHNOD		(sh.bltin_nodes)
+#define PATHNOD		(sh.bltin_nodes)
 #define PS1NOD		(sh.bltin_nodes+1)
 #define PS2NOD		(sh.bltin_nodes+2)
 #define IFSNOD		(sh.bltin_nodes+3)
@@ -111,5 +111,6 @@ extern void sh_save_rand_seed(struct rand *, int);
 #define SH_PPIDNOD	(sh.bltin_nodes+63)
 #define SH_TILDENOD	(sh.bltin_nodes+64)
 #define SHLVL		(sh.bltin_nodes+65)
+#define SRANDNOD	(sh.bltin_nodes+66)
 
 #endif /* SH_VALNOD */

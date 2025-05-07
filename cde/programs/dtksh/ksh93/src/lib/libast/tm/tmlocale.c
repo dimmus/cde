@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -44,7 +45,7 @@ static struct
  */
 
 static int
-standardized(Lc_info_t* li, register char** b)
+standardized(Lc_info_t* li, char** b)
 {
 	if ((li->lc->language->flags & (LC_debug|LC_default)) || streq(li->lc->language->code, "en"))
 	{
@@ -61,11 +62,11 @@ standardized(Lc_info_t* li, register char** b)
  */
 
 static void
-fixup(Lc_info_t* li, register char** b)
+fixup(Lc_info_t* li, char** b)
 {
-	register char**		v;
-	register char**		e;
-	register int		n;
+	char**			v;
+	char**			e;
+	int			n;
 
 	static int		must[] =
 	{
@@ -118,7 +119,7 @@ fixup(Lc_info_t* li, register char** b)
 	tm_info.format = b;
 	if (!(tm_info.deformat = state.format))
 		tm_info.deformat = tm_info.format[TM_DEFAULT];
-	li->data = (void*)b;
+	li->data = b;
 }
 
 #if _WINIX
@@ -182,12 +183,12 @@ static const Map_t map[] =
  */
 
 static char*
-word2posix(register char* f, register char* w, int alternate)
+word2posix(char* f, char* w, int alternate)
 {
-	register char*	r;
-	register int	c;
-	register int	p;
-	register int	n;
+	char*	r;
+	int	c;
+	int	p;
+	int	n;
 
 	while (*w)
 	{
@@ -335,19 +336,19 @@ word2posix(register char* f, register char* w, int alternate)
 static void
 native_lc_time(Lc_info_t* li)
 {
-	register char*	s;
-	register char*	t;
-	register char**	b;
-	register int	n;
-	register int	m;
-	register int	i;
-	LCID		lcid;
-	int		nt;
-	int		ns;
-	int		nl;
-	int		clock_24;
-	int		leading_0;
-	char		buf[256];
+	char*	s;
+	char*	t;
+	char**	b;
+	int	n;
+	int	m;
+	int	i;
+	LCID	lcid;
+	int	nt;
+	int	ns;
+	int	nl;
+	int	clock_24;
+	int	leading_0;
+	char	buf[256];
 
 	lcid = li->lc->index;
 	nt = 2 * GetLocaleInfo(lcid, LOCALE_STIME, 0, 0) + 7; /* HH:MM:SS */
@@ -506,11 +507,11 @@ static const Map_t map[] =
 static void
 native_lc_time(Lc_info_t* li)
 {
-	register char*	s;
-	register char*	t;
-	register char**	b;
-	register int	n;
-	register int	i;
+	char*	s;
+	char*	t;
+	char**	b;
+	int	n;
+	int	i;
 
 	n = 0;
 	for (i = 0; i < elementsof(map); i++)
@@ -534,7 +535,7 @@ native_lc_time(Lc_info_t* li)
 
 #else
 
-#define native_lc_time(li)	((li->data=(void*)(tm_info.format=tm_data.format)),(tm_info.deformat=tm_info.format[TM_DEFAULT]))
+#define native_lc_time(li)	((li->data=(tm_info.format=tm_data.format)),(tm_info.deformat=tm_info.format[TM_DEFAULT]))
 
 #endif
 
@@ -547,10 +548,10 @@ native_lc_time(Lc_info_t* li)
 static void
 load(Lc_info_t* li)
 {
-	register char*		s;
-	register char**		b;
-	register char**		v;
-	register char**		e;
+	char*		s;
+	char**		b;
+	char**		v;
+	char**		e;
 	unsigned char*		u;
 	ssize_t			n;
 	iconv_t			cvt;
@@ -568,7 +569,7 @@ load(Lc_info_t* li)
 	tm_info.format = tm_data.format;
 	if (!(tm_info.deformat = state.format))
 		tm_info.deformat = tm_info.format[TM_DEFAULT];
-	if (mcfind(NiL, NiL, LC_TIME, 0, path, sizeof(path)) && (sp = sfopen(NiL, path, "r")))
+	if (mcfind(NULL, NULL, LC_TIME, 0, path, sizeof(path)) && (sp = sfopen(NULL, path, "r")))
 	{
 		n = sfsize(sp);
 		tp = 0;
@@ -579,7 +580,7 @@ load(Lc_info_t* li)
 				if (tp = sfstropen())
 				{
 					sfread(sp, u, 3);
-					n = iconv_move(cvt, sp, tp, SF_UNBOUND, NiL);
+					n = iconv_move(cvt, sp, tp, SFIO_UNBOUND, NULL);
 				}
 				iconv_close(cvt);
 			}

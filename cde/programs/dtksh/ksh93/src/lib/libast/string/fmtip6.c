@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,39 +14,14 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
-#if _PACKAGE_ast
 #include <ast.h>
-#endif
-
 #include <ip6.h>
 
-#if !_PACKAGE_ast
-
 /*
- * return a pointer to n bytes from a circular reuse buffer
- */
-
-static char*
-fmtbuf(int n)
-{
-	char*		b;
-
-	static char	buf[1024];
-	static char*	p = buf;
-
-	if ((&buf[sizeof(buf)] - p) < n)
-		p = buf;
-	b = p;
-	p += n;
-	return b;
-}
-
-#endif
-
-/* 
  * copy p to s, then convert 0<=n<=999 to text
  * next char in s returned
  * caller ensures that s can take strlen(p)+3 bytes
@@ -74,15 +49,15 @@ dec(char* s, char* p, int n)
 char*
 fmtip6(const unsigned char* addr, int bits)
 {
-	register const unsigned char*	a = addr;
-	register int			n = IP6ADDR;
-	register int			i;
-	register int			z;
-	register int			k;
-	register int			m;
-	unsigned char			r[IP6ADDR];
-	char*				b;
-	char*				s;
+	const unsigned char*	a = addr;
+	int			n = IP6ADDR;
+	int			i;
+	int			z;
+	int			k;
+	int			m;
+	unsigned char		r[IP6ADDR];
+	char*			b;
+	char*			s;
 
 	static const char	dig[] = "0123456789ABCDEF";
 

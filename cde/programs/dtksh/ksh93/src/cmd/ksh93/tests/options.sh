@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -17,6 +17,13 @@
 ########################################################################
 
 . "${SHTESTS_COMMON:-${0%/*}/_common}"
+
+# flag Android/Termux execve(3) breakage killing 'exec -a'
+typeset -i execve_ignores_argv0
+[[ $( (exec -a foo true) 2>&1 ) == *'not supported'* ]]
+if	((execve_ignores_argv0 = ! $?))
+then	warning "execve(3) broken on this system; tests involving 'exec -a' are skipped"
+fi
 
 unset HISTFILE
 export LC_ALL=C ENV=/./dev/null
@@ -68,8 +75,10 @@ else
 		err_exit '--rc ignores $ENV file'
 	[[ $(print env_hit | $SHELL --norc 2>&1) == "OK" ]] &&
 		err_exit '--norc reads $ENV file'
+	if((!SHOPT_SCRIPTONLY));then
 	[[ $(print env_hit | $SHELL -i 2>&1) == "OK" ]] ||
 		err_exit '-i ignores $ENV file'
+	fi # !SHOPT_SCRIPTONLY
 fi
 
 export ENV=/./dev/null
@@ -162,8 +171,10 @@ then
 		err_exit 'privileged --login-shell reads .profile'
 	[[ $(HOME=$PWD $SHELL --login_shell </dev/null 2>&1) == *$t* ]] &&
 		err_exit 'privileged --login_shell reads .profile'
+	if((!execve_ignores_argv0));then
 	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>&1) == *$t* ]] &&
 		err_exit 'privileged exec -a -ksh ksh reads .profile'
+	fi # !execve_ignores_argv0
 	[[ $(HOME=$PWD ./-ksh -i </dev/null 2>&1) == *$t* ]] &&
 		err_exit 'privileged ./-ksh reads .profile'
 	[[ $(HOME=$PWD ./-ksh -ip </dev/null 2>&1) == *$t* ]] &&
@@ -177,12 +188,16 @@ else
 		err_exit '--login-shell ignores .profile'
 	[[ $(HOME=$PWD $SHELL --login_shell </dev/null 2>&1) == *$t* ]] ||
 		err_exit '--login_shell ignores .profile'
+	if((!execve_ignores_argv0));then
 	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>/dev/null) == *$t* ]] ||
 		err_exit 'exec -a -ksh ksh 2>/dev/null ignores .profile'
 	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>&1) == *$t* ]] ||
 		err_exit 'exec -a -ksh ksh 2>&1 ignores .profile'
+	fi # !execve_ignores_argv0
+	if((!SHOPT_SCRIPTONLY));then
 	[[ $(HOME=$PWD ./-ksh -i </dev/null 2>&1) == *$t* ]] ||
 		err_exit './-ksh ignores .profile'
+	fi # !SHOPT_SCRIPTONLY
 	[[ $(HOME=$PWD ./-ksh -ip </dev/null 2>&1) == *$t* ]] &&
 		err_exit './-ksh -p does not ignore .profile'
 fi
@@ -202,8 +217,8 @@ set -- \
 	pipefail pipe-fail pipe_fail \
 	trackall track-all track_all \
 	unset verbose
-((SHOPT_ESH)) && set -- "$@" emacs gmacs
-((SHOPT_VSH)) && set -- "$@" vi viraw vi-raw vi_raw
+((SHOPT_ESH && !SHOPT_SCRIPTONLY)) && set -- "$@" emacs gmacs
+((SHOPT_VSH && !SHOPT_SCRIPTONLY)) && set -- "$@" vi
 for opt
 do	old=$opt
 	if [[ ! -o $opt ]]
@@ -383,14 +398,16 @@ got=$(
 [[ $got == @((12|21)(12|21)) ]] || err_exit "& job delayed by --pipefail, expected '$exp', got '$got'"
 $SHELL -c '[[ $- == *c* ]]' || err_exit 'option c not in $-'
 > $tmp/.profile
-for i in i l r s D E a b e f h k n t u v x $(let SHOPT_BRACEPAT && echo B) C G $(let SHOPT_HISTEXPAND && echo H)
+for i in $(let !SHOPT_SCRIPTONLY && echo i) l r s D E a b e f h k n t u v x \
+	$(let SHOPT_BRACEPAT && echo B) C G $(let "SHOPT_HISTEXPAND && !SHOPT_SCRIPTONLY" && echo H)
 do	HOME=$tmp ENV=/./dev/null $SHELL -$i >/dev/null 2>&1 <<- ++EOF++ || err_exit "option $i not in \$-"
 	[[ \$- == *$i* ]] || exit 1
 	++EOF++
 done
-letters=ilrabefhknuvx$(let SHOPT_BRACEPAT && echo B)CGE
+letters=$(let !SHOPT_SCRIPTONLY && echo i)lrabefhknuvx$(let SHOPT_BRACEPAT && echo B)CGE
 integer j=0
-for i in interactive login restricted allexport notify errexit \
+for i in $(let !SHOPT_SCRIPTONLY && echo interactive) \
+	login restricted allexport notify errexit \
 	noglob trackall keyword noexec nounset verbose xtrace \
 	$(let SHOPT_BRACEPAT && echo braceexpand) \
 	noclobber globstar rc
@@ -400,18 +417,20 @@ do	HOME=$tmp ENV=/./dev/null $SHELL -o $i >/dev/null 2>&1 <<- ++EOF++ || err_exi
 	((j++))
 done
 
+if((!SHOPT_SCRIPTONLY));then
 export ENV=/./dev/null PS1="(:$$:)"
 histfile=$tmp/history
 exp=$(HISTFILE=$histfile $SHELL -c $'function foo\n{\ncat\n}\ntype foo')
 for var in HISTSIZE HISTFILE
 do	got=$( set +x; ( HISTFILE=$histfile $SHELL +E -ic $'unset '$var$'\nfunction foo\n{\ncat\n}\ntype foo\nexit' ) 2>&1 )
-	got=${got##*"$PS1"} 
+	got=${got##*"$PS1"}
 	[[ $got == "$exp" ]] || err_exit "function definition inside (...) with $var unset fails -- got '$got', expected '$exp'"
 	got=$( set +x; { HISTFILE=$histfile $SHELL +E -ic $'unset '$var$'\nfunction foo\n{\ncat\n}\ntype foo\nexit' ;} 2>&1 )
-	got=${got##*"$PS1"} 
+	got=${got##*"$PS1"}
 	[[ $got == "$exp" ]] || err_exit "function definition inside {...;} with $var unset fails -- got '$got', expected '$exp'"
 done
 ( unset HISTFILE; $SHELL -ic "HISTFILE=$histfile" 2>/dev/null ) || err_exit "setting HISTFILE when not in environment fails"
+fi # !SHOPT_SCRIPTONLY
 
 # the next tests loop on all combinations of
 #	{ SUB PAR CMD ADD }
@@ -431,7 +450,14 @@ print $'#!'$SHELL$'\nkill -KILL $$' > command-kill
 print $'kill -KILL $$' > script-kill
 chmod +x command-kill script-kill
 export PATH=.:$PATH
-exp='Killed'
+if [[ $(uname) == Haiku ]]; then
+	# On Haiku signal numbers 9 and 21 (SIGKILL and SIGKILLTHR)
+	# both result in a 'Kill Thread' message, regardless of which
+	# shell or kill utility used.
+	exp='Kill Thread'
+else
+	exp='Killed'
+fi
 for ((S=0; S<${#SUB[@]}; S++))
 do	for ((P=0; P<${#PAR[@]}; P++))
 	do	for ((C=0; C<${#CMD[@]}; C++))
@@ -516,10 +542,22 @@ do		if	{ date | true;} ; true
 done
 (( (SECONDS-t1) > .5 )) && err_exit 'pipefail should not wait for background processes'
 
-# process source files from profiles as profile files
-print '. ./dotfile' > envfile
-print $'alias print=:\nprint foobar' > dotfile
-[[ $(ENV=/.$PWD/envfile $SHELL -i -c : 2>/dev/null) == foobar ]] && err_exit 'files source from profile does not process aliases correctly'
+# ======
+if ((!SHOPT_SCRIPTONLY)); then
+print $'v=$(. ./dotfile)\n(. ./dotfile)\ncat <(. ./dotfile)\n. ./dotfile' > envfile
+# dot scripts sourced from profile files are parsed line by line, so that aliases take effect on the next line in the same file
+print $'alias print=:\nprint fail:subshell==${.sh.subshell} >&2' > dotfile
+got=$(set +x; ENV=/.$PWD/envfile "$SHELL" -i -c : 2>&1)
+exp=''
+[[ $got == "$exp" ]] || err_exit 'dot script sourced from profile does not process aliases correctly' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+# $0 does not change in ksh functions within profile scripts
+print 'function BAD { echo $0; }; BAD >&2' > dotfile
+got=$(set +x; ENV=/.$PWD/envfile "$SHELL" -i -c : 2>&1)
+exp=$SHELL$'\n'$SHELL$'\n'$SHELL$'\n'$SHELL
+[[ $got == "$exp" ]] || err_exit '$0 in ksh function in profile script not correct' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+fi # !SHOPT_SCRIPTONLY
 
 # ======
 if [[ -o ?posix ]]; then
@@ -621,6 +659,21 @@ do
 	[[ $got == "$exp" ]] || err_exit "shell did not wait for entire pipeline with -o $opt" \
 		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 done
+
+# ======
+# showme only printed the first redirection in a list
+# https://github.com/ksh93/ksh/issues/753
+got=$(set +x --showme; PS4='+ '; eval ';true >/dev/null 2>&1 3>&1 4>&3' 2>&1)
+exp=$'+ true\n+ 1> /dev/null 2>& 1 3>& 1 4>& 3'
+[[ $got == "$exp" ]] || err_exit "showme doesn't print redirects properly" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# pipefail did not set 9th bit in exit status if a process got signalled
+# https://github.com/ksh93/ksh/discussions/755#discussioncomment-9925394
+got=$(set --pipefail; "$SHELL" -c 'kill -s PIPE $$' | true; echo $?)
+exp=$(( ${ kill -l PIPE; } + 256 ))
+[[ $got == "$exp" ]] || err_exit "status of signalled process in pipe with pipefail (expected $exp, got $got)"
 
 # ======
 exit $((Errors<125?Errors:125))

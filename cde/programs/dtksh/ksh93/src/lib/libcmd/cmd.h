@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -26,7 +26,7 @@
 
 #include <ast.h>
 #include <error.h>
-#include <stak.h>
+#include <stk.h>
 #include <shcmd.h>
 
 #define cmdinit			_cmd_init
@@ -41,7 +41,7 @@
 
 #ifdef CMD_STANDALONE
 
-#define CMD_CONTEXT(c)		((Shbltin_t*)0)
+#define CMD_CONTEXT(c)		(NULL)
 
 #if CMD_DYNAMIC
 
@@ -60,11 +60,12 @@ extern int CMD_STANDALONE(int, char**, Shbltin_t*);
  */
 
 static int
-cmdinit(int argc, register char** argv, Shbltin_t* context, const char* catalog, int flags)
+cmdinit(int argc, char** argv, Shbltin_t* context, const char* catalog, int flags)
 {
-	register char*	cp;
-	register char*	pp;
+	char*	cp;
+	char*	pp;
 
+	NOT_USED(argc);
 	if (cp = strrchr(argv[0], '/'))
 		cp++;
 	else
@@ -86,8 +87,8 @@ int
 main(int argc, char** argv)
 {
 #if CMD_DYNAMIC
-	register char*	s;
-	register char*	t;
+	char*	s;
+	char*	t;
 	void*		dll;
 	Shbltin_f	fun;
 	char		buf[64];
@@ -107,14 +108,14 @@ main(int argc, char** argv)
 		*t = 0;
 	for (;;)
 	{
-		if (dll = dlopen(NiL, RTLD_LAZY))
+		if (dll = dlopen(NULL, RTLD_LAZY))
 		{
 			if (fun = (Shbltin_f)dlsym(dll, buf + 1))
 				break;
 			if (fun = (Shbltin_f)dlsym(dll, buf))
 				break;
 		}
-		if (dll = dllplug(NiL, "cmd", NiL, RTLD_LAZY, NiL, 0))
+		if (dll = dllplug(NULL, "cmd", NULL, RTLD_LAZY, NULL, 0))
 		{
 			if (fun = (Shbltin_f)dlsym(dll, buf + 1))
 				break;
@@ -123,9 +124,9 @@ main(int argc, char** argv)
 		}
 		return 127;
 	}
-	return (*fun)(argc, argv, NiL);
+	return (*fun)(argc, argv, NULL);
 #else
-	return CMD_STANDALONE(argc, argv, NiL);
+	return CMD_STANDALONE(argc, argv, NULL);
 #endif
 }
 

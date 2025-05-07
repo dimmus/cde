@@ -4,10 +4,7 @@ mem	utsname.base_rel,utsname.idnumber,utsname.m_type,utsname.nodeext sys/utsname
 sys	syscall,systeminfo,syssgi
 
 tst	cross{
-	u=`/bin/uname -o 2>/dev/null`
-	case $u in
-	UWIN-*)	u=UWIN ;;
-	esac
+	u=$(p=$(getconf PATH 2>/dev/null) && PATH=$p; uname -o 2>/dev/null)
 	case $u in
 	'')	;;
 	*)	echo "#define _UNAME_os_DEFAULT     \"$u\"  /* default os name */" ;;

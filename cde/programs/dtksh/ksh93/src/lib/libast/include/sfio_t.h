@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -56,14 +56,14 @@
 #include	"sfio.h"
 
 /* mode bit to indicate that the structure hasn't been initialized */
-#define SF_INIT		0000004
-#define SF_DCDOWN	00010000
+#define SFIO_INIT		0000004
+#define SFIO_DCDOWN	00010000
 
 /* shorthand for common stream types */
-#define SF_RDWR		(SF_READ|SF_WRITE)
-#define SF_RDSTR	(SF_READ|SF_STRING)
-#define SF_WRSTR	(SF_WRITE|SF_STRING)
-#define SF_RDWRSTR	(SF_RDWR|SF_STRING)
+#define SFIO_RDWR		(SFIO_READ|SFIO_WRITE)
+#define SFIO_RDSTR	(SFIO_READ|SFIO_STRING)
+#define SFIO_WRSTR	(SFIO_WRITE|SFIO_STRING)
+#define SFIO_RDWRSTR	(SFIO_RDWR|SFIO_STRING)
 
 /* for static initialization of an Sfio_t structure */
 #define SFNEW(data,size,file,type,disc)	\
@@ -71,60 +71,60 @@
 	  (unsigned char*)(data),			/* endw		*/ \
 	  (unsigned char*)(data),			/* endr		*/ \
 	  (unsigned char*)(data),			/* endb		*/ \
-	  (Sfio_t*)0,					/* push		*/ \
+	  NULL,						/* push		*/ \
 	  (unsigned short)((type)&SFIO_FLAGS),		/* flags	*/ \
 	  (short)(file),				/* file		*/ \
 	  (unsigned char*)(data),			/* data		*/ \
 	  (ssize_t)(size),				/* size		*/ \
 	  (ssize_t)(-1),				/* val		*/ \
-	  (Sfoff_t)0,					/* extent	*/ \
-	  (Sfoff_t)0,					/* here		*/ \
+	  0,						/* extent	*/ \
+	  0,						/* here		*/ \
 	  0,						/* ngetr	*/ \
 	  {0},						/* tiny		*/ \
 	  0,						/* bits		*/ \
-	  (unsigned int)(((type)&(SF_RDWR))|SF_INIT),	/* mode		*/ \
+	  (unsigned int)(((type)&(SFIO_RDWR))|SFIO_INIT),	/* mode		*/ \
 	  (struct _sfdisc_s*)(disc),			/* disc		*/ \
-	  (struct _sfpool_s*)0,				/* pool		*/ \
-	  (struct _sfrsrv_s*)0,				/* rsrv		*/ \
-	  (struct _sfproc_s*)0,				/* proc		*/ \
-	  (void*)0,					/* stdio	*/ \
-	  (Sfoff_t)0,					/* lpos		*/ \
-	  (size_t)0,					/* iosz		*/ \
+	  NULL,						/* pool		*/ \
+	  NULL,						/* rsrv		*/ \
+	  NULL,						/* proc		*/ \
+	  NULL,						/* stdio	*/ \
+	  0,						/* lpos		*/ \
+	  0,						/* iosz		*/ \
 	  0						/* getr		*/ \
 	}
 
 /* function to clear an Sfio_t structure */
 #define SFCLEAR(f) \
-	( (f)->next = (unsigned char*)0,		/* next		*/ \
-	  (f)->endw = (unsigned char*)0,		/* endw		*/ \
-	  (f)->endr = (unsigned char*)0,		/* endr		*/ \
-	  (f)->endb = (unsigned char*)0,		/* endb		*/ \
-	  (f)->push = (Sfio_t*)0,			/* push		*/ \
-	  (f)->flags = (unsigned short)0,		/* flags	*/ \
+	( (f)->next = NULL,				/* next		*/ \
+	  (f)->endw = NULL,				/* endw		*/ \
+	  (f)->endr = NULL,				/* endr		*/ \
+	  (f)->endb = NULL,				/* endb		*/ \
+	  (f)->push = NULL,				/* push		*/ \
+	  (f)->flags = 0,				/* flags	*/ \
 	  (f)->file = -1,				/* file		*/ \
-	  (f)->data = (unsigned char*)0,		/* data		*/ \
-	  (f)->size = (ssize_t)(-1),			/* size		*/ \
-	  (f)->val = (ssize_t)(-1),			/* val		*/ \
-	  (f)->extent = (Sfoff_t)(-1),			/* extent	*/ \
-	  (f)->here = (Sfoff_t)0,			/* here		*/ \
+	  (f)->data = NULL,				/* data		*/ \
+	  (f)->size = -1,				/* size		*/ \
+	  (f)->val = -1,				/* val		*/ \
+	  (f)->extent = -1,				/* extent	*/ \
+	  (f)->here = 0,				/* here		*/ \
 	  (f)->ngetr = 0,				/* ngetr	*/ \
 	  (f)->tiny[0] = 0,				/* tiny		*/ \
 	  (f)->bits = 0,				/* bits		*/ \
 	  (f)->mode = 0,				/* mode		*/ \
-	  (f)->disc = (struct _sfdisc_s*)0,		/* disc		*/ \
-	  (f)->pool = (struct _sfpool_s*)0,		/* pool		*/ \
-	  (f)->rsrv = (struct _sfrsrv_s*)0,		/* rsrv		*/ \
-	  (f)->proc = (struct _sfproc_s*)0,		/* proc		*/ \
-	  (f)->stdio = (void*)0,			/* stdio	*/ \
-	  (f)->lpos = (Sfoff_t)0,			/* lpos		*/ \
-	  (f)->iosz = (size_t)0,			/* iosz		*/ \
+	  (f)->disc = NULL,				/* disc		*/ \
+	  (f)->pool = NULL,				/* pool		*/ \
+	  (f)->rsrv = NULL,				/* rsrv		*/ \
+	  (f)->proc = NULL,				/* proc		*/ \
+	  (f)->stdio = NULL,				/* stdio	*/ \
+	  (f)->lpos = 0,				/* lpos		*/ \
+	  (f)->iosz = 0,				/* iosz		*/ \
 	  (f)->getr = 0					/* getr		*/ \
 	)
 
 /* expose next stream inside discipline function; state saved in int f */
-#define SFDCNEXT(sp,f)	(((f)=(sp)->bits&SF_DCDOWN),(sp)->bits|=SF_DCDOWN)
+#define SFDCNEXT(sp,f)	(((f)=(sp)->bits&SFIO_DCDOWN),(sp)->bits|=SFIO_DCDOWN)
 
 /* restore SFDCNEXT() state from int f */
-#define SFDCPREV(sp,f)	((f)?(0):((sp)->bits&=~SF_DCDOWN))
+#define SFDCPREV(sp,f)	((f)?(0):((sp)->bits&=~SFIO_DCDOWN))
 
 #endif /* _SFIO_T_H */

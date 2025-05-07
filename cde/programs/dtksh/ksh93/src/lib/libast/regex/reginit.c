@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -22,18 +23,7 @@
  */
 
 #include "reglib.h"
-
-#if _PACKAGE_ast
-
 #include <ccode.h>
-
-#else
-
-#define CC_bel		'\a'
-#define CC_esc		'\033'
-#define CC_vt		'\v'
-
-#endif
 
 /*
  * state shared by all threads
@@ -142,8 +132,8 @@ State_t		state =
 		'!',		T_BAD,		T_BAD,
 		'!',		T_BANG,		T_BAD,
 		T_BANG, 	'!',		T_BAD,
-		'!',		'!',		T_BAD,
-		T_BANG,		'!',		T_BAD,
+		'!',		'!',		'!',
+		T_BANG,		'!',		'!',
 	'@',
 		'@',		T_BAD,		T_BAD,
 		'@',		T_BAD,		T_BAD,
@@ -387,22 +377,19 @@ State_t		state =
  */
 
 void*
-alloc(register regdisc_t* disc, void* p, size_t n)
+alloc(regdisc_t* disc, void* p, size_t n)
 {
 	if (disc->re_resizef)
 	{
 		if (!n && (disc->re_flags & REG_NOFREE))
-			return 0;
+			return NULL;
 		return (*disc->re_resizef)(disc->re_resizehandle, p, n);
 	}
-	else if (!n)
+	if (!n)
 	{
 		if (!(disc->re_flags & REG_NOFREE))
 			free(p);
-		return 0;
+		return NULL;
 	}
-	else if (p)
-		return realloc(p, n);
-	else
-		return malloc(n);
+	return realloc(p, n);
 }

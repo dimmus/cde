@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,21 +14,11 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
-#undef	VMDEBUG
-#define	VMDEBUG		0
-
-#if defined(_MSVCRT_H)
-#define strdup		______strdup
-#endif
-
 #include <ast.h>
-
-#if defined(_MSVCRT_H)
-#undef	strdup
-#endif
 
 /*
  * return a copy of s using malloc
@@ -42,8 +32,15 @@
 extern char*
 _ast_strdup(const char* s)
 {
-	register char*	t;
-	register int	n;
+	char*	t;
+	size_t	n;
 
-	return (s && (t = oldof(0, char, n = strlen(s) + 1, 0))) ? (char*)memcpy(t, s, n) : (char*)0;
+	if (s)
+	{
+		n = strlen(s) + 1;
+		t = malloc(n);
+		if (t)
+			return memcpy(t, s, n);
+	}
+	return NULL;
 }

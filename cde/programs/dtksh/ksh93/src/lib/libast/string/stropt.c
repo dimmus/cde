@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -51,18 +51,18 @@
 int
 stropt(const char* as, const void* tab, int siz, int(*f)(void*, const void*, int, const char*), void* a)
 {
-	register int	c;
-	register char*	s;
-	register char*	v;
-	register char*	t;
-	char**		p;
-	char*		u = 0;
-	char*		x;
-	char*		e;
-	int		n;
-	int		ql;
-	int		qr;
-	int		qc = 0;
+	int	c;
+	char*	s;
+	char*	v;
+	char*	t;
+	char**	p;
+	char*	u = 0;
+	char*	x;
+	char*	e;
+	int	n;
+	int	ql;
+	int	qr;
+	int	qc = 0;
 
 	if (!as) n = 0;
 	else if (!(x = s = strdup(as))) n = -1;

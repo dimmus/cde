@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -43,6 +43,8 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 	posix_spawnattr_t		attr;
 #if _lib_posix_spawn_file_actions_addtcsetpgrp_np
 	posix_spawn_file_actions_t	actions;
+#else
+	NOT_USED(tcfd);
 #endif
 
 	if (err = posix_spawnattr_init(&attr))
@@ -70,12 +72,12 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 		if (err = posix_spawn_file_actions_addtcsetpgrp_np(&actions, tcfd))
 			goto fail;
 	}
-	if (err = posix_spawn(&pid, path, (tcfd >= 0) ? &actions : NiL, &attr, argv, envv ? envv : environ))
+	if (err = posix_spawn(&pid, path, (tcfd >= 0) ? &actions : NULL, &attr, argv, envv ? envv : environ))
 #else
-	if (err = posix_spawn(&pid, path, NiL, &attr, argv, envv ? envv : environ))
+	if (err = posix_spawn(&pid, path, NULL, &attr, argv, envv ? envv : environ))
 #endif
 	{
-		if ((err != EPERM) || (err = posix_spawn(&pid, path, NiL, NiL, argv, envv ? envv : environ)))
+		if ((err != EPERM) || (err = posix_spawn(&pid, path, NULL, NULL, argv, envv ? envv : environ)))
 			goto fail;
 	}
 #if _lib_posix_spawn_file_actions_addtcsetpgrp_np
@@ -142,7 +144,7 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 		inherit.flags |= SPAWN_SETGROUP;
 		inherit.pgroup = (pgid > 1) ? pgid : SPAWN_NEWPGROUP;
 	}
-	return spawn(path, 0, (int*)0, &inherit, (const char**)argv, (const char**)envv);
+	return spawn(path, 0, NULL, &inherit, (const char**)argv, (const char**)envv);
 }
 
 #else
@@ -151,17 +153,12 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 #include <wait.h>
 #include <sig.h>
 #include <ast_tty.h>
-#include <ast_vfork.h>
 
 #if _lib_spawnve && _hdr_process
 #include <process.h>
 #if defined(P_NOWAIT) || defined(_P_NOWAIT)
 #undef	_lib_spawnve
 #endif
-#endif
-
-#if !_lib_vfork
-#undef	_real_vfork
 #endif
 
 /*
@@ -175,12 +172,7 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 	int			m;
 	pid_t			pid;
 	pid_t			rid;
-#if _real_vfork
-	volatile int		exec_errno;
-	volatile int* volatile	exec_errno_ptr;
-#else
 	int			err[2];
-#endif /* _real_vfork */
 
 	NOT_USED(tcfd);
 	if (!envv)
@@ -190,10 +182,6 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 		return spawnve(path, argv, envv);
 #endif /* _lib_spawnve */
 	n = errno;
-#if _real_vfork
-	exec_errno = 0;
-	exec_errno_ptr = &exec_errno;
-#else
 	if (pipe(err) < 0)
 		err[0] = -1;
 	else
@@ -201,13 +189,8 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 		fcntl(err[0], F_SETFD, FD_CLOEXEC);
 		fcntl(err[1], F_SETFD, FD_CLOEXEC);
 	}
-#endif /* _real_vfork */
 	sigcritical(SIG_REG_EXEC|SIG_REG_PROC);
-#if _lib_vfork
-	pid = vfork();
-#else
 	pid = fork();
-#endif /* _lib_vfork */
 	if (pid == -1)
 		n = errno;
 	else if (!pid)
@@ -222,35 +205,18 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 				pgid = getpid();
 			if (setpgid(0, pgid) < 0 && errno == EPERM)
 				setpgid(pgid, 0);
-#if _lib_tcgetpgrp
 			if (m)
 				tcsetpgrp(2, pgid);
-#elif defined(TIOCSPGRP)
-			if (m)
-				ioctl(2, TIOCSPGRP, &pgid);
-#endif /* _lib_tcgetpgrp */
 		}
 		execve(path, argv, envv);
-#if _real_vfork
-		*exec_errno_ptr = errno;
-#else
 		if (err[0] != -1)
 		{
 			m = errno;
 			write(err[1], &m, sizeof(m));
 		}
-#endif /* _real_vfork */
 		_exit(errno == ENOENT ? EXIT_NOTFOUND : EXIT_NOEXEC);
 	}
 	rid = pid;
-#if _real_vfork
-	if (pid != -1 && (m = *exec_errno_ptr))
-	{
-		while (waitpid(pid, NiL, 0) == -1 && errno == EINTR);
-		rid = pid = -1;
-		n = m;
-	}
-#else
 	if (err[0] != -1)
 	{
 		close(err[1]);
@@ -272,7 +238,6 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid, i
 		}
 		close(err[0]);
 	}
-#endif /* _real_vfork */
 	sigcritical(0);
 	if (pid != -1 && pgid > 0)
 	{

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,7 +28,7 @@
 			 DT_ATTACH|DT_DETACH|DT_RELINK|DT_CLEAR| \
 			 DT_FLATTEN|DT_EXTRACT|DT_RESTORE|DT_STAT)
 
-static void* dtvsearch(Dt_t* dt, reg void* obj, reg int type)
+static void* dtvsearch(Dt_t* dt, void* obj, int type)
 {
 	int		cmp;
 	Dt_t		*d, *p;
@@ -37,7 +37,7 @@ static void* dtvsearch(Dt_t* dt, reg void* obj, reg int type)
 	if(type&DT_NOVIEWPATH)
 		return (*(dt->meth->searchf))(dt,obj,type);
 
-	o = NIL(void*);
+	o = NULL;
 
 	/* these ops look for the first appearance of an object of the right type */
 	if((type & (DT_MATCH|DT_SEARCH)) ||
@@ -51,10 +51,10 @@ static void* dtvsearch(Dt_t* dt, reg void* obj, reg int type)
 
 	if(dt->meth->type & DT_ORDERED) /* ordered sets/bags */
 	{	if(!(type & (DT_FIRST|DT_LAST|DT_NEXT|DT_PREV|DT_ATLEAST|DT_ATMOST)) )
-			return NIL(void*);
+			return NULL;
 
 		/* find the min/max element that satisfies the op requirement */
-		n = nky = NIL(void*); p = NIL(Dt_t*);
+		n = nky = NULL; p = NULL;
 		for(d = dt; d; d = d->view)
 		{	if(!(o = (*d->meth->searchf)(d, obj, type)) )
 				continue;
@@ -80,7 +80,7 @@ static void* dtvsearch(Dt_t* dt, reg void* obj, reg int type)
 
 	/* unordered collections */
 	if(!(type&(DT_NEXT|DT_PREV)) )
-		return NIL(void*);
+		return NULL;
 
 	if(!dt->walk )
 	{	for(d = dt; d; d = d->view)
@@ -88,13 +88,13 @@ static void* dtvsearch(Dt_t* dt, reg void* obj, reg int type)
 				break;
 		dt->walk = d;
 		if(!(obj = o) )
-			return NIL(void*);
+			return NULL;
 	}
 
 	for(d = dt->walk, obj = (*d->meth->searchf)(d, obj, type);; )
 	{	while(obj) /* keep moving until finding an uncovered object */
 		{	for(p = dt; ; p = p->view)
-			{	if(p == d) /* adjacent object is uncovered */	
+			{	if(p == d) /* adjacent object is uncovered */
 					return obj;
 				if((*(p->meth->searchf))(p, obj, DT_SEARCH) )
 					break;
@@ -103,29 +103,29 @@ static void* dtvsearch(Dt_t* dt, reg void* obj, reg int type)
 		}
 
 		if(!(d = dt->walk = d->view) ) /* move on to next dictionary */
-			return NIL(void*);
+			return NULL;
 		else if(type&DT_NEXT)
-			obj = (*(d->meth->searchf))(d,NIL(void*),DT_FIRST);
-		else	obj = (*(d->meth->searchf))(d,NIL(void*),DT_LAST);
+			obj = (*(d->meth->searchf))(d,NULL,DT_FIRST);
+		else	obj = (*(d->meth->searchf))(d,NULL,DT_LAST);
 	}
 }
 
-Dt_t* dtview(reg Dt_t* dt, reg Dt_t* view)
+Dt_t* dtview(Dt_t* dt, Dt_t* view)
 {
-	reg Dt_t*	d;
+	Dt_t*	d;
 
 	if(view && view->meth != dt->meth) /* must use the same method */
-		return NIL(Dt_t*);
+		return NULL;
 
 	/* make sure there won't be a cycle */
 	for(d = view; d; d = d->view)
 		if(d == dt)
-			return NIL(Dt_t*);
+			return NULL;
 
 	/* no more viewing lower dictionary */
 	if((d = dt->view) )
 		d->nview -= 1;
-	dt->view = dt->walk = NIL(Dt_t*);
+	dt->view = dt->walk = NULL;
 
 	if(!view)
 	{	dt->searchf = dt->meth->searchf;

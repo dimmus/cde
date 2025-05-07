@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -36,7 +37,7 @@ static const char usage[] =
 "[+?If lines in either file are not ordered according to the collating "
 	"sequence of the current locale, the results are not specified.]"
 "[+?If either \afile1\a or \afile2\a is \b-\b, \bcomm\b "
-        "uses standard input starting at the current location.]"
+	"uses standard input starting at the current location.]"
 
 "[1?Suppress the output column of lines unique to \afile1\a.]"
 "[2?Suppress the output column of lines unique to \afile2\a.]"
@@ -59,10 +60,10 @@ static const char usage[] =
 #define C_COMMON	4
 #define C_ALL		(C_FILE1|C_FILE2|C_COMMON)
 
-static int comm(Sfio_t *in1, Sfio_t *in2, register Sfio_t *out,register int mode)
+static int comm(Sfio_t *in1, Sfio_t *in2, Sfio_t *out,int mode)
 {
-	register char *cp1, *cp2;
-	register int n1, n2, n, comp;
+	char *cp1, *cp2;
+	int n1 = 0, n2 = 0, n, comp;
 	if(cp1 = sfgetr(in1,'\n',0))
 		n1 = sfvalue(in1);
 	if(cp2 = sfgetr(in2,'\n',0))
@@ -81,7 +82,7 @@ static int comm(Sfio_t *in1, Sfio_t *in2, register Sfio_t *out,register int mode
 						sfputc(out,'\t');
 				}
 				if(sfwrite(out,cp1,n) < 0)
-					return(-1);
+					return -1;
 			}
 			if(cp1 = sfgetr(in1,'\n',0))
 				n1 = sfvalue(in1);
@@ -95,7 +96,7 @@ static int comm(Sfio_t *in1, Sfio_t *in2, register Sfio_t *out,register int mode
 				if(mode&C_FILE1)
 					sfputc(out,'\t');
 				if(sfwrite(out,cp2,n2) < 0)
-					return(-1);
+					return -1;
 			}
 			if(cp2 = sfgetr(in2,'\n',0))
 				n2 = sfvalue(in2);
@@ -103,7 +104,7 @@ static int comm(Sfio_t *in1, Sfio_t *in2, register Sfio_t *out,register int mode
 		else
 		{
 			if((mode&C_FILE1) && sfwrite(out,cp1,n1) < 0)
-				return(-1);
+				return -1;
 			if(cp1 = sfgetr(in1,'\n',0))
 				n1 = sfvalue(in1);
 		}
@@ -123,8 +124,8 @@ static int comm(Sfio_t *in1, Sfio_t *in2, register Sfio_t *out,register int mode
 	if(!mode || !cp1)
 	{
 		if(cp1 && in1==sfstdin)
-			sfseek(in1,(Sfoff_t)0,SEEK_END);
-		return(0);
+			sfseek(in1,0,SEEK_END);
+		return 0;
 	}
 	/* process the remaining stream */
 	while(1)
@@ -132,19 +133,19 @@ static int comm(Sfio_t *in1, Sfio_t *in2, register Sfio_t *out,register int mode
 		if(n)
 			sfputc(out,'\t');
 		if(sfwrite(out,cp1,n1) < 0)
-			return(-1);
+			return -1;
 		if(!(cp1 = sfgetr(in1,'\n',0)))
-			return(0);
+			return 0;
 		n1 = sfvalue(in1);
 	}
-	/* NOT REACHED */
+	UNREACHABLE();
 }
 
 int
 b_comm(int argc, char *argv[], Shbltin_t* context)
 {
-	register int mode = C_FILE1|C_FILE2|C_COMMON;
-	register char *cp;
+	int mode = C_FILE1|C_FILE2|C_COMMON;
+	char *cp;
 	Sfio_t *f1, *f2;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
@@ -165,8 +166,9 @@ b_comm(int argc, char *argv[], Shbltin_t* context)
 			error(2, "%s",opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s",opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
@@ -174,13 +176,13 @@ b_comm(int argc, char *argv[], Shbltin_t* context)
 	argc -= opt_info.index;
 	if(error_info.errors || argc!=2)
 	{
-		error(ERROR_usage(2),"%s",optusage(NiL));
+		error(ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	cp = *argv++;
 	if(streq(cp,"-"))
 		f1 = sfstdin;
-	else if(!(f1 = sfopen(NiL, cp,"r")))
+	else if(!(f1 = sfopen(NULL, cp,"r")))
 	{
 		error(ERROR_system(1),"%s: cannot open",cp);
 		UNREACHABLE();
@@ -188,7 +190,7 @@ b_comm(int argc, char *argv[], Shbltin_t* context)
 	cp = *argv;
 	if(streq(cp,"-"))
 		f2 = sfstdin;
-	else if(!(f2 = sfopen(NiL, cp,"r")))
+	else if(!(f2 = sfopen(NULL, cp,"r")))
 	{
 		error(ERROR_system(1),"%s: cannot open",cp);
 		UNREACHABLE();
@@ -202,7 +204,7 @@ b_comm(int argc, char *argv[], Shbltin_t* context)
 		}
 	}
 	else if(f1==sfstdin || f2==sfstdin)
-		sfseek(sfstdin,(Sfoff_t)0,SEEK_END);
+		sfseek(sfstdin,0,SEEK_END);
 	if(f1!=sfstdin)
 		sfclose(f1);
 	if(f2!=sfstdin)

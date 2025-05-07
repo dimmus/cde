@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 
@@ -38,6 +39,10 @@ static const char usage[] =
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#if __ANDROID_API__
+/* Android declares ntohs(3) here, not in arpa/inet.h as POSIX mandates */
+#include <sys/endian.h>
+#endif /* __ANDROID_API__ */
 #else
 #undef	S_IFSOCK
 #endif
@@ -151,10 +156,10 @@ static const NV_t	family[] =
 int
 b_fds(int argc, char** argv, Shbltin_t* context)
 {
-	register char*		s;
-	register int		i;
-	register char*		m;
-	register char*		x;
+	char*			s;
+	int			i;
+	char*			m;
+	char*			x;
 	int			flags;
 	int			details;
 	int			open_max;
@@ -192,8 +197,9 @@ b_fds(int argc, char** argv, Shbltin_t* context)
 			unit = opt_info.num;
 			continue;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
@@ -203,7 +209,7 @@ b_fds(int argc, char** argv, Shbltin_t* context)
 	argv += opt_info.index;
 	if (error_info.errors || *argv)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if ((open_max = (int)astconf_long(CONF_OPEN_MAX)) <= 0)
@@ -216,7 +222,7 @@ b_fds(int argc, char** argv, Shbltin_t* context)
 	}
 	if (unit == 1)
 		sp = sfstdout;
-	else if (fstat(unit, &st) || !(sp = sfnew(NiL, NiL, SF_UNBOUND, unit, SF_WRITE)))
+	else if (fstat(unit, &st) || !(sp = sfnew(NULL, NULL, SFIO_UNBOUND, unit, SFIO_WRITE)))
 	{
 		error(ERROR_SYSTEM|3, "%d: cannot write to file descriptor");
 		UNREACHABLE();
@@ -233,7 +239,7 @@ b_fds(int argc, char** argv, Shbltin_t* context)
 			sfprintf(sp, "%d\n", i);
 			continue;
 		}
-		if ((flags = fcntl(i, F_GETFL, (char*)0)) == -1)
+		if ((flags = fcntl(i, F_GETFL, NULL)) == -1)
 			m = "--";
 		else
 			switch (flags & (O_RDONLY|O_WRONLY|O_RDWR))
@@ -251,7 +257,7 @@ b_fds(int argc, char** argv, Shbltin_t* context)
 				m = "??";
 				break;
 			}
-		x = (fcntl(i, F_GETFD, (char*)0) > 0) ? "x" : "-";
+		x = (fcntl(i, F_GETFD, NULL) > 0) ? "x" : "-";
 		if (isatty(i) && (s = ttyname(i)))
 		{
 			sfprintf(sp, "%02d %s%s %s %s\n", i, m, x, fmtmode(st.st_mode, 0), s);
@@ -260,18 +266,18 @@ b_fds(int argc, char** argv, Shbltin_t* context)
 #ifdef S_IFSOCK
 		addrlen = sizeof(addr);
 		memset(&addr, 0, addrlen);
-		if (!getsockname(i, (struct sockaddr*)&addr, (void*)&addrlen))
+		if (!getsockname(i, (struct sockaddr*)&addr, &addrlen))
 		{
 			type = 0;
 			prot = 0;
 #ifdef SO_TYPE
 			len = sizeof(type);
-			if (getsockopt(i, SOL_SOCKET, SO_TYPE, (void*)&type, (void*)&len))
+			if (getsockopt(i, SOL_SOCKET, SO_TYPE, &type, &len))
 				type = -1;
 #endif
 #ifdef SO_PROTOTYPE
 			len = sizeof(prot);
-			if (getsockopt(i, SOL_SOCKET, SO_PROTOTYPE, (void*)&prot, (void*)&len))
+			if (getsockopt(i, SOL_SOCKET, SO_PROTOTYPE, &prot, &len))
 				prot = -1;
 #endif
 			if (!st.st_mode)

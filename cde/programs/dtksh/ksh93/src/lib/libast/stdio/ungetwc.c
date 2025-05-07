@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -28,8 +28,8 @@ NoN(ungetwc)
 wint_t
 ungetwc(wint_t c, Sfio_t* f)
 {
-	register unsigned char*	s = (unsigned char*)&c;
-	register unsigned char*	e = s + sizeof(c);
+	unsigned char*	s = (unsigned char*)&c;
+	unsigned char*	e = s + sizeof(c);
 
 	FWIDE(f, WEOF);
 	while (s < e)

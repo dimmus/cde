@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #include	"dthdr.h"
@@ -67,7 +68,7 @@ void* lfirstlast(Dt_t* dt, int type)
 		list->here = lnk; /* finger points to this */
 	}
 
-	return lnk ? _DTOBJ(disc,lnk) : NIL(void*);
+	return lnk ? _DTOBJ(disc,lnk) : NULL;
 }
 
 /* DT_CLEAR */
@@ -78,7 +79,7 @@ void* lclear(Dt_t* dt)
 	Dtlist_t	*list = (Dtlist_t*)dt->data;
 
 	lnk = list->link;
-	list->link = list->here = NIL(Dtlink_t*);
+	list->link = list->here = NULL;
 	list->data.size = 0;
 
 	if(disc->freef || disc->link < 0)
@@ -88,7 +89,7 @@ void* lclear(Dt_t* dt)
 		}
 	}
 
-	return NIL(void*);
+	return NULL;
 }
 
 /* DT_FLATTEN|DT_EXTRACT|DT_RESTORE */
@@ -98,17 +99,17 @@ void* llist(Dt_t* dt, Dtlink_t* lnk, int type)
 
 	if(type&(DT_FLATTEN|DT_EXTRACT) )
 	{	if(lnk) /* error on calling */
-			return NIL(void*);
+			return NULL;
 
 		lnk = list->link;
 		if(type&DT_EXTRACT)
-		{	list->link = NIL(Dtlink_t*);
+		{	list->link = NULL;
 			dt->data->size = 0;
 		}
 	}
 	else /* if(type&DT_RESTORE) */
-	{	if(list->link != NIL(Dtlink_t*))
-			return NIL(void*);
+	{	if(list->link != NULL)
+			return NULL;
 
 		list->link = lnk;
 
@@ -117,7 +118,7 @@ void* llist(Dt_t* dt, Dtlink_t* lnk, int type)
 			dt->data->size += 1;
 	}
 
-	return (void*)lnk;
+	return lnk;
 }
 
 static void* listat(Dt_t* dt, Dtstat_t* st)
@@ -141,7 +142,7 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 
 	type = DTTYPE(dt,type); /* map type for upward compatibility */
 	if(!(type&DT_OPERATIONS) )
-		return NIL(void*);
+		return NULL;
 
 	DTSETLOCK(dt);
 
@@ -155,13 +156,13 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 		DTRETURN(obj, listat(dt, (Dtstat_t*)obj));
 
 	h = list->here; /* save finger to last search object */
-	list->here = NIL(Dtlink_t*);
+	list->here = NULL;
 
 	if(!obj)
 	{	if((type&(DT_DELETE|DT_DETACH|DT_REMOVE)) && (dt->meth->type&(DT_STACK|DT_QUEUE)) )
 			if((r = list->link) ) /* special case for destack or dequeue */
 				goto dt_delete;
-		DTRETURN(obj, NIL(void*)); /* error, needing non-void object */
+		DTRETURN(obj, NULL); /* error, needing non-void object */
 	}
 
 	if(type&DT_RELINK) /* relink object after some processing */
@@ -169,9 +170,8 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 		goto do_insert;
 	}
 	else if(type&(DT_INSERT|DT_INSTALL|DT_APPEND|DT_ATTACH))
-	{
-		if(!(r = _dtmake(dt, obj, type)) )
-			DTRETURN(obj, NIL(void*));
+	{	if(!(r = _dtmake(dt, obj, type)) )
+			DTRETURN(obj, NULL);
 		dt->data->size += 1;
 
 	do_insert:
@@ -219,7 +219,7 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 			{	list->link = r;
 				r->_left = r;
 			}
-			r->_rght = NIL(Dtlink_t*);
+			r->_rght = NULL;
 		}
 
 		list->here = r;
@@ -229,7 +229,7 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 	/* define key to match */
 	if(type&DT_MATCH)
 	{	key = obj;
-		obj = NIL(void*);
+		obj = NULL;
 	}
 	else	key = _DTKEY(disc, obj);
 
@@ -237,7 +237,7 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 	if(h && _DTOBJ(disc,h) == obj && (type & (DT_SEARCH|DT_NEXT|DT_PREV)) )
 		r = h; /* match at the finger, no search needed */
 	else /* linear search through the list */
-	{	h = NIL(Dtlink_t*); /* track first/last obj with same key */
+	{	h = NULL; /* track first/last obj with same key */
 		for(r = list->link; r; r = r->_rght)
 		{	o = _DTOBJ(disc,r); k = _DTKEY(disc,o);
 			if(_DTCMP(dt, key, k, disc) != 0)
@@ -258,7 +258,7 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 		r = h ? h : r;
 	}
 	if(!r) /* not found */
-		DTRETURN(obj, NIL(void*));
+		DTRETURN(obj, NULL);
 
 	if(type&(DT_DELETE|DT_DETACH|DT_REMOVE))
 	{ dt_delete:
@@ -275,7 +275,7 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 				t->_left = r->_left;
 		}
 
-		list->here = r == list->here ? r->_rght : NIL(Dtlink_t*);
+		list->here = r == list->here ? r->_rght : NULL;
 
 		obj = _DTOBJ(disc,r);
 		_dtfree(dt, r, type);
@@ -287,13 +287,13 @@ static void* dtlist(Dt_t* dt, void* obj, int type)
 	if(type&DT_NEXT)
 		r = r->_rght;
 	else if(type&DT_PREV)
-		r = r == list->link ? NIL(Dtlink_t*) : r->_left;
+		r = r == list->link ? NULL : r->_left;
 	/* else: if(type&(DT_SEARCH|DT_MATCH|DT_ATLEAST|DT_ATMOST)) */
 
 	list->here = r;
 	if(r)
 		DTRETURN(obj, _DTOBJ(disc,r));
-	else	DTRETURN(obj, NIL(void*));
+	else	DTRETURN(obj, NULL);
 
 dt_return:
 	DTANNOUNCE(dt,obj,type);
@@ -305,6 +305,7 @@ static int listevent(Dt_t* dt, int event, void* arg)
 {
 	Dtlist_t	*list = (Dtlist_t*)dt->data;
 
+	NOT_USED(arg);
 	if(event == DT_OPEN)
 	{	if(list) /* already initialized */
 			return 0;
@@ -321,8 +322,8 @@ static int listevent(Dt_t* dt, int event, void* arg)
 			return 0;
 		if(list->link) /* remove all items */
 			(void)lclear(dt);
-		(void)(*dt->memoryf)(dt, (void*)list, 0, dt->disc);
-		dt->data = NIL(Dtdata_t*);
+		(void)(*dt->memoryf)(dt, list, 0, dt->disc);
+		dt->data = NULL;
 		return 0;
 	}
 	else	return 0;

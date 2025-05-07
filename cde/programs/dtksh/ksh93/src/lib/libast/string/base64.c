@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -46,13 +46,13 @@ static const char	alp[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0
 ssize_t
 base64encode(const void* fb, size_t fz, void** fn, void* tb, size_t tz, void** tn)
 {
-	register unsigned char*	fp;
-	register unsigned char*	tp;
-	register unsigned char*	fe;
-	register unsigned char*	te;
-	register unsigned char*	tc;
-	register unsigned char*	m;
-	register unsigned long	b;
+	unsigned char*	fp;
+	unsigned char*	tp;
+	unsigned char*	fe;
+	unsigned char*	te;
+	unsigned char*	tc;
+	unsigned char*	m;
+	unsigned long	b;
 	size_t			n;
 	unsigned char		tmp[B64_EC * B64_CHUNK];
 
@@ -157,17 +157,17 @@ base64encode(const void* fb, size_t fz, void** fn, void* tb, size_t tz, void** t
 ssize_t
 base64decode(const void* fb, size_t fz, void** fn, void* tb, size_t tz, void** tn)
 {
-	register unsigned char*	fp;
-	register unsigned char*	tp;
-	register unsigned char*	fe;
-	register unsigned char*	te;
-	register unsigned char*	tx;
-	register unsigned char*	m;
-	register int		c;
-	register int		state;
-	register unsigned long	v;
-	unsigned char*		fc;
-	ssize_t			n;
+	unsigned char*	fp;
+	unsigned char*	tp;
+	unsigned char*	fe;
+	unsigned char*	te;
+	unsigned char*	tx;
+	unsigned char*	m;
+	int		c;
+	int		state;
+	unsigned long	v;
+	unsigned char*	fc;
+	ssize_t		n;
 
 	if (!(m = map)[0])
 	{

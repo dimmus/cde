@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -79,7 +79,7 @@ aso_init_fcntl(void* data, const char* details)
 		}
 		close(apl->fd);
 		free(apl);
-		return 0;
+		return NULL;
 	}
 	fd = -1;
 	perm = S_IRUSR|S_IWUSR;
@@ -94,11 +94,11 @@ aso_init_fcntl(void* data, const char* details)
 					n = sizeof(tmp) - 1;
 				memcpy(tmp, path + 5, n);
 				tmp[n] = 0;
-				perm = strperm(tmp, NiL, perm);
+				perm = strperm(tmp, NULL, perm);
 			}
 			else if (strneq(path, "size=", 5))
 			{
-				size = strtoul(path + 5, NiL, 0);
+				size = strtoul(path + 5, NULL, 0);
 				if (size <= sizeof(references))
 					goto bad;
 				size -= sizeof(references);
@@ -107,8 +107,8 @@ aso_init_fcntl(void* data, const char* details)
 		}
 	if (!path || !*path)
 	{
-		if (!(path = pathtemp(buf, sizeof(buf), NiL, "aso", &fd)))
-			return 0;
+		if (!(path = pathtemp(buf, sizeof(buf), NULL, "aso", &fd)))
+			return NULL;
 		drop = 1;
 	}
 	if (!(apl = newof(0, APL_t, 1, strlen(path))))
@@ -155,7 +155,7 @@ aso_init_fcntl(void* data, const char* details)
 		close(fd);
 	if (drop)
 		remove(path);
-	return 0;
+	return NULL;
 }
 
 static ssize_t

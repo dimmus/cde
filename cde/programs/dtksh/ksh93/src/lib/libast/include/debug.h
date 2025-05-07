@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -52,7 +53,7 @@
 #define DEBUG_BREAK		break
 #define DEBUG_CONTINUE		continue
 #define DEBUG_GOTO(label)	do { debug_fatal(__FILE__, __LINE__); goto label; } while(0)
-#define DEBUG_RETURN(x)		do { debug_fatal(__FILE__, __LINE__); return(x); } while(0)
+#define DEBUG_RETURN(x)		do { debug_fatal(__FILE__, __LINE__); return x; } while(0)
 
 #else
 
@@ -75,7 +76,7 @@
 #define DEBUG_BREAK		break
 #define DEBUG_CONTINUE		continue
 #define DEBUG_GOTO(label)	goto label
-#define DEBUG_RETURN(x)		return(x)
+#define DEBUG_RETURN(x)		return x
 
 #endif
 

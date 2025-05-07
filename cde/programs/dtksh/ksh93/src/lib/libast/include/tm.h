@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*               K. Eugene Carlson <kvngncrlsn@gmail.com>               *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -26,14 +27,14 @@
 #ifndef _TM_H
 #define _TM_H
 
-#define TM_VERSION	20070319L
+#define TM_VERSION	20230909L
 
 #include <ast.h>
 #include <times.h>
 
 #undef	daylight
 
-#define tmset(z)	tminit(z)
+#define tmset(x, y, z)	tminit(x, y, z)
 #define tmisleapyear(y)	(!((y)%4)&&(((y)%100)||!((((y)<1900)?((y)+1900):(y))%400)))
 
 #define TM_ADJUST	(1<<0)		/* local doesn't do leap secs	*/
@@ -156,7 +157,7 @@ extern Tm_t*		tmfix(Tm_t*);
 extern char*		tmfmt(char*, size_t, const char*, time_t*);
 extern char*		tmform(char*, const char*, time_t*);
 extern int		tmgoff(const char*, char**, int);
-extern void		tminit(Tm_zone_t*);
+extern void		tminit(Tm_zone_t*, time_t, const char);
 extern time_t		tmleap(time_t*);
 extern int		tmlex(const char*, char**, char**, int, char**, int);
 extern char**		tmlocale(void);

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -36,7 +36,7 @@
 #define FNVINIT(h)	(h = FNV_INIT)
 #define FNVPART(h,c)	(h = (h) * FNV_MULT ^ (c))
 #define FNVSUM(h,s,n)	do { \
-			register size_t _i_ = 0; \
+			size_t _i_ = 0; \
 			while (_i_ < n) \
 				FNVPART(h, ((unsigned char*)s)[_i_++]); \
 			} while (0)
@@ -58,7 +58,7 @@
 #define FNVINIT64(h)	(h = FNV_INIT64)
 #define FNVPART64(h,c)	(h = (h) * FNV_MULT64 ^ (c))
 #define FNVSUM64(h,s,n)	do { \
-			register int _i_ = 0; \
+			int _i_ = 0; \
 			while (_i_ < n) \
 				FNVPART64(h, ((unsigned char*)s)[_i_++]); \
 			} while (0)

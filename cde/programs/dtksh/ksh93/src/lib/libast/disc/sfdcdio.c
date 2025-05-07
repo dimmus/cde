@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 #include	"sfdchdr.h"
@@ -62,13 +63,13 @@ static ssize_t diordwr(Sfio_t* f, void* buf, size_t n, Direct_t* di, int type)
 
 			if((io = rw) > di->dio.d_maxiosz )
 				io = di->dio.d_maxiosz;
-			if(type == SF_READ)
+			if(type == SFIO_READ)
 				rv = read(f->file,buf,io);
 			else	rv = write(f->file,buf,io);
 
 			if(rv > 0)
 			{	rw -= rv; done += rv;
-				buf = (void*)((char*)buf + rv);
+				buf = ((char*)buf + rv);
 			}
 
 			if(rv < io || rw < di->dio.d_miniosz)
@@ -83,7 +84,7 @@ static ssize_t diordwr(Sfio_t* f, void* buf, size_t n, Direct_t* di, int type)
 	}
 
 	if((rw = n-done) > 0 &&
-	   (rv = type == SF_READ ? read(f->file,buf,rw) : write(f->file,buf,rw)) > 0 )
+	   (rv = type == SFIO_READ ? read(f->file,buf,rw) : write(f->file,buf,rw)) > 0 )
 		done += rv;
 
 	return done ? done : rv;
@@ -91,19 +92,19 @@ static ssize_t diordwr(Sfio_t* f, void* buf, size_t n, Direct_t* di, int type)
 
 static ssize_t dioread(Sfio_t* f, void* buf, size_t n, Sfdisc_t* disc)
 {
-	return diordwr(f, buf, n, (Direct_t*)disc, SF_READ);
+	return diordwr(f, buf, n, (Direct_t*)disc, SFIO_READ);
 }
 
 static ssize_t diowrite(Sfio_t* f, const void* buf, size_t n, Sfdisc_t* disc)
 {
-	return diordwr(f, (void*)buf, n, (Direct_t*)disc, SF_WRITE);
+	return diordwr(f, buf, n, (Direct_t*)disc, SFIO_WRITE);
 }
 
 static int dioexcept(Sfio_t* f, int type, void* data, Sfdisc_t* disc)
 {
 	Direct_t*	di = (Direct_t*)disc;
 
-	if(type == SF_FINAL || type == SF_DPOP)
+	if(type == SFIO_FINAL || type == SFIO_DPOP)
 	{
 		if(di->cntl&FDIRECT)
 		{	di->cntl &= ~FDIRECT;
@@ -120,6 +121,8 @@ static int dioexcept(Sfio_t* f, int type, void* data, Sfdisc_t* disc)
 int sfdcdio(Sfio_t* f, size_t bufsize)
 {
 #ifndef F_DIOINFO
+	NOT_USED(f);
+	NOT_USED(bufsize);
 	return -1;
 #else
 	int		cntl;
@@ -127,7 +130,7 @@ int sfdcdio(Sfio_t* f, size_t bufsize)
 	void*		buf;
 	Direct_t*	di;
 
-	if(f->extent < 0 || (f->flags&SF_STRING))
+	if(f->extent < 0 || (f->flags&SFIO_STRING))
 		return -1;
 
 	if((cntl = fcntl(f->file,F_GETFL,0)) < 0)
@@ -152,14 +155,14 @@ int sfdcdio(Sfio_t* f, size_t bufsize)
 	if(!(di = (Direct_t*)malloc(sizeof(Direct_t))) )
 		goto no_direct;
 
-	if(!(buf = (void*)memalign(dio.d_mem,bufsize)) )
+	if(!(buf = memalign(dio.d_mem,bufsize)) )
 	{	free(di);
 		goto no_direct;
 	}
 
 	sfsetbuf(f,buf,bufsize);
 	if(sfsetbuf(f,buf,0) == buf)
-		sfset(f,SF_MALLOC,1);
+		sfset(f,SFIO_MALLOC,1);
 	else
 	{	free(buf);
 		free(di);
@@ -168,7 +171,7 @@ int sfdcdio(Sfio_t* f, size_t bufsize)
 
 	di->disc.readf = dioread;
 	di->disc.writef = diowrite;
-	di->disc.seekf = NIL(Sfseek_f);
+	di->disc.seekf = NULL;
 	di->disc.exceptf = dioexcept;
 	di->cntl = cntl;
 	di->dio = dio;

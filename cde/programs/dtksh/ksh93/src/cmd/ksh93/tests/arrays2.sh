@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -13,6 +13,7 @@
 #                  David Korn <dgk@research.att.com>                   #
 #                  Martijn Dekker <martijn@inlv.org>                   #
 #            Johnothan King <johnothanking@protonmail.com>             #
+#         hyenias <58673227+hyenias@users.noreply.github.com>          #
 #                                                                      #
 ########################################################################
 
@@ -173,7 +174,7 @@ fx values[1]
 
 function test_short_integer
 {
-        compound out=( typeset stdout stderr ; integer res )
+	compound out=( typeset stdout stderr ; integer res )
 	compound -r -a tests=(
 		( cmd='integer -s -r -a x=( 1 2 3 ) ; print "${x[2]}"' stdoutpattern='3' )
 		( cmd='integer -s -r -A x=( [0]=1 [1]=2 [2]=3 ) ; print "${x[2]}"' stdoutpattern='3' )
@@ -194,7 +195,7 @@ function test_short_integer
        		[[ "${out.stderr}" == ''			]] || err_exit "${testname}: Expected empty stderr, got $(printf '%q\n' "${out.stderr}")"
 		(( out.res == 0 )) || err_exit "${testname}: Unexpected exit code ${out.res}"
 	done
-	
+
 	return 0
 }
 # run tests
@@ -267,6 +268,62 @@ ini() { unset arr; typeset -a arr=((10 20) 6 8); }
 [[ $( ini; (( (arr[0][2]*=arr[2]) ? arr[0][1]+=arr[1] : arr[1]=7)); typeset -p arr) == 'typeset -a arr=((10 20 0) 7 8)' ]] || err_exit 'ASSIGNOPs: (_*=_)?_:_ false failed.'
 unset arr
 unset -f ini
+
+# ======
+# Array slicing
+# https://github.com/ksh93/ksh/issues/605
+unset arr
+exp='1 2 3'
+got=$(arr=(1 2 3); echo "${arr[*]:0:${#arr[@]}}")
+[[ $got == "$exp" ]] || err_exit "array slicing test 1 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+exp='1 2 3 4'
+got=$(arr=(1 2 3 4 5); echo "${arr[*]:0:${arr[@]:3:1}}")
+[[ $got == "$exp" ]] || err_exit "array slicing test 2 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+exp='a b c'
+got=$(typeset -a arr=(a b (c d e)); echo ${arr[@]:0:${#arr[@]}})
+[[ $got == "$exp" ]] || err_exit "array slicing test 3 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -a arr=(a (b d e) c); num=${#arr[@]}; echo ${arr[@]:0:num})
+[[ $got == "$exp" ]] || err_exit "array slicing test 4 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -a arr=(a (b d e) c); echo ${arr[@]})
+[[ $got == "$exp" ]] || err_exit "array slicing test 5 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -a arr=(a (b d e) c); echo ${arr[@]:})
+[[ $got == "$exp" ]] || err_exit "array slicing test 6 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -a arr=(a (b d e) c); echo ${arr[@]:0})
+[[ $got == "$exp" ]] || err_exit "array slicing test 7 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -a arr=(a (b d e) c); echo ${arr[@]:0:${#arr[@]}})
+[[ $got == "$exp" ]] || err_exit "array slicing test 8 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+# below, we must have 'arr=( (a...' and not 'arr=((a...' due to https://github.com/ksh93/ksh/issues/269
+got=$(typeset -a arr=( (a d e) b c); echo ${arr[@]:0:${#arr[@]}})
+[[ $got == "$exp" ]] || err_exit "array slicing test 9 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -A arr=(a (b d e) c); num=${#arr[@]}; echo ${arr[@]:0:num})
+[[ $got == "$exp" ]] || err_exit "array slicing test 10 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -A arr=(a (b d e) c); echo ${arr[@]:0:${#arr[@]}})
+[[ $got == "$exp" ]] || err_exit "array slicing test 11 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+exp='c d e'
+got=$(typeset -a arr=(a (b d e) c d e); echo ${arr[@]:2:${#arr[@]}-2})
+[[ $got == "$exp" ]] || err_exit "array slicing test 12 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(typeset -A arr=(a (b d e) c d e); echo ${arr[@]:2:${#arr[@]}-2})
+[[ $got == "$exp" ]] || err_exit "array slicing test 13 (expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# Reserved words as values
+# https://github.com/ksh93/ksh/issues/790
+got=$(set +x; eval 'typeset -a a1=((demo) (select) (if) (case) (while))' 2>&1 && typeset -p a1)
+exp='typeset -a a1=((demo) (select) (if) (case) (while) )'
+[[ $got == "$exp" ]] || err_exit "reserved word assigned as multidimensional array value" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(set +x; eval 'typeset -a a1=((demo) (select) if case while)' 2>&1 && typeset -p a1)
+exp='typeset -a a1=((demo) (select) if case while)'
+[[ $got == "$exp" ]] || err_exit "reserved word assigned as top-level value in multidimensional array" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(set +x; eval 'a1=((demo) (select) (if) (case) (while))' 2>&1 && typeset -p a1)
+exp='typeset -a a1=((demo) (select) (if) (case) (while) )'
+[[ $got == "$exp" ]] || err_exit "reserved word assigned as implicit multidimensional array value" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(set +x; eval 'a1=((demo) (select) if case while)' 2>&1 && typeset -p a1)
+exp='typeset -a a1=((demo) (select) if case while)'
+[[ $got == "$exp" ]] || err_exit "reserved word assigned as top-level value in implicit multidimensional array" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
 # ======
 exit $((Errors<125?Errors:125))

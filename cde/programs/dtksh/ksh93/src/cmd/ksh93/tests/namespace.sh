@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -180,6 +180,108 @@ else
 	done
 	unset exp
 fi
+
+# ======
+# Test 'unset -f' in subshell in namespace
+# https://github.com/ksh93/ksh/issues/648
+# NOTE: for ast commands, '--version' is expected to exit with status 2 on 93u+m/1.0, 0 on 93u+m/1.1 and up
+case ${.sh.version} in
+*93u+m/1.[!0]* | 93u+m/[2-9].* | 93u+m/?[!.]*)
+	s=0 ;;
+*)	s=2 ;;
+esac
+exp='^  version         [[:alpha:]]{2,} (.*) ....-..-..$'
+for b in cd disown fg getopts printf pwd read ulimit umask whence
+do
+	got=$(
+		namespace ns
+		{
+			eval "$b() { echo BAD; }"
+			(unset -f "$b"; PATH=/dev/null; "$b" --version 2>&1)
+			exit	# avoid optimizing out the subshell
+		}
+	)
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (1a)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+	namespace ns
+	{
+		got=$(
+			eval "$b() { echo BAD; }"
+			(unset -f "$b"; PATH=/dev/null; "$b" --version 2>&1)
+			exit	# avoid optimizing out the subshell
+		)
+	}
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (1b)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+	# bug introduced on 2023-06-02
+	got=$(
+		eval "$b() { echo BAD; }"
+		namespace ns
+		{
+			(unset -f "$b"; PATH=/dev/null; "$b" --version 2>&1)
+			exit	# avoid optimizing out the subshell
+		}
+	)
+	# for ast commands, '--version' is expected to exit with status 2 on 93u+m/1.0, 0 on 93u+m/1.1 and up
+	case ${.sh.version} in
+	*93u+m/1.[!0]* | 93u+m/[2-9].* | 93u+m/?[!.]*)
+		s=0 ;;
+	*)	s=2 ;;
+	esac
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f $b' fails in subshell (1c)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+	got=$(
+		namespace ns
+		{
+			eval "$b() { echo BAD; }"
+			(unset -f .ns."$b"; PATH=/dev/null; .ns."$b" 2>/dev/null || { let "$?==127" && "$b" --version 2>&1; })
+			exit	# avoid optimizing out the subshell
+		}
+	)
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f .ns.$b' fails in subshell (2a)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+	namespace ns
+	{
+		got=$(
+			eval "$b() { echo BAD; }"
+			(unset -f .ns."$b"; PATH=/dev/null; .ns."$b" 2>/dev/null || { let "$?==127" && "$b" --version 2>&1; })
+			exit	# avoid optimizing out the subshell
+		)
+	}
+	[[ e=$? -eq s && $got =~ $exp ]] || err_exit "'unset -f .ns.$b' fails in subshell (2b)" \
+		"(expected status $s and ERE match of $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+done
+
+# ======
+# https://github.com/ksh93/ksh/issues/727
+exp=foo
+got=$(unset _AST_FEATURES; "$SHELL" -c 'namespace foo { echo foo; }' 2>&1)
+[[ $got == "$exp" ]] || err_exit "'echo' botched in namespace" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+case $'\n'${ builtin;}$'\n' in
+*$'\n'/opt/ast/bin/getconf$'\n'*)
+	got=$(unset _AST_FEATURES; "$SHELL" -c 'namespace ucb { /opt/ast/bin/getconf UNIVERSE = ucb; echo foo; }' 2>&1)
+	[[ $got == "$exp" ]] || err_exit "'getconf' and/or 'echo' botched in namespace" \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+	;;
+esac
+
+# ======
+# https://github.com/ksh93/ksh/issues/728
+got=$(PATH=/opt/ast/bin; PATH=$(getconf PATH); "$SHELL" -c 'builtin basename; namespace ns { basename --version; }' 2>&1)
+exp='  version         basename (*) ????-??-??'
+[[ $got == $exp ]] || err_exit "optional builtin not found when run from namespace" \
+	"(expected match of $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+got=$("$SHELL" -c 'namespace foo { echo OK | read _DeFiNiTeLy_nOnExIsTeNt_vAr_; }' 2>&1) ||
+	err_exit "read fails in namespace (got $(printf %q "$got"))"
+got=$("$SHELL" -c 'namespace foo { export "_dEfInItElY_NoNeXiStEnT_VaR_=1"; }' 2>&1) ||
+	err_exit "export with quoted assignment-argument fails in namespace (got $(printf %q "$got"))"
 
 # ======
 exit $((Errors<125?Errors:125))

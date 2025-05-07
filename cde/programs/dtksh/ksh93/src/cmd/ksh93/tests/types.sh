@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2024 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -347,7 +347,7 @@ expected=$'(\n\ttypeset -l -i h=0\n\tbenchcmd_t -a m\n\ttypeset -l -E o=0\n)'
 
 expected=$'Std_file_t db.file[/etc/profile]=(action=preserve;typeset -A sum=([8242e663d6f7bb4c5427a0e58e2925f3]=1);)'
 {
-  got=$($SHELL <<- \EOF 
+  got=$($SHELL <<- \EOF
 	MAGIC='stdinstall (AT&T Research) 2009-08-25'
 	typeset -T Std_file_t=(
 		typeset action
@@ -364,15 +364,15 @@ expected=$'Std_file_t db.file[/etc/profile]=(action=preserve;typeset -A sum=([82
 [[ $got == "$expected" ]] ||  err_exit 'types with arrays of types as members fails'
 
 typeset -T x_t=(
-	integer dummy 
+	integer dummy
 	function set
 	{
 		[[ ${.sh.name} == v ]] || err_exit  "name=${.sh.name} should be v"
 		[[ ${.sh.subscript} == 4 ]] || err_exit "subscript=${.sh.subscript} should be 4"
 		[[ ${.sh.value} == hello ]] || err_exit  "value=${.sh.value} should be hello"
-	} 
+	}
 )
-x_t -a v 
+x_t -a v
 v[4]="hello"
 
 typeset -T oset=(
@@ -400,23 +400,23 @@ bar.foo[a]=b
 
 { x=$( $SHELL 2> /dev/null << \++EOF++
     typeset -T ab_t=(
-        integer a=1 b=2
-        function increment
-        {
-                (( _.a++, _.b++ ))
-        }
+	integer a=1 b=2
+	function increment
+	{
+		(( _.a++, _.b++ ))
+	}
     )
     function ar_n
     {
-        nameref sn=$2
-        sn.increment
-        $1 && printf "a=%d, b=%d\n" sn.a sn.b
+	nameref sn=$2
+	sn.increment
+	$1 && printf "a=%d, b=%d\n" sn.a sn.b
     }
     function ar
     {
-        ab_t -S -a s
-        [[ -v s[5] ]] || s[5]=( )
-        ar_n $1 s[5]
+	ab_t -S -a s
+	[[ -v s[5] ]] || s[5]=( )
+	ar_n $1 s[5]
     }
     x=$(ar false ; ar false ; ar true ; printf ";")
     y=$(ar false ; ar false ; ar true ; printf ";")
@@ -495,7 +495,7 @@ else
 	err_exit 'typeset -T not supported'
 fi
 
-[[ $($SHELL -c 'typeset -T x=( typeset -a h ) ; x j; print -v j.h') ]] && err_exit 'type with indexed array without elements inserts element 0' 
+[[ $($SHELL -c 'typeset -T x=( typeset -a h ) ; x j; print -v j.h') ]] && err_exit 'type with indexed array without elements inserts element 0'
 
 [[ $($SHELL  -c 'typeset -T x=( integer -a s ) ; compound c ; x c.i ; c.i.s[4]=666 ; print -v c') == *'[0]'* ]] &&  err_exit 'type with indexed array with non-zero element inserts element 0'
 
@@ -545,7 +545,7 @@ typeset -T b_t=(
 	a_t b
 )
 compound b
-compound -a b.ca 
+compound -a b.ca
 b_t b.ca[4].b
 exp='typeset -C b=(typeset -C -a ca=( [4]=(b_t b=(a_t b=(a=hello))));)'
 got=$(typeset -p b)
@@ -553,7 +553,7 @@ got=$(typeset -p b)
 	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
 typeset -T u_t=(
-	integer dummy 
+	integer dummy
 	unset()
 	{
 		print unset
@@ -673,7 +673,7 @@ exp=': trap: is a special shell builtin'
 
 # ======
 # Bugs involving scripts without a #! path
-# Hashbangless scripts are executed in a reinitialised fork of ksh, which is very bug-prone.
+# Hashbangless scripts are executed in a reinitialised fork of ksh.
 # https://github.com/ksh93/ksh/issues/350
 # Some of these fixed bugs don't involve types at all, but the tests need to go somewhere.
 # Plus, invoking these from an environment with a bunch of types defined is an additional test.
@@ -774,6 +774,109 @@ exp=": foo.get: cannot set discipline for undeclared type member"
 got=$(set +x; redirect 2>&1; typeset -T _bad_disc_t=(typeset dummy; function foo.get { :; }); echo end_reached)
 let "(e=$?)==1" && [[ $got == *"$exp" ]] || err_exit "attempt to set disc for nonexistent type member not handled correctly" \
 	"(expected status 1, match of *$(printf %q "$exp"); got status $e, $(printf %q "$got"))"
+
+# ======
+# Crash due to incorrect alignment calculation
+# https://github.com/ksh93/ksh/issues/537
+got=$({ "$SHELL" -c '
+	typeset -T Coord_t=(
+		typeset -i x
+	)
+	typeset -T Job_t=(
+		typeset -si BUGTRIGGER
+		Coord_t pos
+		set_pos() { _.pos.x=0 ;}
+	)
+	Job_t job
+	job.set_pos
+	job.set_pos
+'; } 2>&1)
+e=$?
+let "e==0" || err_exit 'crash involving short int as first type member' \
+	"(got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"), $(printf %q "$got"))"
+
+# ======
+# loop invariants optimizer bug
+# reproducer by Daniel Douglas
+# https://github.com/ksh93/ksh/issues/704
+typeset -T Thing=(
+	integer x
+	typeset y
+)
+function f
+{
+	Thing -a t=(
+		[0]=(x=1; y=hi)
+		[1]=(x=2; y=yo)
+		[2]=(x=3; y=moo)
+		[5]=(x=6; y=boo)
+		[9]=(x=10; y=boom)
+	)
+	typeset -p t
+	g t
+}
+function g
+{
+	typeset -n ref=$1 d e
+	set -- "${!ref[@]}"
+	set -- "${@/*/ref[\0]}"
+	for e do
+		for d in e.x e.y
+		do	printf '%s %s %-14s %s\n' "${@e}" "${!d}" "${@d}" "${d}"
+		done
+	done
+	echo
+}
+exp='Thing -a t=([0]=(typeset -l -i x=1;y=hi) [1]=(typeset -l -i x=2;y=yo) [2]=(typeset -l -i x=3;y=moo) [5]=(typeset -l -i x=6;y=boo) [9]=(typeset -l -i x=10;y=boom))
+Thing t[0].x typeset -l -i  1
+Thing t[0].y                hi
+Thing t[1].x typeset -l -i  2
+Thing t[1].y                yo
+Thing t[2].x typeset -l -i  3
+Thing t[2].y                moo
+Thing t[5].x typeset -l -i  6
+Thing t[5].y                boo
+Thing t[9].x typeset -l -i  10
+Thing t[9].y                boom'
+got=$(f 2>&1)
+[[ $got == "$exp" ]] ||
+{
+	err_exit "issue 704: expected '-' lines, got '+' lines:"
+	diff -U1 <(print "$exp") <(print "$got") | sed $'1,3 d; s,^,\t,' >&2
+}
+
+# ======
+got=$("$SHELL" -c '(typeset -T echo=(typeset TYPEVAR); echo V; print $V); echo OK' 2>&1)
+exp=$'( typeset TYPEVAR )\nOK'
+[[ $got == "$exp" ]] || err_exit 'type definition overriding regular built-in' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+# As of 93u+m/1.1, _ in types always refers to the type variable, even within a member discipline function.
+# Change backported from ksh 93v- 2013-07-27 and 2013-08-29.
+case ${.sh.version} in
+Version*93u+m/1.0* | Version*93??\ * | Version*93?\ *)
+	;;
+*)
+	typeset -T argnod_discfunc_test_t=(
+		typeset x
+		integer y=5
+		function x.getn
+		{
+			((.sh.value = ++_.y))
+			typeset -p _
+		}
+	)
+	argnod_discfunc_test_t argnod_discfunc_obj
+	exp=$'typeset -n _=argnod_discfunc_obj\n6'
+	got=$(set +x; redirect 2>&1; print -r -- "${argnod_discfunc_obj.x}")
+	[[ $got == "$exp" ]] || err_exit "_ does not refer to the type variable in a member discipline function" \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+	got=$(set +x; redirect 2>&1; print -r -- "$((argnod_discfunc_obj.x))")
+	[[ $got == "$exp" ]] || err_exit "_ does not refer to the type variable in a member discipline function" \
+		"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+	;;
+esac
 
 # ======
 exit $((Errors<125?Errors:125))

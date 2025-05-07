@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2014 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
 *            Johnothan King <johnothanking@protonmail.com>             *
+*                      Phi <phi.debian@gmail.com>                      *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -27,14 +28,12 @@
 #include	"shopt.h"
 #include	"defs.h"
 #include	<error.h>
-#include	<stak.h>
 #include	"io.h"
 #include	"name.h"
 #include	"history.h"
 #include	"builtins.h"
 #include	"streval.h"
 #include	<tmx.h>
-#include	<ccode.h>
 
 union types_t
 {
@@ -56,6 +55,7 @@ struct printf
 	Sffmt_t		hdr;
 	int		argsize;
 	int		intvar;
+	char		**argv0; /* see reload() below */
 	char		**nextarg;
 	char		*lastarg;
 	char		cescape;
@@ -83,6 +83,7 @@ static const struct printmap  Pmap[] =
 
 static int		echolist(Sfio_t*, int, char**);
 static int		extend(Sfio_t*,void*, Sffmt_t*);
+static int		reload(int argn, char fmt, void* v, Sffmt_t* fe);
 static char		*genformat(char*);
 static int		fmtvecho(const char*, struct printf*);
 static ssize_t		fmtbase64(Sfio_t*, char*, int);
@@ -108,13 +109,13 @@ static int	exitval;
 	/* This mess is because /bin/echo on BSD is different */
 	if(!sh.universe)
 	{
-		register char *universe;
+		char *universe;
 		if(universe=astconf("UNIVERSE",0,0))
 			bsd_univ = (strcmp(universe,"ucb")==0);
 		sh.universe = 1;
 	}
 	if(!bsd_univ)
-		return(b_print(0,argv,(Shbltin_t*)&prdata));
+		return b_print(0,argv,(Shbltin_t*)&prdata);
 	prdata.options = sh_optecho;
 	prdata.raw = 1;
 	while(argv[1] && *argv[1]=='-')
@@ -134,7 +135,7 @@ static int	exitval;
 			break;
 		argv++;
 	}
-	return(b_print(0,argv,(Shbltin_t*)&prdata));
+	return b_print(0,argv,(Shbltin_t*)&prdata);
    }
 #endif /* SHOPT_ECHOPRINT */
 
@@ -145,16 +146,19 @@ int    b_printf(int argc, char *argv[],Shbltin_t *context)
 	NOT_USED(context);
 	memset(&prdata,0,sizeof(prdata));
 	prdata.options = sh_optprintf;
-	return(b_print(-1,argv,(Shbltin_t*)&prdata));
+	return b_print(-1,argv,(Shbltin_t*)&prdata);
 }
 
 static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
 {
 	const struct printmap *pm;
 	char c='%';
+	NOT_USED(op);
+	NOT_USED(s);
+	NOT_USED(dp);
 	for(pm=Pmap;pm->size>0;pm++)
 		sfprintf(sp, "[+%c(%s)q?Equivalent to %s.]",c,pm->name,pm->equivalent);
-	return(1);
+	return 1;
 }
 
 /*
@@ -163,17 +167,20 @@ static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)
  */
 int    b_print(int argc, char *argv[], Shbltin_t *context)
 {
-	register Sfio_t *outfile;
-	register int n, fd = 1;
+	Sfio_t *outfile;
+	int n, fd = 1;
 	const char *options, *msg = e_file+4;
 	char *format = 0;
-	int sflag = 0, nflag=0, rflag=0, vflag=0;
+#if !SHOPT_SCRIPTONLY
+	int sflag = 0;
+#endif /* !SHOPT_SCRIPTONLY */
+	int nflag=0, rflag=0, vflag=0;
 	Namval_t *vname=0;
 	Optdisc_t disc;
 	exitval = 0;
+	memset(&disc, 0, sizeof(disc));
 	disc.version = OPT_VERSION;
 	disc.infof = infof;
-	opt_info.disc = &disc;
 	if(argc>0)
 	{
 		options = sh_optprint;
@@ -192,22 +199,34 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 			goto skip;
 		}
 	}
+	opt_info.disc = &disc;
+#if SHOPT_PRINTF_LEGACY
+	/* POSIX-ignorant printf(1) compat, prong 1: prevent option parsing if first arg looks like format operand */
+	if(argc<0 && argv[1] && (strchr(argv[1],'%') || strchr(argv[1],'\\')))
+	{
+		opt_info.index = 1;
+		goto skipopts;
+	}
+#endif /* SHOPT_PRINTF_LEGACY */
 	while((n = optget(argv,options))) switch(n)
 	{
 		case 'n':
 			nflag++;
 			break;
 		case 'p':
+		coprocess:
 			fd = sh.coutpipe;
 			msg = e_query;
 			break;
 		case 'f':
 			format = opt_info.arg;
 			break;
+#if !SHOPT_SCRIPTONLY
 		case 's':
 			/* print to history file */
 			if(!sh_histinit())
 			{
+				opt_info.disc = NULL;
 				errormsg(SH_DICT,ERROR_system(1),e_history);
 				UNREACHABLE();
 			}
@@ -215,6 +234,7 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 			sh_onstate(SH_HISTORY);
 			sflag++;
 			break;
+#endif /* !SHOPT_SCRIPTONLY */
 		case 'e':
 			rflag = 0;
 			break;
@@ -222,12 +242,18 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 			rflag = 1;
 			break;
 		case 'u':
+			if(opt_info.arg[0]=='p' && opt_info.arg[1]==0)
+				goto coprocess;
 			fd = (int)strtol(opt_info.arg,&opt_info.arg,10);
 			if(*opt_info.arg)
 				fd = -1;
 			else if(!sh_iovalidfd(fd))
 				fd = -1;
+#if SHOPT_SCRIPTONLY
+			else if(!(sh.inuse_bits&(1<<fd)) && sh_inuse(fd))
+#else
 			else if(!(sh.inuse_bits&(1<<fd)) && (sh_inuse(fd) || (sh.hist_ptr && fd==sffileno(sh.hist_ptr->histfp))))
+#endif /* SHOPT_SCRIPTONLY */
 				fd = -1;
 			break;
 		case 'v':
@@ -237,6 +263,7 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 				vname = nv_open(opt_info.arg, sh.var_tree, NV_VARNAME);
 				if(!vname)
 				{
+					opt_info.disc = NULL;
 					errormsg(SH_DICT, ERROR_exit(2), e_create, opt_info.arg);
 					UNREACHABLE();
 				}
@@ -248,6 +275,14 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 			vflag='C';
 			break;
 		case ':':
+#if SHOPT_PRINTF_LEGACY
+			/* POSIX-ignorant printf(1) compat, prong 2: treat erroneous first option as operand */
+			if(argc<0 && (opt_info.index==1 || opt_info.index==2 && argv[1][0]=='-' && argv[1][1]=='-'))
+			{
+				opt_info.index = 1;
+				goto skipopts;
+			}
+#endif /* SHOPT_PRINTF_LEGACY */
 			/* The following is for backward compatibility */
 			if(strcmp(opt_info.name,"-R")==0)
 			{
@@ -263,6 +298,7 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 						nflag++;
 						argv++;
 					}
+					opt_info.disc = NULL;
 					goto skip2;
 				}
 			}
@@ -270,13 +306,19 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 				errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			opt_info.disc = NULL;
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
+#if SHOPT_PRINTF_LEGACY
+skipopts:
+#endif /* SHOPT_PRINTF_LEGACY */
+	opt_info.disc = NULL;
 	argv += opt_info.index;
 	if(error_info.errors || (argc<0 && !(format = *argv++)))
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
+		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	if(vflag && format)
@@ -292,9 +334,10 @@ skip:
 		argv++;
 	if(vname)
 	{
-		if(!sh.strbuf2)
-			sh.strbuf2 = sfstropen();
-		outfile = sh.strbuf2;
+		static Sfio_t *vbuf;
+		if(!vbuf)
+			vbuf = sfstropen();
+		outfile = vbuf;
 		goto printf_v;
 	}
 skip2:
@@ -309,20 +352,20 @@ skip2:
 	{
 		/* don't print error message for stdout for compatibility */
 		if(fd==1)
-			return(1);
+			return 1;
 		errormsg(SH_DICT,ERROR_system(1),msg);
 		UNREACHABLE();
 	}
 	if(!(outfile=sh.sftable[fd]))
 	{
 		sh_onstate(SH_NOTRACK);
-		n = SF_WRITE|((n&IOREAD)?SF_READ:0);
-		sh.sftable[fd] = outfile = sfnew(NIL(Sfio_t*),sh.outbuff,IOBSIZE,fd,n);
+		n = SFIO_WRITE|((n&IOREAD)?SFIO_READ:0);
+		sh.sftable[fd] = outfile = sfnew(NULL,sh.outbuff,IOBSIZE,fd,n);
 		sh_offstate(SH_NOTRACK);
-		sfpool(outfile,sh.outpool,SF_WRITE);
+		sfpool(outfile,sh.outpool,SFIO_WRITE);
 	}
 	/* turn off share to guarantee atomic writes for printf */
-	n = sfset(outfile,SF_SHARE|SF_PUBLIC,0);
+	n = sfset(outfile,SFIO_SHARE|SFIO_PUBLIC,0);
 printf_v:
 	if(format)
 	{
@@ -332,20 +375,22 @@ printf_v:
 		memset(&pdata, 0, sizeof(pdata));
 		pdata.hdr.version = SFIO_VERSION;
 		pdata.hdr.extf = extend;
+		pdata.hdr.reloadf = reload;
 		pdata.nextarg = argv;
 		sh_offstate(SH_STOPOK);
-		pool=sfpool(sfstderr,NIL(Sfio_t*),SF_WRITE);
+		pool=sfpool(sfstderr,NULL,SFIO_WRITE);
 		do
 		{
+			pdata.argv0 = pdata.nextarg;
 			if(sh.trapnote&SH_SIGSET)
 				break;
 			pdata.hdr.form = format;
 			sfprintf(outfile,"%!",&pdata);
 		} while(*pdata.nextarg && pdata.nextarg!=argv);
 		if(pdata.nextarg == nullarg && pdata.argsize>0)
-			if(sfwrite(outfile,stakptr(staktell()),pdata.argsize) < 0)
+			if(sfwrite(outfile,stkptr(sh.stk,stktell(sh.stk)),pdata.argsize) < 0)
 				exitval = 1;
-		sfpool(sfstderr,pool,SF_WRITE);
+		sfpool(sfstderr,pool,SFIO_WRITE);
 		if (pdata.err)
 			exitval = 1;
 	}
@@ -365,7 +410,7 @@ printf_v:
 		/* echo style print */
 		if(nflag && !argv[0])
 		{
-			if (sfsync((Sfio_t*)0) < 0)
+			if (sfsync(NULL) < 0)
 				exitval = 1;
 		}
 		else if(echolist(outfile,rflag,argv) && !nflag)
@@ -374,19 +419,21 @@ printf_v:
 	}
 	if(vname)
 		nv_putval(vname, sfstruse(outfile), 0);
+#if !SHOPT_SCRIPTONLY
 	else if(sflag)
 	{
 		hist_flush(sh.hist_ptr);
 		sh_offstate(SH_HISTORY);
 	}
+#endif /* !SHOPT_SCRIPTONLY */
 	else
 	{
-		if(n&SF_SHARE)
-			sfset(outfile,SF_SHARE|SF_PUBLIC,1);
+		if(n&SFIO_SHARE)
+			sfset(outfile,SFIO_SHARE|SFIO_PUBLIC,1);
 		if (sfsync(outfile) < 0)
 			exitval = 1;
 	}
-	return(exitval);
+	return exitval;
 }
 
 /*
@@ -396,8 +443,8 @@ printf_v:
  */
 static int echolist(Sfio_t *outfile, int raw, char *argv[])
 {
-	register char	*cp;
-	register int	n;
+	char	*cp;
+	int	n;
 	struct printf pdata;
 	pdata.cescape = 0;
 	pdata.err = 0;
@@ -406,7 +453,7 @@ static int echolist(Sfio_t *outfile, int raw, char *argv[])
 		if(!raw  && (n=fmtvecho(cp,&pdata))>=0)
 		{
 			if(n)
-				if(sfwrite(outfile,stakptr(staktell()),n) < 0)
+				if(sfwrite(outfile,stkptr(sh.stk,stktell(sh.stk)),n) < 0)
 					exitval = 1;
 		}
 		else
@@ -417,7 +464,7 @@ static int echolist(Sfio_t *outfile, int raw, char *argv[])
 				exitval = 1;
 		sh_sigcheck();
 	}
-	return(!pdata.cescape);
+	return !pdata.cescape;
 }
 
 /*
@@ -425,27 +472,27 @@ static int echolist(Sfio_t *outfile, int raw, char *argv[])
  */
 static char strformat(char *s)
 {
-        register char*  t;
-        register int    c;
-        char*           b;
-        char*           p;
+	char*		t;
+	int		c;
+	char*		b;
+	char*		p;
 #if SHOPT_MULTIBYTE && defined(FMT_EXP_WIDE)
 	int		w;
 #endif
-        b = t = s;
-        for (;;)
-        {
-                switch (c = *s++)
-                {
-                    case '\\':
+	b = t = s;
+	for (;;)
+	{
+		switch (c = *s++)
+		{
+		    case '\\':
 			if(*s==0)
 				break;
 #if SHOPT_MULTIBYTE && defined(FMT_EXP_WIDE)
-                        c = chrexp(s - 1, &p, &w, FMT_EXP_CHAR|FMT_EXP_LINE|FMT_EXP_WIDE);
+			c = chrexp(s - 1, &p, &w, FMT_EXP_CHAR|FMT_EXP_LINE|FMT_EXP_WIDE);
 #else
-                        c = chresc(s - 1, &p);
+			c = chresc(s - 1, &p);
 #endif
-                        s = p;
+			s = p;
 #if SHOPT_MULTIBYTE
 #if defined(FMT_EXP_WIDE)
 			if(w)
@@ -468,29 +515,29 @@ static char strformat(char *s)
 				*t++ = '%';
 				c = 'Z';
 			}
-                        break;
-                    case 0:
-                        *t = 0;
-                        return(t - b);
-                }
-                *t++ = c;
-        }
+			break;
+		    case 0:
+			*t = 0;
+			return t - b;
+		}
+		*t++ = c;
+	}
 }
 
 static char *genformat(char *format)
 {
-	register char *fp;
-	stakseek(0);
-	stakputs(format);
-	fp = (char*)stakfreeze(1);
+	char *fp;
+	stkseek(sh.stk,0);
+	sfputr(sh.stk,format,-1);
+	fp = stkfreeze(sh.stk,1);
 	strformat(fp);
-	return(fp);
+	return fp;
 }
 
 static char *fmthtml(const char *string, int flags)
 {
-	register const char *cp = string, *op;
-	register int c, offset = staktell();
+	const char *cp = string, *op;
+	int c, offset = stktell(sh.stk);
 	/*
 	 * The only multibyte locale ksh currently supports is UTF-8, which is a superset of ASCII. So, if we're on an
 	 * EBCDIC system, below we attempt to convert EBCDIC to ASCII only if we're not in a multibyte locale (mbwide()).
@@ -501,22 +548,20 @@ static char *fmthtml(const char *string, int flags)
 		/* Encode for HTML and XML, for main text and single- and double-quoted attributes. */
 		while(op = cp, c = mbchar(cp))
 		{
-			if(!mbwide())
-				c = CCMAPC(c,CC_NATIVE,CC_ASCII);
 			if(mbwide() && c < 0)		/* invalid multibyte char */
-				stakputc('?');
+				sfputc(sh.stk,'?');
 			else if(c == 60)		/* < */
-				stakputs("&lt;");
+				sfputr(sh.stk,"&lt;",-1);
 			else if(c == 62)		/* > */
-				stakputs("&gt;");
+				sfputr(sh.stk,"&gt;",-1);
 			else if(c == 38)		/* & */
-				stakputs("&amp;");
+				sfputr(sh.stk,"&amp;",-1);
 			else if(c == 34)		/* " */
-				stakputs("&quot;");
+				sfputr(sh.stk,"&quot;",-1);
 			else if(c == 39)		/* ' (&apos; is not HTML) */
-				stakputs("&#39;");
+				sfputr(sh.stk,"&#39;",-1);
 			else
-				stakwrite(op, cp-op);
+				sfwrite(sh.stk, op, cp-op);
 		}
 	}
 	else
@@ -527,12 +572,12 @@ static char *fmthtml(const char *string, int flags)
 			while(op = cp, c = mbchar(cp))
 			{
 				if(c < 0)
-					stakputs("%3F");
+					sfputr(sh.stk,"%3F",-1);
 				else if(c < 128 && strchr(URI_RFC3986_UNRESERVED, c))
-					stakputc(c);
+					sfputc(sh.stk,c);
 				else
 					while(c = *(unsigned char*)op++, op <= cp)
-						sfprintf(stkstd, "%%%02X", c);
+						sfprintf(sh.stk, "%%%02X", c);
 			}
 		}
 		else
@@ -540,14 +585,14 @@ static char *fmthtml(const char *string, int flags)
 			while(c = *(unsigned char*)cp++)
 			{
 				if(strchr(URI_RFC3986_UNRESERVED, c))
-					stakputc(c);
+					sfputc(sh.stk,c);
 				else
-					sfprintf(stkstd, "%%%02X", CCMAPC(c, CC_NATIVE, CC_ASCII));
+					sfprintf(sh.stk, "%%%02X", c);
 			}
 		}
 	}
-	stakputc(0);
-	return(stakptr(offset));
+	sfputc(sh.stk,0);
+	return stkptr(sh.stk,offset);
 }
 
 static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
@@ -555,7 +600,7 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 	char			*cp;
 	Sfdouble_t		d;
 	ssize_t			size;
-	Namval_t		*np = nv_open(string, NiL, NV_VARNAME|NV_NOADD);
+	Namval_t		*np = nv_open(string, NULL, NV_VARNAME|NV_NOADD);
 	Namarr_t		*ap;
 	static union types_t	number;
 	if(!np || nv_isnull(np))
@@ -565,7 +610,7 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 			errormsg(SH_DICT,ERROR_exit(1),e_notset,string);
 			UNREACHABLE();
 		}
-		return(0);
+		return 0;
 	}
 	if(nv_isattr(np,NV_INTEGER))
 	{
@@ -603,10 +648,10 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 			else
 			{
 				size =  sizeof(short);
-				number.i = (int)d; 
+				number.i = (int)d;
 			}
 		}
-		return(sfwrite(iop, (void*)&number, size));
+		return sfwrite(iop, &number, size);
 	}
 	if(nv_isattr(np,NV_BINARY))
 	{
@@ -617,7 +662,7 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 				break;
 		}
 		if(fp)
-			return (*fp->disc->writef)(np, iop, 0, fp); 		
+			return (*fp->disc->writef)(np, iop, 0, fp);
 		else
 		{
 			int n = nv_size(np);
@@ -628,11 +673,11 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 				nv_offattr(np,NV_RAW);
 			}
 			else
-				cp = (char*)np->nvalue.cp;
+				cp = np->nvalue;
 			if((size = n)==0)
 				size = strlen(cp);
 			size = sfwrite(iop, cp, size);
-			return(n?n:size);
+			return n?n:size;
 		}
 	}
 	else if(nv_isarray(np) && (ap=nv_arrayptr(np)) && array_elem(ap) && (ap->nelem&(ARRAY_UNDEF|ARRAY_SCAN)))
@@ -640,7 +685,7 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 		nv_outnode(np,iop,(alt?-1:0),0);
 		if(sfputc(iop,')') < 0)
 			exitval = 1;
-		return(sftell(iop));
+		return sftell(iop);
 	}
 	else
 	{
@@ -652,15 +697,15 @@ static ssize_t fmtbase64(Sfio_t *iop, char *string, int alt)
 		if(alt)
 			nv_offattr(np,NV_EXPORT);
 		if(!cp)
-			return(0);
+			return 0;
 		size = strlen(cp);
-		return(sfwrite(iop,cp,size));
+		return sfwrite(iop,cp,size);
 	}
 }
 
 static int varname(const char *str, int n)
 {
-	register int c,dot=1,len=1;
+	int c,dot=1,len=1;
 	if(n < 0)
 	{
 		if(*str=='.')
@@ -681,7 +726,7 @@ static int varname(const char *str, int n)
 			break;
 		dot = (c=='.');
 	}
-	return(n==0);
+	return n==0;
 }
 
 static const char *mapformat(Sffmt_t *fe)
@@ -690,10 +735,10 @@ static const char *mapformat(Sffmt_t *fe)
 	while(pm->size>0)
 	{
 		if(pm->size==fe->n_str && strncmp(pm->name,fe->t_str,fe->n_str)==0)
-			return(pm->map);
+			return pm->map;
 		pm++;
 	}
-	return(0);
+	return NULL;
 }
 
 static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
@@ -707,8 +752,9 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 	int		fold = fe->base;
 	union types_t*	value = (union types_t*)v;
 	struct printf*	pp = (struct printf*)fe;
-	register char*	argp = *pp->nextarg;
+	char*		argp = *pp->nextarg;
 	char		*w,*s;
+	NOT_USED(sp);
 	if(fe->n_str>0 && (format=='T'||format=='Q') && varname(fe->t_str,fe->n_str) && (!argp || varname(argp,-1)))
 	{
 		if(argp)
@@ -717,7 +763,7 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 			argp = pp->lastarg;
 		if(argp)
 		{
-			sfprintf(sh.strbuf,"%s.%.*s%c",argp,fe->n_str,fe->t_str,0);
+			sfprintf(sh.strbuf,"%s.%.*s",argp,fe->n_str,fe->t_str);
 			argp = sfstruse(sh.strbuf);
 		}
 	}
@@ -756,7 +802,7 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 		case 'E':
 		case 'F':
 		case 'G':
-                        if(SFFMT_LDOUBLE)
+			if(SFFMT_LDOUBLE)
 				value->ld = 0.;
 			else
 				value->d = 0.;
@@ -769,7 +815,12 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 			break;
 		case 'T':
 			fe->fmt = 'd';
+			tm_info.flags = 0;
 			value->ll = tmxgettime();
+			break;
+		case '.':
+			fe->fmt = 'd';
+			value->ll = 0;
 			break;
 		default:
 			if(!strchr("DdXxoUu",format))
@@ -793,17 +844,17 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 		{
 			Namval_t *np;
 			np = nv_open(argp,sh.var_tree,NV_VARNAME|NV_NOARRAY);
-			_nv_unset(np,0);
+			nv_unset(np,0);
 			nv_onattr(np,NV_INTEGER);
-			if (np->nvalue.lp = new_of(int32_t,0))
-				*np->nvalue.lp = 0;
+			if (np->nvalue = new_of(int32_t,0))
+				*((int32_t*)np->nvalue) = 0;
 			nv_setsize(np,10);
 			if(sizeof(int)==sizeof(int32_t))
-				value->ip = (int*)np->nvalue.lp;
+				value->ip = np->nvalue;
 			else
 			{
 				int32_t sl = 1;
-				value->ip = (int*)(((char*)np->nvalue.lp) + (*((char*)&sl) ? 0 : sizeof(int)));
+				value->ip = (int*)(((char*)np->nvalue) + (*((char*)&sl) ? 0 : sizeof(int)));
 			}
 			break;
 		}
@@ -885,7 +936,15 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 				}
 				break;
 			default:
-				d = sh_strnum(argp,&lastchar,0);
+				if(sh.bltinfun==b_printf && sh_isoption(SH_POSIX))
+				{
+					/* POSIX requires evaluating a number here, not an arithmetic expression */
+					d = (Sfdouble_t)strtoll(argp,&lastchar,0);
+					if(*lastchar)
+						errormsg(SH_DICT,ERROR_exit(0),e_number,argp);
+				}
+				else
+					d = sh_strnum(argp,&lastchar,0);
 				if(d<longmin)
 				{
 					errormsg(SH_DICT,ERROR_warn(0),e_overflow,argp);
@@ -899,7 +958,7 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 					d = longmax;
 				}
 				value->ll = (Sflong_t)d;
-				if(lastchar == *pp->nextarg)
+				if(lastchar == argp)
 				{
 					value->ll = *argp;
 					lastchar = "";
@@ -916,7 +975,6 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 		case 'E':
 		case 'F':
 		case 'G':
-			d = sh_strnum(*pp->nextarg,&lastchar,0);
 			switch(*argp)
 			{
 			    case '\'':
@@ -929,10 +987,18 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 				}
 				break;
 			    default:
-				d = sh_strnum(*pp->nextarg,&lastchar,0);
+				if(sh.bltinfun==b_printf && sh_isoption(SH_POSIX))
+				{
+					/* POSIX requires evaluating a number here, not an arithmetic expression */
+					d = strtold(argp,&lastchar);
+					if(*lastchar)
+						errormsg(SH_DICT,ERROR_exit(0),e_number,argp);
+				}
+				else
+					d = sh_strnum(argp,&lastchar,0);
 				break;
 			}
-                        if(SFFMT_LDOUBLE)
+			if(SFFMT_LDOUBLE)
 			{
 				value->ld = d;
 				fe->size = sizeof(value->ld);
@@ -944,10 +1010,10 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 			}
 			break;
 		case 'Q':
-			value->ll = (Sflong_t)strelapsed(*pp->nextarg,&lastchar,1);
+			value->ll = (Sflong_t)strelapsed(argp,&lastchar,1);
 			break;
 		case 'T':
-			value->ll = (Sflong_t)tmxdate(*pp->nextarg,&lastchar,TMX_NOW);
+			value->ll = (Sflong_t)tmxdate(argp,&lastchar,TMX_NOW);
 			break;
 		default:
 			value->ll = 0;
@@ -980,7 +1046,7 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 				pp->argsize = n;
 				return -1;
 			}
-			value->s = stakptr(staktell());
+			value->s = stkptr(sh.stk,stktell(sh.stk));
 			fe->size = n;
 		}
 		break;
@@ -1036,12 +1102,57 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 			value->s = fmttmx(fe->t_str, value->ll);
 			fe->t_str[fe->n_str] = n;
 		}
-		else value->s = fmttmx(NIL(char*), value->ll);
+		else value->s = fmttmx(NULL, value->ll);
 		fe->fmt = 's';
 		fe->size = -1;
 		break;
 	}
 	return 0;
+}
+
+/*
+ * reload() is called when the caller wants to solve a fp[x] cache miss, i.e.,
+ * a type mismatch between the cached type/value and the desired new type.
+ * This keeps the fp[x] cache intact, it just fills up the new value (v)
+ * with a conversion of the fp[x] type/value to the new type/value.
+ * This is a single-use value; the conversion is not cached.
+ * The conversion is handled by the extend() function that uses the current
+ * nextarg (argv[]) and pushes it, i.e., *nextarg++.
+ * To trick extend(), we back up nextarg, set nextarg to argn, do extend()
+ * and restore nextarg.
+ *
+ * fmt==0 is a special case to handle indexed jumps like '%s $5s'.
+ * In that case, argv[0] and argv[4] are consumed and nextarg push
+ * to &argv[5] argv[1..3] is ignored.
+ */
+static int reload(int argn, char fmt, void* v, Sffmt_t* fe)
+{
+	struct printf*	pp = (struct printf*)fe;
+	int		r;
+	int		n;
+	if(fmt == 0)
+	{
+		/* Set nextarg */
+		n = 0;
+		if(pp->nextarg != nullarg)
+		{
+			n = pp->nextarg - pp->argv0;
+			pp->nextarg = pp->argv0;
+			while(argn && *pp->nextarg)
+				argn--, pp->nextarg++;
+		}
+		return n;
+	}
+	/*
+	 * fmt!=0 ==> Late conversion on type mismatch on fp[x], i.e., %1$s %1$d
+	 * fp[1-1].fmt='s' ==> %1$d wants an int, go convert.
+	 */
+	n = pp->nextarg - pp->argv0;
+	pp->nextarg = pp->argv0 + argn;
+	fe->fmt = fmt;
+	r = extend(0,v,fe);
+	pp->nextarg = pp->argv0 + n;
+	return r;
 }
 
 /*
@@ -1052,9 +1163,9 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
  */
 static int fmtvecho(const char *string, struct printf *pp)
 {
-	register const char *cp = string, *cpmax;
-	register int c;
-	register int offset = staktell();
+	const char *cp = string, *cpmax;
+	int c;
+	int offset = stktell(sh.stk);
 	int chlen;
 	if(mbwide())
 	{
@@ -1071,22 +1182,22 @@ static int fmtvecho(const char *string, struct printf *pp)
 		while((c= *cp++) && (c!='\\'))
 			;
 	if(c==0)
-		return(-1);
+		return -1;
 	c = --cp - string;
 	if(c>0)
-		stakwrite((void*)string,c);
+		sfwrite(sh.stk,string,c);
 	for(; c= *cp; cp++)
 	{
 		if (mbwide() && ((chlen = mbsize(cp)) > 1))
 		{
-			stakwrite(cp,chlen);
+			sfwrite(sh.stk,cp,chlen);
 			cp +=  (chlen-1);
 			continue;
 		}
 		if( c=='\\') switch(*++cp)
 		{
 			case 'E':
-				c = ('a'==97?'\033':39); /* ASCII/EBCDIC */
+				c = '\033'; /* ASCII */
 				break;
 			case 'a':
 				c = '\a';
@@ -1128,11 +1239,11 @@ static int fmtvecho(const char *string, struct printf *pp)
 			default:
 				cp--;
 		}
-		stakputc(c);
+		sfputc(sh.stk,c);
 	}
 done:
-	c = staktell()-offset;
-	stakputc(0);
-	stakseek(offset);
-	return(c);
+	c = stktell(sh.stk)-offset;
+	sfputc(sh.stk,0);
+	stkseek(sh.stk,offset);
+	return c;
 }

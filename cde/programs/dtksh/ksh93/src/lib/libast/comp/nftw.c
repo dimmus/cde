@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -29,7 +29,7 @@ static int	(*nftw_userf)(const char*, const struct stat*, int, struct FTW*);
 static int
 nftw_user(Ftw_t* ftw)
 {
-	register int	n = ftw->info;
+	int		n = ftw->info;
 	struct FTW	nftw;
 	struct stat	st;
 
@@ -53,5 +53,5 @@ nftw(const char* path, int(*userf)(const char*, const struct stat*, int, struct 
 	if (flags & FTW_CHDIR) flags &= ~FTW_DOT;
 	else flags |= FTW_DOT;
 	nftw_flags = flags;
-	return ftwalk(path, nftw_user, flags, NiL);
+	return ftwalk(path, nftw_user, flags, NULL);
 }

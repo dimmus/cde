@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,8 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
 *            Johnothan King <johnothanking@protonmail.com>             *
+*         hyenias <58673227+hyenias@users.noreply.github.com>          *
+*                  Lev Kujawski <int21h@mailbox.org>                   *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -45,7 +47,9 @@
 #include	"history.h"
 #include	"builtins.h"
 #include	"variables.h"
-#include	"FEATURE/dynamic"
+#if SHOPT_DYNAMIC
+#include	<dlldefs.h>
+#endif
 
 /*
  * The first two fields must correspond with those in 'struct adata' in name.c and nvdisc.c
@@ -88,11 +92,12 @@ static void(*nullscan)(Namval_t*,void*);
 #endif
 int    b_readonly(int argc,char *argv[],Shbltin_t *context)
 {
-	register int flag;
+	int flag;
 	char *command = argv[0];
 	struct tdata tdata;
 	NOT_USED(argc);
-	memset((void*)&tdata,0,sizeof(tdata));
+	NOT_USED(context);
+	memset(&tdata,0,sizeof(tdata));
 	tdata.aflag = '-';
 	while((flag = optget(argv,*command=='e'?sh_optexport:sh_optreadonly))) switch(flag)
 	{
@@ -103,12 +108,13 @@ int    b_readonly(int argc,char *argv[],Shbltin_t *context)
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(0), "%s", opt_info.arg);
-			return(2);
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	if(error_info.errors)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),optusage(NIL(char*)));
+		errormsg(SH_DICT,ERROR_usage(2),optusage(NULL));
 		UNREACHABLE();
 	}
 	argv += (opt_info.index-1);
@@ -118,7 +124,7 @@ int    b_readonly(int argc,char *argv[],Shbltin_t *context)
 		flag = (NV_ASSIGN|NV_EXPORT|NV_IDENT);
 	if(!sh.prefix)
 		sh.prefix = Empty;
-	return(setall(argv,flag,sh.var_tree, &tdata));
+	return setall(argv,flag,sh.var_tree, &tdata);
 }
 
 /*
@@ -126,16 +132,17 @@ int    b_readonly(int argc,char *argv[],Shbltin_t *context)
  */
 #if 0
     /* for the dictionary generator */
-    int    b_hash(int argc,register char *argv[],Shbltin_t *context){}
+    int    b_hash(int argc,char *argv[],Shbltin_t *context){}
 #endif
-int    b_alias(int argc,register char *argv[],Shbltin_t *context)
+int    b_alias(int argc,char *argv[],Shbltin_t *context)
 {
-	register unsigned flag = NV_NOARRAY|NV_NOSCOPE|NV_ASSIGN;
-	register Dt_t *troot;
-	register int rflag=0, xflag=0, n;
+	unsigned flag = NV_NOARRAY|NV_NOSCOPE|NV_ASSIGN;
+	Dt_t *troot;
+	int rflag=0, xflag=0, n;
 	struct tdata tdata;
 	NOT_USED(argc);
-	memset((void*)&tdata,0,sizeof(tdata));
+	NOT_USED(context);
+	memset(&tdata,0,sizeof(tdata));
 	troot = sh.alias_tree;
 	if(*argv[0]=='h')
 		flag |= NV_TAGGED;
@@ -164,18 +171,19 @@ int    b_alias(int argc,register char *argv[],Shbltin_t *context)
 			break;
 		    case ':':
 			if(sh.shcomp)
-				return(2);  /* don't print usage info while shcomp is compiling */
+				return 2;  /* don't print usage info while shcomp is compiling */
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		    case '?':
 			if(sh.shcomp)
-				return(2);
-			errormsg(SH_DICT,ERROR_usage(0), "%s", opt_info.arg);
-			return(2);
+				return 0;
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		if(error_info.errors)
 		{
-			errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NIL(char*)));
+			errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NULL));
 			UNREACHABLE();
 		}
 		argv += (opt_info.index-1);
@@ -184,41 +192,46 @@ int    b_alias(int argc,register char *argv[],Shbltin_t *context)
 	if(flag&NV_TAGGED)
 	{
 		if(xflag)
-			return(0);		/* do nothing for 'alias -tx' */
-		troot = sh_subtracktree(1);	/* use hash table */
+			return 0;			/* do nothing for 'alias -tx' */
 		if(tdata.pflag)
-			tdata.aflag = '+';	/* for 'alias -pt', don't add anything to the hash table */
+		{
+			troot = sh_subtracktree(0);	/* use existing hash table */
+			tdata.aflag = '+';		/* for 'alias -pt', don't add anything to the hash table */
+		}
 		else
-			tdata.aflag = '-';	/* make setall() treat 'hash' like 'alias -t' */
-		if(rflag)			/* hash -r: clear hash table */
-			nv_scan(troot,nv_rehash,(void*)0,NV_TAGGED,NV_TAGGED);
+		{
+			troot = sh_subtracktree(1);	/* use hash table, creating a new one if needed */
+			tdata.aflag = '-';		/* make setall() treat 'hash' like 'alias -t' */
+		}
+		if(rflag)				/* hash -r: clear hash table */
+			nv_scan(troot,nv_rehash,NULL,NV_TAGGED,NV_TAGGED);
 	}
-	return(setall(argv,flag,troot,&tdata));
+	return setall(argv,flag,troot,&tdata);
 }
 
 
 #if 0
     /* for the dictionary generator */
-    int    b_autoload(int argc,register char *argv[],Shbltin_t *context){}
-    int    b_compound(int argc,register char *argv[],Shbltin_t *context){}
-    int    b_float(int argc,register char *argv[],Shbltin_t *context){}
-    int    b_functions(int argc,register char *argv[],Shbltin_t *context){}
-    int    b_integer(int argc,register char *argv[],Shbltin_t *context){}
-    int    b_local(int argc,register char *argv[],Shbltin_t *context){}
-    int    b_nameref(int argc,register char *argv[],Shbltin_t *context){}
+    int    b_autoload(int argc,char *argv[],Shbltin_t *context){}
+    int    b_compound(int argc,char *argv[],Shbltin_t *context){}
+    int    b_float(int argc,char *argv[],Shbltin_t *context){}
+    int    b_functions(int argc,char *argv[],Shbltin_t *context){}
+    int    b_integer(int argc,char *argv[],Shbltin_t *context){}
+    int    b_local(int argc,char *argv[],Shbltin_t *context){}
+    int    b_nameref(int argc,char *argv[],Shbltin_t *context){}
 #endif
-int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
+int    b_typeset(int argc,char *argv[],Shbltin_t *context)
 {
-	register int	n, flag = NV_VARNAME|NV_ASSIGN;
+	int		n, flag = NV_VARNAME|NV_ASSIGN;
 	struct tdata	tdata;
 	const char	*optstring = sh_opttypeset;
 	Namdecl_t 	*ntp = (Namdecl_t*)context->ptr;
 	Dt_t		*troot;
 	int		isfloat=0, isadjust=0, shortint=0, sflag=0;
 
-	memset((void*)&tdata,0,sizeof(tdata));
+	memset(&tdata,0,sizeof(tdata));
 	troot = sh.var_tree;
-	if(ntp)					/* custom declaration command added using enum */
+	if(ntp)					/* type declaration command added using 'typeset -T' or 'enum' */
 	{
 		tdata.tp = ntp->tp;
 		opt_info.disc = (Optdisc_t*)ntp->optinfof;
@@ -226,7 +239,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 	}
 	else if(argv[0][0] != 't')		/* not <t>ypeset */
 	{
-		char **new_argv = (char **)stakalloc((argc + 2) * sizeof(char*));
+		char **new_argv = stkalloc(sh.stk, (argc + 2) * sizeof(char*));
 		error_info.id = new_argv[0] = SYSTYPESET->nvname;
 		if(argv[0][0] == 'a')		/* <a>utoload == typeset -fu */
 			new_argv[1] = "-fu";
@@ -242,7 +255,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 			new_argv[1] = "-n";
 		else
 		{
-			errormsg(SH_DICT, ERROR_exit(128), "internal error");
+			errormsg(SH_DICT, ERROR_PANIC, e_internal);
 			UNREACHABLE();
 		}
 		for (n = 1; n <= argc; n++)
@@ -258,7 +271,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 		{
 			case 'a':
 				flag |= NV_IARRAY;
-				if(opt_info.arg && *opt_info.arg!='[')
+				if(opt_info.arg && !(opt_info.arg[0]=='[' && opt_info.arg[strlen(opt_info.arg)-1]==']'))
 				{
 					opt_info.index--;
 					goto endargs;
@@ -289,7 +302,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 				if(shortint)
 				{
 					shortint = 0;
-					flag &= ~NV_INT16P;
+					flag &= ~NV_INT16;
 				}
 				if(n=='E')
 				{
@@ -341,7 +354,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 				}
 				break;
 			case 'M':
-				if((tdata.wctname = opt_info.arg) && !nv_mapchar((Namval_t*)0,tdata.wctname))
+				if((tdata.wctname = opt_info.arg) && !nv_mapchar(NULL,tdata.wctname))
 				{
 					errormsg(SH_DICT, ERROR_exit(1),e_unknownmap, tdata.wctname);
 					UNREACHABLE();
@@ -368,7 +381,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 				if(shortint)
 				{
 					flag &= ~NV_LONG;
-					flag |= NV_INT16P;
+					flag |= NV_INT16;
 				}
 				else
 					flag |= NV_INTEGER;
@@ -377,8 +390,8 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 				if(shortint)
 				{
 					shortint = 0;
-					/* Turn off the NV_INT16P bits except the NV_INTEGER bit */
-					flag &= ~(NV_INT16P & ~NV_INTEGER);
+					/* Turn off the NV_INT16 bits except the NV_INTEGER bit */
+					flag &= ~(NV_INT16 & ~NV_INTEGER);
 				}
 				tdata.wctname = e_tolower;
 				flag |= NV_UTOL;
@@ -404,7 +417,7 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 					if(flag&NV_INTEGER)
 					{
 						flag &= ~NV_LONG;
-						flag |= NV_INT16P;
+						flag |= NV_INT16;
 					}
 				}
 				break;
@@ -429,9 +442,10 @@ int    b_typeset(int argc,register char *argv[],Shbltin_t *context)
 				errormsg(SH_DICT,2, "%s", opt_info.arg);
 				break;
 			case '?':
-				errormsg(SH_DICT,ERROR_usage(0), "%s", opt_info.arg);
 				opt_info.disc = 0;
-				return(2);
+				/* self-doc: write to standard output */
+				error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+				return 0;
 		}
 	}
 endargs:
@@ -482,7 +496,7 @@ endargs:
 	}
 	if(error_info.errors)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s", optusage(NIL(char*)));
+		errormsg(SH_DICT,ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if(sizeof(char*)<8 && tdata.argnum > SHRT_MAX)
@@ -511,9 +525,12 @@ endargs:
 	if(flag&NV_TYPE)
 	{
 		Stk_t *stkp = sh.stk;
-		int off=0,offset = stktell(stkp);
+#if SHOPT_NAMESPACE
+		int off = 0;
+#endif /* SHOPT_NAMESPACE */
+		int offset = stktell(stkp);
 		if(!tdata.prefix)
-			return(sh_outtype(sfstdout));
+			return sh_outtype(sfstdout);
 		sfputr(stkp,NV_CLASS,-1);
 #if SHOPT_NAMESPACE
 		if(sh.namespace)
@@ -542,12 +559,12 @@ endargs:
 		}
 		else if(nv_isnull(tdata.tp) && sh.envlist)   /* only create a type command if there were assignment(s) */
 			nv_newtype(tdata.tp);
-		tdata.tp->nvenv = tdata.help;
+		tdata.tp->nvmeta = tdata.help;
 		flag &= ~NV_TYPE;
 		if(nv_isattr(tdata.tp,NV_TAGGED))
 		{
 			nv_offattr(tdata.tp,NV_TAGGED);
-			return(0);
+			return 0;
 		}
 	}
 	else if(tdata.aflag==0 && ntp && ntp->tp)
@@ -559,13 +576,13 @@ endargs:
 		errormsg(SH_DICT,ERROR_exit(1),e_nounattr);
 		UNREACHABLE();
 	}
-	return(setall(argv,flag,troot,&tdata));
+	return setall(argv,flag,troot,&tdata);
 }
 
 static void print_value(Sfio_t *iop, Namval_t *np, struct tdata *tp)
 {
-	char	 *name;
-	int	aflag=tp->aflag;
+	char		 *name;
+	int		aflag=tp->aflag;
 	Namval_t	*table;
 	if(nv_isnull(np))
 	{
@@ -634,21 +651,23 @@ static void print_value(Sfio_t *iop, Namval_t *np, struct tdata *tp)
 	}
 }
 
-static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp)
+static int     setall(char **argv,int flag,Dt_t *troot,struct tdata *tp)
 {
-	register char *name;
+	char *name;
 	char *last = 0;
 	int nvflags=(flag&(NV_ARRAY|NV_NOARRAY|NV_VARNAME|NV_IDENT|NV_ASSIGN|NV_STATIC|NV_MOVE));
 	int r=0, ref=0, comvar=(flag&NV_COMVAR),iarray=(flag&NV_IARRAY);
-	Dt_t *save_vartree;
-	Namval_t *save_namespace;
+	Dt_t *save_vartree = NULL;
+#if SHOPT_NAMESPACE
+	Namval_t *save_namespace = NULL;
+#endif
 	if(flag&NV_GLOBAL)
 	{
 		save_vartree = sh.var_tree;
 		troot = sh.var_tree = sh.var_base;
 #if SHOPT_NAMESPACE
 		save_namespace = sh.namespace;
-		sh.namespace = NIL(Namval_t*);
+		sh.namespace = NULL;
 #endif
 	}
 	if(!sh.prefix)
@@ -674,8 +693,8 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 			nvflags |= (NV_NOREF|NV_NOADD|NV_NOFAIL);
 		while(name = *++argv)
 		{
-			register unsigned newflag;
-			register Namval_t *np;
+			unsigned newflag;
+			Namval_t *np;
 			Namarr_t	*ap=0;
 			Namval_t	*mp;
 			unsigned curflag;
@@ -701,11 +720,11 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 #endif /* SHOPT_NAMESPACE */
 					np = nv_open(name,sh_subfuntree(1),NV_NOARRAY|NV_IDENT|NV_NOSCOPE);
 				}
-				else 
+				else
 				{
 					if(sh.prefix)
 					{
-						sfprintf(sh.strbuf,"%s.%s%c",sh.prefix,name,0);
+						sfprintf(sh.strbuf,"%s.%s",sh.prefix,name);
 						name = sfstruse(sh.strbuf);
 					}
 #if SHOPT_NAMESPACE
@@ -750,16 +769,20 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 						np = nv_search(stkptr(sh.stk,offset),troot,0);
 						stkseek(sh.stk,offset);
 					}
-					if(np && np->nvalue.cp) 
-						np->nvalue.rp->help = tp->help;
+					if(np && np->nvalue)
+						((struct Ufunction*)np->nvalue)->help = tp->help;
 				}
 				continue;
 			}
 			/* tracked alias */
 			if(troot==sh.track_tree && tp->aflag=='-')
 			{
-				np = nv_search(name,troot,NV_ADD|NV_NOSCOPE);
-				path_alias(np,path_absolute(nv_name(np),NIL(Pathcomp_t*),0));
+				Pathcomp_t *pp;
+				sh_offstate(SH_DEFPATH);  /* 'command -p hash foo' should work to create 'foo=/bin/foo' */
+				if(!(pp = path_absolute(name,NULL,2)))
+					errormsg(SH_DICT,ERROR_exit(0),e_found,name);
+				path_settrackedalias(name,pp);
+				r |= !pp;
 				continue;
 			}
 			if(troot==sh.alias_tree && sh.subshell && !sh.subshare && strchr(name,'='))
@@ -776,14 +799,14 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 				continue;
 			}
 			if(np->nvflag&NV_RDONLY && !tp->pflag
-			&& (flag & ~(NV_ASSIGN|NV_RDONLY|NV_EXPORT)))	/* allow readonly/export on readonly vars */
+			&& (tp->aflag=='+' || flag & ~(NV_ASSIGN|NV_RDONLY|NV_EXPORT)))	/* allow readonly/export on readonly vars */
 			{
 				errormsg(SH_DICT,ERROR_exit(1),e_readonly,nv_name(np));
 				UNREACHABLE();
 			}
 			if(nv_isnull(np) && !nv_isarray(np) && nv_isattr(np,NV_NOFREE))
 				nv_offattr(np,NV_NOFREE);
-			else if(tp->tp && !nv_isattr(np,NV_MINIMAL|NV_EXPORT) && (mp=(Namval_t*)np->nvenv) && (ap=nv_arrayptr(mp)) && (ap->nelem&ARRAY_TREE))
+			else if(tp->tp && !nv_isattr(np,NV_MINIMAL|NV_EXPORT) && (mp = np->nvmeta) && (ap = nv_arrayptr(mp)) && (ap->nelem & ARRAY_TREE))
 			{
 				errormsg(SH_DICT,ERROR_exit(1),e_typecompat,nv_name(np));
 				UNREACHABLE();
@@ -791,16 +814,16 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 			else if((ap=nv_arrayptr(np)) && nv_aindex(np)>0 && ap->nelem==1 && nv_getval(np)==Empty)
 			{
 				ap->nelem++;
-				_nv_unset(np,0);
+				nv_unset(np,0);
 				ap->nelem--;
 			}
-			else if(iarray && ap && ap->fun) 
+			else if(iarray && ap && ap->fun)
 			{
 				errormsg(SH_DICT,ERROR_exit(1),"cannot change associative array %s to indexed array",nv_name(np));
 				UNREACHABLE();
 			}
 			else if( (iarray||(flag&NV_ARRAY)) && nv_isvtree(np) && !nv_type(np))
-				_nv_unset(np,NV_EXPORT);
+				nv_unset(np,NV_EXPORT);
 			if(tp->pflag)
 			{
 				if(!nv_istable(np))
@@ -842,7 +865,7 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 					{
 						if(ap && comvar)
 							ap->nelem |= ARRAY_TREE;
-						nv_putsub(np, (char*)0, 0);
+						nv_putsub(np, NULL, 0);
 					}
 				}
 				else if(nvflags&NV_ARRAY)
@@ -854,7 +877,7 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 							ap->nelem |= ARRAY_TREE;
 						else
 						{
-							_nv_unset(np,NV_RDONLY);
+							nv_unset(np,NV_RDONLY);
 							nv_onattr(np,NV_NOFREE);
 						}
 					}
@@ -897,7 +920,7 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 						{
 							nv_disc(np,fp,NV_POP);
 							if(!(fp->nofree&1))
-								free((void*)fp);
+								free(fp);
 							nv_offattr(np,flag&(NV_LTOU|NV_UTOL));
 						}
 					}
@@ -932,7 +955,7 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 			if (tp->aflag && (tp->argnum || (curflag!=newflag)))
 			{
 				if(np==SH_LEVELNOD)
-					return(r);
+					return r;
 				if(sh.subshell)
 					sh_assignok(np,1);
 				if(troot!=sh.var_tree)
@@ -951,7 +974,7 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 			}
 			if(tp->help && !nv_isattr(np,NV_MINIMAL|NV_EXPORT))
 			{
-				np->nvenv = tp->help;
+				np->nvmeta = tp->help;
 				nv_onattr(np,NV_EXPORT);
 			}
 			if(last)
@@ -1031,7 +1054,7 @@ static int     setall(char **argv,register int flag,Dt_t *troot,struct tdata *tp
 		sh.namespace = save_namespace;
 #endif
 	}
-	return(r);
+	return r;
 }
 
 #if SHOPT_DYNAMIC
@@ -1040,7 +1063,7 @@ typedef void (*Libinit_f)(int,void*);
 
 #define GROWLIB	4
 
-Libcomp_t	*liblist;
+Libcomp_t		*liblist;
 static int		nlib;
 static int		maxlib;
 
@@ -1052,8 +1075,8 @@ static int		maxlib;
  */
 int sh_addlib(void* dll, char* name, Pathcomp_t* pp)
 {
-	register int	n;
-	register int	r;
+	int		n;
+	int		r;
 	Libinit_f	initfn;
 	Shbltin_t	*sp = &sh.bltindata;
 
@@ -1089,7 +1112,7 @@ int sh_addlib(void* dll, char* name, Pathcomp_t* pp)
 
 Shbltin_f sh_getlib(char* sym, Pathcomp_t* pp)
 {
-	register int	n;
+	int	n;
 
 	for (n = 0; n < nlib; n++)
 		if (liblist[n].ino == pp->ino && liblist[n].dev == pp->dev)
@@ -1105,9 +1128,9 @@ Shbltin_f sh_getlib(char* sym, Pathcomp_t* pp)
  */
 int	b_builtin(int argc,char *argv[],Shbltin_t *context)
 {
-	register char *arg=0, *name;
-	register int n, r=0, flag=0;
-	register Namval_t *np;
+	char *arg=0, *name;
+	int n, r=0, flag=0;
+	Namval_t *np;
 	long dlete=0;
 	struct tdata tdata;
 	Shbltin_f addr;
@@ -1117,10 +1140,11 @@ int	b_builtin(int argc,char *argv[],Shbltin_t *context)
 	int list = 0;
 #endif
 	NOT_USED(argc);
+	NOT_USED(context);
 	memset(&tdata,0,sizeof(tdata));
 	stkp = sh.stk;
 	if(!sh.pathlist)
-		path_absolute(argv[0],NIL(Pathcomp_t*),0);
+		path_absolute(argv[0],NULL,0);
 	while (n = optget(argv,sh_optbuiltin)) switch (n)
 	{
 	    case 's':
@@ -1146,13 +1170,14 @@ int	b_builtin(int argc,char *argv[],Shbltin_t *context)
 		errormsg(SH_DICT,2, "%s", opt_info.arg);
 		break;
 	    case '?':
-		errormsg(SH_DICT,ERROR_usage(2), "%s", opt_info.arg);
-		UNREACHABLE();
+		/* self-doc: write to standard output */
+		error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+		return 0;
 	}
 	argv += opt_info.index;
 	if(error_info.errors)
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s", optusage(NIL(char*)));
+		errormsg(SH_DICT,ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if(arg || *argv)
@@ -1171,21 +1196,21 @@ int	b_builtin(int argc,char *argv[],Shbltin_t *context)
 		unsigned long ver;
 		char path[PATH_MAX];
 		void *library;
-		if(!(library = dllplugin(SH_ID, arg, NiL, SH_PLUGIN_VERSION, &ver, RTLD_LAZY, path, sizeof(path))))
+		if(!(library = dllplugin(SH_ID, arg, NULL, SH_PLUGIN_VERSION, &ver, RTLD_LAZY, path, sizeof(path))))
 		{
 			errormsg(SH_DICT,ERROR_exit(0),"%s: %s",arg,dllerror(0));
-			return(1);
+			return 1;
 		}
 		if(list)
 			sfprintf(sfstdout, "%s %08lu %s\n", arg, ver, path);
-		sh_addlib(library,arg,NiL);
+		sh_addlib(library,arg,NULL);
 	}
 	else
 #endif /* SHOPT_DYNAMIC */
 	if(*argv==0 && !dlete)
 	{
 		print_scan(sfstdout, flag, sh.bltin_tree, 1, &tdata);
-		return(0);
+		return 0;
 	}
 	r = 0;
 	flag = stktell(stkp);
@@ -1228,7 +1253,7 @@ int	b_builtin(int argc,char *argv[],Shbltin_t *context)
 				errmsg = "restricted name";
 			addr = funptr(np);
 		}
-		if(!dlete && !addr && !(np=sh_addbuiltin(arg,(Shbltin_f)0 ,0)))
+		if(!dlete && !addr && !(np=sh_addbuiltin(arg,NULL,0)))
 			errmsg = "not found";
 		if(errmsg)
 		{
@@ -1238,18 +1263,19 @@ int	b_builtin(int argc,char *argv[],Shbltin_t *context)
 		stkseek(stkp,flag);
 		argv++;
 	}
-	return(r);
+	return r;
 }
 
-int    b_set(int argc,register char *argv[],Shbltin_t *context)
+int    b_set(int argc,char *argv[],Shbltin_t *context)
 {
 	struct tdata tdata;
+	NOT_USED(context);
 	memset(&tdata,0,sizeof(tdata));
 	tdata.prefix=0;
 	if(argv[1])
 	{
 		if(sh_argopts(argc,argv) < 0)
-			return(2);
+			return 0;  /* self-doc was written to standard output */
 		if(sh_isoption(SH_VERBOSE))
 			sh_onstate(SH_VERBOSE);
 		else
@@ -1258,7 +1284,7 @@ int    b_set(int argc,register char *argv[],Shbltin_t *context)
 	else
 		/* scan name chain and print */
 		print_scan(sfstdout,0,sh.var_tree,0,&tdata);
-	return(0);
+	return 0;
 }
 
 /*
@@ -1268,22 +1294,22 @@ int    b_set(int argc,register char *argv[],Shbltin_t *context)
  * Non-existent items being deleted give non-zero exit status
  */
 
-int    b_unalias(int argc,register char *argv[],Shbltin_t *context)
+int    b_unalias(int argc,char *argv[],Shbltin_t *context)
 {
 	NOT_USED(context);
-	return(unall(argc,argv,sh.alias_tree));
+	return unall(argc,argv,sh.alias_tree);
 }
 
-int    b_unset(int argc,register char *argv[],Shbltin_t *context)
+int    b_unset(int argc,char *argv[],Shbltin_t *context)
 {
 	NOT_USED(context);
-	return(unall(argc,argv,sh.var_tree));
+	return unall(argc,argv,sh.var_tree);
 }
 
-static int unall(int argc, char **argv, register Dt_t *troot)
+static int unall(int argc, char **argv, Dt_t *troot)
 {
-	register Namval_t *np;
-	register const char *name;
+	Namval_t *np;
+	const char *name;
 	volatile int r;
 	Dt_t	*dp;
 	int nflag=0,all=0,isfun,jmpval;
@@ -1311,17 +1337,18 @@ static int unall(int argc, char **argv, register Dt_t *troot)
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
 		case '?':
-			errormsg(SH_DICT,ERROR_usage(0), "%s", opt_info.arg);
-			return(2);
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 	}
 	argv += opt_info.index;
 	if(error_info.errors || (*argv==0 &&!all))
 	{
-		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NIL(char*)));
+		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage(NULL));
 		UNREACHABLE();
 	}
 	if(!troot)
-		return(1);
+		return 1;
 	r = 0;
 	if(troot==sh.var_tree)
 		nflag |= NV_VARNAME;
@@ -1335,7 +1362,7 @@ static int unall(int argc, char **argv, register Dt_t *troot)
 				sh_subfork();	/* avoid affecting the parent shell's alias table */
 			dtclear(troot);
 		}
-		return(r);
+		return r;
 	}
 	while(name = *argv++)
 	{
@@ -1345,8 +1372,21 @@ static int unall(int argc, char **argv, register Dt_t *troot)
 		if(jmpval==0)
 		{
 #if SHOPT_NAMESPACE
-			if(sh.namespace && troot!=sh.var_tree)
-				np = sh_fsearch(name,nflag);
+			if(sh.namespace && troot==sh.fun_tree && !sh.prefix && *name!='.')
+			{
+				char *nsname;
+				Namval_t *np2;
+				/* prefix the namespace name */
+				sfputr(sh.strbuf,nv_name(sh.namespace),'.');
+				sfputr(sh.strbuf,name,'\0');
+				nsname = sfstruse(sh.strbuf);
+				np = nv_search(nsname,troot,NV_NOSCOPE);
+				if(troot!=sh.fun_base && !np && (np2=nv_search(nsname,troot,0)) && is_afunction(np2))
+				{	/* create dummy virtual subshell node without NV_FUNCTION attribute */
+					nv_open(nsname,troot,NV_NOSCOPE);
+					return r;
+				}
+			}
 			if(!np)
 #endif /* SHOPT_NAMESPACE */
 			np=nv_open(name,troot,NV_NOADD|nflag);
@@ -1389,58 +1429,58 @@ static int unall(int argc, char **argv, register Dt_t *troot)
 				}
 			}
 			if(!nv_isnull(np) || nv_size(np) || nv_isattr(np,~(NV_MINIMAL|NV_NOFREE)))
-				_nv_unset(np,0);
+				nv_unset(np,0);
 			if(troot==sh.var_tree && sh.st.real_fun && (dp=sh.var_tree->walk) && dp==sh.st.real_fun->sdict)
 				nv_delete(np,dp,NV_NOFREE);
 			else if(isfun)
 			{
 				if(troot!=sh.fun_base)
-					nv_offattr(np,NV_FUNCTION);	/* invalidate */
-				else if(!(np->nvalue.rp && np->nvalue.rp->running))
+					np->nvflag = 0;	/* invalidate */
+				else if(!(np->nvalue && ((struct Ufunction*)np->nvalue)->running))
 					nv_delete(np,troot,0);
 			}
-			/* The alias has been unset by call to _nv_unset, remove it from the tree */
+			/* The alias has been unset by call to nv_unset, remove it from the tree */
 			else if(troot==sh.alias_tree)
 			{
 				if(sh.subshell && !sh.subshare)
 					sh_subfork();	/* avoid affecting the parent shell's alias table */
-				_nv_unset(np,nv_isattr(np,NV_NOFREE));
+				nv_unset(np,nv_isattr(np,NV_NOFREE));
 				nv_delete(np,troot,0);
 			}
 		}
 		else if(troot==sh.alias_tree)
 			r = 1;
-		else if(troot==sh.fun_tree && troot!=sh.fun_base && nv_search(name,sh.fun_tree,0))
-			nv_open(name,troot,NV_NOSCOPE);	/* create dummy virtual subshell node without NV_FUNCTION attribute */
+		else if(troot==sh.fun_tree && troot!=sh.fun_base && !np && (np=nv_search(name,troot,0)) && is_afunction(np))
+			nv_open(name,troot,NV_NOSCOPE); /* create dummy virtual subshell node without NV_FUNCTION attribute */
 	}
-	return(r);
+	return r;
 }
 
 /*
  * print out the name and value of a name-value pair <np>
  */
-static int print_namval(Sfio_t *file,register Namval_t *np,register int flag, struct tdata *tp)
+static int print_namval(Sfio_t *file,Namval_t *np,int flag, struct tdata *tp)
 {
-	register char *cp;
+	char	*cp;
 	int	indent=tp->indent, outname=0, isfun;
 	char	tempexport=0;
 	sh_sigcheck();
 	if(flag)
 		flag = '\n';
 	if(tp->noref && nv_isref(np))
-		return(0);
+		return 0;
 	if(sh.shcomp)
-		return(1);  /* print nothing while shcomp is compiling */
+		return 1;  /* print nothing while shcomp is compiling */
 	if(nv_isattr(np,NV_NOPRINT|NV_INTEGER)==NV_NOPRINT)
 	{
 		if(is_abuiltin(np))
 			sfputr(file,nv_name(np),'\n');
-		return(0);
+		return 0;
 	}
 	if(nv_istable(np))
 	{
 		print_value(file,np,tp);
-		return(0);
+		return 0;
 	}
 	isfun = is_afunction(np);
 	if(tp->prefix)
@@ -1463,11 +1503,11 @@ static int print_namval(Sfio_t *file,register Namval_t *np,register int flag, st
 	}
 	if(isfun)
 	{
-		Sfio_t *iop=0;
 		char *fname=0;
+		struct Ufunction *rp = np->nvalue;
 		if(nv_isattr(np,NV_NOFREE))
-			return(0);
-		if(!flag && !np->nvalue.ip)
+			return 0;
+		if(!flag && !rp)
 			sfputr(file,"typeset -fu",' ');
 		else if(!flag && !nv_isattr(np,NV_FPOSIX))
 			sfputr(file,"function",' ');
@@ -1477,43 +1517,37 @@ static int print_namval(Sfio_t *file,register Namval_t *np,register int flag, st
 		sfputr(file,cp,-1);
 		if(nv_isattr(np,NV_FPOSIX))
 			sfwrite(file,"()",2);
-		if(np->nvalue.ip && np->nvalue.rp->hoffset>=0)
-			fname = np->nvalue.rp->fname;
+		else if(rp)
+		{
+			int i;
+			/* output function reference list (for .sh.math.* functions) */
+			for(i = 0; i < rp->argc; i++)
+				sfprintf(file," %s",rp->argv[i]);
+		}
+		if(rp && rp->ptree)
+			fname = rp->fname;
 		else
 			flag = '\n';
 		if(flag)
 		{
-			if(tp->pflag && np->nvalue.ip && np->nvalue.rp->hoffset>=0)
-				sfprintf(file," #line %d %s\n", np->nvalue.rp->lineno, fname ? sh_fmtq(fname) : Empty);
+			if(tp->pflag && rp && rp->ptree)
+				sfprintf(file," #line %d %s\n", rp->lineno, fname ? sh_fmtq(fname) : Empty);
 			else
 				sfputc(file, '\n');
 		}
 		else
 		{
-			if(nv_isattr(np,NV_FTMP))
-			{
-				fname = 0;
-				iop = sh.heredocs;
-			}
-			else if(fname)
-				iop = sfopen(iop,fname,"r");
-			else if(sh.hist_ptr)
-				iop = (sh.hist_ptr)->histfp;
-			if(iop && sfseek(iop,(Sfoff_t)np->nvalue.rp->hoffset,SEEK_SET)>=0)
-				sfmove(iop,file, nv_size(np), -1);
-			else
-				flag = '\n';
-			if(fname)
-				sfclose(iop);
+			sfputc(file, '\n');
+			sh_deparse(file, (Shnode_t*)(rp->ptree), 2 | nv_isattr(np,NV_FPOSIX), 0);
 		}
-		return(nv_size(np)+1);
+		return nv_size(np) + 1;
 	}
 	if(nv_arrayptr(np))
 	{
 		if(indent)
 			sfnputc(file,'\t',indent);
 		print_value(file,np,tp);
-		return(0);
+		return 0;
 	}
 	if(nv_isvtree(np) && !nv_isattr(np,NV_EXPORT))
 	{
@@ -1545,11 +1579,11 @@ static int print_namval(Sfio_t *file,register Namval_t *np,register int flag, st
 			else
 				sfputr(file,nv_isvtree(np)?cp:sh_fmtq(cp),'\n');
 		}
-		return(1);
+		return 1;
 	}
 	else if(outname || (tp->scanmask && tp->scanroot==sh.var_tree))
 		sfputr(file,nv_name(np),'\n');
-	return(0);
+	return 0;
 }
 
 /*
@@ -1558,15 +1592,15 @@ static int print_namval(Sfio_t *file,register Namval_t *np,register int flag, st
 static void	print_all(Sfio_t *file,Dt_t *root, struct tdata *tp)
 {
 	tp->outfile = file;
-	nv_scan(root, print_attribute, (void*)tp, 0, 0);
+	nv_scan(root, print_attribute, tp, 0, 0);
 }
 
 /*
  * print the attributes of name value pair give by <np>
  */
-static void	print_attribute(register Namval_t *np,void *data)
+static void	print_attribute(Namval_t *np,void *data)
 {
-	register struct tdata *dp = (struct tdata*)data;
+	struct tdata *dp = (struct tdata*)data;
 	nv_attribute(np,dp->outfile,dp->prefix,dp->aflag);
 }
 
@@ -1576,9 +1610,9 @@ static void	print_attribute(register Namval_t *np,void *data)
  */
 static void print_scan(Sfio_t *file, int flag, Dt_t *root, int option,struct tdata *tp)
 {
-	register char **argv;
-	register Namval_t *np;
-	register int namec;
+	char **argv;
+	Namval_t *np;
+	int namec;
 	Namval_t *onp = 0;
 	char	*name=0;
 	size_t	len;
@@ -1593,9 +1627,9 @@ static void print_scan(Sfio_t *file, int flag, Dt_t *root, int option,struct tda
 		tp->scanmask |= (NV_DOUBLE|NV_EXPNOTE);
 	if(flag==NV_LTOU || flag==NV_UTOL)
 		tp->scanmask |= NV_UTOL|NV_LTOU;
-	namec = nv_scan(root, nullscan, (void*)tp, tp->scanmask, flag&~NV_IARRAY);
-	argv = tp->argnam  = (char**)stkalloc(sh.stk,(namec+1)*sizeof(char*));
-	namec = nv_scan(root, pushname, (void*)tp, tp->scanmask, flag&~NV_IARRAY);
+	namec = nv_scan(root, nullscan, tp, tp->scanmask, flag&~NV_IARRAY);
+	argv = tp->argnam  = stkalloc(sh.stk,(namec+1)*sizeof(char*));
+	namec = nv_scan(root, pushname, tp, tp->scanmask, flag&~NV_IARRAY);
 	if(mbcoll())
 		strsort(argv,namec,strcoll);
 	if(namec==0 && sh.namespace && nv_dict(sh.namespace)==root)

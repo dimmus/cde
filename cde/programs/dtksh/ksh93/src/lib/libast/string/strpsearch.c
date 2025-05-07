@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -48,17 +48,17 @@
 void*
 strpsearch(const void* tab, size_t num, size_t siz, const char* name, char** next)
 {
-	register char*		lo = (char*)tab;
-	register char*		hi = lo + (num - 1) * siz;
-	register char*		mid;
+	char*		lo = (char*)tab;
+	char*		hi = lo + (num - 1) * siz;
+	char*		mid;
 #if CC_NATIVE != CC_ASCII
-	register unsigned char*	m;
+	unsigned char*	m;
 #endif
-	register unsigned char*	s;
-	register unsigned char*	t;
-	register int		c;
-	register int		v;
-	int			sequential = 0;
+	unsigned char*	s;
+	unsigned char*	t;
+	int		c;
+	int		v;
+	int		sequential = 0;
 
 #if CC_NATIVE != CC_ASCII
 	m = ccmap(CC_NATIVE, CC_ASCII);
@@ -88,7 +88,7 @@ strpsearch(const void* tab, size_t num, size_t siz, const char* name, char** nex
 					{
 						if (next)
 							*next = (char*)t;
-						return (void*)mid;
+						return mid;
 					}
 					if (!sequential)
 					{
@@ -117,5 +117,5 @@ strpsearch(const void* tab, size_t num, size_t siz, const char* name, char** nex
 		else
 			hi = mid - siz;
 	}
-	return 0;
+	return NULL;
 }

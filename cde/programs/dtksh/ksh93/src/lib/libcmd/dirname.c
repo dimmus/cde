@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,8 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
+*             dnewhall <dnewhall@users.noreply.github.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -25,10 +27,10 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: dirname (AT&T Research) 2009-01-31 $\n]"
+"[-?\n@(#)$Id: dirname (ksh 93u+m) 2024-12-25 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 "[+NAME?dirname - return directory portion of file name]"
-"[+DESCRIPTION?\bdirname\b treats \astring\a as a file name and returns "
+"[+DESCRIPTION?\bdirname\b treats each \astring\a as a file name and outputs "
 	"the name of the directory containing the file name by deleting "
 	"the last component from \astring\a.]"
 "[+?If \astring\a consists solely of \b/\b characters the output will "
@@ -43,25 +45,27 @@ static const char usage[] =
 	"the output will be as if the original string had consisted solely "
 	"as \b/\b characters as described above.  Otherwise, all "
 	"trailing slashes are removed and the output will be this string "
-	"unless this string is empty.  If empty the output will be \b.\b.]" 
+	"unless this string is empty.  If empty the output will be \b.\b.]"
 "[f:file?Print the \b$PATH\b relative regular file path for \astring\a.]"
 "[r:relative?Print the \b$PATH\b relative readable file path for \astring\a.]"
 "[x:executable?Print the \b$PATH\b relative executable file path for \astring\a.]"
+"[z:zero?Each line of output is terminated with a NUL character instead "
+    "of a newline.]"
 "\n"
-"\nstring\n"
+"\nstring ...\n"
 "\n"
 "[+EXIT STATUS?]{"
-        "[+0?Successful completion.]"
-        "[+>0?An error occurred.]"
+	"[+0?Successful completion.]"
+	"[+>0?An error occurred.]"
 "}"
 "[+SEE ALSO?\bbasename\b(1), \bgetconf\b(1), \bdirname\b(3), \bpathname\b(3)]"
 ;
 
 #include <cmd.h>
 
-static void l_dirname(register Sfio_t *outfile, register const char *pathname)
+static void l_dirname(Sfio_t *outfile, const char *pathname, char termch)
 {
-	register const char  *last;
+	const char  *last;
 	/* go to end of path */
 	for(last=pathname; *last; last++);
 	/* back over trailing '/' */
@@ -79,16 +83,21 @@ static void l_dirname(register Sfio_t *outfile, register const char *pathname)
 		/* back over trailing '/' */
 		for(;*last=='/' && last > pathname; last--);
 	}
-	/* preserve // */
+	/* preserve leading '//' */
+	if(last==pathname && pathname[0]=='/')
+		while(last[1]=='/')
+			last++;
 	if(last!=pathname && pathname[0]=='/' && pathname[1]=='/')
 	{
+		/* skip any '/' until last two */
 		while(pathname[2]=='/' && pathname<last)
 			pathname++;
-		if(last!=pathname && pathname[0]=='/' && pathname[1]=='/' && *astconf("PATH_LEADING_SLASHES",NiL,NiL)!='1')
+		/* skip first '/' if PATH_LEADING_SLASHES not set */
+		if(last!=pathname && pathname[0]=='/' && pathname[1]=='/' && *astconf("PATH_LEADING_SLASHES",NULL,NULL)!='1')
 			pathname++;
 	}
 	sfwrite(outfile,pathname,last+1-pathname);
-	sfputc(outfile,'\n');
+	sfputc(outfile,termch);
 }
 
 int
@@ -96,6 +105,7 @@ b_dirname(int argc, char** argv, Shbltin_t* context)
 {
 	int	mode = 0;
 	char	buf[PATH_MAX];
+	char	termch = '\n';
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	for (;;)
@@ -112,27 +122,34 @@ b_dirname(int argc, char** argv, Shbltin_t* context)
 		case 'x':
 			mode |= PATH_EXECUTE;
 			continue;
+		case 'z':
+			termch = '\0';
+			continue;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
 	argv += opt_info.index;
 	argc -= opt_info.index;
-	if(error_info.errors || argc != 1)
+	if(error_info.errors || argc < 1)
 	{
-		error(ERROR_usage(2),"%s", optusage(NiL));
+		error(ERROR_usage(2),"%s", optusage(NULL));
 		UNREACHABLE();
 	}
-	if(!mode)
-		l_dirname(sfstdout,argv[0]);
-	else if(pathpath(argv[0], "", mode, buf, sizeof(buf)))
-		sfputr(sfstdout, buf, '\n');
-	else
-		error(1|ERROR_WARNING, "%s: relative path not found", argv[0]);
+	for(; argv[0]; argv++)
+	{
+		if(!mode)
+			l_dirname(sfstdout,argv[0],termch);
+		else if(pathpath(argv[0], "", mode, buf, sizeof(buf)))
+			sfputr(sfstdout, buf, termch);
+		else
+			error(1|ERROR_WARNING, "%s: relative path not found", argv[0]);
+	}
 	return 0;
 }

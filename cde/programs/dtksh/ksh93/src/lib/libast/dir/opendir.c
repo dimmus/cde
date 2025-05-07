@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -42,13 +42,13 @@ static const char id_dir[] = "\n@(#)$Id: directory (AT&T Research) 1993-04-01 $\
 static DIR*	freedirp;		/* always keep one dirp */
 
 DIR*
-opendir(register const char* path)
+opendir(const char* path)
 {
-	register DIR*	dirp = 0;
-	register int	fd;
+	DIR*		dirp = 0;
+	int		fd;
 	struct stat	st;
 
-	if ((fd = open(path, O_RDONLY|O_cloexec)) < 0) return(0);
+	if ((fd = open(path, O_RDONLY|O_cloexec)) < 0) return NULL;
 	if (fstat(fd, &st) < 0 ||
 	   !S_ISDIR(st.st_mode) && (errno = ENOTDIR) ||
 #if !O_cloexec
@@ -68,19 +68,19 @@ opendir(register const char* path)
 			if (!freedirp) freedirp = dirp;
 			else free(dirp);
 		}
-		return(0);
+		return NULL;
 	}
 	freedirp = 0;
 	dirp->dd_fd = fd;
 	dirp->dd_loc = dirp->dd_size = 0;	/* refill needed */
 #if defined(_DIR_PRIVATE_) || _ptr_dd_buf
-	dirp->dd_buf = (void*)((char*)dirp + sizeof(DIR));
+	dirp->dd_buf = ((char*)dirp + sizeof(DIR));
 #endif
-	return(dirp);
+	return dirp;
 }
 
 void
-closedir(register DIR* dirp)
+closedir(DIR* dirp)
 {
 	if (dirp)
 	{

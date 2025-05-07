@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2023 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,7 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -44,18 +45,18 @@ typedef struct Tree_s
 int
 pathexists(char* path, int mode)
 {
-	register char*		s;
-	register char*		e;
-	register Tree_t*	p;
-	register Tree_t*	t;
-	register int		c;
-	char*			ee;
-	int			cc;
-	int			x;
-	struct stat		st;
-	int			(*cmp)(const char*, const char*);
+	char*		s;
+	char*		e;
+	Tree_t*		p;
+	Tree_t*		t;
+	char		c;
+	char*		ee;
+	char		cc;
+	int		x;
+	struct stat	st;
+	int		(*cmp)(const char*, const char*);
 
-	static Tree_t		tree;
+	static Tree_t	tree;
 
 	t = &tree;
 	e = (c = *path) == '/' ? path + 1 : path;

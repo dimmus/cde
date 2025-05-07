@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1985-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -14,6 +14,8 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                   Phong Vo <kpv@research.att.com>                    *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*                  Lev Kujawski <int21h@mailbox.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -36,7 +38,6 @@
 #define _BLD_aso	1
 #define _BLD_cdt	1
 #define _BLD_sfio	1
-#define _BLD_vmalloc	1
 #endif
 
 #ifdef	_SFSTDIO_H
@@ -62,10 +63,8 @@ struct _sfio_s;
 #error In 2022, libast joined the 21st century and started requiring fork(2).
 #endif
 #include <ast_sys.h>
-#include <ast_getopt.h>	/* <stdlib.h> does this */
 #include <ast_fcntl.h>
 #include <ast_limits.h>
-#include <ast_botch.h>
 
 #ifdef	_SKIP_SFSTDIO_H
 #undef	_SKIP_SFSTDIO_H
@@ -138,18 +137,17 @@ extern char*		getenv(const char*);
 #undef	setlocale
 #define setlocale	_ast_setlocale
 
-#undef	strerror
-#define strerror	_ast_strerror
-
 extern struct lconv*	localeconv(void);
 extern char*		setenviron(const char*);
 extern char*		setlocale(int, const char*);
-extern char*		strerror(int);
 
 #define AST_MESSAGE_SET		3	/* see <mc.h> mcindex()		*/
 
 /*
  * maintain this order when adding categories
+ * AST_LC_COUNT is the number of categories
+ * The numbering must be consecutive and correspond to the order of lc_categories[] in comp/setlocale.c
+ * The initializers in port/lc.c must also be kept in sync with this
  */
 
 #define AST_LC_ALL		0
@@ -163,19 +161,18 @@ extern char*		strerror(int);
 #define AST_LC_ADDRESS		8
 #define AST_LC_NAME		9
 #define AST_LC_TELEPHONE	10
-#define AST_LC_XLITERATE	11
-#define AST_LC_MEASUREMENT	12
-#define AST_LC_PAPER		13
-#define AST_LC_COUNT		14
+#define AST_LC_MEASUREMENT	11
+#define AST_LC_PAPER		12
+#define AST_LC_COUNT		13	/* number of preceding AST_LC_* defines */
 #define AST_LC_LANG		255
 
 #define AST_LC_internal		1
-#define AST_LC_test		(1L<<26)
-#define AST_LC_setenv		(1L<<27)
-#define AST_LC_find		(1L<<28)
-#define AST_LC_debug		(1L<<29)
-#define AST_LC_setlocale	(1L<<30)
-#define AST_LC_translate	(1L<<31)
+#define AST_LC_test		(1 << 25)
+#define AST_LC_setenv		(1 << 26)
+#define AST_LC_find		(1 << 27)
+#define AST_LC_debug		(1 << 28)
+#define AST_LC_setlocale	(1 << 29)
+#define AST_LC_translate	(1 << 30)
 
 #ifndef LC_ALL
 #define LC_ALL			(-AST_LC_ALL)
@@ -209,9 +206,6 @@ extern char*		strerror(int);
 #endif
 #ifndef LC_TELEPHONE
 #define LC_TELEPHONE		(-AST_LC_TELEPHONE)
-#endif
-#ifndef LC_XLITERATE
-#define LC_XLITERATE		(-AST_LC_XLITERATE)
 #endif
 #ifndef LC_MEASUREMENT
 #define LC_MEASUREMENT		(-AST_LC_MEASUREMENT)
@@ -273,16 +267,8 @@ extern _Ast_info_t	_ast_info;
 
 /* direct macro access for bsd crossover */
 
-#if !defined(memcpy) && !defined(_lib_memcpy) && defined(_lib_bcopy)
-#define memcpy(t,f,n)	(bcopy(f,t,n),(t))
-#endif
-
 #if !defined(memzero) && !defined(_lib_memzero)
-#if defined(_lib_memset) || !defined(_lib_bzero)
 #define memzero(b,n)	memset(b,0,n)
-#else
-#define memzero(b,n)	(bzero(b,n),(b))
-#endif
 #endif
 
 #if !defined(remove)
@@ -293,20 +279,6 @@ extern int		remove(const char*);
 extern int		rename(const char*, const char*);
 #endif
 
-#if !defined(strchr) && !defined(_lib_strchr) && defined(_lib_index)
-#define strchr(s,c)	index(s,c)
-#endif
-
-#if !defined(strrchr) && !defined(_lib_strrchr) && defined(_lib_rindex)
-#define strrchr(s,c)	rindex(s,c)
-#endif
-
-/* and now introducing prototypes botched by the standard(s) */
-
-#undef	getpgrp
-#define	getpgrp()	_ast_getpgrp()
-extern int		_ast_getpgrp(void);
-
 /*
  * and finally, standard interfaces hijacked by AST
  * _AST_STD_I delays headers that require <ast_map.h>
@@ -315,16 +287,6 @@ extern int		_ast_getpgrp(void);
 #include <ast_map.h>
 
 #undef	_AST_STD_I
-
-#if _AST_GETOPT_H < 0
-#undef	_AST_GETOPT_H
-#include <ast_getopt.h>
-#endif
-
-#if _GETOPT_H < 0
-#undef	_GETOPT_H
-#include <getopt.h>
-#endif
 
 #if _REGEX_H < 0
 #undef	_REGEX_H

@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1982-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -22,8 +22,6 @@
  *
  */
 
-#include	<stak.h>
-
 struct ionod
 {
 	unsigned	iofile;
@@ -40,7 +38,11 @@ struct comnod
 {
 	int		comtyp;
 	struct ionod	*comio;
-	struct argnod	*comarg;
+	union
+	{
+		struct argnod	*ap;	/* use if (comtyp&COMSCAN) */
+		struct dolnod	*dp;	/* use if (!(comtyp&COMSCAN)) */
+	}		comarg;
 	struct argnod	*comset;
 	void		*comnamp;
 	void		*comnamq;
@@ -57,9 +59,9 @@ struct slnod 	/* struct for linked list of stacks */
 {
 	struct slnod	*slnext;
 	struct slnod	*slchild;
-	Stak_t		*slptr;
+	Sfio_t		*slptr;
 	/* slpad aligns struct functnod = struct slnod + 1 on some architectures */
-	struct slnod	*slpad;	
+	struct slnod	*slpad;
 };
 
 /*
@@ -72,7 +74,7 @@ struct dolnod
 	int		dolmax;		/* size of dolval array */
 	int		dolnum;		/* number of elements */
 	int		dolbot;		/* current first element */
-	struct dolnod	*dolnxt;	/* used when list are chained */
+	struct dolnod	*dolnxt;	/* used when lists are chained */
 	char		*dolval[1];	/* array of value pointers */
 };
 
@@ -93,7 +95,6 @@ struct argnod
 	{
 		struct argnod	*ap;
 		char		*cp;
-		int		len;
 	}		argchn;
 	unsigned char	argflag;
 	char		argval[4];
@@ -111,7 +112,7 @@ struct argnod
 #define ARG_RAW		0x1	/* string needs no processing */
 #define ARG_MAKE	0x2	/* bit set during argument expansion */
 #define ARG_MAC		0x4	/* string needs macro expansion */
-#define	ARG_EXP		0x8	/* string needs file expansion */
+#define ARG_EXP		0x8	/* string needs file expansion */
 #define ARG_ASSIGN	0x10	/* argument is an assignment */
 #define ARG_QUOTED	0x20	/* word contained quote characters */
 #define ARG_MESSAGE	0x40	/* contains international string */
@@ -119,7 +120,11 @@ struct argnod
 #define ARG_ARRAY	0x2	/* for typeset -a */
 /* The following can be passed as options to sh_macexpand() */
 #define ARG_ARITH	0x100	/* arithmetic expansion */
+#if SHOPT_OPTIMIZE
 #define ARG_OPTIMIZE	0x200	/* try to optimize */
+#else
+#define ARG_OPTIMIZE	0
+#endif /* SHOPT_OPTIMIZE */
 #define ARG_NOGLOB	0x400	/* no file name expansion */
 #define ARG_ARRAYOK	0x1000	/* $x[sub] ==> ${x[sub]} */
 
@@ -132,6 +137,5 @@ extern const char	e_heading[];
 extern const char	e_subst[];
 extern const char	e_exec[];
 extern const char	e_devfdNN[];
-extern const char	e_devfdstd[];
 
 #endif /* ARG_RAW */

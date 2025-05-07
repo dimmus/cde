@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -24,7 +24,7 @@
  */
 
 static const char usage_head[] =
-"[-?@(#)$Id: cp (ksh 93u+m) 2022-08-20 $\n]"
+"[-?\n@(#)$Id: cp (ksh 93u+m) 2024-11-26 $\n]"
 "[--catalog?" ERROR_CATALOG "]"
 ;
 
@@ -41,10 +41,10 @@ static const char usage_cp[] =
     "\b--preserve\b \b--recursive\b.]"
 "[A:attributes?Preserve selected file attributes:]:[eipt]"
     "{"
-        "[+e?Everything permissible.]"
-        "[+i?Owner UID and GID.]"
-        "[+p?Permissions.]"
-        "[+t?Access and modify times.]"
+	"[+e?Everything permissible.]"
+	"[+i?Owner UID and GID.]"
+	"[+p?Permissions.]"
+	"[+t?Access and modify times.]"
     "}"
 "[p:preserve?Preserve file owner, group, permissions and timestamps.]"
 "[h:hierarchy|parents?Form the name of each destination file by "
@@ -57,7 +57,7 @@ static const char usage_cp[] =
 "[U:remove-destination?Remove existing destination files before copying.]"
 "[L:logical|dereference?Follow symbolic links and copy the files they "
     "point to.]"
-"[P|d:physical|nodereference?Don't follow symbolic links; copy symbolic "
+"[P|d:physical|nodereference|no-dereference?Don't follow symbolic links; copy symbolic "
     "links rather than the files they point to.]"
 ;
 
@@ -93,20 +93,20 @@ static const char usage_tail[] =
 "[s:symlink|symbolic-link?Make symbolic links to destination files.]"
 "[u:update?Replace a destination file only if its modification time is "
     "older than the corresponding source file modification time.]"
-"[v:verbose?Print the name of each file before operating on it.]"
+"[v:verbose?Report each successful operation.]"
 "[F:fsync|sync?\bfsync\b(2) each file after it is copied.]"
 "[B:backup?Make backups of files that are about to be replaced. "
     "\b--suffix\b sets the backup suffix. The backup type is determined in "
     "this order: this option, the \bVERSION_CONTROL\b environment variable, "
     "or the default value \bexisting\b. \atype\a may be one of:]:?[type]"
     "{"
-        "[+numbered|t?Always make numbered backups. The numbered backup "
-            "suffix is \b.\aSNS\a, where \aS\a is the \bbackup-suffix\b and "
-            "\aN\a is the version number, starting at 1, incremented with "
-            "each version.]"
-        "[+existing|nil?Make numbered backups of files that already have "
-            "them, otherwise simple backups.]"
-        "[+simple|never?Always make simple backups.]"
+	"[+numbered|t?Always make numbered backups. The numbered backup "
+	    "suffix is \b.\aSNS\a, where \aS\a is the \bbackup-suffix\b and "
+	    "\aN\a is the version number, starting at 1, incremented with "
+	    "each version.]"
+	"[+existing|nil?Make numbered backups of files that already have "
+	    "them, otherwise simple backups.]"
+	"[+simple|never?Always make simple backups.]"
 	"[+none|off?Disable backups.]"
     "}"
 "[S:suffix?A backup file is made by renaming the file to the same name "
@@ -227,14 +227,12 @@ preserve(State_t* state, const char* path, struct stat* ns, struct stat* os)
  */
 
 static int
-visit(State_t* state, register FTSENT* ent)
+visit(State_t* state, FTSENT* ent)
 {
-	register char*	base;
-	register int	n;
-	register int	len;
-	int		rm;
-	int		rfd;
-	int		wfd;
+	char*		base;
+	int		n;
+	int		len;
+	int		rm = state->remove || ent->fts_info == FTS_SL;
 	int		m;
 	int		v;
 	char*		s;
@@ -249,7 +247,7 @@ visit(State_t* state, register FTSENT* ent)
 	if (ent->fts_info == FTS_DC)
 	{
 		error(2, "%s: directory causes cycle", ent->fts_path);
-		fts_set(NiL, ent, FTS_SKIP);
+		fts_set(NULL, ent, FTS_SKIP);
 		return 0;
 	}
 	if (ent->fts_level == 0)
@@ -309,7 +307,7 @@ visit(State_t* state, register FTSENT* ent)
 					if (mkdir(state->path, st.st_mode & S_IPERM))
 					{
 						error(ERROR_SYSTEM|2, "%s: cannot create directory -- %s ignored", state->path, ent->fts_path);
-						fts_set(NiL, ent, FTS_SKIP);
+						fts_set(NULL, ent, FTS_SKIP);
 						return 0;
 					}
 				}
@@ -343,7 +341,7 @@ visit(State_t* state, register FTSENT* ent)
 	case FTS_D:
 		if (!state->recursive)
 		{
-			fts_set(NiL, ent, FTS_SKIP);
+			fts_set(NULL, ent, FTS_SKIP);
 			if (state->op == CP)
 				error(1, "%s: directory -- copying as plain file", ent->fts_path);
 			else if (state->link == link && !state->force)
@@ -359,7 +357,7 @@ visit(State_t* state, register FTSENT* ent)
 			return 0;
 		case FTS_DNX:
 			error(2, "%s: cannot search directory", ent->fts_path);
-			fts_set(NiL, ent, FTS_SKIP);
+			fts_set(NULL, ent, FTS_SKIP);
 
 			/* FALLTHROUGH */
 		case FTS_D:
@@ -376,7 +374,7 @@ visit(State_t* state, register FTSENT* ent)
 			else if (mkdir(state->path, (ent->fts_statp->st_mode & S_IPERM)|(ent->fts_info == FTS_D ? S_IRWXU : 0)))
 			{
 				error(ERROR_SYSTEM|2, "%s: cannot create directory -- %s ignored", state->path, ent->fts_path);
-				fts_set(NiL, ent, FTS_SKIP);
+				fts_set(NULL, ent, FTS_SKIP);
 			}
 			if (!state->directory)
 			{
@@ -403,7 +401,7 @@ visit(State_t* state, register FTSENT* ent)
 		st.st_mode = 0;
 	else if (state->update && !S_ISDIR(st.st_mode) && (unsigned long)ent->fts_statp->st_mtime < (unsigned long)st.st_mtime)
 	{
-		fts_set(NiL, ent, FTS_SKIP);
+		fts_set(NULL, ent, FTS_SKIP);
 		return 0;
 	}
 	else
@@ -416,8 +414,6 @@ visit(State_t* state, register FTSENT* ent)
 				 * let rename() handle it
 				 */
 
-				if (state->verbose)
-					sfputr(sfstdout, state->path, '\n');
 				goto operate;
 			}
 			error(2, "%s: identical to %s", state->path, ent->fts_path);
@@ -428,9 +424,6 @@ visit(State_t* state, register FTSENT* ent)
 			error(2, "%s: cannot %s existing directory", state->path, state->opname);
 			return 0;
 		}
-		if (state->verbose)
-			sfputr(sfstdout, state->path, '\n');
-		rm = state->remove || ent->fts_info == FTS_SL;
 		if (!rm || !state->force)
 		{
 			if (S_ISLNK(st.st_mode) && (n = -1) || (n = open(state->path, O_RDWR|O_BINARY|O_cloexec)) >= 0)
@@ -458,7 +451,7 @@ visit(State_t* state, register FTSENT* ent)
 			{
 				protection =
 #ifdef ETXTBSY
-				    errno == ETXTBSY ? "``running program''" : 
+				    errno == ETXTBSY ? "``running program''" :
 #endif
 				    st.st_uid != state->uid ? "``not owner''" :
 				    fmtmode(st.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO), 0) + 1;
@@ -493,14 +486,14 @@ visit(State_t* state, register FTSENT* ent)
 				s = state->path;
 			}
 			n = strlen(s);
-			if (fts = fts_open((char**)e, FTS_NOCHDIR|FTS_ONEPATH|FTS_PHYSICAL|FTS_NOPOSTORDER|FTS_NOSTAT|FTS_NOSEEDOTDIR, NiL))
+			if (fts = fts_open((char**)e, FTS_NOCHDIR|FTS_ONEPATH|FTS_PHYSICAL|FTS_NOPOSTORDER|FTS_NOSTAT|FTS_NOSEEDOTDIR, NULL))
 			{
 				while (sub = fts_read(fts))
 				{
 					if (strneq(s, sub->fts_name, n) && sub->fts_name[n] == '.' && strneq(sub->fts_name + n + 1, state->suffix, state->suflen) && (m = strtol(sub->fts_name + n + state->suflen + 1, &e, 10)) && streq(e, state->suffix) && m > v)
 						v = m;
 					if (sub->fts_level)
-						fts_set(NiL, sub, FTS_SKIP);
+						fts_set(NULL, sub, FTS_SKIP);
 				}
 				fts_close(fts);
 			}
@@ -517,7 +510,7 @@ visit(State_t* state, register FTSENT* ent)
 		backup:
 			if (!(s = sfstruse(state->tmp)))
 			{
-				error(ERROR_SYSTEM|3, "%s: out of space", state->path);
+				error(ERROR_SYSTEM|3, "%s: out of memory", state->path);
 				UNREACHABLE();
 			}
 			if (rename(state->path, s))
@@ -542,7 +535,7 @@ visit(State_t* state, register FTSENT* ent)
 		for (;;)
 		{
 			if (!rename(ent->fts_path, state->path))
-				return 0;
+				goto success;
 			if (errno == ENOENT)
 				rm = 1;
 			else if (!rm && st.st_mode && !remove(state->path))
@@ -576,6 +569,8 @@ visit(State_t* state, register FTSENT* ent)
 		}
 		else if (state->op == CP || S_ISREG(ent->fts_statp->st_mode) || S_ISDIR(ent->fts_statp->st_mode))
 		{
+			int	rfd = -1;
+			int	wfd = -1;
 			if (ent->fts_statp->st_size > 0 && (rfd = open(ent->fts_path, O_RDONLY|O_BINARY|O_cloexec)) < 0)
 			{
 				error(ERROR_SYSTEM|2, "%s: cannot read", ent->fts_path);
@@ -590,14 +585,14 @@ visit(State_t* state, register FTSENT* ent)
 			}
 			else if (ent->fts_statp->st_size > 0)
 			{
-				if (!(ip = sfnew(NiL, NiL, SF_UNBOUND, rfd, SF_READ)))
+				if (!(ip = sfnew(NULL, NULL, SFIO_UNBOUND, rfd, SFIO_READ)))
 				{
 					error(ERROR_SYSTEM|2, "%s: %s read stream error", ent->fts_path, state->path);
 					close(rfd);
 					close(wfd);
 					return 0;
 				}
-				if (!(op = sfnew(NiL, NiL, SF_UNBOUND, wfd, SF_WRITE)))
+				if (!(op = sfnew(NULL, NULL, SFIO_UNBOUND, wfd, SFIO_WRITE)))
 				{
 					error(ERROR_SYSTEM|2, "%s: %s write stream error", ent->fts_path, state->path);
 					close(wfd);
@@ -605,7 +600,7 @@ visit(State_t* state, register FTSENT* ent)
 					return 0;
 				}
 				n = 0;
-				if (sfmove(ip, op, (Sfoff_t)SF_UNBOUND, -1) < 0)
+				if (sfmove(ip, op, (Sfoff_t)SFIO_UNBOUND, -1) < 0)
 					n |= 3;
 				if (!sfeof(ip))
 					n |= 1;
@@ -652,26 +647,31 @@ visit(State_t* state, register FTSENT* ent)
 			if (state->op == MV && remove(ent->fts_path))
 				error(ERROR_SYSTEM|1, "%s: cannot remove", ent->fts_path);
 		}
+	success:
+		if (state->verbose)
+			sfprintf(sfstdout, "%s -> %s\n", ent->fts_path, state->path);
 		break;
 	case LN:
 		if ((*state->link)(ent->fts_path, state->path))
 			error(ERROR_SYSTEM|2, "%s: cannot link to %s", ent->fts_path, state->path);
+		else if (state->verbose)
+			sfprintf(sfstdout, "%s %c> %s\n", state->path, state->link == link ? '=' : '-', ent->fts_path);
 		break;
 	}
 	return 0;
 }
 
 int
-b_cp(int argc, register char** argv, Shbltin_t* context)
+b_cp(int argc, char** argv, Shbltin_t* context)
 {
-	register char*	file;
-	register char*	s;
+	char*		file;
+	char*		s;
 	char**		v;
 	char*		backup_type;
 	FTS*		fts;
 	FTSENT*		ent;
 	const char*	usage;
-	int		path_resolve;
+	int		path_resolve = 0;
 	int		standard;
 	struct stat	st;
 	State_t*	state;
@@ -699,7 +699,7 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 	state->wflags = O_WRONLY|O_CREAT|O_TRUNC|O_BINARY;
 	if (!state->tmp && !(state->tmp = sfstropen()))
 	{
-		error(ERROR_SYSTEM|3, "out of space [tmp string]");
+		error(ERROR_SYSTEM|3, "out of memory");
 		UNREACHABLE();
 	}
 	sfputr(state->tmp, usage_head, -1);
@@ -739,7 +739,7 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 	sfputr(state->tmp, usage_tail, -1);
 	if (!(usage = sfstruse(state->tmp)))
 	{
-		error(ERROR_SYSTEM|3, "%s: out of space", state->path);
+		error(ERROR_SYSTEM|3, "out of memory");
 		UNREACHABLE();
 	}
 	state->opname = state->op == CP ? ERROR_translate(0, 0, 0, "overwrite") : ERROR_translate(0, 0, 0, "replace");
@@ -858,8 +858,9 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 			state->remove = 1;
 			continue;
 		case '?':
-			error(ERROR_USAGE|4, "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			continue;
@@ -873,7 +874,7 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 		argc--;
 		argv++;
 	}
-	if (!(v = (char**)stkalloc(stkstd, (argc + 2) * sizeof(char*))))
+	if (!(v = stkalloc(stkstd, (argc + 2) * sizeof(char*))))
 	{
 		error(ERROR_SYSTEM|ERROR_PANIC, "out of memory");
 		UNREACHABLE();
@@ -945,7 +946,7 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 	}
 	if (argc <= 0 || error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (!path_resolve)
@@ -963,7 +964,7 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 		pathcanon(file, 0, 0);
 	if (!(state->directory = !stat(file, &st) && S_ISDIR(st.st_mode)) && argc > 1)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if (s && !state->directory)
@@ -986,7 +987,7 @@ b_cp(int argc, register char** argv, Shbltin_t* context)
 	state->perm = state->uid ? S_IPERM : (S_IPERM & ~S_ISVTX);
 	if (!state->recursive)
 		state->flags |= FTS_TOP;
-	if (fts = fts_open(argv, state->flags, NiL))
+	if (fts = fts_open(argv, state->flags, NULL))
 	{
 		while (!sh_checksig(context) && (ent = fts_read(fts)) && !visit(state, ent));
 		fts_close(fts);

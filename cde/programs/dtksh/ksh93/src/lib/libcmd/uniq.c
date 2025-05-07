@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1992-2012 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2024 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -13,6 +13,7 @@
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
 *                  Martijn Dekker <martijn@inlv.org>                   *
+*            Johnothan King <johnothanking@protonmail.com>             *
 *                                                                      *
 ***********************************************************************/
 /*
@@ -39,9 +40,9 @@ static const char usage[] =
 "[D:all-repeated?Output all duplicate lines as a group with an empty "
     "line delimiter specified by \adelimit\a:]:?[delimit:=none]"
     "{"
-        "[n:none?Do not delimit duplicate groups.]"
-        "[p:prepend?Prepend an empty line before each group.]"
-        "[s:separate?Separate each group with an empty line.]"
+	"[n:none?Do not delimit duplicate groups.]"
+	"[p:prepend?Prepend an empty line before each group.]"
+	"[s:separate?Separate each group with an empty line.]"
     "}"
 "[f:skip-fields]#[fields?\afields\a is the number of fields to skip over "
     "before checking for uniqueness. A field is the minimal string matching "
@@ -55,7 +56,7 @@ static const char usage[] =
 	"an empty string will be used for comparison. +\anumber\a is "
 	"equivalent to \b--skip-chars\b=\anumber\a.]"
 "[u:unique?Output unique lines.]"
-"[w:check-chars]#[chars?\achars\a is the number of characters to compare " 
+"[w:check-chars]#[chars?\achars\a is the number of characters to compare "
 	"after skipping any specified fields and characters.]"
 "\n"
 "\n[infile [outfile]]\n"
@@ -80,9 +81,9 @@ typedef int (*Compare_f)(const char*, const char*, size_t);
 
 static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, int mode, int* all, Compare_f compare)
 {
-	register int n, f, outsize=0, mb = mbwide();
-	register char *cp, *ep, *mp, *bufp, *outp;
-	char *orecp, *sbufp=0, *outbuff;
+	int n, f, outsize=0, mb = mbwide();
+	char *cp=NULL, *ep, *mp, *bufp, *outp=NULL;
+	char *orecp=NULL, *sbufp=0, *outbuff;
 	int reclen,oreclen= -1,count=0,cwidth=0,sep,next;
 	if(mode&C_FLAG)
 		cwidth = CWIDTH+1;
@@ -90,7 +91,7 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 	{
 		if(bufp = sfgetr(fdin,'\n',0))
 			n = sfvalue(fdin);
-		else if(bufp = sfgetr(fdin,'\n',SF_LASTR))
+		else if(bufp = sfgetr(fdin,'\n',SFIO_LASTR))
 		{
 			n = sfvalue(fdin);
 			bufp = memcpy(fmtbuf(n + 1), bufp, n);
@@ -189,7 +190,7 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 							if(outp!=sbufp)
 							{
 								if(!(sbufp=fmtbuf(outsize)))
-									return(1);
+									return 1;
 								memcpy(sbufp,outp+CWIDTH+1,outsize);
 								sfwrite(fdout,outp,0);
 								outp = sbufp;
@@ -200,7 +201,7 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 						}
 					}
 					if(sfwrite(fdout,outp,outsize) != outsize)
-						return(1);
+						return 1;
 				}
 			}
 		}
@@ -209,7 +210,7 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 		if(count = next)
 		{
 			if(sfwrite(fdout,outp,outsize) != outsize)
-				return(1);
+				return 1;
 			if(*all >= 0)
 				*all = 1;
 			sep = 0;
@@ -218,14 +219,14 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 			sep = all && *all > 0;
 		/* save current record */
 		if (!(outbuff = sfreserve(fdout, 0, 0)) || (outsize = sfvalue(fdout)) < 0)
-			return(1);
+			return 1;
 		outp = outbuff;
 		if(outsize < n+cwidth+sep)
 		{
 			/* no room in outp, clear lock and use side buffer */
 			sfwrite(fdout,outp,0);
 			if(!(sbufp = outp=fmtbuf(outsize=n+cwidth+sep)))
-				return(1);
+				return 1;
 		}
 		else
 			outsize = n+cwidth+sep;
@@ -235,14 +236,14 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 		oreclen = reclen;
 		orecp = outp+cwidth+sep + (cp-bufp);
 	}
-	return(0);
+	return 0;
 }
 
 int
 b_uniq(int argc, char** argv, Shbltin_t* context)
 {
-	register int mode=0;
-	register char *cp;
+	int mode=0;
+	char *cp;
 	int fields=0, chars=0, width=-1;
 	Sfio_t *fpin, *fpout;
 	int* all = 0;
@@ -298,8 +299,9 @@ b_uniq(int argc, char** argv, Shbltin_t* context)
 			error(2, "%s", opt_info.arg);
 			break;
 		case '?':
-			error(ERROR_usage(2), "%s", opt_info.arg);
-			UNREACHABLE();
+			/* self-doc: write to standard output */
+			error(ERROR_USAGE|ERROR_OUTPUT, STDOUT_FILENO, "%s", opt_info.arg);
+			return 0;
 		}
 		break;
 	}
@@ -308,12 +310,12 @@ b_uniq(int argc, char** argv, Shbltin_t* context)
 		error(2, "-c and -D are mutually exclusive");
 	if(error_info.errors)
 	{
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	if((cp = *argv) && (argv++,!streq(cp,"-")))
 	{
-		if(!(fpin = sfopen(NiL,cp,"r")))
+		if(!(fpin = sfopen(NULL,cp,"r")))
 		{
 			error(ERROR_system(1),"%s: cannot open",cp);
 			UNREACHABLE();
@@ -324,7 +326,7 @@ b_uniq(int argc, char** argv, Shbltin_t* context)
 	if(cp = *argv)
 	{
 		argv++;
-		if(!(fpout = sfopen(NiL,cp,"w")))
+		if(!(fpout = sfopen(NULL,cp,"w")))
 		{
 			error(ERROR_system(1),"%s: cannot create",cp);
 			UNREACHABLE();
@@ -335,7 +337,7 @@ b_uniq(int argc, char** argv, Shbltin_t* context)
 	if(*argv)
 	{
 		error(2, "too many arguments");
-		error(ERROR_usage(2), "%s", optusage(NiL));
+		error(ERROR_usage(2), "%s", optusage(NULL));
 		UNREACHABLE();
 	}
 	error_info.errors = uniq(fpin,fpout,fields,chars,width,mode,all,compare);
@@ -343,5 +345,5 @@ b_uniq(int argc, char** argv, Shbltin_t* context)
 		sfclose(fpin);
 	if(fpout!=sfstdout)
 		sfclose(fpout);
-	return(error_info.errors);
+	return error_info.errors;
 }

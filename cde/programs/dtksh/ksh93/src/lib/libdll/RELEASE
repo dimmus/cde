@@ -17,7 +17,7 @@ ____
 08-05-12 dllscan.c: LIBSUFFIX==.dylib => default plugin version match 0.0
 06-10-11 dllscan.c: check sfstruse() return values -- doh
 06-01-25 dllplug.c: add errorf() library message for dlopen() error
-05-02-14 dllscan.c: "" || "-" => NiL
+05-02-14 dllscan.c: "" || "-" => NULL
 04-10-01 dllfind.c: drop ksh "builtin" workaround
 	 dllscan.c: directory prefix in name limits search to dir and siblings
 04-07-22 dllscan.c: access() => eaccess()
@@ -28,7 +28,7 @@ ____
 03-02-11 dllscan.c: change LIBPATH to <dir>[:<env>[:<pat>]][,...]
 03-01-08 dllscan.c: hack version logic again -- is consistency rocket science?
 03-01-07 dlfcn.c: fix darwin.ppc dlopen/dlsym/dlclose
-02-11-18 dllfind.c: add path,size args (with backwards compatibility checks)
+02-11-18 dllfind.c: add path,size args (with backward compatibility checks)
 02-11-15 dllfind.c: check for ./path if '.' in path but no '/'
 02-08-30 dllfind.c: fix a bug that returned uninitialized value on not found
 02-08-28 dllscan.c: handle and display bin as a sibling dir

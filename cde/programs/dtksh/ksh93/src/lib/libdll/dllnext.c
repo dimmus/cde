@@ -2,7 +2,7 @@
 *                                                                      *
 *               This software is part of the ast package               *
 *          Copyright (c) 1997-2011 AT&T Intellectual Property          *
-*          Copyright (c) 2020-2022 Contributors to ksh 93u+m           *
+*          Copyright (c) 2020-2025 Contributors to ksh 93u+m           *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 2.0                  *
 *                                                                      *
@@ -51,9 +51,9 @@ typedef ssize_t (*Write_f)(int, const void*, size_t);
 void*
 _dll_next(int flags, _DLL_RLD_SYM_TYPE* here)
 {
-	register char*	vp;
-	register void*	lp;
-	register int	found = 0;
+	char*		vp;
+	void*		lp;
+	int		found = 0;
 	char*		s;
 	char*		b;
 	char*		e;
@@ -81,7 +81,7 @@ _dll_next(int flags, _DLL_RLD_SYM_TYPE* here)
 	{
 		do
 		{
-			if (lp = dllopen(strcmp(vp, "MAIN") ? vp : (char*)0, flags))
+			if (lp = dllopen(strcmp(vp, "MAIN") ? vp : NULL, flags))
 			{
 				if (found)
 				{
@@ -163,20 +163,21 @@ extern struct link_dynamic	_DYNAMIC;
 void*
 dllnext(int flags)
 {
-	register void*			dll;
+	void*			dll;
 #ifndef RTLD_NEXT
 #if _dll_DYNAMIC
-	register struct link_map*	map;
-	register char*			s;
-	register char*			b;
+	struct link_map*	map;
+	char*			s;
+	char*			b;
 #endif
-	register char*			ver;
+	char*			ver;
 	char*				path;
 
 	static char			next[] = { _DLL_NEXT_PATH };
 #endif
 
 #ifdef RTLD_NEXT
+	NOT_USED(flags);
 	dll = RTLD_NEXT;
 #else
 	path = next;
@@ -201,10 +202,10 @@ dllnext(int flags)
 		do
 		{
 			if (ver <= path)
-				return 0;
+				return NULL;
 		} while (*--ver != '.');
 		if (*(ver + 1) <= '0' || *(ver + 1) >= '9')
-			return 0;
+			return NULL;
 		*ver = 0;
 	}
 #endif

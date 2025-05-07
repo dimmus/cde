@@ -2,7 +2,7 @@
 #                                                                      #
 #               This software is part of the ast package               #
 #          Copyright (c) 1982-2012 AT&T Intellectual Property          #
-#          Copyright (c) 2020-2022 Contributors to ksh 93u+m           #
+#          Copyright (c) 2020-2025 Contributors to ksh 93u+m           #
 #                      and is licensed under the                       #
 #                 Eclipse Public License, Version 2.0                  #
 #                                                                      #
@@ -355,11 +355,11 @@ foo=one
 [[ ! ${foo[@]:1} ]] || err_exit '${foo[@]:1} not null'
 function EMPTY
 {
-        typeset i
-        typeset -n ARRAY=$1
-        for i in ${!ARRAY[@]}
-        do      unset ARRAY[$i]
-        done
+	typeset i
+	typeset -n ARRAY=$1
+	for i in ${!ARRAY[@]}
+	do      unset ARRAY[$i]
+	done
 }
 unset foo
 typeset -A foo
@@ -565,7 +565,7 @@ arr2[1]=def
 
 unset foo
 typeset foo[7]
-[[ ${#foo[@]} == 0 ]] || err_exit 'typeset foo[7] should not have one element' 
+[[ ${#foo[@]} == 0 ]] || err_exit 'typeset foo[7] should not have one element'
 
 a=123 $SHELL  2> /dev/null -c 'integer a[5]=3 a[2]=4; unset a;x=0; ((a[++x]++));:' || err_exit 'unsetting array variable leaves side effect'
 
@@ -607,16 +607,16 @@ x=$(
 	"(expected $(printf %q "$exp"), got $(printf %q "$x"))"
 
 # test for cloning a very large indexed array - can core dump
-(	
+(
     trap 'x=$?;exit $(( $x!=0 ))' EXIT
     $SHELL <<- \EOF
 	(
 		print '('
 		integer i
 		for ((i=0 ; i < 16384 ; i++ )) ; do
-                	printf '\tinteger var%i=%i\n' i i
-        	done
-        	printf 'typeset -a ar=(\n'
+			printf '\tinteger var%i=%i\n' i i
+		done
+		printf 'typeset -a ar=(\n'
 		for ((i=0 ; i < 16384 ; i++ )) ; do
 			printf '\t[%d]=%d\n' i i
 		done
@@ -625,7 +625,11 @@ x=$(
 	) | read -C hugecpv
 	compound hugecpv2=hugecpv
 	v=$(typeset -p hugecpv)
-	[[ ${v/hugecpv/hugecpv2} == "$(typeset -p hugecpv2)" ]]
+	# FIXME: the == operator in [[ ... ]] may crash in the regex code for large values due to
+	# excessive recursion; replace with a test(1) invocation (it doesn't call the regex code).
+	# More info: https://github.com/ksh93/ksh/issues/207#issuecomment-2508747419
+	#[[ ${v/hugecpv/hugecpv2} == "$(typeset -p hugecpv2)" ]]
+	test "${v/hugecpv/hugecpv2}" = "$(typeset -p hugecpv2)"
 EOF
 ) 2> /dev/null || err_exit 'copying a large array fails'
 
@@ -830,13 +834,122 @@ exp=$'typeset -A a=([0]=1 [1]=2 [2]=3)\ntypeset -a a=(1 2 3)'
 # ======
 # spurious command execution of a word starting with '[' but not containing ']=' in associative array assignments
 # https://github.com/ksh93/ksh/issues/427
-exp='*: syntax error at line *: `\[badword]'\'' unexpected'
-got=$(set +x; PATH=/dev/null; eval 'typeset -A badword=([x]=1 \[badword])' 2>&1)
-case $((e=$?)),$got in
-3,$exp)	;;
-*)	err_exit 'spurious command execution in invalid associative array assignment' \
-		"(expected status 3 and $(printf %q "$exp"), got status $e and $(printf %q "$got"))" ;;
-esac
+exp=': syntax error at line 1: `[badword]'\'' unexpected'
+got=$(set +x -f; PATH=/dev/null; eval 'typeset -A badword=([x]=1 \[badword])' 2>&1)
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit 'issue 427 test 1' \
+		"(expected status 3 and *$(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+exp=': syntax error at line 1: `[bar_key\]=]'\'' unexpected'
+got=$(set +x -f; PATH=/dev/null; eval 'fn=([foo_key]=foo_val [bar_key\]=])' 2>&1)
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit 'issue 427 test 2' \
+		"(expected status 3 and *$(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+exp=': syntax error at line 1: `[abcdefg]\=r_key'\'' unexpected'
+got=$(set +x -f; PATH=/dev/null; eval 'fn=([foo]=bar [abcdefg]\=r_key)' 2>&1)
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit 'issue 427 test 3' \
+		"(expected status 3 and *$(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+exp=''
+got=$(set +x -f; PATH=/dev/null; eval 'fn=([foo]=bar [abcdef"g"]=r_key)' 2>&1)
+[[ e=$? -eq 0 && $got == "$exp" ]] || err_exit 'issue 427 test 4' \
+		"(expected status 0 and $(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+exp=': syntax error at line 1: `[badword]=good'\'' unexpected'
+got=$(set +x -f; PATH=/dev/null; eval 'badword=([x]=1 \[badword]=good)' 2>&1)
+[[ e=$? -eq 3 && $got == *"$exp" ]] || err_exit 'issue 427 test 5' \
+		"(expected status 3 and *$(printf %q "$exp"), got status $e and $(printf %q "$got"))"
+
+# ======
+# arithmetic subscript that yields 0 while incrementing variable caused crash (in 'read')
+# or spurious error (in 'printf -v') due to double evaluation of the arithmetic expression
+# https://github.com/ksh93/ksh/issues/606
+unset i n a
+exp=$'typeset -a a=(foo bar)\ntypeset -l -i n=2'
+got=$(set +x; { "$SHELL" -c 'integer n=0; read a\[n++] <<< foo; read a\[n++] <<< bar; typeset -p a n';} 2>&1)
+[[ e=$? -eq 0 && $got == "$exp" ]] || err_exit '2x read a[n++]' \
+	"(expected status 0, $(printf %q "$exp");" \
+	"got status $e$( ((e>128)) && print -n /SIG && kill -l "$e"), $(printf %q "$got"))"
+got=$(integer n=0; printf -v a\[n++] foo 2>&1; printf -v a\[n++] bar 2>&1; typeset -p a n)
+[[ (e=$? -eq 0 && $got == "$exp") || .sh.version -lt 20211118 ]] || err_exit '2x printf -v a[n++]' \
+	"(expected status 0, $(printf %q "$exp"); got status $e, $(printf %q "$got"))"
+# check for 'typeset -a a=(foo)' (ARRAY_FILL) and not 'typeset -a a=foo'
+exp=$'i=1\ntypeset -a a=(foo)'
+got=$(i=0; typeset -a a; printf -v a\[i++] foo 2>&1; typeset -p i a)
+[[ (e=$? -eq 0 && $got == "$exp") || .sh.version -lt 20211118 ]] || err_exit '1x printf -v a[i++]' \
+	"(expected status 0, $(printf %q "$exp"); got status $e, $(printf %q "$got"))"
+
+# ======
+# tests for preserving array type, backported from ksh 93v- beta
+
+# ... from 2013-07-19:
+
+unset ar
+ar=(foo bar bam)
+ar=()
+got=$(typeset -p ar)
+exp='typeset -a ar'
+[[ $got == "$exp" ]] || err_exit 'ar=() does not preserve index array type' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+unset ar
+typeset -A ar=([0]=foo [1]=bar [2]=bam)
+ar=()
+got=$(typeset -p ar)
+exp='typeset -A ar=()'
+[[ $got == "$exp" ]] || err_exit 'ar=() does not preserve associative array type' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+unset ar
+typeset -CA ar
+ar[1]=(foo=1; bar=2)
+ar[3]=(foo=3; bar=4)
+ar=()
+got=$(typeset -p ar)
+exp='typeset -C -A ar=()'
+[[ $got == "$exp" ]] || err_exit 'ar=() does not preserve -C attribute' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+unset ar
+ar=(foo bar bam)
+ar=()
+got=$(typeset -p ar)
+exp='typeset -a ar'
+[[ $got == "$exp" ]] || err_exit 'ar=() for index array should preserve index array type' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+unset ar
+typeset -A ar=([1]=foo [3]=bar)
+ar=()
+got=$(typeset -p ar)
+exp='typeset -A ar=()'
+[[ $got == "$exp" ]] || err_exit 'ar=() for associative array should preserve index array type' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ... from 2013-07-27:
+
+unset ar
+integer -a ar=( 2 3 4 )
+ar=()
+got=$(typeset -p ar)
+exp='typeset -a -l -i ar'
+[[ $got == "$exp" ]] || err_exit 'ar=() for index array should preserve attributes' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+unset ar
+integer -a ar=( 2 3 4 )
+integer -A ar=([1]=9 [3]=12)
+ar=()
+got=$(typeset -p ar)
+exp='typeset -A -l -i ar=()'
+[[ $got == "$exp" ]] || err_exit 'ar=() for associative array should preserve attributes' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# ======
+got=$(typeset -A yarr; typeset -i yarr[lorem=ipsum]=456 yarr[foo=bar]=123 2>&1; typeset -p yarr)
+exp='typeset -A -i yarr=([foo=bar]=123 [lorem=ipsum]=456)'
+[[ $got == "$exp" ]] || err_exit "associative array index containing '=' misparsed in declaration command" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+unset SUCCESS
+got=$(typeset toto[${SUCCESS:=0}]="SUCCESS" 2>&1; typeset -p toto)
+exp='typeset -a toto=(SUCCESS)'
+[[ $got == "$exp" ]] || err_exit "array index containing expansion containing '=' misparsed in declaration command" \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
 
 # ======
 exit $((Errors<125?Errors:125))
