@@ -30,6 +30,16 @@
 #ifndef BOOL_H
 #define BOOL_H
 
+#if defined __STDC_VERSION__ && __STDC_VERSION__ > 201710L
+/* bool, true and false are keywords.  */
+#else
+/* #define bool    _Bool */
+typedef int bool;
+#define true    1
+#define false   0
+#endif
+
+/*
 #if __STDC__ > 199901
 #include <stdbool.h>
 #else
@@ -37,5 +47,5 @@ typedef int bool;
 #define true 1
 #define false 0
 #endif
-
+*/
 #endif /* BOOL_H */
