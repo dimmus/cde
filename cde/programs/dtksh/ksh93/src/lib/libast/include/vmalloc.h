@@ -15,17 +15,21 @@
 
 /*
  * New Vmalloc: a small interface around the standard memory allocator
- * that implement allocation regions and automatic initialization.
+ * that implements allocation regions and automatic initialization.
  */
 
 #ifndef _VMALLOC_H
 #define _VMALLOC_H
 
+#include <ast_std.h>
+
 typedef struct
 {
-	void		*alloc;			/* tree of pointers & their alloc sizes	*/
+	/* public use */
 	uint32_t	options;		/* option bits for the region		*/
 	void		(*outofmemory)(size_t);	/* called when malloc, etc. fails	*/
+	/* internal use only */
+	void		*_list_;		/* head of allocations list		*/
 } Vmalloc_t;
 
 extern Vmalloc_t	*vmopen(void);

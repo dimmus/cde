@@ -804,7 +804,7 @@ grep(char* id, int options, int argc, char** argv, Shbltin_t* context)
 		goto done;
 	case ':':
 		error(2, "%s", opt_info.arg);
-		goto done;
+		break;
 	default:
 		error(2, "%s: not implemented", opt_info.name);
 		goto done;
@@ -813,22 +813,28 @@ grep(char* id, int options, int argc, char** argv, Shbltin_t* context)
 	if ((state.options & REG_LITERAL) && (state.options & (REG_AUGMENTED|REG_EXTENDED)))
 	{
 		error(2, "-F and -A or -P or -X are incompatible");
-		goto done;
+		error_info.errors++;
 	}
 	if ((state.options & REG_LITERAL) && state.words)
 	{
 		error(ERROR_SYSTEM|2, "-F and -w are incompatible");
-		goto done;
+		error_info.errors++;
 	}
 	if (!state.files.head && !state.patterns.head)
 	{
 		if (!argv[0])
 		{
 			error(2, "no pattern");
-			goto done;
+			error_info.errors++;
 		}
-		if (addstring(&state, &state.patterns, *argv++))
+		else if (addstring(&state, &state.patterns, *argv++))
 			goto done;
+	}
+	if (error_info.errors)
+	{
+		error(ERROR_USAGE|2, "%s", optusage(NULL));
+		r = 2;
+		goto done;
 	}
 	if (!(state.options & (REG_FIRST|REG_NOSUB)))
 	{
