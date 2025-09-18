@@ -158,7 +158,7 @@ static Bool myCheckSelectionEvent(Display *display, XEvent *event, char *args)
 Bool _DtPerfChkpntMsgReceive(DtChkpntMsg *dtcp_msg, Bool bBlock)
 {
     XEvent        event;
-    Bool          bool=True;
+    Bool          hasEvent=True;
     XTextProperty tp;
     int 	  i;
     static char   **Stringlist;
@@ -178,10 +178,10 @@ Bool _DtPerfChkpntMsgReceive(DtChkpntMsg *dtcp_msg, Bool bBlock)
     if (bBlock == True)
 	XIfEvent(dtsvc_info.display, &event, myCheckSelectionEvent, NULL);
     else
-	bool = XCheckIfEvent(dtsvc_info.display, &event,
+	hasEvent = XCheckIfEvent(dtsvc_info.display, &event,
 				myCheckSelectionEvent, NULL);
     
-    if (bool == True) {
+    if (hasEvent == True) {
 	switch (event.type) {
 	    case SelectionRequest:	/* Message received from a client */
 		/* Is this a Checkpoint request ?*/
@@ -213,10 +213,10 @@ Bool _DtPerfChkpntMsgReceive(DtChkpntMsg *dtcp_msg, Bool bBlock)
 	    case SelectionClear:	/* We no longer own the selection */
 	    default:
 		fprintf(stderr,"\t** Chkpnt listener: Warning - loss of Selection ownership **\n");
-		bool = False;
+		hasEvent = False;
 		break;
 	}
     }
     _DtSvcProcessUnlock();
-    return(bool);
+    return(hasEvent);
 }

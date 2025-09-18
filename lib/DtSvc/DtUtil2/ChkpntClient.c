@@ -110,7 +110,7 @@ myDtChkpntMsgSend(char *message, char *type)
     struct timezone time_zone;
     XTextProperty   tp;
     Status          status;
-    Bool            bool;
+    Bool            hasEvent;
     XEvent          event;
 
     /* Check to see if checkpoint is actually on */
@@ -153,9 +153,9 @@ myDtChkpntMsgSend(char *message, char *type)
 	timestamp = oldtime;
     }
     else {		     /* Check event queue */
-	bool = XCheckIfEvent(dtcp_info.display, &event,
+	hasEvent = XCheckIfEvent(dtcp_info.display, &event,
 			 myCheckClientEvent, NULL);
-	if (bool == True) {
+	if (hasEvent == True) {
 	    if (event.type == PropertyNotify)
 		 timestamp = event.xproperty.time; 
 	    else timestamp = event.xselection.time;
@@ -190,12 +190,12 @@ myDtChkpntMsgSend(char *message, char *type)
      */
     oldtime = INVALID_TIME;
     do {
-	bool = XCheckIfEvent(dtcp_info.display, &event,
+	hasEvent = XCheckIfEvent(dtcp_info.display, &event,
 			     myCheckClientEvent, NULL);
 	if (event.type == PropertyNotify) /* Save timestamp for recycling */
 	     oldtime = event.xproperty.time;
 	else oldtime = event.xselection.time;
-    } while(bool == True);
+    } while(hasEvent == True);
 
     /*
      * Increment the property and message counters

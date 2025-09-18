@@ -41,6 +41,7 @@
 
 #include	<stdio.h>
 #include	<stdlib.h>
+#include	<stdbool.h>
 #include	<unistd.h>
 #include	<string.h>
 #include	<sys/param.h>
@@ -173,8 +174,6 @@
 #define	NUM_ACTIONS		2
 #define	ACTION_MASK		0xf0
 
-
-typedef	short		bool;
 
     /* operation states */
 typedef enum {
