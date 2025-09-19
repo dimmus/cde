@@ -373,4 +373,3 @@ _DtCreateView(
 	return (XtCreateWidget (name, dtViewWidgetClass, 
 			parent, arglist, argcount));
 }
-	

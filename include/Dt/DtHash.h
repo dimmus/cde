@@ -38,12 +38,3 @@ typedef void (*DtHashOperateFunc)();
 typedef int  (*DtHashDestroyFunc)();
 
 #endif /* _DtHash_h */
-
-
-
-
-
-
-
-
-

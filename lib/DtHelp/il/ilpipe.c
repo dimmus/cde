@@ -1366,5 +1366,3 @@ ilError                 error;
         }       /* END switch pipe state */
     return IL_EXECUTE_ERROR;
 }
-
-
