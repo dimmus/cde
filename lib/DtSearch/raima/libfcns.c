@@ -65,8 +65,8 @@
 /* Internal function prototypes */
 static int rec_okay(P1(int) Pi(int *) 
 				   Pi(RECORD_ENTRY * *));
-static int ctblcmp(P1(const unsigned char FAR*)
-                                  Pi(const unsigned char FAR*) Pi(int));
+static int ctblcmp(P1(const unsigned char *)
+                                  Pi(const unsigned char *) Pi(int));
 
 /* Check for valid db number and set curr_db, curr_db_table and curr_rn_table
 */
