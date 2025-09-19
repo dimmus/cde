@@ -50,8 +50,7 @@
 #include "dbtype.h"
 
 /* Internal function Prototypes */
-static int sortcmp(P1(SET_ENTRY *) Pi(char *) 
-				  Pi(char *));
+static int sortcmp(SET_ENTRY *, char *, char *);
 
 /* set pointer structure definition */
 typedef struct {

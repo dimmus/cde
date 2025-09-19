@@ -23,12 +23,9 @@
 /*
  *   COMPONENT_NAME: austext
  *
- *   FUNCTIONS: P1
+ *   FUNCTIONS:
  *              POINTER_ASSIGN
  *              POINTER_INIT
- *              Pi
- *              Piv
- *              Pv
  *              int
  *
  *   ORIGINS: 27,157
@@ -292,39 +289,8 @@ typedef struct {char *ptr; LOCK_DESC} CHAR_P;
 typedef struct {DB_ADDR *ptr; LOCK_DESC} DB_ADDR_P;
 
 
-/* Allow for function prototyping */
-#ifdef LINT_ARGS
-#define P0	void	/* parameterless function */
-#define P1(t)	t	/* first (or only) parameter in function */
-#define Pi(t)	,t	/* subsequent (2,3,...) parameter in function */
-#ifdef ANSI
-#define Piv(t)	,...	/* begining of variable number of parameters */
-#define Pv(t)	/**/	/* function has 0 or more parameters */
-#endif
-#else
-#define P0	/**/
-#define P1(t)	/**/
-#define Pi(t)	/**/
-#define Piv(t)	/**/
-#define Pv(t)	/**/
-#endif
-
-
-
-#define DBN_D1 Pv(int)
-#define DBN_FIX_D1 P1(int)
-#define DBN_Dn Piv(int)
-
-#define TASK_DBN_D1 DBN_D1
-#define TASK_D1 P0
-#define TASK_Di /**/
-#define TASK_PTR_D1 P0
-#define TASK_PTR_Di /**/
 #define CURRTASK_PARM            /**/
 #define CURRTASK_ONLY            /**/
-
-#define LOCK_D1 /**/
-#define LOCK_Di /**/
 
 typedef struct {
    int  item;  /* record or set number */

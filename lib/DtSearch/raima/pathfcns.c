@@ -81,11 +81,11 @@
 
 /* ********************** FUNCTION PROTOTYPES ************************ */
 
-static int isabs(P1(char *));
+static int isabs(char *);
 					/* TRUE if path is absolute */
-static char * remdrv(P1(char *));
+static char * remdrv(char *);
 					/* Removes drive spec from path */
-static char * remfile(P1(char *));
+static char * remfile(char *);
 					/* Removes file from path */
 
 /* ======================================================================

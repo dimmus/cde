@@ -56,11 +56,11 @@ typedef struct {
 
 #define LLIST_INIT()    { POINTER_INIT(), POINTER_INIT(), NULL }
 
-BOOLEAN ll_access(P1(llist *));
-int ll_append(P1(llist *) Pi(CHAR_P *));
+BOOLEAN ll_access(llist *);
+int ll_append(llist *, CHAR_P *);
 #define ll_deaccess(ll)	    /**/
-CHAR_P *ll_first(P1(llist *));
-void ll_free(P1(llist *));
-CHAR_P *ll_next(P1(llist *));
-int ll_prepend(P1(llist *) Pi(CHAR_P *));
+CHAR_P *ll_first(llist *);
+void ll_free(llist *);
+CHAR_P *ll_next(llist *);
+int ll_prepend(llist *, CHAR_P *);
 /* vpp -nOS2 -dUNIX -nBSD -nVANILLA_BSD -nVMS -nMEMLOCK -nWINDOWS -nFAR_ALLOC -f/usr/users/master/config/nonwin ll.h */

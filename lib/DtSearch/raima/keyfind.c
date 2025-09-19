@@ -51,8 +51,7 @@
 #include "dbtype.h"
 
 /* Internal function prototypes */
-static void chk_desc_key(P1(int) Pi(FIELD_ENTRY *) 
-					Pi(const char *) Pi(char *));
+static void chk_desc_key(int, FIELD_ENTRY *, const char *, char *);
 
 /* Find record thru key field
 */
