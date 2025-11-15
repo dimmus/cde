@@ -42,6 +42,36 @@
 #include <tiuser.h>
 #include <sys/socket.h>
 
+int
+tli_setopt(int fd, int level, int name, int value)
+{
+	struct t_optmgmt req, resp;
+	struct {
+		struct opthdr opt;
+		int value;
+	} reqbuf;
+
+	reqbuf.opt.level = level;
+	reqbuf.opt.name = name;
+	reqbuf.opt.len = sizeof (int);
+
+	reqbuf.value = value;
+
+	req.flags = T_NEGOTIATE;
+	req.opt.len = sizeof (reqbuf);
+	req.opt.buf = (char *)&reqbuf;
+
+	resp.flags = 0;
+	resp.opt.buf = (char *)&reqbuf;
+	resp.opt.maxlen = sizeof (reqbuf);
+
+	if (t_optmgmt(fd, &req, &resp) < 0 || resp.flags != T_SUCCESS) {
+		t_error("t_optmgmt");
+		return (0);
+	}
+        return (1);
+}
+
 
 /* 
  * Sets the TCP_NODELAY option for a tli stream bound using tcp. This
@@ -53,33 +83,8 @@ extern "C"
 int
 _tt_tli_set_nodelay(int fd)
 {
-	struct t_optmgmt *options;
-	struct sochdr {
-		struct opthdr opthdr;
-		long value;
-	} sochdr;
-
-	options = (struct t_optmgmt *)t_alloc(fd, T_OPTMGMT, 0);
-	if (options == (struct t_optmgmt *)0) {
-		return (0);
-	}
-	sochdr.opthdr.level = IPPROTO_TCP;
-	sochdr.opthdr.name = TCP_NODELAY;
-	sochdr.opthdr.len = 4;
-	sochdr.value = 1;
-	options->opt.maxlen = sizeof(sochdr);
-	options->opt.len = sizeof(sochdr);
-	options->opt.buf =  (char *) &sochdr;
-	options->flags = T_NEGOTIATE;
-	if (t_optmgmt(fd, options, options) == -1) {
-		t_error("t_optmgmt");
-		return(0);
-	}
-	options->opt.buf = 0;
-	(void) t_free((char *)options, T_OPTMGMT);
-	return(1);
+	return (tli_setopt(fd, IPPROTO_TCP, TCP_NODELAY, 1));
 }
-
 
 extern "C" 
 int
