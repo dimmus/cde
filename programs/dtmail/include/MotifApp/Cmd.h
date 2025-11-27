@@ -116,12 +116,6 @@ class Cmd {
     void    deactivate(); // Deactivate this object
     char    *getLabel() { return _label; }  
     
-#ifdef DEAD_WOOD
-    // Functions to register dependent commands
-    
-    void    addToActivationList ( Cmd * );
-    void    addToDeactivationList ( Cmd * );
-#endif /* DEAD_WOOD */
     
     // Register an UIComponent used to execute this command
     

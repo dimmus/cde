@@ -776,20 +776,6 @@ DtMailGenDialog::setToErrorDialog(
     setDialog(title, text, XmDIALOG_ERROR);
 }
 
-#ifdef DEAD_WOOD
-void
-DtMailGenDialog::setToInfoDialog(
-    char *title,
-    char *text
-)
-{
-    if (NULL != _textField && XtIsManaged(_textField))
-      XtUnmanageChild(_textField);
-    
-    setDialog(title, text, XmDIALOG_INFORMATION);
-}
-#endif /* DEAD_WOOD */
-
 extern "C" Pixmap _DtGetMask(Screen * screen, char * image_name);
 
 void

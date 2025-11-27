@@ -891,18 +891,6 @@ reload_notify_cb(XtPointer)
 }
 #endif   /* DTMAIL_TOOLTALK */
 
-#ifdef DEAD_WOOD
-static void
-SigChldHandler(int)
-{
-    int status;
-    int pid = (int) wait(&status);
-
-    ChildExitNotify(pid, status);
-}
-#endif /* DEAD_WOOD */
-
-
 void pspace_signal( int )
 {
    Widget parent=theApplication->baseWidget();

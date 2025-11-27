@@ -29,14 +29,14 @@ dtmail_SOURCES = AliasListUiItem.C               AlternatesListUiItem.C \
 		 Editor.C			 EncryptedTextFieldUiItem.C \
 		 FindDialog.C			 Fonts.C \
 		 Icon.C				 IgnoreListUiItem.C \
-		 Image.C			 InboxTextFieldUiItem.C \
+		 InboxTextFieldUiItem.C		 \
 		 IndexedOptionMenu.C		 IndexedOptionMenuUiItem.C \
 		 ListUiItem.C			 MailRcSource.C \
 		 MailRetrievalOptions.C		 MailSession.C \
 		 MoveMenuListUiItem.C            MsgHndArray.C \
 		 MsgScrollingList.C              NoOpCmd.C \
 		 OptCmd.C                        PasswordDialogManager.C \
-		 PropUi.C                        QueryDialogManager.C \
+		 PropUi.C                        \
 		 RoamApp.C                       RoamCmds.C \
 		 RoamInterruptibleCmd.C          RoamMenuWindow.C \
 		 ScaleUiItem.C                   SendMsgDialog.C \

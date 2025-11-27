@@ -945,23 +945,6 @@ RFCMailBox::save()
     CheckPointEvent();
 }
 
-#ifdef DEAD_WOOD
-int
-RFCMailBox::messageCount(DtMailEnv & error)
-{
-	error.clear();
-
-    _at_eof.waitTrue();
-
-    if (_object_valid->state() <= 0) {
-	error.setError(DTME_ObjectInvalid);
-	return(0);
-    }
-
-    return(_msg_list.length());
-}
-#endif /* DEAD_WOOD */
-
 DtMailMessageHandle
 RFCMailBox::getFirstMessageSummary(DtMailEnv & error,
 				    const DtMailHeaderRequest & request,

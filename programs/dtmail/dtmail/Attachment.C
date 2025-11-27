@@ -130,11 +130,6 @@ unsigned char invalidbits[] = {
 
 String typeName;
 
-#ifdef DEAD_WOOD
-void runit_callback( int *data );
-void norunit_callback( int *data );
-#endif /* DEAD_WOOD */
-
 
 /*
  * CDExc17304
@@ -289,20 +284,6 @@ Attachment::initialize()
     
     installDestroyHandler();
 }
-
-#ifdef DEAD_WOOD
-Boolean
-Attachment::check_if_binary(String contents, unsigned long size)
-{
-    int i;
-
-    for(i=0;i<size;i++) {
-	if((!isprint(contents[i])) && (!isspace(contents[i])))
-	    return True;
-    }
-    return False;
-}
-#endif /* DEAD_WOOD */
 
 //
 // Map the name (which we got from the classing engine) to a 
@@ -488,20 +469,6 @@ Attachment::handleDoubleClick()
     invokeAction(0);
     _parent->attachmentFeedback(FALSE);
 }
-
-#ifdef DEAD_WOOD
-void
-runit_callback(int *data)
-{
-    *data=1;
-}
-
-void
-norunit_callback(int *data)
-{
-    *data=2;
-}
-#endif /* DEAD_WOOD */
 
 int
 Attachment::operator==
@@ -712,17 +679,6 @@ Attachment::setY(
 
     if (was_managed) manageIconWidget();
 }
-
-#ifdef DEAD_WOOD
-void
-Attachment::setRow(
-    int row
-)
-{
-    _row = row;
-}
-#endif /* DEAD_WOOD */
-
 
 void 
 Attachment::actionCallback(

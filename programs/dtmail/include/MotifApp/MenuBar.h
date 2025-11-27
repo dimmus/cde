@@ -90,9 +90,6 @@ class CmdList;
 
 class MenuBar : public UIComponent {
   protected:
-#ifdef DEAD_WOOD
-    virtual	Boolean isValidMenuPane(Widget);
-#endif /* DEAD_WOOD */
 
     virtual Widget createPulldown ( Widget, CmdList *, 
 			Boolean, unsigned char);

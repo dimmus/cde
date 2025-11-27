@@ -198,9 +198,6 @@ class AttachArea : public UIComponent {
     void 			addToList( Attachment * );
     void			addToDeletedList( Attachment *);
 
-#ifdef DEAD_WOOD
-    void			undeleteAllDeletedAttachments(DtMailEnv &);
-#endif /* DEAD_WOOD */
     void			undeleteLastDeletedAttachment(DtMailEnv &);
 
     void			removeLastDeletedAttachment();
@@ -255,14 +252,8 @@ class AttachArea : public UIComponent {
 
     Attachment*		getSelectedAttachment();
     void		unselectOtherSelectedAttachments(Attachment *);
-#ifdef DEAD_WOOD
-    void			deleteAttachments();
-#endif /* DEAD_WOOD */
     void 			manageList();
     void 			CalcSizeOfAttachPane( );
-#ifdef DEAD_WOOD
-    void 			CalcAttachmentPosition(Attachment *);
-#endif /* DEAD_WOOD */
     void			CalcAllAttachmentPositions();
     void			DisplayAttachmentsInRow(unsigned int);
     void			calculate_attachment_position(
@@ -276,14 +267,7 @@ class AttachArea : public UIComponent {
     void 			initialize(Widget);
     void 			initialize_send(Widget);
     void 			initialize_view(Widget);
-#ifdef DEAD_WOOD
-    void			setAttachmentsLabel( );
-#endif /* DEAD_WOOD */
     int				getSelectedIconCount();
-#ifdef DEAD_WOOD
-    void			CalcAttachmentsSize( );
-    void			add_attachment( Attachment * );
-#endif /* DEAD_WOOD */
 
     // Methods for parsing the attachments in a DtMail::Message
 
@@ -300,9 +284,6 @@ class AttachArea : public UIComponent {
     void		unmanage();
     void		removeCurrentAttachments();
     void		clearAttachArea();
-#ifdef DEAD_WOOD
-    void		saveAttachmentToFile(DtMailEnv &, char *);
-#endif /* DEAD_WOOD */
     void		deleteSelectedAttachments(DtMailEnv &);
     Widget		ownerShellWidget();
     void		setOwnerShell(RoamMenuWindow *);

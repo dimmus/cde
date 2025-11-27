@@ -173,24 +173,6 @@ void Cmd::revert()
 	deactivate();
 }
 
-#ifdef DEAD_WOOD
-void Cmd::addToActivationList ( Cmd *cmd )
-{
-    if ( !_activationList )
-	_activationList = new CmdList();
-    
-    _activationList->add ( cmd );
-}
-
-void Cmd::addToDeactivationList ( Cmd *cmd )
-{
-    if ( !_deactivationList )
-	_deactivationList = new CmdList();
-    
-    _deactivationList->add ( cmd );
-}
-#endif /* DEAD_WOOD */
-
 void Cmd::execute()
 {
     int i;      

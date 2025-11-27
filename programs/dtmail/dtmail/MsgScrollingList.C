@@ -58,9 +58,6 @@
 #include "MemUtils.hh"
 #include "MsgHndArray.hh"
 #include "MsgScrollingList.hh"
-#ifdef DEAD_WOOD
-#include "QueryDialogManager.hh"
-#endif /* DEAD_WOOD */
 #include "RoamApp.h"
 #include "RoamMenuWindow.h"
 #include "Sort.hh"
@@ -200,25 +197,6 @@ MsgScrollingList::items(
 		   NULL );
 }
 
-#ifdef DEAD_WOOD
-void 
-MsgScrollingList::addChooseCommand(
-    ChooseCmd *cmd
-) 
-{
-    _choose=cmd;
-}
-
-void 
-MsgScrollingList::addDeleteCommand(
-    DeleteCmd *cmd
-) 
-{
-    _delete=cmd;
-}
-#endif /* DEAD_WOOD */
-
-
 void
 MsgScrollingList::select_next_item()
 {
@@ -340,39 +318,6 @@ MsgScrollingList::position(
     return (_msgs->indexof(msgno))+1; 
 }
 
-#ifdef DEAD_WOOD
-int 
-MsgScrollingList::position( 
-			    MsgStruct *a_msg_struct
-			) 
-{ 
-    return (_msgs->indexof(a_msg_struct))+1; 
-}
-
-void
-MsgScrollingList::appendMsg(
-    DtMailMessageHandle msg_hndl
-)
-{
-    MsgStruct *newMS;
-
-    // A new message has come in.
-    // Increase the session_message_number which keeps track of the
-    // number of messages in this session for this folder (scrolling list).
-    // 
-    
-    newMS = new MsgStruct();
-    newMS->message_handle = msg_hndl;
-    newMS->indexNumber = session_message_number-num_deleted_messages;
-    newMS->sessionNumber = session_message_number;
-    newMS->is_deleted = FALSE;
-    _msgs->append(newMS);
-    session_message_number++;
-
-}
-#endif /* DEAD_WOOD */
-
-    
 void
 MsgScrollingList::insertMsg(
     DtMailMessageHandle msg_hndl
@@ -2825,19 +2770,6 @@ MsgScrollingList::shutdown()
 	
     }
 }
-
-#ifdef DEAD_WOOD
-DtMailMessageHandle
-MsgScrollingList::lastMsg()
-{
-    if (_msgs->length() > 0) {
-	return((_msgs->at(_msgs->length() - 1))->message_handle);
-    }
-    else {  // Currently an empty folder
-	return(NULL);
-    }
-}
-#endif /* DEAD_WOOD */
 
 void
 MsgScrollingList::clearMsgs()

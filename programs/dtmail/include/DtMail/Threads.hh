@@ -148,13 +148,6 @@ class Condition : public DtCPlusPlusAllocator {
     void wait(void);
 
     void waitTrue(void);
-#ifdef DEAD_WOOD
-    void waitFalse(void);
-    void waitFor(int);
-    void waitGT(int); // wait >
-    void waitLT(int); // wait <
-    void waitProcStatus(void);
-#endif /* DEAD_WOOD */
 
   private:
     void *	_mutex;

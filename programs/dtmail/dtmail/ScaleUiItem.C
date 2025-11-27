@@ -49,12 +49,7 @@
 
 ScaleUiItem::ScaleUiItem(Widget w, int source, char *search_key):PropUiItem(w, source, search_key)
 {
-#ifdef DEAD_WOOD
-  data_source = source;
-#endif /* DEAD_WOOD */
-
   options_field_init(w, &(this->dirty_bit));
-
 }
 
 // ScaleUiItem::writeFromUiToSource()

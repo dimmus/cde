@@ -54,19 +54,8 @@ class AntiCheckBoxUiItem : public CheckBoxUiItem {
 public:
   AntiCheckBoxUiItem(Widget w, int source, char *search_key);
   virtual ~AntiCheckBoxUiItem(){;}; // we don't alloc any memory
-#ifdef DEAD_WOOD
-  virtual int getType(){ return _ANTICHECKBOX_ITEM; };
-  virtual int getSource(){ return data_source; };
-#endif /* DEAD_WOOD */
   virtual void writeFromUiToSource();
   virtual void writeFromSourceToUi();
-
-private:
-  
-#ifdef DEAD_WOOD
-  int data_source;
-#endif /* DEAD_WOOD */
-
 };
 
 #endif

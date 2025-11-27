@@ -66,13 +66,6 @@
 #include <Xm/Xm.h>
 #include <Xm/MessageB.h>
 
-#ifdef DEAD_WOOD
-// Define an instance to be available throughout the framework.
-
-QuestionDialogManager *theQuestionDialogManager = 
-    new QuestionDialogManager ( "QuestionDialog", "QuestionDialog" );
-#endif /* DEAD_WOOD */
-
 QuestionDialogManager::QuestionDialogManager ( char   *name ) : 
                                  DialogManager ( name )
 {

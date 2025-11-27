@@ -145,22 +145,6 @@ DtApp::DtApp(char *progname, int *argc, char **argv) :
 	  }
        }
       delete procs;
-#ifdef DEAD_WOOD
-      // This is a workaround to avoid a bug in dtsession or dtaction.
-      // We should be fixing the problem there.
-      //
-      // Fork so that the dtaction grandparent exits.  If we don't the
-      // session manager starts the dtaction process and our dtprintinfo
-      // process, then dtaction process starts the dtprintinfo process and
-      // we have two dtprintinfo processes running when the user logs in.
-
-      // On Novell, we notice that the child is dying when the parent
-      // exits.  Ignore the SIGHUP signal before fork() and life is good.
-      signal(SIGHUP, SIG_IGN);
-
-      if (fork() != 0)
-         exit(0);
-#endif
     }
    else
     {

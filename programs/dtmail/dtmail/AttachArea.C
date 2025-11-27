@@ -352,97 +352,6 @@ void AttachArea::addToList( Attachment *attachment )
 //    setAttachmentsLabel();
 }
 
-#ifdef DEAD_WOOD
-void AttachArea::setAttachmentsLabel( )
-{
-    char *c = new char[256];
-    XmString xmstr;
-    String str;
-    unsigned int last_displayCount, last_selectedCount;
-    unsigned int displayCount = _iconCount - _deleteCount;
-    unsigned int attachmentsSize;
-
-    if((displayCount) == 0) {
-	XtUnmanageChild(_no_attachments_label);
-	XtUnmanageChild(_attachments_label);
-	XtUnmanageChild(_size_attachments_label);
-	XtUnmanageChild(_no_selected_label);
-	XtUnmanageChild(_selected_label);
-	XtUnmanageChild(_size_selected_label);
-    } else {
-	CalcAttachmentsSize();
-	attachmentsSize = getAttachmentsSize();
-
-	// Number of Attachments
-	XtVaGetValues(_no_attachments_label,
-		XmNlabelString, &xmstr,
-		NULL);
-	str = NULL;
-        str = (char *) _XmStringUngenerate(
-					xmstr, NULL,
-					XmMULTIBYTE_TEXT, XmMULTIBYTE_TEXT);
-	if (NULL == str) return; // internal error
-	last_displayCount = (unsigned int)strtol(str, NULL, 10);
-	XtFree(str);
-
-	// Number of Attachments Selected
-	XtVaGetValues(_no_selected_label,
-		XmNlabelString, &xmstr,
-		NULL);
-	str = NULL;
-        str = (char *) _XmStringUngenerate(
-					xmstr, NULL,
-					XmMULTIBYTE_TEXT, XmMULTIBYTE_TEXT);
-	if (NULL == str) return; // internal error
-	last_selectedCount = (unsigned int)strtol(str, NULL, 10);
-	XtFree(str);
-
-	if((last_displayCount == 0 && displayCount == 1) ||
-	   (last_displayCount == 2 && displayCount == 1)) {
-	    sprintf(c, CATGETS(DT_catd, 12, 1, "Attachment"));
-	    XtVaSetValues(_attachments_label,
-		XtVaTypedArg, XmNlabelString, XtRString, c, strlen(c)+1,
-		NULL);
-	} else if(last_displayCount == 1 && displayCount == 2) {
-	    sprintf(c, CATGETS(DT_catd, 12, 2, "Attachments"));
-	    XtVaSetValues(_attachments_label,
-		XtVaTypedArg, XmNlabelString, XtRString, c, strlen(c)+1,
-		NULL);
-	}
-	if(last_displayCount != displayCount) {
-	    sprintf(c, CATGETS(DT_catd, 12, 3, "displayCount"));
-	    XtVaSetValues(_no_attachments_label,
-		XtVaTypedArg, XmNlabelString, XtRString, c, strlen(c)+1,
-		NULL);
-	}
-	sprintf(c, "(%s),", calcKbytes(attachmentsSize));
-	XtVaSetValues(_size_attachments_label,
-	    XtVaTypedArg, XmNlabelString, XtRString, c, strlen(c)+1,
-	    NULL);
-
-	if(last_selectedCount != _iconSelectedCount) {
-	    sprintf(c, "%d", _iconSelectedCount); 
-	    XtVaSetValues(_no_selected_label,
-		XtVaTypedArg, XmNlabelString, XtRString, c, strlen(c)+1,
-		NULL);
-	    sprintf(c, "(%s)", calcKbytes(getSelectedAttachmentsSize())); 
-	    XtVaSetValues(_size_selected_label,
-		XtVaTypedArg, XmNlabelString, XtRString, c, strlen(c)+1,
-		NULL);
-	}
-	if(!XtIsManaged(_no_attachments_label)) {
-	    XtManageChild(_no_attachments_label);
-	    XtManageChild(_attachments_label);
-	    XtManageChild(_size_attachments_label);
-	    XtManageChild(_no_selected_label);
-	    XtManageChild(_selected_label);
-	    XtManageChild(_size_selected_label);
-	}
-    }
-    delete [] c;
-}
-#endif /* DEAD_WOOD */
-
 int AttachArea::getSelectedIconCount()
 {
     Attachment **list = getList();
@@ -455,23 +364,6 @@ int AttachArea::getSelectedIconCount()
     return (num_selected);
 }
 
-#ifdef DEAD_WOOD
-void AttachArea::CalcAttachmentsSize( )
-{
-     Attachment **list = getList();
-     unsigned int total = 0;
-     int i;
-
-     int num_icons = getIconCount();
-
- 
-     for(i=0;i<num_icons;i++)
- 	if(!list[i]->isDeleted())
- 	    total += (unsigned int)list[i]->getContentsSize();
-     
-     setAttachmentsSize(total);
-}
-#endif /* DEAD_WOOD */
 
 Attachment *
 AttachArea::getSelectedAttachment()
@@ -817,63 +709,6 @@ AttachArea::addAttachment(
     return(attachment);
 }
 
-#ifdef DEAD_WOOD
-void
-AttachArea::add_attachment(
-    Attachment *attachment
-)
-{
-    
-     attachment->setAttachArea(this);
-     attachment->initialize();
-     addToList( attachment );
-}
-
-//
-// This function truly deletes all the attachments in the AttachArea
-// The widgets are unmanaged and the attachment classes are deleted.
-//
-
-void AttachArea::deleteAttachments( )
-{
-    int i;
-    WidgetList deleteList;
-    int count;
-
-    Attachment **list = getList();
- 
-     // First, unmanaged all the attachment at once so there is no
-     // flickering when we delete them
-
-     deleteList = (WidgetList)XtMalloc(sizeof(Widget) * getIconCount());
-
-     for(i=0;i<getIconCount();i++)
- 	deleteList[i] = list[i]->baseWidget();
-     XtUnmanageChildren(deleteList, i);
-
-     delete deleteList;
-     XtFree((char *)deleteList);
- 
-    // Delete each attachment in the list
-    count = getIconCount();
-    for(i=count-1;i>=0;i--) {
- 	delete list[i];
- 	decIconCount();
-    }
-
-     _iconCount = 0;
-     _iconSelectedCount = 0;
-     _deleteCount = 0;
-     CalcLastRow();
-     AdjustCurrentRow();
-     SetScrollBarSize(getLastRow()+1);
-     activateDeactivate();
-     _attachmentList=NULL;
-     _attachmentsSize = 0;
-     _selectedAttachmentsSize = 0;
-}
-#endif /* DEAD_WOOD */
-
 void AttachArea::manageList( )
 {
     int i;
@@ -888,29 +723,6 @@ void AttachArea::manageList( )
     SetScrollBarSize(getLastRow()+1);
     DisplayAttachmentsInRow(_currentRow);
 }
-
-#ifdef DEAD_WOOD
-//
-// Find the x and y position for a newly created attachment
-//
-
-void AttachArea::CalcAttachmentPosition(Attachment *item)
-{
-    int i, j;
-    Boolean found_managed = FALSE;
-
-     Attachment **list = getList();
-     for(i=0, j=0;i<getIconCount();i++)
- 	if(!list[i]->isDeleted()) {
- 	    j = i;
- 	    found_managed = TRUE;
- 	}
-    calculate_attachment_position(
-       found_managed ? list[j] : (Attachment *)NULL, item
-       );
-
-}      
-#endif /* DEAD_WOOD */
 
 //
 // Display the attachments in row X
@@ -1436,21 +1248,6 @@ AttachArea::clearAttachArea()
     _cache_single_attachment = NULL;
 }
 
-#ifdef DEAD_WOOD
-void
-AttachArea::saveAttachmentToFile(
-    DtMailEnv &mail_error,
-    char *save_path
-)
-{
-
-    Attachment *attachment = this->getSelectedAttachment();
-
-    if(attachment != NULL)
-    	attachment->saveToFile(mail_error, save_path);
-
-}
-#endif /* DEAD_WOOD */
 
 void
 AttachArea::deleteSelectedAttachments(
@@ -1486,15 +1283,6 @@ AttachArea::deleteSelectedAttachments(
     this->manageList();
 }
 
-
-#ifdef DEAD_WOOD
-void
-AttachArea::undeleteAllDeletedAttachments(
-    DtMailEnv &		//mail_error
-)
-{
-}
-#endif /* DEAD_WOOD */
 
 void
 AttachArea::undeleteLastDeletedAttachment(

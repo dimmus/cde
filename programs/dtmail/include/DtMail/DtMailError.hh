@@ -193,15 +193,6 @@ public:
   //
   void		logError(DtMailBoolean criticalError,
 			 const char *format, ...) const;
-
-#ifdef DEAD_WOOD
-  //
-  // This one is the same as logError() plus it sets _fatal.
-  //
-  void		logFatalError(DtMailBoolean criticalError,
-			      const char *format, ...);
-#endif /* DEAD_WOOD */
-  
   //
   // Set the error code. Tt_message is optional.
   //
@@ -303,10 +294,6 @@ protected:
   void			setCPP(CPPclearF, CPPmessageF, CPPerrorF);
 
   void			implClear();
-#ifdef DEAD_WOOD
-  const char *		implGetMessage();
-  int			implGetError();
-#endif /* DEAD_WOOD */
   
 private:
   DTMailError_t		_error;		// The corrected error number.
@@ -422,13 +409,5 @@ DtMailEnv::implClear()
   }
 }
 
-#ifdef DEAD_WOOD
-inline Tt_message
-DtMailError_getTTmsg(DtMailEnv & error)
-{
-  return((const Tt_message)error);	// The prefered way.
-}
-#endif /* DEAD_WOOD */
-
-#endif	// _DTCM_HH
+#endif	// _DTMAILERROR_HH
  

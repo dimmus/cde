@@ -58,9 +58,6 @@
 #include "Icon.h"
 #include "AttachCmds.h"
 #include "InfoDialogManager.h"
-#ifdef DEAD_WOOD
-#include "QuestionDialogManager.h"
-#endif /* DEAD_WOOD */
 #include "RoamMenuWindow.h"
 #include <DtMail/DtMailError.hh>
 #include <DtMail/DtMail.hh>

@@ -111,40 +111,11 @@ DtMailValue::toDate(void)
     return(date);
 }
 
-#ifdef DEAD_WOOD
-void
-DtMailValue::fromDate(const DtMailValueDate & date)
-{
-    if (_value) {
-	free(_value);
-    }
-
-    _value = (char *)malloc(64);
-
-    tm result;
-
-    SafeLocaltime(&date.dtm_date, result);
-
-    /* NL_COMMENT
-     * The %C is the time and date format, please refer to strftime man page for 
-     * explanation of each format.
-     */
-    SafeStrftime(_value, 64, DtMailError::getMessageText(2, 1, "%C"), &result);
-}
-#endif /* DEAD_WOOD */
-
 DtMailAddressSeq *
 DtMailValue::toAddress(void)
 {
     return(NULL);
 }
-
-#ifdef DEAD_WOOD
-void
-DtMailValue::fromAddress(const DtMailAddressSeq &)
-{
-}
-#endif /* DEAD_WOOD */
 
 const char *
 DtMailValue::raw(void)

@@ -86,41 +86,6 @@ CustomListUiItem::CustomListUiItem(Widget w,
 
 }
 
-#ifdef DEAD_WOOD
-//-----------------======================-----------------
-void handleDoubleSelection(Widget w, XtPointer clientdata, XtPointer calldata)
-{
-  CustomListUiItem *item;
-  XmListCallbackStruct *list_info = (XmListCallbackStruct *)calldata;
-  char *selection_string = NULL;
-  DtVirtArray<PropStringPair *> *list_items;
-
-
-  XtVaGetValues(w, 
-	XmNuserData, &item,
-	NULL);  
-
-  list_items = item->getItemList();
-
-  if(list_items != NULL)
-    {                                         // motif index is 1 based
-                                              //virtarry is 0 based
-      PropStringPair *pair = (*list_items)[list_info->item_position - 1];
-
-      if(pair != NULL)
-	{
-	  XtVaSetValues(item->getKeyWidget(),
-			XmNvalue,pair->label,
-			NULL);
-	  
-	  XtVaSetValues(item->getValueWidget(),
-			XmNvalue,pair->value,
-			NULL);
-	}
-    }	
-}
-#endif /* DEAD_WOOD */
-
 //-----------------======================-----------------
 void handleCustSelection(Widget w, XtPointer, XtPointer calldata)
 {

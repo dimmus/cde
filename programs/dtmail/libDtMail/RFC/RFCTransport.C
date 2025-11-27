@@ -103,10 +103,6 @@ writeToFileDesc(const char * buf, int len, va_list args)
 
 	if (status < 0 && errno != 0)		// Did an error occur??
 	  saveErrno = (unsigned long)errno;	// Yes: remember "last" errno 
-
-#ifdef DEAD_WOOD
-	DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
     }
 
     return(saveErrno);		// return last error recorded

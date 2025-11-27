@@ -101,9 +101,6 @@
 #include "RoamApp.h"
 #include "ButtonInterface.h"
 #include "WorkingDialogManager.h"
-#ifdef DEAD_WOOD
-#include "QuestionDialogManager.h"
-#endif /* DEAD_WOOD */
 #include "MemUtils.hh"
 #include "Help.hh"
 #include "DtMailHelp.hh"

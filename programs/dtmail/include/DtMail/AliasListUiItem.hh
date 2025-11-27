@@ -45,10 +45,6 @@
 #ifndef _ALIASLISTUIITEM_HH
 #define _ALIASLISTUIITEM_HH
 
-#ifdef DEAD_WOOD
-extern void handleDoubleSelection(Widget w, XtPointer clientdata, XtPointer calldata);
-#endif /* DEAD_WOOD */
-
 // CLASS AliasListUiItem
 // derived class for prop sheet glue items for textfield
 ///////////////////////////////////////////////////////////

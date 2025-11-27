@@ -43,9 +43,6 @@
 #ifndef MSGSCROLLINGLIST_H
 #define MSGSCROLLINGLIST_H
 
-#ifdef DEAD_WOOD
-#include "Image.h"
-#endif /* DEAD_WOOD */
 #include "MsgHndArray.hh"
 #include "RoamCmds.h"
 #include "ScrollingList.h"
@@ -92,10 +89,6 @@ class MsgScrollingList : public ScrollingList {
     int  selected_item_position() { return _selected_item_position; }
     RoamMenuWindow *parent() { return _parent; }
 
-#ifdef DEAD_WOOD
-    void addChooseCommand( ChooseCmd * );
-    void addDeleteCommand( DeleteCmd * );
-#endif /* DEAD_WOOD */
     void select_next_item();
     void select_prev_item();
 
@@ -104,9 +97,6 @@ class MsgScrollingList : public ScrollingList {
 
     DtMailMessageHandle current_msg_handle();
     int       position(DtMailMessageHandle msgno);
-#ifdef DEAD_WOOD
-    int       position(MsgStruct* a_msg_struct);
-#endif /* DEAD_WOOD */
     
     virtual const char *const className() {return ("MsgScrollingList");}
     virtual void insertMsg(DtMailMessageHandle);
@@ -115,14 +105,6 @@ class MsgScrollingList : public ScrollingList {
 
     int copySelected(DtMailEnv &, char *, int delete_after_copy, int silent);
     void items( XmString [], int );
-
-#ifdef DEAD_WOOD
-    void appendMsg(DtMailMessageHandle msg_hndl, int sess_num);
-
-    void appendMsg(DtMailMessageHandle msgno);
-
-    DtMailMessageHandle lastMsg();
-#endif /* DEAD_WOOD */
 
     void clearMsgs();
 
@@ -192,9 +174,6 @@ class MsgScrollingList : public ScrollingList {
     void	undelete_messages(MsgHndArray *);
     void	undelete_last_deleted();
     void	display_message_summary();
-#ifdef DEAD_WOOD
-    void	display_message_selected();
-#endif /* DEAD_WOOD */
     void	display_message(DtMailEnv &, int a_position);
 
     int		load_headers(DtMailEnv &);
@@ -218,10 +197,6 @@ class MsgScrollingList : public ScrollingList {
     MenuBar  *_menuPopupMsgs;
 
   private:
-#ifdef DEAD_WOOD
-    Image *_attach_image;
-    Image *_letter_image;
-#endif /* DEAD_WOOD */
     RoamMenuWindow *_parent;
     ChooseCmd *_choose;  
     DeleteCmd *_delete;

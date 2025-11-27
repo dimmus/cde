@@ -183,13 +183,6 @@ void dtb_save_command(
 );
 char *  dtb_get_command();
 String dtb_get_exe_dir(void);
-#ifdef DEAD_WOOD
-void dtb_help_dispatch(
-    Widget 	widget,
-    XtPointer 	clientData,
-    XtPointer 	callData
-);
-#endif /* DEAD_WOOD */
 void dtb_more_help_dispatch(
     Widget 	widget,
     XtPointer 	clientData,
@@ -200,28 +193,10 @@ void dtb_help_back_hdlr(
     XtPointer 	clientData,
     XtPointer 	callData
 );
-#ifdef DEAD_WOOD
-void dtb_do_onitem_help();
-#endif /* DEAD_WOOD */
 int dtb_show_help_volume_info(
     char	*volume_name,
     char	*location_id
 );
-#ifdef DEAD_WOOD
-void  dtb_call_help_callback(
-    Widget widget,
-    XtPointer clientData,
-    XtPointer callData
-);
-void dtb_children_center(
-    Widget		form,
-    DTB_CENTERING_TYPES	type
-);
-void dtb_children_uncenter(
-    Widget		form,
-    DTB_CENTERING_TYPES	type
-);
-#endif /* DEAD_WOOD */
 void dtb_center(
     Widget		form_child,
     DTB_CENTERING_TYPES	type

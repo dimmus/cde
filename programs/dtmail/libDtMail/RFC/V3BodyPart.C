@@ -315,16 +315,6 @@ V3BodyPart::~V3BodyPart(void)
 {
 }
 
-#ifdef DEAD_WOOD
-DtMailChecksumState
-V3BodyPart::checksum(DtMailEnv & error)
-{
-    error.clear();
-
-    return(DtMailCheckUnknown);
-}
-#endif /* DEAD_WOOD */
-
 static int
 countTypes(char ** types)
 {
