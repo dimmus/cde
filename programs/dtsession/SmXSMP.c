@@ -803,9 +803,9 @@ SaveYourselfReqProc (
 	 * appropriate location.
 	*/
 	if (notify) {
-		ShowWaitState(True);
+		EnterWaitState();
 		NotifyProxyClients ();
-		ShowWaitState(False);
+		LeaveWaitState();
 	}
 
 	for (pClientRec = connectedList; pClientRec != NULL; 

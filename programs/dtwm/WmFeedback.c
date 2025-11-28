@@ -898,7 +898,8 @@ void ConfirmAction (WmScreenData *pSD, int nbr)
 
 void EnterWaitState(void)
 {
-    waitCursor = _DtGetHourGlassCursor(DISPLAY);
+    if (!waitCursor)
+	waitCursor = _DtGetHourGlassCursor(DISPLAY);
 
     XGrabPointer (DISPLAY, DefaultRootWindow(DISPLAY), FALSE,
 		0, GrabModeAsync, GrabModeAsync, None,

@@ -421,7 +421,7 @@ main (int argc, char **argv)
     /*
      * Put the program into a wait state
      */
-    ShowWaitState(True);
+    EnterWaitState();
 
     InitErrorHandler();
 
@@ -484,7 +484,7 @@ main (int argc, char **argv)
     XSelectInput(smGD.display, smGD.topLevelWindow,
 		 windAtt.your_event_mask | PropertyChangeMask);
 
-    ShowWaitState(False);
+    LeaveWaitState();
 
     /*
      * Register for events
