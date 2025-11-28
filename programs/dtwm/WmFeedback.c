@@ -872,17 +872,17 @@ void ConfirmAction (WmScreenData *pSD, int nbr)
 
 /*************************************<->*************************************
  *
- *  ShowWaitState (flag)
- *
+ *  EnterWaitState (void)
+ *  LeaveWatState (void)
  *
  *  Description:
  *  -----------
- *  Enter/Leave the wait state.
- *
+ *  Enter the wait state.
+ *  Leave the wait state.
  *
  *  Inputs:
  *  ------
- *  flag = TRUE for Enter, FALSE for Leave.
+ *  None.
  *
  * 
  *  Outputs:
@@ -896,26 +896,22 @@ void ConfirmAction (WmScreenData *pSD, int nbr)
  * 
  *************************************<->***********************************/
 
-void ShowWaitState (Boolean flag)
+void EnterWaitState(void)
 {
+    waitCursor = _DtGetHourGlassCursor(DISPLAY);
 
-   _DtGetHourGlassCursor(DISPLAY);
+    XGrabPointer (DISPLAY, DefaultRootWindow(DISPLAY), FALSE,
+		0, GrabModeAsync, GrabModeAsync, None,
+		waitCursor, CurrentTime);
+    XGrabKeyboard (DISPLAY, DefaultRootWindow(DISPLAY), FALSE,
+		GrabModeAsync, GrabModeAsync, CurrentTime);
+}
 
-    if (flag)
-    {
-	XGrabPointer (DISPLAY, DefaultRootWindow(DISPLAY), FALSE, 
-			0, GrabModeAsync, GrabModeAsync, None, 
-			waitCursor, CurrentTime);
-	XGrabKeyboard (DISPLAY, DefaultRootWindow(DISPLAY), FALSE, 
-			GrabModeAsync, GrabModeAsync, CurrentTime);
-    }
-    else
-    {
-	XUngrabPointer (DISPLAY, CurrentTime);
-	XUngrabKeyboard (DISPLAY, CurrentTime);
-    }
-
-} /* END OF FUNCTION ShowWaitState */
+void LeaveWaitState(void)
+{
+    XUngrabPointer (DISPLAY, CurrentTime);
+    XUngrabKeyboard (DISPLAY, CurrentTime);
+}
 
 
 

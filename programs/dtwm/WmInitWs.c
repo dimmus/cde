@@ -493,7 +493,7 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
     
     InitCursorInfo ();
     InitWmDisplayEnv ();
-    ShowWaitState (TRUE);
+    EnterWaitState();
 
     /*
      * Initialize support for BMenu virtual mouse binding
@@ -626,7 +626,7 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
     if (!(wmGD.Screens = (WmScreenData *) 
 	    XtCalloc (wmGD.numScreens, sizeof(WmScreenData))))
     {
-	ShowWaitState (FALSE);
+	LeaveWaitState();
 	Warning (((char *)GETMESSAGE(40, 2, "Insufficient memory for Screen data")));
 	ExitWM (WM_ERROR_EXIT_VALUE);
     }
@@ -747,7 +747,7 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
 						   dpy2Argv);
 		    if (!wmGD.display1)
 		    {
-			ShowWaitState (FALSE);
+			LeaveWaitState();
 			Warning(((char *)GETMESSAGE(40, 4, "Could not open second display connection.")));
 			ExitWM (WM_ERROR_EXIT_VALUE);
 		    }
@@ -819,7 +819,7 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
 	    /*
 	     * No screens for me to manage, give up.
 	     */
-	    ShowWaitState (FALSE);
+	    LeaveWaitState();
 	    Warning (((char *)GETMESSAGE(40, 5, "Unable to manage any screens on display.")));
 	    ExitWM (WM_ERROR_EXIT_VALUE);
 	}
@@ -856,7 +856,7 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
 
     if (fcntl (ConnectionNumber (DISPLAY), F_SETFD, 1) == -1)
     {
-	ShowWaitState (FALSE);
+	LeaveWaitState();
 	Warning (((char *)GETMESSAGE(40, 6, "Cannot configure X connection")));
 	ExitWM (WM_ERROR_EXIT_VALUE);
     }
@@ -1137,7 +1137,7 @@ XFlush (DISPLAY);
     
     InitKeyboardFocus ();
 
-    ShowWaitState (FALSE);
+    LeaveWaitState();
 
     /*
      * Tell the rest of DT that we're up
@@ -2079,7 +2079,7 @@ void InitScreenNames (void)
     if (!(wmGD.screenNames = 
 	  (unsigned char **) XtMalloc (numScreens * sizeof(char *))))
     {
-	ShowWaitState (FALSE);
+	LeaveWaitState();
 	Warning (((char *)GETMESSAGE(40, 12, "Insufficient memory for screen names")));
 	ExitWM (WM_ERROR_EXIT_VALUE);
     }
@@ -2089,7 +2089,7 @@ void InitScreenNames (void)
 	if (!(wmGD.screenNames[num] = 
 	      (unsigned char *) XtMalloc (4*sizeof(char))))
 	{
-	    ShowWaitState (FALSE);
+	    LeaveWaitState();
 	    Warning (((char *)GETMESSAGE(40, 13, "Insufficient memory for screen names")));
 	    ExitWM (WM_ERROR_EXIT_VALUE);
 	}
