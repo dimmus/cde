@@ -41,12 +41,19 @@
  *+ENOTICE
  */
 
+#if HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#if HAVE_POLL_H
 #include <poll.h>
+#elif HAVE_SYS_POLL_H
+#include <sys/poll.h>
+#endif
 
 /*
 ** file included for INFTIM

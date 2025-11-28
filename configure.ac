@@ -690,7 +690,7 @@ dnl Used to check if program 'tic' is available to install terminfo files
 AC_CHECK_PROGS(TIC, tic, :)
 
 dnl headers
-AC_CHECK_HEADERS([locale.h security/pam_appl.h utempter.h])
+AC_CHECK_HEADERS([locale.h poll.h sys/poll.h security/pam_appl.h utempter.h])
 
 dnl Xrender header
 if test "x$enable_xrender" != xno; then

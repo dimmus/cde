@@ -40,13 +40,20 @@
  *+ENOTICE
  */
 
+#if HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#if HAVE_POLL_H
 #include <poll.h>
+#elif HAVE_SYS_POLL_H
+#include <sys/poll.h>
+#endif
 #include <fcntl.h>
 #include <assert.h>
 #include <signal.h>
