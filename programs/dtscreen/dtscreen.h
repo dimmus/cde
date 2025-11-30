@@ -93,10 +93,10 @@ extern void unhide_hft_ring();
 
 #if defined (SYSV) || defined (SVR4)
 
-#if HAVE_SYS_POLL_H
-#include <sys/poll.h>
-#elif HAVE_POLL_H
+#if HAVE_POLL_H
 #include <poll.h>
+#elif HAVE_SYS_POLL_H
+#include <sys/poll.h>
 #endif
 
 #include <sys/time.h>

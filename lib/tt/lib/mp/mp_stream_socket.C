@@ -37,10 +37,10 @@
 #include "tt_options.h"
 #include <stdio.h>
 #include "mp/mp_stream_socket.h"
-#if HAVE_SYS_POLL_H
-#include <sys/poll.h>
-#elif HAVE_POLL_H
+#if HAVE_POLL_H
 #include <poll.h>
+#elif HAVE_SYS_POLL_H
+#include <sys/poll.h>
 #endif
 #include <sys/socket.h>
 #include <fcntl.h>

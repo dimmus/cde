@@ -28,10 +28,10 @@
 #if HAVE_CONFIG_H
 #include <cde_config.h>
 #endif
-#if HAVE_SYS_POLL_H
-# include <sys/poll.h>
-#elif HAVE_POLL_H
+#if HAVE_POLL_H
 # include <poll.h>
+#elif HAVE_SYS_POLL_H
+# include <sys/poll.h>
 #endif
 #include <errno.h>
 #include <unistd.h>
