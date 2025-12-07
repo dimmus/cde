@@ -362,7 +362,6 @@ euc_to_octal(char *srcStr)
 char *
 cm_printf(double value, int decimal_pt)
 {
-	int sign = 0;
 	int deci_pt = 0;
 	int buf_cnt = 0;
 	int formatted_cnt = 0;
@@ -385,16 +384,9 @@ cm_printf(double value, int decimal_pt)
 		free(buf);
 		return (char *)NULL;
 	}
-#ifdef SunOS
-	fconvert(value, decimal_pt, &deci_pt, &sign, buf);
-#elif defined(CSRG_BASED)
 	snprintf(buf, decimal_pt, "%f", value);
-#else
-	/* this version, available on the HP and AIX machine is not reentrant. */
 
-	strcpy(buf, fcvt(value, decimal_pt, &deci_pt, &sign));
-#endif
-	if ( sign ) {
+	if ( value < 0 ) {
 		strcpy(formatted, "-");
 	}
 	buf_len = deci_pt + decimal_pt;
