@@ -46,15 +46,13 @@
  * Author:  Keith Packard, MIT X Consortium
  */
 
+#include <stdlib.h>
 #include <X11/Xos.h>
 #include <sys/ioctl.h>
 
 #ifdef SVR4
 #include <termio.h>
 #endif
-
-extern void exit ();
-
 
 void
 BecomeDaemon( void )

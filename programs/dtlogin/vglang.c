@@ -49,6 +49,7 @@
  ***************************************************************************/
 
 #include	<stdio.h>
+#include	<string.h>
 #include	"vg.h"
 #include	"vgmsg.h"
 #include	<Xm/CascadeBG.h>

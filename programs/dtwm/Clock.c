@@ -67,6 +67,7 @@ SOFTWARE.
 #include <sys/stat.h>
 #include <time.h>
 #include <sys/time.h>
+#include <math.h>
 #include <Xm/GadgetP.h>
 #include <Xm/ManagerP.h>
 #include "ClockP.h"
@@ -346,7 +347,6 @@ ClockTick(
         XtIntervalId *id )
 {
 	DtClockGadget		w = 	(DtClockGadget)client_data;	
-	struct tm *	localtime ();
 	struct tm 	tm; 
 	time_t		time_value;
 	Display *	dpy = XtDisplay (w);
@@ -484,8 +484,6 @@ DrawHand(
 	double angle, cosangle, sinangle;
 	double ws, wc;
 	Position x, y, x1, y1, x2, y2;
-	double cos ();
-	double sin ();
 
 	/*  A full circle is 2 PI radians.
 	 *  Angles are measured from 12 o'clock, clockwise increasing.

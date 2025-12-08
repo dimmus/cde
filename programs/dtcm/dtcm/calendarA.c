@@ -147,9 +147,6 @@ extern int errno;
 #define NL_CAT_LOCALE       0
 #endif
 
-extern time_t timelocal();	/* LINT */
-extern char * getlogin();	/* LINT */
-extern void(*sigset())();
 extern int cmtt_init(char *, Calendar *, XtAppContext, Widget);
 extern void show_about(Widget, XtPointer, XtPointer);
 

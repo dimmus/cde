@@ -578,7 +578,6 @@ AddSuLog(
 
 {
     char        *toString;
-    struct tm  *localtime ();
 
        FILE * f;
     time_t    timenow;

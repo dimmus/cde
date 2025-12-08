@@ -108,18 +108,6 @@
 #define SHORT_SELECT_TIMEOUT	20
 
 /*
- * External system calls:
- */
-extern pid_t 	fork ();
-extern int 	execvp ();
-extern pid_t 	wait ();
-extern int 	atoi ();
-extern void 	_exit ();
-extern unsigned int 	sleep ();
-extern void 	exit ();
-extern char     *getenv();
-
-/*
  * Local func protos
  */
 void DoneRequest(int doneCode);

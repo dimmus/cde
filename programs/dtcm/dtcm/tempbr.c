@@ -84,11 +84,7 @@
 
 static void tb_cancel_cb();
 static void tempbr_show_cb(Widget w, XtPointer data, XtPointer cbs);
-#if defined(__linux__)
 #include <string.h>
-#else
-extern char *strdup(const char *);
-#endif
 
 #ifdef FNS_DEMO
 /* This stuff is currently broken */

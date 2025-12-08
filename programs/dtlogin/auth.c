@@ -1084,7 +1084,6 @@ SetUserAuthorization (struct display *d, struct verify_info *verify)
     int	lockStatus;
     Xauth	*entry, **auths;
     int	setenv;
-    char	**setEnv (), *getEnv ();
     struct stat	statb;
     int		i;
     int		magicCookie;
@@ -1278,7 +1277,6 @@ RemoveUserAuthorization (struct display *d, struct verify_info *verify)
     FILE    *old, *new;
     struct stat	statb;
     int	    i;
-    char    *getEnv ();
 
     if (!(auths = d->authorizations))
 	return;

@@ -131,8 +131,6 @@ static LockStruct LockProcs[] = {
 #define NUMPROCS (sizeof LockProcs / sizeof LockProcs[0])
 
 
-extern char *getenv();
-
 #ifndef DEF_FILESEARCHPATH
 #define DEF_FILESEARCHPATH "/usr/lib/X11/%T/%N%S"
 #endif
