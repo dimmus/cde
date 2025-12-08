@@ -115,7 +115,7 @@ isstart(int isfd, struct keydesc *keydesc, int length, char *record,
 	
     recnum = isrecnum;
 
-    if ((ret = _amstart(&fab->isfhandle, precord, reclen,
+    if ((ret = _amstart(&fab->isfhandle, precord, &reclen,
 			readmode, keydesc, length, &fab->curpos,
 			&recnum, &fab->errcode)) == ISOK) {
 	isrecnum = recnum;		     /* Set isrecnum */
