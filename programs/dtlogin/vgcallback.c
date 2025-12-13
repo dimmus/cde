@@ -1450,10 +1450,8 @@ RespondLangCB( Widget w, XtPointer client, XtPointer call)
 	/** but it does work ok.                          **/
 	/** notice the related code in chooser.c at the   **/
 	/** beginning of main.                            **/
-	char buff[128];
 	if (XmToggleButtonGadgetGetState(w)) {
-	    snprintf(buff, sizeof(buff), "LANG=%s", (char *) client);
-	    putenv(buff);
+	    setenv("LANG", client, 1);
 	    execv(orig_argv[0], orig_argv);
 	}
   } else {
