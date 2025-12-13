@@ -249,6 +249,7 @@ int sprintf_len (XeString s, XeString format, ...)
   va_start(ap, format);
   if (s) *s = XeChar_NULL;
   vsprintf(s, format, ap);
+  va_end(ap);
   return(strlen(s));
 }
 
