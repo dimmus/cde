@@ -95,6 +95,7 @@ text_string = (char *)calloc (1, sizeof (char));
 if (xmstring) {
     if (!XmStringInitContext (&context, xmstring)) {
       printf("Can't convert compound string.\n");
+      free(text_string);
       return (NULL);
     }
     while  (XmStringGetNextSegment (context, &temp, &charset,

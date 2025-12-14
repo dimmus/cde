@@ -1606,34 +1606,33 @@ _DtHelpCeGetSdlDocStamp(
     char		**ret_time)
 {
     int		    result    = -1;
-    char	   *docId     = NULL;
-    char	   *timestamp = NULL;
     CESDLVolume    *sdlVol    =  _DtHelpCeGetSdlVolumePtr(volume);
 
     if (sdlVol->sdl_info != NULL)
       {
 	result = 0;
-	if (NULL != _SdlDocInfoPtrDocId(sdlVol->sdl_info))
-	    docId = strdup(_SdlDocInfoPtrDocId(sdlVol->sdl_info));
-	else
+	char *tmp = _SdlDocInfoPtrDocId(sdlVol->sdl_info);
+	if (NULL != tmp) {
+	    if (ret_doc != NULL) {
+	        *ret_doc = strdup(tmp);
+		if (*ret_doc == NULL)
+			return -1;
+	    }
+	} else {
 	    result = -2;
+	}
 
-	if (NULL != _SdlDocInfoPtrStamp(sdlVol->sdl_info))
-	    timestamp = strdup(_SdlDocInfoPtrStamp(sdlVol->sdl_info));
-	else
+	tmp = _SdlDocInfoPtrStamp(sdlVol->sdl_info);
+	if (NULL != tmp) {
+	    if (ret_time != NULL) {
+	        *ret_time = strdup(tmp);
+		if (*ret_time == NULL)
+			return -1;
+	    }
+	} else {
 	    result = -2;
+	}
       }
-
-    if (ret_doc != NULL)
-	*ret_doc = docId;
-    if (ret_time != NULL)
-	*ret_time = timestamp;
-
-    if (result == 0 && (docId == NULL || timestamp == NULL)) {
-	free(docId);     /* Incase only one of them is NULL */
-	free(timestamp); /*  " */
-	return -1;
-    }
 
     return result;
 }
