@@ -155,6 +155,8 @@ typedef	struct _formatVariables {
 } FormatVariables;
 
 
+#undef NormalState
+
 enum	_processState
   {
     NormalState,
