@@ -173,13 +173,18 @@ _DtShmProtoInitStrtab(int sizeguess)
   return((DtShmProtoStrtab) ptr);
 }
 
+static int destroy_hashval(int *ptr, int *unused, unsigned char *unused2) {
+	free(ptr);
+	return 0;
+}
+
 int 
 _DtShmProtoDestroyStrtab(DtShmProtoStrtab strlist)
 {
   strlist_t * ptr = (strlist_t *) strlist;
   
   _DtUtilDestroyHash(ptr->sl_hash, NULL, NULL);
-  _DtUtilDestroyHash(ptr->sl_bosons, (des_func)free, NULL);
+  _DtUtilDestroyHash(ptr->sl_bosons, destroy_hashval, NULL);
   free(ptr);
   return(0);
 }
