@@ -42,9 +42,15 @@
 #include "isam_impl.h"
 #include <sys/stat.h>
 
-static int _create_datfile(), _create_indfile(), _create_varfile();
-static void _remove_datfile(), _remove_indfile(), _remove_varfile();
-Static int _open_datfile(), _open_indfile(), _open_varfile();
+static int _create_datfile(char *isfname);
+static int _create_indfile(char *isfname);
+static int _create_varfile(char *isfname);
+static void _remove_datfile(char *isfname);
+static void _remove_indfile(char *isfname);
+static void _remove_varfile(char *isfname);
+static int _open_datfile(char *isfname, Bool *rdonly);
+static int _open_indfile(char *isfname, Bool rdonly);
+static int _open_varfile(char *isfname, Bool rdonly);
 
 /*
  * _isfcb_create(isfname, crdat, crind, crvar, owner, group, u_mask, errcode)

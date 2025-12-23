@@ -40,8 +40,6 @@
 
 #include "isam_impl.h"
 
-extern int _iskeycmp();
-
 static void remove_entry(Btree *, char *, int);
 static void move_from_right(Btree *, char *, char *, int);
 static void move_from_left(Btree *, char *, char *, int);

@@ -142,8 +142,8 @@ _amrewcurr(Bytearray *isfhandle, char *record, int reclen,
     int			err;
     char		oldrecord[ISMAXRECLEN];
     int			reclen2;
-    int			(*rec_read)();
-    int			(*rec_rewrite)();
+    int			(*rec_read)(Fcb *, char *, Recno, int *);
+    int			(*rec_rewrite)(Fcb *, char *, Recno, int);
 
     _isam_entryhook();
 

@@ -60,7 +60,7 @@ struct hashtable {
 } hashtable [FCBHASHSIZE];
 #define unused(entry) ((entry).fcb == NULL)
 
-static int _hashisfhandle();
+static int _hashisfhandle(Bytearray *isfhandle);
 
 static int mrused_last = 0;			     /* stamp generator */
 

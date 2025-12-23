@@ -41,7 +41,8 @@
 #include <sys/file.h>
 #include <sys/time.h>
 
-static int _am_write();
+static int _am_write(Fab *fab, char *record, int reclen,
+                     Bytearray *curpos, Recno *recnum);
 
 /*
  * err =  iswrite(isfd, record)
@@ -70,7 +71,6 @@ static int _am_write();
 int 
 iswrite(int isfd, char *record)
 {
-    int			_am_write();
     Fab	*fab;
     int			reclen;
     Recno		recnum;

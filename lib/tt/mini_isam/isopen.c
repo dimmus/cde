@@ -41,7 +41,7 @@
 #include <sys/file.h>
 #include <sys/time.h>
 
-static int _am_open();
+static int _am_open(Fab *fab);
 /*
  * isfd = isopen(isfname, mode)
  *

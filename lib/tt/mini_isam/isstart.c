@@ -41,7 +41,9 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
-static int _amstart();
+static int _amstart(Bytearray *isfhandle, char *record, int *reclen,
+         enum readmode readmode, struct keydesc *keydesc, int keylen,
+         Bytearray *curpos, Recno *recnum, struct errcode *errcod);
 
 /*
  * err =  isstart(isfd, keydesc, length, record, mode)
@@ -171,7 +173,7 @@ _amstart(Bytearray *isfhandle, char *record, int *reclen,
     char		*pkey;
     Btree		*btree = NULL;
     int			reclen2;
-    int			(*rec_read)();
+    int			(*rec_read)(Fcb *, char *, Recno, int *);
 
     _isam_entryhook();
 

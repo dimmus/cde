@@ -40,7 +40,7 @@
 
 #include "isam_impl.h"
 
-void _delkeys();
+void _delkeys(Fcb *fcb, char *record, Recno recnum);
 
 /*
  * _amdelrec(isfhandle, recnum, errcode)
@@ -62,8 +62,8 @@ _amdelrec(Bytearray *isfhandle, Recno recnum, struct errcode *errcode)
     Fcb			*fcb = NULL;
     char		recbuf[ISMAXRECLEN];
     int			reclen;
-    int			(*rec_read)();
-    int			(*rec_delete)();
+    int			(*rec_read)(Fcb *, char *, Recno, int *);
+    int			(*rec_delete)(Fcb *, Recno);
 
     _isam_entryhook();
 

@@ -39,12 +39,12 @@
 #include "isam_impl.h"
 
 /* Local functions */
-long _vl_getpos();			     /* Get offset in .rec file */
+long _vl_getpos(Fcb *fcb, Recno recnum);			     /* Get offset in .rec file */
 int  _vl_deleted();			     /* 0/1 returns 1 if record is deleted */
-static void remove_from_chain2();	     /* used by _vlrec_wrrec() */
-long _istail_insert();
-static void _istail_delete();
-static int _istail_read();
+static void remove_from_chain2(Fcb *fcb, Recno recnum);	     /* used by _vlrec_wrrec() */
+long _istail_insert(Fcb *fcb, char *tailp, int taillen);
+static void _istail_delete(Fcb *fcb, long offset);
+static int _istail_read(Fcb *fcb, long offset, char *buffer);
 
 /*
  * _vlrec_write(fcb, record, recnum, reclen)

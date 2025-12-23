@@ -40,7 +40,7 @@
 #include "isam_impl.h"
 #include <sys/time.h>
 
-Static int _am_addprimary();
+Static int _am_addprimary(Fab *fab, struct keydesc *keydesc);
 
 
 /*

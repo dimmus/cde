@@ -40,9 +40,6 @@
 
 #include "isam_impl.h"
 
-void _removelast();
-char *_lastelement();
-
 /*
  * _makedat_isfname(isfname)
  *

@@ -166,7 +166,7 @@ int iserase(char *isfname);
 void _isfatal_error(char *msg);
 void _isfatal_error1(char *msg);
 void _isam_warning(char *msg);
-int _isfatal_error_set_func(int (*func)(void));
+int _isfatal_error_set_func(int (*func)(char *));
 void _setiserrno2(int error, int is1, int is2);
 void _seterr_errcode(struct errcode *errcode);
 

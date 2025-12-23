@@ -40,7 +40,9 @@
 #include "isam_impl.h"
 #include <sys/time.h>
 
-static int _amread();
+static int _amread(Bytearray *isfhandle, char *record, int *reclen,
+        enum readmode readmode, Bytearray *curpos, Recno *recnum,
+        struct errcode *errcode);
 
 /*
  * err =  isread(isfd, record, mode)
@@ -159,7 +161,7 @@ _amread(Bytearray *isfhandle, char *record, int *reclen,
     int			skipbytes;
     int			ret;
     Bytearray		oldcurpos;
-    int			(*rec_read)();
+    int			(*rec_read)(Fcb *, char *, Recno, int *);
 
     _isam_entryhook();
 

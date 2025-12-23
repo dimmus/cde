@@ -40,8 +40,6 @@
 
 #include "isam_impl.h"
 
-extern int _iskeycmp();
-
 void leftkey_up(Btree *, int);
 
 static void insert_key(Btree *, char *, int, char *, Blkno);

@@ -42,11 +42,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-extern int _iskeycmp();
-
-static void _readallrecords(), _attach_dups_serial();
-static Blkno _buildbtree();
-static int _duplicate_exist();
+static void _readallrecords(Fcb *fcb, Issort *srt, Keydesc2 *pkeydesc2);
+static void _attach_dups_serial(Issort *srt, Keydesc2 *pkeydesc2);
+static Blkno _buildbtree(Fcb *fcb, Keydesc2 *pkeydesc2, Issort *srt);
+static int _duplicate_exist(Issort *srt, int keylength);
 static void checkavailfd(void);
 
 /*
@@ -386,7 +385,7 @@ _readallrecords(Fcb *fcb, Issort *srt, Keydesc2 *pkeydesc2)
 	char		keybuf [MAXKEYSIZE];
 	Recno		recnum;
 	int		reclen = 0;
-	int		(*rec_read)() = (fcb->varflag?_vlrec_read:_flrec_read);
+	int		(*rec_read)(Fcb *, char *, Recno, int *) = (fcb->varflag?_vlrec_read:_flrec_read);
 	
 	for (recnum = 1; recnum <= fcb->lastrecno; recnum++) {
 	
@@ -457,7 +456,6 @@ _attach_dups_serial(Issort *srt, Keydesc2 *pkeydesc2)
 Static Blkno 
 _buildbtree(Fcb *fcb, Keydesc2 *pkeydesc2, Issort *srt)
 {
-    Bufhdr		*_allockpage();
     int			depth;
     int 		nrecords = fcb->nrecords;
     int			keyspernode[ISMAXBTRLEVEL];

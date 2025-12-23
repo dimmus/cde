@@ -39,7 +39,8 @@
 #include "isam_impl.h"
 #include <sys/time.h>
 
-static int _amwrrec();
+static int _amwrrec(Bytearray *isfhandle, char *record, int reclen, Recno recnum,
+         struct errcode *errcode);
 
 /*
  * isfd = iswrrec(isfd, recnum, record)
@@ -130,7 +131,7 @@ _amwrrec(Bytearray *isfhandle, char *record, int reclen, Recno recnum,
 {
     Fcb			*fcb = NULL;
     int			err;
-    int			(*rec_wrrec)();
+    int			(*rec_wrrec)(Fcb *, char *, Recno, int);
 
     _isam_entryhook();
 
