@@ -29,160 +29,160 @@
     /* External Functions */
 
 	/* main.c */
-extern	void	sigExit(/* sig */);
-extern	void	Exit(/* err_code */);
-extern	int	NotifyErrCode(/* err_code */);
-extern	int	ErrFilePathNeeded(/* error */);
-extern	int	InWaitingState(/*  */);
-extern	void	ximsMain(/*  */);
-extern	void	ximsFinish(/*  */);
-extern	char	*xims_errmsg(/* err_num, arg1, arg2, arg3 */);
+extern	void	sigExit(int sig);
+extern	void	Exit(int err_code);
+extern	int	NotifyErrCode(int err_code);
+extern	int	ErrFilePathNeeded(ximsError error);
+extern	int	InWaitingState(void);
+extern	void	ximsMain(void);
+extern	void	ximsFinish(void);
+extern	char	*xims_errmsg(int err_num, void *arg1, void *arg2, void *arg3);
 
 	/* env.c */
-extern	int	set_cmd_env(/*  */);
-extern	int	get_user_environ(/*  */);
-extern	int	expand_string(/* in_str, out_str, out_len, ims */);
-extern	int	make_new_environ(/* oenv, sel */);
-extern	int	put_new_environ(/* oenv */);
-extern	int	set_remote_env(/* ptr, env_pass */);
-extern	char	*xhp_xinput_name(/* locale */);
-extern	char	*get_real_locale(/* locale, aliases */);
+extern	int	set_cmd_env(void);
+extern	int	get_user_environ(void);
+extern	int	expand_string(char *in_str, char *out_str, int out_len, ImsConf *ims);
+extern	int	make_new_environ(OutEnv *oenv, UserSelection *sel);
+extern	int	put_new_environ(OutEnv *oenv);
+extern	int	set_remote_env(char *ptr, char *env_pass);
+//extern	char	*xhp_xinput_name(/* locale */);
+//extern	char	*get_real_locale(/* locale, aliases */);
 
 	/* select.c */
-extern	void	ximsSelect(/*  */);
-extern	int	update_user_selection(/* sel, list, idx, host, host_type */);
-extern	int	get_ims_idx(/* list, name */);
-extern	int	set_ims_status(/* ent */);
-extern	int	get_ims_list(/* listp, locale, fill_ent */);
+extern	void	ximsSelect(void);
+extern	int	update_user_selection(UserSelection *sel, ImsList *list, int idx, char *host, int host_type);
+extern	int	get_ims_idx(ImsList *list, char *name);
+extern	int	set_ims_status(ImsEnt *ent);
+extern	int	get_ims_list(ImsList **listp, char *locale, int fill_ent);
 
 	/* start.c */
-extern	void	ximsStart(/*  */);
-extern	void	ximsWait(/*  */);
-extern	void	ximsWaitDone(/*  */);
-extern	int	is_waiting(/*  */);
-extern	void	set_sig_chld(/* enable */);
-extern	int	im_mod_available(/* renv */);
-extern	int	next_wait_interval(/* restart */);
-extern	int	mk_ims_option(/* ptr, sel */);
-extern	int	load_resources(/*  */);
-extern	int	restore_resources(/*  */);
+extern	void	ximsStart(void);
+extern	void	ximsWait(void);
+extern	void	ximsWaitDone(void);
+extern	int	is_waiting(void);
+extern	void	set_sig_chld(int enable);
+extern	int	im_mod_available(RunEnv *renv);
+extern	int	next_wait_interval(int restart);
+extern	int	mk_ims_option(char *ptr, UserSelection *sel);
+extern	int	load_resources(void);
+extern	int	restore_resources(void);
 
 	/* remote.c */
-extern	int	put_remote_conf(/* locale, ims_name */);
-extern	int	get_remote_conf(/* listp, hostname, locale, ims_name */);
-extern	int	exec_remote_ims(/* sel */);
-extern	int	check_hostname(/* hostname */);
-extern	int	set_remote_confdata(/* confbuf, conflen */);
-extern	int	read_remote_confdata(/* confbuf, conflen */);
-extern	int	get_window_status(/*  */);
-extern	int	change_window_status(/* status */);
-extern	int	set_window_data(/* ac, av */);
-extern	int	get_window_data(/* acp, avp */);
+extern	int	put_remote_conf(char *locale, char *ims_name);
+extern	int	get_remote_conf(ImsList **listp, char *hostname, char *locale, char *ims_name);
+extern	int	exec_remote_ims(UserSelection *sel);
+extern	int	check_hostname(char *hostname);
+extern	int	set_remote_confdata(char *confbuf, int conflen);
+extern	int	read_remote_confdata(char **confbuf, int *conflen);
+extern	int	get_window_status(void);
+extern	int	change_window_status(int status);
+extern	int	set_window_data(int ac, char **av);
+extern	int	get_window_data(int *acp, char ***avp);
 
 	/* action.c */
-extern	int	invoke_action(/* action, host */);
-extern	void	send_dtims_msg(/* msg, errcode */);
-extern	void	dtims_msg_proc(/* w, cd, event, continue_dispatch */);
+extern	int	invoke_action(char *action, char *host);
+extern	void	send_dtims_msg(int msg,int errcode);
+extern	void	dtims_msg_proc(Widget w, XtPointer cd, XEvent *event, Boolean *continue_dispatch);
 
 	/* file.c */
-extern	int	create_xims_dir(/*  */);
-extern	int	init_log_file(/* org_path, check_size */);
-extern	int	set_errorlog(/* path */);
-extern	int	read_cmd_conf(/*  */);
-extern	int	expand_cmd_conf(/*  */);
-extern	int	read_imsconf(/* conf, ims_name, ims_fname */);
-extern	int	check_ims_conf(/* ims, ims_name */);
-extern	int	read_localeconf(/* list, locale_name */);
-extern	int	read_user_selection(/* fselp, locale_name */);
-extern	int	read_selection_file(/* fsel, fp */);
-extern	int	save_user_selection(/* sel, locale_name */);
-extern	int	get_select_mode(/*  */);
-extern	int	set_select_mode(/* cur_mode, new_mode */);
-extern	int	parse_protolist(/* valp */);
-extern	int	default_protocol(/* conf */);
+extern	int	create_xims_dir(void);
+extern	int	init_log_file(char *org_path, int check_size);
+extern	int	set_errorlog(char *path);
+extern	int	read_cmd_conf(void);
+extern	int	expand_cmd_conf(void);
+extern	int	read_imsconf(ImsConf *conf, char *ims_name, char *ims_fname);
+extern	int	check_ims_conf(ImsConf *ims, char *ims_name);
+extern	int	read_localeconf(ImsList *list, char *locale_name);
+extern	int	read_user_selection(FileSel **fselp, char *locale_name);
+extern	int	read_selection_file(FileSel *fsel, FILE *fp);
+extern	int	save_user_selection(UserSelection *sel, char *locale_name);
+extern	int	get_select_mode(void);
+extern	int	set_select_mode(int cur_mode, int new_mode);
+extern	int	parse_protolist(char *valp);
+extern	int	default_protocol(ImsConf *conf);
 
 	/* win.c */
-extern	int	open_display(/*  */);
-extern	void	close_display(/*  */);
-extern	int	window_env_ok(/*  */);
-extern	int	init_window_env(/*  */);
-extern	void	end_window_env(/*  */);
-extern	int	clear_cmd_property(/* win */);
-extern	int	save_RM(/*  */);
-extern	int	merge_RM(/* res1, res2 */);
-extern	int	restore_RM(/*  */);
-extern	int	start_selection_window(/*  */);
-extern	int	start_mode_window(/* cur_mode */);
-extern	void	stop_help(/*  */);
-extern	void	ximsHelp(/* help_type */);
-extern	int	put_msg_win(/* type, msg */);
-extern	void	xevent_loop(/*  */);
-extern	void	xt_start_waiting(/*  */);
-extern	void	xt_stop_waiting(/*  */);
+extern	int	open_display(void);
+extern	void	close_display(void);
+extern	int	window_env_ok(void);
+extern	int	init_window_env(void);
+extern	void	end_window_env(void);
+extern	int	clear_cmd_property(Window win);
+extern	int	save_RM(void);
+extern	int	merge_RM(char *res1, char *res2);
+extern	int	restore_RM(void);
+extern	int	start_selection_window(void);
+extern	int	start_mode_window(int cur_mode);
+extern	void	stop_help(void);
+extern	void	ximsHelp(int help_type);
+extern	int	put_msg_win(int type, char *msg);
+extern	void	xevent_loop(void);
+extern	void	xt_start_waiting(void);
+extern	void	xt_stop_waiting(void);
 
 	/* util.c */
 		/* string */
-extern	char	*strcpyx(/* dest, src */);
-extern	char	*strcpy2(/* dest, src1, src2 */);
-extern	char	*newstradded(/* src1, src2, src3 */);
-extern	int	str_to_int(/* ptr, val */);
+extern	char	*strcpyx(char *dest, char *src);
+extern	char	*strcpy2(char *dest, char *src1, char *src2);
+extern	char	*newstradded(char *src1, char *src2, char *src3);
+extern	int	str_to_int(char *ptr, int *val);
 extern	bool	str_to_bool(char *ptr, bool def_val);
-extern	char	*trim_line(/* ptr */);
+extern	char	*trim_line(char *ptr);
 extern	char	**parse_strlist(register char *ptr, char sep_ch);
-extern	int	pack_strlist(/* ptr, listp, sep_ch */);
-extern	void	free_strlist(/* pp */);
-extern	bool	parse_dpy_str(/* display_str, host, dnum, snum, dnet */);
-extern	char	*std_dpy_str(/* display_str, snum */);
+extern	int	pack_strlist(char *ptr, char **listp, char sep_ch);
+extern	void	free_strlist(char **pp);
+extern	bool	parse_dpy_str(char *display_str, char **host, int *dnum, int *snum, int *dnet);
+extern	char	*std_dpy_str(char *display_str, int *snum);
 		/* file & dir */
-extern	int	make_user_dir(/* path */);
-extern	char	*dirname(/* path */);
-extern	int	is_directory(/* path, must_writable */);
-extern	int	is_regularfile(/* path */);
-extern	int	is_emptyfile(/* path */);
-extern	int	is_executable(/* path */);
-extern	int	is_writable(/* path */);
-extern	int	is_readable(/* path, allow_empty */);
+extern	int	make_user_dir(char *path);
+extern	char	*dirname(char *path);
+extern	int	is_directory(char *path, int must_writable);
+extern	int	is_regularfile(char *path);
+extern	int	is_emptyfile(char *path);
+extern	int	is_executable(char *path);
+extern	int	is_writable(char *path);
+extern	int	is_readable(char *path, int allow_empty);
 		/* file read */
-extern	int	start_tag_line(/* fname */);
-extern	int	read_tag_line(/* fp, tagp, valp */);
+extern	int	start_tag_line(char *fname);
+extern	int	read_tag_line(FILE *fp, char **tagp, char **valp);
 		/* error messges */
-extern	void	put_xims_msg(/* msg_type, err_num, arg1, arg2, arg3 */);
-extern	void	put_xims_errmsg(/* err_num, arg1, arg2, arg3 */);
-extern	void	put_xims_warnmsg(/* err_num, arg1, arg2, arg3 */);
-extern	void	print_msg(/* fmt, arg1, arg2, arg3, arg4, arg5 */);
-extern	int	put_xims_log(/* fmt, arg1, arg2, arg3 */);
+extern	void	put_xims_msg(int msg_type, int err_num, void *arg1, void *arg2, void *arg3);
+extern	void	put_xims_errmsg(int err_num, void *arg1, void *arg2, void *arg3);
+extern	void	put_xims_warnmsg(int err_num, void *arg1, void *arg2, void *arg3);
+extern	void	print_msg(char *fmt, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5);
+extern	int	put_xims_log(char *fmt, void *arg1, void *arg2, void *arg3);
 		/* clear structure */
-extern	void	clear_ImsConf(/* ims */);
-extern	void	clear_ImsEnt(/* ent */);
-extern	void	clear_ImsList(/* list */);
-extern	void	clear_FileSel(/* fsel */);
-extern	void	clear_UserSelection(/* sel */);
-extern	void	clear_RunEnv(/* renv */);
-extern	void	clear_OutEnv(/* oenv */);
-extern	void	clear_UserEnv(/*  */);
-extern	void	clear_CmdConf(/*  */);
-extern	void	clear_WinEnv(/*  */);
-extern	void	clear_CmdOpt(/*  */);
-extern	void	clear_All(/*  */);
+extern	void	clear_ImsConf(ImsConf *ims);
+extern	void	clear_ImsEnt(ImsEnt *ent);
+extern	void	clear_ImsList(ImsList *list);
+extern	void	clear_FileSel(FileSel *fsel);
+extern	void	clear_UserSelection(UserSelection *sel);
+extern	void	clear_RunEnv(RunEnv *renv);
+extern	void	clear_OutEnv(OutEnv *oenv);
+extern	void	clear_UserEnv(void);
+extern	void	clear_CmdConf(void);
+extern	void	clear_WinEnv(void);
+extern	void	clear_CmdOpt(void);
+extern	void	clear_All(void);
 # ifdef	DEBUG
 		/* print structure */
-extern	void	pr_FileSel(/* fsel */);
-extern	void	pr_UserSelection(/* sel */);
-extern	void	pr_ImsConf(/* conf, ims_name */);
-extern	void	pr_ImsEnt(/* ent, idx */);
-extern	void	pr_ImsList(/* list */);
-extern	void	pr_WinEnv(/* wenv */);
-extern	void	pr_RunEnv(/* renv */);
-extern	void	pr_UserEnv(/*  */);
-extern	void	pr_OutEnv(/* oenv */);
-extern	void	pr_CmdConf(/*  */);
-extern	void	pr_CmdOpt(/*  */);
-extern	void	pr_OpModeFlag(/*  */);
-extern	char	*StateName(/*  */);
-extern	char	*error_name(/* error */);
-extern	char	*proto_name(/* proto_idx */);
-extern	char	*sig_name(/* sig */);
-extern	void	pr_brk(/* msg */);
+extern	void	pr_FileSel(FileSel *fsel);
+extern	void	pr_UserSelection(UserSelection *sel);
+extern	void	pr_ImsConf(ImsConf *conf, char *ims_name);
+extern	void	pr_ImsEnt(ImsEnt *ent, int idx);
+extern	void	pr_ImsList(ImsList *list);
+extern	void	pr_WinEnv(WinEnv *wenv);
+extern	void	pr_RunEnv(RunEnv *renv);
+extern	void	pr_UserEnv(void);
+extern	void	pr_OutEnv(OutEnv *oenv);
+extern	void	pr_CmdConf(void);
+extern	void	pr_CmdOpt(void);
+extern	void	pr_OpModeFlag(void);
+extern	char	*StateName(void);
+extern	char	*error_name(ximsError error);
+extern	char	*proto_name(int proto_idx);
+extern	char	*sig_name(int sig);
+extern	void	pr_brk(char *msg);
 # endif	/* DEBUG */
 
 

@@ -77,7 +77,7 @@ static void clear_flag_on_modify(Widget, XtPointer, XtPointer);
 #define ABS(x) (((x) > 0) ? (x) : (-(x)))
 #endif
 
-static void set_editor_msg_defaults();
+static void set_editor_msg_defaults(Editor *e);
 
 /*******************************************************************************
 **

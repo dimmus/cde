@@ -141,7 +141,7 @@ extern	int	_DtHelpCeSaveString (
 			int		    link_index,
 			int		    multi_len,
 			int		    flags,
-			void		   (*load_font)(),
+			void		   (*load_font)(void *, char *, const char *, _DtHelpFontHints, void **),
 			_SdlFontMode	    resolve_font,
 			_DtCvValue	    newline);
 extern	int	_DtHelpCeSkipCdata (

@@ -39,7 +39,7 @@ extern void ** _DtCmGetHash(void * tbl, const unsigned char * key);
 
 extern void ** _DtCmFindHash(void * tbl,const unsigned char * key);
 
-extern void _DtCmDestroyHash(void * tbl, int (*des_func)(), void * usr_arg);
+extern void _DtCmDestroyHash(void * tbl, int (*des_func)(void *, void *, unsigned char *), void * usr_arg);
 
 #endif /* _HASH_H */
 

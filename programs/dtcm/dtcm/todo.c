@@ -71,7 +71,7 @@ static void t_build_expand(ToDo *);
 #ifndef ABS
 #define ABS(x) (((x) > 0) ? (x) : (-(x)))
 #endif
-static void set_todo_msg_defaults();
+static void set_todo_msg_defaults(ToDo *t);
 static void clear_flag_on_modify(Widget, XtPointer, XtPointer);
 
 static CSA_return_code

@@ -556,7 +556,7 @@ IL_PRIVATE ilBool _ilAddLevelConversionFilter (
 unsigned int                sample;
 ilPtr                       pPriv;
 ilDstElementData            dstData;
-ilError                     (*executeFunction)();
+ilError                     (*executeFunction)(ilExecuteData *, long, long *);
 ilBool                      all4Bit, all8Bit;
 
         /*  Determine if we support requested conversion.

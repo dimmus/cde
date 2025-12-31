@@ -73,7 +73,8 @@
  */
 static void
 print_summ(
-    Element_t	*e
+    Element_t	*e,
+    void *unused
 )
 {
     int i, n, dsize;
@@ -105,7 +106,7 @@ PrintElemSummary(
     Element_t	*e
 )
 {
-    print_summ(0);
+    print_summ(0, NULL);
     DescendTree(e, print_summ, 0, 0, 0);
 }
 
@@ -120,7 +121,8 @@ PrintElemSummary(
  */
 static void
 print_context(
-    Element_t	*e
+    Element_t	*e,
+    void *unused
 )
 {
     char buf[LINESIZE];
@@ -155,7 +157,8 @@ PrintContext(
  */
 static void
 print_indent(
-    Element_t	*e
+    Element_t	*e,
+    void *unused
 )
 {
     int		i, ne, nd;

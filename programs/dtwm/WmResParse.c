@@ -161,7 +161,7 @@ static MaskTableEntry modifierStrings[] = {
 typedef struct {
    char         *event;
    unsigned int  eventType;
-   Boolean       (*parseProc)();
+   Boolean       (*parseProc)(unsigned char **linePP, unsigned int closure, unsigned int  *detail);
    unsigned int  closure;
    Boolean       fClick;
 } EventTableEntry;
@@ -271,14 +271,14 @@ static EventTableEntry buttonEvents[] = {
     {"btn9up",      ButtonRelease,  ParseImmed,    Button9,  FALSE},
     {"btn9click",   ButtonRelease,  ParseImmed,    Button9,  TRUE},
     {"btn9click2",  ButtonPress,    ParseImmed,    Button9,  TRUE},
-    { NULL, 0, (Boolean(*)())NULL,  0, FALSE}
+    { NULL,         0,              NULL,          0,        FALSE}
 };
 
 
 static EventTableEntry keyEvents[] = {
 
     {"key",         KeyPress,    ParseKeySym,    0,  FALSE},
-    { NULL,         0,    (Boolean(*)())NULL,    0,  FALSE}
+    { NULL,         0,           NULL,           0,  FALSE}
 };
 
 typedef struct _ConfigFileStackEntry {
@@ -314,7 +314,7 @@ typedef struct {
    unsigned int   resource;
    long           mgtMask;
    WmFunction     wmFunction;
-   Boolean       (*parseProc)();
+   Boolean       (*parseProc)(unsigned char **linePP, WmFunction wmFunction, String *pArgs);
 } FunctionTableEntry;
 
 
@@ -338,12 +338,12 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Circle_Down,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.circle_up",	F_SUBCONTEXT_IB_IICON|F_SUBCONTEXT_IB_WICON,
 			CRS_ANY,
 			0,
 			F_Circle_Up,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.create_workspace", 0,
 			CRS_ANY,
 			0,
@@ -430,7 +430,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Next_Key,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.next_workspace",	0,
 			CRS_ANY,
 			0,
@@ -482,7 +482,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Prev_Key,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.prev_workspace",	0,
 			CRS_ANY,
 			0,
@@ -555,7 +555,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Send_Msg,
-			ParseWmFuncNbrArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncNbrArg},
     {"f.separator",	0,
 			CRS_MENU,
 			0,
@@ -570,7 +570,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Set_Context,
-			ParseWmFuncNbrArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncNbrArg},
     {"f.title",		0,
 			CRS_MENU,
 			0,
@@ -5365,7 +5365,7 @@ ParseWmFunctionArg (
      * Apply the function argument parser.
      */
     if ((functionTable[ix].wmFunction != wmFunc) ||
-	!(*(functionTable [ix].parseProc)) (&lineP, wmFunc, ppArg))
+	!(*(functionTable [ix].parseProc)) (&lineP, wmFunc, (char **) ppArg))
     {
 	bValidArg = False;
     }

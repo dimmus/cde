@@ -92,8 +92,8 @@ long	hilite_cleartext (int parse_type, char *stems, int stemcount)
     char		*textp, *stemp;
     DBLK		*dblk =		usrblk.dblk;
     PARG		parg;
-    char *		(*parser)() =	usrblk.dblk->parser;
-    char *		(*stemmer)() =	usrblk.dblk->stemmer;
+    char *		(*parser)(PARG *) =	usrblk.dblk->parser;
+    char *		(*stemmer)(char *, struct dblk_tag *) =	usrblk.dblk->stemmer;
     DtSrHitword		*hitwords = NULL;
     size_t		hitwords_size =	0;
     long		hitwcount =	0;

@@ -45,6 +45,7 @@
 
 #include <Dt/HelpDialog.h>
 #include "HelpDialogP.h"
+#include "DisplayAreaP.h"
 
 
 /* Update list defines use in _DtHelpUpdateDisplayArea */
@@ -146,7 +147,7 @@ extern void _DtHelpUpdateJumpList(
  *
  *****************************************************************************/
 extern void _DtHelpDialogHypertextCB (
-    XtPointer pDisplayAreaStruct,
+    DtHelpDispAreaStruct *pDisplayAreaStruct,
     XtPointer clientData,
     DtHelpHyperTextStruct *hyperData);
 

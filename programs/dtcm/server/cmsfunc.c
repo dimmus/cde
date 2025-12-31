@@ -54,6 +54,7 @@
 #include "iso8601.h"
 #include "log.h"
 #include "lutil.h"
+#include "cm.h"
 #include "cm_tbl.i"
 #include "callback.h"
 #include "insert.h"

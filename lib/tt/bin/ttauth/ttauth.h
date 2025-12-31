@@ -58,7 +58,9 @@ typedef int Bool;
 
 extern char *ProgramName;
 
-int process_command(), auth_initialize(), auth_finalize();
+int process_command(char *inputfilename, int lineno, int argc, char **argv);
+int auth_initialize(char *authfilename);
+int auth_finalize(void);
 extern int print_help(FILE *fp, const char *cmd);
 extern int verbose;
 extern Bool ignore_locks;

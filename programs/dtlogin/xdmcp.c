@@ -115,8 +115,8 @@ extern Time_t time ();
  * interface to policy routines
  */
 
-extern ARRAY8Ptr	ChooseAuthentication ();
-extern int		SelectConnectionTypeIndex ();
+extern ARRAY8Ptr	ChooseAuthentication (ARRAYofARRAY8Ptr authenticationNames);
+extern int		SelectConnectionTypeIndex (ARRAY16Ptr connectionTypes, ARRAYofARRAY8Ptr connectionAddresses);
 
 void query_respond (struct sockaddr *from, int fromlen, int length);
 void broadcast_respond (struct sockaddr *from, int fromlen, int length);
@@ -213,8 +213,8 @@ sendForward (CARD16 connectionType, ARRAY8Ptr address, char *closure)
     return;
 }
 
-extern char *NetaddrAddress();
-extern char *NetaddrPort();
+extern char *NetaddrAddress(XdmcpNetaddr netaddrp, int *lenp);
+extern char *NetaddrPort(XdmcpNetaddr netaddrp, int *lenp);
 
 static void
 ClientAddress (struct sockaddr *from, ARRAY8Ptr addr, ARRAY8Ptr port, CARD16 *type)
@@ -222,7 +222,7 @@ ClientAddress (struct sockaddr *from, ARRAY8Ptr addr, ARRAY8Ptr port, CARD16 *ty
     int length, family;
     char *data;
 
-    data = NetaddrPort(from, &length);
+    data = NetaddrPort((XdmcpNetaddr) /* TODO this seems wrong */ from, &length);
     XdmcpAllocARRAY8 (port, length);
     memmove( port->data, data, length);
     port->length = length;
@@ -967,7 +967,7 @@ manage (struct sockaddr *from, int fromlen, int length)
 	    d = FindDisplayByName (name);
 	    if (d)
 	    {
-		extern void StopDisplay ();
+		extern void StopDisplay (struct display *d);
 
 		Debug ("Terminating active session for %s\n", d->name);
 		StopDisplay (d);

@@ -59,7 +59,10 @@
 
 WidgetClass	dtViewWidgetClass;
 
-Widget		_DtCreateView ();
+Widget		_DtCreateView (Widget parent,
+                        String name,
+                        ArgList arglist,
+                        Cardinal argcount);
 
 
 
@@ -72,11 +75,6 @@ Widget		_DtCreateView ();
 
 /********    Public Function Declarations    ********/
 
-extern Widget _DtCreateView( 
-                        Widget parent,
-                        String name,
-                        ArgList arglist,
-                        Cardinal argcount) ;
 
 /********    End Public Function Declarations    ********/
 

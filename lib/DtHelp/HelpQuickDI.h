@@ -44,6 +44,7 @@
 #define _HelpQuickDI_h
 
 #include "DisplayAreaI.h"
+#include "DisplayAreaP.h"
 
 /* General Define for Quick Help Dialog Widget */
 
@@ -84,7 +85,7 @@
  *
  *****************************************************************************/
 extern void _DtHelpQuickDialogHypertextCB (
-    XtPointer pDisplayAreaStruct,
+    DtHelpDispAreaStruct *pDisplayAreaStruct,
     XtPointer clientData,
     DtHelpHyperTextStruct *hyperData);
 

@@ -66,9 +66,9 @@ extern Widget _DtCreateMenuSystem(
                         Boolean createSharedComponents,
                         MenuDesc * menuDesc,
                         int numMenuComponents,
-                        void (*getMenuDataProc)(),
-                        void (*setMenuSensitivity)(),
-                        void (*restoreMenuSensitivity)()) ;
+                        void (*getMenuDataProc)(Widget, XtPointer *, MenuDesc **, int *, unsigned int **, unsigned int **),
+                        void (*setMenuSensitivity)(Widget, XtPointer, XtPointer),
+                        void (*restoreMenuSensitivity)(Widget, XtPointer, XtPointer)) ;
 extern void _DtGlobalUpdateMenuItemState(
                         Widget btn,
                         unsigned int mask,

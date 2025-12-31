@@ -144,7 +144,7 @@ void
 _DtHelpFreeSegments (
     _DtCvSegment	*seg_list,
     _DtCvStatus		 unresolved,
-    void		(*destroy_region)(),
+    void		(*destroy_region)(void *, void *),
     _DtCvPointer	 client_data)
 {
     int			   i;
@@ -299,7 +299,7 @@ _DtHelpFreeSegments (
 void
 _DtHelpDestroyTopicData (
     _DtCvTopicInfo	*topic,
-    void		(*destroy_region)(),
+    void		(*destroy_region)(void *, void *),
     _DtCvPointer	 client_data)
 {
     if (NULL != topic)

@@ -55,6 +55,6 @@
 #include "calendar.h"
 
 extern void	CMSaveSessionCB(Widget,  XtPointer, XtPointer);
-extern void	GetSessionInfo();
+extern void	GetSessionInfo(Calendar *c);
 
 #endif

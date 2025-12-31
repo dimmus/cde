@@ -76,10 +76,10 @@ typedef struct _ilElementRec {
     unsigned int        elementType;
     unsigned long       flags;
     ilExecuteData       exec;
-    ilError           (*Init)();
-    ilError           (*Cleanup)();
-    ilError           (*Destroy)();
-    ilError           (*ExecuteThree)();
+    ilError           (*Init)(ilByte *, ilImageInfo *, ilImageInfo *);
+    ilError           (*Cleanup)(ilByte *, ilBool);
+    ilError           (*Destroy)(ilByte *);
+    ilError           (*ExecuteThree)(ilExecuteData *, long, long *);
     ilError           (*ExecuteFour)(ilExecuteData *,
 				     long,
 				     long *,
@@ -426,7 +426,7 @@ ilPipePtr   pPipe;
         return (ilPipe)NULL;
         }
 
-    pPipe = (ilPipePtr)_ilCreateObject (context, IL_PIPE, ((void (*)())ilEmptyPipe), 
+    pPipe = (ilPipePtr)_ilCreateObject (context, IL_PIPE, ((void (*)(ilByte *)) ilEmptyPipe), 
                                        sizeof (ilPipeRec));
     if (!pPipe)
         return (ilPipe)NULL;
@@ -776,18 +776,15 @@ ilPtr ilAddPipeElement (
     unsigned long       flags,
     ilSrcElementData   *pSrcData,
     ilDstElementData   *pDstData,
-    ilError           (*Init)(),
-    ilError           (*Cleanup)(),
-    ilError           (*Destroy)(),
+    ilError           (*Init)(ilByte *, ilImageInfo *, ilImageInfo *),
+    ilError           (*Cleanup)(ilByte *, ilBool),
+    ilError           (*Destroy)(ilByte *),
 /*
 ** Added another execute function for passing in a fourth
 ** parameter which is a floating pointing.
 */
-    ilError           (*ExecuteThree)(),
-    ilError           (*ExecuteFour)(ilExecuteData *,
-					      long,
-					      long *,
-					      float),
+    ilError           (*ExecuteThree)(ilExecuteData *, long, long *),
+    ilError           (*ExecuteFour)( ilExecuteData *, long, long *, float),
     unsigned long       mustBeZero
     )
 {

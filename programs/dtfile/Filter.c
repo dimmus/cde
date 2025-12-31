@@ -117,23 +117,23 @@ static DialogResource resources[] =
 {
    { "matchFilter", XmRBoolean, sizeof(Boolean),
      XtOffset(FilterDataPtr, match_flag),
-     (XtPointer) True, _DtBooleanToString },
+     (XtPointer) True, (WriteResourceProc) _DtBooleanToString },
 
    { "name", XmRString, sizeof(String),
      XtOffset(FilterDataPtr, filter),
-     (XtPointer) "", _DtStringToString },
+     (XtPointer) "", (WriteResourceProc) _DtStringToString },
 
    { "showHidden", XmRBoolean, sizeof(Boolean),
      XtOffset(FilterDataPtr, show_hidden),
-     (XtPointer) False, _DtBooleanToString },
+     (XtPointer) False, (WriteResourceProc) _DtBooleanToString },
 
    { "filetypesFilteredCount", XmRInt, sizeof(int),
      XtOffset(FilterDataPtr, filetypesFilteredCount),
-     (XtPointer) 3, _DtIntToString },
+     (XtPointer) 3, (WriteResourceProc) _DtIntToString },
 
    { "filetypesFiltered", XmRString, sizeof(String),
      XtOffset(FilterDataPtr, filetypesFiltered),
-     (XtPointer) DEFAULT_FILTER, _DtStringToString },
+     (XtPointer) DEFAULT_FILTER, (WriteResourceProc) _DtStringToString },
 };
 
 
@@ -1474,7 +1474,7 @@ ReadInFiletypes(
 
    DtDtsFreeDataTypeNames(file_types);
 
-   qsort( filter_data->user_data, count, sizeof( FTData *), (int (*)())FileTypeAscending );
+   qsort( filter_data->user_data, count, sizeof( FTData *), (int (*)(const void *, const void *))FileTypeAscending );
 
    filtered_types = filter_data->filetypesFiltered;
    for(i = 0; i < filter_data->filetypesFilteredCount; i++)

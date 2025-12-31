@@ -274,7 +274,7 @@ void * _DtUtilDelHash(DtHashTbl t, const unsigned char * key)
   return(tmp->data);	
 }
 
-int _DtUtilOperateHash(DtHashTbl t, void (*ptr)(), void * usr_arg)
+int _DtUtilOperateHash(DtHashTbl t, void (*ptr)(void *, void *, unsigned char *), void * usr_arg)
 {
   hash * tbl = (hash *) t;
   hash_entry * tmp = tbl->start;
@@ -282,14 +282,14 @@ int _DtUtilOperateHash(DtHashTbl t, void (*ptr)(), void * usr_arg)
 
   while(tmp)
     {
-      (*ptr)(tmp->data,usr_arg, tmp->key);
+      (*ptr)(tmp->data, usr_arg, tmp->key);
       tmp = tmp->left_entry;
       c++;
     }
   return(c);
 }
 
-void _DtUtilDestroyHash(DtHashTbl t, int (*ptr)(), void * usr_arg)
+void _DtUtilDestroyHash(DtHashTbl t, int (*ptr)(void *, void *, unsigned char *), void * usr_arg)
 {
   hash * tbl = (hash *) t;
   hash_entry * tmp = tbl->start, * prev;

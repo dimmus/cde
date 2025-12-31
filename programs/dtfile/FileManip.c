@@ -297,7 +297,7 @@ Check(
         char *spth,
         ino_t dinode,
         int mode,
-        void (*errorHandler)() )
+        void (*errorHandler)(Widget, XtPointer, XtPointer) )
 {
    struct stat sbuf;
    char filename [MAX_PATH];
@@ -359,7 +359,7 @@ MoveDir(
         char *source,
         char *target,
         struct stat *sourceStatInfo,
-        void (*errorHandler)(),
+        void (*errorHandler)(Widget, XtPointer, XtPointer),
         char ** targetRtn ,
         int type )
 {
@@ -627,7 +627,7 @@ CopyDir(
         char *to,
         Boolean  isContainer,
         struct stat *s1,
-        void (*errorHandler)(),
+        void (*errorHandler)(Widget, XtPointer, XtPointer),
         Boolean checkForBusyDir,
         int type )
 {
@@ -783,7 +783,7 @@ FileManip(
         char *from,
         char *to,
         Boolean  isContainer,          /* described in function CopyDir */
-        void (*errorHandler)(),
+        void (*errorHandler)(Widget, XtPointer, XtPointer),
         Boolean checkForBusyDir,
         int type )
 {
@@ -792,10 +792,10 @@ FileManip(
    int n;
    Boolean copy_dir_return;
    Boolean move_dir_return;
-   void (*oldInt)();
-   void (*oldQuit)();
-   void (*oldPipe)();
-   void (*oldTerm)();
+   void (*oldInt)(int);
+   void (*oldQuit)(int);
+   void (*oldPipe)(int);
+   void (*oldTerm)(int);
    char * cptr;
    int len;
    Boolean restricted = False;

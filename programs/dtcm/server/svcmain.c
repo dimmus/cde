@@ -533,7 +533,7 @@ init_alarm(void)
 static void
 run_service(void)
 {
-	extern void garbage_collect(void);
+	extern void garbage_collect(int);
 	extern void debug_switch(void);
 	sigset_t block, orig;
 	fd_set	readfds;
@@ -548,7 +548,7 @@ run_service(void)
 	for (;;) {
 		if (gc_requested) {
 			gc_requested = 0;
-			garbage_collect();
+			garbage_collect(0);
 		}
 		if (debug_requested) {
 			debug_requested = 0;

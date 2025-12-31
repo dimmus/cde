@@ -281,7 +281,7 @@ static ApplicationArgs application_args;
 
 /********    Static Function Declarations    ********/
 
-static void ErrorHandler(
+static int ErrorHandler(
                         Display *disp,
                         XErrorEvent *event) ;
 static void ToolkitErrorHandler(
@@ -290,7 +290,7 @@ static void Usage(
                         char **argv) ;
 static void RestrictModeUsage(
                         char **argv) ;
-static void Stop( void ) ;
+static void Stop( int ignored ) ;
 static void RestoreSettingsFile( void ) ;
 static void MoveDefaultSettings(
                         int mode) ;
@@ -431,7 +431,7 @@ static Widget post_dialog(
 			Widget parent,
 			char *title,
 			char *msg,
-			void (*callback)());
+			void (*callback)(Widget widget, XtPointer client_data, XtPointer call_data));
 static void DtErrExitCB(
 			Widget widget,
 			XtPointer client_data,
@@ -1015,7 +1015,7 @@ main(
    printf("  Start\n");
    gettimeofday(&update_time_ss, NULL);
 #endif
-   (void) signal (SIGINT, (void (*)())Stop);
+   (void) signal (SIGINT, Stop);
 
    /* We don't want any zombie children, do we? */
 #if defined(CSRG_BASED)
@@ -1143,7 +1143,7 @@ _DtPerfChkpntMsgSend("Begin XtInitialize");
    XmAddWMProtocolCallback(toplevel, save_yourself_atom, SaveSessionCallback,
                            NULL);
 
-   XSetErrorHandler ((int (*)())ErrorHandler);
+   XSetErrorHandler (ErrorHandler);
    XtAppSetErrorHandler (XtWidgetToApplicationContext(toplevel),
                          ToolkitErrorHandler);
 
@@ -1815,7 +1815,7 @@ _DtPerfChkpntMsgSend("Begin XtInitialize");
  *
  ************************************************************************/
 
-static void
+static int
 ErrorHandler(
         Display *disp,
         XErrorEvent *event )
@@ -1828,6 +1828,8 @@ ErrorHandler(
   xErrorDetected = True;
 
   /* We do not want to exit here lets try to continue... */
+  
+  return 0; /* The return value of an XErrorHandler is ignored */ 
 
 }
 
@@ -1958,7 +1960,7 @@ RestrictModeUsage(
  ************************************************************************/
 
 static void
-Stop( void )
+Stop( int ignored )
 {
   FinalizeToolTalkSession( );
   exit(0);
@@ -3161,8 +3163,8 @@ ViewAccept(
    View *view,
    Tt_message msg)
 {
-   extern Tt_message FileCallback();
-   extern Tt_message SessionCallback();
+   extern Tt_message FileCallback(Tt_message msg, Tttk_op op, char * file, void * clientdata, int trust, int self);
+   extern Tt_message SessionCallback(Tt_message msg, void * client_data, Tt_message contract);
 
    if ((msg == 0) || tt_is_err( tt_ptr_error( msg ))) {
       return;
@@ -6167,7 +6169,7 @@ ExitApp(
  */
 
 static Widget
-post_dialog(Widget parent, char *title, char *msg, void (*DtErrExitCB)())
+post_dialog(Widget parent, char *title, char *msg, void (*DtErrExitCB)(Widget widget, XtPointer client_data, XtPointer call_data))
 {
    Widget dialog, dialogShell;
    XmString message_text, ok;

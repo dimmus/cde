@@ -113,10 +113,6 @@ extern "C" {
  */
 typedef XtPointer DtHashKey;
 
-typedef DtHashKey (*DtGetHashKeyFunc)();
-typedef Boolean (*DtHashEnumerateFunc)();
-typedef void (*DtReleaseKeyProc)();
-
 typedef struct _DtHashEntryPartRec {
     unsigned int	type:16;
     unsigned int	flags:16;
@@ -125,6 +121,10 @@ typedef struct _DtHashEntryPartRec {
 typedef struct _DtHashEntryRec {
     DtHashEntryPartRec	hash;
 }DtHashEntryRec, *DtHashEntry;
+
+typedef DtHashKey (*DtGetHashKeyFunc)(DtHashEntry entry, DtHashKey);
+typedef Boolean (*DtHashEnumerateFunc)(DtHashEntry, DtHashKey);
+typedef void (*DtReleaseKeyProc)(DtHashEntry entry, DtHashKey);
 
 typedef struct _DtHashEntryTypePartRec {
     unsigned int		entrySize;
@@ -138,6 +138,7 @@ typedef struct _DtHashEntryTypeRec {
 }DtHashEntryTypeRec, *DtHashEntryType;
 
 typedef struct _DtHashTableRec *DtHashTable;
+
 
 /********    Private Function Declarations for Hash.c    ********/
 

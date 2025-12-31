@@ -110,16 +110,16 @@ static char * CHANGEDIRECTORY = "ChangeDirectory";
 static DialogResource resources[] =
 {
    { "string_path", XmRXmString, sizeof(XmString),
-     XtOffset(ChangeDirDataPtr, string_path), NULL, _DtXmStringToString },
+     XtOffset(ChangeDirDataPtr, string_path), NULL, (WriteResourceProc) _DtXmStringToString },
 
    { "historyList", XmRXmStringTable, sizeof(XmStringTable),
-      XtOffset(ChangeDirDataPtr, history_list), NULL, _DtXmStringTableToString },
+      XtOffset(ChangeDirDataPtr, history_list), NULL, (WriteResourceProc) _DtXmStringTableToString },
 
    { "visibleCount", XmRInt, sizeof(int),
-      XtOffset(ChangeDirDataPtr, visible_count), (XtPointer) 8, _DtIntToString },
+      XtOffset(ChangeDirDataPtr, visible_count), (XtPointer) 8, (WriteResourceProc) _DtIntToString },
 
    { "listCount", XmRInt, sizeof(int),
-      XtOffset(ChangeDirDataPtr, list_count), NULL, _DtIntToString },
+      XtOffset(ChangeDirDataPtr, list_count), NULL, (WriteResourceProc) _DtIntToString },
 };
 
 
@@ -154,7 +154,9 @@ static Boolean TryToChangeDir( Boolean isFromDialog,
                                Widget selection_box,
                                ChangeDirApply * apply_data,
                                XmSelectionBoxCallbackStruct * callback_data,
-                               void (*callback)()) ;
+                               void (*callback)(FileMgrData *, char *),
+                               void (*callbackfromdialog)(Widget, XtPointer, XtPointer)
+                               ) ;
 static void OkCallback( Widget selection_box,
                         ChangeDirApply *apply_data,
                         XmSelectionBoxCallbackStruct *callback_data) ;
@@ -699,7 +701,8 @@ TryToChangeDir(
        Widget selection_box,
        ChangeDirApply * apply_data,
        XmSelectionBoxCallbackStruct * callback_data,
-       void (*callback)())
+       void (*callback)(FileMgrData *, char *),
+       void (*callbackfromdialog)(Widget, XtPointer, XtPointer))
 {
   char * new_directory;
   char * host;
@@ -852,7 +855,7 @@ TryToChangeDir(
 
        /*  Call the encapsulation change data callback  */
        if (isFromDialog)
-         (*callback)(selection_box, apply_data->client_data, path);
+         (*callbackfromdialog)(selection_box, apply_data->client_data, path);
        else
          (*callback)(file_mgr_data, path);
      }
@@ -967,7 +970,7 @@ OkCallback(
    {
       TryToChangeDir(True, (char *)strValue, file_mgr_data,
                      file_mgr_rec, change_dir_data, selection_box, apply_data,
-                     callback_data, apply_data->callback);
+                     callback_data, NULL, apply_data->callback);
    }
 
    XtFree(value);
@@ -1116,7 +1119,7 @@ ChangeToNewDir (
    {
      if( TryToChangeDir(False, value, file_mgr_data, file_mgr_rec,
                         change_dir_data, selection_box, NULL, NULL,
-                        GoToNewDir) )
+                        GoToNewDir, NULL) )
        /* de-activate the text widget */
        UnpostTextPath( file_mgr_data );
    }
@@ -1174,7 +1177,7 @@ DropOnChangeView (
 
          TryToChangeDir(False, full_path_name, file_mgr_data, file_mgr_rec,
                         change_dir_data, selection_box, NULL, NULL,
-                        GoToNewDir);
+                        GoToNewDir, NULL);
       }
       XtFree(full_path_name);
    }
@@ -1372,7 +1375,7 @@ ChangeDirectoryToParent(
    {
       TryToChangeDir(False, directory, file_mgr_data, file_mgr_rec,
                      change_dir_data, selection_box, NULL, NULL,
-                     GoToNewDir);
+                     GoToNewDir, NULL);
    }
 
 }

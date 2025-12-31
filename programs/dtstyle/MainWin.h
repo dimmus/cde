@@ -54,6 +54,7 @@ extern void activateCB_exitBtn(
                         Widget w,
                         XtPointer client_data,
                         XtPointer call_data) ;
+extern void activateCB_exitBtnSignal(int notused) ;
 extern void restoreMain( Widget shell, XrmDatabase db) ;
 extern void saveMain( int fd) ;
 

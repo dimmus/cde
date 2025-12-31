@@ -45,6 +45,8 @@
 #ifndef _DtHelpFormatUtilI_h
 #define _DtHelpFormatUtilI_h
 
+#include "DtI/FontAttrI.h"
+
 /********    Semi-Private Structure Declarations    ********/
 typedef	struct	sdlMatchData {
 	int	clan;
@@ -53,11 +55,11 @@ typedef	struct	sdlMatchData {
 } SdlMatchData;
 
 typedef struct  _frmtUiInfo {
-	_DtCvValue	(*load_graphic)();
-	_DtCvValue	(*resolve_spc)();
-	void            (*load_font)();
-	int	        (*exec_filter)();
-	void	        (*destroy_region)();
+	_DtCvValue	(*load_graphic)(void *, char *, char *, char *, char *, char *, _DtCvUnit *, _DtCvUnit *, void **);
+	_DtCvValue	(*resolve_spc)(void *, char *, const char *, _DtHelpFontHints, const char *, void **, _DtCvUnit *, _DtCvUnit *, _DtCvUnit *);
+	void            (*load_font)(void *, char *, const char *, _DtHelpFontHints, void **);
+	int	        (*exec_filter)(void *, const char *, char **);
+	void	        (*destroy_region)(void *, void *);
 	_DtCvPointer    client_data;
 	_DtCvUnit	line_width;
 	_DtCvUnit	line_height;

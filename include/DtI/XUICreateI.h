@@ -88,9 +88,9 @@ extern	XtPointer	_DtHelpCreateDisplayArea (
 				Boolean marker_flag,
 				int	rows,
 				int	columns,
-				void	(*hyperTextCB)(),
-				void	(*resizeCB)(),
-				int	(*exec_ok_routine)(),
+				void	(*hyperTextCB)(DtHelpDispAreaStruct *, void *, DtHelpHyperTextStruct *),
+				void	(*resizeCB)(void *),
+				int	(*exec_ok_routine)(void *, const char *, char **),
 				XtPointer client_data,
 				XmFontList  default_list );
 
@@ -105,9 +105,9 @@ extern	XtPointer	_DtHelpCreateOutputArea (
 				Dimension	width,
 				Dimension	height,
 				unsigned short media_resolution,
-				void	(*hyperTextCB)(),
-				void	(*resizeCB)(),
-				int	(*exec_ok_routine)(),
+				void	(*hyperTextCB)(DtHelpDispAreaStruct *, void *, DtHelpHyperTextStruct *),
+				void	(*resizeCB)(void *),
+				int	(*exec_ok_routine)(void *, const char *, char **),
 				XtPointer client_data,
 				XmFontList  default_list );
 

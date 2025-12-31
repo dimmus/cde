@@ -52,7 +52,7 @@
         Includes, Defines, and Global variables from the Declarations Editor:
 *******************************************************************************/
 
-extern void Do_FileIO();
+extern void Do_FileIO(Widget wid, XtPointer client_unused, XmFileSelectionBoxCallbackStruct *callback_data);
 
 Widget  fileIODialog;
 
@@ -60,7 +60,7 @@ Widget  fileIODialog;
         Forward declarations of functions that are defined later in this file.
 *******************************************************************************/
 
-Widget  create_fileIODialog();
+Widget  create_fileIODialog(void);
 
 /*******************************************************************************
         The following are callback functions.
@@ -202,7 +202,7 @@ create_fileIODialog( void )
     XmStringFree(tmpXmStr7);
 
     XtAddCallback(fileIODialog, XmNcancelCallback, cancelCB_fileIODialog, NULL);
-    XtAddCallback(fileIODialog, XmNokCallback, Do_FileIO, NULL);
+    XtAddCallback(fileIODialog, XmNokCallback, (XtCallbackProc) Do_FileIO, NULL);
 
     n = 0;
     XtSetArg (args[n], XmNuseAsyncGeometry, True);                          n++;

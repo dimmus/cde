@@ -460,12 +460,12 @@ GetFileName(
     XtAddCallback(pSelect->file_dialog, XmNokCallback,
 			(XtCallbackProc) pStuff->pendingFileFunc,
 			(XtPointer)pPad);
-    pStuff->pendingFileFunc = (void(*)())NULL;
+    pStuff->pendingFileFunc = NULL;
     XtRemoveAllCallbacks(pSelect->file_dialog, XmNhelpCallback);
     XtAddCallback(pSelect->file_dialog, XmNhelpCallback,
 			(XtCallbackProc) pStuff->pendingFileHelpFunc,
 			(XtPointer)pPad);
-    pStuff->pendingFileHelpFunc = (void (*)())NULL;
+    pStuff->pendingFileHelpFunc = NULL;
 
     /* -----> seed FSB directory from either fileName */
     if(type == OPEN) {

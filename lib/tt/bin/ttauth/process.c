@@ -78,7 +78,7 @@ typedef struct _CommandTable {		/* commands that are understood */
     char *name;				/* full name */
     int minlen;				/* unique prefix */
     int maxlen;				/* strlen(name) */
-    int (*processfunc)();		/* handler */
+    int (*processfunc)(char *, int, int, char **);		/* handler */
     char *helptext;			/* what to print for help */
 } CommandTable;
 
@@ -885,7 +885,7 @@ merge_entries(_tt_AuthFileEntryList **firstp, _tt_AuthFileEntryList *second,
 
 static int
 search_and_do(char *inputfilename, int lineno, int start,
-              int argc, char *argv[], int (*do_func)(), char *data)
+              int argc, char *argv[], int (*do_func)(char *, int, _tt_AuthFileEntry *, char *), char *data)
 {
     int i;
     int status = 0;

@@ -193,11 +193,11 @@ long               nLinesM1, nPixelsM1Temp;
 IL_PRIVATE ilConvertRec _ilPaletteToRGBByte = {
     IL_NPF,                                     /* CheckFormat() */
     IL_STD_FORMAT_BYTE,                         /* srcFormatCode */
-    ilAddElementPaletteToRGBByte,               /* AddElement() */
+    (ilError (*)(ilByte *, unsigned short *, void *)) ilAddElementPaletteToRGBByte, /* AddElement() */
     IL_DES_RGB,                                 /* pDstDes */
     IL_FORMAT_3BYTE_PIXEL,                      /* pDstFormat */
     sizeof (ilPaletteToRGBPrivRec),             /* nBytesPrivate */
-    ilInitPaletteToRGBByte,                     /* Init() */
+    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitPaletteToRGBByte, /* Init() */
     IL_NPF,                                     /* Cleanup() */
     IL_NPF,                                     /* Destroy() */
     ilExecutePaletteToRGBByte                   /* Execute() */

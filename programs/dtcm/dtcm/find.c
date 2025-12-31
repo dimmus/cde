@@ -72,6 +72,12 @@ static void layout_labels(Widget, Widget, Widget, Widget);
 extern void _i18n_WidestWidget(int num, Widget *ret, Dimension *dim, ...);
 extern void _i18n_HighestWidget(int num, Widget *ret, Dimension *dim, ...);
 
+void find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs);
+void show_appt(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs);
+void f_cancel_cb(Widget  widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs),
+                 f_searchrange_cb(Widget widget, XtPointer client_data, XtPointer call_data),
+                 f_searchall_cb(Widget widget, XtPointer client_data, XtPointer call_data);
+
 extern caddr_t
 make_find(Calendar *c)
 {
@@ -85,8 +91,6 @@ make_find(Calendar *c)
 	Tick		 cursor;
 	char		 buffer[50];
 	int		 i;
-	void 		 find_appts(), show_appt(), f_cancel_cb(), 
-			 f_searchrange_cb(), f_searchall_cb();
 	Arg		 args[3];
 	Dimension	 highest;
 	Widget	 	 highest_label;
@@ -339,7 +343,7 @@ make_find(Calendar *c)
 		XmNbottomAttachment,	XmATTACH_FORM,
 		XmNshowAsDefault,	0,
                 NULL);
-	XtAddCallback(f->find_button, XmNactivateCallback, find_appts, NULL);
+	XtAddCallback(f->find_button, XmNactivateCallback, (void *) find_appts, NULL);
 	XmStringFree(xmstr);
 		
 	xmstr = XmStringCreateLocalized(
@@ -358,7 +362,7 @@ make_find(Calendar *c)
                 NULL);
 	XmStringFree(xmstr);
 
-	XtAddCallback(f->show_button, XmNactivateCallback, show_appt, NULL);
+	XtAddCallback(f->show_button, XmNactivateCallback, (void *) show_appt, NULL);
 
 	xmstr = XmStringCreateLocalized(CATGETS(c->DT_catd, 1, 680, "Close"));
 	f->cancel_button = XtVaCreateWidget("cancel", 
@@ -375,7 +379,7 @@ make_find(Calendar *c)
                 NULL);
 	XmStringFree(xmstr);
 
-	XtAddCallback(f->cancel_button, XmNactivateCallback, f_cancel_cb, NULL);
+	XtAddCallback(f->cancel_button, XmNactivateCallback, (void *) f_cancel_cb, NULL);
 
 	xmstr = XmStringCreateLocalized(CATGETS(c->DT_catd, 1, 77, "Help"));
 	f->help_button = XtVaCreateWidget("help", 
@@ -422,7 +426,7 @@ make_find(Calendar *c)
 
 	XtManageChild(f->find_list);
 
-	XtAddCallback(f->find_list, XmNdefaultActionCallback, show_appt, NULL);
+	XtAddCallback(f->find_list, XmNdefaultActionCallback, (void *) show_appt, NULL);
 
 	layout_labels(f->date_label, f->time_label, 
 		      f->what_label, f->find_list);

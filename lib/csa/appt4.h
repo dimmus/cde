@@ -38,7 +38,7 @@
 #include "rtable4.h"
 #include "ansi_c.h"
 
-extern Appt_4 *_DtCm_make_appt4();
+extern Appt_4 *_DtCm_make_appt4(boolean_t alloc);
 
 extern Appt_4 *_DtCm_copy_one_appt4(Appt_4 *a4);
 

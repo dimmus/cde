@@ -1438,7 +1438,7 @@ Widget DtHelpQuickDialogGetChild(
  *
  ****************************************************************************/
 void _DtHelpQuickDialogHypertextCB (
-    XtPointer pDisplayAreaStruct,
+    DtHelpDispAreaStruct *pDisplayAreaStruct,
     XtPointer clientData,
     DtHelpHyperTextStruct *hyperData)
 {

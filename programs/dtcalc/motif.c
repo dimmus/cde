@@ -221,7 +221,7 @@ static void new_cf_value(Widget, XtPointer, XtPointer);
 static void do_memory(Widget, XtPointer, XtPointer);
 static void switch_mode(enum mode_type);
 static void update_cf_value(void);
-static void xerror_interpose(Display *, XErrorEvent *);
+static int xerror_interpose(Display *, XErrorEvent *);
 
 static Widget button_create(Widget, int, int, int, int);
 static void save_state(Widget, XtPointer, XtPointer);
@@ -2646,7 +2646,7 @@ start_tool(void)
   XmAddWMProtocolCallback(X->kframe, saveatom, save_state, (XtPointer)NULL) ;
 
   v->started = 1 ;
-  XSetErrorHandler((int (*)())xerror_interpose) ;
+  XSetErrorHandler(xerror_interpose) ;
   XtAddEventHandler(X->kframe, KeyPressMask | KeyReleaseMask,
                     FALSE, event_proc, NULL) ;
   XmProcessTraversal( X->kbuttons[0][0], XmTRAVERSE_CURRENT );
@@ -3233,7 +3233,7 @@ write_cf_value(Widget widget, XtPointer client_data, XtPointer call_data)
 }
 
 
-static void
+static int
 xerror_interpose(Display *display, XErrorEvent *error)
 {
   char msg1[80];
@@ -3243,6 +3243,8 @@ xerror_interpose(Display *display, XErrorEvent *error)
   sprintf(msg, "\nX Error (intercepted): %s\nMajor Request Code   : %d\nMinor Request Code   : %d\nResource ID (XID)    : %lu\nError Serial Number  : %lu\n", msg1, error->request_code, error->minor_code, error->resourceid, error->serial);
   _DtSimpleError (v->appname, DtError, NULL, msg);
   abort() ;
+  
+  return 0; /* Return value is ignored */
 }
 
 static void

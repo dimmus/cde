@@ -66,7 +66,7 @@
 #include "datefield.h"
 #include "props.h"
 
-static void select_weekhotbox();
+static void select_weekhotbox(Calendar *c);
 
 /* Highlight thickness  - mghis */
 #define	STDTTT		3	/* default */

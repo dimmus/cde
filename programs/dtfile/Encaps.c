@@ -147,23 +147,23 @@ static DialogResource commonResources[] =
 {
    { "displayed", XmRBoolean, sizeof(Boolean),
      XtOffset(DialogInstanceDataPtr, displayed),
-     (caddr_t) False, _DtBooleanToString },
+     (caddr_t) False, (WriteResourceProc) _DtBooleanToString },
 
    { "x", XmRPosition, sizeof(Position),
      XtOffset(DialogInstanceDataPtr, x),
-     (caddr_t) 0, _DtPositionToString},
+     (caddr_t) 0, (WriteResourceProc) _DtPositionToString},
 
    { "y", XmRPosition, sizeof(Position),
       XtOffset(DialogInstanceDataPtr, y),
-      (caddr_t) 0, _DtPositionToString },
+      (caddr_t) 0, (WriteResourceProc) _DtPositionToString },
 
    { "width", XmRHorizontalDimension, sizeof(Dimension),
      XtOffset(DialogInstanceDataPtr, width),
-     (caddr_t) 0, _DtDimensionToString },
+     (caddr_t) 0, (WriteResourceProc) _DtDimensionToString },
 
    { "height", XmRVerticalDimension, sizeof(Dimension),
       XtOffset(DialogInstanceDataPtr, height),
-      (caddr_t) 0, _DtDimensionToString },
+      (caddr_t) 0, (WriteResourceProc) _DtDimensionToString },
 };
 
 static Widget encap_parent_shell;

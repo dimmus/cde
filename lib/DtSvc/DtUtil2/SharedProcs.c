@@ -179,11 +179,11 @@ _DtMessage(
         char *title,
         char *message_text,
         XtPointer helpIdStr,
-        void (*helpCallback)() )
+        void (*helpCallback)(Widget widget,	XtPointer client_data, XtPointer call_data) )
 
 {
    _DtMessageDialog(w, title, message_text, helpIdStr, False,
-                 NULL, _DtMessageOK, _DtMessageClose, helpCallback, True, 
+                 NULL, _DtMessageOK, (XtCallbackProc)_DtMessageClose, helpCallback, True, 
                  ERROR_DIALOG);
 }
 
@@ -195,19 +195,17 @@ _DtMessage(
  ************************************************************************/
 
 Widget
-_DtMessageDialog(
-        Widget w,
-        char *title,
-        char *message_text,
-        XtPointer helpIdStr,
-        Boolean cancel_btn,
-        void (*cancel_callback)(),
-        void (*ok_callback)(),
-        void (*close_callback)(),
-        void (*help_callback)(),
-        Boolean deleteOnClose,
-        int dialogType )
-
+_DtMessageDialog(Widget w,
+                 char *title,
+                 char *message_text,
+                 XtPointer helpIdStr,
+                 Boolean cancel_btn,
+                 void (*cancel_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                 void (*ok_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                 void (*close_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                 void (*help_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                 Boolean deleteOnClose,
+                 int dialogType)
 {
    Widget message = NULL;
    Widget widget;
@@ -305,7 +303,7 @@ _DtMessageDialog(
    if (deleteOnClose)
    {
       if (close_callback == NULL)
-         close_callback = _DtMessageClose;
+         close_callback = (XtCallbackProc) _DtMessageClose;
 
       XtAddEventHandler(XtParent (message), StructureNotifyMask, True,
                          (XtEventHandler)close_callback, message);

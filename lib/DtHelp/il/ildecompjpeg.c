@@ -259,7 +259,11 @@ ilBool _ilDecompJPEG (
         dstData.constantStrip = pInfo->constantStrip;
         pPriv = (ilJPEGPrivPtr)ilAddPipeElement(pipe, IL_FILTER, 
                 sizeof(ilJPEGPrivRec), 0, (ilSrcElementData *)NULL, &dstData, 
-                ilDecompInit, ilDecompCleanup, IL_NPF, ilDecompRawExecute, NULL, 0);
+                (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilDecompInit,
+                (ilError (*)(ilByte *, ilBool)) ilDecompCleanup,
+                IL_NPF,
+                (ilError (*)(ilExecuteData *, long, long *)) ilDecompRawExecute,
+                NULL, 0);
         }
     else {
             /*  JIF: a single data stream (strip) with tables in the stream: decompress
@@ -278,7 +282,11 @@ ilBool _ilDecompJPEG (
         dstData.constantStrip = TRUE;
         pPriv = (ilJPEGPrivPtr)ilAddPipeElement(pipe, IL_FILTER, 
                 sizeof(ilJPEGPrivRec), 0, (ilSrcElementData *)NULL, &dstData, 
-                ilDecompInit, ilDecompCleanup, IL_NPF, ilDecompJIFExecute, NULL, 0);
+                (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilDecompInit,
+                (ilError (*)(ilByte *, ilBool)) ilDecompCleanup,
+                IL_NPF,
+                (ilError (*)(ilExecuteData *, long, long *)) ilDecompJIFExecute,
+                NULL, 0);
         }
 
         /*  Fill in data into private; copy jpgData */

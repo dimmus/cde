@@ -184,7 +184,7 @@ _DtShmProtoDestroyStrtab(DtShmProtoStrtab strlist)
   strlist_t * ptr = (strlist_t *) strlist;
   
   _DtUtilDestroyHash(ptr->sl_hash, NULL, NULL);
-  _DtUtilDestroyHash(ptr->sl_bosons, destroy_hashval, NULL);
+  _DtUtilDestroyHash(ptr->sl_bosons, (DtHashDestroyFunc) destroy_hashval, NULL);
   free(ptr);
   return(0);
 }
@@ -279,7 +279,7 @@ _DtShmProtoCopyStrtab(DtShmProtoStrtab in, void * destination)
   building.tabstart = (strtab_entry_t *) ((unsigned char *) ptr  + ptr->st_taboffset);
   building.strtab = ptr;
 
-  _DtUtilOperateHash(strlist->sl_hash, build_it, & building);
+  _DtUtilOperateHash(strlist->sl_hash, (DtHashOperateFunc) build_it, & building);
   return((DtShmStrtab) destination);
 }
 

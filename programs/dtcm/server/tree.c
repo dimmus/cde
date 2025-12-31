@@ -54,8 +54,7 @@ typedef struct {
 	_DtCmsCompareProc compare;
 	} Private;
 
-typedef void (*Action_proc)
-	(/* Private *private; Tree_node *y, *z, *root */);
+typedef void (*Action_proc)(Private *private, Tree_node *y, Tree_node *z, Tree_node *root);
 
 
 static Tree_node *
@@ -535,7 +534,7 @@ visit_subtree(Tree_node *node, Private *p, Tree_node *z, Direction dir)
 	Tree_node *link;
 	link = (dir == up) ? node->llink : node->rlink;
 	if (link != z && visit_subtree(link, p, z, dir)) return(B_TRUE);
-	if (p->enumerate((caddr_t)node, node->data)) return(B_TRUE);
+	if (p->enumerate(node->data)) return(B_TRUE);
 	link = (dir == up) ? node->rlink : node->llink;
 	if (link != z) return(visit_subtree(link, p, z, dir));
 	else return(B_FALSE);

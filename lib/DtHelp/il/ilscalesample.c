@@ -559,11 +559,15 @@ ilDstElementData          dstdata;
 
        case  3:
                  pPriv = (ilScaleSamplePtr) ilAddPipeElement (pipe, IL_FILTER, sizeof (ilScaleSampleRec), 0, (ilSrcElementData *)NULL,
-                                                              &dstdata, ilScaleSampleInit, IL_NPF, IL_NPF, ilScaleSample3ByteExecute, NULL, 0);
+                                                              &dstdata,
+                                                              (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilScaleSampleInit,
+                                                              IL_NPF, IL_NPF, ilScaleSample3ByteExecute, NULL, 0);
                  break;
        case  1:
                  pPriv = (ilScaleSamplePtr) ilAddPipeElement (pipe, IL_FILTER, sizeof (ilScaleSampleRec), 0, (ilSrcElementData *)NULL,
-                                                              &dstdata, ilScaleSampleInit, IL_NPF, IL_NPF, ilScaleSampleByteExecute, NULL, 0);
+                                                              &dstdata,
+                                                              (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilScaleSampleInit,
+                                                              IL_NPF, IL_NPF, ilScaleSampleByteExecute, NULL, 0);
     }
 
 

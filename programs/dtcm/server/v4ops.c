@@ -693,7 +693,7 @@ _DtCmsLookupRangeV4(
 	boolean_t	no_end_time_range,
 	long		end1,
 	long		end2,
-	boolean_t	(*match_func)(),
+	boolean_t	(*match_func)(Appt_4 *, uint, cms_attribute *, CSA_enum *),
 	uint		num_attrs,
 	cms_attribute	*attrs,
 	CSA_enum	*ops,
@@ -713,7 +713,7 @@ _DtCmsLookupRangeV4(
 	int		ntimes;
 	Appt_4		*p_appt;
 	cms_entry	*entries;
-	CSA_return_code	(*add_list_func)();
+	CSA_return_code	(*add_list_func)(Appt_4 *, char *, uint, char **);
 
 	/* do lookup on new format calendar */
 	if (cal->fversion > 1) {
@@ -903,7 +903,7 @@ _DtCmsLookupKeyrangeV4(
 	time_t		end1,
 	time_t		end2,
 	long		id,
-	boolean_t	(*match_func)(),
+	boolean_t	(*match_func)(Appt_4 *, uint, cms_attribute *, CSA_enum *),
 	uint		num_attrs,
 	cms_attribute	*attrs,
 	CSA_enum	*ops,
@@ -921,7 +921,7 @@ _DtCmsLookupKeyrangeV4(
 	Appt_4		*p_appt, *tappt;
 	Abb_Appt_4	*tabbr;
 	cms_entry	*entries;
-	CSA_return_code (*add_list_func)();
+	CSA_return_code (*add_list_func)(Appt_4 *p_appt, char *user, uint access, caddr_t *ilp);
 
 	/* do lookup on new format calendar */
 	if (cal->fversion >= _DtCM_FIRST_EXTENSIBLE_DATA_VERSION) {
@@ -965,7 +965,7 @@ _DtCmsLookupKeyrangeV4(
 		/* just return the first event */
 		if (no_start_time_range && no_end_time_range)
 			return ((*add_list_func)(p_appt, user, access,
-				(appt_r ? (caddr_t)appt_r : (caddr_t)abbr_r)));
+				(appt_r ? (caddr_t *)appt_r : (caddr_t *)abbr_r)));
 
 		/* Get the range of events from this appointment. */
 		ntimes = _DtCms_get_ninstance_v4(p_appt);
@@ -1016,8 +1016,8 @@ _DtCmsLookupKeyrangeV4(
 
 				/* Add to list, restore parent key */
 				stat = (*add_list_func)(p_appt, user, access,
-					(appt_r ? (caddr_t)appt_r :
-					(caddr_t)abbr_r));
+					(appt_r ? (caddr_t *)appt_r :
+					(caddr_t *)abbr_r));
 
 				APPT_TICK(p_appt) = tmp_tick;
 
@@ -1046,8 +1046,8 @@ _DtCmsLookupKeyrangeV4(
 				} else {
 					return ((*add_list_func)(p_appt, user,
 						access, (appt_r ?
-						(caddr_t)appt_r :
-						(caddr_t)abbr_r)));
+						(caddr_t *)appt_r :
+						(caddr_t *)abbr_r)));
 				}
 			}
 		}

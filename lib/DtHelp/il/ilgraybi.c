@@ -236,8 +236,8 @@ IL_PRIVATE ilConvertRec _ilDiffuseGrayToBitonal = {
     IL_DES_BITONAL,                             /* pDstDes */
     IL_FORMAT_BIT,                              /* pDstFormat */
     sizeof (ilBiDiffusionPrivRec),              /* nBytesPrivate */
-    ilInitBiDiffusion,                          /* Init() */
-    ilCleanupBiDiffusion,                       /* Cleanup() */
+    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitBiDiffusion, /* Init() */
+    (ilError (*)(ilByte *, ilBool)) ilCleanupBiDiffusion, /* Cleanup() */
     IL_NPF,                                     /* Destroy() */
     ilExecuteBiDiffusion                        /* Execute() */
     };
@@ -393,11 +393,11 @@ ilByte             threshold;
 IL_PRIVATE ilConvertRec _ilThresholdGrayToBitonal = {
     IL_NPF,                                     /* CheckFormat() */
     IL_STD_FORMAT_BYTE,                         /* srcFormatCode */
-    ilAddElementThreshold,                      /* AddElement() */
+    (ilError (*)(ilByte *, unsigned short *, void *)) ilAddElementThreshold, /* AddElement() */
     IL_DES_BITONAL,                             /* pDstDes */
     IL_FORMAT_BIT,                              /* pDstFormat */
     sizeof (ilThresholdPrivRec),                /* nBytesPrivate */
-    ilInitThreshold,                            /* Init() */
+    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitThreshold, /* Init() */
     IL_NPF,                                     /* Cleanup() */
     IL_NPF,                                     /* Destroy() */
     ilExecuteThreshold                          /* Execute() */

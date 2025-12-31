@@ -112,43 +112,43 @@ static discInfo * setHelpDisciplines( void ) ;
 
 
 static Namdisc_t arrowDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())arrowCreateDisc, NULL, NULL};
+                           arrowCreateDisc, NULL, NULL};
 static Namdisc_t comboDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())comboCreateDisc, NULL, NULL};
+                           comboCreateDisc, NULL, NULL};
 static Namdisc_t cmdDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())cmdCreateDisc, NULL, NULL};
+                           cmdCreateDisc, NULL, NULL};
 static Namdisc_t dAreaDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())dAreaCreateDisc, NULL, NULL};
+                           dAreaCreateDisc, NULL, NULL};
 static Namdisc_t dbtnDisc ={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())dbtnCreateDisc, NULL, NULL};
+                           dbtnCreateDisc, NULL, NULL};
 static Namdisc_t dtPrintDisc ={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())dtPrintSetupProcDisc, NULL, NULL};
+                           dtPrintSetupProcDisc, NULL, NULL};
 static Namdisc_t fselDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())fselCreateDisc, NULL, NULL};
+                           fselCreateDisc, NULL, NULL};
 static Namdisc_t listDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())listCreateDisc, NULL, NULL};
+                           listCreateDisc, NULL, NULL};
 static Namdisc_t pbtnDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())pbtnCreateDisc, NULL, NULL};
+                           pbtnCreateDisc, NULL, NULL};
 static Namdisc_t rcDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())rcCreateDisc, NULL, NULL};
+                           rcCreateDisc, NULL, NULL};
 static Namdisc_t scaleDisc={0, NULL, NULL, NULL, NULL,
-                           (Namval_t *(*)()) scaleCreateDisc, NULL, NULL};
+                           scaleCreateDisc, NULL, NULL};
 static Namdisc_t sbarDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())sbarCreateDisc, NULL, NULL};
+                           sbarCreateDisc, NULL, NULL};
 static Namdisc_t swinDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())swinCreateDisc, NULL, NULL};
+                           swinCreateDisc, NULL, NULL};
 static Namdisc_t sboxDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())sboxCreateDisc, NULL, NULL};
+                           sboxCreateDisc, NULL, NULL};
 static Namdisc_t textDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())textCreateDisc, NULL, NULL};
+                           textCreateDisc, NULL, NULL};
 static Namdisc_t textDisc2={0, NULL, NULL, NULL, NULL,
-                           (Namval_t *(*)())textCreateDisc2, NULL, NULL};
+                           textCreateDisc2, NULL, NULL};
 static Namdisc_t tbtnDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())tbtnCreateDisc, NULL, NULL};
+                           tbtnCreateDisc, NULL, NULL};
 static Namdisc_t dftDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())dftCreateDisc, NULL, NULL};
+                           dftCreateDisc, NULL, NULL};
 static Namdisc_t helpDisc={0, NULL, NULL, NULL, NULL, 
-                           (Namval_t *(*)())helpCreateDisc, NULL, NULL};
+                           helpCreateDisc, NULL, NULL};
 
 
 /*

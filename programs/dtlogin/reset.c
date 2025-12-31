@@ -145,6 +145,6 @@ pseudoReset( Display *dpy )
 		(void) alarm (0);
 	}
 	signal (SIGALRM, SIG_DFL);
-	XSetErrorHandler ((int (*)()) 0);
+	XSetErrorHandler (NULL);
 	Debug ("pseudoReset() done\n");
 }

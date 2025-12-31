@@ -181,43 +181,43 @@ void DtMrmInitialize (void)
      */
     MrmRegisterClass(
 		0, NULL,
-		"DtCreateEditor", DtCreateEditor,
+		"DtCreateEditor", (Widget (*)()) DtCreateEditor,
         	(WidgetClass) &dtEditorClassRec
 		);
 
     MrmRegisterClass(
 		0, NULL,
-		"DtCreateHelpDialog", DtCreateHelpDialog,
+		"DtCreateHelpDialog", (Widget (*)()) DtCreateHelpDialog,
         	(WidgetClass) &dtHelpDialogWidgetClassRec
 		);
 
     MrmRegisterClass(
 		0, NULL,
-		"DtCreateHelpQuickDialog", DtCreateHelpQuickDialog,
+		"DtCreateHelpQuickDialog", (Widget (*)()) DtCreateHelpQuickDialog,
         	(WidgetClass) &dtHelpQuickDialogWidgetClassRec
 		);
 
     MrmRegisterClass(
 		0, NULL,
-		"DtCreateMenuButton", DtCreateMenuButton,
+		"DtCreateMenuButton", (Widget (*)()) DtCreateMenuButton,
         	(WidgetClass) &dtMenuButtonClassRec
 		);
 
     MrmRegisterClass(
 		0, NULL,
-		"DtCreatePrintSetupBox", DtCreatePrintSetupBox,
+		"DtCreatePrintSetupBox", (Widget (*)()) DtCreatePrintSetupBox,
         	(WidgetClass) &dtPrintSetupBoxClassRec
 		);
 
     MrmRegisterClass(
 		0, NULL,
-		"DtCreatePrintSetupDialog", DtCreatePrintSetupDialog,
+		"DtCreatePrintSetupDialog", (Widget (*)()) DtCreatePrintSetupDialog,
         	(WidgetClass) &dtPrintSetupBoxClassRec
 		);
 
     MrmRegisterClass(
 		0, NULL,
-		"DtCreateTerm", DtCreateTerm,
+		"DtCreateTerm", (Widget (*)()) DtCreateTerm,
         	(WidgetClass) &dtTermClassRec
 		);
 

@@ -58,10 +58,10 @@ program_handle program = &po;
 
 program_handle newph(void) 
 {
-	extern void initrtable2();
-	extern void initrtable3();
-	extern void initrtable4();
-	extern void initfunctable();
+	extern void initrtable2(program_handle ph);
+	extern void initrtable3(program_handle ph);
+	extern void initrtable4(program_handle ph);
+	extern void initfunctable(program_handle ph);
 	
 	program->nvers = sizeof(ptable)/sizeof(ptable[0]);
 	initrtable2(program);

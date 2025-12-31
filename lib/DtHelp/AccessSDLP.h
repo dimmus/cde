@@ -124,7 +124,7 @@ typedef	struct _sdlVolume {
     _DtCvSegment *snb;		/* A pointer to the document's snb   */
     _DtCvPointer  client_data;	/* data that must be used to free the title
 				   and snb				*/
-    void	(*destroy_region)(); /* The destroy region routine specified
+    void	(*destroy_region)(void *, void *); /* The destroy region routine specified
 				   when the title was read              */
     short      minor_no;	/* The minor number of the sdl version */
     short      title_processed;	/* If the title has already been searched for */

@@ -200,7 +200,7 @@ ilImageDes              des;
 ilImageFormat           format;
 ilImageInfo            *pInfo;
 int                     i;
-ilError               (*executeProc) ();
+ilError               (*executeProc) (ilExecuteData *, long, long *);
 
         /*  Validate that pipe and image are such, and that they have the same context.
         */

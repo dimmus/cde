@@ -50,10 +50,10 @@ typedef enum {
 	_DtCmsIsGreater
 } _DtCmsComparisonResult;
 
-typedef caddr_t (*_DtCmsGetKeyProc) (/* caddr_t data */);
+typedef caddr_t (*_DtCmsGetKeyProc)(caddr_t data);
 
-typedef _DtCmsComparisonResult (*_DtCmsCompareProc)(/* caddr_t key; caddr_t data */);
+typedef _DtCmsComparisonResult (*_DtCmsCompareProc)(caddr_t key, caddr_t data);
 
-typedef boolean_t (*_DtCmsEnumerateProc) (/* caddr_t data */);
+typedef boolean_t (*_DtCmsEnumerateProc)(caddr_t data);
 
 #endif

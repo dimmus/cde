@@ -939,16 +939,28 @@ static unsigned long    defaultBitonalThreshold = 192;
        switch (imdes.nSamplesPerPixel) {
             case 3:
                      pPriv = (ilScalePrivptr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilScalePriv), 0, (ilSrcElementData *) NULL,
-                                                               &dstdata, ilScaleInit, IL_NPF, IL_NPF, ilScale3ByteExecute, NULL, 0);
+                                                               &dstdata,
+                                                               (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilScaleInit,
+                                                               IL_NPF, IL_NPF,
+                                                               (ilError (*)(ilExecuteData *, long, long *)) ilScale3ByteExecute,
+                                                               NULL, 0);
                      break;
 
             case 1:  
                      if(bitonal) 
                        pPriv = (ilScalePrivptr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilScalePriv), 0, (ilSrcElementData *) NULL,
-                                                                 &dstdata, ilScaleInit, IL_NPF, IL_NPF, ilScaleBitonalExecute, NULL, 0);
+                                                                 &dstdata,
+                                                                 (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilScaleInit,
+                                                                 IL_NPF, IL_NPF,
+                                                                 (ilError (*)(ilExecuteData *, long, long *)) ilScaleBitonalExecute,
+                                                                 NULL, 0);
                      else 
                        pPriv = (ilScalePrivptr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilScalePriv), 0, (ilSrcElementData *) NULL,
-                                                                 &dstdata, ilScaleInit, IL_NPF, IL_NPF, ilScaleByteExecute, NULL, 0);
+                                                                 &dstdata,
+                                                                 (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilScaleInit,
+                                                                 IL_NPF, IL_NPF,
+                                                                 (ilError (*)(ilExecuteData *, long, long *)) ilScaleByteExecute,
+                                                                 NULL, 0);
        }
 
        if(!pPriv)

@@ -44,12 +44,15 @@ static char	*conf_msg_id = STR_CONFDATA;
 #define	CONF_MSG_HEADER_LEN	(CONF_MSG_ID_LEN + CONF_MSG_DATASIZE_LEN)
 #define	CONF_MSG_SIZE_MAX	(8*1024 - 64)	/* < PIPE_BUF (PIPSIZ) */
 
-static int	mk_remote_conf(/* list, locale, ims_name, status, confbuf, conflen */);
-static char	*mk_ims_ent(/* bp, idx, ent */);
-static int	parse_ims_list(/* ptr, list */);
-static int	parse_remote_conf(/* listp, locale, confbuf, conflen */);
-static int	prepare_action(/* act_typ, av, ac */);
-static int	read_property(/* prop, type, format, remove, datapp, lenp */);
+static int	mk_remote_conf(ImsList *list, char *locale,
+                               char *ims_name, int status,
+                               char *confbuf, int *conflen);
+static char	*mk_ims_ent(char *bp, int idx, ImsEnt *ent);
+static int	parse_ims_list(char *ptr, ImsList *list);
+static int	parse_remote_conf(ImsList **listp, char *locale, char *confbuf, int conflen);
+static int	prepare_action(int act_typ, char **av, int ac);
+static int	read_property(Atom prop, Atom type, int format, int del_flag, unsigned char **datapp,
+                              unsigned long *lenp);
 
 #if	0	/* README */
 
@@ -731,7 +734,7 @@ int	get_window_status(void)
 
     win_st = WIN_ST_NONE;
     if (read_property(winEnv.atom_status, XA_INTEGER, 32, False,
-	    (char **)&datap, &len) == True && len > 0) {
+	    (unsigned char **)&datap, (long *) &len) == True && len > 0) {
 	    win_st = datap[0];
 	    FREE(datap);
     }
@@ -801,13 +804,13 @@ int	get_window_data(int *acp, char ***avp)
     int ac;
     char *data;
     char **av;
-    int len = 0;
+    unsigned long len = 0;
     int	i, j;
 
     if (winEnv.atom_data == None || winEnv.atom_owner == None)
 	return ErrInternal;
 
-    if (read_property(winEnv.atom_data, XA_STRING, 8, True, &data, &len) != True) {
+    if (read_property(winEnv.atom_data, XA_STRING, 8, True, (unsigned char **) &data, &len) != True) {
 	*acp = 0;
 	*avp = NULL;
 	return ErrRemoteData;

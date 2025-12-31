@@ -164,7 +164,7 @@ _DtHelpCeBufFileFlush (BufFilePtr f, int doClose)
  *			Routines working on a File descriptor
  *****************************************************************************/
 static int
-FdRawRead (BufFilePtr f)
+FdRawRead (int ignored, BufFilePtr f)
 {
     int	left;
 
@@ -192,7 +192,7 @@ FdClose (
  *			Routines working on a Raw Compressed file
  *****************************************************************************/
 static int
-CompressRawRead (BufFilePtr f)
+CompressRawRead (int ignored, BufFilePtr f)
 {
     int	left;
 
@@ -233,7 +233,7 @@ CompressRawClose (
  *
  *****************************************************************************/
 static int
-RdPipeStream (BufFilePtr f)
+RdPipeStream (int ignored, BufFilePtr f)
 {
     int    left;
 
@@ -286,9 +286,9 @@ ClosePipeStream (
 BufFilePtr
 _DtHelpCeBufFileCreate (
     char    *hidden,
-    int	    (*io)(),
-    int	    (*skip)(),
-    int	    (*close)() )
+    int	    (*io)(int, BufFilePtr),
+    int	    (*skip)(BufFilePtr f, int count),
+    int	    (*close)(BufFilePtr, int) )
 {
     BufFilePtr	f;
 
@@ -373,7 +373,8 @@ _DtHelpCeBufFileRd (
     int	    c, cnt;
     cnt = n;
     while (cnt--) {
-	c = BufFileGet (f);
+	int ignored = 0;
+	c = BufFileGet (ignored, f);
 	if (c == BUFFILEEOF)
 	    break;
 	*b++ = c;

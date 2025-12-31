@@ -65,7 +65,7 @@ AnyDisplaysLeft( void )
 }
 
 void
-ForEachDisplay( void (*f)() )
+ForEachDisplay( void (*f)(struct display *) )
 {
 	struct display	*d, *next;
 

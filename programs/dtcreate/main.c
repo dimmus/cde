@@ -66,11 +66,13 @@ extern XmWidgetExtData _XmGetWidgetExtData(
 #include "cmnrtns.h"
 #include "ErrorDialog.h"
 #include "fileio.h"
+#include "FileCharacteristics.h"
+#include "AddFiletype.h"
 
 #ifdef __TOOLTALK
 #include <Tt/tttk.h>
 void DieFromToolTalkError(Widget, char*, Tt_status);
-Tt_message ProcessToolTalkMessage( );
+Tt_message ProcessToolTalkMessage(Tt_message msg, void* cdata, Tt_message contract);
 #endif
 
 #if !defined(NL_CAT_LOCALE)
@@ -1354,8 +1356,6 @@ main(int argc, char *argv[])
 #endif
 
         Widget          mainIface;
-        extern swidget  create_AddFiletype();
-        extern swidget  create_FileCharacteristics();
         extern swidget  create_OpenFile();
         extern swidget  create_Confirmed();
         extern Widget   create_ErrorDialog();

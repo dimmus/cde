@@ -185,19 +185,19 @@ static DialogResource resources[] =
 {
    { "folders", XmRString, sizeof(String),
      XtOffset(FindDataPtr, directories),
-     (XtPointer) NULL, _DtStringToString },
+     (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 
    { "name", XmRString, sizeof(String),
      XtOffset(FindDataPtr, filter),
-     (XtPointer) NULL, _DtStringToString },
+     (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 
    { "selectedItem", XmRInt, sizeof(int),
      XtOffset(FindDataPtr, selected_item),
-     (XtPointer) -1, _DtIntToString },
+     (XtPointer) -1, (WriteResourceProc) _DtIntToString },
 
    { "content", XmRString, sizeof(String),
      XtOffset(FindDataPtr, content),
-     (XtPointer) NULL, _DtStringToString },
+     (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 };
 
 
@@ -205,7 +205,7 @@ static DialogResource match_resources[] =
 {
    { "matchData", XmRString, sizeof(String),
      XtOffset(DummyPtr, string),
-     (XtPointer) NULL, _DtStringToString },
+     (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 };
 
 /********    Static Function Declarations    ********/

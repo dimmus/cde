@@ -286,7 +286,7 @@ main(
   
     XtSetLanguageProc(NULL, NULL, NULL);
     _DtEnvControl(DT_ENV_SET);
-    (void) signal(SIGCHLD, (void (*)())SIG_IGN);
+    (void) signal(SIGCHLD, SIG_IGN);
 
     /*  Initialize the toolkit and open the display  */
     XtToolkitInitialize() ;

@@ -55,7 +55,7 @@ typedef unsigned char auth_cblock[8];	/* block size */
 
 typedef struct auth_ks_struct { auth_cblock _; } auth_wrapper_schedule[16];
 
-extern void _XdmcpWrapperToOddParity();
+extern void _XdmcpWrapperToOddParity(unsigned char *in, unsigned char *out);
 
 #ifdef SILLYEXPORTRULE
 #define _XdmcpAuthSetup _xX_a1

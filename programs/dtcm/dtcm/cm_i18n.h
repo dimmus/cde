@@ -83,14 +83,8 @@ extern char *fontset2[];
 extern int use_default_fonts;
 extern int use_octal;
 
-extern int cm_get_fonts(/* char * */); 
-extern void ps_i18n_header(/* FILE *, Frame */);
-extern char *euc_to_octal(/* char * */);
-extern char *cm_get_i18n_date(/* Frame, char * */);
-extern char *cm_printf();
-
-int is_comment();
-int match_locale();
+int is_comment(char *);
+int match_locale(char *, char *);
 
 extern int	cm_get_fonts(char *);
 extern int	is_comment(char[MAX_LINE_LEN]);

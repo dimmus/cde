@@ -134,7 +134,7 @@ extern XmWidgetExtData _XmGetWidgetExtData(
 #include "Main.h"
 #include "SharedProcs.h"
 
-extern char *pathcollapse();
+extern char *pathcollapse(const char *, char *, boolean);
 
 
 /* Defines */

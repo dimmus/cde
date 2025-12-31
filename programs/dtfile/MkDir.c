@@ -103,7 +103,7 @@ RunFileCommand(
             int exit_value;      /* command exit value */
    char *command_name;  /* pointer to the command name */
    int i;
-   void (*oldSig)();
+   void (*oldSig)(int);
   
    /* prepare to catch the command termination */
 

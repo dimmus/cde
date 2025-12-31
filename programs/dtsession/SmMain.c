@@ -319,7 +319,7 @@ main (int argc, char **argv)
     /*
      * Initialize XSMP
      */
-    if (!InitXSMP (argv[0]))
+    if (!InitXSMP ())
         SM_EXIT(-1);
 
     /* Added the following check to exit in case of error RK 09.08.93 */

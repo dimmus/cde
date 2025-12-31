@@ -89,7 +89,7 @@ extern "C" {                                    /* for C++ V2.0 */
 #define IL_ADD_PIPE_HOLD_DST    (1<<2)
 
         /*  ilAddPipeElement (null function pointer) */
-#define IL_NPF                  ((ilError (*)())0)
+#define IL_NPF                  NULL
 
 typedef struct {
     ilObject            producerObject;
@@ -182,18 +182,15 @@ extern ilPtr ilAddPipeElement (
     unsigned long       flags,
     ilSrcElementData   *pSrcData,
     ilDstElementData   *pDstData,
-    ilError           (*Init)(),
-    ilError           (*Cleanup)(),
-    ilError           (*Destroy)(),
+    ilError           (*Init)(ilByte *, ilImageInfo *, ilImageInfo *),
+    ilError           (*Cleanup)(ilByte *, ilBool),
+    ilError           (*Destroy)(ilByte *),
 /*
 ** Added another execute function for passing in a fourth
 ** parameter which is a floating pointing.
 */
-    ilError           (*ExecuteThree)(),
-    ilError           (*ExecuteFour)( ilExecuteData *,
-				  long,
-	                          long *,
-	                          float),
+    ilError           (*ExecuteThree)(ilExecuteData *, long, long *),
+    ilError           (*ExecuteFour)( ilExecuteData *, long, long *, float),
     unsigned long       mustBeZero
 #endif
     );

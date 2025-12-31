@@ -35,15 +35,16 @@
 
 typedef unsigned char BufChar;
 
-typedef struct _buffile {
+typedef struct _buffile BufFileRec, *BufFilePtr;
+struct _buffile {
     BufChar *bufp;
     int	    left;
     BufChar buffer[BUFFILESIZE];
-    int	    (*io)(/* BufFilePtr f */);
-    int	    (*skip)(/* BufFilePtr f, int count */);
-    int	    (*close)(/* BufFilePtr f */);
+    int	    (*io)(int, BufFilePtr f);
+    int	    (*skip)(BufFilePtr f, int count);
+    int	    (*close)(BufFilePtr f, int);
     char    *hidden;
-} BufFileRec, *BufFilePtr;
+};
 
 typedef	struct _compressInfo{
     int     fd;
@@ -51,10 +52,10 @@ typedef	struct _compressInfo{
 } CECompressInfo, *CECompressInfoPtr;
 
 extern BufFilePtr   __DtBufFileCreate ();
-extern BufFilePtr   _DtHelpCeBufFilePushZ ();
-extern BufFilePtr   _DtHelpCeBufFileOpenWr ();
-extern int	    _DtHelpCeBufFileFlush ();
-#define BufFileGet(f)	((f)->left-- ? *(f)->bufp++ : (*(f)->io) (f))
+extern BufFilePtr   _DtHelpCeBufFilePushZ (BufFilePtr f);
+extern BufFilePtr   _DtHelpCeBufFileOpenWr (int fd);
+extern int	    _DtHelpCeBufFileFlush (BufFilePtr f, int doClose);
+#define BufFileGet(ignored, f)	((f)->left-- ? *(f)->bufp++ : (*(f)->io) (ignored, f))
 #define BufFilePut(c,f)	(--(f)->left ? *(f)->bufp++ = (c) : (*(f)->io) (c,f))
 #define BufFilePutBack(c,f) { (f)->left++; *(--(f)->bufp) = (c); }
 #define BufFileSkip(f,c)    ((*(f)->skip) (f, c))
@@ -66,9 +67,9 @@ extern	void		_DtHelpCeBufFileClose (
 				int		doClose);
 extern	BufFilePtr	_DtHelpCeBufFileCreate (
 				char		*hidden,
-				int		(*io)(),
-				int		(*skip)(),
-				int		(*close)());
+				int		(*io)(int, BufFilePtr),
+				int		(*skip)(BufFilePtr f, int count),
+				int		(*close)(BufFilePtr, int));
 extern	int		_DtHelpCeBufFileRd (
 				BufFilePtr	 f,
 				char		*buffer,

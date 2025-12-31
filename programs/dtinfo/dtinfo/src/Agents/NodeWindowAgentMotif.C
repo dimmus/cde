@@ -211,8 +211,8 @@ extern AppPrintData * l_AppPrintData;
 
 extern "C"
 {
-  typedef void (*resize_cb_ptr)();
-  typedef void (*hypertext_cb_ptr)();
+  typedef void (*resize_cb_ptr)(void *);
+  typedef void (*hypertext_cb_ptr)(DtHelpDispAreaStruct *, void *, DtHelpHyperTextStruct *);
 }
 
 #ifdef CV_HYPER_DEBUG

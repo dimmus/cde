@@ -505,7 +505,8 @@ ilError                 error;
         return (ilInternalImage)NULL;
 
         /*  Create the object and add it to context. */
-    pImage = (ilImagePtr)_ilCreateObject (context, IL_INTERNAL_IMAGE, _ilFreeImagePixels, 
+    pImage = (ilImagePtr)_ilCreateObject (context, IL_INTERNAL_IMAGE,
+                                         (void (*)(ilByte *)) _ilFreeImagePixels, 
                                          sizeof (ilImageRec));
     if (!pImage)
         return (ilInternalImage)NULL;
@@ -670,7 +671,8 @@ int                     plane, nPlanes;
         return (ilClientImage)NULL;
 
         /*  Create the object and add it to context. */
-    pImage = (ilImagePtr)_ilCreateObject (context, IL_CLIENT_IMAGE, _ilFreeImagePixels, 
+    pImage = (ilImagePtr)_ilCreateObject (context, IL_CLIENT_IMAGE,
+                                         (void (*)(ilByte *)) _ilFreeImagePixels, 
                                          sizeof (ilImageRec));
     if (!pImage)
         return (ilClientImage)NULL;

@@ -72,13 +72,16 @@ extern int  reinittime;
 extern Bool usefirst;
 extern Bool mono;
 extern Bool create;
-extern void (*callback) ();
-extern void (*init) ();
+extern void (*callback) (perwindow *);
+extern void (*init) (perwindow *);
 
-extern void GetResources();
+extern void GetResources(int argc, char *argv[]);
 extern void CheckResources();
-extern void hsbramp();
-extern void error();
+extern void hsbramp(double h1, double s1, double b1,
+        double h2, double s2, double b2,
+        int count,
+        u_char *red, u_char *green, u_char *blue);
+extern void error(char *, char *);
 extern long seconds();
 extern void usage();
 extern void hide_hft_ring();

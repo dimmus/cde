@@ -186,7 +186,7 @@ static int (*oldXErrorHandler)(Display *, XErrorEvent *);
 // cmtt.c
 void DieFromToolTalkError(Calendar *c, char *errfmt, Tt_status status);
 
-void init_strings();
+void init_strings(void);
 
 int		child;
 int		yyylineno;
@@ -971,7 +971,8 @@ void view_year_cb( Widget w, XtPointer data, XtPointer cbs)
 static void
 make_view_menu(Calendar *c)
 {
-	void view_appt_cb(), view_todo_cb();
+	void view_appt_cb(Widget, XtPointer, XtPointer);
+	void view_todo_cb(Widget, XtPointer, XtPointer);
         Widget view_menu, day, week, month, year, appt_list, tz,
 		view_btn, find, go_to;
         XmString day_str, week_str, month_str, year_str, tz_str, apptlist_str,

@@ -868,7 +868,7 @@ OrderFiles(
     *  Sort the files.  (The file type comparisons already order files
     *  of the same type by name, so there is no second pass by name.)
     */
-   qsort (order_list, file_count, sizeof (FileViewData *), (int (*)())sort);
+   qsort (order_list, file_count, sizeof (FileViewData *), (int (*)(const void *, const void *))sort);
 }
 
 
@@ -5517,8 +5517,11 @@ AddFileIcons(
 
 /* compare function for qsort and bsearch */
 static int
-WidgetCmp(Widget *w1, Widget *w2)
+WidgetCmp(const void *v1, const void *v2)
 {
+  const Widget *w1 = v1;
+  const Widget *w2 = v2;
+
   /* (a pointer difference truncated to int can have the wrong sign) */
   if (*w1 < *w2)
     return -1;
@@ -5555,7 +5558,7 @@ MakeReuseList(
      /* create a sorted list of children */
      sorted_chilren = (Widget *)XtMalloc(num_children * sizeof(Widget));
      memcpy(sorted_chilren, children, num_children * sizeof(Widget));
-     qsort(sorted_chilren, num_children, sizeof(Widget), (int (*)())WidgetCmp);
+     qsort(sorted_chilren, num_children, sizeof(Widget), WidgetCmp);
 
      /* create reuse flags; initially assume all children can be reused */
      reuse = (Boolean *)XtMalloc(num_children * sizeof(Boolean));
@@ -5588,7 +5591,7 @@ MakeReuseList(
 	       {
 		 p = bsearch(&order_list[i]->widget,
 			     sorted_chilren, num_children, sizeof(Widget),
-			     (int (*)())WidgetCmp);
+			    WidgetCmp);
 		 if (p)
 		   {
 		     /* don't reuse this widget for any other file */
@@ -5611,7 +5614,7 @@ MakeReuseList(
 	       {
 		 p = bsearch(&order_list[i]->treebtn,
 			     sorted_chilren, num_children, sizeof(Widget),
-			     (int (*)())WidgetCmp);
+			     WidgetCmp);
 		 if (p)
 		   {
 		     /* don't reuse this widget for any other file */

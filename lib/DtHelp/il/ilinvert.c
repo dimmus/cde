@@ -159,7 +159,9 @@ ilImageFormat               imformat;
     dstData.constantStrip  = FALSE;
     dstData.pPalette       = (unsigned short *)NULL;
     pPriv = (ilinvertPtr ) ilAddPipeElement (pipe, IL_FILTER, sizeof (ilinvertRec), 0, (ilSrcElementData *)NULL,
-                                             &dstData, ilInitInvert, IL_NPF, IL_NPF, ilExecuteinvert, NULL, 0);
+                                             &dstData,
+                                             (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitInvert,
+                                             IL_NPF, IL_NPF, ilExecuteinvert, NULL, 0);
     if (!pPriv) return FALSE;                    
 
     if ( imdes.type == IL_BITONAL )  pPriv->bitonal = TRUE;

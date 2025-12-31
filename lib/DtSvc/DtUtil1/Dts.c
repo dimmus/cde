@@ -149,7 +149,7 @@ extern  XtAppContext _DtAppContext;
 static	DtDtsMMRecord *	name_list(type_info_t *linfo,
 		DtDtsMMDatabase	*db,
 		DtDtsMMRecord *rec_ptr);
-static	const struct stat *get_stat();
+static	const struct stat *get_stat(type_info_t *info);
 
 static int      csh_match_star(const char *, const char *);
 

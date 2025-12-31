@@ -101,11 +101,11 @@ static int	last_lineno;
 
 /* forward references */
 static void	HandleArgs(int, char *[]);
-static void	Initialize1();
-static void	Initialize2();
+static void	Initialize1(char *);
+static void	Initialize2(void);
 static void	ReadInstance(char *);
-static void	DoHelpMessage();
-extern void	Browse();
+static void	DoHelpMessage(void);
+extern void	Browse(void);
 static int TclPrintLocation(ClientData clientData,
 			    Tcl_Interp *interp,
 			    int argc,

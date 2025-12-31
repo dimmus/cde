@@ -635,6 +635,17 @@ callCancels( void )
 /*+++++++++++++++++++++++++++++++++++++++*/
 
 void 
+activateCB_exitBtnSignal(int notused)
+{
+/*callCancels() remembers whether its been called so it won't get called*/
+/*twice on logout.*/
+   callCancels();
+
+   XSync(style.display, 0);
+   exit(0);
+}
+
+void 
 activateCB_exitBtn(
         Widget w,
         XtPointer client_data,

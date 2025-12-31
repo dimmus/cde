@@ -452,7 +452,11 @@ IL_PRIVATE ilBool _ilDecompLZW (
 
     pPriv = (ilDecompPrivPtr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilDecompPrivRec), 0,
                     (ilSrcElementData *)NULL, &dstdata, 
-                    ilDecompLZWInit, ilDecompLZWCleanup, IL_NPF, ilDecompLZWExecute, NULL, 0);
+                    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilDecompLZWInit,
+                    (ilError (*)(ilByte *, ilBool)) ilDecompLZWCleanup,
+                    IL_NPF,
+                    (ilError (*)(ilExecuteData *, long, long *)) ilDecompLZWExecute,
+                    NULL, 0);
     if (!pPriv) return FALSE;
 
         /*  Store info in *pPriv.  For nDstLineBytes, need minimum # of bytes uncompressed

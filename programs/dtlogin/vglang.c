@@ -269,8 +269,8 @@ _enumLanglistEnd(
 
 struct _enumObject
 {
-  Boolean (*methodNext)();
-  void (*methodEnd)();
+  Boolean (*methodNext)(void *, char**, char **);
+  void (*methodEnd)(void *);
   void *enumstate;
 };
 

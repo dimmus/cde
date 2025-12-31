@@ -71,42 +71,42 @@ extern nl_catd  scmc_catd;   /* Cat descriptor for scmc conversion */
  * Declare external interface routines for supported screen savers.
  */
 
-extern void inithop();
-extern void drawhop();
+extern void inithop(perwindow *);
+extern void drawhop(perwindow *);
 
-extern void initlife();
-extern void drawlife();
+extern void initlife(perwindow *);
+extern void drawlife(perwindow *);
 
-extern void initqix();
-extern void drawqix();
+extern void initqix(perwindow *);
+extern void drawqix(perwindow *);
 
-extern void initimage();
-extern void drawimage();
+extern void initimage(perwindow *);
+extern void drawimage(perwindow *);
 
-extern void initblank();
-extern void drawblank();
+extern void initblank(perwindow *);
+extern void drawblank(perwindow *);
 
-extern void initswarm();
-extern void drawswarm();
+extern void initswarm(perwindow *);
+extern void drawswarm(perwindow *);
 
-extern void initrotor();
-extern void drawrotor();
+extern void initrotor(perwindow *);
+extern void drawrotor(perwindow *);
 
-extern void initpyro();
-extern void drawpyro();
+extern void initpyro(perwindow *);
+extern void drawpyro(perwindow *);
 
-extern void initflame();
-extern void drawflame();
+extern void initflame(perwindow *);
+extern void drawflame(perwindow *);
 
-extern void initworm();
-extern void drawworm();
+extern void initworm(perwindow *);
+extern void drawworm(perwindow *);
 
 void CheckResources(void);
 
 typedef struct {
     char       *cmdline_arg;
-    void        (*lp_init) ();
-    void        (*lp_callback) ();
+    void        (*lp_init) (perwindow *);
+    void        (*lp_callback) (perwindow *);
     int         def_delay;
     int         def_batchcount;
     float       def_saturation;

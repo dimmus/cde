@@ -657,7 +657,7 @@ extern struct display * FindDisplayBySessionID(
 			CARD32 sessionID) ;
 
 extern void ForEachDisplay(
-			void (*f)()) ;
+			void (*f)(struct display *)) ;
 extern struct display * NewDisplay(
 			char *name,
 			char *class) ;

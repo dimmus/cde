@@ -74,8 +74,6 @@ static int magic_header[] = { 0x1F, 0x9D };
 # define MAXCODE(n_bits)	((1 << (n_bits)) - 1)
 #endif /* COMPATIBLE */
 
-static code_int getcode();
-
 /*
  * the next two codes should not be changed lightly, as they must not
  * lie within the contiguous general code space.
@@ -109,6 +107,7 @@ typedef struct _compressedFILE {
     unsigned short  *tab_prefix;
 } CompressedFile;
 
+static code_int getcode(CompressedFile  *file);
 
 static	int hsize_table[] = {
     5003,	/* 12 bits - 80% occupancy */
@@ -118,7 +117,9 @@ static	int hsize_table[] = {
     69001	/* 16 bits - 95% occupancy */
 };
 
-static int  BufCompressedFill(), BufCompressedSkip(), BufCompressedClose();
+static int BufCompressedFill(int ignored, BufFilePtr f);
+static int BufCompressedSkip(BufFilePtr	f, int bytes);
+static int BufCompressedClose(BufFilePtr f, int  doClose);
 
 BufFilePtr
 _DtHelpCeBufFilePushZ (BufFilePtr f)
@@ -128,13 +129,14 @@ _DtHelpCeBufFilePushZ (BufFilePtr f)
     int		    hsize;
     CompressedFile  *file;
     int		    extra;
+    int ignored = 0;
 
-    if ((BufFileGet(f) != magic_header[0]) ||
-	(BufFileGet(f) != magic_header[1]))
+    if ((BufFileGet(ignored, f) != magic_header[0]) ||
+	(BufFileGet(ignored, f) != magic_header[1]))
     {
 	return 0;
     }
-    code = BufFileGet (f);
+    code = BufFileGet (ignored, f);
     maxbits = code & BIT_MASK;
     if (maxbits > BITS || maxbits < 12)
 	return 0;
@@ -188,7 +190,7 @@ BufCompressedClose (
 }
 
 static int
-BufCompressedFill (BufFilePtr f)
+BufCompressedFill (int ignored, BufFilePtr f)
 {
     CompressedFile  *file;
     char_type *stackp, *de_stack;
@@ -290,6 +292,7 @@ getcode(CompressedFile  *file)
     int r_off, bits;
     char_type *bp = file->buf;
     BufFilePtr	raw;
+    int ignored = 0;
 
     if ( file->clear_flg > 0 || file->offset >= file->size ||
 	file->free_ent > file->maxcode )
@@ -312,7 +315,7 @@ getcode(CompressedFile  *file)
 	}
 	bits = file->n_bits;
 	raw = file->file;
-	while (bits > 0 && (code = BufFileGet (raw)) != BUFFILEEOF)
+	while (bits > 0 && (code = BufFileGet (ignored, raw)) != BUFFILEEOF)
 	{
 	    *bp++ = code;
 	    --bits;
@@ -363,7 +366,9 @@ BufCompressedSkip (
     int		bytes)
 {
     int		    c = 0;
-    while (bytes-- && ((c = BufFileGet(f)) != BUFFILEEOF))
+    int		    ignored = 0;
+    
+    while (bytes-- && ((c = BufFileGet(ignored, f)) != BUFFILEEOF))
 	    ;
     return c;
 }
@@ -378,6 +383,7 @@ _DtHelpCeUncompressFile(
     int             inFd, outFd;
     struct stat     statBuf;
     CECompressInfoPtr	myInfo;
+    int ignored = 0;
     
 
     inFd = open(infile, O_RDONLY);
@@ -410,7 +416,7 @@ _DtHelpCeUncompressFile(
     inputraw = _DtHelpCeBufFileRdRawZ (myInfo);
     input    = _DtHelpCeBufFilePushZ (inputraw);
     output   = _DtHelpCeBufFileOpenWr (outFd);
-    while ((c = BufFileGet (input)) != -1)
+    while ((c = BufFileGet (ignored, input)) != -1)
 	BufFilePut (c, output);
 
     c = myInfo->size;
