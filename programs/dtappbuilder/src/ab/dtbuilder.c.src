@@ -2211,7 +2211,7 @@ exit_dtbuilder(int n)
     struct sigaction	exit_action;
     struct sigaction	ign_action;
 
-    ign_action.sa_handler = (void (*)())SIG_IGN;
+    ign_action.sa_handler = SIG_IGN;
     ign_action.sa_flags = 0;
     sigemptyset(&(ign_action.sa_mask));
 

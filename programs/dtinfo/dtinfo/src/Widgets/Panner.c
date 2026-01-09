@@ -167,14 +167,14 @@ static XtResource resources[] = {
 /*
  * widget class methods used below
  */
-static void Initialize();		/* create gc's */
-static void Realize();			/* create window */
-static void Destroy();			/* clean up widget */
-static void Resize();			/* need to rescale ourselves */
-static void Redisplay();		/* draw ourselves */
-static Boolean SetValues();		/* set all of the resources */
-static void SetValuesAlmost();		/* deal with failed setval geom req */
-static XtGeometryResult QueryGeometry();  /* say how big we would like to be */
+static void Initialize(Widget greq, Widget gnew, ArgList args, Cardinal *num_args);		/* create gc's */
+static void Realize(Widget gw, XtValueMask *valuemaskp, XSetWindowAttributes *attr);			/* create window */
+static void Destroy(Widget gw);			/* clean up widget */
+static void Resize(Widget gw);			/* need to rescale ourselves */
+static void Redisplay(Widget gw, XEvent *event, Region region);		/* draw ourselves */
+static Boolean SetValues(Widget gcur, Widget greq, Widget gnew, ArgList args, Cardinal *num_args);		/* set all of the resources */
+static void SetValuesAlmost(Widget gold, Widget gnew, XtWidgetGeometry *req, XtWidgetGeometry *reply);		/* deal with failed setval geom req */
+static XtGeometryResult QueryGeometry(Widget gw, XtWidgetGeometry *intended, XtWidgetGeometry *pref);  /* say how big we would like to be */
 
 PannerClassRec pannerClassRec = {
   { /* core fields */
@@ -523,7 +523,7 @@ static int parse_page_string (char *s, int pagesize, int canvassize, Boolean *re
  *****************************************************************************/
 
 
-static void Initialize (Widget greq, Widget gnew)
+static void Initialize (Widget greq, Widget gnew, ArgList args, Cardinal *num_args)
 {
     PannerWidget req = (PannerWidget) greq, new = (PannerWidget) gnew;
     Dimension defwidth, defheight;
@@ -684,7 +684,7 @@ static void Redisplay (Widget gw, XEvent *event, Region region)
 
 
 /* ARGSUSED */
-static Boolean SetValues (Widget gcur, Widget greq, Widget gnew)
+static Boolean SetValues (Widget gcur, Widget greq, Widget gnew, ArgList args, Cardinal *num_args)
 {
     PannerWidget cur = (PannerWidget) gcur;
     PannerWidget new = (PannerWidget) gnew;
