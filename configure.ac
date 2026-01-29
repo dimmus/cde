@@ -869,11 +869,25 @@ AC_DEFINE_UNQUOTED([ICONV_CONST], [${iconv_const}],
 
 dnl figure out pam support
 dnl Right now this only works on linux and netbsd (9.2 tested)
+
+dnl PAM configuration directory - configurable for non-root installs
+AC_ARG_WITH([pam-dir],
+  AS_HELP_STRING([--with-pam-dir=DIR],
+    [directory for PAM configuration files (default: /etc/pam.d; /usr/local/etc/pam.d on FreeBSD)]),
+  [PAM_CONFDIR="$withval"],
+  [if test "$build_freebsd" = "yes"; then
+     PAM_CONFDIR="/usr/local/etc/pam.d"
+   else
+     PAM_CONFDIR="/etc/pam.d"
+   fi])
+AC_SUBST(PAM_CONFDIR)
+
 if test "$supports_pam" = "yes"
 then
         AC_CHECK_LIB(pam, pam_start,
              [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DHAS_PAM_LIBRARY";
-	      PAMLIB="-lpam"])
+	      PAMLIB="-lpam";
+              AC_MSG_NOTICE([PAM configuration directory: $PAM_CONFDIR])])
         AC_SUBST(PAMLIB)
 else
         AC_CHECK_LIB(pam, NOTSUPPORTED)

@@ -22,16 +22,14 @@ CPP_TARGETS = 0060.dtsysenv Dtlogin Xaccess Xconfig Xconfig.con	\
 if HAS_PAM_LIBRARY
 CPP_TARGETS += dtlogin
 dist_pam_DATA = dtlogin
+pamdir = $(PAM_CONFDIR)
 if FREEBSD
-pamdir = /usr/local/etc/pam.d
 PAM_AUTHENTICATION_MODULE = /usr/local/lib/security/pam_pwauth_suid.so
 GENCPP_DEFINES += -DPAM_AUTHENTICATION_MODULE=$(PAM_AUTHENTICATION_MODULE)
-else
-pamdir = /etc/pam.d
+endif
 if NETBSD
 PAM_AUTHENTICATION_MODULE = /usr/pkg/lib/security/pam_pwauth_suid.so
 GENCPP_DEFINES += -DPAM_AUTHENTICATION_MODULE=$(PAM_AUTHENTICATION_MODULE)
-endif
 endif
 endif
 
