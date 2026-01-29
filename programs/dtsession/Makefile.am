@@ -131,7 +131,7 @@ sys.session.ive: sys.session.src
 
 install-exec-hook:
 if !HAS_PAM_LIBRARY
-	chown root $(DESTDIR)$(bindir)/dtsession
-	chmod 4755 $(DESTDIR)$(bindir)/dtsession
+	-chown root $(DESTDIR)$(bindir)/dtsession
+	-chmod 4755 $(DESTDIR)$(bindir)/dtsession
 endif
 

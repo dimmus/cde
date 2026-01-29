@@ -45,4 +45,4 @@ dtcm_editor_SOURCES = datefield.c     deskset.c       dssw.c \
 		      reminders.c     rfp.c
 
 install-exec-hook:
-	$(INSTALL) -m 0755 -d $(DESTDIR)/var/spool/calendar
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(localstatedir)/spool/calendar
