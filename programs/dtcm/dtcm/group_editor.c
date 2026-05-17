@@ -1721,8 +1721,7 @@ add_to_gaccess_list(
 	new_data->entry_access = user_access;
 	CmDataListAdd(ge->access_data, (void *)new_data, 0);
 
-	buf = (char *)ckalloc(ACCESS_NAME_LEN + cm_strlen(CATGETS(c->DT_catd,
-		1, 348, "Insert Permission")) + 5);
+	buf = (char *)ckalloc(ACCESS_NAME_LEN + cm_strlen(name) + 3);
 	sprintf(buf, "%-*s %c", ACCESS_NAME_LEN, name, access);
 	xmstr = XmStringCreateLocalized(buf);
 	free(buf);
