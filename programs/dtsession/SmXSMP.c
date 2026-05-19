@@ -1006,7 +1006,16 @@ CloseConnectionProc (
 #endif /* DEBUG */
 
 	if (count > 0) {
-		PostReasonsDialog (GetArrayPropertyValue (tmp, SmProgram), count, reasonMsgs, True);
+		/*
+		 * Do not block in a nested XtAppNextEvent loop here.
+		 * CloseConnectionProc runs inside IceProcessMessages, and a
+		 * nested event loop allows Xt to re-enter _XtProcessIceMsgProc
+		 * on the same ICE fd when the client closes its socket. The
+		 * recursive call would tear down the connection via the IO
+		 * error path, leaving pClientRec->{smConn,iceConn} == NULL,
+		 * so the CloseDownClient call below would dereference NULL.
+		 */
+		PostReasonsDialog (GetArrayPropertyValue (tmp, SmProgram), count, reasonMsgs, False);
 		SmFreeReasons (count, reasonMsgs);
 	}
 
