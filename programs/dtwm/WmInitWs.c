@@ -1329,6 +1329,18 @@ InitWmScreen (WmScreenData *pSD, int sNum)
 					       args,
 					       argnum);
 
+    /*
+     * Force the screen-specific colormap on the popup shell. When this
+     * shell's X parent (wmGD.topLevelW) lives on a different screen, Xt's
+     * VendorShell silently inherits the parent's colormap and ignores the
+     * XtNcolormap arg, which then causes BadMatch on every CreateWindow
+     * targeting a non-default screen.
+     */
+    argnum = 0;
+    XtSetArg (args[argnum], XtNcolormap,
+	    DefaultColormap(DISPLAY, sNum));	argnum++;
+    XtSetValues (pSD->screenTopLevelW, args, argnum);
+
     argnum = 0;
     XtSetArg (args[argnum], XtNgeometry, NULL);			argnum++;
     XtSetArg (args[argnum], XtNx, 10000);			argnum++;
@@ -1350,6 +1362,12 @@ InitWmScreen (WmScreenData *pSD, int sNum)
 					       wmGD.topLevelW1,
 					       args,
 					       argnum);
+
+    argnum = 0;
+    XtSetArg (args[argnum], XtNcolormap,
+	    DefaultColormap(DISPLAY1, sNum));	argnum++;
+    XtSetValues (pSD->screenTopLevelW1, args, argnum);
+
     XtRealizeWidget (pSD->screenTopLevelW1);
 
     /*
@@ -1518,6 +1536,12 @@ void InitWmWorkspace (WmWorkspaceData *pWS, WmScreenData *pSD)
     						pSD->screenTopLevelW,
 					   	args,
 						argnum);
+
+    /* Same colormap-inheritance workaround as for screenTopLevelW. */
+    argnum = 0;
+    XtSetArg (args[argnum], XtNcolormap,
+	    DefaultColormap(DISPLAY, pSD->screen));	argnum++;
+    XtSetValues (pWS->workspaceTopLevelW, args, argnum);
 
     /* internalize the workspace name */
     pWS->id = XInternAtom (DISPLAY, pWS->name, False);
