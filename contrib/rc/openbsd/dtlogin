@@ -1,6 +1,6 @@
 #!/bin/ksh
 
-daemon="/usr/dt/bin/dtlogin"
+daemon="@bindir@/dtlogin"
 
 . /etc/rc.d/rc.subr
 

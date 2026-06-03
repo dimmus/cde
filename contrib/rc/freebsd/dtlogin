@@ -1,6 +1,6 @@
 #!/bin/sh
 # Script to start dtlogin upon system boot for FreeBSD
-# Instructions: 
+# Instructions:
 # Put this script in /usr/local/etc/rc.d (owned and read/execute by root.)
 # Use dtlogin_enable="YES" in /etc/rc.conf to enable dtlogin startup.
 #
@@ -16,7 +16,7 @@
 name=dtlogin
 rcvar=dtlogin_enable
 
-command="/usr/dt/bin/dtlogin"
+command="@bindir@/dtlogin"
 command_args="&"
 
 dtlogin_prestart()
@@ -30,5 +30,3 @@ dtlogin_prestart()
 
 load_rc_config $name
 run_rc_command "$1"
-
-

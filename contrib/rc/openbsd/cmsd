@@ -1,4 +1,4 @@
-daemon="/usr/dt/bin/rpc.cmsd &"
+daemon="@bindir@/rpc.cmsd &"
 
 . /etc/rc.d/rc.subr
 

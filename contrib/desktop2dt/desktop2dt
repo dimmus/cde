@@ -37,9 +37,9 @@ usage(){
   echo "Usage: $0"' [-i] [-a] some.desktop ...'
   echo "generates some.dt and the appropriate icons"
   echo "If -i is specified, some.dt and the icons are installed"
-  echo '(in $DESTDIR/etc/dt if possible, otherwise in $HOME/.dt)'
+  echo '(in $DESTDIR@CDE_CONFIGURATION_TOP@ if possible, otherwise in $HOME/.dt)'
   echo 'If -a is specified, appmanager files are created'
-  echo '(in $DESTDIR/etc/dt/appconfig/appmanager/C or $HOME/.dt/appmanager)'
+  echo '(in $DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/appmanager/C or $HOME/.dt/appmanager)'
   exit 1
 }
 
@@ -129,18 +129,18 @@ do
       PREFIX="$XPREFIX"; export PREFIX
     ;;
     -i*)
-      mkdir -p "$DESTDIR/etc/dt/appconfig/types/C" && \
-      canwrite "$DESTDIR/etc/dt/appconfig/types/C/aaa.xyz.test" && \
-      INSTALLDIR="$DESTDIR/etc/dt/appconfig/types/C/" \
-      ICONDIR="$DESTDIR/etc/dt/appconfig/icons/C/" || \
+      mkdir -p "$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/types/C" && \
+      canwrite "$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/types/C/aaa.xyz.test" && \
+      INSTALLDIR="$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/types/C/" \
+      ICONDIR="$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/icons/C/" || \
       INSTALLDIR="$HOME/.dt/types/" ICONDIR="$HOME/.dt/icons/"
       export ICONDIR INSTALLDIR
       mkdir -p "$ICONDIR" "$INSTALLDIR"
     ;;
     -a)
-      mkdir -p "$DESTDIR/etc/dt/appconfig/appmanager/C" && \
-      canwrite "$DESTDIR/etc/dt/appconfig/appmanager/C/aaa.xyz.test" && \
-      APPMGR="$DESTDIR/etc/dt/appconfig/appmanager/C" || \
+      mkdir -p "$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/appmanager/C" && \
+      canwrite "$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/appmanager/C/aaa.xyz.test" && \
+      APPMGR="$DESTDIR@CDE_CONFIGURATION_TOP@/appconfig/appmanager/C" || \
       APPMGR="$HOME/.dt/appmanager"
       export APPMGR
       #echo $APPMGR

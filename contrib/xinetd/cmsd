@@ -8,6 +8,6 @@ service cmsd
     protocol	= udp
     wait	= yes
     user	= root
-    server	= /usr/dt/bin/rpc.cmsd
+    server	= @bindir@/rpc.cmsd
     only_from 	= 127.0.0.1/0
 }

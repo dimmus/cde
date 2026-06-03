@@ -1379,6 +1379,16 @@ include/Makefile
 copyright
 doc/common/help/HELPEnt.sgm
 lib/tt/bin/ttauth/ttauth.man
+
+contrib/desktopentry/cde.desktop
+contrib/rc/linux/dtlogin
+contrib/rc/freebsd/dtlogin
+contrib/rc/netbsd/dtlogin
+contrib/rc/openbsd/dtlogin
+contrib/rc/openbsd/cmsd
+contrib/xinetd/cmsd
+contrib/xinetd/ttdbserver
+contrib/desktop2dt/desktop2dt
 ])
 
 dnl include/Dt/Dt.h carries the version and is included by most of the
