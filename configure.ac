@@ -401,16 +401,77 @@ AC_SUBST(RM)
 CP="cp -f"
 AC_SUBST(CP)
 
-dnl these should be configurable someday...
-CDE_INSTALLATION_TOP="$ac_default_prefix"
-CDE_LOGFILES_TOP=/var/dt
-CDE_CONFIGURATION_TOP=/etc/dt
+dnl ----------------------------------------------------------------------
+dnl Packager-overridable roots.
+dnl
+dnl Each "top" is exposed both as an automake-substituted variable (for
+dnl Makefile.am) and as a C preprocessor macro in cde_config.h (so source
+dnl code can use it directly without each Makefile.am having to add a
+dnl -DCDE_*_TOP=... define). Defaults preserve the historical CDE layout.
+dnl ----------------------------------------------------------------------
+
+AC_ARG_WITH([cde-data-dir],
+    AS_HELP_STRING([--with-cde-data-dir=DIR],
+        [directory for CDE arch-independent data
+         (backdrops, palettes, types, app-defaults, appconfig, infolib,
+         lib/nls) @<:@default=PREFIX@:>@]),
+    [CDE_DATA_TOP="$withval"],
+    [CDE_DATA_TOP='${prefix}'])
+
+AC_ARG_WITH([cde-config-dir],
+    AS_HELP_STRING([--with-cde-config-dir=DIR],
+        [directory for CDE system configuration @<:@default=/etc/dt@:>@]),
+    [CDE_CONFIGURATION_TOP="$withval"],
+    [CDE_CONFIGURATION_TOP="/etc/dt"])
+
+AC_ARG_WITH([cde-state-dir],
+    AS_HELP_STRING([--with-cde-state-dir=DIR],
+        [directory for CDE runtime state/logs @<:@default=/var/dt@:>@]),
+    [CDE_LOGFILES_TOP="$withval"],
+    [CDE_LOGFILES_TOP="/var/dt"])
+
+AC_ARG_WITH([cde-libexec-dir],
+    AS_HELP_STRING([--with-cde-libexec-dir=DIR],
+        [directory for CDE-internal helper binaries
+         (rpc.cmsd, ttsession, ...) @<:@default=BINDIR@:>@]),
+    [CDE_LIBEXEC_DIR="$withval"],
+    [CDE_LIBEXEC_DIR='${bindir}'])
+
+dnl CDE_INSTALLATION_TOP follows --prefix. The previous code used
+dnl ${ac_default_prefix} which always resolves to AC_PREFIX_DEFAULT
+dnl (/usr/dt) regardless of --prefix, so packagers passing --prefix=/usr
+dnl unexpectedly got /usr/dt baked into their binaries.
+CDE_INSTALLATION_TOP='${prefix}'
 CDE_USER_TOP=.dt
 
 AC_SUBST(CDE_INSTALLATION_TOP)
+AC_SUBST(CDE_DATA_TOP)
 AC_SUBST(CDE_CONFIGURATION_TOP)
 AC_SUBST(CDE_LOGFILES_TOP)
+AC_SUBST(CDE_LIBEXEC_DIR)
 AC_SUBST(CDE_USER_TOP)
+
+dnl Resolve the substitution vars now (expanding ${prefix}/${bindir})
+dnl so the values land as concrete strings in cde_config.h. The
+dnl "prefix=NONE" idiom is the autoconf-recommended way to do this
+dnl from configure.ac without writing a custom m4 macro.
+test "x$prefix"      = xNONE && prefix="$ac_default_prefix"
+test "x$exec_prefix" = xNONE && exec_prefix="$prefix"
+eval _cde_install_top="\"$CDE_INSTALLATION_TOP\""
+eval _cde_data_top="\"$CDE_DATA_TOP\""
+eval _cde_libexec_dir="\"$CDE_LIBEXEC_DIR\""
+eval _cde_libexec_dir="\"$_cde_libexec_dir\""
+
+AC_DEFINE_UNQUOTED([CDE_INSTALLATION_TOP], ["$_cde_install_top"],
+    [Top of the CDE installation tree (== --prefix)])
+AC_DEFINE_UNQUOTED([CDE_DATA_TOP], ["$_cde_data_top"],
+    [Top of the CDE arch-independent data tree])
+AC_DEFINE_UNQUOTED([CDE_CONFIGURATION_TOP], ["$CDE_CONFIGURATION_TOP"],
+    [Top of the CDE system configuration tree])
+AC_DEFINE_UNQUOTED([CDE_LOGFILES_TOP], ["$CDE_LOGFILES_TOP"],
+    [Top of the CDE runtime state/log tree])
+AC_DEFINE_UNQUOTED([CDE_LIBEXEC_DIR], ["$_cde_libexec_dir"],
+    [Directory for CDE-internal helper binaries])
 
 dnl This variable will contain a list of programs that were not found,
 dnl but are required to build CDE.  At the end, if the variable is
