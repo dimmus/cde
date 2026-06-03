@@ -54,8 +54,8 @@
 *******************************************************************/
 #define BIN_PATH_STRING	 CDE_INSTALLATION_TOP "/bin"
 
-#define NLS_PATH_STRING  CDE_INSTALLATION_TOP "/lib/nls/msg/%L/%N.cat:" \
-                         CDE_INSTALLATION_TOP "/lib/nls/msg/C/%N.cat"
+#define NLS_PATH_STRING  CDE_DATA_TOP "/lib/nls/msg/%L/%N.cat:" \
+                         CDE_DATA_TOP "/lib/nls/msg/C/%N.cat"
 
 #if defined(sun)
 #define X_BIN_PATH_STRING "/usr/openwin/bin"
@@ -94,8 +94,8 @@
  */
 #define SYSTEM_APPL_PATH_STRING  CDE_CONFIGURATION_TOP "/app-defaults/%L/%N:" \
                                  CDE_CONFIGURATION_TOP "/app-defaults/C/%N:" \
-                                 CDE_INSTALLATION_TOP "/app-defaults/%L/%N:" \
-                                 CDE_INSTALLATION_TOP "/app-defaults/C/%N"
+                                 CDE_DATA_TOP "/app-defaults/%L/%N:" \
+                                 CDE_DATA_TOP "/app-defaults/C/%N"
 
 
 /**********************************************************************

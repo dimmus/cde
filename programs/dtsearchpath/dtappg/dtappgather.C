@@ -218,7 +218,7 @@ void AppManagerDirectory::TraversePath()
 	while (!dir.isNull()) {
 	    GatherAppsFromASearchElement (dir);
 	    dir = subpath.next();
-	    if (langVersionFound && dir == CDE_INSTALLATION_TOP "/appconfig/appmanager/C")
+	    if (langVersionFound && dir == CDE_DATA_TOP "/appconfig/appmanager/C")
 		dir = subpath.next();
 	}
     }
@@ -272,7 +272,7 @@ void AppManagerDirectory::GatherAppsFromASearchElement
 		source.replace("%L",user_->OS()->LANG());
 		if (!user_->OS()->isDirectory(source))
 		     return;
-		if (source.contains(CDE_INSTALLATION_TOP "/appconfig/appmanager/"))
+		if (source.contains(CDE_DATA_TOP "/appconfig/appmanager/"))
 		    langVersionFound = 1;
 	    }
 	    else

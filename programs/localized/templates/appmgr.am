@@ -2,7 +2,7 @@
 
 ACTION = $(top_builddir)/programs/localized/$(LANG)/types/action
 
-desktop_appsdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Desktop_Apps
+desktop_appsdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Desktop_Apps
 desktop_apps_SCRIPTS = Desktop_Apps/Dtmanpageview			\
 	Desktop_Apps/Dthelpview Desktop_Apps/DtPrintManager		\
 	Desktop_Apps/Dtcreate Desktop_Apps/Dtstyle			\
@@ -12,36 +12,36 @@ desktop_apps_SCRIPTS = Desktop_Apps/Dtmanpageview			\
 	Desktop_Apps/Dticon Desktop_Apps/Dtcm Desktop_Apps/Dtfile	\
 	Desktop_Apps/Dtcalc
 
-graphicsdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Graphics
+graphicsdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Graphics
 graphics_SCRIPTS = Graphics/xv Graphics/fontforge Graphics/gimp	\
 	Graphics/inkscape Graphics/okular
 
-internetdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Internet
+internetdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Internet
 internet_SCRIPTS = Internet/firefox Internet/nxclient		\
 	Internet/thunderbird Internet/skype Internet/chromium
 
-gamesdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Games
+gamesdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Games
 games_SCRIPTS = Games/pychess Games/powermanga Games/eboard	\
 	Games/supertux Games/dreamchess Games/lbreakout2	\
 	Games/gcompris Games/xboard Games/ktuberling
 
-texdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Tex
+texdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Tex
 tex_SCRIPTS = TeX/xdvi TeX/acroread TeX/xpdf TeX/TeX TeX/mgv	\
 	TeX/emacs TeX/gv TeX/kile TeX/xournal
 
-officedir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Office
+officedir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Office
 office_SCRIPTS = Office/nedit Office/libreoffice-calc		\
 	Office/libreoffice-writer Office/acroread Office/xpdf	\
 	Office/libreoffice-draw Office/libreoffice-base		\
 	Office/libreoffice-main Office/libreoffice-math		\
 	Office/libreoffice-impress Office/xournal
 
-systemdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/System
+systemdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/System
 system_SCRIPTS = System/caja System/firestarter System/virtualbox	\
 	System/engrampa System/wicd System/synaptic			\
 	System/file-roller System/pgadmin
 
-desktop_toolsdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Desktop_Tools
+desktop_toolsdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Desktop_Tools
 desktop_tools_SCRIPTS = Desktop_Tools/Rm Desktop_Tools/DttermRlogin	\
 	Desktop_Tools/Env Desktop_Tools/Uncompress			\
 	Desktop_Tools/Xclipboard Desktop_Tools/Xwd			\
@@ -65,17 +65,17 @@ desktop_tools_SCRIPTS = Desktop_Tools/Rm Desktop_Tools/DttermRlogin	\
 	Desktop_Tools/DttermDtspcd Desktop_Tools/DtwmrcEdit		\
 	Desktop_Tools/XtermDtspcd
 
-media_toolsdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Media_Tools
+media_toolsdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Media_Tools
 media_tools_SCRIPTS = Media_Tools/k3b Media_Tools/rhythmbox		\
 	Media_Tools/xine Media_Tools/vlc Media_Tools/rosegarden		\
 	Media_Tools/pavucontrol Media_Tools/sound-juicer		\
 	Media_Tools/amarok Media_Tools/brasero Media_Tools/k9copy
 
-educationdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Education
+educationdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Education
 education_SCRIPTS = Education/tuxpaint Education/gcompris	\
 	Education/stellarium Education/geogebra
 
-informationdir = $(CDE_INSTALLATION_TOP)/appconfig/appmanager/$(LANG)/Information
+informationdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Information
 information_SCRIPTS = Information/OpenDtIntro
 
 appmgr_allfiles = $(desktop_apps_SCRIPTS) $(graphics_SCRIPTS)		\

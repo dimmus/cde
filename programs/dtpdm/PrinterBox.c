@@ -44,7 +44,7 @@
 #define CDE_INSTALLATION_TOP "/usr/dt"
 #endif
 
-#define ICON_INSTALL_DIR CDE_INSTALLATION_TOP "/appconfig/icons/C/"
+#define ICON_INSTALL_DIR CDE_DATA_TOP "/appconfig/icons/C/"
 
 #ifndef MAX
 # define MAX(a, b) ((a) > (b) ? (a) : (b))

@@ -32,7 +32,7 @@ XCOMM ------
 
 MESSAGE="$@"
 #ifdef _AIX
-MSGCAT=CDE_INSTALLATION_TOP/lib/nls/msg/$LANG/dtfile.cat
+MSGCAT=CDE_DATA_TOP/lib/nls/msg/$LANG/dtfile.cat
 TITLE=`dspmsg $MSGCAT -s 32 1 "dt Error"`
 #else
 TITLE="dt Error"

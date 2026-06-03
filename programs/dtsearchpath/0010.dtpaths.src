@@ -53,8 +53,8 @@ XCOMM ##	 Inputs:       DTSPSYSAPPHOSTS, DTSPUSERAPPHOSTS
 XCOMM ##     Default:      $HOME/.dt/appmanager,
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/appmanager/%L,
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/appmanager/C,
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/appmanager/%L,
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/appmanager/C
+XCOMM ##                   CDE_DATA_TOP/appconfig/appmanager/%L,
+XCOMM ##                   CDE_DATA_TOP/appconfig/appmanager/C
 XCOMM ##
 XCOMM ##  DTDATABASESEARCHPATH
 XCOMM ##     Description:  The directories in which we will look for actions and
@@ -64,8 +64,8 @@ XCOMM ##     Default:      Derived from DTSPSYSAPPHOSTS
 XCOMM ##                   $HOME/.dt/types,
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/types/%L,
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/types/C,
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/types/%L,
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/types/C
+XCOMM ##                   CDE_DATA_TOP/appconfig/types/%L,
+XCOMM ##                   CDE_DATA_TOP/appconfig/types/C
 XCOMM ##  DTHELPSEARCHPATH
 XCOMM ##     Description:  The directories in which we will look for online help.
 XCOMM ##	 Inputs:       DTSPSYSHELP, DTSPUSERHELP
@@ -73,8 +73,8 @@ XCOMM ##     Default:      Derived from DTSPSYSAPPHOSTS
 XCOMM ##                   $HOME/.dt/help/%T/[ %H | %H.sdl | %H.hv ],
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/help/%L/%T/[ %H | %H.sdl | %H.hv ],
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/help/C/%T/[ %H | %H.sdl | %H.hv ],
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/help/%L/%T/[ %H | %H.sdl | %H.hv ]
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/help/C/%T/[ %H | %H.sdl | %H.hv ]
+XCOMM ##                   CDE_DATA_TOP/appconfig/help/%L/%T/[ %H | %H.sdl | %H.hv ]
+XCOMM ##                   CDE_DATA_TOP/appconfig/help/C/%T/[ %H | %H.sdl | %H.hv ]
 XCOMM ##  DTINFOLIBSEARCHPATH
 XCOMM ##     Description:  The directories in which we will look for online help.
 XCOMM ##	 Inputs:       DTSPSYSINFOLIB, DTSPUSERINFOLIB
@@ -82,8 +82,8 @@ XCOMM ##     Default:      Derived from DTSPSYSAPPHOSTS and DTSPUSERAPPHOSTS
 XCOMM ##                   $HOME/.dt/infolib/%I.dt
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/infolib/%L/%I.dti
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/infolib/C/%I.dti
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/infolib/%L/%I.dti
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/infolib/C/%I.dti
+XCOMM ##                   CDE_DATA_TOP/appconfig/infolib/%L/%I.dti
+XCOMM ##                   CDE_DATA_TOP/appconfig/infolib/C/%I.dti
 XCOMM ##  DTICONSEARCHPATH
 XCOMM ##     Description:  The directories in which we will look for icons.
 XCOMM ##	 Inputs:       DTSPSYSICON, DTSPUSERICON
@@ -91,8 +91,8 @@ XCOMM ##     Default:      Derived from DTSPSYSAPPHOSTS
 XCOMM ##                   $HOME/.dt/icons/[ %B.pm | %B.bm | %B ],
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/icons/%L/[ %B.pm | %B.bm | %B ],
 XCOMM ##                   CDE_CONFIGURATION_TOP/appconfig/icons/C/[ %B.pm | %B.bm | %B ],
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/icons/%L/[ %B.pm | %B.bm | %B ]
-XCOMM ##                   CDE_INSTALLATION_TOP/appconfig/icons/C/[ %B.pm | %B.bm | %B ]
+XCOMM ##                   CDE_DATA_TOP/appconfig/icons/%L/[ %B.pm | %B.bm | %B ]
+XCOMM ##                   CDE_DATA_TOP/appconfig/icons/C/[ %B.pm | %B.bm | %B ]
 XCOMM ##
 XCOMM ####################################################################
 
@@ -130,7 +130,7 @@ XCOMM ##    prefix), then that value will be appended to the CDE_CONFIGURATION_T
 XCOMM ##    default search path.  For example, if you specify a value for the 
 XCOMM ##    DTSPSYSHELP, then your value will be appended to the normal 
 XCOMM ##    configuration value -- after "CDE_CONFIGURATION_TOP/appconfig/help" -- but before
-XCOMM ##    the factory default location--"CDE_INSTALLATION_TOP/appconfig/help".
+XCOMM ##    the factory default location--"CDE_DATA_TOP/appconfig/help".
 XCOMM ##
 XCOMM ##    Users may also set the USER equivalents of these search paths. They
 XCOMM ##    can be done in their $HOME/.dtprofile file, which will be sourced in

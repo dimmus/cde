@@ -5,7 +5,7 @@
 BUILT_SOURCES = $(patsubst %.msg,%.cat,$(filter-out libAB%,$(notdir $(wildcard $(srcdir)/*.msg))))
 CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
-msgcatdir = $(CDE_INSTALLATION_TOP)/lib/nls/msg/$(LANG)
+msgcatdir = $(CDE_DATA_TOP)/lib/nls/msg/$(LANG)
 dist_msgcat_DATA = $(BUILT_SOURCES)
 
 SUFFIXES = .msg .cat

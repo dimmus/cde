@@ -319,8 +319,8 @@ loadDatabase(void)
 
   lang = setlocale (LC_CTYPE,NULL);
 
-  pl_desc = (char *)XtMalloc(strlen(CDE_INSTALLATION_TOP "/palettes/desc.") + strlen(lang) + 1);
-  strcpy (pl_desc,CDE_INSTALLATION_TOP "/palettes/desc.");
+  pl_desc = (char *)XtMalloc(strlen(CDE_DATA_TOP "/palettes/desc.") + strlen(lang) + 1);
+  strcpy (pl_desc,CDE_DATA_TOP "/palettes/desc.");
   strcat (pl_desc, lang);
   if((sys_pl_DB = XrmGetFileDatabase (pl_desc)))
     XrmMergeDatabases(sys_pl_DB, &pl_DB);

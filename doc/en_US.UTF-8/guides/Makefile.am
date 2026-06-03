@@ -43,7 +43,7 @@ CLEANFILES += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
 # ever change, but for now we will list them as they are currently
 # installed.
 
-cdedtidir = $(CDE_INSTALLATION_TOP)/infolib/$(LANG)/cde.dti
+cdedtidir = $(CDE_DATA_TOP)/infolib/$(LANG)/cde.dti
 dist_cdedti_DATA = ../cde.dti/bookcase.map ../cde.dti/cde.oli
 
 cdedtidocdir = $(cdedtidir)/CDEDOC
@@ -73,5 +73,5 @@ CLEANFILES += $(cdedti_DATA) $(cdedtidoc_DATA) $(cdedtidocsearch_DATA)
 
 # link the en_US.UTF-8 version to C
 install-data-hook:
-	$(RM) -rf $(DESTDIR)$(CDE_INSTALLATION_TOP)/infolib/C
-	cd $(DESTDIR)$(CDE_INSTALLATION_TOP)/infolib && $(LN_S) en_US.UTF-8 C
+	$(RM) -rf $(DESTDIR)$(CDE_DATA_TOP)/infolib/C
+	cd $(DESTDIR)$(CDE_DATA_TOP)/infolib && $(LN_S) en_US.UTF-8 C

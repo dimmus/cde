@@ -57,7 +57,7 @@ CDEEnvironment::CDEEnvironment
     CString envVar;
 
     sysAdmConfig = CDE_CONFIGURATION_TOP "/appconfig";
-    factoryInstall = CDE_INSTALLATION_TOP "/appconfig";
+    factoryInstall = CDE_DATA_TOP "/appconfig";
     factoryManPath = CDE_INSTALLATION_TOP "/man";
 
     envVar = os->getEnvironmentVariable("DTSPSYSAPPHOSTS");

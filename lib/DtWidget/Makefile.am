@@ -4,14 +4,15 @@ include $(top_srcdir)/build-aux/cde-libs.am
 # half-written.
 .DELETE_ON_ERROR:
 
-unixdir = $(CDE_INSTALLATION_TOP)/app-defaults/C
+unixdir = $(CDE_DATA_TOP)/app-defaults/C
 
 MAINTAINERCLEANFILES = Makefile.in
 
 lib_LTLIBRARIES = libDtWidget.la
 
 # also used to preprocess UNIXbindings, which must not see $(CDE_CPPFLAGS)
-WIDGET_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) $(DT_INCDIR)
+WIDGET_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \
+	-DCDE_DATA_TOP=$(CDE_DATA_TOP) $(DT_INCDIR)
 
 AM_CPPFLAGS = $(CDE_CPPFLAGS) $(WIDGET_DEFINES)
 

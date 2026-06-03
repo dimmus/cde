@@ -36,7 +36,7 @@ fi
 if [ -z "$SDT_ALT_HELLO" ]
 then
   if [ -x $DTDSPMSG ]; then 
-     export SDT_ALT_HELLO="CDE_INSTALLATION_TOP/bin/dthello -string '`$DTDSPMSG -s 37 CDE_INSTALLATION_TOP/lib/nls/msg/$LANG/dthello.cat 1 'Starting the OpenWindows Desktop'`' &"
+     export SDT_ALT_HELLO="CDE_INSTALLATION_TOP/bin/dthello -string '`$DTDSPMSG -s 37 CDE_DATA_TOP/lib/nls/msg/$LANG/dthello.cat 1 'Starting the OpenWindows Desktop'`' &"
   else
      export SDT_ALT_HELLO="CDE_INSTALLATION_TOP/bin/dthello -string 'Starting the OpenWindows Desktop' &"
   fi

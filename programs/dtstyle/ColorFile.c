@@ -124,7 +124,7 @@ static void InitializeBW(
 /*+++++++++++++++++++++++++++++++++++++++*/
 /* Internal Variables                    */
 /*+++++++++++++++++++++++++++++++++++++++*/
-static char *PALETTE_DIR = CDE_INSTALLATION_TOP "/palettes/";
+static char *PALETTE_DIR = CDE_DATA_TOP "/palettes/";
 static char *PALETTE_DIR_ADM = CDE_CONFIGURATION_TOP "/palettes/";
 static char *B_O_W = "BlackWhite.dp";
 static char *W_O_B = "WhiteBlack.dp";

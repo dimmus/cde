@@ -19,6 +19,7 @@ dist_bin_SCRIPTS = dtfile_error dterror.ds
 
 dtfile_CPPFLAGS = $(CDE_CPPFLAGS) -I./dtcopy -DSHAPE -D_ILS_MACROS -DSUN_PERF \
 		-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+		-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 		-DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"
 
 dtfile_LDADD = dtcopy/sharedFuncs.o \
@@ -51,6 +52,7 @@ dtfile_SOURCES = ChangeDir.c     ChangeDirP.c    Command.c       Common.c \
 # Mind the quoting here...
 SCRIPTFLAGS = -DSHAPE -D_ILS_MACROS -DSUN_PERF \
 	-DCDE_INSTALLATION_TOP="$(CDE_INSTALLATION_TOP)" \
+	-DCDE_DATA_TOP="$(CDE_DATA_TOP)" \
 	-DCDE_CONFIGURATION_TOP="$(CDE_CONFIGURATION_TOP)"
 
 dtfile.config: dtfile.config.cpp

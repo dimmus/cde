@@ -358,8 +358,8 @@ char **GetIconSearchPathList(void)
   char    **pplist;
   char    *lang;
   int     langsize;
-  static  char *default_list1[] = {"~/.dt/icons", CDE_CONFIGURATION_TOP "/appconfig/icons/C", CDE_INSTALLATION_TOP "/appconfig/icons/C"};
-  static  char *default_list2[] = {CDE_CONFIGURATION_TOP "/appconfig/icons/C", CDE_INSTALLATION_TOP "/appconfig/icons/C"};
+  static  char *default_list1[] = {"~/.dt/icons", CDE_CONFIGURATION_TOP "/appconfig/icons/C", CDE_DATA_TOP "/appconfig/icons/C"};
+  static  char *default_list2[] = {CDE_CONFIGURATION_TOP "/appconfig/icons/C", CDE_DATA_TOP "/appconfig/icons/C"};
   char    **default_list;
   Boolean bFound;
   char    *pszEnvVar;

@@ -54,7 +54,7 @@ XCOMM      Save the list of workspace we occupy
 
 XCOMM      Tell the session manager how to restart us
       DtSetStartupCommand $TOPLEVEL \
-		   "CDE_INSTALLATION_TOP/share/examples/dtksh/SessionTest $SAVEFILE"
+		   "CDE_DATA_TOP/share/examples/dtksh/SessionTest $SAVEFILE"
    else
       echo "DtSessionSavePath FAILED!!"
       exit -3

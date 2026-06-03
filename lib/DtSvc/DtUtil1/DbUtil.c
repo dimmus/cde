@@ -105,8 +105,8 @@ static char DTDATABASESEARCHPATH_DEFAULT[] =
   "%s/.dt/types,"
   CDE_CONFIGURATION_TOP "/appconfig/types/%%L,"
   CDE_CONFIGURATION_TOP "/appconfig/types,"
-  CDE_INSTALLATION_TOP "/appconfig/types/%%L,"
-  CDE_INSTALLATION_TOP "/appconfig/types";
+  CDE_DATA_TOP "/appconfig/types/%%L,"
+  CDE_DATA_TOP "/appconfig/types";
 
 
 /****   Substitution records used by XtFindFile() in _DtExpandLang()   ****/

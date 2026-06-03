@@ -14,10 +14,10 @@ XCOMM  US Government Users Restricted Rights - Use, duplication or
 XCOMM  disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 XCOMM
 XCOMM
-XCOMM Add CDE_INSTALLATION_TOP/lib/nls/msg/%L/%N.cat to NLSPATH
+XCOMM Add CDE_DATA_TOP/lib/nls/msg/%L/%N.cat to NLSPATH
 XCOMM
 
-NLSPATH=CDE_INSTALLATION_TOP/lib/nls/msg/%L/%N.cat:$NLSPATH
+NLSPATH=CDE_DATA_TOP/lib/nls/msg/%L/%N.cat:$NLSPATH
 export NLSPATH
 
 usage="$0 [-b banner_title] [-d lpdest] [-f print_file] 

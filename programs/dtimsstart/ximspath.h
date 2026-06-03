@@ -47,14 +47,14 @@
 #define	ENV_NO_DTIMSSTART	"NODTIMSSTART"
 #define	ENV_XFILESEARCHPATH	"XFILESEARCHPATH"
 #define	ENV_XFILESEARCHPATH_STRING \
-	CDE_CONFIGURATION_TOP "/app-defaults/%L/%N:" CDE_CONFIGURATION_TOP "/app-defaults/C/%N:" CDE_INSTALLATION_TOP "/app-defaults/%L/%N:" CDE_INSTALLATION_TOP "/app-defaults/C/%N"
+	CDE_CONFIGURATION_TOP "/app-defaults/%L/%N:" CDE_CONFIGURATION_TOP "/app-defaults/C/%N:" CDE_DATA_TOP "/app-defaults/%L/%N:" CDE_DATA_TOP "/app-defaults/C/%N"
 #define	ENV_NLSPATH		"NLSPATH"
 #define	ENV_NLSPATH_STRING \
-	CDE_INSTALLATION_TOP "/lib/nls/msg/%L/%N.cat:" CDE_INSTALLATION_TOP "/lib/nls/msg/C/%N.cat"
+	CDE_DATA_TOP "/lib/nls/msg/%L/%N.cat:" CDE_DATA_TOP "/lib/nls/msg/C/%N.cat"
 
 	/* configuration */
 #define	DTIMS_CONFDIR		CDE_INSTALLATION_TOP "/config/ims"
-#define	DTIMS_APPDIR		CDE_INSTALLATION_TOP "/app-defaults"
+#define	DTIMS_APPDIR		CDE_DATA_TOP "/app-defaults"
 #define	DTIMS_CONFFILE		"start.conf"
 
 	/* path of executable (used for remote execution) */

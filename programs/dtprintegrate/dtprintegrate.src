@@ -36,7 +36,7 @@ XCOMM ##  Set default values.
 XCOMM ##
 COMMAND_NAME=dtprintegrate
 
-ACTION_STUB_FILE=CDE_INSTALLATION_TOP/appconfig/appmanager/C/Desktop_Apps/Dtcalc
+ACTION_STUB_FILE=CDE_DATA_TOP/appconfig/appmanager/C/Desktop_Apps/Dtcalc
 
 base_icon_name="Fpprnt"
 
@@ -85,7 +85,7 @@ Initialize()
     HASH
     HASH Search path for printer icons...
     HASH
-    DEFAULT_PATH=.,$HOME/.dt/icons,CDE_INSTALLATION_TOP/appconfig/icons/C
+    DEFAULT_PATH=.,$HOME/.dt/icons,CDE_DATA_TOP/appconfig/icons/C
     DTPRINTICONPATH=${DTPRINTICONPATH:-$DEFAULT_PATH}
 
     HASH

@@ -20,7 +20,7 @@ PTYPES = \
 BUILT_SOURCES = types.xdr
 CLEANFILES = types.xdr .tt_lock *.ptype.deps *.done
 
-tttypesdir = $(CDE_INSTALLATION_TOP)/appconfig/tttypes
+tttypesdir = $(CDE_DATA_TOP)/appconfig/tttypes
 dist_tttypes_DATA = $(BUILT_SOURCES)
 
 TT_TYPE_COMP = $(top_builddir)/lib/tt/bin/tt_type_comp/tt_type_comp

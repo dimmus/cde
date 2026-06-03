@@ -406,8 +406,8 @@ CreateBackdropDialog(
     /* from that locale's description file from the system location */
     lang = setlocale (LC_CTYPE,NULL);
 
-    bd_desc = (char *)XtMalloc(strlen(CDE_INSTALLATION_TOP "/backdrops/desc.") + strlen(lang) + 1);
-    strcpy (bd_desc,CDE_INSTALLATION_TOP "/backdrops/desc.");
+    bd_desc = (char *)XtMalloc(strlen(CDE_DATA_TOP "/backdrops/desc.") + strlen(lang) + 1);
+    strcpy (bd_desc,CDE_DATA_TOP "/backdrops/desc.");
     strcat (bd_desc, lang);
     if((sys_bd_DB = XrmGetFileDatabase (bd_desc)))
       	XrmMergeDatabases(sys_bd_DB, &bd_DB);
@@ -648,7 +648,7 @@ static int
   backdrops.tmpNumBitmaps = 0;
   
   /* read system backdrop directory */
-    ReadBitmapDirectory(CDE_INSTALLATION_TOP "/backdrops");
+    ReadBitmapDirectory(CDE_DATA_TOP "/backdrops");
   /* read sys admin backdrop directory */
   ReadBitmapDirectory(CDE_CONFIGURATION_TOP "/backdrops");
   

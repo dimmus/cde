@@ -21,7 +21,7 @@
 !# Font resource values must be a valid font alias name.
 !#
 !# Font resource values must match exactly the default font resources 
-!# specified in CDE_INSTALLATION_TOP/app-defaults/%L/Dtstyle
+!# specified in CDE_DATA_TOP/app-defaults/%L/Dtstyle
 !###
 
 XCOMM if WIDTH > 1175

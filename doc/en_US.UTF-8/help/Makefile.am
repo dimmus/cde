@@ -13,5 +13,5 @@ include $(top_srcdir)/doc/common/help/sdl-data.am
 
 # need to setup a symlink for the C locale to point toward en_US
 install-data-hook:
-	$(RM) -rf $(DESTDIR)$(CDE_INSTALLATION_TOP)/appconfig/help/C
-	cd $(DESTDIR)$(CDE_INSTALLATION_TOP)/appconfig/help/ && $(LN_S) en_US.UTF-8 C
+	$(RM) -rf $(DESTDIR)$(CDE_DATA_TOP)/appconfig/help/C
+	cd $(DESTDIR)$(CDE_DATA_TOP)/appconfig/help/ && $(LN_S) en_US.UTF-8 C

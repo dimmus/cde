@@ -93,7 +93,7 @@ DtFindSet::DtFindSet(DtMainW *parent, char *name, CallerCallback _callback)
       output = (char *) malloc(strlen(home) + 80);
       n_dirs = 3;
       sprintf(output, "%s/.dt/icons\n"
-                      CDE_INSTALLATION_TOP "/appconfig/icons/C\n"
+                      CDE_DATA_TOP "/appconfig/icons/C\n"
                       CDE_CONFIGURATION_TOP "/appconfig/icons/C\n", (home[1] ? home : "" ));
     }
    dirs = new char *[n_dirs];

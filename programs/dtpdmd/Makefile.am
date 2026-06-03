@@ -4,7 +4,8 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = dtpdmd
 
-dtpdmd_CFLAGS = $(CDE_CFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\"
+dtpdmd_CFLAGS = $(CDE_CFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\"
 
 dtpdmd_LDADD = $(LIBSVC) $(XTLIB) $(XAULIB) $(X11LIB)
 

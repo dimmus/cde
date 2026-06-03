@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = Makefile.in
 .DELETE_ON_ERROR:
 
 LOCAL_CPP_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \
+-DCDE_DATA_TOP=$(CDE_DATA_TOP) \
 	-DCDE_CONFIGURATION_TOP=$(CDE_CONFIGURATION_TOP) \
 	-DCDE_LOGFILES_TOP=$(CDE_LOGFILES_TOP) -DKORNSHELL=$(KSH) \
 	-DDTKORNSHELL=$(CDE_INSTALLATION_TOP)/bin/dtksh
@@ -14,8 +15,8 @@ LOCAL_CPP_DEFINES += -D__sun
 endif
 
 BUILT_SOURCES = autoStart.dt compat.dt datatypes.dt develop.dt		\
-	dtappman.dt dt.dt dtfile.dt dthelp.dt dthelpprint.dt		\
-	dthelptag.dt dtims.dt dtinfo.dt dtpad.dt dtscreen.dt		\
+	dtappman.dt dt.dt dtcm.dt dtfile.dt dthelp.dt dthelpprint.dt	\
+	dthelptag.dt dtims.dt dtinfo.dt dtmail.dt dtpad.dt dtscreen.dt	\
 	dt.softinit dtwm.fp error.ds hp.dt ibm.dt IconBrowse.dt		\
 	laserrom.dt miscActions.dt miscImages.dt print.dt		\
 	printerNN.dt sunOW.dt unsupported.dt user-prefs.dt uxstd.dt	\
@@ -36,6 +37,14 @@ compat.dt: compat.dt.src
 datatypes.dt: datatypes.dt.src
 	$(RM) $@
 	$(GENCPP) -P -C -DXCOMM=# $(LOCAL_CPP_DEFINES) $< > $@
+dtcm.dt: dtcm.dt.src
+	$(RM) $@
+	$(GENCPP) -P -C -DXCOMM=# $(LOCAL_CPP_DEFINES) $< > $@
+
+dtmail.dt: dtmail.dt.src
+	$(RM) $@
+	$(GENCPP) -P -C -DXCOMM=# $(LOCAL_CPP_DEFINES) $< > $@
+
 
 develop.dt: develop.dt.src
 	$(RM) $@

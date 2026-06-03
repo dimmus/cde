@@ -3,11 +3,11 @@
 
 
 # install the common graphics files
-cmngraphdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/graphics
+cmngraphdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/graphics
 dist_cmngraph_DATA = $(shell find common/graphics/*)
 
 # install the common/*.hf files
-hfdirdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)
+hfdirdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)
 dist_hfdir_DATA = $(shell ls common/*.hf)
 
 # Now, install any graphics assets found for each help section
@@ -17,78 +17,78 @@ dist_hfdir_DATA = $(shell ls common/*.hf)
 # restrain the urge to delete them all from the repo for now.
 
 # Appmanager
-appmanagerdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Appmanager/graphics
+appmanagerdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Appmanager/graphics
 dist_appmanager_DATA = $(shell [ -d Appmanager/graphics ] && find Appmanager/graphics/* |grep -v /CDR)
 
 # AppBuilder
-appbuilderdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/AppBuilder/graphics
+appbuilderdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/AppBuilder/graphics
 dist_appbuilder_DATA = $(shell [ -d AppBuilder/graphics ] && find AppBuilder/graphics/* |grep -v /CDR)
 
 # Calculator
-calculatordir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Calculator/graphics
+calculatordir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Calculator/graphics
 dist_calculator_DATA = $(shell [ -d Calculator/graphics ] && find Calculator/graphics/* |grep -v /CDR)
 
 # Calendar
-calendardir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Calendar/graphics
+calendardir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Calendar/graphics
 dist_calendar_DATA = $(shell [ -d Calendar/graphics ] && find Calendar/graphics/* |grep -v /CDR)
 
 # CreatAct
-creatactdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/CreatAct/graphics
+creatactdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/CreatAct/graphics
 dist_creatact_DATA = $(shell [ -d CreatAct/graphics ] && find CreatAct/graphics/* |grep -v /CDR)
 
 # Filemgr
-filemgrdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Filemgr/graphics
+filemgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Filemgr/graphics
 dist_filemgr_DATA = $(shell [ -d Filemgr/graphics ] && find Filemgr/graphics/* |grep -v /CDR)
 
 # FPanel
-fpaneldir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/FPanel/graphics
+fpaneldir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/FPanel/graphics
 dist_fpanel_DATA = $(shell [ -d FPanel/graphics ] && find FPanel/graphics/* |grep -v /CDR)
 
 # Help4Help
-help4helpdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Help4Help/graphics
+help4helpdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Help4Help/graphics
 dist_help4help_DATA = $(shell [ -d Help4Help/graphics ] && find Help4Help/graphics/* |grep -v /CDR)
 
 # Iconed
-iconeddir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Iconed/graphics
+iconeddir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Iconed/graphics
 dist_iconed_DATA = $(shell [ -d Iconed/graphics ] && find Iconed/graphics/* |grep -v /CDR)
 
 # Infomgr
-infomgrdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Infomgr/graphics
+infomgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Infomgr/graphics
 dist_infomgr_DATA = $(shell [ -d Infomgr/graphics ] && find Infomgr/graphics/* |grep -v /CDR)
 
 # Intromgr
-intromgrdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Intromgr/graphics
+intromgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Intromgr/graphics
 dist_intromgr_DATA = $(shell [ -d Intromgr/graphics ] && find Intromgr/graphics/* |grep -v /CDR)
 
 # LibDtPrint
-libdtprintdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/LibDtPrint/graphics
+libdtprintdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/LibDtPrint/graphics
 dist_libdtprint_DATA = $(shell [ -d LibDtPrint/graphics ] && find LibDtPrint/graphics/* |grep -v /CDR)
 
 # Loginmgr
-loginmgrdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Loginmgr/graphics
+loginmgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Loginmgr/graphics
 dist_loginmgr_DATA = $(shell [ -d Loginmgr/graphics ] && find Loginmgr/graphics/* |grep -v /CDR)
 
 # Mailer
-mailerdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Mailer/graphics
+mailerdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Mailer/graphics
 dist_mailer_DATA = $(shell [ -d Mailer/graphics ] && find Mailer/graphics/* |grep -v /CDR)
 
 # Printmgr
-printmgrdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Printmgr/graphics
+printmgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Printmgr/graphics
 dist_printmgr_DATA = $(shell [ -d Printmgr/graphics ] && find Printmgr/graphics/* |grep -v /CDR)
 
 # PrnSetup
-prnsetupdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/PrnSetup/graphics
+prnsetupdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/PrnSetup/graphics
 dist_prnsetup_DATA = $(shell [ -d PrnSetup/graphics ] && find PrnSetup/graphics/* |grep -v /CDR)
 
 # Stylemgr
-stylemgrdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Stylemgr/graphics
+stylemgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Stylemgr/graphics
 dist_stylemgr_DATA = $(shell [ -d Stylemgr/graphics ] && find Stylemgr/graphics/* |grep -v /CDR)
 
 # Terminal
-terminaldir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Terminal/graphics
+terminaldir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Terminal/graphics
 dist_terminal_DATA = $(shell [ -d Terminal/graphics ] && find Terminal/graphics/* |grep -v /CDR)
 
 # Textedit
-texteditdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)/Textedit/graphics
+texteditdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Textedit/graphics
 dist_textedit_DATA = $(shell [ -d Textedit/graphics ] && find Textedit/graphics/* |grep -v /CDR)
 

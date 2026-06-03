@@ -3,7 +3,7 @@
 BUILT_SOURCES = desc.$(LANG)
 CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
-backdropsdir = $(CDE_INSTALLATION_TOP)/share/backdrops
+backdropsdir = $(CDE_DATA_TOP)/share/backdrops
 dist_backdrops_DATA = $(BUILT_SOURCES)
 
 TOP = $(top_builddir)/programs

@@ -154,11 +154,11 @@
 #define CHANGE_VIEW_ICON_S      "change_view.s"
 #define CHANGE_VIEW_ICON_M      "change_view.m"
 #define MULTIPLE_FILE_DRAG      "drag.bm"
-#define SMALL_DIRECTORY_ICON    CDE_INSTALLATION_TOP "/appconfig/icons/C/dirblue.t.pm"
+#define SMALL_DIRECTORY_ICON    CDE_DATA_TOP "/appconfig/icons/C/dirblue.t.pm"
 
-#define TOOL_ICON_NAME     CDE_INSTALLATION_TOP "/appconfig/icons/C/Fpapps.l.pm"
-#define TRASH_ICON_NAME    CDE_INSTALLATION_TOP "/appconfig/icons/C/Fptrsh.l.pm"
-#define HOME_ICON_NAME     CDE_INSTALLATION_TOP "/appconfig/icons/C/Fphome.l.pm"
+#define TOOL_ICON_NAME     CDE_DATA_TOP "/appconfig/icons/C/Fpapps.l.pm"
+#define TRASH_ICON_NAME    CDE_DATA_TOP "/appconfig/icons/C/Fptrsh.l.pm"
+#define HOME_ICON_NAME     CDE_DATA_TOP "/appconfig/icons/C/Fphome.l.pm"
 
 
 /* File manipulation types */

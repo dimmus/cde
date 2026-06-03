@@ -7,6 +7,7 @@ bin_PROGRAMS = dtprintinfo
 AM_CPPFLAGS = $(CDE_CPPFLAGS) -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./objects	\
 	-I./objects/PrintObj -DKORNSHELL=\"$(KSH)\" \
 	-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 	-DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
 	-DCDE_LOGFILES_TOP=\"$(CDE_LOGFILES_TOP)\"
 

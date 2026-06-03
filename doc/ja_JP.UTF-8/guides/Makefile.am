@@ -42,7 +42,7 @@ CLEANFILES += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
 # ever change, but for now we will list them as they are currently
 # installed.
 
-cdedtidir = $(CDE_INSTALLATION_TOP)/infolib/$(LANG)/cde.dti
+cdedtidir = $(CDE_DATA_TOP)/infolib/$(LANG)/cde.dti
 dist_cdedti_DATA = ../cde.dti/bookcase.map ../cde.dti/cde.oli
 
 cdedtidocdir = $(cdedtidir)/CDEDOC

@@ -9,7 +9,8 @@ noinst_SCRIPTS = CallbackTest2 CallDataTest4 crMovesText1 DtCursorTest2 \
 		 SelBoxResTest SessionTest TextCutBuf1 TextDisp1 TextFXYPos1 \
 		 TransEventTest TransTest1 WorkProcTest1 XdrawTest
 
-LOCAL_CPP_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP)
+LOCAL_CPP_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \
+-DCDE_DATA_TOP=$(CDE_DATA_TOP)
 
 BUILT_SOURCES =  CallbackTest2 CallDataTest4 crMovesText1 DtCursorTest2 \
                  DtWsTest1 EventHandlerTest ListBounds1 ListItemPos1 PopupTest \

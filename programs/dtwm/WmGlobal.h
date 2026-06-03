@@ -1418,7 +1418,7 @@ typedef struct _WmBackdropData
 
 typedef struct _WmBackdropData *PtrBackdropData;
 
-#define DEFAULT_BACKDROP_DIR CDE_INSTALLATION_TOP "/backdrops"
+#define DEFAULT_BACKDROP_DIR CDE_DATA_TOP "/backdrops"
 
 /*
  * direction for slide-out panels

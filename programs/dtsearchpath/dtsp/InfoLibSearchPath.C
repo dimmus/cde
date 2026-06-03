@@ -71,7 +71,7 @@ InfoLibSearchPath::InfoLibSearchPath
 
     // Need to re-initialize the defaults.
     user->sysAdmConfig   = CDE_CONFIGURATION_TOP;
-    user->factoryInstall = CDE_INSTALLATION_TOP;
+    user->factoryInstall = CDE_DATA_TOP;
 
     if (user->DTINFOLIBSP()) {
 	if (user->DTUSERINFOLIBSP()) {
