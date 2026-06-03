@@ -15,7 +15,7 @@ XCOMM ##########################################################################
 XCOMM #
 XCOMM #  File:              dtsession_res
 XCOMM #
-XCOMM #  Default Location:  /usr/dt/bin/dtsession_res
+XCOMM #  Default Location:  CDE_INSTALLATION_TOP/bin/dtsession_res
 XCOMM #
 XCOMM #  Purpose:           Load the RESOURCE_MANAGER with desktop resources
 XCOMM #

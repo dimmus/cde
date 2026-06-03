@@ -25,6 +25,11 @@ dist_tttypes_DATA = $(BUILT_SOURCES)
 
 TT_TYPE_COMP = $(top_builddir)/lib/tt/bin/tt_type_comp/tt_type_comp
 
+# Let the dtinfo ptypes pick up CDE_DATA_TOP / CDE_INSTALLATION_TOP from
+# cde_config.h via tt_type_comp's internal cpp pass, so their start
+# strings resolve against the configured --with-cde-* layout.
+TT_CPP_FLAGS = -I$(top_builddir)/include -I$(top_srcdir)/include
+
 # One tt_type_comp run parses every file and writes types.xdr once.
 # DISPLAY and the session variables are unset so that tt_type_comp
 # does not contact, or autostart, a ttsession just to announce the
@@ -38,5 +43,5 @@ types.xdr: $(PTYPES) dtinfo_start.opnums $(TT_TYPE_COMP)
 	  else srcs="$$srcs $(srcdir)/$$f"; fi; \
 	done; \
 	(unset DISPLAY TT_SESSION _SUN_TT_SESSION; \
-	 TTPATH=. $(TT_TYPE_COMP) -sd user -m $$srcs); \
+	 TTPATH=. $(TT_TYPE_COMP) $(TT_CPP_FLAGS) -sd user -m $$srcs); \
 	status=$$?; $(RM) .tt_lock; exit $$status

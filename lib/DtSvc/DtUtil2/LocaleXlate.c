@@ -370,8 +370,8 @@ on HP-UX platforms, the string is "HPUX", so the translation
 databases to be loaded must be named "HPUX.lcx".
 
 By default, the search paths are:
-DTLCXSEARCHPATH = "/usr/dt/config/svc:" \
-                  "/etc/dt/config/svc:" \
+DTLCXSEARCHPATH = CDE_INSTALLATION_TOP "/config/svc:" \
+                  CDE_CONFIGURATION_TOP "/config/svc:" \
                   "$HOME/.dt/config/svc"
 
 Alternatively, the DTLCXSEARCHPATH directory may be used

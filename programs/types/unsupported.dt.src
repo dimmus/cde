@@ -39,7 +39,7 @@ ACTION DtTypes
         ARG_COUNT	0
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-	EXEC_STRING	CDE_INSTALLATION_TOP/bin/dtterm -e KORNSHELL -c '/usr/dt/bin/dttypes;'
+	EXEC_STRING	CDE_INSTALLATION_TOP/bin/dtterm -e KORNSHELL -c 'CDE_INSTALLATION_TOP/bin/dttypes;'
 	DESCRIPTION	%|nls-9002-#The#|
 }
 ACTION DtTypes
@@ -47,7 +47,7 @@ ACTION DtTypes
         LABEL		%|nls-32-#DtTypes#|
 	TYPE		COMMAND
 	WINDOW_TYPE	PERM_TERMINAL
-	EXEC_STRING	sh -c '/usr/dt/bin/dttypes -type "%(File)Arg_1%"; \
+	EXEC_STRING	sh -c 'CDE_INSTALLATION_TOP/bin/dttypes -type "%(File)Arg_1%"; \
                  echo "%|nls-9011-#Select#|"'
 	DESCRIPTION	%|nls-9002-#The#|
 }
@@ -70,7 +70,7 @@ ACTION DisplayFont
 	EXEC_STRING	sh -c '/usr/lpp/X11/bin/xfd -fn \
                 `basename "%(File)Arg_1"%|nls-9012-#Font#|"%" | sed /[.].*/s///`;\
 	                if [ \$? -eq 1 ] ; then \
-                                 /usr/dt/bin/dterror.ds \
+                                 CDE_INSTALLATION_TOP/bin/dterror.ds \
                                    "%|nls-9014-#The Font#|" \
                                    "%|nls-9015-#Invalid#|" \
                                    "%|nls-21002-#OK#|" ; \
@@ -128,7 +128,7 @@ ACTION DisplayFont
 	EXEC_STRING	sh -c '/usr/openwin/bin/xfd -fn \
                 `basename "%(File)Arg_1"%|nls-9012-#Font#|"%" | sed /[.].*/s///`;\
 	                if [ \$? -eq 1 ] ; then \
-                                 /usr/dt/bin/dterror.ds \
+                                 CDE_INSTALLATION_TOP/bin/dterror.ds \
                                    "%|nls-9014-#The Font#|" \
                                    "%|nls-9015-#Invalid#|" \
                                    "%|nls-21002-#OK#|" ; \

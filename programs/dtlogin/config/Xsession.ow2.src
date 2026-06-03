@@ -3,11 +3,11 @@ XCOMM $XConsortium: Xsession.ow2.src /main/3 1996/11/19 11:41:57 drk $
 XCOMM ####################################################################
 XCOMM ##  File:              Xsession.ow2
 XCOMM ##
-XCOMM ##  Default Location:  /usr/dt/config/Xsession.ow2
+XCOMM ##  Default Location:  CDE_INSTALLATION_TOP/config/Xsession.ow2
 XCOMM ##
 XCOMM ##  Purpose:           OpenWindows Desktop start script
 XCOMM ##
-XCOMM ##  Invoked by:        /usr/dt/bin/Xsession
+XCOMM ##  Invoked by:        CDE_INSTALLATION_TOP/bin/Xsession
 XCOMM ##
 XCOMM ##  Revision:          @(#)Xsession.ow2.src 1.3 95/02/16 
 XCOMM ##
@@ -16,7 +16,7 @@ XCOMM ##
 XCOMM ####################################################################
 
 XCOMM First a little namespace cleanup of vars associated with this
-XCOMM (and /usr/dt/bin/Xsession.ow) scripts.
+XCOMM (and CDE_INSTALLATION_TOP/bin/Xsession.ow) scripts.
 
 unset SDT_ALT_SESSION
 unset SDT_ALT_HELLO

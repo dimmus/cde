@@ -76,7 +76,7 @@ if ((m_argc > 2) && (strchr(m_argv[2], 'f') || strchr(m_argv[2], 'F')))
     filelist = TRUE;
 
 /* Get installation directory */
-#define CONTRIB "/usr/dt/bin/"
+#define CONTRIB CDE_INSTALLATION_TOP "/bin/"
 
 /* get our path if we can */
 /* A hacked up ``which'', just to find our directory */

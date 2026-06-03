@@ -70,8 +70,8 @@ InfoLibSearchPath::InfoLibSearchPath
     CString oldFactoryInstall = user->factoryInstall;
 
     // Need to re-initialize the defaults.
-    user->sysAdmConfig   = "/etc/dt";
-    user->factoryInstall = "/usr/dt";
+    user->sysAdmConfig   = CDE_CONFIGURATION_TOP;
+    user->factoryInstall = CDE_INSTALLATION_TOP;
 
     if (user->DTINFOLIBSP()) {
 	if (user->DTUSERINFOLIBSP()) {

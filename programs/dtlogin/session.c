@@ -775,7 +775,7 @@ LoadXloginResourcesXrdb(struct display *d)
     char	cmd[1024];
     char	*authority = "";
     char	*auth_key = "";
-    char	tmpname[32];
+    char	tmpname[1024];
     int		fd;
     int		ret = 0;
 
@@ -784,7 +784,7 @@ LoadXloginResourcesXrdb(struct display *d)
 	auth_key = "XAUTHORITY=";
     }
 
-    strcpy(tmpname, "/var/dt/dtlogin_XXXXXX");
+    snprintf(tmpname, sizeof(tmpname), "%s/dtlogin_XXXXXX", CDE_LOGFILES_TOP);
     if ((fd = mkstemp(tmpname)) == -1) {
 	Debug("LoadXloginResources - mkstemp() failed: %s\n", strerror(errno));
 	return -1;

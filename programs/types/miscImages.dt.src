@@ -54,7 +54,7 @@ ACTION Open
         ARG_TYPE        pict-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26003-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -90,7 +90,7 @@ ACTION Open
         ARG_TYPE        ppm-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26005-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -120,7 +120,7 @@ ACTION Open
         ARG_TYPE        pj-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26007-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -156,7 +156,7 @@ ACTION Open
         ARG_TYPE        pgm-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26009-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -192,7 +192,7 @@ ACTION Open
    	ARG_TYPE        pbm-file
    	TYPE            COMMAND
    	WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26011-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -228,7 +228,7 @@ ACTION Open
         ARG_TYPE        ilbm-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26013-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -258,7 +258,7 @@ ACTION Open
         ARG_TYPE        pi1-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26015-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -288,7 +288,7 @@ ACTION Open
         ARG_TYPE        pcx-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26017-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -318,7 +318,7 @@ ACTION Open
         ARG_TYPE        tga-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26019-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -348,7 +348,7 @@ ACTION Open
         ARG_TYPE        xim-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26023-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -378,7 +378,7 @@ ACTION Open
         ARG_TYPE        mtv-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26025-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -408,7 +408,7 @@ ACTION Open
         ARG_TYPE        qrt-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26027-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -438,7 +438,7 @@ ACTION Open
         ARG_TYPE        imgw-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26029-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -468,7 +468,7 @@ ACTION Open
         ARG_TYPE        sld-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26031-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -498,7 +498,7 @@ ACTION Open
         ARG_TYPE        spc-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26033-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -528,7 +528,7 @@ ACTION Open
         ARG_TYPE        spu-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26035-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -558,7 +558,7 @@ ACTION Open
         ARG_TYPE        gould-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26037-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -588,7 +588,7 @@ ACTION Open
         ARG_TYPE        fs-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26043-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -618,7 +618,7 @@ ACTION Open
         ARG_TYPE        fits-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26045-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -654,7 +654,7 @@ ACTION Open
         ARG_TYPE        lispm-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26047-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -684,7 +684,7 @@ ACTION Open
         ARG_TYPE        hips-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26072-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -714,7 +714,7 @@ ACTION Open
         ARG_TYPE        mac-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26052-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -744,7 +744,7 @@ ACTION Open
         ARG_TYPE        atk-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26054-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -774,7 +774,7 @@ ACTION Open
         ARG_TYPE        brush-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26056-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -810,7 +810,7 @@ ACTION Open
         ARG_TYPE        cmu-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26058-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -846,7 +846,7 @@ ACTION Open
         ARG_TYPE        mgr-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26060-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -876,7 +876,7 @@ ACTION Open
         ARG_TYPE        g3-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26062-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -906,7 +906,7 @@ ACTION Open
         ARG_TYPE        img-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26064-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -935,7 +935,7 @@ ACTION Open
         ARG_TYPE        pi3-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26066-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -971,7 +971,7 @@ ACTION Open
         ARG_TYPE        ybm-file
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dterror.ds \
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
                            "%|nls-26070-#Cannot#|" \
                            "%|nls-13-#Information#|" \
                            "%|nls-6-#OK#|"
@@ -1005,7 +1005,7 @@ ACTION Open
 	ARG_TYPE        photocd-file
 	TYPE            COMMAND
 	WINDOW_TYPE     NO_STDIO
-	EXEC_STRING     /usr/dt/bin/dterror.ds \
+	EXEC_STRING     CDE_INSTALLATION_TOP/bin/dterror.ds \
 			"%|nls-26074-#Cannot#|" \
 			"%|nls-13-#Information#|" \
 			"%|nls-6-#OK#|"

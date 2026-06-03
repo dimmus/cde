@@ -47,22 +47,22 @@
 #define	ENV_NO_DTIMSSTART	"NODTIMSSTART"
 #define	ENV_XFILESEARCHPATH	"XFILESEARCHPATH"
 #define	ENV_XFILESEARCHPATH_STRING \
-	"/etc/dt/app-defaults/%L/%N:/etc/dt/app-defaults/C/%N:/usr/dt/app-defaults/%L/%N:/usr/dt/app-defaults/C/%N"
+	CDE_CONFIGURATION_TOP "/app-defaults/%L/%N:" CDE_CONFIGURATION_TOP "/app-defaults/C/%N:" CDE_INSTALLATION_TOP "/app-defaults/%L/%N:" CDE_INSTALLATION_TOP "/app-defaults/C/%N"
 #define	ENV_NLSPATH		"NLSPATH"
 #define	ENV_NLSPATH_STRING \
-	"/usr/dt/lib/nls/msg/%L/%N.cat:/usr/dt/lib/nls/msg/C/%N.cat"
+	CDE_INSTALLATION_TOP "/lib/nls/msg/%L/%N.cat:" CDE_INSTALLATION_TOP "/lib/nls/msg/C/%N.cat"
 
 	/* configuration */
-#define	DTIMS_CONFDIR		"/usr/dt/config/ims"
-#define	DTIMS_APPDIR		"/usr/dt/app-defaults"
+#define	DTIMS_CONFDIR		CDE_INSTALLATION_TOP "/config/ims"
+#define	DTIMS_APPDIR		CDE_INSTALLATION_TOP "/app-defaults"
 #define	DTIMS_CONFFILE		"start.conf"
 
 	/* path of executable (used for remote execution) */
-#define	DTIMS_CMDPATH		"/usr/dt/bin/dtimsstart"
+#define	DTIMS_CMDPATH		CDE_INSTALLATION_TOP "/bin/dtimsstart"
 
 	/* user dir */
 #define	DTIMS_IMSDIR		"ims"		/* [%b] */
-#define	DTIMS_LOGDIR		"/var/dt"	/* [%G] */
+#define	DTIMS_LOGDIR		CDE_LOGFILES_TOP	/* [%G] */
 #define	DTIMS_LOGFILE		"imslog"	/* [%g] */
 
 	/* user dir */
@@ -99,10 +99,10 @@
 #define	SH_PATH			"/usr/bin/sh"
 #define	CAT_PATH		"/usr/bin/cat"
 #define	XRDB_PATH		"/usr/bin/X11/xrdb"
-#define	DTSESSION_RES_PATH	"/usr/dt/bin/dtsession_res"
+#define	DTSESSION_RES_PATH	CDE_INSTALLATION_TOP "/bin/dtsession_res"
 
     /* DT dirs */
-#define	DT_CONFDIR		"/usr/dt/config"
+#define	DT_CONFDIR		CDE_INSTALLATION_TOP "/config"
 #define	DT_USERDIR		"%H/.dt"
 
 #endif	/* _XIMSPATH_H_ */

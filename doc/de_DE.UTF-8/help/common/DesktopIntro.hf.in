@@ -16,7 +16,7 @@
 
 *.charSet:      UTF-8
 *.title:        Überblick und Grundkenntnisse für das Desktop
-*.bitmap:       @prefix@/appconfig/help/de_DE.UTF-8/graphics/cdelogo.pm
+*.bitmap:       @CDE_DATA_TOP@/appconfig/help/de_DE.UTF-8/graphics/cdelogo.pm
 *.abstract:     Überblick und Grundkenntnisse für das \
                 Common Desktop Environment.
 

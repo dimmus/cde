@@ -227,9 +227,9 @@ AddLibraryAgent::pick_dir () {
 //       user environment LANG is OK ...
     char *tmpstr;
     if( (tmpstr = getenv("LANG")) )
-	snprintf( buf, buflen, "/usr/dt/infolib/%s/", tmpstr );
+	snprintf( buf, buflen, CDE_INSTALLATION_TOP "/infolib/%s/", tmpstr );
     else
-	snprintf( buf, buflen, "/usr/dt/infolib/%s/", env().lang() );
+	snprintf( buf, buflen, CDE_INSTALLATION_TOP "/infolib/%s/", env().lang() );
 //
     XmString basedir_str = XmStringCreateLocalized( buf );
     slen = strlen(buf);

@@ -693,8 +693,8 @@ void MotifUI::GetPixmaps(Widget w,
    char *s;
    SubstitutionRec subs[1];
    char *bmPath;
-   char *PIXMAP_DIR = "/usr/dt/appconfig/icons/%L/%B:"
-                      "/usr/dt/appconfig/icons/C/%B:"
+   char *PIXMAP_DIR = CDE_INSTALLATION_TOP "/appconfig/icons/%L/%B:"
+                      CDE_INSTALLATION_TOP "/appconfig/icons/C/%B:"
                       "/usr/include/X11/bitmaps/%B";
 
    if (*name == '/')

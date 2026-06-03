@@ -63,7 +63,7 @@ $COPYRIGHT$:
 #define XDEFAULTS_FILE		"/.Xdefaults"
 #define XDEFAULTS_HOST_FILE	"/.Xdefaults-"
 #define TMP_DIR_STR		"/.dt/tmp"
-#define DTHELPPRINTSH_FILE	"/usr/dt/bin/dthelpprint.sh"
+#define DTHELPPRINTSH_FILE	CDE_INSTALLATION_TOP "/bin/dthelpprint.sh"
 
 /*=========== helper constants ===========*/
 #define EOS           '\0'

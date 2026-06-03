@@ -201,7 +201,7 @@ EnvMgr::init(int argc_i, char** argv_i)
     {
        static char markref[256];
        snprintf (markref, sizeof(markref), "DTINFO_MARKSPECPATH=%s",
-					"/usr/dt/infolib/etc" );
+					CDE_INSTALLATION_TOP "/infolib/etc" );
        putenv (markref);
     }
   }

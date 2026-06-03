@@ -16,7 +16,7 @@
 
 *.charSet:      UTF-8
 *.title:        Introduzione alle funzioni principali del desktop
-*.bitmap:       @prefix@/appconfig/help/it_IT.UTF-8/graphics/cdelogo.pm
+*.bitmap:       @CDE_DATA_TOP@/appconfig/help/it_IT.UTF-8/graphics/cdelogo.pm
 *.abstract:     Introduzione alle funzioni principali del \
                 Common Desktop Environment.
 

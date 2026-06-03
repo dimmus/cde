@@ -31,7 +31,7 @@
 #include "udcopt.h"
 
 /* default path of dtaddcpf */
-#define DFLTPATH 	"/usr/dt/lib/dtudcfonted/dtaddcpf"
+#define DFLTPATH 	CDE_INSTALLATION_TOP "/lib/dtudcfonted/dtaddcpf"
 #define DFLTCMD		"dtaddcpf"
 
 /* commands for exchange font format */
@@ -39,7 +39,7 @@
 #define BDFTOPCF_CMD	"bdftopcf"
 
 /* default path for commands */
-#define SNFTOBDF	"/usr/dt/lib/dtudcfonted/dtgpftobdf"
+#define SNFTOBDF	CDE_INSTALLATION_TOP "/lib/dtudcfonted/dtgpftobdf"
 #ifndef FONTC
 #define BDFTOPCF        "/usr/bin/X11/bdftopcf"
 #else
@@ -55,7 +55,7 @@
 #define DTUDCFONTS		"DTUDCFONTS"
 
 #ifndef DTUDCFONTSLISTDIR
-#define	DTUDCFONTSLISTDIR	"/usr/dt/config"
+#define	DTUDCFONTSLISTDIR	CDE_INSTALLATION_TOP "/config"
 #endif
 
 /* default font path */

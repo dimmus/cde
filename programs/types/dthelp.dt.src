@@ -129,8 +129,8 @@ ACTION Dthelpview
         ICON		Fphelp
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-        EXEC_STRING     /bin/sh -c '/usr/dt/bin/dthelpgen -dir $HOME/.dt/help/$DTUSERSESSION; \
-                 /usr/dt/bin/dthelpview -helpVolume browser '
+        EXEC_STRING     /bin/sh -c 'CDE_INSTALLATION_TOP/bin/dthelpgen -dir $HOME/.dt/help/$DTUSERSESSION; \
+                 CDE_INSTALLATION_TOP/bin/dthelpview -helpVolume browser '
 	DESCRIPTION	%|nls-11007-#The#|
 }
 ACTION Dthelpview
@@ -139,9 +139,9 @@ ACTION Dthelpview
         ICON		Fphelp
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-        EXEC_STRING     /bin/sh -c '/usr/dt/bin/dthelpgen 	\
+        EXEC_STRING     /bin/sh -c 'CDE_INSTALLATION_TOP/bin/dthelpgen 	\
 			    -dir $HOME/.dt/help/$DTUSERSESSION; \
-                            /usr/dt/bin/dthelpview -helpVolume "%(File)Arg_1%" '
+                            CDE_INSTALLATION_TOP/bin/dthelpview -helpVolume "%(File)Arg_1%" '
 	DESCRIPTION	%|nls-11007-#The#|
 }
 
@@ -153,7 +153,7 @@ ACTION Dthelpgen
         ICON		Fphelp
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-        EXEC_STRING     /bin/sh -c '/usr/dt/bin/dthelpgen -dir \
+        EXEC_STRING     /bin/sh -c 'CDE_INSTALLATION_TOP/bin/dthelpgen -dir \
                          "%(File)Arg_1"%|nls-11015-#Location to put files:#|"%"'
 	DESCRIPTION	%|nls-11016-#The#|
 }
@@ -163,7 +163,7 @@ ACTION Dthelpgen_delay
         ICON		Fphelp
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-        EXEC_STRING     /bin/sh -c 'sleep 15; /usr/dt/bin/dthelpgen -dir \
+        EXEC_STRING     /bin/sh -c 'sleep 15; CDE_INSTALLATION_TOP/bin/dthelpgen -dir \
                          $HOME/.dt/help/$DTUSERSESSION'
 	DESCRIPTION	%|nls-11016-#The#|
 }
@@ -176,7 +176,7 @@ ACTION Dtmanpageview
         ICON		Dthover
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-        EXEC_STRING     sh -c ' /usr/dt/bin/dthelpview -manPage \
+        EXEC_STRING     sh -c ' CDE_INSTALLATION_TOP/bin/dthelpview -manPage \
               `basename "%(File)Arg_1"%|nls-11011-#Man#|"%" | sed /[.].*/s///` \
               -xrm "Dthelpview*manBox*columns: %|nls-11012-#100#|"'
 	DESCRIPTION	%|nls-11013-#The#|

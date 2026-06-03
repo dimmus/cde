@@ -49,7 +49,7 @@ Dtlogin.pidFile:               CDE_LOGFILES_TOP/Xpid
 XCOMM #########################################################################
 XCOMM  Note: If you do not specify a full path beginning with a "/"
 XCOMM	dtlogin will first search for the following files in
-XCOMM	/etc/dt/config then in /usr/dt/config.
+XCOMM	CDE_CONFIGURATION_TOP/config then in CDE_INSTALLATION_TOP/config.
 XCOMM
 XCOMM #########################################################################
 Dtlogin.accessFile:            Xaccess

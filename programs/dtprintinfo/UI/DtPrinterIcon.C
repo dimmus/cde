@@ -334,10 +334,10 @@ char *DtPrinterIcon::CreateActionFile()
 
    if (app_mode == INITIALIZE_PRINTERS || app_mode == CONFIG_PRINTERS)
     {
-      snprintf(filename, MAXPATHLEN, "/etc/dt/appconfig/types/%s", lang);
+      snprintf(filename, MAXPATHLEN, CDE_CONFIGURATION_TOP "/appconfig/types/%s", lang);
       if (stat(filename, &statbuff) < 0)
          MakeDirectories(filename);
-      snprintf(filename, MAXPATHLEN, "/etc/dt/appconfig/types/%s/%s.dt", lang,
+      snprintf(filename, MAXPATHLEN, CDE_CONFIGURATION_TOP "/appconfig/types/%s/%s.dt", lang,
 	      queue->Name());
       if (stat(filename, &statbuff) < 0 || statbuff.st_size == 0)
          create_file = true;
@@ -349,7 +349,7 @@ char *DtPrinterIcon::CreateActionFile()
       snprintf(buf, MAXPATHLEN, "%s/.dt/types/%s.dt", homeDir, queue->Name());
       if (stat(buf, &statbuff) < 0 || statbuff.st_size == 0)
        {
-         snprintf(buf, MAXPATHLEN, "/etc/dt/appconfig/types/%s/%s.dt", lang, queue->Name());
+         snprintf(buf, MAXPATHLEN, CDE_CONFIGURATION_TOP "/appconfig/types/%s/%s.dt", lang, queue->Name());
          if (stat(buf, &statbuff) >= 0 && statbuff.st_size > 0)
 	  {
 	    char *types = new char[strlen(homeDir) + 12];

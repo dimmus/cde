@@ -319,8 +319,8 @@ loadDatabase(void)
 
   lang = setlocale (LC_CTYPE,NULL);
 
-  pl_desc = (char *)XtMalloc(strlen("/usr/dt/palettes/desc.") + strlen(lang) + 1);
-  strcpy (pl_desc,"/usr/dt/palettes/desc.");
+  pl_desc = (char *)XtMalloc(strlen(CDE_INSTALLATION_TOP "/palettes/desc.") + strlen(lang) + 1);
+  strcpy (pl_desc,CDE_INSTALLATION_TOP "/palettes/desc.");
   strcat (pl_desc, lang);
   if((sys_pl_DB = XrmGetFileDatabase (pl_desc)))
     XrmMergeDatabases(sys_pl_DB, &pl_DB);
@@ -328,8 +328,8 @@ loadDatabase(void)
   
   /* load the palette description data base for the given locale*/
   /* from that locale's description file from the admin location */
-  pl_desc = (char *)XtMalloc(strlen("/etc/dt/palettes/desc.") + strlen(lang) + 1);
-  strcpy (pl_desc,"/etc/dt/palettes/desc.");
+  pl_desc = (char *)XtMalloc(strlen(CDE_CONFIGURATION_TOP "/palettes/desc.") + strlen(lang) + 1);
+  strcpy (pl_desc,CDE_CONFIGURATION_TOP "/palettes/desc.");
   strcat (pl_desc, lang);
   if ((adm_pl_DB = XrmGetFileDatabase (pl_desc)))
     XrmMergeDatabases(adm_pl_DB, &pl_DB);

@@ -725,7 +725,7 @@ void  update_container_contents (char *filter)
   /******************************************************************/
   n = 0;
   /*
-  XtSetArg(args[n], XmNimageName, "/usr/dt/appconfig/icons/C/Dtactn.m.pm"); n++;
+  XtSetArg(args[n], XmNimageName, CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtactn.m.pm"); n++;
   */
   XtSetArg(args[n], XmNimageName, NULL); n++;
   XtSetArg(args[n], XmNfillMode, XmFILL_SELF); n++;

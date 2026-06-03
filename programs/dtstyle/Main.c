@@ -561,7 +561,7 @@ malloc_trace(0);
     string = (char *)XtMalloc(strlen(style.home) + strlen("/.dt/backdrops:") + 1);
     sprintf(string, "%s/.dt/backdrops:", style.home);
 
-    dirs = (char *)XtCalloc(1, strlen("/etc/dt/backdrops:/usr/dt/backdrops") + 
+    dirs = (char *)XtCalloc(1, strlen(CDE_CONFIGURATION_TOP "/backdrops:" CDE_INSTALLATION_TOP "/backdrops") +
 			    (style.xrdb.backdropDir == NULL ? 2 :
 			    strlen(style.xrdb.backdropDir)) + 
 			    strlen(string) + 2);
@@ -573,7 +573,7 @@ malloc_trace(0);
 	strcat(dirs, style.xrdb.backdropDir);
 	strcat(dirs, ":"); 
       }
-    strcat(dirs, "/etc/dt/backdrops:/usr/dt/backdrops");
+    strcat(dirs, CDE_CONFIGURATION_TOP "/backdrops:" CDE_INSTALLATION_TOP "/backdrops");
 
     _DtWsmSetBackdropSearchPath(style.screen, dirs, style.useMultiColorIcons);
 

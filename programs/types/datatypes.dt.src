@@ -736,7 +736,7 @@ ACTION Print
         ARG_TYPE        HTML
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dtlp "%Arg_1%"
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dtlp "%Arg_1%"
 }
 
 XCOMM #######################################################
@@ -763,7 +763,7 @@ ACTION Print
         ARG_TYPE        ENRICHED_TEXT
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dtlp "%Arg_1%"
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dtlp "%Arg_1%"
 }
 
 XCOMM #######################################################
@@ -790,7 +790,7 @@ ACTION Print
         ARG_TYPE        RICHTEXT
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dtlp "%Arg_1%"
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dtlp "%Arg_1%"
 }
 
 XCOMM #######################################################

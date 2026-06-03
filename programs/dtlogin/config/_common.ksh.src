@@ -213,7 +213,7 @@ XCOMM ##########################################################################
  *   language will thus be provided in the KBD_MAP table setup by the
  *   sysadmin and the keyboard mapping will be done in Xsetup. 
  *
- * - using 'xinit /usr/dt/bin/Xsession' from an HFT/LFT
+ * - using 'xinit CDE_INSTALLATION_TOP/bin/Xsession' from an HFT/LFT
  *   
  *   Since the keyboard is local, the keyboard mapping will be done in 
  *   Xsession and the language will be determined via querykbd.

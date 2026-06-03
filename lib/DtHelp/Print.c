@@ -99,7 +99,7 @@ typedef struct _DtHelpPrintCBRec {
 } _DtHelpPrintCBRec;
 
 /***** Global Variables ****/
-char _DtHelpDefaultHelpPrint[] = "/usr/dt/bin/dthelpprint";
+char _DtHelpDefaultHelpPrint[] = CDE_INSTALLATION_TOP "/bin/dthelpprint";
 
 /* The order of these names must match the constants DtHELP_PAPERSIZE_xxx */
 char *_DtHelpPaperSizeNames[] =

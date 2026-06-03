@@ -3,7 +3,7 @@ XCOMM $XConsortium: dtprintegrate.src /main/5 1996/04/23 12:02:04 drk $
 XCOMM ####################################################################
 XCOMM ##  File:              dtprintegrate
 XCOMM ##
-XCOMM ##  Default Location:  /usr/dt/bin/dtprintegrate
+XCOMM ##  Default Location:  CDE_INSTALLATION_TOP/bin/dtprintegrate
 XCOMM ##
 XCOMM ##  Purpose:           Set up the desktop configuration files for 
 XCOMM ##                     the desktop components.
@@ -36,7 +36,7 @@ XCOMM ##  Set default values.
 XCOMM ##
 COMMAND_NAME=dtprintegrate
 
-ACTION_STUB_FILE=/usr/dt/appconfig/appmanager/C/Desktop_Apps/Dtcalc
+ACTION_STUB_FILE=CDE_INSTALLATION_TOP/appconfig/appmanager/C/Desktop_Apps/Dtcalc
 
 base_icon_name="Fpprnt"
 
@@ -58,7 +58,7 @@ Initialize()
     HASH
     HASH Location for Print action files...
     HASH
-    DEFAULT_FOLDER=/etc/dt/appconfig/appmanager/C/Printers
+    DEFAULT_FOLDER=CDE_CONFIGURATION_TOP/appconfig/appmanager/C/Printers
     DTPRINTERFOLDER=${DTPRINTERFOLDER:-$DEFAULT_FOLDER}
  
     if (( ${#DTUSERPRINTERFOLDER} ))
@@ -74,7 +74,7 @@ Initialize()
     HASH
     HASH Location for Print definition (*.dt) files...
     HASH
-    DEFAULT_FOLDER=/etc/dt/appconfig/types/C
+    DEFAULT_FOLDER=CDE_CONFIGURATION_TOP/appconfig/types/C
     DTPRINTACTIONFOLDER=${DTPRINTACTIONFOLDER:-$DEFAULT_FOLDER}
 
     if [ ! -d "$DTPRINTACTIONFOLDER" ]
@@ -85,13 +85,13 @@ Initialize()
     HASH
     HASH Search path for printer icons...
     HASH
-    DEFAULT_PATH=.,$HOME/.dt/icons,/usr/dt/appconfig/icons/C
+    DEFAULT_PATH=.,$HOME/.dt/icons,CDE_INSTALLATION_TOP/appconfig/icons/C
     DTPRINTICONPATH=${DTPRINTICONPATH:-$DEFAULT_PATH}
 
     HASH
     HASH Location for printer icons...
     HASH
-    DEFAULT_FOLDER=/etc/dt/appconfig/icons/C
+    DEFAULT_FOLDER=CDE_CONFIGURATION_TOP/appconfig/icons/C
     DTPRINTERICONFOLDER=${DTPRINTERICONFOLDER:-$DEFAULT_FOLDER}
 
     HASH
@@ -220,7 +220,7 @@ MakeDatabaseFile()
             echo "        EXEC_STRING             env LPDEST=$printer_name \\"
 	fi
 
-	echo "				/usr/dt/bin/dtaction Print %(File)Arg_1%"
+	echo "				CDE_INSTALLATION_TOP/bin/dtaction Print %(File)Arg_1%"
 	) >> "$databasefile_path"
 
 	if (( help_flag ))
@@ -249,7 +249,7 @@ MakeDatabaseFile()
 	else
 	    echo "	EXEC_STRING		env LPDEST=$printer_name \\"
 	fi
-	echo "				/usr/dt/bin/dtaction Dtqueueinfo"
+	echo "				CDE_INSTALLATION_TOP/bin/dtaction Dtqueueinfo"
 	echo "}"
 	) >> "$databasefile_path"
 }
@@ -513,27 +513,27 @@ ReloadActions() {
 	HASH
 	HASH  User wants to force reloading actions
 	HASH
-		if [[ -x /usr/dt/bin/dtaction  &&  -n "$DISPLAY" ]]
+		if [[ -x CDE_INSTALLATION_TOP/bin/dtaction  &&  -n "$DISPLAY" ]]
 		then
-			/usr/dt/bin/dtaction ReloadActions
+			CDE_INSTALLATION_TOP/bin/dtaction ReloadActions
 		fi
 	elif [[ "$display_host" = "$session_host" ]]
 	HASH
 	HASH  Our session server is running on the desktop
 	HASH
 	then
-		if [ -x /usr/dt/bin/dtaction ]
+		if [ -x CDE_INSTALLATION_TOP/bin/dtaction ]
 		then
-			/usr/dt/bin/dtaction ReloadActions
+			CDE_INSTALLATION_TOP/bin/dtaction ReloadActions
 		fi
 	elif [[ -z "$display_host" && -n "$DISPLAY" ]]
 	then
 	HASH
 	HASH  Covers the case in which the simple value ":0.0" is our $DISPLAY
 	HASH
-		if [ -x /usr/dt/bin/dtaction ]
+		if [ -x CDE_INSTALLATION_TOP/bin/dtaction ]
 		then
-			/usr/dt/bin/dtaction ReloadActions
+			CDE_INSTALLATION_TOP/bin/dtaction ReloadActions
 		fi
 	fi
 }

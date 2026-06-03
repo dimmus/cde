@@ -205,18 +205,18 @@ Widget  last_action_pushed = (Widget)NULL;
 Widget  last_filetype_pushed = (Widget)NULL;
 
 const char *ca_icon_default = "Dtactn";
-const char *ca_full_icon_default =  "/usr/dt/appconfig/icons/C/Dtactn";
-const char *ca_lrg_icon_default =  "/usr/dt/appconfig/icons/C/Dtactn.l";
-const char *ca_med_icon_default =  "/usr/dt/appconfig/icons/C/Dtactn.m";
-const char *ca_sml_icon_default =  "/usr/dt/appconfig/icons/C/Dtactn.s";
-const char *ca_tiny_icon_default = "/usr/dt/appconfig/icons/C/Dtactn.t";
+const char *ca_full_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtactn";
+const char *ca_lrg_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtactn.l";
+const char *ca_med_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtactn.m";
+const char *ca_sml_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtactn.s";
+const char *ca_tiny_icon_default = CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtactn.t";
 
 const char *af_icon_default = "Dtdata";
-const char *af_full_icon_default =  "/usr/dt/appconfig/icons/C/Dtdata";
-const char *af_lrg_icon_default =  "/usr/dt/appconfig/icons/C/Dtdata.l";
-const char *af_med_icon_default =  "/usr/dt/appconfig/icons/C/Dtdata.m";
-const char *af_sml_icon_default =  "/usr/dt/appconfig/icons/C/Dtdata.s";
-const char *af_tiny_icon_default = "/usr/dt/appconfig/icons/C/Dtdata.t";
+const char *af_full_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtdata";
+const char *af_lrg_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtdata.l";
+const char *af_med_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtdata.m";
+const char *af_sml_icon_default =  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtdata.s";
+const char *af_tiny_icon_default = CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtdata.t";
 
 
 

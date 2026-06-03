@@ -3,7 +3,7 @@ XCOMM $XConsortium: Xsession.ow.src /main/3 1996/11/19 11:41:19 drk $
 XCOMM ####################################################################
 XCOMM ##  File:              Xsession.ow
 XCOMM ##
-XCOMM ##  Default Location:  /usr/dt/config/Xsession.ow
+XCOMM ##  Default Location:  CDE_INSTALLATION_TOP/config/Xsession.ow
 XCOMM ##
 XCOMM ##  Purpose:           OpenWindows session start script
 XCOMM ##

@@ -53,7 +53,7 @@ ACTION OpenAppGroup
         TT_ARG2_MODE            TT_IN
         TT_ARG2_VTYPE           -root
         TT_ARG2_REP_TYPE        TT_REP_STRING
-        TT_ARG2_VALUE   	/var/dt/appconfig/appmanager/$DTUSERSESSION
+        TT_ARG2_VALUE   	CDE_LOGFILES_TOP/appconfig/appmanager/$DTUSERSESSION
         TT_ARG3_MODE            TT_IN
         TT_ARG3_VTYPE           -common_link_point
         TT_ARG3_REP_TYPE        TT_REP_STRING
@@ -78,7 +78,7 @@ ACTION OpenParentAppGroup
         TT_ARG2_MODE            TT_IN
         TT_ARG2_VTYPE           -root
         TT_ARG2_REP_TYPE        TT_REP_STRING
-        TT_ARG2_VALUE   	/var/dt/appconfig/appmanager/$DTUSERSESSION
+        TT_ARG2_VALUE   	CDE_LOGFILES_TOP/appconfig/appmanager/$DTUSERSESSION
         TT_ARG3_MODE            TT_IN
         TT_ARG3_VTYPE           -common_link_point
         TT_ARG3_REP_TYPE        TT_REP_STRING

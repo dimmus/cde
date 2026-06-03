@@ -1651,12 +1651,12 @@ InsureDefaultBackdropDir(char **ppchBackdropDirs)
   if (bFound)  
     {
       len = strlen (homeDir) + strlen("/.dt/backdrops") + 
-	    strlen (*ppchBackdropDirs) + strlen("/etc/dt/backdrops") + 3;
+	    strlen (*ppchBackdropDirs) + strlen(CDE_CONFIGURATION_TOP "/backdrops") + 3;
       tmpptr = XtMalloc (len * sizeof (char *));
       strcpy (tmpptr, homeDir);
       strcat (tmpptr, "/.dt/backdrops");
       strcat (tmpptr, ":");
-      strcat (tmpptr, "/etc/dt/backdrops");
+      strcat (tmpptr, CDE_CONFIGURATION_TOP "/backdrops");
       strcat (tmpptr, ":");
       strcat (tmpptr, *ppchBackdropDirs);
       *ppchBackdropDirs = tmpptr;
@@ -1669,14 +1669,14 @@ InsureDefaultBackdropDir(char **ppchBackdropDirs)
     {
       len = strlen (homeDir) + strlen("/.dt/backdrops") + 
 	    strlen (*ppchBackdropDirs) + strlen(pchD) + 
-	    strlen("/etc/dt/backdrops") + 4;
+	    strlen(CDE_CONFIGURATION_TOP "/backdrops") + 4;
       tmpptr = XtMalloc (len * sizeof (char *));
       strcpy (tmpptr, homeDir);
       strcat (tmpptr, "/.dt/backdrops");
       strcat (tmpptr, ":");
       strcat (tmpptr, *ppchBackdropDirs); 
       strcat (tmpptr, ":");
-      strcat (tmpptr, "/etc/dt/backdrops"); 
+      strcat (tmpptr, CDE_CONFIGURATION_TOP "/backdrops");
       strcat (tmpptr, ":");
       strcat (tmpptr, pchD);
       *ppchBackdropDirs = tmpptr;

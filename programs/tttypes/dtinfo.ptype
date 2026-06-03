@@ -10,10 +10,11 @@
  * (c) Copyright 1996 Hitachi.
  */
 
+#include "cde_config.h"
 #include "dtinfo_start.opnums"
 
 ptype DtInfo {
-       	start 	"/usr/dt/infolib/etc/dtinfo_start";
+	start 	CDE_DATA_TOP "/infolib/etc/dtinfo_start";
 	handle:
 		session DtInfo_LoadInfoLib (
 				in string action_name,
@@ -32,7 +33,7 @@ ptype DtInfo {
 }
 
 ptype DtInfoPrint {
-      start "/usr/dt/bin/dtinfo -print";
+      start CDE_INSTALLATION_TOP "/bin/dtinfo -print";
       handle:
 
       /* print a specified section */

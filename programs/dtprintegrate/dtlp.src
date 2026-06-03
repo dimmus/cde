@@ -15,7 +15,7 @@ XCOMM ###################################################################
 XCOMM
 XCOMM  File:              dtlp
 XCOMM
-XCOMM  Default Location:  /usr/dt/bin/dtlp
+XCOMM  Default Location:  CDE_INSTALLATION_TOP/bin/dtlp
 XCOMM
 XCOMM  Purpose:           Set up print spooler options and print.
 XCOMM
