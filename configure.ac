@@ -264,6 +264,18 @@ AC_ARG_ENABLE([japanese],
 )
 AM_CONDITIONAL([JAPANESE], [test "x$enable_japanese" != xno])
 
+AC_ARG_ENABLE([chinese],
+        AS_HELP_STRING([--enable-chinese], [Build Chinese (zh_CN.UTF-8) locale (default=no)]),
+        [enable_zh="yes"], [enable_zh=""]
+)
+AM_CONDITIONAL([CHINESE], [test -n "$enable_zh"])
+
+AC_ARG_ENABLE([chinese-tw],
+        AS_HELP_STRING([--enable-chinese-tw], [Build Chinese Traditional (zh_TW.UTF-8) locale (default=no)]),
+        [enable_zt="yes"], [enable_zt=""]
+)
+AM_CONDITIONAL([CHINESE_TW], [test -n "$enable_zt"])
+
 dnl interface font
 AC_ARG_ENABLE([misc-fixed],
         AS_HELP_STRING([--enable-misc-fixed], [Set interface font to misc-fixed (default=no)]),
@@ -1250,6 +1262,22 @@ programs/localized/ja_JP.UTF-8/types/Makefile
 programs/localized/ja_JP.UTF-8/palettes/Makefile
 programs/localized/ja_JP.UTF-8/msg/Makefile
 programs/localized/ja_JP.UTF-8/appmanager/Makefile
+programs/localized/zh_CN.UTF-8/Makefile
+programs/localized/zh_CN.UTF-8/app-defaults/Makefile
+programs/localized/zh_CN.UTF-8/config/Makefile
+programs/localized/zh_CN.UTF-8/backdrops/Makefile
+programs/localized/zh_CN.UTF-8/types/Makefile
+programs/localized/zh_CN.UTF-8/palettes/Makefile
+programs/localized/zh_CN.UTF-8/msg/Makefile
+programs/localized/zh_CN.UTF-8/appmanager/Makefile
+programs/localized/zh_TW.UTF-8/Makefile
+programs/localized/zh_TW.UTF-8/app-defaults/Makefile
+programs/localized/zh_TW.UTF-8/config/Makefile
+programs/localized/zh_TW.UTF-8/backdrops/Makefile
+programs/localized/zh_TW.UTF-8/types/Makefile
+programs/localized/zh_TW.UTF-8/palettes/Makefile
+programs/localized/zh_TW.UTF-8/msg/Makefile
+programs/localized/zh_TW.UTF-8/appmanager/Makefile
 
 doc/Makefile
 

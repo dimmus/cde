@@ -1,0 +1,8 @@
+#  This file is a template for setting the platform-specific LANG
+#  variable for a locale.
+
+if SOLARIS
+LANG=zh
+else
+LANG=zh_CN.UTF-8
+endif
