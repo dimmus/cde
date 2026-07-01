@@ -10,9 +10,12 @@ noinst_LTLIBRARIES = libTerm.la
 
 libTerm_la_CFLAGS = $(CDE_CFLAGS) -I../TermPrim @DT_INCDIR@
 
-TermLineData.c: TermLineData.data
+$(top_builddir)/lib/DtTerm/util/lineToData:
+	$(MAKE) -C $(top_builddir)/lib/DtTerm/util lineToData
+
+TermLineData.c: TermLineData.data $(top_builddir)/lib/DtTerm/util/lineToData
 	$(RM) $@
-	../util/lineToData -p _DtTerm -f TermLineData.data > $@
+	$(top_builddir)/lib/DtTerm/util/lineToData -p _DtTerm -f TermLineData.data > $@
 
 includes:: TermLineData.c
 
