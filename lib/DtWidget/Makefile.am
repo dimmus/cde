@@ -52,6 +52,9 @@ libDtWidget_la_SOURCES = ComboBox.c      Control.c       DialogBox.c \
 BUILT_SOURCES = UNIXbindings
 CLEANFILES = UNIXbindings
 
-UNIXbindings: UNIXbindings.cpp
+$(top_builddir)/util/tradcpp/tradcpp:
+	$(MAKE) -C $(top_builddir)/util/tradcpp tradcpp
+
+UNIXbindings: UNIXbindings.cpp $(top_builddir)/util/tradcpp/tradcpp
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# $(WIDGET_DEFINES) $< > $@
