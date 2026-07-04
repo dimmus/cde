@@ -2190,12 +2190,14 @@ programs/types/develop.dt
 programs/types/dt.dt
 programs/types/dt.softinit
 programs/types/dtappman.dt
+programs/types/dtcm.dt
 programs/types/dtfile.dt
 programs/types/dthelp.dt
 programs/types/dthelpprint.dt
 programs/types/dthelptag.dt
 programs/types/dtims.dt
 programs/types/dtinfo.dt
+programs/types/dtmail.dt
 programs/types/dtpad.dt
 programs/types/dtscreen.dt
 programs/types/dtwm.fp
