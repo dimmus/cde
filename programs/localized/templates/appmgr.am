@@ -2,6 +2,9 @@
 
 ACTION = $(top_builddir)/programs/localized/$(LANG)/types/action
 
+$(ACTION):
+	$(MAKE) -C ../types action
+
 desktop_appsdir = $(CDE_DATA_TOP)/appconfig/appmanager/$(LANG)/Desktop_Apps
 desktop_apps_SCRIPTS = Desktop_Apps/Dtmanpageview			\
 	Desktop_Apps/Dthelpview Desktop_Apps/DtPrintManager		\
