@@ -10,6 +10,12 @@ libtt_la_SOURCES =
 
 # fake things so libtool creates this as a C++ library
 nodist_EXTRA_libtt_la_SOURCES = dummy.cxx
+
+dummy.cxx:
+	: > $@
+
+BUILT_SOURCES = dummy.cxx
+CLEANFILES = dummy.cxx
 libtt_la_LIBADD = api/c/libapi.la api/dnd/libdnd.la db/libdb.la mp/libmp.la \
 		  util/libutil.la tttk/libtttk.la $(XTLIB) $(X11LIB)
 
