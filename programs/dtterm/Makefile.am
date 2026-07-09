@@ -34,14 +34,19 @@ CPP_TARGETS = dtterm.ti DtTermFallBackResources.c.src	\
 BUILT_SOURCES = $(CPP_TARGETS)
 CLEANFILES = $(CPP_TARGETS)
 
+TRADCPP = $(top_builddir)/util/tradcpp/tradcpp
+
+$(TRADCPP):
+	$(MAKE) -C $(top_builddir)/util/tradcpp tradcpp
+
 cfgdir = $(CDE_INSTALLATION_TOP)/config
 dist_cfg_DATA = dtterm.ti
 
-Dtterm.ad: Dtterm.ad.src
+Dtterm.ad: Dtterm.ad.src $(TRADCPP)
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# $< > $@
 
-DtTermFallBackResources.c.src: Dtterm.ad.src
+DtTermFallBackResources.c.src: Dtterm.ad.src $(TRADCPP)
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# -DFALLBACK_RESOURCES $< > $@
 
@@ -49,7 +54,7 @@ DtTermFallBackResources.c: DtTermFallBackResources.c.src
 	$(RM) $@
 	./mkfallbk < DtTermFallBackResources.c.src > $@
 
-dtterm.ti: terminfoChecklist
+dtterm.ti: terminfoChecklist $(TRADCPP)
 	$(RM) $@
 	CPP="$(GENCPP)" $(SHELL) terminfoCreate < terminfoChecklist > $@
 
