@@ -10,3 +10,5 @@ endif
 
 libdti_excs_la_SOURCES = Jump_Environment.C      Exceptions.C    Exception.C \
 			 Destructable.C          terminate.C
+
+noinst_HEADERS = Exceptions.hh
