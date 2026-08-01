@@ -4,7 +4,9 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 lib_LTLIBRARIES = libDtMrm.la
 
-libDtMrm_la_CFLAGS = $(CDE_CFLAGS) -I../DtTerm/Term -I../DtTerm/TermPrim -I../DtHelp \
+libDtMrm_la_CFLAGS = $(CDE_CFLAGS) \
+		     -I$(top_srcdir)/lib/DtTerm/Term -I$(top_srcdir)/lib/DtTerm/TermPrim \
+		     -I$(top_srcdir)/lib/DtHelp \
 		     @DT_INCDIR@ @DTI_INCDIR@
 
 libDtMrm_la_SOURCES = DtMrm.c
