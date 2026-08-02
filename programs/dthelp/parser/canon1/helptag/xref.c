@@ -149,6 +149,9 @@ FILE *tex;
 
 strcpy(helpext, ".xrh");
 tex = fopen(helpbase, "w");
+if (! tex) {
+	return;
+}
 fprintf(tex, "\\gobble\001%s\002%%\n", m_signon);
 fputs("% Generated Cross-Reference Macros (for a particular document)\n", tex);
 if (! xtree.data) {
