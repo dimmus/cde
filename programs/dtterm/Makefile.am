@@ -63,4 +63,3 @@ if !HAS_UTEMPTER_LIBRARY
 	-chown root $(DESTDIR)$(bindir)/dtterm
 	-chmod 4755 $(DESTDIR)$(bindir)/dtterm
 endif
-	@TIC@ dtterm.ti
