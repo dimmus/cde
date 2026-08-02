@@ -65,9 +65,6 @@ extern XtPointer _XmStringUngenerate (XmString string,
                         XmTextType output_type);
 
 
-typedef Uil_continue_type(*UIL_CB)();
-
-
 /*
  * Private function declarations
  */
@@ -1047,8 +1044,8 @@ parse_uil(
     /* Call uil compiler with appropriate paramters */
 
     compile_stat = Uil(&command_desc, &compile_desc,
-		       (UIL_CB)message_cb, (char *)&user_mess_data,
-		       (UIL_CB)status_cb, (char *)&user_stat_data);
+		       (uil_message_cb_t)message_cb, (char *)&user_mess_data,
+		       (uil_status_cb_t)status_cb, (char *)&user_stat_data);
 
     fprintf(stderr, "\nUIL Compiler Version %d, ",
 		compile_desc.compiler_version);
