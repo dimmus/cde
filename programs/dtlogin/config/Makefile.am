@@ -75,7 +75,7 @@ CLEANFILES = $(CPP_TARGETS)
 # programs/localization/
 
 configsdir=$(CDE_INSTALLATION_TOP)/config
-dist_configs_DATA = Xaccess Xconfig Xfailsafe Xservers
+dist_configs_DATA = Xaccess Xconfig Xservers
 dist_configs_SCRIPTS = sys.dtprofile Xfailsafe Xreset Xsetup Xstartup
 
 xsessdir=$(CDE_INSTALLATION_TOP)/config/Xsession.d
