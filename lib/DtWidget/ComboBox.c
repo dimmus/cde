@@ -110,7 +110,23 @@ express or implied warranty.
 #include <Dt/DtMsgsP.h>
 #include "ComboBoxP.h"
 #include <Xm/DrawP.h>
+/*
+ * Motif 2.3.4's installed DisplayP.h uses HAVE_CONFIG_H to include
+ * Motif's build-time <config.h>, which is not installed with its
+ * development headers.  Do not let CDE's HAVE_CONFIG_H leak into
+ * the Motif private header.
+ */
+#ifdef HAVE_CONFIG_H
+#define CDE_DISPLAYP_RESTORE_HAVE_CONFIG_H 1
+#undef HAVE_CONFIG_H
+#endif
+
 #include <Xm/DisplayP.h>
+
+#ifdef CDE_DISPLAYP_RESTORE_HAVE_CONFIG_H
+#define HAVE_CONFIG_H 1
+#undef CDE_DISPLAYP_RESTORE_HAVE_CONFIG_H
+#endif
 #include <Xm/List.h>
 #include <Xm/ComboBox.h>	/* for redirecting utility functions */
 #include "DtWidgetI.h"		/* for _Dt thread-safety macros */
