@@ -3487,29 +3487,48 @@ Boolean IconVisible (ClientData *pCD)
  *************************************<->***********************************/
 
 String WmXmStringToString (XmString xmString)
-{ 
-    XmStringContext       xmStrContext;
-    char                 *asciiString = NULL; 
-    XmStringCharSet      ibTitleCharset; 
-    XmStringDirection    ibTitleDirection; 
-    Boolean              separator; 
+{
+    char                  *asciiString = NULL;    
+    int                   asciiStringLen = 0;
+    char                  *newAsciiString = NULL;
+    XmStringContext       xmStrContext = NULL;
+    XmStringComponentType xmStrComponentType = XmSTRING_COMPONENT_TEXT;
+    XtPointer             xmStrValue = NULL;
+    int                   xmStrLen = 0;
+
+    if (!xmString) return NULL;
+    if (!XmStringInitContext (&xmStrContext, xmString)) return NULL;
     
-    if (xmString)
+    while (xmStrComponentType != XmSTRING_COMPONENT_END) 
     {
-	XmStringInitContext (&xmStrContext, xmString);
-    
-	XmStringGetNextSegment (xmStrContext, &asciiString, 
-				&ibTitleCharset, &ibTitleDirection, 
-				&separator);
-
-	if (ibTitleCharset != NULL) 
-	{
-	    XtFree ((char *)ibTitleCharset);
-	}
-
-	XmStringFreeContext (xmStrContext);
+        xmStrComponentType = XmStringGetNextTriple (
+            xmStrContext,
+            &xmStrLen,
+            &xmStrValue);
+        if ((xmStrComponentType == XmSTRING_COMPONENT_TEXT)
+            || (xmStrComponentType == XmSTRING_COMPONENT_LOCALE_TEXT))
+        {
+            newAsciiString = realloc(asciiString, asciiStringLen + xmStrLen + 1);
+            if (!newAsciiString) 
+            {
+                free(asciiString);
+                XtFree((char*)xmStrValue);
+                XmStringFreeContext(xmStrContext);
+                return NULL;
+            }
+            asciiString = newAsciiString;
+            strcpy(asciiString + asciiStringLen, (char*)xmStrValue);
+            asciiStringLen += xmStrLen;
+        }
+        if (asciiStringLen > 0) asciiString[asciiStringLen] = '\0';
+        if (xmStrValue) 
+        {
+          XtFree((char*) xmStrValue);
+          xmStrValue = NULL;
+        }   
     }
-    
+        
     return(asciiString);
-    
+
 } /* END OF FUNCTION WmXmStringToString */
+
