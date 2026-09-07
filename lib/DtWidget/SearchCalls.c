@@ -64,11 +64,10 @@
 #define XOS_USE_XT_LOCKING
 #include <X11/Xos_r.h>
 
-extern XtPointer
-_XmStringUngenerate(XmString    string,
-		    XmStringTag tag,
-		    XmTextType  tag_type,
-		    XmTextType  output_type);
+#if XmVersion < 2004
+extern XtPointer _XmStringUngenerate(XmString, XmStringTag, XmTextType, XmTextType);
+#define XmStringUngenerate _XmStringUngenerate
+#endif
 
 static Boolean DoReplace(
 	DtEditorWidget pPriv,
@@ -1110,7 +1109,7 @@ _DtEditorMisspelledSelectCB(
     XtFree(M_misspelled_string(editor));
 
     M_misspelled_string(editor) = 
-	_XmStringUngenerate(cb->item, NULL, XmCHARSET_TEXT, XmCHARSET_TEXT);
+	XmStringUngenerate(cb->item, NULL, XmCHARSET_TEXT, XmCHARSET_TEXT);
 
     /*
      * Mark that it has not been found
