@@ -122,6 +122,15 @@ dnl other things as we go along.
 EXTRA_LIBS=""
 EXTRA_INCS=""
 
+dnl Use Motif's advertised compiler interface when pkg-config metadata is
+dnl available. Some Motif implementations expose dependencies such as Xft
+dnl through their public headers. Keep the legacy library detection below
+dnl for Motif implementations without pkg-config metadata and for CDE's
+dnl existing linker ordering.
+PKG_CHECK_MODULES([MOTIF], [motif],
+    [CPP_COMPILER_FLAGS="${CPP_COMPILER_FLAGS} ${MOTIF_CFLAGS}"],
+    [:])
+
 # pam currently only works on netbsd (9.2 tested) and linux
 supports_pam=no
 
