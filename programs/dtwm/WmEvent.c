@@ -2358,6 +2358,14 @@ void HandleWsFocusIn (XFocusInEvent *focusEvent)
     ClientData *pCD;
     Boolean sameScreen;
 
+    /* Focus can move directly from a client to the root window. */
+    if (focusEvent->mode == NotifyNormal &&
+        focusEvent->detail == NotifyInferior &&
+        focusEvent->window == ACTIVE_PSD->rootWindow)
+    {
+        SetKeyboardFocus (NULL, REFRESH_LAST_FOCUS);
+    }
+
     /*
      * This code is used to handle the case of the focus being
      * set to pointer root (either explicitly by some client, by the window

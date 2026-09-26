@@ -27,11 +27,69 @@
 
 #include "WmGlobal.h"
 #include "WmEvent.h"
+#include "WmCEvent.h"
+#include "WmEwmh.h"
+#include "WmWinList.h"
 #include "WmFunction.h"
 #include "WmMultiHead.h"
 #include "WmProperty.h"
 #include "WmWinState.h"
 #include "WmWrkspace.h"
+
+/* Publish confirmed client focus, excluding icons and hidden windows. */
+void UpdateNetActiveWindow (void)
+{
+    int scr;
+    ClientData *pCD = wmGD.keyboardFocus;
+
+    if (wmGD.xa__NET_ACTIVE_WINDOW == None) return;
+
+    for (scr = 0; scr < wmGD.numScreens; ++scr)
+    {
+        WmScreenData *pSD = &wmGD.Screens[scr];
+        Window active = None;
+
+        if (!pSD->managed) continue;
+        if (pCD && pCD->pSD == pSD &&
+            (pCD->clientState == NORMAL_STATE ||
+             pCD->clientState == MAXIMIZED_STATE))
+            active = pCD->client;
+
+        XChangeProperty (DISPLAY, pSD->rootWindow,
+            wmGD.xa__NET_ACTIVE_WINDOW, XA_WINDOW, 32, PropModeReplace,
+            (unsigned char *)&active, 1);
+    }
+}
+
+/* Use the normal focus path so ICCCM input models and modality still apply. */
+void ProcessNetActiveWindow (ClientData *pCD, Time timestamp)
+{
+    ClientData *pLeader;
+    WmWorkspaceData *pWS;
+
+    if ((pCD->clientState & ~UNSEEN_STATE) == WITHDRAWN_STATE) return;
+    pLeader = FindTransientTreeLeader (pCD);
+    if (wmGD.systemModalActive && pLeader != wmGD.systemModalClient) return;
+
+    pWS = pCD->pSD->pActiveWS;
+    if (!ClientInWorkspace (pWS, pCD))
+    {
+        if (!pCD->numInhabited) return;
+        pWS = GetWorkspaceData (pCD->pSD, pCD->pWsList[0].wsID);
+        if (!pWS) return;
+    }
+
+    SetActiveScreen (pCD->pSD);
+    if (pWS != pCD->pSD->pActiveWS) ChangeToWorkspace (pWS);
+    if (timestamp == CurrentTime) timestamp = GetTimestamp ();
+
+    if (pLeader->clientState == MINIMIZED_STATE)
+        SetClientState (pLeader,
+            pLeader->maxConfig ? MAXIMIZED_STATE : NORMAL_STATE, timestamp);
+
+    Do_Raise (pCD, NULL, STACK_NORMAL);
+    Do_Focus_Key (pCD, timestamp, ALWAYS_SET_FOCUS);
+}
 
 static void ProcessNetWmStateAbove (ClientData *pCD, long action);
 static void ProcessNetWmStateBelow (ClientData *pCD, long action);
@@ -217,6 +275,7 @@ void SetupWmEwmh (void)
 	XA_UTF8_STRING,
 	XA__NET_SUPPORTED,
 	XA__NET_SUPPORTING_WM_CHECK,
+	XA__NET_ACTIVE_WINDOW,
 	XA__NET_WM_NAME,
 	XA__NET_WM_ICON_NAME,
 	XA__NET_WM_VISIBLE_NAME,
@@ -234,6 +293,7 @@ void SetupWmEwmh (void)
 	"UTF8_STRING",
 	_XA__NET_SUPPORTED,
 	_XA__NET_SUPPORTING_WM_CHECK,
+	_XA__NET_ACTIVE_WINDOW,
 	_XA__NET_WM_NAME,
 	_XA__NET_WM_ICON_NAME,
 	_XA__NET_WM_VISIBLE_NAME,
@@ -247,10 +307,11 @@ void SetupWmEwmh (void)
 	_XA__NET_WM_STATE_BELOW
     };
 
-    Atom atoms[XtNumber(atom_names) + 1];
+    Atom atoms[XtNumber(atom_names)];
 
     XInternAtoms(DISPLAY, atom_names, XtNumber(atom_names), False, atoms);
 
+    wmGD.xa__NET_ACTIVE_WINDOW = atoms[XA__NET_ACTIVE_WINDOW];
     wmGD.xa_UTF8_STRING = atoms[XA_UTF8_STRING];
     wmGD.xa__NET_WM_NAME = atoms[XA__NET_WM_NAME];
     wmGD.xa__NET_WM_ICON_NAME = atoms[XA__NET_WM_ICON_NAME];
@@ -292,6 +353,7 @@ void SetupWmEwmh (void)
 	XChangeProperty(DISPLAY, wmGD.Screens[scr].rootWindow,
 			atoms[XA__NET_SUPPORTED], XA_ATOM, 32, PropModeReplace,
 			(unsigned char *)&atoms[XA__NET_SUPPORTING_WM_CHECK],
-			12);
+			XtNumber(atom_names) - XA__NET_SUPPORTING_WM_CHECK);
     }
+    UpdateNetActiveWindow ();
 }

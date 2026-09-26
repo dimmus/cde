@@ -30,6 +30,8 @@ void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     int top, int bottom, int left, int right);
 void ProcessNetWmState (ClientData *pCD, long action,
     Atom firstProperty, Atom secondProperty);
+void ProcessNetActiveWindow (ClientData *pCD, Time timestamp);
+void UpdateNetActiveWindow (void);
 void SetupWmEwmh (void);
 
 #endif

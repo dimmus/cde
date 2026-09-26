@@ -127,6 +127,7 @@ extern Pixel		FPselectcolor;
 #define _NET_WM_STATE_ADD 1
 #define _NET_WM_STATE_TOGGLE 2
 
+#define _XA__NET_ACTIVE_WINDOW "_NET_ACTIVE_WINDOW"
 #define _XA__NET_SUPPORTED "_NET_SUPPORTED"
 #define _XA__NET_SUPPORTING_WM_CHECK "_NET_SUPPORTING_WM_CHECK"
 #define _XA__NET_WM_NAME "_NET_WM_NAME"
@@ -2000,6 +2001,7 @@ typedef struct _WmGlobalData
     Atom	xa_SM_CLIENT_ID;
     Atom	xa_WMSAVE_HINT;
 
+    Atom	xa__NET_ACTIVE_WINDOW;
     Atom	xa_UTF8_STRING;
     Atom	xa__NET_WM_NAME;
     Atom	xa__NET_WM_ICON_NAME;

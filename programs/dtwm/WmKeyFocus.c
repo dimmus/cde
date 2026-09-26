@@ -35,6 +35,7 @@
  */
 
 #include "WmGlobal.h"
+#include "WmEwmh.h"
 /*
  * include extern functions
  */
@@ -272,6 +273,7 @@ void SetKeyboardFocus (ClientData *pCD, long focusFlags)
     }
     
     wmGD.keyboardFocus = pCD;
+    UpdateNetActiveWindow ();
 
 
     /*
