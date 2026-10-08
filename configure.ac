@@ -522,10 +522,28 @@ AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"], ,
                   [${EXTRA_INCS} ${EXTRA_LIBS}])
 AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"], ,
                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"], ,
+AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"],
+                 [AC_MSG_ERROR([libXm (Motif) not found, please install it])],
                  [${EXTRA_INCS} ${EXTRA_LIBS}])
 XTOOLLIB="${EXTRA_INCS} ${EXTRA_LIBS} ${X_EXTRA_LIBS} ${XTOOLLIB}"
 AC_SUBST([XTOOLLIB])
+
+dnl Motif headers, the resource manager (libDtMrm) and the UIL compiler
+dnl library (dtbuilder)
+save_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${CPPFLAGS} ${EXTRA_INCS}"
+AC_CHECK_HEADER([Xm/Xm.h], [],
+                [AC_MSG_ERROR([Motif headers (Xm/Xm.h) not found, please install them])])
+AC_CHECK_HEADER([X11/bitmaps/xm_hour16], [],
+                [AC_MSG_ERROR([Motif bitmaps (X11/bitmaps/xm_*) not found, please install them])])
+CPPFLAGS="${save_CPPFLAGS}"
+AC_CHECK_LIB(Mrm, MrmOpenHierarchyPerDisplay, [MRESOURCELIB="-lMrm"],
+             [AC_MSG_ERROR([libMrm (Motif) not found, please install it])],
+             [${XTOOLLIB}])
+AC_SUBST(MRESOURCELIB)
+AC_CHECK_LIB(Uil, Uil, [:],
+             [AC_MSG_ERROR([libUil (Motif) not found, please install it])],
+             [${MRESOURCELIB} ${XTOOLLIB}])
 
 dnl only needed by dtlogin
 AC_CHECK_LIB(Xdmcp, XdmcpFlush, [XDMCPLIB="-lXdmcp"], [XDMCPLIB=""],
