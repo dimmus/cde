@@ -62,6 +62,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#endif
 
 #include <Dt/MsgLog.h>
 
@@ -624,6 +627,43 @@ void FinalLinger(void)
 
 /******************************************************************************
  *
+ * MarkCloseOnExec - in the forked child, mark every descriptor from 3 up
+ * close-on-exec except 'keep'.  The old loop stopped at FOPEN_MAX (16 on
+ * Linux and the BSDs), so the ToolTalk and X connections and any other
+ * descriptor above 15 leaked into the command dtexec runs.
+ *
+ *****************************************************************************/
+
+#ifndef CLOSE_RANGE_CLOEXEC
+#define CLOSE_RANGE_CLOEXEC	(1U << 2)
+#endif
+
+static void
+MarkCloseOnExec (
+	int keep)
+{
+   long fd, max;
+
+#if defined(__linux__) && defined(SYS_close_range)
+   if (syscall(SYS_close_range, 3U, ~0U, CLOSE_RANGE_CLOEXEC) == 0) {
+      if (keep >= 3)
+	 (void) fcntl (keep, F_SETFD, 0);
+      return;
+   }
+#endif
+
+   max = sysconf(_SC_OPEN_MAX);
+   if (max <= 0)
+      max = 1024;
+   for (fd = 3; fd < max; fd++) {
+      if (fd != keep)
+	 (void) fcntl ((int) fd, F_SETFD, FD_CLOEXEC);
+   }
+}
+
+
+/******************************************************************************
+ *
  * ExecuteCommand -
  *
  *****************************************************************************/
@@ -632,7 +672,7 @@ static int
 ExecuteCommand (
 	char **commandArray)
 {
-   int i, index1;
+   int index1;
    struct sigaction svec;
 
    for (index1 = 0; (index1 < 10) && ((childPidG = fork()) < 0); index1++) {
@@ -681,10 +721,7 @@ ExecuteCommand (
       (void) sigaction(SIGUSR2, &svec, (struct sigaction *) NULL);
       (void) sigaction(SIGHUP, &svec, (struct sigaction *) NULL);
 
-      for (i=3; i < FOPEN_MAX; i++) {
-         if ( i != errorpipeG[1] )
-	     (void) fcntl (i, F_SETFD, FD_CLOEXEC);
-      }
+      MarkCloseOnExec(errorpipeG[1]);
 
       (void) execvp(commandArray[0], commandArray);
 
