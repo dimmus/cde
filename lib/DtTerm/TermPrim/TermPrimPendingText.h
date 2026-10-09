@@ -65,6 +65,9 @@ _DtTermPrimPendingTextAppendChunk
     int		len
 );
 
+/* replace the chunk's text with buffer, which must have been allocated
+ * with XtMalloc() and is owned by the chunk from now on...
+ */
 extern
 void
 _DtTermPrimPendingTextReplace
@@ -72,6 +75,18 @@ _DtTermPrimPendingTextReplace
     PendingTextChunk chunk,
     unsigned char *buffer,
     int bufferLen
+);
+
+/* append buffer as a single chunk.  buffer must have been allocated
+ * with XtMalloc() and is owned by the list from now on...
+ */
+extern
+PendingTextChunk
+_DtTermPrimPendingTextAppendBuffer
+(
+    PendingText     list,
+    unsigned char  *buffer,
+    int             len
 );
 
 extern

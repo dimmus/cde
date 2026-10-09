@@ -43,6 +43,8 @@
 #include "TermPrimSelectP.h"
 #include "TermPrimMessageCatI.h"
 #include <limits.h>
+#include <string.h>
+#include <wchar.h>
 
 #ifdef	DKS
 void
@@ -932,6 +934,84 @@ _DtTermPrimFillScreenGap(Widget w)
     }
 }
 
+/*
+** The overflow buffer for buffer inserts.  An insert of n characters
+** can push out at most n plus a line's worth of characters, and the
+** insert-with-wrap path inserts those into the next line, which can
+** push out another line's worth.  Size for wchar_t so that both the
+** single byte and the wide character inserts can use it.
+*/
+termChar *
+_DtTermPrimRenderGetOverflowBuffer(Widget w, int numChars)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    int needed;
+
+    needed = numChars + 2 * _DtTermPrimBufferGetCols(tpd->termBuffer) + 2;
+    if (needed < BUFSIZ)
+	needed = BUFSIZ;
+    needed *= sizeof(wchar_t);
+
+    if (tpd->overflowBufferLen < needed) {
+	tpd->overflowBuffer = (termChar *)
+		XtRealloc((char *) tpd->overflowBuffer, needed);
+	tpd->overflowBufferLen = needed;
+    }
+    return(tpd->overflowBuffer);
+}
+
+/*
+** Decode one UTF-8 character from s (n > 0 bytes available).  This
+** accepts exactly what glibc's UTF-8 locales accept: 1 to 6 byte forms
+** up to 0x7fffffff, with no overlong forms and no UTF-16 surrogates.
+** Returns the length of the character and stores it in *pwc, -1 if s
+** does not start with a valid character (the first byte should be
+** skipped), or -2 if the n bytes are a valid but incomplete prefix.
+*/
+static int
+utf8Decode(const unsigned char *s, int n, wchar_t *pwc)
+{
+    unsigned int c = s[0];
+    unsigned int v;
+    unsigned int min;
+    int need;
+    int k;
+
+    if (c < 0x80) {
+	*pwc = (wchar_t) c;
+	return(1);
+    }
+    if (c < 0xc2) {
+	/* continuation byte, or an always-overlong 2-byte lead... */
+	return(-1);
+    } else if (c < 0xe0) {
+	need = 2; v = c & 0x1f; min = 0x80;
+    } else if (c < 0xf0) {
+	need = 3; v = c & 0x0f; min = 0x800;
+    } else if (c < 0xf8) {
+	need = 4; v = c & 0x07; min = 0x10000;
+    } else if (c < 0xfc) {
+	need = 5; v = c & 0x03; min = 0x200000;
+    } else if (c < 0xfe) {
+	need = 6; v = c & 0x01; min = 0x4000000;
+    } else {
+	return(-1);
+    }
+
+    for (k = 1; k < need; k++) {
+	if (k >= n)
+	    return(-2);
+	if ((s[k] & 0xc0) != 0x80)
+	    return(-1);
+	v = (v << 6) | (s[k] & 0x3f);
+    }
+    if ((v < min) || ((v >= 0xd800) && (v <= 0xdfff)))
+	return(-1);
+    *pwc = (wchar_t) v;
+    return(need);
+}
+
 static short
 DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
 {
@@ -951,7 +1031,7 @@ DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
     }
 
     /* insert the text... */
-    returnChars = (termChar *) XtMalloc(BUFSIZ * sizeof (termChar));
+    returnChars = _DtTermPrimRenderGetOverflowBuffer(w, length);
     newWidth = _DtTermPrimBufferInsert(tBuffer,	/* TermBuffer		*/
 	    tpd->topRow + tpd->cursorRow,		/* row			*/
 	    tpd->cursorColumn,			/* column		*/
@@ -963,7 +1043,6 @@ DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
 	    &returnCount);			/* return count ptr	*/
 
     if ((tpd->insertCharMode != DtTERM_INSERT_CHAR_ON_WRAP) || (returnCount <= 0)) {
-        (void) XtFree((char *) returnChars);
 	return(newWidth);
     }
 
@@ -1000,7 +1079,6 @@ DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
 	    &returnCount);		/* return count ptr	*/
 
     (void) XtFree((char *) buffer);
-    (void) XtFree((char *) returnChars);
     return(newWidth);
 }
 
@@ -1013,7 +1091,7 @@ _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length)
     int i;
     short renderStartX;
     short renderEndX;
-    short insertStartX;
+    int insertStartX;
     short insertCharCount;
     short newWidth;
     Boolean needToRender = False;
@@ -1022,93 +1100,87 @@ _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length)
 
     if (tpd->mbCurMax > 1)
     {
-        short    wcBufferLen;
-        wchar_t *wcBuffer;
-        wchar_t *pwc;
-        int      i;
-        int      mbLen;
-        char    *pmb;        
-#ifdef    NOCODE
+        wchar_t   *wcBuffer;
+        int       *byteOffsets;	/* byte offset of each wide char */
+        int        wcBufferLen = 0;
+        int        pos = 0;
+        int        mbLen;
+        int        inserted;
+        wchar_t    wc;
+        mbstate_t  state;
+        Boolean    shared = !tpd->wcBufferInUse;
+
         /* 
-        ** It would be nice if the calling function supplied us with a count
-        ** of the number of mb characters in the buffer, then we wouldn't
-        ** have to count them again.
+        ** convert to wide characters, remembering where each one
+        ** started so that the count of characters inserted can be
+        ** mapped back to a byte count.  Use the widget's buffers unless
+        ** we have been called recursively...
         */
-        /* 
-        ** we could use this if the multi-byte buffer was null terminated
-        */
-        wcBufferLen = mbstowcs((wchar_t *)NULL, (char *)buffer, length);
-#else  /* NOCODE */
-        i           = 0;
-        pmb         = (char *)buffer;
-        /* 
-        ** we should never need more than length * sizeof(wchar_t)
-        ** bytes to store the wide char equivalent of the incoming mb string
-        */
-        wcBuffer    = (wchar_t *)XtMalloc(length * sizeof(wchar_t));                                                
-        pwc         = wcBuffer;
-        wcBufferLen = 0;
-        while (i < length)
+        if (shared) {
+            if (tpd->wcBufferLen < length) {
+                tpd->wcBufferLen = MAX(length, BUFSIZ);
+                tpd->wcBuffer = (wchar_t *) XtRealloc(
+                        (char *) tpd->wcBuffer,
+                        tpd->wcBufferLen * sizeof(wchar_t));
+                tpd->wcByteOffsets = (int *) XtRealloc(
+                        (char *) tpd->wcByteOffsets,
+                        tpd->wcBufferLen * sizeof(int));
+            }
+            wcBuffer = tpd->wcBuffer;
+            byteOffsets = tpd->wcByteOffsets;
+            tpd->wcBufferInUse = True;
+        } else {
+            wcBuffer = (wchar_t *) XtMalloc(MAX(length, 1) * sizeof(wchar_t));
+            byteOffsets = (int *) XtMalloc(MAX(length, 1) * sizeof(int));
+        }
+
+        (void) memset(&state, '\0', sizeof(state));
+        while (pos < length)
         {
-            switch (mbLen = mbtowc(pwc, pmb, MIN(((int)MB_CUR_MAX), length - i)))
-            {
-              case -1:
-                if ((int)MB_CUR_MAX <= length - i) {
-                    /* we have a bogus multi-byte character.  Throw away
-                     * the first byte and rescan (TM 12/14/93)...
-                     */
+            if (buffer[pos] < 0x80 && tpd->isUtf8) {
+                /* ASCII... */
+                wc = buffer[pos];
+                mbLen = 1;
+            } else if (tpd->isUtf8) {
+                mbLen = utf8Decode(buffer + pos, length - pos, &wc);
+            } else {
+                mbLen = (int) mbrtowc(&wc, (char *) buffer + pos,
+                        MIN((int) MB_CUR_MAX, length - pos), &state);
+                if (mbLen == 0) {
                     /* 
-                    ** in this case, we move the remaining length - i - 1 
-                    ** bytes one byte to the left (to overwrite the bogus
-                    ** byte)
+                    ** treat null character same as any other character...
                     */
-                    memmove(pmb, pmb + 1, length - i - 1);
-                    length--;
-                    continue;
+                    mbLen = 1;
+                } else if (mbLen < 0) {
+                    (void) memset(&state, '\0', sizeof(state));
                 }
-                /* a truncated character at the end of the buffer:
-                 * drop it (otherwise we would loop forever)...
+            }
+            if (mbLen < 0) {
+                /* we have a bogus or truncated multi-byte character.
+                 * Throw away the first byte and rescan (TM 12/14/93)...
                  */
-                length = i;
+                pos++;
                 continue;
-              case  0:
-                /* 
-                ** treat null character same as any other character...
-                */
-                mbLen = 1;
-              default:
-                i   += mbLen;
-                pmb += mbLen;
-                pwc++;
-                wcBufferLen++;
             }
+            byteOffsets[wcBufferLen] = pos;
+            wcBuffer[wcBufferLen++] = wc;
+            pos += mbLen;
         }
-#endif /* NOCODE */
-        i = _DtTermPrimInsertTextWc(w, wcBuffer, wcBufferLen);
+
+        inserted = _DtTermPrimInsertTextWc(w, wcBuffer, wcBufferLen);
+
 	/* convert back from a wide character count to a multibyte
-	 * character count...
+	 * byte count.  Bytes we threw away count as inserted...
 	 */
-        pmb         = (char *)buffer;
-        wcBufferLen = i;
-	i           = 0;
-        while (i < wcBufferLen)
-        {
-            switch (mbLen = mblen(pmb, MIN(((int)MB_CUR_MAX),
-                    length - (int)(pmb - (char *)buffer))))
-            {
-	      case -1:
-              case  0:
-                /* 
-                ** treat null character same as any other character...
-                */
-                mbLen = 1;
-              default:
-                i   ++;
-                pmb += mbLen;
-            }
+        pos = (inserted < wcBufferLen) ? byteOffsets[inserted] : length;
+
+        if (shared) {
+            tpd->wcBufferInUse = False;
+        } else {
+            XtFree((char *) wcBuffer);
+            XtFree((char *) byteOffsets);
         }
-        XtFree((char *)wcBuffer);
-        return(pmb - (char *) buffer);
+        return(pos);
     }
 
     /* turn off the cursor... */
@@ -1328,9 +1400,9 @@ _DtTermPrimParseInput
     DtTermPrimitiveClassPart	 *termClassPart = &(((DtTermPrimitiveClassRec *)
 	    (tw->core.widget_class))->term_primitive_class);
     int i;
-    short insertStart;
-    short insertByteCount;
-    short returnLen;
+    int insertStart;
+    int insertByteCount;
+    int returnLen;
     Boolean turnCursorOn = False;
     unsigned char *tmpBuffer = (unsigned char *) 0;
     int mbCharLen = 1;
@@ -1373,53 +1445,92 @@ _DtTermPrimParseInput
 
 
     for (i = 0; (i < len) && tpd->ptyInputId; ) {
-	if (tpd->mbCurMax > 1) {
-            switch (mbCharLen = 
-                    mblen((char *) &buffer[i], MIN(((int)MB_CUR_MAX), len - i)))
-            {
-              case -1:
-		if ((int)MB_CUR_MAX <= len - i)
-                {
-		    /* we have a bogus multi-byte character.  Throw away
-		     * the first byte and rescan (TM 12/14/93)...
-		     */
-		    /* dump what we know we want to insert... */
-		    if (insertByteCount > 0) {
-			returnLen = (*(termClassPart->term_insert_proc))(w,
-				&buffer[insertStart], insertByteCount);
-			if (returnLen != insertByteCount) {
-			    (void) buildDangleBuffer(buffer, len,
-					tpd->mbPartialChar,
-					&tpd->mbPartialCharLen,
-					insertStart + returnLen,
-					dangleBuffer, dangleBufferLen);
+	/* the common case: a run of plain text while the parser is in
+	 * its start state.  Queue up the whole run at once...
+	 */
+	if (!tpd->parserNotInStartState) {
+	    int j = i;
 
-			    insertByteCount = 0;
-			    break;
-			}
-			insertByteCount = 0;
-		    }
-		    /* skip over the bogus char's first byte... */
-		    (void) i++;
-		    insertStart = i;
-		    continue;
-		} else {
-		    /* we have a dangling partial multi-byte character... */
-		    (void) memmove(tpd->mbPartialChar, &buffer[i], len - i);
-		    tpd->mbPartialCharLen = len - i;
-		    /* remove the partial char from the buffer and adjust
-		     * the buffer len...
-		     */
-		    len = i;
-		    continue;
+	    if (tpd->mbCurMax == 1) {
+		while ((j < len) && !preParseTable[buffer[j]])
+		    j++;
+	    } else if (tpd->isUtf8) {
+		/* printable ASCII (and DEL, which is not a control
+		 * code here either)...
+		 */
+		while ((j < len) && (buffer[j] >= 0x20) && (buffer[j] < 0x80))
+		    j++;
+	    }
+	    if (j > i) {
+		insertByteCount += j - i;
+		i = j;
+		continue;
+	    }
+	}
+
+	if (tpd->mbCurMax > 1) {
+	    Boolean bogus = False;
+	    Boolean partial = False;
+
+	    if (tpd->isUtf8) {
+		wchar_t wc;
+
+		mbCharLen = (buffer[i] < 0x80) ? 1 :
+			utf8Decode(&buffer[i], len - i, &wc);
+		if (mbCharLen == -1) {
+		    bogus = True;
+		} else if (mbCharLen == -2) {
+		    partial = True;
 		}
-                break;
-              case 0:
-                mbCharLen = 1;
-                /* fall through */
-              default:
-                break;
-            }
+	    } else {
+		mbCharLen = mblen((char *) &buffer[i],
+			MIN(((int)MB_CUR_MAX), len - i));
+		if (mbCharLen == -1) {
+		    if ((int)MB_CUR_MAX <= len - i) {
+			bogus = True;
+		    } else {
+			partial = True;
+		    }
+		} else if (mbCharLen == 0) {
+		    mbCharLen = 1;
+		}
+	    }
+
+	    if (bogus) {
+		/* we have a bogus multi-byte character.  Throw away
+		 * the first byte and rescan (TM 12/14/93)...
+		 */
+		/* dump what we know we want to insert... */
+		if (insertByteCount > 0) {
+		    returnLen = (*(termClassPart->term_insert_proc))(w,
+			    &buffer[insertStart], insertByteCount);
+		    if (returnLen != insertByteCount) {
+			(void) buildDangleBuffer(buffer, len,
+				    tpd->mbPartialChar,
+				    &tpd->mbPartialCharLen,
+				    insertStart + returnLen,
+				    dangleBuffer, dangleBufferLen);
+
+			insertByteCount = 0;
+			break;
+		    }
+		    insertByteCount = 0;
+		}
+		/* skip over the bogus char's first byte... */
+		(void) i++;
+		insertStart = i;
+		continue;
+	    }
+	    if (partial) {
+		/* we have a dangling partial multi-byte character... */
+		(void) memmove(tpd->mbPartialChar, &buffer[i], len - i);
+		tpd->mbPartialCharLen = len - i;
+		/* remove the partial char from the buffer and adjust
+		 * the buffer len...
+		 */
+		len = i;
+		continue;
+	    }
 	}
 
 	if (((mbCharLen == 1) && preParseTable[buffer[i]]) ||

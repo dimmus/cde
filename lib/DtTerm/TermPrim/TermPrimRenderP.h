@@ -72,6 +72,12 @@ typedef struct _TermFontRec {
     XtPointer			fontInfo;
 } TermFontRec;
 
+/* return a buffer big enough for the characters a buffer insert of
+ * numChars characters can push off the end of a line (or two).  It is
+ * owned by the widget and reused...
+ */
+extern termChar *_DtTermPrimRenderGetOverflowBuffer(Widget w, int numChars);
+
 #ifdef	__cplusplus
 } /* close scope of 'extern "C"'... */
 #endif	/* __cplusplus */

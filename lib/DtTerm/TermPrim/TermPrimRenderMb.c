@@ -608,7 +608,8 @@ DoInsertWc(Widget w, wchar_t *wcBuffer, int wcBufferLen, Boolean *wrapped)
     }
 
     /* insert the text... */
-    returnChars = (wchar_t *) XtMalloc(BUFSIZ * sizeof (wchar_t));
+    returnChars = (wchar_t *) _DtTermPrimRenderGetOverflowBuffer(w,
+	    wcBufferLen);
     newWidth = _DtTermPrimBufferInsertWc(tBuffer,       /* TermBuffer	    */
 	    tpd->topRow + tpd->cursorRow,	        /* row		    */
 	    tpd->cursorColumn,			        /* column	    */
@@ -619,7 +620,6 @@ DoInsertWc(Widget w, wchar_t *wcBuffer, int wcBufferLen, Boolean *wrapped)
 	    &returnCount);			        /* return count ptr */
 
     if ((tpd->insertCharMode != DtTERM_INSERT_CHAR_ON_WRAP) || (returnCount <= 0)) {
-        (void) XtFree((char *) returnChars);
 	return(newWidth);
     }
 
@@ -656,7 +656,6 @@ DoInsertWc(Widget w, wchar_t *wcBuffer, int wcBufferLen, Boolean *wrapped)
 	    (termChar **) (&returnChars),                /* return char ptr  */
 	    &returnCount);		                /* return count ptr */
     (void) XtFree((char *) wcBuffer);
-    (void) XtFree((char *) returnChars);
     return(newWidth);
 }
 
@@ -679,7 +678,7 @@ _DtTermPrimInsertTextWc
     int         i;
     short       renderStartX;
     short       renderEndX;
-    short       insertStartX;
+    int         insertStartX;
     short       insertCharCount;
     short       insertCharWidth; /* column width of characters to insert */
     short	thisCharWidth;

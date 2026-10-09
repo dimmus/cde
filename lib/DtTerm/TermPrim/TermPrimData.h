@@ -356,6 +356,20 @@ typedef struct termData {
     */
     OnTheSpotData onthespot;
 
+    /*
+    ** Output processing buffers, allocated once and reused...
+    */
+    unsigned char *readBuffer;		/* pty read buffer (with room
+					 * in front for a partial
+					 * multibyte character)		*/
+    Boolean isUtf8;			/* locale codeset is UTF-8	*/
+    termChar *overflowBuffer;		/* overflow from buffer inserts	*/
+    int overflowBufferLen;		/* size in bytes		*/
+    wchar_t *wcBuffer;			/* multibyte to wide conversion	*/
+    int *wcByteOffsets;			/* byte offset of each wchar	*/
+    int wcBufferLen;			/* size in characters		*/
+    Boolean wcBufferInUse;		/* guard against reentrancy	*/
+
 } DtTermPrimDataRec, *DtTermPrimData;
 
 

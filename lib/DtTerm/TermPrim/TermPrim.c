@@ -73,6 +73,15 @@ extern char * _DtTermPrimGetMessage( char *filename, int set, int n, char *s );
 #include <ctype.h>
 #include <Dt/MsgCatP.h>
 #include <wchar.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
+#include <langinfo.h>
+
+/* pty output processing (see readPty())... */
+#define	READ_BUFFER_SIZE	(64 * 1024)
+#define	READ_HEADROOM		MB_LEN_MAX
+#define	READ_TIME_BUDGET_NS	(8 * 1000 * 1000)	/* 8 ms */
 #if defined(__linux__)
 # include <sys/types.h> /* For FD_* macros. */
 # include <sys/time.h> /* For select() prototype. */
@@ -1054,6 +1063,10 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
     tpd->pendingRead = _DtTermPrimPendingTextCreate();
     tpd->pendingWrite = _DtTermPrimPendingTextCreate();
 
+    /* the pty read buffer (see readPty())... */
+    tpd->readBuffer = (unsigned char *) XtMalloc(READ_HEADROOM +
+	    READ_BUFFER_SIZE);
+
     /*
     ** Initialize the utmp stuff...
     */
@@ -1280,6 +1293,9 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
      */
     DebugF('m', 1, tpd->mbCurMax = MB_LEN_MAX);
     tpd->mbPartialCharLen = 0;	/* no pending partial multi-byte char */
+    /* UTF-8 output is decoded inline rather than through mblen()... */
+    tpd->isUtf8 = (tpd->mbCurMax > 1) &&
+	    !strcmp(nl_langinfo(CODESET), "UTF-8");
 
     /* check results of type converters... */
     shadowTypeID = XmRepTypeGetId(XmRShadowType);
@@ -2744,6 +2760,16 @@ Destroy(Widget w)
 	    tw->term.tpd->pendingWrite = (PendingText) 0;
 	}
 
+	/* free up the output processing buffers... */
+	(void) XtFree((char *) tw->term.tpd->readBuffer);
+	tw->term.tpd->readBuffer = (unsigned char *) 0;
+	(void) XtFree((char *) tw->term.tpd->overflowBuffer);
+	tw->term.tpd->overflowBuffer = (termChar *) 0;
+	(void) XtFree((char *) tw->term.tpd->wcBuffer);
+	tw->term.tpd->wcBuffer = (wchar_t *) 0;
+	(void) XtFree((char *) tw->term.tpd->wcByteOffsets);
+	tw->term.tpd->wcByteOffsets = (int *) 0;
+
         if (tw->term.tpd->capsLockKeyCodes)
                  (void) XtFree((char *)tw->term.tpd->capsLockKeyCodes) ;
 
@@ -2860,16 +2886,123 @@ moreInput(int pty)
     return(True);
 }
 
+/* note output that has just arrived (from the pty or looped back): map
+ * the window if we map on output, and pass it to the output log...
+ */
+static void
+noteOutput(DtTermPrimitiveWidget tw, unsigned char *buffer, int len)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (!tpd->windowMapped && tw->term.mapOnOutput) {
+	/*
+	** map window unless it is too early...
+	*/
+	if (tw->term.mapOnOutputDelay)
+	    if ((time((time_t *) 0) - tpd->creationTime) >
+		    tw->term.mapOnOutputDelay) {
+		/*
+		** time is up
+		*/
+		tw->term.mapOnOutputDelay = 0 ;
+	    }
+
+	if (!tw->term.mapOnOutputDelay) {
+	    Widget sw;
+
+	    for (sw = (Widget)tw; !XtIsShell(sw); sw = XtParent(sw))
+		;
+	    XtMapWidget(sw);
+	}
+    }
+
+    if (tw->term.log_on) {
+	_DtTermPrimWriteLog(tw, (char *) buffer, len) ;
+    }
+
+    if (tw->term.outputLogCallback) {
+	DtTermOutputLogCallbackStruct cb;
+
+	cb.reason = DtCR_TERM_OUTPUT_LOG;
+	cb.event = (XEvent *) 0;
+	cb.text = buffer;
+	cb.length = len;
+
+	(void) XtCallCallbackList((Widget) tw,
+		tw->term.outputLogCallback, &cb);
+    }
+}
+
+/* parse and display buffer.  If the parser stops early (because input
+ * was turned off for a scroll, ^S, etc.), the unprocessed text is put
+ * back on the pendingRead list: into chunk if we were working on a
+ * pending chunk, else onto the end of the list...
+ */
+static void
+processOutput(DtTermPrimitiveWidget tw, unsigned char *buffer, int len,
+	PendingTextChunk chunk)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+    unsigned char *dangleBuffer;
+    int dangleBufferLen;
+
+    if (!_DtTermPrimParseInput((Widget) tw, buffer, len,
+	    &dangleBuffer, &dangleBufferLen)) {
+	/* we were not able to write out everything and
+	 * we need to stuff away the pending text.  The pending text
+	 * list takes over the dangle buffer...
+	 */
+	if (chunk) {
+	    /* we didn't finish up the pending text chunk we were
+	     * working on, so update the pointers and continue...
+	     */
+	    (void) _DtTermPrimPendingTextReplace(chunk, dangleBuffer,
+		    dangleBufferLen);
+	} else {
+	    chunk = _DtTermPrimPendingTextAppendBuffer(tpd->pendingRead,
+		    dangleBuffer, dangleBufferLen);
+	}
+	/* this text has already been logged... */
+	chunk->logged = True;
+    } else if (chunk) {
+	/* we finished a pending chunk, so let's move on... */
+	_DtTermPrimPendingTextRemoveChunk(tpd->pendingRead, chunk);
+    }
+}
+
+static long
+elapsedNs(struct timespec *start)
+{
+    struct timespec now;
+
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    return((now.tv_sec - start->tv_sec) * 1000000000L +
+	    (now.tv_nsec - start->tv_nsec));
+}
+
+/* readPty...
+ *
+ * Process output from the pty (or text looped back with
+ * DtTermDisplaySend()).  Text queued on the pendingRead list is processed
+ * first, one chunk per call.  Otherwise we read the pty into a
+ * READ_BUFFER_SIZE buffer, and if the pty is non-blocking, keep reading
+ * and processing until it runs dry (EAGAIN) or READ_TIME_BUDGET_NS has
+ * passed, so that a fast producer costs one main loop pass per budget
+ * rather than per read.
+ */
 /*ARGSUSED*/
 static void
 readPty(XtPointer client_data, int *source, XtInputId *id)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) client_data;
     DtTermPrimData tpd = tw->term.tpd;
-    unsigned char buffer[BUFSIZ];
+    unsigned char *buffer;
     int len;
-    unsigned char *dangleBuffer;
-    int dangleBufferLen;
+    int flags;
+    int partialLen;
+    Boolean drained = False;
+    Boolean keepReading;
+    struct timespec start = { 0, 0 };
     PendingTextChunk chunk = (PendingTextChunk) 0;
 
     Debug('i', fprintf(stderr, ">>readPty() starting\n"));
@@ -2884,23 +3017,59 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
     }
 
     if (TextIsPending(tpd->pendingRead)) {
-	/* take text from the pendingRead buffer instead of doing a read...
+	/* take text from the pendingRead buffer instead of doing a read.
+	 * We parse it in place; processOutput() replaces or removes the
+	 * chunk once the parser is done with it...
 	 */
 	chunk = _DtTermPrimPendingTextGetChunk(tpd->pendingRead);
-	len = chunk->len;
-	(void) memcpy(buffer, chunk->bufPtr, len);
+	if (chunk->len > 0) {
+	    if (!chunk->logged) {
+		(void) noteOutput(tw, chunk->bufPtr, chunk->len);
+	    }
+	    (void) processOutput(tw, chunk->bufPtr, chunk->len, chunk);
+	} else {
+	    _DtTermPrimPendingTextRemoveChunk(tpd->pendingRead, chunk);
+	}
+	if (!tpd->ptyInputId) {
+	    /* we need to wait until we get a graphicsexpose (count==0)
+	     * or a noexpose...
+	     */
+	    tpd->readInProgress = False;
+	    Debug('i', fprintf(stderr, ">>readPty() finished\n"));
+	    return;
+	}
     } else {
-	len = read(*source, buffer, sizeof(buffer));
-	Debug('i', fprintf(stderr, ">>readPty() read len=%d\n", len));
-	if (isDebugFSet('i', 1)) {
+	/* only loop on a non-blocking fd, or we could block here... */
+	flags = fcntl(*source, F_GETFL, 0);
+	keepReading = (flags != -1) && (flags & O_NONBLOCK);
+	if (keepReading) {
+	    (void) clock_gettime(CLOCK_MONOTONIC, &start);
+	}
+
+	do {
+	    buffer = tpd->readBuffer + READ_HEADROOM;
+	    len = read(*source, buffer, READ_BUFFER_SIZE);
+	    Debug('i', fprintf(stderr, ">>readPty() read len=%d\n", len));
+	    if (len < 0) {
+		if (errno == EINTR) {
+		    continue;
+		}
+		if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+		    drained = True;
+		}
+		break;
+	    }
+	    if (len == 0) {
+		break;
+	    }
+	    if (isDebugFSet('i', 1)) {
 #ifdef	BBA
 #pragma BBA_IGNORE
 #endif	/*BBA*/
-	    int i1;
+		int i1;
 
-	    (void) fprintf(stderr,
-		    ">>readPty() read %d bytes", len);
-	    if (len > 0) {
+		(void) fprintf(stderr,
+			">>readPty() read %d bytes", len);
 		for (i1 = 0; i1 < len; i1++) {
 		    if (!(i1 % 20))
 			fputs("\n    ", stderr);
@@ -2908,82 +3077,49 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
 		}
 		(void) fprintf(stderr, "\n");
 	    }
-	}
-    }
-	
-    if (len > 0) {
-        if (!tpd->windowMapped && tw->term.mapOnOutput) {
-            /*
-            ** map window unless it is too early...
-            */
-            if (tw->term.mapOnOutputDelay)
-                if ((time((time_t *) 0) - tpd->creationTime) >
-			tw->term.mapOnOutputDelay) {
-                /*
-                ** time is up
-                */
-                tw->term.mapOnOutputDelay = 0 ;
-            }
 
-            if (!tw->term.mapOnOutputDelay) {
-                Widget sw;
+	    (void) noteOutput(tw, buffer, len);
 
-                for (sw = (Widget)tw; !XtIsShell(sw); sw = XtParent(sw))
-		    ;
-                XtMapWidget(sw);
-            }
-        }
- 
-        if (tw->term.log_on) {
-            _DtTermPrimWriteLog(tw, (char *) buffer, len) ;
-        }
-
-	if (tw->term.outputLogCallback) {
-	    DtTermOutputLogCallbackStruct cb;
-
-	    cb.reason = DtCR_TERM_OUTPUT_LOG;
-	    cb.event = (XEvent *) 0;
-	    cb.text = buffer;
-	    cb.length = len;
-
-	    (void) XtCallCallbackList((Widget) tw,
-		    tw->term.outputLogCallback, &cb);
-	}
-
-	if (!_DtTermPrimParseInput((Widget) tw, buffer, len,
-		&dangleBuffer, &dangleBufferLen)) {
-	    /* we were not able to write out everything and
-	     * we need to stuff away the pending text...
+	    /* if the last read ended with a partial multibyte
+	     * character, put it in front of the new text here rather
+	     * than have the parser copy the whole buffer to do so...
 	     */
-	    if (chunk) {
-		/* we didn't finish up the pending text chunk we were
-		 * working on, so update the pointers and continue...
-		 */
-		(void) _DtTermPrimPendingTextReplace(chunk, dangleBuffer,
-			dangleBufferLen);
-	    } else {
-		(void) _DtTermPrimPendingTextAppend(tpd->pendingRead,
-			dangleBuffer, dangleBufferLen);
+	    partialLen = tpd->mbPartialCharLen;
+	    if ((partialLen > 0) && (partialLen <= READ_HEADROOM)) {
+		buffer -= partialLen;
+		(void) memcpy(buffer, tpd->mbPartialChar, partialLen);
+		len += partialLen;
+		tpd->mbPartialCharLen = 0;
 	    }
-	    (void) XtFree((char *) dangleBuffer);
-	} else if (chunk) {
-	    /* we finished a pending chunk, so let's move on... */
-	    _DtTermPrimPendingTextRemoveChunk(tpd->pendingRead, chunk);
-	}
-	if (!tpd->ptyInputId) {
-	    /* we need to wait until we get a graphicsexpose (count==0)
-	     * or a noexpose...
+
+	    (void) processOutput(tw, buffer, len, (PendingTextChunk) 0);
+
+	    if (!tpd->ptyInputId) {
+		/* we need to wait until we get a graphicsexpose
+		 * (count==0) or a noexpose...
+		 */
+		/* we know we have more input, so we don't need to turn on
+		 * the cursor...
+		 */
+		tpd->readInProgress = False;
+		Debug('i', fprintf(stderr, ">>readPty() finished\n"));
+		return;
+	    }
+
+	    /* text that was put back has to be processed before we
+	     * read any more...
 	     */
-	    /* we know we have more input, so we don't need to turn on
-	     * the cursor...
-	     */
-	    tpd->readInProgress = False;
-	    Debug('i', fprintf(stderr, ">>readPty() finished\n"));
-	    return;
-	}
+	    if (TextIsPending(tpd->pendingRead)) {
+		break;
+	    }
+	} while (keepReading && (elapsedNs(&start) < READ_TIME_BUDGET_NS));
     }
 
-    if (!moreInput(tw->term.pty)) {
+    if (!drained && moreInput(*source)) {
+	/* more input is waiting.  We will be called again as soon as
+	 * the main loop has handled any pending events...
+	 */
+    } else {
 	/* we won't be getting an input select so we need to check on
 	 * pending text and force a read if we still have some...
 	 */
