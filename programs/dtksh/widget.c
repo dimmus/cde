@@ -53,6 +53,7 @@
 #include "extra.h"
 #include "xmwidgets.h"
 #include "msgs.h"
+#include <stdint.h>
 
 /* values for the flags field of the W array */
 
@@ -416,11 +417,122 @@ handle_to_widget(
 }
 
 /*
+ * Widget -> W[] index map (open addressing, linear probing), so that
+ * widget_to_wtab() does not search the whole table; it runs for every
+ * translation (Translation_ksh_eval) among others.  The map holds, for
+ * each widget, the lowest valid index -- what the linear search used to
+ * return -- and every hit is checked against W[], so a stale or missing
+ * entry only costs a fallback to the linear search.
+ */
+static Widget  *wmapKey = NULL;
+static int     *wmapIdx = NULL;
+static unsigned wmapSize = 0, wmapCount = 0;
+
+static unsigned
+wmap_home( Widget w )
+{
+	unsigned long h = (unsigned long)(uintptr_t)w;
+
+	h ^= h >> 16;
+	h *= 2654435761UL;
+	h ^= h >> 15;
+	return (unsigned)h & (wmapSize - 1);
+}
+
+/* slot holding key w, or the empty slot where it would go */
+static unsigned
+wmap_slot( Widget w )
+{
+	unsigned s = wmap_home(w);
+
+	while (wmapKey[s] != NULL && wmapKey[s] != w)
+		s = (s + 1) & (wmapSize - 1);
+	return s;
+}
+
+static Boolean
+wtab_valid( int i, Widget w )
+{
+	return (i >= 0 && i < NumW && W[i]->type != TAB_EMPTY && W[i]->w == w);
+}
+
+static void
+wmap_grow( void )
+{
+	Widget *oldKey = wmapKey;
+	int *oldIdx = wmapIdx;
+	unsigned oldSize = wmapSize, i, s;
+
+	wmapSize = oldSize ? oldSize * 2 : 64;
+	wmapKey = (Widget *)XtCalloc(wmapSize, sizeof(Widget));
+	wmapIdx = (int *)XtMalloc(wmapSize * sizeof(int));
+	for (i = 0; i < oldSize; i++) {
+		if (oldKey[i] != NULL) {
+			s = wmap_slot(oldKey[i]);
+			wmapKey[s] = oldKey[i];
+			wmapIdx[s] = oldIdx[i];
+		}
+	}
+	XtFree((char *)oldKey);
+	XtFree((char *)oldIdx);
+}
+
+/* W[index] now holds widget w */
+static void
+wmap_add( Widget w, int index )
+{
+	unsigned s;
+
+	if (w == NULL)
+		return;
+	if ((wmapCount + 1) * 2 > wmapSize)
+		wmap_grow();
+	s = wmap_slot(w);
+	if (wmapKey[s] == NULL) {
+		wmapKey[s] = w;
+		wmapIdx[s] = index;
+		wmapCount++;
+	} else if (!wtab_valid(wmapIdx[s], w) || wmapIdx[s] > index)
+		wmapIdx[s] = index;
+}
+
+/* W[index] (holding w) is being freed */
+void
+wtab_map_remove( Widget w, int index )
+{
+	unsigned s, j, mask;
+
+	if (w == NULL || wmapSize == 0)
+		return;
+	s = wmap_slot(w);
+	if (wmapKey[s] == NULL || wmapIdx[s] != index)
+		return;
+	/* backward-shift deletion keeps every probe chain intact */
+	mask = wmapSize - 1;
+	j = s;
+	for (;;) {
+		j = (j + 1) & mask;
+		if (wmapKey[j] == NULL)
+			break;
+		if (((j - wmap_home(wmapKey[j])) & mask) >= ((j - s) & mask)) {
+			wmapKey[s] = wmapKey[j];
+			wmapIdx[s] = wmapIdx[j];
+			s = j;
+		}
+	}
+	wmapKey[s] = NULL;
+	wmapCount--;
+}
+
+/* set_up_w() has filled in W[index] */
+void
+wtab_map_add( wtab_t *w, int index )
+{
+	wmap_add(w->w, index);
+}
+
+/*
  * This function takes a widget and finds the wtab associated with it.
- * This operation is performed infrequently, for example if the user
- * gets a resource that is a widget.  So, we're just using a linear
- * search right now.  If profiling reveals this to be too slow we'll
- * have to introduce another hash table or something.
  */
 
 wtab_t *
@@ -432,9 +544,17 @@ widget_to_wtab(
 
 	if (w == NULL)
 		return(NULL);
+	if (wmapSize != 0) {
+		unsigned s = wmap_slot(w);
+
+		if (wmapKey[s] != NULL && wtab_valid(wmapIdx[s], w))
+			return(W[wmapIdx[s]]);
+	}
 	for (i = 0; i < NumW; i++) {
-		if ((W[i]->type != TAB_EMPTY) && (W[i]->w == w))
+		if ((W[i]->type != TAB_EMPTY) && (W[i]->w == w)) {
+			wmap_add(w, i);
 			return(W[i]);
+		}
 	}
 	/*
 	 * If we failed to find the widget id in the
