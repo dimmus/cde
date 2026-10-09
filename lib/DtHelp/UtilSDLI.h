@@ -110,6 +110,8 @@ extern	int	_DtHelpCeMatchSdlElement (
 			BufFilePtr	 f,
 			const char	*element_str,
 			int		 sig_chars);
+extern	void	_DtHelpCeFreeTossIndex (
+			_DtCvSegment	*toss);
 extern	_DtCvSegment *_DtHelpCeMatchSemanticStyle (
 			_DtCvSegment	*toss,
 			SdlOption	 clan,

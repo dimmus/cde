@@ -1018,6 +1018,8 @@ _DtHelpCeCleanSdlVolume (
 	/*
 	 * free the toss information.
 	 */
+	if (sdlVol->toss != NULL)
+	    _DtHelpCeFreeTossIndex(_DtCvContainerListOfSeg(sdlVol->toss));
 	FreeTossInfo(sdlVol->toss);
 	_DtHelpFreeSegments(sdlVol->toss , _DtCvFALSE, NULL, NULL);
 
