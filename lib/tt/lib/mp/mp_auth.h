@@ -59,9 +59,16 @@
 #define _TT_ICEAUTH_MAGIC_COOKIE_LEN	16
 #define _TT_ICEAUTH_PROTOCOL_NAME	"TT"
 
-#define _TT_ICEAUTH_DEFAULT_RETRIES	10   /* num of competitors we expect */
-#define _TT_ICEAUTH_DEFAULT_TIMEOUT	2    /* in seconds, be quick */
-#define _TT_ICEAUTH_DEFAULT_DEADTIME	600L /* 10 minutes in seconds */
+/*
+ * ~/.TTauthority locking: wait at most RETRIES x TIMEOUT seconds (polled
+ * every 100 ms) and treat a lock older than DEADTIME seconds as stale.
+ * Holders keep the lock for milliseconds; ttsession takes it while it
+ * holds the X server grabbed, so a stale lock used to freeze the display
+ * for 20 s (10 x 2 s with a 10 minute dead time) and then fail anyway.
+ */
+#define _TT_ICEAUTH_DEFAULT_RETRIES	6    /* x TIMEOUT = 12 s > DEADTIME */
+#define _TT_ICEAUTH_DEFAULT_TIMEOUT	2    /* in seconds */
+#define _TT_ICEAUTH_DEFAULT_DEADTIME	10L  /* in seconds */
 
 
 
