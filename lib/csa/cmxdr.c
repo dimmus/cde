@@ -36,6 +36,7 @@
 #include <cde_config.h>
 #endif
 #include <EUSCompat.h>
+#include <stdlib.h>
 #include "cm.h"
 #include "csa.h" 
 #include "cmxdr.h"
@@ -236,18 +237,53 @@ xdr_cms_attribute(XDR *xdrs, cms_attribute *objp)
  * and has a variable number of attributes associated with it.
  */
 
+/*
+ * The list is walked iteratively.  It used to recurse through
+ * xdr_pointer() once per entry, so a lookup returning a few tens of
+ * thousands of entries (e.g. a daily appointment over the whole
+ * 1970-2038 range) overflowed the stack and crashed rpc.cmsd.  The
+ * encoding is the one xdr_pointer() produces: after each entry a
+ * boolean saying whether another entry follows.
+ */
 bool_t
 xdr_cms_entry(XDR *xdrs, cms_entry *objp)
 {
-	if (!xdr_cms_key(xdrs, &objp->key))
-		return (FALSE);
-	if (!xdr_array(xdrs, (char **)&objp->attrs, (u_int *) &objp->num_attrs,
-	    ~0, sizeof (cms_attribute), (xdrproc_t) xdr_cms_attribute))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->next, sizeof (cms_entry),
-	    (xdrproc_t) xdr_cms_entry))
-		return (FALSE);
-	return (TRUE);
+	cms_entry	*cur = objp, *next;
+	bool_t		more;
+
+	for (;;) {
+		if (!xdr_cms_key(xdrs, &cur->key))
+			return (FALSE);
+		if (!xdr_array(xdrs, (char **)&cur->attrs,
+		    (u_int *) &cur->num_attrs, ~0, sizeof (cms_attribute),
+		    (xdrproc_t) xdr_cms_attribute))
+			return (FALSE);
+
+		if (xdrs->x_op == XDR_FREE) {
+			/* as xdr_pointer(): free the rest of the list */
+			next = cur->next;
+			cur->next = NULL;
+			if (cur != objp)
+				free(cur);
+			if (next == NULL)
+				return (TRUE);
+			cur = next;
+			continue;
+		}
+
+		more = (cur->next != NULL);
+		if (!xdr_bool(xdrs, &more))
+			return (FALSE);
+		if (!more) {
+			cur->next = NULL;
+			return (TRUE);
+		}
+		if (cur->next == NULL &&
+		    (cur->next = (cms_entry *)calloc(1, sizeof(cms_entry)))
+		    == NULL)
+			return (FALSE);
+		cur = cur->next;
+	}
 }
 
 
