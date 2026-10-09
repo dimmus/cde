@@ -49,17 +49,19 @@ _Tt_db_results _tt_db_network_path (const _Tt_string &path,
                           	    _Tt_string       &network_path)
 {
 	_Tt_db_results results = TT_DB_OK;
-
-
-	if (_tt_is_network_path(path)) {
-		local_path = _tt_network_path_to_local_path(path);
-	} else {
-		local_path = _tt_realpath(path);
-	}
+	bool_t is_network_path = _tt_is_network_path(path);
 
 	_Tt_file_system file_system;
-	_Tt_file_system_entry_ptr file_system_entry =
-			    file_system.bestMatchToPath(local_path);
+	_Tt_file_system_entry_ptr file_system_entry;
+
+	if (is_network_path) {
+		local_path = _tt_network_path_to_local_path(path);
+		file_system_entry = file_system.bestMatchToPath(local_path);
+	} else {
+		// Resolve once; bestMatchToPath() would do it again.
+		local_path = _tt_realpath(path);
+		file_system_entry = file_system.bestMatchToRealPath(local_path);
+	}
 
 	hostname = file_system_entry->getHostname();
 
@@ -90,11 +92,12 @@ _Tt_db_results _tt_db_network_path (const _Tt_string &path,
 			_Tt_string temp_string;
 			_Tt_string local_network_path;
 
-			if (_tt_is_network_path(path)) {
+			if (is_network_path) {
 				local_network_path = path;
 			} else {
+				// local_path is still _tt_realpath(path).
 				local_network_path =
-					_tt_local_network_path(path);
+					_tt_real_local_network_path(local_path);
 			}
 
 			results = database->getFilePartition(local_network_path,

@@ -2466,7 +2466,8 @@ static _Tt_string _tt_get_local_path (const _Tt_string &network_path,
   _Tt_string local_path = _tt_realpath (temp_string.split(':', hostname));
 
   _Tt_file_system file_system;
-  _Tt_file_system_entry_ptr entry = file_system.bestMatchToPath(local_path);
+  _Tt_file_system_entry_ptr entry =
+    file_system.bestMatchToRealPath(local_path);
 
   partition = entry->getMountPoint();
 
