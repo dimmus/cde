@@ -54,6 +54,8 @@ _Tt_hostname_cache()
 {
 	hostname = (_Tt_string) 0;
 	addr_length = 0;
+	resolved = 0;
+	expires = 0;
 }
 
 _Tt_hostname_cache::
@@ -62,6 +64,8 @@ _Tt_hostname_cache(_Tt_string & new_hostname)
 	hostname = new_hostname;
 	addr_list = new _Tt_string_list;
 	addr_length = 0;
+	resolved = 0;
+	expires = 0;
 }
 
 _Tt_hostname_cache::
@@ -75,11 +79,45 @@ h_keyfn (_Tt_object_ptr & p)
 	return ((_Tt_hostname_cache *)p.c_pointer())->hostname_val();
 }
 
+// Name lookups are cached for the life of the process, so that the many
+// short-lived _Tt_host_equiv objects share them.  Answers are kept for
+// _TT_HOST_EQUIV_TTL seconds, failures for _TT_HOST_EQUIV_NEG_TTL.
+#define _TT_HOST_EQUIV_TTL	300
+#define _TT_HOST_EQUIV_NEG_TTL	30
+
+_Tt_hostname_cache_table_ptr *_Tt_host_equiv::_cache_table = 0;
+
 _Tt_host_equiv::
 _Tt_host_equiv()
 {
-        _cache_table =
-		new _Tt_hostname_cache_table((_Tt_object_table_keyfn) & _Tt_hostname_cache::h_keyfn);
+	if (_cache_table == 0) {
+		_cache_table = new _Tt_hostname_cache_table_ptr;
+		*_cache_table = new _Tt_hostname_cache_table(
+			(_Tt_object_table_keyfn) & _Tt_hostname_cache::h_keyfn);
+	}
+}
+
+// Returns the cache entry for host, resolving it if there is no current
+// one.  The entry's "resolved" says whether the name could be resolved.
+_Tt_hostname_cache_ptr _Tt_host_equiv::
+lookup(const _Tt_string & host)
+{
+	time_t now = time(0);
+	_Tt_string name = host;
+	_Tt_hostname_cache_ptr entry = (*_cache_table)->lookup(name);
+
+	if (!entry.is_null()) {
+		if (now < entry->expires) {
+			return entry;
+		}
+		(*_cache_table)->remove(name);
+	}
+	entry = new _Tt_hostname_cache(name);
+	entry->resolved = _cache_it(entry, name);
+	entry->expires = now + (entry->resolved ? _TT_HOST_EQUIV_TTL
+						: _TT_HOST_EQUIV_NEG_TTL);
+	(*_cache_table)->insert(entry);
+	return entry;
 }
 
 _Tt_host_equiv::
@@ -210,26 +248,14 @@ hostname_equiv(const _Tt_string & host1, const _Tt_string & host2)
 	//
 	_Tt_hostname_cache_ptr sh, lh;
 
-	sh = _cache_table->lookup(shorthost);
-	if (sh.is_null()) {
-		sh = new _Tt_hostname_cache(shorthost);
-
-		if (_cache_it(sh, shorthost) == 1) {
-			_cache_table->insert(sh);
-		} else {
-			return 0;
-		}
+	sh = lookup(shorthost);
+	if (!sh->resolved) {
+		return 0;
 	}
 
-	lh = _cache_table->lookup(longhost);
-	if (lh.is_null()) {
-		lh = new _Tt_hostname_cache(longhost);
-
-		if (_cache_it(lh, longhost) == 1) {
-			_cache_table->insert(lh);
-		} else {
-			return 0;
-		}
+	lh = lookup(longhost);
+	if (!lh->resolved) {
+		return 0;
 	}
 
 	// Now sort through the address list looking
@@ -242,9 +268,11 @@ hostname_equiv(const _Tt_string & host1, const _Tt_string & host2)
 	}
 
 	_Tt_string_list_cursor sh_c(sh->addr_list);
-	_Tt_string_list_cursor lh_c(lh->addr_list);
 
         while (sh_c.next()) {
+		// (A fresh cursor for each address: a single one used to
+		// be exhausted after the first.)
+		_Tt_string_list_cursor lh_c(lh->addr_list);
         	while (lh_c.next()) {
 			// Do the IP addresses match?
 			if (memcmp((char *) *sh_c, (char *) *lh_c,
@@ -294,8 +322,8 @@ _cache_it(_Tt_hostname_cache_ptr cache_ptr, _Tt_string & hostname)
 			break;	// no more addresses
 		}
 
-                // copy the address
-		_Tt_string new_addr((const unsigned char *)h_addr_list,
+                // copy the address (not the pointer to it)
+		_Tt_string new_addr((const unsigned char *)*h_addr_list,
 				    host_ret->h_length);
 		// cache it
 		cache_ptr->addr_list->append(new_addr);

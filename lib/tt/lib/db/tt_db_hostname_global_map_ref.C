@@ -35,8 +35,83 @@
  * Copyright (c) 1992 by Sun Microsystems, Inc.
  */
 
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include "db/tt_db_hostname_global_map_ref.h"
 #include "util/tt_global_env.h"
+
+//
+// Negative cache: a host whose rpc.ttdbserverd could not be reached is
+// not tried again for TT_DB_NEG_CACHE_SECS, since each attempt costs a
+// name lookup, a portmapper query (or a connect timeout) and a syslog
+// message, and callers retry on every file-scoped operation.
+//
+#define TT_DB_NEG_CACHE_SECS	30
+#define TT_DB_NEG_CACHE_SIZE	8
+
+static struct {
+	char		*host;
+	time_t		 until;
+	_Tt_db_results	 results;
+} dbNegCache[TT_DB_NEG_CACHE_SIZE];
+
+static int
+negCacheFind(const _Tt_string &host)
+{
+	for (int i = 0; i < TT_DB_NEG_CACHE_SIZE; i++) {
+		if (dbNegCache[i].host &&
+		    strcmp(dbNegCache[i].host, (char *)host) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+// Returns TT_DB_OK, or the error of a recent failed attempt on host.
+static _Tt_db_results
+negCacheCheck(const _Tt_string &host)
+{
+	int i = negCacheFind(host);
+
+	if (i == -1) {
+		return TT_DB_OK;
+	}
+	if (time(0) < dbNegCache[i].until) {
+		return dbNegCache[i].results;
+	}
+	free(dbNegCache[i].host);
+	dbNegCache[i].host = 0;
+	return TT_DB_OK;
+}
+
+static void
+negCacheAdd(const _Tt_string &host, _Tt_db_results results)
+{
+	time_t	now = time(0);
+	int	i = negCacheFind(host);
+
+	if (i == -1) {
+		// A free or expired slot, else the one expiring first.
+		i = 0;
+		for (int j = 0; j < TT_DB_NEG_CACHE_SIZE; j++) {
+			if (!dbNegCache[j].host || dbNegCache[j].until <= now) {
+				i = j;
+				break;
+			}
+			if (dbNegCache[j].until < dbNegCache[i].until) {
+				i = j;
+			}
+		}
+		free(dbNegCache[i].host);
+		dbNegCache[i].host = strdup((char *)host);
+		if (!dbNegCache[i].host) {
+			return;
+		}
+	}
+	dbNegCache[i].until = now + TT_DB_NEG_CACHE_SECS;
+	dbNegCache[i].results = results;
+}
 
 _Tt_db_client_table_ptr*
 _Tt_db_hostname_global_map_ref::dbHostnameMap = (_Tt_db_client_table_ptr *)NULL;
@@ -78,10 +153,31 @@ _Tt_db_hostname_global_map_ref::getDB (const _Tt_string &hostname,
   }
   real_hostname = temp_hostname;
 
-  _Tt_db_client_ptr db_ptr = (*dbHostnameMap)->lookup(real_hostname);
+  return connectDB(real_hostname, results);
+}
+
+_Tt_db_client_ptr
+_Tt_db_hostname_global_map_ref::getDirectDB (const _Tt_string &hostname,
+					     _Tt_db_results   &results)
+{
+  return connectDB(hostname, results);
+}
+
+// Returns the cached connection to the dbserver on hostname, making one
+// if there is none (and no recent failure to make one).
+_Tt_db_client_ptr
+_Tt_db_hostname_global_map_ref::connectDB (const _Tt_string &hostname,
+					   _Tt_db_results   &results)
+{
+  _Tt_db_client_ptr db_ptr = (*dbHostnameMap)->lookup(hostname);
   if (db_ptr.is_null()) {
-    db_ptr = new _Tt_db_client(real_hostname, results);
-    if (results != TT_DB_OK) {                  /* Can't happen ??? */
+    results = negCacheCheck(hostname);
+    if (results != TT_DB_OK) {
+      return db_ptr;
+    }
+    db_ptr = new _Tt_db_client(hostname, results);
+    if (results != TT_DB_OK) {
+      negCacheAdd(hostname, results);
       db_ptr = (_Tt_db_client *)0;
       return db_ptr;
     }
@@ -105,4 +201,9 @@ void _Tt_db_hostname_global_map_ref::flush ()
     delete dbHostnameMap;
   }
   dbHostnameMap = (_Tt_db_client_table_ptr *)NULL;
+
+  for (int i = 0; i < TT_DB_NEG_CACHE_SIZE; i++) {
+    free(dbNegCache[i].host);
+    dbNegCache[i].host = 0;
+  }
 }

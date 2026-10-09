@@ -50,6 +50,21 @@
 #include "util/tt_audit.h"
 #include "util/tt_port.h"
 #include "util/tt_host_equiv.h"
+#include "db/tt_db_hostname_global_map_ref.h"
+
+// A cached dbserver connection that failed is dropped, so that the next
+// call reconnects (as _tt_db_network_path() does).
+static void
+dropBrokenDB(_Tt_db_hostname_global_map_ref &map_ref,
+	     const _Tt_string &hostname, _Tt_db_results db_status)
+{
+	if (db_status == TT_DB_ERR_DB_CONNECTION_FAILED ||
+	    db_status == TT_DB_ERR_RPC_CONNECTION_FAILED ||
+	    db_status == TT_DB_ERR_RPC_FAILED ||
+	    db_status == TT_DB_ERR_DB_OPEN_FAILED) {
+		map_ref.removeDB(hostname);
+	}
+}
 
 // "magic" (in the /etc/magic sense) prefix for netfile strings
 #define TT_NETFILE_PREFIX "TTN0"
@@ -177,16 +192,19 @@ _tt_host_file_netfile(const char * host, const char * filename)
 	_Tt_string	path(filename);
 	_Tt_string	netfile;
 
-	// Connect to dbserver on remote host.
+	// Connect to dbserver on remote host, reusing the connection
+	// (and remembering a failure) from earlier calls.
 	_Tt_db_results	db_status;
-	_Tt_db_client_ptr h_dbserv = new _Tt_db_client(hostname, db_status);
+	_Tt_db_hostname_global_map_ref map_ref;
+	_Tt_db_client_ptr h_dbserv = map_ref.getDirectDB(hostname, db_status);
 
 	// run _tt_file_netfile() on the remote host.
-	if ((status = _tt_get_api_error(h_dbserv->getConnectionResults(),
+	if ((status = _tt_get_api_error(db_status,
 					  _TT_API_FILE_MAP)) == TT_OK) {
 
-		status = _tt_get_api_error(h_dbserv->file_netfile(path, netfile),
-					   _TT_API_FILE_MAP);
+		db_status = h_dbserv->file_netfile(path, netfile);
+		dropBrokenDB(map_ref, hostname, db_status);
+		status = _tt_get_api_error(db_status, _TT_API_FILE_MAP);
 	}
 
 	if (status != TT_OK) {
@@ -238,18 +256,22 @@ _tt_host_netfile_file(const char * host, const char * netfilename)
 	_Tt_string	file;
 
 
-	// Connect to dbserver on remote host.
+	// Connect to dbserver on remote host, reusing the connection
+	// (and remembering a failure) from earlier calls.
 	_Tt_db_results	db_status;
-	_Tt_db_client_ptr h_dbserv = new _Tt_db_client(hostname, db_status);
+	_Tt_db_hostname_global_map_ref map_ref;
+	_Tt_db_client_ptr h_dbserv = map_ref.getDirectDB(hostname, db_status);
 
 	// run _tt_netfile_file() on the remote host.
-	if ((status = _tt_get_api_error(h_dbserv->getConnectionResults(),
+	if ((status = _tt_get_api_error(db_status,
 				        _TT_API_FILE_MAP)) != TT_OK) {
 		status = status == TT_ERR_PATH ? TT_ERR_NETFILE : status;
 		return (char *)_tt_error_pointer(status);
 	}
 	
-	if ((status = _tt_get_api_error(h_dbserv->netfile_file(path, file),
+	db_status = h_dbserv->netfile_file(path, file);
+	dropBrokenDB(map_ref, hostname, db_status);
+	if ((status = _tt_get_api_error(db_status,
 					_TT_API_FILE_MAP)) == TT_OK) {
 		return _tt_strdup((char *) file);
 	}
@@ -263,7 +285,9 @@ _tt_host_netfile_file(const char * host, const char * netfilename)
 	if (path.left(strlen(TT_NETFILE_PREFIX)) == TT_NETFILE_PREFIX) {
 		path = path.right(path.len()-strlen(TT_NETFILE_PREFIX));
 		
-		if ((status = _tt_get_api_error(h_dbserv->netfile_file(path, file),
+		db_status = h_dbserv->netfile_file(path, file);
+		dropBrokenDB(map_ref, hostname, db_status);
+		if ((status = _tt_get_api_error(db_status,
 					_TT_API_FILE_MAP)) == TT_OK) {
 			return _tt_strdup((char *) file);
 		}
