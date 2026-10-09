@@ -72,6 +72,7 @@ extern int errno;
 #include "FontAttrI.h"
 #include "FontI.h"
 #include "GraphicsI.h"
+#include "GraphicCacheI.h"
 #include "RegionI.h"
 #include "StringFuncsI.h"
 #include "XInterfaceI.h"
@@ -2000,6 +2001,8 @@ _DtHelpDALoadGraphic (
     char		 *fileName = file_xid;        
     Screen               *retScr;
     int                  screen;
+    int                  cached;
+    _DtHelpGrCacheKey    key;
 
     pGS  = (DtHelpGraphicStruct *) malloc (sizeof(DtHelpGraphicStruct));
     pReg = (_DtHelpDARegion     *) malloc (sizeof(_DtHelpDARegion));
@@ -2029,6 +2032,7 @@ _DtHelpDALoadGraphic (
 	if (fileName == NULL)
 	  {
 	    free(pGS);
+	    free(pReg);
 	    return -1;
 	  }
 
@@ -2045,9 +2049,32 @@ _DtHelpDALoadGraphic (
      * Find out if this is a X Pixmap graphic and set flag if it is.
      * This will be used later when/if colors need to be freed.
      */
+    pGS->used = 0;
     if (fileName != NULL && _DtHelpCeStrrchr(fileName, ".", MB_CUR_MAX, &extptr) != -1)
     	if (strcmp (extptr, ".xpm") == 0 || strcmp (extptr, ".pm") == 0)
 		pGS->used = -1;
+
+    /*
+     * Reuse the pixmap if this graphic was loaded before with the
+     * same colors (it is shared, and released in _DtHelpDADestroyGraphic).
+     */
+    key.dpy              = XtDisplay(pDAS->dispWid);
+    key.screen           = XScreenNumberOfScreen(XtScreen(pDAS->dispWid));
+    key.depth            = pDAS->depth;
+    key.colormap         = pDAS->colormap;
+    key.visual           = pDAS->visual;
+    key.fg               = pDAS->foregroundColor;
+    key.bg               = pDAS->backgroundColor;
+    key.media_resolution = pDAS->media_resolution;
+    key.path             = fileName;
+    cached = _DtHelpGrCacheLookup (&key, &(pGS->pix), &(pGS->mask),
+					&(pGS->width), &(pGS->height));
+    if (cached == 1)
+      {
+	pGS->pixels     = NULL;
+	pGS->num_pixels = 0;
+	goto have_graphic;
+      }
 
     if (pDAS->context == NULL)
     {
@@ -2078,6 +2105,20 @@ _DtHelpDALoadGraphic (
         pDAS->context = NULL;
     }
 
+    /*
+     * Hand a newly decoded graphic (not the "missing graphic" default)
+     * to the cache; it then owns the pixmap, mask and colors.
+     */
+    if (cached == 0 && pGS->pix != 0 && pGS->pix != pDAS->def_pix &&
+	_DtHelpGrCacheAdd (&key, pGS->pix, pGS->mask, pGS->width,
+			pGS->height, pGS->pixels, pGS->num_pixels,
+			(pGS->used != -1) ? True : False))
+      {
+	pGS->pixels     = NULL;
+	pGS->num_pixels = 0;
+      }
+
+have_graphic:
     if (fileName != file_xid)
 	free (fileName);
 
@@ -2127,6 +2168,15 @@ _DtHelpDADestroyGraphic (
     DtHelpDispAreaStruct *pDAS = (DtHelpDispAreaStruct *) client_data;
     DtHelpGraphicStruct	 *pGS  = (DtHelpGraphicStruct *)     graphic_ptr;
     Display		 *dpy  = XtDisplay(pDAS->dispWid);
+
+    /*
+     * A graphic shared through the cache just drops its reference.
+     */
+    if (pGS->pix != pDAS->def_pix && _DtHelpGrCacheRelease(dpy, pGS->pix))
+      {
+	free((char *) pGS);
+	return;
+      }
 
     if (pGS->pix != pDAS->def_pix)
 	XFreePixmap(dpy, pGS->pix);

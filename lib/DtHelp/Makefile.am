@@ -38,7 +38,7 @@ libDtHelp_la_SOURCES = Actions.c       AsciiSpc.c      Callbacks.c \
 		       bufio.c         decompress.c    HelpXlate.c  \
 		       Canvas.c        CanvasOs.c      CvString.c \
 		       Layout.c        LayoutUtil.c    LinkMgr.c \
-		       Selection.c     VirtFuncs.c
+		       Selection.c     VirtFuncs.c     GraphicCache.c
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
