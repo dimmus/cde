@@ -1,0 +1,11 @@
+/libcdebench_preload.so
+/libdtwmbench_preload.so
+/dtsvcbench
+/ttbench
+/dtwmbench
+/cdebench-proxy
+/results/
+*.json
+!/baseline.json
+# The top-level .gitignore ignores generated Makefiles; this one is not.
+!/Makefile
