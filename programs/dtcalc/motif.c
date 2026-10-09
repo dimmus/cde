@@ -2452,7 +2452,7 @@ set_item(enum item_type itemno, char *str)
             w = X->modevals[(int) DISPLAYITEM] ;
             XmTextSetString(w, displayStr) ;
             XmTextSetInsertionPosition(w, XmTextGetLastPosition(w)) ;
-            XSync(X->dpy, False);
+            XFlush(X->dpy);  /* send it now; no round trip per keypress */
          }
       }
       return ;
