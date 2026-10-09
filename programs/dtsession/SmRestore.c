@@ -1878,7 +1878,9 @@ RestoreClients( void )
     }
     
     linec = 0;
-    displayName = strdup(smGD.display->display_name);
+    /* Room for a '.' that may have to be appended below. */
+    displayName = malloc(strlen(smGD.display->display_name) + 2);
+    strcpy(displayName, smGD.display->display_name);
     remoteDisplay = (unsigned char *)
       SM_MALLOC(sizeof(unsigned char) * (strlen(displayName) + 101));
 
@@ -1907,6 +1909,15 @@ RestoreClients( void )
 	}
 	pch++;
     }
+
+    /*
+     * The screen number is appended to this later, so it must end in '.'.
+     * A display name without a screen (":1") used to become ":10" -- the
+     * wrong display -- for every restored client (":0" only worked by
+     * accident, as ":00").
+     */
+    if (dispPtr != NULL && strchr(dispPtr, '.') == NULL)
+	strcat(displayName, ".");
 
     /*
      * Create the display name for remotely executing clients.
