@@ -417,7 +417,7 @@ call(int rpc_proc,
 			tmout = -1;
 			break;
 		      default:
-			tmout = TT_RPC_TMOUT;
+			tmout = _tt_rpc_timeout(TT_RPC_TMOUT);
 			break;
 		}
 	} else {

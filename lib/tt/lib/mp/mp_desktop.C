@@ -159,19 +159,21 @@ init(_Tt_string dt_handle, _Tt_dt_type /* t */)
 	}
 	
 	ret_val = 1;
-	int retries = 20;
+	// Keep trying for 20 s (it used to be 20 x sleep(1)), backing off
+	// from 10 ms so that a display that comes up is found at once.
+	long long deadline = _tt_monotonic_ms() + 20000;
+	int delay = 10;
 	set_error_handler(_Tt_desktop::io_error_proc);
 	if (0 == sigsetjmp(io_exception, 1)) {
 
 		// now connect to the indicated X11 server
-		while (retries--) {
+		do {
 			if ((priv->xd = (Display *)
 			       CALLX11(XOpenDisplay)((char *)display))) {
 				// Xlib has already emitted diagnostic
 				break;
 			}
-			sleep(1);
-		}
+		} while (_tt_backoff(&delay, 250, deadline));
 		if (!priv->xd) ret_val = 0;
 	} else {
 		ret_val = 0;
