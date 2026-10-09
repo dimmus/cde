@@ -112,6 +112,14 @@ CheckAccess(
         char *fname,
         int what)
 {
+#if defined(AT_EACCESS) && !defined(BLS)
+   /*
+    * Check with the effective user and group IDs.  This is what the
+    * code below does by temporarily setting the real IDs to the
+    * effective ones, in one system call instead of seven.
+    */
+   return faccessat(AT_FDCWD, fname, what, AT_EACCESS);
+#else
     int access_priv;
     uid_t save_ruid;
     gid_t save_rgid;
@@ -154,6 +162,7 @@ CheckAccess(
 
    return access_priv;
 #endif /* BLS */
+#endif /* AT_EACCESS */
 }
 
 
@@ -1063,9 +1072,11 @@ FileManip(
             {
                if (RunFileCommand(MOVE_CMD, from, to, NULL) == 0)
                   return(True);
-               else
-                  if (RunFileCommand(LINK_CMD, "-s", from, to) == 0)
-                     return(True);
+            }
+            else
+            {
+               if (RunFileCommand(LINK_CMD, "-s", from, to) == 0)
+                  return(True);
             }
 
             link_result = (-1);

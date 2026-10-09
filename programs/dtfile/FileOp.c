@@ -307,26 +307,42 @@ PipeWriteString(
 	int fd,
 	char *s)
 {
-   short len, sent = 0;
-   void (*oldPipe)();
-
-   oldPipe = (void (*)())signal(SIGPIPE, SIG_IGN);
+   short len;
+   char stack_buf[1024];
+   char *buf;
+   size_t n, done;
+   ssize_t rc = 0;
+   void (*oldPipe)(int);
 
    if (s == NULL)
       len = 0;
    else
       len = strlen(s);
 
-   if (write(fd, &len, sizeof(short)) < 0) {
-      return -1;
-   }
-
+   /* send the length and the string with one write() */
+   n = sizeof(short) + (len > 0 ? len : 0);
+   buf = (n <= sizeof(stack_buf)) ? stack_buf : XtMalloc(n);
+   memcpy(buf, &len, sizeof(short));
    if (len > 0)
-      sent = write(fd, s, len);
+      memcpy(buf + sizeof(short), s, len);
 
+   oldPipe = signal(SIGPIPE, SIG_IGN);
+   for (done = 0; done < n; done += rc)
+   {
+      rc = write(fd, buf + done, n - done);
+      if (rc < 0 && errno == EINTR)
+         rc = 0;
+      else if (rc <= 0)
+         break;
+   }
    signal(SIGPIPE, oldPipe);
 
-   return sent;
+   if (buf != stack_buf)
+      XtFree(buf);
+
+   if (done < n)
+      return -1;
+   return (len > 0) ? len : 0;
 }
 
 
