@@ -103,6 +103,7 @@ DtWsmGetWorkspaceInfo(
     _DtSvcDisplayToAppContext(display);
 
     _DtSvcAppLock(app);
+    *ppWsInfo = NULL;
     /* 
      * Construct atom name
      */
@@ -125,17 +126,25 @@ DtWsmGetWorkspaceInfo(
      */
     if ((rcode=_DtGetMwmWindow (display, root, &wmWindow)) == Success)
     {
-	if ((rcode=XGetTextProperty(
-			display,
-			wmWindow,
-			&tp,
-			aProperty))>=Success)
+	/*
+	 * XGetTextProperty returns a Status (non-zero on success), not an
+	 * error code; XmbTextPropertyToTextList returns Success, a count of
+	 * unconvertible characters, or a negative error.  The old code
+	 * compared both with Success and stored the comparison, so a
+	 * missing property or a failed conversion returned Success with
+	 * a NULL *ppWsInfo.
+	 */
+	if (!XGetTextProperty(display, wmWindow, &tp, aProperty))
+	{
+	    rcode = BadAtom;	/* no such property */
+	}
+	else
 	{
 	    if ((rcode=XmbTextPropertyToTextList (
 				display,
 				&tp,
 				&ppchList,
-				&count) >= Success))
+				&count)) >= Success)
 	    {
 		pWsInfo = (DtWsmWorkspaceInfo *)
 			XtCalloc(1, sizeof(DtWsmWorkspaceInfo));
