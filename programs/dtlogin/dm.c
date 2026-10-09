@@ -940,6 +940,15 @@ StartDisplay(
 	Debug("Attempting to start server for %s.  startTries = %d\n", 
 	        d->name, d->startTries);
 
+#ifdef GETTY_RUNNING_IMPLEMENTED
+	/*
+	 * At boot, give a getty on the console up to five seconds to show
+	 * up before taking the display.  GettyRunning() is a stub that
+	 * always returns FALSE on every supported platform, which turned
+	 * this into an unconditional five-second sleep before the first
+	 * X server start, so it is only compiled in where a real
+	 * GettyRunning() exists.
+	 */
 	if (d->serverPid == -1) {
 	    static int bootup = 0;
 	    
@@ -954,6 +963,7 @@ StartDisplay(
 		}
 	    }
 	}
+#endif /* GETTY_RUNNING_IMPLEMENTED */
 	
 	if (d->serverPid == -1 && 
 	    (d->startTries++ >= d->startAttempts ||
@@ -1561,6 +1571,11 @@ GettyMessage( struct display *d, int msgnum )
 int 
 GettyRunning( struct display *d )
 {
+    /*
+     * Not implemented: always FALSE.  If a real implementation is added,
+     * define GETTY_RUNNING_IMPLEMENTED to re-enable the boot-time wait in
+     * StartDisplay().
+     */
     return FALSE;
 }
 
@@ -1582,6 +1597,12 @@ GettyRunning( struct display *d )
  *  file.  (MarkShutdownTime()).  This time is then used to determine if
  *  sufficient time has elapsed before restarting.
  *
+ *  The minimum gap is the restartDelay resource (seconds, default 2; it
+ *  used to be a fixed 30, which made every "restart dtlogin" stall for
+ *  half a minute).  0 disables the check.  It is also skipped when
+ *  dtlogin runs as a systemd service: systemd does not respawn it during
+ *  shutdown and has its own restart rate limiting.
+ *
  ***************************************************************************/
 
 static void
@@ -1590,18 +1611,22 @@ CheckRestartTime( void )
     struct stat	statb;
     int		sleeptime;
     
+    if (restartDelay <= 0)
+	return;
+
+    /* systemd sets INVOCATION_ID in the environment of every service. */
+    if (!daemonMode && getenv("INVOCATION_ID") != NULL) {
+	Debug("Started by systemd; not checking restart time.\n");
+	return;
+    }
+
     if (servers[0] == '/' && stat(servers, &statb) != -1) {
 
 	Debug("Checking restart time.\n");
 	
-#ifdef OSFDEBUG
-/* only those other systems are this slow :-) */
-        sleeptime = 6 - (int) (time((time_t *) 0) - statb.st_atime);
-#else
-	sleeptime = 30 - (int) (time((time_t *) 0) - statb.st_atime);
-#endif
+	sleeptime = restartDelay - (int) (time((time_t *) 0) - statb.st_atime);
 	
-	if ( sleeptime > 30 ) sleeptime = 30;
+	if ( sleeptime > restartDelay ) sleeptime = restartDelay;
 	
 	if ( sleeptime > 0 ) {
 	    Debug("Restarting too soon after shutdown. Sleeping %d seconds.\n",

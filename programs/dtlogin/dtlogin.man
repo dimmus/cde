@@ -298,6 +298,7 @@ pidFile	PidFile	String	NULL
 authDir	AuthDir	String	/usr/dt/config
 removeDomainname	RemoveDomainname	Boolean	True
 requestPort	RequestPort	Int	177
+restartDelay	RestartDelay	Int	2
 servers	Servers	String	:0 Local local /usr/bin/X11/X :0
 sysParmsFile	SysParmsFile	String	/etc/src.sh
 timeZone	TimeZone	String	MST7MDT
@@ -438,6 +439,13 @@ associates the \fBITE\fP device "console" (/dev/console) with display ":0".
 If your configuration does not match this default, specify "@<device>" for
 the display(s) with an associated \fBITE\fP and "@none" for all other displays
 listed in the \fBservers\fP file.
+.IP "\fBrestartDelay\fP"
+The minimum number of seconds between \fIdtlogin\fP shutting down and
+starting again.  If \fIdtlogin\fP is restarted sooner (for example by
+\fBinit\fP while the system is shutting down), it waits for the rest of
+this interval before starting the X-server.  A value of 0 disables the
+check.  The check is also skipped when \fIdtlogin\fP is started by
+\fBsystemd\fP.
 .IP "\fBsysParmsFile\fP"
 This resource specifies a file containing shell commands, one of which sets
 the timezone environment variable (TZ) for the system.

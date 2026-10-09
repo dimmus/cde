@@ -89,6 +89,7 @@ char	*fpHead = NULL;
 char	*fpTail = NULL;
 int	wakeupInterval;
 int 	langListTimeout;
+int	restartDelay;
 #ifdef DEF_NETWORK_DEV
 char    *networkDev;
 #endif
@@ -266,6 +267,8 @@ struct dmResources {
 				"10" },
 { "langListTimeout","langListTimeout",DM_INT,	(char **) &langListTimeout,
 				"30" },
+{ "restartDelay","RestartDelay",DM_INT,	(char **) &restartDelay,
+				"2" },
 #ifdef DEF_NETWORK_DEV
 { "networkDevice","NetworkDevice",DM_STRING,      &networkDev,
                                 DEF_NETWORK_DEV },
