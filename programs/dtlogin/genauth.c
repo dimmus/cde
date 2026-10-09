@@ -53,9 +53,6 @@
  * 
  * $EndLog$
  */
-#ifndef lint
-static char *rcsid = "@(#)$RCSfile: genauth.c $ $Revision: /main/6 $ (DEC) $Date: 1997/03/25 12:33:13 $";
-#endif
 /*
 
 Copyright (c) 1988  X Consortium
@@ -189,7 +186,7 @@ xdm_srand(unsigned int seed)
 }
 #endif /* no HASXDMAUTH */
 
-#ifdef USE_ENCRYPT
+#if !defined(HASXDMAUTH) && !defined(USE_CRYPT) && defined(USE_ENCRYPT)
 static void
 bitsToBytes (unsigned long bits[2], char bytes[64])
 {
@@ -291,7 +288,7 @@ GenerateAuthData (char *auth, int len)
 	    auth[i] = 0;
 	    for (bit = 1; bit < 256; bit <<= 1) {
 	    	_XdmcpAuthDoIt (tdata, tdata, schedule, 1);
-	    	if (tdata[0] + tdata[1] & 0x4)
+	    	if ((tdata[0] + tdata[1]) & 0x4)
 		    auth[i] |= bit;
 	    }
     	}

@@ -529,7 +529,6 @@ void SPC_Encode_Termios(XeString buff, struct termios *tio)
     /* of the string is defined at the front of this file.                 */
 
     XeString	item;
-    XeString	protocol_version;
     int		item_cnt = 0;
     speed_t     speed;    
     
@@ -543,7 +542,6 @@ void SPC_Encode_Termios(XeString buff, struct termios *tio)
 	switch(++item_cnt) 
         {
 	case SPC_TERMIO_VER_FIELD : 
-	    protocol_version = item; 
 	    /* Check this some day ??? */
 	    break;
 

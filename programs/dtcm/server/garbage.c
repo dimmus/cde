@@ -220,6 +220,7 @@ magic_time(time_t t)
         boolean_t magic = B_FALSE;
         struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm = _XLocaltime(&t, localtime_buf);
 
@@ -251,6 +252,8 @@ visit1(caddr_t node, caddr_t d)
 		if (magic_time(((Appt_4 *)d)->appt_id.tick)) {
 			((Appt_4 *)d)->tag->showtime = 0;
 		}
+		break;
+	default:
 		break;
 	}
 

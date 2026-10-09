@@ -166,7 +166,6 @@ void dispatch_targets( XEvent *report )
     Atom   *target_list;
     int    target_count;
     XEvent reply;
-    Status status;
 
 
     target_count = 4;
@@ -196,7 +195,7 @@ void dispatch_targets( XEvent *report )
     reply.xselection.property  = report->xselectionrequest.property;
     reply.xselection.time      = report->xselectionrequest.time;
 
-    status = XSendEvent( report->xselectionrequest.display,
+    XSendEvent( report->xselectionrequest.display,
 			 report->xselectionrequest.requestor,
 			 True, 0, &reply );
 }
@@ -218,7 +217,6 @@ void dispatch_multiple( XEvent *report )
 void dispatch_timestamp( XEvent *report )
 {
     XEvent reply;
-    Status status;
 
 
     XChangeProperty( report->xselectionrequest.display,
@@ -237,7 +235,7 @@ void dispatch_timestamp( XEvent *report )
     reply.xselection.property  = report->xselectionrequest.property;
     reply.xselection.time      = report->xselectionrequest.time;
 
-    status = XSendEvent( report->xselectionrequest.display,
+    XSendEvent( report->xselectionrequest.display,
 			 report->xselectionrequest.requestor,
 			 True, 0, &reply );
 }
@@ -249,7 +247,6 @@ void dispatch_timestamp( XEvent *report )
 void dispatch_not_supported( XEvent *report )
 {
     XEvent reply;
-    Status status;
 
     reply.xselection.type      = SelectionNotify;
     reply.xselection.requestor = report->xselectionrequest.requestor;
@@ -258,7 +255,7 @@ void dispatch_not_supported( XEvent *report )
     reply.xselection.property  = None;
     reply.xselection.time      = report->xselectionrequest.time;
 
-    status = XSendEvent( report->xselectionrequest.display,
+    XSendEvent( report->xselectionrequest.display,
 			 report->xselectionrequest.requestor,
 			 True, 0, &reply );
 }

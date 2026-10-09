@@ -328,10 +328,10 @@ PdmJobBoxSetAttr(PdmSetupBox* me, PdmXp* pdm_xp)
     }
     if(data->notification_profile_supported)
     {
+#if 0 && defined(PRINTING_SUPPORTED)
 	Boolean set;
 	
 	set = XmToggleButtonGadgetGetState(data->notify_toggle);
-#if 0 && defined(PRINTING_SUPPORTED)
 	PdmXpSetStringValue(pdm_xp, XPJobAttr,
 			    pdmoid_att_notification_profile,
 			    PdmOidNotifyString(set

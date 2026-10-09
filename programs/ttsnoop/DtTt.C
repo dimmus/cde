@@ -214,32 +214,34 @@ DtTtNth(
 {
 	switch (type) {
 	    case DTTT_PROCID:
-		if ((n < 0) || (n >= dtTtProcidsCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtProcidsCount)) {
 			return 0;
 		}
 		return (void *)dtTtProcids[ n ];
 	    case DTTT_MESSAGE:
-		if ((n < 0) || (n >= dtTtMessagesCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtMessagesCount)) {
 			return 0;
 		}
 		return dtTtMessages[ n ];
 	    case DTTT_PATTERN:
-		if ((n < 0) || (n >= dtTtPatternsCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtPatternsCount)) {
 			return 0;
 		}
 		return dtTtPatterns[ n ];
 	    case DTTT_DTSESSION:
-		if ((n < 0) || (n >= dtTtDtSessionsCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtDtSessionsCount)) {
 			return 0;
 		}
 		return dtTtDtSessions[ n ];
 	    case DTTT_DTFILE:
-		if ((n < 0) || (n >= dtTtDtFilesCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtDtFilesCount)) {
 			return 0;
 		}
 		return dtTtDtFiles[ n ];
 	    case DTTT_OP:
 		return tttk_op_string( (Tttk_op)(n+1) );
+	    default:
+	        break;
 	}
 
         return 0;
@@ -253,7 +255,7 @@ DtTtNthClientDatum(
 {
 	switch (type) {
 	    case DTTT_PROCID:
-		if ((n < 0) || (n >= dtTtProcidsCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtProcidsCount)) {
 			return 0;
 		}
 		return (void *)dtTtProcidClientDatums[ n ];
@@ -272,7 +274,7 @@ DtTtNthClientDatumSet(
 {
 	switch (type) {
 	    case DTTT_PROCID:
-		if ((n < 0) || (n >= dtTtProcidsCount)) {
+		if ((n < 0) || ((unsigned int)n >= dtTtProcidsCount)) {
 			return;
 		}
 		dtTtProcidClientDatums[ n ] = clientData;
@@ -338,6 +340,8 @@ DtTtIndex(
 			}
 		}
 		return -1;
+	    default:
+	        break;
 	}
 
         return 0;
@@ -365,10 +369,10 @@ DtTtDestroyed(
 		if (i < 0) {
 			return TT_WRN_NOTFOUND;
 		}
-		for (j = i; j < dtTtProcidsCount - 1; j++) {
+		for (j = i; (unsigned int)j < dtTtProcidsCount - 1; j++) {
 			dtTtProcids[j] = dtTtProcids[j+1];
 		}
-		for (j = i; j < dtTtProcidsCount - 1; j++) {
+		for (j = i; (unsigned int)j < dtTtProcidsCount - 1; j++) {
 			dtTtProcidClientDatums[j] =
 				dtTtProcidClientDatums[j+1];
 		}
@@ -383,7 +387,7 @@ DtTtDestroyed(
 		if (i < 0) {
 			return TT_WRN_NOTFOUND;
 		}
-		for (j = i; j < dtTtMessagesCount - 1; j++) {
+		for (j = i; (unsigned int)j < dtTtMessagesCount - 1; j++) {
 			dtTtMessages[j] = dtTtMessages[j+1];
 		}
 		dtTtMessagesCount--;
@@ -398,7 +402,7 @@ DtTtDestroyed(
 		if (i < 0) {
 			return TT_WRN_NOTFOUND;
 		}
-		for (j = i; j < dtTtPatternsCount - 1; j++) {
+		for (j = i; (unsigned int)j < dtTtPatternsCount - 1; j++) {
 			dtTtPatterns[j] = dtTtPatterns[j+1];
 		}
 		dtTtPatternsCount--;
@@ -417,7 +421,7 @@ DtTtDestroyed(
 			DtTtDestroyed( DTTT_PATTERN, *pats );
 			pats++;
 		}
-		for (j = i; j < dtTtDtSessionsCount - 1; j++) {
+		for (j = i; (unsigned int)j < dtTtDtSessionsCount - 1; j++) {
 			dtTtDtSessions[j] = dtTtDtSessions[j+1];
 		}
 		dtTtDtSessionsCount--;
@@ -436,11 +440,13 @@ DtTtDestroyed(
 			DtTtDestroyed( DTTT_PATTERN, *pats );
 			pats++;
 		}
-		for (j = i; j < dtTtDtFilesCount - 1; j++) {
+		for (j = i; (unsigned int)j < dtTtDtFilesCount - 1; j++) {
 			dtTtDtFiles[j] = dtTtDtFiles[j+1];
 		}
 		dtTtDtFilesCount--;
 		break;
+	    default:
+	        break;
 	}
 	return TT_OK;
 }
@@ -547,7 +553,7 @@ _DtTtChoices(
 			return 0;
 		}
 		*itemCount = dtTtProcidsCount;
-		for (i = 0; i < dtTtProcidsCount; i++) {
+		for (i = 0; (unsigned int)i < dtTtProcidsCount; i++) {
 			items[ i ] = XmStringCreateLocalized(
 					(String)dtTtProcids[ i ] );
 		}
@@ -559,7 +565,7 @@ _DtTtChoices(
 			return 0;
 		}
 		*itemCount = dtTtMessagesCount;
-		for (i = 0; i < dtTtMessagesCount; i++) {
+		for (i = 0; (unsigned int)i < dtTtMessagesCount; i++) {
 			std::ostringstream itemStream;
 			itemStream << (void *)dtTtMessages[ i ];
 			char *op = tt_message_op( dtTtMessages[ i ] );
@@ -584,7 +590,7 @@ _DtTtChoices(
 			return 0;
 		}
 		*itemCount = dtTtPatternsCount;
-		for (i = 0; i < dtTtPatternsCount; i++) {
+		for (i = 0; (unsigned int)i < dtTtPatternsCount; i++) {
 			std::ostringstream itemStream;
 			itemStream << (void *)dtTtPatterns[ i ] << ends;
 			items[ i ] = XmStringCreateLocalized(
@@ -611,6 +617,8 @@ _DtTtChoices(
 					(String)tttk_op_string( (Tttk_op)i ));
 		}
 		return items;
+	    default:
+	        break;
 	}
 
         return 0;

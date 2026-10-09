@@ -53,6 +53,7 @@ _DtCm_print_tick(time_t t)
         char *a;
 	_Xctimeparams ctime_buf;
  
+        (void) ctime_buf;	/* unused unless XTHREADS */
         a = _XCtime(&t, ctime_buf);
         (void) fprintf (stderr, "%ld %s\n", t, a);
 }

@@ -90,8 +90,7 @@ p_create_v5_group_access_pane(
         int 		 i = 0;
         Widget 		 gap2_form_mgr;
 	Dimension	 max_left_label_width,
-			 max_button_label_width,
-			 tmp;
+			 max_button_label_width;
         Arg 		 args[20]; 
 	XtWidgetGeometry geo;
 
@@ -343,8 +342,7 @@ CreatePermissions(
 {
 	Calendar *c = 	 calendar;
 	Widget 		 perm_form;
-	int 		 n,
-			 max_label_width,
+	int 		 max_label_width,
 			 label_offset;
 	Dimension	 tog_width,
 			 view_label_width,
@@ -738,7 +736,7 @@ GAPAddProc(
 					XmStringFree(xmstr);
 					return;
 				}
-			} while (access_list_ptr = access_list_ptr->next);
+			} while ((access_list_ptr = access_list_ptr->next));
 		}
 	}
 

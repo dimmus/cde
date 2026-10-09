@@ -525,7 +525,7 @@ char *update_filter (char *filter)
   /******************************************************************/
   /* determine what filter should be depending on icon type (pm/bm) */
   /******************************************************************/
-  if (fe_ptr = strrchr(filter_end, EXT_DELIMITER)) {
+  if ((fe_ptr = strrchr(filter_end, EXT_DELIMITER))) {
      ffg_ptr = strrchr(file_filter_global, EXT_DELIMITER);
      if (bShowPixmaps) {
         if ((int)strlen(fe_ptr) >= (int)strlen(PIXMAP_EXT)) {
@@ -933,9 +933,8 @@ static  void    calc_bottom_attachment( Widget UxWidget,
                                              XtPointer UxClientData,
                                              XtPointer UxCallbackArg )
 {
-  _UxCicon_selection_dialog *UxSaveCtx, *UxContext;
+  _UxCicon_selection_dialog *UxContext;
 
-  UxSaveCtx = UxIcon_selection_dialogContext;
   UxIcon_selection_dialogContext = UxContext =
                   (_UxCicon_selection_dialog *) UxGetContext( UxWidget );
   {
@@ -959,9 +958,8 @@ static  void    activateCB_bottom_button( Widget UxWidget,
                                              XtPointer UxClientData,
                                              XtPointer UxCallbackArg )
 {
-  _UxCicon_selection_dialog *UxSaveCtx, *UxContext;
+  _UxCicon_selection_dialog *UxContext;
 
-  UxSaveCtx = UxIcon_selection_dialogContext;
   UxIcon_selection_dialogContext = UxContext =
                   (_UxCicon_selection_dialog *) UxGetContext( UxWidget );
   {
@@ -1060,9 +1058,8 @@ static  void    activateCB_bottom_button1( Widget UxWidget,
                                              XtPointer UxClientData,
                                              XtPointer UxCallbackArg )
 {
-  _UxCicon_selection_dialog *UxSaveCtx, *UxContext;
+  _UxCicon_selection_dialog *UxContext;
 
-  UxSaveCtx = UxIcon_selection_dialogContext;
   UxIcon_selection_dialogContext = UxContext =
                   (_UxCicon_selection_dialog *) UxGetContext( UxWidget );
   {
@@ -1174,9 +1171,8 @@ static  void    activateCB_bottom_button2( Widget UxWidget,
                                              XtPointer UxClientData,
                                              XtPointer UxCallbackArg )
 {
-  _UxCicon_selection_dialog *UxSaveCtx, *UxContext;
+  _UxCicon_selection_dialog *UxContext;
 
-  UxSaveCtx = UxIcon_selection_dialogContext;
   UxIcon_selection_dialogContext = UxContext =
                   (_UxCicon_selection_dialog *) UxGetContext( UxWidget );
   {
@@ -1202,9 +1198,8 @@ static  void    activateCB_bottom_button3( Widget UxWidget,
                                              XtPointer UxClientData,
                                              XtPointer UxCallbackArg )
 {
-  _UxCicon_selection_dialog *UxSaveCtx, *UxContext;
+  _UxCicon_selection_dialog *UxContext;
 
-  UxSaveCtx = UxIcon_selection_dialogContext;
   UxIcon_selection_dialogContext = UxContext =
                   (_UxCicon_selection_dialog *) UxGetContext( UxWidget );
   {
@@ -1944,9 +1939,7 @@ Widget  create_icon_selection_dialog(swidget    _UxUxParent,
 
 
 {
-        char                   *icon_file_name;
         Widget                  rtrn;
-        int                     lcv;
         _UxCicon_selection_dialog *UxContext;
 
         UxIcon_selection_dialogContext = UxContext =

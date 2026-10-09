@@ -115,10 +115,6 @@ _DtCmsV5LoadAndCheckAccess(
 	_DtCmsCalendar	**cal)
 {
 	CSA_return_code		stat;
-	cms_access_entry	*alist;
-	cms_attribute_value	*owner;
-	int			worldaccess = 0, useraccess = 0;
-	boolean_t		isowner;
 
 
 	if (target == NULL || sender == NULL || cal == NULL)
@@ -425,7 +421,7 @@ get_uname(uid_t uid)
 {
 	struct passwd *pw;
 	char buff[16];
-	Uname_cache *ucache, *prev;
+	Uname_cache *ucache;
 
 	if ((ucache = in_u_cache(uid)) == NULL)
 	{
@@ -454,8 +450,6 @@ get_uname(uid_t uid)
 static Access_Entry_4 *
 in_access_list(Access_Entry_4 *l, char *s)
 {
-	char	*name;
-
 	if (l==NULL || s==NULL) return(NULL);
 	while(l != NULL) {
 		/* only for combining lists, not for authentication */

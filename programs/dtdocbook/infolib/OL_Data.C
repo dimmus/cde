@@ -151,7 +151,7 @@ OL_Data::OL_Data( const Token &t,
 
     case REFERENCE:
       {
-	BaseData *sub_data = new AttributeData(t, eptr->name(), mode );
+	AttributeData *sub_data = new AttributeData(t, eptr->name(), mode );
 	if ( sub_data ) {
 	  if ( (data_avail= sub_data->DataWillBeAvailable()) ) {
 	    ValueBuffer.write( sub_data->content(),

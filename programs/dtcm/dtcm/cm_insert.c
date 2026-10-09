@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)cm_insert.c 1.31 95/05/19 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,7 +77,6 @@ static  char sccsid[] = "@(#)cm_insert.c 1.31 95/05/19 Copyr 1993 Sun Microsyste
 int debug = 0;
 static nl_catd	DT_catd;
 static char cm_target[256] = "";	/* target for table (user@host) */
-static int cm_today = 0;		/* today's date (in epoch time) */
 static char cm_date[256] = "";		/* appointment date */
 static char cm_view[16] = "day";	/* view span (day,week,month) */
 static char cm_start[16] = "";		/* start time for appointment list*/
@@ -92,11 +87,6 @@ static char cm_what[1024] = "Appointment";
 					/* what appointment is about */
 static char cm_appt_file[1024] = "";
 					/* file to find an appointment template in */
-static int cm_repeat = 0;		/* how often to repeat this */
-static int cm_flash = 0;		/* flash reminder */
-static int cm_beep = 0;			/* beep reminder */
-static int cm_open = 0;			/* open reminder */
-static int cm_mail = 0;			/* mail reminder */
 
 static void cm_args();			/* parse command line */
 
@@ -246,7 +236,7 @@ prompt_for_insert(Props *p) {
 	
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	int		cnt, status = 0;
@@ -260,7 +250,6 @@ main(int argc, char **argv)
 	CSA_calendar_user	csa_user;
 	DisplayType		dt;
 	int			version;
-	char			date_str[256];
 #ifdef FNS
 	char		buf[256];
 #endif

@@ -134,7 +134,7 @@ parse_args(int argc, char **argv)
 {
 	int	opt;
 
-	if (pgname = strrchr (argv[0], '/'))
+	if ((pgname = strrchr (argv[0], '/')))
 		pgname++;
 	else
 		pgname = argv[0];
@@ -514,9 +514,11 @@ main(int argc, char **argv)
         program_handle ph = newph();
 	struct passwd *pw;
 	struct group *gr;
+#if defined(SunOS)
 	struct rlimit rl;
+#endif
 	struct sockaddr_in saddr;
-	int asize = sizeof (saddr);
+	socklen_t asize = sizeof (saddr);
 	SVCXPRT *tcp_transp = (SVCXPRT *)-1;
 	SVCXPRT *udp_transp = (SVCXPRT *)-1;
 	int	fd, error;

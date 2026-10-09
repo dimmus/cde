@@ -238,7 +238,7 @@ _DtShmProtoCopyStrtab(DtShmProtoStrtab in, void * destination)
 
   _DtUtilOperateHash(strlist->sl_hash, inc_it, &foo);
 
-  size = sizeof(strtab_t) + (foo[0]) * sizeof(strtab_entry_t) + (foo[0] + foo[1] + 3) & ~3 ;
+  size = (sizeof(strtab_t) + (foo[0]) * sizeof(strtab_entry_t) + (foo[0] + foo[1] + 3)) & ~3 ;
          /* header */      /* table */  /* for string + terminator */
 
   memset((char *) ptr, 255, size);
@@ -246,7 +246,7 @@ _DtShmProtoCopyStrtab(DtShmProtoStrtab in, void * destination)
 
   ptr-> st_size= size;
   ptr-> st_stroffset = sizeof(*ptr);
-  ptr-> st_taboffset = sizeof(*ptr) + (foo[0] + foo[1] + 3) & ~3;
+  ptr-> st_taboffset = (sizeof(*ptr) + (foo[0] + foo[1] + 3)) & ~3;
   ptr-> st_count = foo[0];			/* patch alignment */
 
   building.index = 0;

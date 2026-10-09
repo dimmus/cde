@@ -2128,8 +2128,8 @@ void SetupSystemModalState (ClientData *pCD)
 	height = noenter32_height;
 	x_hot = noenter32_x_hot;
 	y_hot = noenter32_y_hot;
-	bits = noenter32_bits;
-	mask_bits = noenter32m_bits;
+	bits = (unsigned char *) noenter32_bits;
+	mask_bits = (unsigned char *) noenter32m_bits;
     }
     else
 
@@ -2140,8 +2140,8 @@ void SetupSystemModalState (ClientData *pCD)
 	height = noenter16_height;
 	x_hot = noenter16_x_hot;
 	y_hot = noenter16_y_hot;
-	bits = noenter16_bits;
-	mask_bits = noenter16m_bits;
+	bits = (unsigned char *) noenter16_bits;
+	mask_bits = (unsigned char *) noenter16m_bits;
     }
 
     for (scr=0; scr<wmGD.numScreens; scr++)

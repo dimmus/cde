@@ -379,7 +379,7 @@ static int	parse_ims_list(char *ptr, ImsList *list)
 
     def_name = NULL;
     num_ent = 0;
-    while (np = strchr(bp, '\n')) {
+    while ((np = strchr(bp, '\n'))) {
 	if (np == bp) {
 	    bp++;
 	    continue;
@@ -531,7 +531,10 @@ static int	parse_remote_conf(ImsList **listp, char *locale, char *confbuf, int c
 int	exec_remote_ims(UserSelection *sel)
 {
     int		ret = NoError;
-    int		n, num_opts, binc;
+    int		n, num_opts;
+#if	0
+    int		binc;
+#endif
     char	*bp, *np;
     char	envbuf[BUFSIZ];
     char	tmpbuf[BUFSIZ];
@@ -675,9 +678,8 @@ int	read_remote_confdata(char **confbuf, int *conflen)
 {
     char **av = NULL;
     int ac = 0;
-    int ret;
 
-    ret = get_window_data(&ac, &av);
+    get_window_data(&ac, &av);
     /* if (ac != 1) {  FREE  av[i]; return ErrBabData; } */
 
     *confbuf = av[0];
@@ -774,7 +776,7 @@ int	set_window_data(int ac, char **av)
 
     for (i = 0, nbytes = 1; i < ac; i++)
 	nbytes += strlen(av[i]) + 1;
-    if (bp = buf = XtMalloc(nbytes)) {	/* copy args into single buffer */
+    if ((bp = buf = XtMalloc(nbytes))) {	/* copy args into single buffer */
 	for (i = 0; i < ac; i++) {
 	    if (av[i]) {
 		(void) strcpy(bp, av[i]);

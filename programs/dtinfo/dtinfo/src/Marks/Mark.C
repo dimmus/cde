@@ -79,7 +79,7 @@ Mark::~Mark()
 
 
 bool
-Mark::operator== (const Mark &mark)
+Mark::operator== (const Mark &mark) const
 {
   // Base classes must override this method if two different Mark
   // objects can represent the same logical Mark. 

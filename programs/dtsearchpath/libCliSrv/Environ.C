@@ -40,8 +40,9 @@ CDEEnvironment::CDEEnvironment
 	(
 	CString * homedir,
 	OSEnvironment * os_
-	) : dtspSysApp(0),
+	) : userHostDir(""),
 	    dtspUserApp(0),
+	    dtspSysApp(0),
 	    dtspSysIcon(0),
 	    dtspUserIcon(0),
 	    dtspSysHelp(0),
@@ -51,7 +52,6 @@ CDEEnvironment::CDEEnvironment
 	    dtspSysDB(0),
 	    dtspUserDB(0),
 	    dtManPath(0),
-	    userHostDir(""),
 	    os(os_)
 {
     CString envVar;

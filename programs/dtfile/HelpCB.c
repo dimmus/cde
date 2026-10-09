@@ -148,9 +148,9 @@ HelpRequestCB(
    /* printf ("in HelpRequestCB: clientdata=\"%s\"\n",(char *)clientData); */
    XmUpdateDisplay(w);
 
-   if (recordStruct = LocateRecordStructure(w))
+   if ((recordStruct = LocateRecordStructure(w)))
    {
-      if (dialogData = _DtGetInstanceData(recordStruct))
+      if ((dialogData = _DtGetInstanceData(recordStruct)))
       {
          if (IsMainWinDialog(dialogData))
          {
@@ -317,7 +317,7 @@ DTHelpRequestCB(
 {
    DesktopRec * dtInfo;
    Arg args[8];
-   int n,i;
+   int i;
    String topicTitle = NULL;
    int helpType;
    String filetypeOrActionName;
@@ -403,7 +403,6 @@ TrashHelpRequestCB(
         XtPointer callData )
 
 {
-   Arg args[5];
    char *vol;
    char *locId;
 

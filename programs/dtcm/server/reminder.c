@@ -255,7 +255,7 @@ _DtCmsPrintReminderListV4(Rm_que *qhead)
 	fprintf (stderr, "--- Active Reminder Queue ---\n");
 	while (p_node != NULL) {
 
-		if (temp = strchr(p_node->appt->what, '\n'))
+		if ((temp = strchr(p_node->appt->what, '\n')))
 			*temp = '\0';
 
 		fprintf(stderr, "%s (%d) %s: %s\n", ctime(&p_node->remind_at),
@@ -509,7 +509,6 @@ _BuildReminder4Entry(
 	_DtCmsRemInfo	*rptr, *rptr2;
 	time_t		lead;
 	time_t		tick;
-	RepeatEventState *restate;
 
 	if (active) *active = NULL;
 
@@ -730,15 +729,15 @@ _RemoveReminderFromQ(
 		tick = ClosestTick(entry->key.time, entry->key.time, lnode->re,
 			&restate);
 		free(restate);
-		if (do_old = (tick - lead < remq->cutoff))
+		if ((do_old = (tick - lead < remq->cutoff)))
 			rptr1 = _RemoveReminderFromList(&remq->oldhead[qindex],
 				entry, starttime, delfwd);
 
-		if (do_new = (lnode->lasttick - lead >= remq->cutoff))
+		if ((do_new = (lnode->lasttick - lead >= remq->cutoff)))
 			rptr2 = _RemoveReminderFromList(&remq->active[qindex],
 				entry, starttime, delfwd);
 
-		if (rptr = rptr1 ? rptr1 : rptr2) {
+		if ((rptr = rptr1 ? rptr1 : rptr2)) {
 			if (do_old && do_new) {
 				/* need to clean up the other queue
 				 * since add reminder will add to both
@@ -914,7 +913,7 @@ _GetNextRemindersFromList(
 
 				if (head == NULL)
 					head = rptr;
-				else if (head->runtime = rptr->runtime) {
+				else if ((head->runtime = rptr->runtime)) {
 					rptr->next = head;
 					head = rptr;
 				} else {
@@ -937,7 +936,7 @@ _GetNextRemindersFromList(
 		/* now do lookup in the remaining list */
 
 		while (rlist != NULL) {
-			if (rptr = _GetReminderRefFromInfo(rlist, 0, 0)) {
+			if ((rptr = _GetReminderRefFromInfo(rlist, 0, 0))) {
 				rptr->next = head;
 				head = rptr;
 			} else {

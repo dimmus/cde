@@ -292,7 +292,7 @@ MessageMgr::quit_dialog (char *message_text, Widget parent)
   //Widget dialog = XmCreateQuestionDialog(parent, "dialog", NULL, 0);
   Widget dialog = create_dialog(XmDIALOG_QUESTION, message_text, parent);
 
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON));
+  XtUnmanageChild(XtNameToWidget(dialog, "Help"));
   XtVaSetValues(dialog,
                 XmNdialogStyle, XmDIALOG_FULL_APPLICATION_MODAL,
                 XmNmessageAlignment, XmALIGNMENT_CENTER,
@@ -301,11 +301,11 @@ MessageMgr::quit_dialog (char *message_text, Widget parent)
   // Set labels on buttons
   XmStringLocalized mtfstring;
   mtfstring = MCATGETS(Set_AgentLabel, 244, "Yes");
-  XtVaSetValues(XmMessageBoxGetChild(dialog, XmDIALOG_OK_BUTTON),
+  XtVaSetValues(XtNameToWidget(dialog, "OK"),
                 XmNlabelString, (XmString)mtfstring,
                 NULL);
   mtfstring = MCATGETS(Set_AgentLabel, 245, "No");
-  XtVaSetValues(XmMessageBoxGetChild(dialog, XmDIALOG_CANCEL_BUTTON),
+  XtVaSetValues(XtNameToWidget(dialog, "Cancel"),
                 XmNlabelString, (XmString)mtfstring,
                 NULL);
 
@@ -344,8 +344,8 @@ MessageMgr::error_dialog (char *message_text, Widget parent)
   Widget dialog = create_dialog(XmDIALOG_ERROR, message_text, parent);
   //Widget dialog = XmCreateErrorDialog(parent, "dialog", NULL, 0);
 
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON));
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_CANCEL_BUTTON));
+  XtUnmanageChild(XtNameToWidget(dialog, "Help"));
+  XtUnmanageChild(XtNameToWidget(dialog, "Cancel"));
   XtVaSetValues(dialog,
                 XmNdialogStyle, XmDIALOG_FULL_APPLICATION_MODAL,
                 XmNmessageAlignment, XmALIGNMENT_BEGINNING,
@@ -379,8 +379,8 @@ MessageMgr::warning_dialog (char *message_text, Widget parent)
   Widget dialog = create_dialog(XmDIALOG_WARNING, message_text, parent);
   //Widget dialog = XmCreateWarningDialog(parent, "dialog", NULL, 0);
 
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON));
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_CANCEL_BUTTON));
+  XtUnmanageChild(XtNameToWidget(dialog, "Help"));
+  XtUnmanageChild(XtNameToWidget(dialog, "Cancel"));
   XtVaSetValues(dialog,
                 XmNdialogStyle, XmDIALOG_FULL_APPLICATION_MODAL,
                 XmNmessageAlignment, XmALIGNMENT_BEGINNING,
@@ -414,8 +414,8 @@ void
 MessageMgr::info_dialog (char *message_text, Widget parent)
 {
   Widget dialog = create_dialog(XmDIALOG_INFORMATION, message_text, parent);
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON));
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_CANCEL_BUTTON));
+  XtUnmanageChild(XtNameToWidget(dialog, "Help"));
+  XtUnmanageChild(XtNameToWidget(dialog, "Cancel"));
 
   // Set the window title
   Widget shell = XtParent(dialog);
@@ -478,7 +478,7 @@ MessageMgr::question_dialog (char *message_text, Widget parent)
   if(parent == NULL)
     parent = (Widget)window_system().toplevel();
   Widget dialog = XmCreateInformationDialog(parent, (char*)"dialog", NULL, 0);
-  XtUnmanageChild(XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON));
+  XtUnmanageChild(XtNameToWidget(dialog, "Help"));
   WXmString wxms = message_text;
   XtVaSetValues(dialog,
                 XmNdialogStyle, XmDIALOG_FULL_APPLICATION_MODAL,
@@ -489,11 +489,11 @@ MessageMgr::question_dialog (char *message_text, Widget parent)
   // Set labels on buttons
   XmStringLocalized mtfstring;
   mtfstring = MCATGETS(Set_AgentLabel, 244, "Yes");
-  XtVaSetValues(XmMessageBoxGetChild(dialog, XmDIALOG_OK_BUTTON),
+  XtVaSetValues(XtNameToWidget(dialog, "OK"),
                 XmNlabelString, (XmString)mtfstring,
                 NULL);
   mtfstring = MCATGETS(Set_AgentLabel, 245, "No");
-  XtVaSetValues(XmMessageBoxGetChild(dialog, XmDIALOG_CANCEL_BUTTON),
+  XtVaSetValues(XtNameToWidget(dialog, "Cancel"),
                 XmNlabelString, (XmString)mtfstring,
                 NULL);
 

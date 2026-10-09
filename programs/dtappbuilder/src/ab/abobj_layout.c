@@ -64,9 +64,6 @@
 **       Private Function Declarations                                  **
 **                                                                      **
 **************************************************************************/
-static void clear_layout(
-    		ABObj obj
-	    );
 
 /*************************************************************************
 **		    		    		    		          **
@@ -155,6 +152,8 @@ abobj_calculate_new_layout(
 	   if (new_x == 0 && attachments->west.offset < 0)
 		attachments->west.offset = 0;
 	   break;
+	default:
+	   break;
     }
 
     switch(attachments->east.type) 
@@ -176,6 +175,8 @@ abobj_calculate_new_layout(
 	case AB_ATTACH_ALIGN_OBJ_EDGE:
 	   attachments->east.offset += (x + width - new_x - new_width);
 	   break;
+        default:
+           break;
     }
 
     switch(attachments->north.type)
@@ -197,6 +198,8 @@ abobj_calculate_new_layout(
            if (new_y == 0 && attachments->north.offset < 0) 
         	attachments->north.offset = 0; 
            break; 
+        default:
+           break;
     }
 
     switch(attachments->south.type)
@@ -218,6 +221,8 @@ abobj_calculate_new_layout(
         case AB_ATTACH_ALIGN_OBJ_EDGE: 
            attachments->south.offset += (y + height - new_y - new_height); 
            break; 
+        default:
+           break;
     }
 
     objxm_obj_set_attachment_args(obj, OBJXM_CONFIG_BUILD);
@@ -264,33 +269,6 @@ abobj_sort_children(
 	    }
 	}
     }
-}
-
-/*
- * Set North and West to objs y and x positions. Set
- * South and East to none.
- */
-void
-clear_layout(
-    ABObj obj
-)
-{
-    obj_set_attachment(obj, AB_CP_NORTH, 
-				    AB_ATTACH_POINT,
-				    NULL, 
-				    obj_get_y(obj));
-    obj_set_attachment(obj, AB_CP_WEST, 
-				    AB_ATTACH_POINT,
-				    NULL, 
-				    obj_get_x(obj));
-    obj_set_attachment(obj, AB_CP_SOUTH, 
-				    AB_ATTACH_NONE,
-				    NULL, 
-				    0);
-    obj_set_attachment(obj, AB_CP_EAST, 
-				    AB_ATTACH_NONE,
-				    NULL, 
-				    0);
 }
 
 /*

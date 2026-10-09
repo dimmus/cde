@@ -95,19 +95,6 @@ typedef struct _termSelectInfoRec
 extern "C" {
 #endif	/* __cplusplus */
 
-static Time
-getServerTime
-(
-     Widget w
-);
-
-static void
-setScanType
-(
-    Widget  w,
-    XEvent *event
-);
-
 typedef struct {
     Widget widget;
     XmTextPosition insert_pos;

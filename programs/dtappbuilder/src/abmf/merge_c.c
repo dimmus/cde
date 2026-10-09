@@ -203,7 +203,6 @@ merge_files_by_segment(
     int		c = 0;
     long	oldFileOffset = 0;
     long	nextModOffset = 0;
-    long	nextDeltaOffset = 0;
     File	mergedFile = NULL;
     File	deltaFile = NULL;
     CUserSeg	oldUserSeg = NULL;

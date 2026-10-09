@@ -40,12 +40,12 @@
 #include "rpcextras.h"
 
 program_table ptable[] = {
-	(struct rpcgen_table *)NULL, 0, /* rtable 0 no longer supported */
-	(struct rpcgen_table *)NULL, 0, /* rtable 1 no longer supported */
-	(struct rpcgen_table *)NULL, 0, /* rtable 2 filled in by rtable2.c */
-	(struct rpcgen_table *)NULL, 0, /* rtable 3 filled in by rtable3.c */
-	(struct rpcgen_table *)NULL, 0, /* rtable 4 filled in by rtable4.c */
-	(struct rpcgen_table *)NULL, 0, /* rtable 5 filled in by cmsfunc.c */
+	{ (struct rpcgen_table *)NULL, 0 }, /* rtable 0 no longer supported */
+	{ (struct rpcgen_table *)NULL, 0 }, /* rtable 1 no longer supported */
+	{ (struct rpcgen_table *)NULL, 0 }, /* rtable 2 filled in by rtable2.c */
+	{ (struct rpcgen_table *)NULL, 0 }, /* rtable 3 filled in by rtable3.c */
+	{ (struct rpcgen_table *)NULL, 0 }, /* rtable 4 filled in by rtable4.c */
+	{ (struct rpcgen_table *)NULL, 0 }, /* rtable 5 filled in by cmsfunc.c */
 	}; 
 	
 /* program_num is filled in from one of the rtable*.c's so that */

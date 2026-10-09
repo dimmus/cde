@@ -459,7 +459,7 @@ _DtShowDialog(
    Arg args[5];
    Boolean doCenter = False;
    Boolean doParentRelativePositioning = False;
-   int availableDialogCount;
+   int availableDialogCount = 0;
 
 
    /*  See if there is a cached, unused dialog of the correct type.  */
@@ -1443,7 +1443,6 @@ _DtEncapSetWorkSpaceHints(
       Atom     pCurrent;
       Screen   *currentScreen;
       int      screen;
-      char     *workspace_name;
 
       /*
        * Since no specific workspaces were specified, we will force the
@@ -2029,13 +2028,8 @@ _DtBuildDialog(
 
 {
    Dialog * dialog;
-   int dialog_type, n;
-   DialogInstanceData * instance_data;
-   char geometry[40];
+   int dialog_type;
    Arg args[5];
-   Boolean doCenter = False;
-   Boolean doParentRelativePositioning = False;
-   int availableDialogCount;
 
 
    /*  See if there is a cached, unused dialog of the correct type.  */
@@ -2048,7 +2042,6 @@ _DtBuildDialog(
       Dialog * availableDialog;
 
       availableDialog = class_set[dialog_type].dialog_list;
-      availableDialogCount = 0;
 
       /*
        * In addition to looking for an available dialog in the cache to use,
@@ -2062,8 +2055,6 @@ _DtBuildDialog(
          {
             if (dialog == NULL)
                dialog = availableDialog;
-            else
-               availableDialogCount++;
          }
          availableDialog = availableDialog->next;
       }
@@ -2143,7 +2134,6 @@ _DtShowBuiltDialog(
    Arg args[5];
    Boolean doCenter = False;
    Boolean doParentRelativePositioning = False;
-   int availableDialogCount;
 
 
    dialog_type = dialog_data->type;

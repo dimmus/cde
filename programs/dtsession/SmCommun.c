@@ -107,12 +107,6 @@ static const char *INTERACT_ERRORS	= "Errors";
 static const char *TRUE_STR		= "True";
 static const char *FALSE_STR		= "False";
 
-/*
- * Local function definitions
- */
-
-static void DtwmStarted(void);
-
 static void
 ProcessSaveSessionMessage (
 	Tt_message 		saveMsg )
@@ -373,7 +367,6 @@ void
 StartMsgServer(void)
 {
     Boolean 	makeConnect;
-    String	tmpString;
     char *	sessId;
     char *	procId;
     int		fd;
@@ -458,33 +451,6 @@ StartMsgServer(void)
 	WarnNoStartup();
     }
 } /* END OF FUNCTION StartMsgServer  */
-
-
-/*************************************<->*************************************
- *
- *  DtwmStarted (fields, client_data, num_words)
- *
- *
- *  Description:
- *  -----------
- *
- *  Inputs:
- *  ------
- *
- * 
- *  Outputs:
- *  -------
- *
- *
- *  Comments:
- *  --------
- * 
- *************************************<->***********************************/
-static void 
-DtwmStarted(void)
-{
-    smGD.dtwmRunning = True;
-} /* END OF FUNCTION  DtwmStarted */
 
 
 /*************************************<->*************************************
@@ -872,7 +838,6 @@ ProcessScreenSaverMessage(
                      XEvent *next)
 {
   XScreenSaverNotifyEvent *ssEvent =  (XScreenSaverNotifyEvent *) next;
-  static int          ssCount = 0;
 
   if (ssEvent->state == ScreenSaverOn)
   { 

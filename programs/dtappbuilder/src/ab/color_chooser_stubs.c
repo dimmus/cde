@@ -92,11 +92,6 @@ static void 	swatch_resizeCB(
 			XtPointer calldata
 		);
 
-static void 	helpCB(
-			Widget w,
-			XtPointer clientdata,
-			XtPointer calldata
-		);
 
 static void	create_color_chooser();
 static void	update_color_palette(Widget parent);
@@ -371,7 +366,6 @@ swatch_resizeCB(
     XGCValues gcv;
     XtGCMask gcm;
     GC gc;
-    int col_index;
     Pixel 		color;
     extern Widget 	AB_toplevel;
 
@@ -606,7 +600,6 @@ cancelCB(
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
 
-        short index;
         Widget current_color;
         XmString label;
 

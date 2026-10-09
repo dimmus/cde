@@ -784,7 +784,6 @@ Tt_status _Tt_session::
 set_id(char *id)
 {
 	char			host[64];
-	char			dpname[125];
 	int			svnum;
 	char			*ssid;
 	

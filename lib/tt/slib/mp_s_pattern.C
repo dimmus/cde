@@ -365,7 +365,6 @@ match_scopes(const _Tt_message &msg, int &tm,
 	     const _Tt_msg_trace &trace) const
 {
 	Tt_scope	s = msg.scope();
-	int		valid_scope_mask = 0;
 	int		rval;
 
 	ASSERT(TT_SCOPE_NONE==0 && TT_SESSION==1 && TT_FILE==2 &&

@@ -128,10 +128,12 @@ void Cmd::registerInterface ( CmdInterface *ci )
     _numInterfaces++;
     
     if ( ci )
+    {
 	if ( _active )
 	    ci->activate();
 	else
 	    ci->deactivate();      
+    }
 }
 
 void Cmd::activate()

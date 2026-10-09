@@ -53,7 +53,6 @@ void m_free(void *block, char *msg)
   {
     char buffer[32] ;
 
-    free(block) ;
     if (m_malftrace) {
 #if defined(_AIX) || defined(sun)
       snprintf(buffer, 32, "%5x:%5x",
@@ -67,6 +66,7 @@ void m_free(void *block, char *msg)
       m_trace(msg) ;
       m_trace("\n") ;
       }      
+    free(block) ;
     }
 
 void *m_malloc(int size, char *msg)

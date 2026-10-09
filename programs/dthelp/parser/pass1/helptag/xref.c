@@ -349,7 +349,7 @@ if (!*id)
     return;
     }
 xref = (struct xref *) m_malloc(sizeof(struct xref), "xref");
-if (old = (struct xref *) m_ntrtrie(id, &xtree, (M_TRIE *) xref))
+if ((old = (struct xref *) m_ntrtrie(id, &xtree, (M_TRIE *) xref)))
     {
     m_free(xref, "xref");
     xref = old;
@@ -459,7 +459,7 @@ if (savid)
 
 /* Enter id in xref table if it's not already there */
 xref = (struct xref *) m_malloc(sizeof(struct xref), "xref");
-if (old = (struct xref *) m_ntrtrie(id, &xtree, (M_TRIE *) xref))
+if ((old = (struct xref *) m_ntrtrie(id, &xtree, (M_TRIE *) xref)))
     {
     /* non-NULL, we had an old one */
     m_free(xref, "xref");

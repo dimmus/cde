@@ -198,7 +198,6 @@ p_create_editor_pane(
 	int		 ac;
 	Arg		 args[10];
 	char		 buf[MAXNAMELEN];
-	Props		*p = (Props *)c->properties;
 	Widget		 ep_form_mgr;
 	Widget		 text_field;
 	Props_pu	*pu = (Props_pu *)c->properties_pu;
@@ -491,14 +490,6 @@ set_scale_value(Widget w, int val, Props_pu *p)
 	XmStringFree(xmstr);
 }
 
-
-static void
-print_it(Widget w, XtPointer data, XtPointer cbs) {
-	int			val;
-	Props_pu		*p = (Props_pu *)data;
-	XmScaleCallbackStruct	*scbs = (XmScaleCallbackStruct *)cbs;
-
-}
 /*
 **  Functions related to the display pane
 */
@@ -2138,7 +2129,6 @@ p_save_changes(Calendar *c) {
 
 		if (c->editor && ((Editor *) c->editor)->base_form_mgr) {
 
-			Editor *e = (Editor *) c->editor;
 			DSSW *dssw = &((Editor *) c->editor)->dssw;
 
 			set_dssw_menus(dssw, p);
@@ -2160,7 +2150,6 @@ p_save_changes(Calendar *c) {
 	
 
 		if (c->todo && ((ToDo *) c->todo)->base_form_mgr) {
-			ToDo *t = (ToDo *)c->todo;
 			DSSW *dssw = &((ToDo *) c->todo)->dssw;
 
 			set_dssw_menus(dssw, p);
@@ -2279,8 +2268,6 @@ p_flush_changes(Calendar *c) {
 	Props		*p = (Props *)c->properties;
 	Props_pu	*pu = (Props_pu *)c->properties_pu;
 	static int	answer;
-	int		redisplay_mask;
-	int		val;
 
 	if (pu->changed_flag == True) {
 		char *title = XtNewString(CATGETS(c->DT_catd, 1, 450, "Calendar : Options - Help"));
@@ -2332,7 +2319,6 @@ p_make_props_pu(Calendar *c) {
 	char		*buf;
 	char		*popuplabel = 
 			     CATGETS(c->DT_catd, 1, 458, "Calendar : Options");
-	PaneType	pt;
 	Props_pu	*p = (Props_pu *)c->properties_pu;
 	XmString	label;
 	XmString	xmstr;
@@ -2641,7 +2627,7 @@ get_editor_vals_from_ui(Props_pu *pu, Props *p) {
 	Widget		text = NULL;
 	DisplayType	dt = get_int_prop(p, CP_DEFAULTDISP);
 	Reminders_val	*val;
-	char		*msg, *dur_txt;
+	char		*dur_txt;
 	Reminder_val_op status;
 	Calendar	*c = pu->cal;
 
@@ -2719,7 +2705,7 @@ get_editor_vals_from_ui(Props_pu *pu, Props *p) {
 		strncpy(buf, &pu->ep_dssw.start_val.val[3], 2);
 		buf[2] = '\0';
 	} else {
-		strncpy(buf, &pu->ep_dssw.start_val.val[2], 2);
+		snprintf(buf, 3, "%.2s", &pu->ep_dssw.start_val.val[2]);
 		buf[2] = '\0';
 	}
 	min = atoi(buf) % 60;
@@ -2746,6 +2732,8 @@ get_editor_vals_from_ui(Props_pu *pu, Props *p) {
 		case ADVANCE_NONNUMERIC : text = XtNewString(CATGETS(c->DT_catd, 1, 910, "Reminder values must be a number with an optional sign.\nYour properties settings have not been saved."));
 			break;
 
+		default:
+			break;
 		}
 		dialog_popup(pu->frame,
 			DIALOG_TITLE, title,
@@ -3148,7 +3136,7 @@ set_gap_vals_on_ui(Props_pu *pu, Props *p) {
 	XmString	xmstr;
 	CSA_return_code	stat;
 	Dtcm_calendar	*cal;
-	CSA_access_list	step = NULL, holder = NULL, last;
+	CSA_access_list	step = NULL;
 
 	cal = allocate_cal_struct(appt_read, 
 				    	pu->cal->my_cal_version,

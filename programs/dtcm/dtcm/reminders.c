@@ -129,7 +129,6 @@ static Reminder_val_op
 r_get_bfpm_vals(Widget toggle, Widget text, Reminders_val *val,
 		Boolean convert_to_secs) {
 	char			*cval;
-	Time_scope_menu_op	scope;
 	Reminder_val_op		status;
 
 	if (!XmToggleButtonGetState(toggle)) {
@@ -187,7 +186,6 @@ r_set_bfpm_vals(
 	Boolean 	compute_best_fit) 
 {
 	char		buf[128];
-	Calendar       *c = calendar;
 	Widget		submenu;
 	int		n;
 	WidgetList	option_items;
@@ -247,7 +245,7 @@ r_set_bfpm_vals(
                		sprintf(buf, "%d", seconds_to_minutes(val->scope_val));
 		}
 	} else
-		sprintf(buf, "%d", val->scope_val);
+		sprintf(buf, "%ld", (long)val->scope_val);
 
 	switch ( scope ) {
 	  case TIME_MINS :
@@ -288,7 +286,6 @@ r_set_mailto_val(Reminders *r) {
 static void
 r_scope_menu_proc(Widget item, XtPointer client_data, XtPointer cbs) {
 	Reminders_val		*val = (Reminders_val *)client_data;
-	Time_scope_menu_op	scope;
 
 	XtVaGetValues(item, XmNuserData, &val->scope,
 		NULL);
@@ -303,7 +300,6 @@ r_alarm_toggle_proc(Widget toggle_w, XtPointer client_data, XtPointer cbs) {
 
 	Boolean		status = XmToggleButtonGetState(toggle_w);
 	Reminders	*r = (Reminders *)client_data;
-	Widget		text_w, menu_w;
 
 	if (!r)
 		return;
@@ -347,7 +343,6 @@ r_alarm_toggle_proc(Widget toggle_w, XtPointer client_data, XtPointer cbs) {
 extern void
 build_reminders(Reminders *r, Calendar *c, Widget parent) {
 
-	Widget		widest_toggle;
 	Dimension	widest, highest;
 	Widget		prev, curr;
 	Dimension	_toText, _toOption;

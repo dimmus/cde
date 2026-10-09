@@ -126,9 +126,6 @@ static void	make_win_iconic(
 static void	remove_win_close(
 		    void	*cl_data
 		);
-static void	destroy_menus(
-		    void	*cl_data
-		);
 static void	sensitize_objects(
 		    void	*cl_data
 		);
@@ -154,21 +151,8 @@ static void	activate_detach_handler(
 		    AB_ACTION_INFO	*notify_info,
 		    XtCallbackProc	when_cb
 		);
-static void	post_menu_attach_handler(
-		    AB_ACTION_INFO	*notify_info,
-		    XtCallbackProc	when_cb
-		);
-static void	post_menu_detach_handler(
-		    AB_ACTION_INFO	*notify_info,
-		    XtCallbackProc	when_cb
-		);
 
 static void	activate_when_cb(
-		    Widget	w,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
-static void	post_menu_when_cb(
 		    Widget	w,
 		    XtPointer	client_data,
 		    XtPointer	call_data
@@ -207,9 +191,6 @@ static void	set_value_action_handler(
 static void	set_label_action_handler(
 		    AB_ACTION_INFO	*action_info
 		);
-static void	show_help_action_handler(
-		    AB_ACTION_INFO	*action_info
-		);
 
 
 static void	tree_enable_help(
@@ -242,6 +223,8 @@ get_when_callback(AB_WHEN	when)
       case AB_WHEN_POPPED_UP:		return (XtCallbackProc)NULL;
       case AB_WHEN_REPAINT_NEEDED:	return (XtCallbackProc)NULL;
       case AB_WHEN_NUM_VALUES:		return (XtCallbackProc)NULL;
+      default:
+          break;
     }
     return (XtCallbackProc)NULL;
 }
@@ -262,6 +245,8 @@ get_when_attach_handler(AB_WHEN	when)
       case AB_WHEN_POPPED_UP:		return (INTERPRET_HANDLER)NULL;
       case AB_WHEN_REPAINT_NEEDED:	return (INTERPRET_HANDLER)NULL;
       case AB_WHEN_NUM_VALUES:		return (INTERPRET_HANDLER)NULL;
+      default:
+          break;
     }
     return (INTERPRET_HANDLER)NULL;
 }
@@ -282,6 +267,8 @@ get_when_detach_handler(AB_WHEN	when)
       case AB_WHEN_POPPED_UP:		return (INTERPRET_HANDLER)NULL;
       case AB_WHEN_REPAINT_NEEDED:	return (INTERPRET_HANDLER)NULL;
       case AB_WHEN_NUM_VALUES:		return (INTERPRET_HANDLER)NULL;
+      default:
+          break;
     }
     return (INTERPRET_HANDLER)NULL;
 }
@@ -377,8 +364,6 @@ conn_disable_action_interpret(
     ABObj	project
 )
 {
-    ABObj		obj;
-    AB_TRAVERSAL	trav;
 
     if (!is_enabled)
 	return;
@@ -541,7 +526,6 @@ set_initial_state(
      * to reset to it when we return to Build mode (in case any connections
      * have hidden/shown something).
      */
-    AB_OBJECT_TYPE	trg_type = obj_get_type(trg_obj);
 
     if (obj_is_window(trg_obj))
     {
@@ -1018,12 +1002,10 @@ get_action_handler(
 	 */
 	{
 	    ABObj		trg = notify_info->to;
-	    AB_OBJECT_TYPE	trg_type;
 
 	    if (trg == NULL)
 		goto cret;
 
-	    trg_type = obj_get_type(trg);
 	    /* Used to just check for BASE_WINDOW and DIALOG */
 	    if (obj_is_window(trg))
 	    {
@@ -1070,6 +1052,8 @@ get_action_handler(
       case AB_FUNC_HELP_VOLUME:
 	handler = help_volume_handler;
 	break;
+      default:
+		    break;
     }
 cret:
     return(handler);
@@ -1083,7 +1067,6 @@ activate_attach_handler(
 )
 {
     ABObj	c_from	= notify_info->from;
-    ABObj	c_to	= notify_info->to;
     Widget	attach_w;
     AB_ITEM_TYPE	item_type;
 
@@ -1126,6 +1109,8 @@ activate_attach_handler(
 				    when_cb, (XtPointer)notify_info);
 	    }
 	    break;
+	  default:
+	    break;
 	}
 	break;
       case AB_TYPE_BUTTON:
@@ -1133,51 +1118,6 @@ activate_attach_handler(
 	if (attach_w != NULL)
 	    XtAddCallback(attach_w, XmNactivateCallback,
 			    when_cb, (XtPointer)notify_info);
-	break;
-      default:
-	break;
-    }
-}
-
-static void
-post_menu_attach_handler(
-    AB_ACTION_INFO	*notify_info,
-    XtCallbackProc	when_cb
-)
-{
-    ABObj	c_from	= notify_info->from;
-    ABObj	c_to	= notify_info->to;
-    Widget	attach_w;
-    AB_ITEM_TYPE	item_type;
-
-    if (when_cb == NULL)
-	return;
-
-    switch(obj_get_type(c_from))
-    {
-      case AB_TYPE_ITEM:
-	item_type = (AB_ITEM_TYPE)obj_get_subtype(c_from);
-	switch(item_type)
-	{
-	  case AB_ITEM_FOR_MENU:
-	    {
-		if (obj_has_menu(c_from))
-		{
-		    if (objxm_get_widget(c_from) != NULL)
-			XtAddCallback(objxm_get_widget(c_from),
-				    XmNcascadingCallback,
-				    when_cb, (XtPointer)notify_info);
-		}
-		else
-		{
-		    if (objxm_get_widget(c_from) != NULL)
-			XtAddCallback(objxm_get_widget(c_from),
-				    XmNactivateCallback,
-				    when_cb, (XtPointer)notify_info);
-		}
-	    }
-	    break;
-	}
 	break;
       default:
 	break;
@@ -1235,6 +1175,8 @@ activate_detach_handler(
 				    when_cb, (XtPointer)notify_info);
 	    }
 	    break;
+	  default:
+	    break;
 	}
 	break;
       case AB_TYPE_BUTTON:
@@ -1248,50 +1190,6 @@ activate_detach_handler(
     }
 }
 
-static void
-post_menu_detach_handler(
-    AB_ACTION_INFO	*notify_info,
-    XtCallbackProc	when_cb
-)
-{
-    ABObj	c_from	= notify_info->from;
-    Widget	attach_w;
-    AB_ITEM_TYPE	item_type;
-
-    if (when_cb == NULL)
-	return;
-
-    switch(obj_get_type(c_from))
-    {
-      case AB_TYPE_ITEM:
-	item_type = (AB_ITEM_TYPE)obj_get_subtype(c_from);
-	switch(item_type)
-	{
-	  case AB_ITEM_FOR_MENU:
-	    {
-		if (obj_has_menu(c_from))
-		{
-		    if (objxm_get_widget(c_from) != NULL)
-			XtRemoveCallback(objxm_get_widget(c_from),
-				    XmNcascadingCallback,
-				    when_cb, (XtPointer)notify_info);
-		}
-		else
-		{
-		    if (objxm_get_widget(c_from) != NULL)
-			XtRemoveCallback(objxm_get_widget(c_from),
-				    XmNactivateCallback,
-				    when_cb, (XtPointer)notify_info);
-		}
-	    }
-	    break;
-	}
-	break;
-      default:
-	break;
-    }
-}
-
 static void
 activate_when_cb(
     Widget	w,
@@ -1331,25 +1229,6 @@ activate_when_cb(
 	(*handler)(notify_info);
 }
 
-static void
-post_menu_when_cb(
-    Widget	w,
-    XtPointer	client_data,
-    XtPointer	call_data
-)
-{
-    AB_ACTION_INFO	*notify_info = (AB_ACTION_INFO *)client_data;
-    ACTION_HANDLER	handler;
-
-    if (notify_info == NULL)
-	return;
-
-    handler = get_action_handler(notify_info);
-
-    if (handler != NULL)
-	(*handler)(notify_info);
-}
-
 static void
 user_def_fn_handler(
     AB_ACTION_INFO	*action_info
@@ -1396,30 +1275,6 @@ help_volume_handler(
     dtb_show_help_volume_info(istr_string(action_info->volume_id),
 		istr_string(action_info->location)); 
 } 
-
-/*
-** Handle a 'show-help' connection by dispatching the XmNhelpCallback on the
-** target object (if it has one).
-*/
-static void
-show_help_action_handler(
-    AB_ACTION_INFO	*action_info
-)
-{
-    ABObj		c_to	= action_info->to;
-    ABObj		root_obj, help_obj;
-    
-    if (c_to == NULL || objxm_get_widget(c_to) == NULL)
-	return;
-
-    if(obj_has_help_data(c_to) == True) {
-	help_obj = objxm_comp_get_subobj(c_to,AB_CFG_HELP_OBJ);
-	if(help_obj != NULL) {
-		XtCallCallbacks(objxm_get_widget(help_obj),XmNhelpCallback,
-			(XtPointer)NULL);
-	}
-    }
-}
 
 static void
 show_action_handler(
@@ -1671,7 +1526,6 @@ get_menu_item_refs(
     int			num_refs;
     int			list_size;
     ABObj		*item_ref_list;
-    AB_TRAVERSAL	item_trav;
     ABObj		item_child;
     int			i;
     int			item_index;
@@ -1713,7 +1567,6 @@ get_menu_item_refs(
     {
 	if (obj_is_menu_ref(child) && obj_get_actual_obj(child) == parent_menu)
 	{
-	    ABObj		item_ref;
 
 	    /* Find our item by index in each tree rooted at a menu-reference */
 
@@ -1752,8 +1605,6 @@ conn_test_mode_initialize(
     ABObj	project
 )
 {
-    AB_TRAVERSAL	trav;
-    ABObj		obj;
 
     ConnP_wins_deiconify  = util_llist_create();
     

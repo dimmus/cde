@@ -175,21 +175,6 @@ static void     expired (char *sprintbuf)
 }  /* expired() */
 
 
-/************************************************/
-/*                                              */
-/*            alarm_signal_handler              */
-/*                                              */
-/************************************************/
-/* Interrupt handler for SIGALRM */
-static void     alarm_signal_handler (int sig)
-{
-    fprintf (aa_stderr, PROGNAME "32 "
-	"%s %s shutdown due to excessive user idle time.\n",
-	nowstring (NULL), aa_argv0);
-    DtSearchExit (100 + sig);
-}  /* alarm_signal_handler() */
-
-
 /****************************************/
 /*					*/
 /*		 oe_unblob		*/

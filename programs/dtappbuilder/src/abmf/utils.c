@@ -378,7 +378,7 @@ abmfP_calloc(size_t n, size_t size)
 {
     char               *p;
 
-    if (p = (STRING) calloc(n, size))
+    if ((p = (STRING) calloc(n, size)))
 	return p;
     util_error(CATGETS(Dtb_project_catd, 1, 83, "calloc: out of memory"));
     return NULL;
@@ -392,7 +392,7 @@ abmfP_malloc(size_t size)
 {
     void               *p;
 
-    if (p = malloc(size))
+    if ((p = malloc(size)))
 	return p;
     util_error(CATGETS(Dtb_project_catd, 1, 84, "malloc: out of memory"));
     return NULL;
@@ -406,7 +406,7 @@ abmfP_realloc(void *buf, unsigned int size)
 {
     void               *p;
 
-    if (p = realloc(buf, size))
+    if ((p = realloc(buf, size)))
 	return p;
     util_error(CATGETS(Dtb_project_catd, 1, 85, "realloc: out of memory"));
     return NULL;
@@ -1338,6 +1338,8 @@ abmfP_obj_get_group_type(ABObj obj)
 	    return("DTB_GROUP_COLUMNS");
 	case AB_GROUP_ROWSCOLUMNS:
 	    return("DTB_GROUP_ROWSCOLUMNS");
+	default:
+	    break;
     }
 
     return("DTB_GROUP_NONE");
@@ -1471,7 +1473,6 @@ abmfP_proj_has_message(ABObj proj)
 {
     ABObj       	obj = (ABObj) NULL;
     AB_TRAVERSAL	trav;
-    int			i = 0;
     BOOL		hasMsg = FALSE;
 
     if (!proj)

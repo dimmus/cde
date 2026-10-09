@@ -157,7 +157,6 @@ _DtCvChar (
 {
     int i, len;
     char *ptr;
-    char str[MB_CUR_MAX];
     wchar_t value;
 
     if (0 == type) {

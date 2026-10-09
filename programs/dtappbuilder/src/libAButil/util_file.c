@@ -87,7 +87,6 @@ util_unbuffer_file(FILE *fp)
 {
     int		iReturn= 0;
     int		iRC= 0;		/* return code */
-    int		fileMode= 0;
 
     setbuf(fp, NULL);
     /* this is too much - actually waits for sync to disk, and runs
@@ -555,13 +554,13 @@ util_derive_name_from_path(
         /*
          * Check return value of strrchr before adding 1 to it
          */
-        if (filename = strrchr(fullpath, '/'))
+        if ((filename = strrchr(fullpath, '/')))
             name = (STRING)strdup(filename + 1);        
 	else
             name = (STRING)strdup(fullpath);
  
         len = strlen(name) - (AB_EXT_LENGTH + 1);
-        strncpy(objname, name, len);
+        memcpy(objname, name, len);
         objname[len] = '\0';
         free(name);
     }
@@ -570,7 +569,7 @@ util_derive_name_from_path(
         /*
          * Check return value of strrchr before adding 1 to it
          */
-        if (filename = strrchr(fullpath, '/'))
+        if ((filename = strrchr(fullpath, '/')))
             strcpy(objname, filename + 1);
         else
             strcpy(objname, fullpath);
@@ -595,7 +594,7 @@ util_check_name(
     if ( util_file_name_has_ab_extension(name) )
     {
 	len = strlen(name) - (AB_EXT_LENGTH + 1);
-	strncpy(new_name, name, len);
+	memcpy(new_name, name, len);
 	new_name[len] = '\0'; 
     }
     else
@@ -658,7 +657,6 @@ FILE *
 util_fopen_locked(const char *filename, const char *accessType)
 {
     FILE	*file = NULL;
-    char	char1 = accessType[0];
     BOOL	charPlus = 
 		    (   (accessType[1] != 0) 
 		     && ((accessType[1] == '+') || (accessType[2] == '+')));

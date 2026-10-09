@@ -112,10 +112,11 @@ channel_clasp channel_class = &channel_class_struct;
 
 static Wire dummy_wire={
   0,                             /* Flags */
-  -1, -1,                        /* File Descriptors */
+  { -1, -1 },                    /* File Descriptors */
   (XeString) "/dev/null", 	/* Master PTY */
   (XeString) "/dev/null", 	/* Slave PTY */
   0, 0,                          /* Toolkit IDs */
+  { 0 }, { 0 },                  /* Master/Slave termios */
   0                           /* pointer to next wire */
   };
 
@@ -173,7 +174,7 @@ SPC_Initialize(void)
      return(SPC_ERROR);
   }
 
-  if(home=getenv("HOME")) {
+  if((home=getenv("HOME"))) {
     spc_user_environment_file=(XeString) XeMalloc(strlen(home)+
 		strlen(SPCD_ENV_HOME_DIRECTORY)+strlen(SPCD_ENV_FILE)+3);
     sprintf(spc_user_environment_file, "%s/%s/%s", 
@@ -625,7 +626,6 @@ int  exec_proc_channel_object (SPC_Channel_Ptr channel)
 {
 
   XeString *tmp_argv;
-  int iomode=channel->IOMode;
   
   /* If there is no argv specified, fix it up to be the convention
      (argv[0] = file pathname) */

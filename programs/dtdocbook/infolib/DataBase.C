@@ -448,7 +448,7 @@ void DBCursor::string_field(FILE *fp, char **out, size_t *lenOut)
   char *str = new char[len + 1];
   io = fread(str, sizeof(str[0]), len+1, fp); /* read \n also */
 
-  FRIENDLY_ASSERT(io == len+1);
+  FRIENDLY_ASSERT((size_t)io == len+1);
 
   str[len] = 0; /* replace \n with 0 (just in case...) */
 

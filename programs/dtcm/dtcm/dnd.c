@@ -78,7 +78,6 @@ static char	dnd_filename[20];
 static Boolean 
 validate_dropped_appt(char *filename, Calendar *c) {
 	Props			*p = (Props *)c->properties;
-	Props_pu		*pu = (Props_pu *)c->properties_pu;
 	CmDataList		*list = NULL;
 	Validate_op		op;
 	int			i;
@@ -93,7 +92,7 @@ validate_dropped_appt(char *filename, Calendar *c) {
 				  (void *)c, c->general->version);
 
 	for (i = 1; i <= list->count; i++)
-		if (a = (Dtcm_appointment *)CmDataListGetData(list, i))
+		if ((a = (Dtcm_appointment *)CmDataListGetData(list, i)))
 			free_appt_struct(&a);
 	CmDataListDestroy(list, B_FALSE);
 
@@ -113,8 +112,10 @@ handle_animate_cb(
         DtDndDropAnimateCallbackStruct *animateInfo = (DtDndDropAnimateCallbackStruct *)call_data;
 	Calendar	*c;
 	char		*data;
+#ifdef NOT
 	int		size;
 	FILE		*fp;
+#endif
 	int		i;
 #if defined(FNS) && defined(FNS_DEMO)
 	char		buf[256];
@@ -192,10 +193,11 @@ handle_drop_cb(
 	XtPointer	client_data,
 	XtPointer	call_data)
 {
-	Display		*display = XtDisplay(w);
 	DtDndDropCallbackStruct *transfer_info = (DtDndDropCallbackStruct *)call_data;
 	Calendar	*c;
+#ifdef NOT
 	char		filename[20];
+#endif
 	char		*data;
 	int		size;
 	FILE		*fp;
@@ -281,7 +283,6 @@ cm_register_drop_site(
 					      {NULL, NULL} };
 	static XtCallbackRec animateCBRec[] = { {handle_animate_cb, NULL},
 						{NULL, NULL} };
-	Display		*display = XtDisplayOfObject(w);
 
 	/*
 	 * The above string "CalendarAppointment" is hard coded to match the type
@@ -364,7 +365,7 @@ schedule_appt(Calendar *c, Dtcm_appointment *a) {
 		set_message(c->message_text, "");
 		if ( rc == 2)
 			return 0;
-			return -1;
+		return -1;
 	}
 	} else {
 	if (!t->frame)
@@ -486,7 +487,7 @@ drag_load_proc(char *filename, Calendar *c) {
 	}
 
 	for (i = 1; i <= list->count; i++)
-		if (a = (Dtcm_appointment *)CmDataListGetData(list, i))
+		if ((a = (Dtcm_appointment *)CmDataListGetData(list, i)))
 			free_appt_struct(&a);
 	CmDataListDestroy(list, B_FALSE);
 
@@ -515,7 +516,7 @@ drag_load_proc(char *filename, Calendar *c) {
 
 CSA_entry_handle
 get_appt_struct(DragContext *context) {
-	int             *item_list = NULL, item_cnt = 0, answer;
+	int             *item_list = NULL, item_cnt = 0;
 	char		buf[MAXNAMELEN];
 	Widget 		list = NULL;
 	Calendar 	*c = context->calendar;
@@ -537,7 +538,7 @@ get_appt_struct(DragContext *context) {
 				"Calendar : Error - Drag Appointment"));
 		char *text = XtNewString(CATGETS(c->DT_catd, 1, 231, "Select an appointment and DRAG again."));
 		char *ident = XtNewString(CATGETS(c->DT_catd, 1, 95, "Continue"));
-                answer = dialog_popup(c->frame,
+                dialog_popup(c->frame,
                         DIALOG_TITLE, title,
                         DIALOG_TEXT, text,
                         BUTTON_IDENT, 1, ident,
@@ -568,7 +569,7 @@ get_appt_struct(DragContext *context) {
 		char *ident = XtNewString(CATGETS(c->DT_catd, 1, 95, "Continue"));
 		sprintf(buf, "%s", CATGETS(c->DT_catd, 1, 845,
 		"Drag and Drop operation Failed\nInternal consistency error."));
-                answer = dialog_popup(c->frame,
+                dialog_popup(c->frame,
                         DIALOG_TITLE, title,
                         DIALOG_TEXT, buf,
                         BUTTON_IDENT, 1, ident,
@@ -600,9 +601,9 @@ ApptConvertCB(
         DtDndBuffer 	*data		= &(convertInfo->dragData->data.buffers[0]);
         DragContext     *context        = (DragContext *)clientData;
         Display         *display        = XtDisplay(dragContext);
-        Atom            CMAPPOINTMENT 	
-			= XmInternAtom(display, "CalendarAppointment", False);
 	Calendar	*c = context->calendar;
+
+	(void) XmInternAtom(display, "CalendarAppointment", False);
 
 	if (convertInfo->reason != DtCR_DND_CONVERT_DATA)
 		return;
@@ -626,7 +627,6 @@ GetIcon(Calendar *calendar)
  
         Display        *display = XtDisplay(calendar->frame);
         Window          window = XtWindow(calendar->frame);
-        unsigned char  *bitmapData, *bitmapMask;
         Editor          *e = (Editor *) calendar->editor;
         GEditor         *ge = (GEditor *) calendar->geditor;
  
@@ -729,7 +729,6 @@ TranslationDragStart(
         static XtCallbackRec dragFinishCBRec[] =  { {DragFinishCB, NULL},
                                                     {NULL, NULL} };
  
-        Display        *display 	= XtDisplay(widget);
         DragContext     *context = calloc(sizeof(DragContext), 1);
         Editor          *e = (Editor *) calendar->editor;
 	CSA_entry_handle	entry;
@@ -773,6 +772,8 @@ TranslationDragStart(
 	  case TodoEditorList:
 	    ((ToDo *)context->editor)->doing_drag = False;
 	    break;
+	  default:
+	    break;
 	  }
 
 	  free(context);
@@ -815,7 +816,6 @@ ApptDragStart(
         static XtCallbackRec dragFinishCBRec[] =  { {DragFinishCB, NULL},
                                                     {NULL, NULL} };
  
-        Display        *display 	= XtDisplay(widget);
         DragContext     *context = calloc(sizeof(DragContext), 1);
 	Editor		*e = (Editor *) calendar->editor;
 	GEditor		*ge = (GEditor *) calendar->geditor;

@@ -428,7 +428,7 @@ boolean BaseObj::SendAction(Action *action,
 boolean BaseObj::SendAction(const char *actionName,
 		            BaseObj *requestor)
 {
-   Action *action;
+   Action *action = NULL;
 
    (void) HasAction(actionName, &action);
    return SendAction(action, requestor);

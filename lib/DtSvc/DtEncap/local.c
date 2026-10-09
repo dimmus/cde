@@ -156,6 +156,7 @@ int remove_logfile_local_channel_object(SPC_Channel_Ptr channel)
   int result;
 
   call_parent_method(channel, remove_logfile, (channel), result);
+  (void)result;
   
   if(unlink(channel->logfile)==ERROR) {
     SPC_Error(SPC_Unlink_Logfile);
@@ -186,7 +187,6 @@ void local_channel_object_input_handler(void * client_data,
   SPC_Channel_Ptr channel=(SPC_Channel_Ptr) client_data;
   int fd=(*source);
   int connector;
-  int len;
   fd_set read_fd_vect, except_fd_vect;
   SPC_Channel_Ptr tmp, this_ptr;
   struct timeval timeout;		  /* Not part of XPG3 !!! */
@@ -228,7 +228,7 @@ void local_channel_object_input_handler(void * client_data,
     SPC_Error(SPC_Bad_Fd);
     return /* (SPC_ERROR) */;
   }
-  len = SPC_Input_Handler(channel, connector);
+  SPC_Input_Handler(channel, connector);
   return /* (len) */;
 }
 

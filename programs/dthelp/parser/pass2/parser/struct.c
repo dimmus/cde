@@ -58,9 +58,10 @@ int m_checkstart(M_ELEMENT val)
     if (m_stacktop->oldtop) {
       if (m_element[m_stacktop->element - 1].content == M_ANY) return(TRUE) ;
       if (m_element[m_stacktop->element - 1].content == M_CDATA ||
-          m_element[m_stacktop->element - 1].content == M_RCDATA)
+          m_element[m_stacktop->element - 1].content == M_RCDATA) {
         if (! val) return(TRUE) ;
         else return(FALSE) ;
+        }
       }
 
     /* Check content model */
@@ -157,7 +158,7 @@ LOGICAL m_ckend(M_ELEMENT val, LOGICAL neednet)
       m_endtag(m_stacktop->element) ;
       }
     if (m_stacktop->neednet != neednet) {
-      M_WCHAR *wc_etago, *wc_tagc, *wc_mnet, *wc_stago, *wc_net;
+      M_WCHAR *wc_etago, *wc_tagc, *wc_stago, *wc_net;
 
       wc_etago = MakeWideCharString(m_etago);
       wc_stago = MakeWideCharString(m_stago);
@@ -455,7 +456,7 @@ void m_push(M_ELEMENT elt, M_STATE current, LOGICAL need)
    first character only and not with every character. */
 void m_strtcdata(int scanval)
   {
-    if (! m_strtproc(M_NULLVAL))
+    if (! m_strtproc(M_NULLVAL)) {
       if (m_whitespace((M_WCHAR) scanval)) {
         m_curcon = m_prevcon ;
         return ;
@@ -472,6 +473,7 @@ void m_strtcdata(int scanval)
           m_expecting() ;
           }
         }
+      }
     m_start = TRUE ;
     m_textaction((M_WCHAR) scanval) ;
     m_stacktop->firstre = TRUE ;
@@ -508,7 +510,7 @@ LOGICAL m_strtproc(M_ELEMENT scanval)
     savestack = m_stacktop ;
     original = m_stacktop ;
     m_stacktop = m_copystackelt() ;
-    if (check = m_checkstart(scanval)) {
+    if ((check = m_checkstart(scanval))) {
       if (scanval && m_stacktop->holdre && check != M_NONCONTEXTUAL) {
         m_freeFSA(m_stacktop) ;
         m_free(m_stacktop, "stack element") ;
@@ -538,7 +540,7 @@ LOGICAL m_strtproc(M_ELEMENT scanval)
     starttagomit = m_stacktop ;
     while (TRUE) {
       if (m_omitstart()) {
-        if (check = m_checkstart(scanval)) break ;
+        if ((check = m_checkstart(scanval))) break ;
         else continue ;
         }
       m_freemin(m_minstart, "start-tag minimization") ;
@@ -553,7 +555,7 @@ LOGICAL m_strtproc(M_ELEMENT scanval)
         m_stacktop = m_stacktop->oldtop ;
         m_stacktop = m_copystackelt() ;
         starttagomit = m_stacktop ;
-        if (check = m_checkstart(scanval)) break ;
+        if ((check = m_checkstart(scanval))) break ;
         else continue ;
         }
       m_freemin(m_minend, "end-tag minimization") ;

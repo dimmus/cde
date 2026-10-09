@@ -341,6 +341,7 @@ SPC_Write_Log(XeString str)
   time_t t;
   _Xctimeparams ctime_buf;
   char *result;
+  (void) ctime_buf; /* unused unless XTHREADS */
 
   _DtSvcProcessLock();
   if (spc_logging && spc_logF) {
@@ -364,6 +365,7 @@ int SPC_Format_Log (XeString format, ...)
   time_t t;
   _Xctimeparams ctime_buf;
   char *result;
+  (void) ctime_buf; /* unused unless XTHREADS */
 
   _DtSvcProcessLock();
   if (spc_logging && spc_logF) {

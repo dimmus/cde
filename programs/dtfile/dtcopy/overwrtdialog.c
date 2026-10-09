@@ -259,7 +259,7 @@ create_overwrite_dialog(
   XmString xm_string[N_OVERWRITE_RADIO_BUTTONS];
   Widget radiobtn[N_OVERWRITE_RADIO_BUTTONS];
   Widget form, outerFrame;
-  Widget action_label, icon, action_area, separator, msg_label;
+  Widget action_label, icon, action_area, msg_label;
   Pixel background, foreground;
   Pixmap px;
   Position x, y;
@@ -453,7 +453,7 @@ create_overwrite_dialog(
 
   /* create the action area of the Copy Directory Dialog */
   action_area = Create_Action_Area(form, overwriteActions, NULL);
-  separator  =  XtVaCreateManagedWidget("separator",
+  XtVaCreateManagedWidget("separator",
                              xmSeparatorWidgetClass,
                              form,
                              XmNtopAttachment,     XmATTACH_WIDGET,

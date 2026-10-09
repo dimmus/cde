@@ -259,7 +259,7 @@ Create(
 {
    FilterRec * filter_rec;
    Widget shell, form, fileNameFilter;
-   Widget tog_frame, tog_form, fileTypeScrollWin, file_window;
+   Widget fileTypeScrollWin, file_window;
    Widget labelPt2, hidden, separator, sel_form;
    Widget ok, apply, reset, close, help;
    Widget selectAll, unselectAll;
@@ -270,7 +270,7 @@ Create(
 
    Arg args[20];
    int n;
-   char * tmpStr, * resolvedFilterTranslationString;
+   char * resolvedFilterTranslationString;
 
    /*  Allocate the file filter dialog instance record.  */
    filter_rec = (FilterRec *) XtMalloc (sizeof (FilterRec));
@@ -782,7 +782,6 @@ GetResourceValues(
         char **name_list )
 {
    FilterData * filter_data;
-   static Boolean convertersAdded = False;
 
 
    /*  Allocate and get the resources for file filter dialog data.  */
@@ -895,9 +894,9 @@ SetValues(
 
       user_data = filter_data->user_data[i];
 
-      if (ptr = (char *)DtDtsDataTypeToAttributeValue(user_data->filetype,
+      if ((ptr = (char *)DtDtsDataTypeToAttributeValue(user_data->filetype,
                                                       FM_TYPE_LABEL,
-                                                      NULL))
+                                                      NULL)))
       {
          icon_label = XmStringCreateLocalized(ptr);
          DtDtsFreeAttributeValue(ptr);
@@ -918,7 +917,8 @@ SetValues(
       if (pixmapData)
         XtSetArg (args[n], XmNimageName, pixmapData->iconFileName);
       else
-        XtSetArg (args[n], XmNimageName, NULL);                         n++;
+        XtSetArg (args[n], XmNimageName, NULL);
+      n++;
       XtSetArg (args[n], XmNunderline, False);                          n++;
 
       XtSetArg (args[n], XmNpixmapPosition, XmPIXMAP_TOP);              n++;
@@ -1097,8 +1097,6 @@ WriteResourceValues(
         char **name_list )
 {
    FilterData * filter_data = (FilterData *) values->data;
-   FilterRec  * filter_rec;
-   Arg args[2];
 
 
    /*  If the dialog is currently displayed, update the geometry  */
@@ -1107,7 +1105,6 @@ WriteResourceValues(
    if (filter_data->displayed == True)
    {
       _DtGenericUpdateWindowPosition(values);
-      filter_rec = (FilterRec *) _DtGetDialogInstance (values);
    }
 
    _DtDialogPutResources (fd, name_list, FILE_FILTER, values->data,
@@ -1158,7 +1155,6 @@ DefaultCallback(
    FilterRec * filter_rec = (FilterRec *) client_data;
    DialogData * dialog_data;
    FilterData * filter_data;
-   int i;
    Arg args[1];
 
 
@@ -1386,7 +1382,6 @@ ShowHiddenFiles (
    FilterData *filter_data;
    FileMgrData *file_mgr_data;
    FileMgrRec *file_mgr_rec;
-   FilterRec *filter_rec;
    DialogData *dialog_data;
    Widget mbar;
    Arg args[1];
@@ -1414,8 +1409,6 @@ ShowHiddenFiles (
       filter_data->show_hidden = True;
       file_mgr_data->show_hid_enabled = True;
    }
-
-   filter_rec = (FilterRec *)_DtGetDialogInstance( file_mgr_data->filter_edit );
 
    /* Refilter the contents of the current directory */
 
@@ -1544,7 +1537,7 @@ UpdateFilterAfterDBReread (
    filter_data = (FilterData *) dialog_data->data;
    new_filter_data = (FilterData *) XtMalloc (sizeof (FilterData));
 
-   if (filter_rec = (FilterRec *) _DtGetDialogInstance(dialog_data))
+   if ((filter_rec = (FilterRec *) _DtGetDialogInstance(dialog_data)))
    {
       /* Dialog is posted */
       result = GetFilterValues (filter_rec, new_filter_data);

@@ -255,8 +255,6 @@ static void SetStateFromResources(
 static Tt_callback_action HostCB(
         Tt_message m, 
         Tt_pattern p);
-static void Usage(
-        char **argv );
 static int dtpadXErrorHandler(
         Display *display,
 	XErrorEvent *xerr);
@@ -284,8 +282,7 @@ main(
 {
     Editor *pPad;
 
-    char *sessId, *tmpStr;
-    Tt_pattern requests2Handle;
+    char *tmpStr;
     Tt_message msg;
     Tt_status status = TT_OK;
     int ttFd;    /* ToolTalk file descriptor */
@@ -514,21 +511,16 @@ CreateFirstPad(
     Editor *pPad;
     Arg al[10];
     int ac;
-    Widget foo;
     int i;
-    /* Added for the argument fix*/
-    char* inS;
-    int in;
     Atom xa_WM_SAVE_YOURSELF;
     extern char *optarg;
     extern int optind, opterr, optind;
-    char c;
 
     /* Create the 1st Editor entry in list of Editor instances.
      * This is also done in FindOrCreatePad() for each Editor pad instance */
     CreatePad(&pPad);
 
-    if (pPad->progname=MbStrrchr(argv[0], '/'))
+    if ((pPad->progname=MbStrrchr(argv[0], '/')))
 	pPad->progname++;
     else
 	pPad->progname = argv[0];
@@ -819,7 +811,7 @@ SendMessageToServer(
 	char **argv)
 {
     StartupStruct *pStruct = (StartupStruct *)XtMalloc(sizeof(StartupStruct));
-    char *fileName, *pArgs;
+    char *fileName;
     Tt_message msg;
     Tt_status status;
     Tttk_op op;
@@ -1233,7 +1225,6 @@ GetAdjustedResizeHints(
         XSizeHints *pHints)
 {
     Arg al[2];			/* arg list */
-    int ac;		/* arg count */
     Dimension MBheight;
 
     /* get Dt Editor widget size hints */
@@ -1581,13 +1572,13 @@ SetStateFromResources(
 /* ARGSUSED */
 void SigcldHndlr (int dummy)
 {
-    int   status, w;
+    int   status;
     struct sigaction act;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
     act.sa_handler = SigcldHndlr;
 
-    w = wait (&status);
+    wait (&status);
 
     /*
      * Is this really necessary?
@@ -1739,85 +1730,8 @@ HostCB(Tt_message m, Tt_pattern p)
     value = tt_message_arg_val(m, 1);
     waitCB = 0;
   }
+  return TT_CALLBACK_CONTINUE;
 }
-
-/************************************************************************
- *
- *  Usage
- *      When incorrect parameters have been specified on the command
- *      line, print out a set of messages detailing the correct use
- *      and exit.
- *
- ************************************************************************/
-
-static void
-Usage(
-        char **argv )
-{
-   char * template;
-   char * message_string1 = "'%s' is a bad option.\nUsage: %s...\n"
-                         "   -saveOnClose\n\t"
-                         "Dtpad automatically and silently saves the current text when there\n\t"
-                         "are unsaved changes and the Text Editor is closed.\n\n"
-                         "   -missingFileWarning\n\t"
-                         "Posts a warning dialog whenever a file name is specified and\n\t"
-                         "the file dones not exist or cannot be accessed.\n\n"
-                         "   -noReadOnlyWarning\n\t"
-                         "Disables the warning dialog posted whenever a file is\n\t"
-                         "specified for which the user does not have write permission.\n\n"
-                         "   -noNameChange\n\t"
-                         "Indicates that the default file name associated with the\n\t"
-                         "current text is not to change when the text is saved under a\n\t"
-                         "name different than what it was read in under.\n\n"
-                         "   -viewOnly\n\t"
-                         "Disallows editing of text in the edit window, essentially\n\t"
-                         "turning the Text Editor into a Text Viewer.\n\n"
-                         "   -statusLine\n\t"
-                         "Displays a status line at the bottom of the edit window.  The\n\t"
-                         "status line shows the line number of the line where the text\n\t"
-                         "cursor is currently positioned.\n\n"
-                         "   -wrapToFit\n\t"
-                         "Initially turns on wrap-to-fit mode.\n\n"
-                         "   -workspaceList WorkspaceList\n\t"
-                         "Displays the edit window for the current invocation of the\n\t"
-                         "Text Editor in the specified workspace or workspaces.\n\n"
-                         "   -session SessionFile\n";
-
-   char * message_string2 = "\tRestores the Text Editor to all text editing windows and\n\t"
-                         "settings that were in effect at a previous CDE shutdown.  All\n\t"
-                         "other command-line options are ignored when this option is\n\t"
-                         "specified.\n\n"
-                         "   -standAlone\n\t"
-                         "Forces the current invocation of the Text Editor to do its\n\t"
-                         "own text processing in its own window, independent of the\n\t"
-                         "Text Editor server.\n\n"
-                         "   -noBlocking\n\t"
-                         "Terminates the Text Editor requestor process as soon as the\n\t"
-                         "Text Editor server determines that it can handle the\n\t"
-                         "requestor's edit request.\n\n"
-                         "   -server\n\t"
-                         "Forces a Text Editor server to be started up (if one is not\n\t"
-                         "already running) to process all subsequent edit requests for\n\t"
-                         "the display.\n\n"
-                         "   -exitOnLastClose\n\t"
-                         "Specifies that the Text Editor server process is to terminate\n\t"
-                         "when the last edit window for the display is closed.  It\n\t"
-                         "should only be used with the -server option since it only\n\t"
-                         "applies to the server process.\n\n"
-                         "See the dtpad man page for more details on any of these options.\n\n";
-
-
-   template = (GETMESSAGE(7,9, message_string1));
-
-   fprintf (stderr, template, argv[1], argv[0]);
-
-   template = (GETMESSAGE(7,10, message_string2));
-
-   fprintf (stderr, "%s", template);
-
-   exit (0);
-}
-
 
 
 /************************************************************************
@@ -1868,7 +1782,6 @@ static int
 dtpadXIOErrorHandler(
         Display *display)
 {
-    static char msg[1024];
 
     fprintf(stderr, "X IO Error");
     PanicSave();

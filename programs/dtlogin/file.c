@@ -163,7 +163,7 @@ copyArgs( char **args )
 	return NULL;
     n = new;
     a = args;
-    while (*n++ = *a++)
+    while ((*n++ = *a++))
 	;
     return new;
 }
@@ -379,10 +379,10 @@ static struct displayMatch {
 	char		*name;
 	DisplayType	type;
 } displayTypes[] = {
-	"local",		{ Local, Permanent, FromFile },
-	"local_uid",		{ Local, Permanent, FromFile },
-	"foreign",		{ Foreign, Permanent, FromFile },
-	0,			{ Local, Permanent, FromFile },
+	{ "local",		{ Local, Permanent, FromFile } },
+	{ "local_uid",		{ Local, Permanent, FromFile } },
+	{ "foreign",		{ Foreign, Permanent, FromFile } },
+	{ 0,			{ Local, Permanent, FromFile } },
 };
 
 static DisplayType 

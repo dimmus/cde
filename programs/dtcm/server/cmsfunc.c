@@ -116,7 +116,6 @@ extern  cms_open_res *
 cms_open_calendar_5_svc(cms_open_args *args, struct svc_req *svcrq)
 {
 	static cms_open_res	res;
-	static char		sversion[80];
 	_DtCmsCalendar		*cal;
 	char			*user;
 
@@ -709,7 +708,6 @@ cms_enumerate_sequence_5_svc(cms_enumerate_args *args, struct svc_req *svcrq)
 				B_FALSE, B_TRUE, args->start, args->end,
 				0, 0, args->id, 0, NULL, NULL, &res.entries);
 	} else {
-		Range_4 prange;
 		Appt_4 *appt = NULL;
 		res.stat = _DtCmsLookupKeyrangeV4(cal, user, access,
 				B_FALSE, B_TRUE, args->start, args->end,
@@ -917,7 +915,7 @@ cms_update_entry_5_svc(cms_update_args *args, struct svc_req *svcrq)
 	cms_entry		*newentry;
 	caddr_t			event;
 	char			*user;
-	uint			access, needaccess;
+	uint			access;
 	Appt_4			*appt = NULL;
 
 	if (debug)
@@ -1032,8 +1030,6 @@ cms_update_entry_5_svc(cms_update_args *args, struct svc_req *svcrq)
 			args->entry.id, args->scope, args->entry.time,
 			args->pid);
 
-	free(appt);
-
 	/* reply */
 	if (cal->fversion >= _DtCM_FIRST_EXTENSIBLE_DATA_VERSION ||
 	    (cal->fversion < _DtCM_FIRST_EXTENSIBLE_DATA_VERSION &&
@@ -1045,6 +1041,8 @@ cms_update_entry_5_svc(cms_update_args *args, struct svc_req *svcrq)
 		_DtCm_free_cms_entry(newentry);
 	}
 
+	free(appt);
+
 	return (&res);
 }
 
@@ -1055,7 +1053,7 @@ cms_delete_entry_5_svc(cms_delete_args *args, struct svc_req *svcrq)
 	_DtCmsCalendar		*cal;
 	caddr_t			event;
 	char			*user;
-	uint			access, needaccess;
+	uint			access;
 
 	if (debug)
 		fprintf(stderr, "cms_delete_entry_5_svc called\n");
@@ -1142,7 +1140,7 @@ _DtCmsCreateCallog(char *user, cms_create_args *args, _DtCmsCalendar **newcal)
 {
 	CSA_return_code	stat;
 	_DtCmsCalendar	*cal;
-	int		i, index;
+	int		i;
 	char		datestr[80];
 	char		*calname;
 	char		*log;
@@ -1266,8 +1264,8 @@ _DtCmsCreateCallog(char *user, cms_create_args *args, _DtCmsCalendar **newcal)
 	/* dump file */
 	if ((stat = _DtCmsAppendCalAttrsByFN(log, cal->num_attrs, cal->attrs))
 	    != CSA_SUCCESS) {
-		free(log);
 		unlink(log);
+		free(log);
 		_DtCmsFreeCalendar(cal);
 		return (stat);
 	}
@@ -1293,7 +1291,7 @@ _ListCalendarNames(uint *num_names, char ***names)
 	if ((dirp = opendir(".")) == NULL)
 		return (CSA_E_FAILURE);
 
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp))) {
 		if (strncmp(dp->d_name, "callog.", strlen("callog.")) == 0) {
 			if (count == num) {
 				count += _NAME_INCREMENT;
@@ -1333,7 +1331,7 @@ _grow_char_array(void *ptr, uint oldcount, uint newcount)
 {
 	void *nptr;
 
-	if (nptr = realloc(ptr, newcount)) {
+	if ((nptr = realloc(ptr, newcount))) {
 		memset((void *)((char *)nptr + oldcount), 0,
 			newcount - oldcount);
 		return (nptr);
@@ -1368,7 +1366,6 @@ _DtCmsGetOldCalAttrNames(
 	uint		*num_names_r,
 	cms_attr_name	**names_r)
 {
-	CSA_return_code	stat = CSA_SUCCESS;
 	cms_attr_name	*names;
 	uint		i, j;
 

@@ -398,6 +398,9 @@ operator==(const _Tt_arg &arg) const
 		if (_data_string != arg.data_string()) {
 			return 0;
 		}
+		break;
+	    default:
+		break;
 	}
 	return 1;
 }

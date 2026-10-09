@@ -270,7 +270,7 @@ struct _PanelData
 
 extern PanelData panel;
 
-#define O_Shell(o)	(panel.shell)
+#define O_Shell(o)	((void)(o), panel.shell)
 
 
 /*  Box record defines and structure declarations  */

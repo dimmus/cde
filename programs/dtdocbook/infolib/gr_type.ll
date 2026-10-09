@@ -1,4 +1,5 @@
 %option noyywrap
+%option nounput
 
 %{
 /* $XConsortium: gr_type.l /main/3 1996/11/19 16:55:02 drk $ */

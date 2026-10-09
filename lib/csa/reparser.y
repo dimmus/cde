@@ -31,7 +31,9 @@ static NumberList *AllocNumber(unsigned int);
 static WeekDayTimeList *AllocWeekDayTimeList(NumberList*, NumberList *,
 			NumberList *);
 static RepeatEvent *HandleEndDate(RepeatEvent *, time_t);
+#ifdef MINUTE
 static RepeatEvent *DeriveMinuteEvent(unsigned int, unsigned int);
+#endif /* MINUTE */
 static RepeatEvent *DeriveDailyEvent(unsigned int, NumberList *,
 			unsigned int, RepeatEvent *);
 static RepeatEvent *DeriveWeeklyEvent(unsigned int, DayTimeList *,
@@ -43,11 +45,14 @@ static RepeatEvent *DeriveYearlyEvent(RepeatType, unsigned int, NumberList *,
 
 %}
 
-%token ERROR ENDMARKER DURATION NUMBER FIRSTWEEK SECONDWEEK THIRDWEEK
+%token ERROR ENDMARKER DURATION
+%token <number> NUMBER
+%token FIRSTWEEK SECONDWEEK THIRDWEEK
 %token FOURTHWEEK FIFTHWEEK LASTWEEK SECONDLAST THIRDLAST FOURTHLAST            
 %token FIFTHLAST MINUTECOMMAND DAILYCOMMAND WEEKLYCOMMAND MONTHPOSCOMMAND       
-%token MONTHDAYCOMMAND YEARDAYCOMMAND YEARMONTHCOMMAND LASTDAY SUNDAY
-%token MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY DATE 
+%token MONTHDAYCOMMAND YEARDAYCOMMAND YEARMONTHCOMMAND LASTDAY
+%token <weekday> SUNDAY MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY
+%token <date> DATE
 
 %union	{
 		int		 number;
@@ -67,13 +72,11 @@ static RepeatEvent *DeriveYearlyEvent(RepeatType, unsigned int, NumberList *,
 %type <nl>	time0List timeList dayOfMonthList monthOfYearList
 		dayOfYearList occurrenceList genericNumberList 
 		generic0NumberList weekdayList
-%type <weekday>	SUNDAY MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY
-		weekday
-%type <number>	duration NUMBER occurrence endMarker time
+%type <weekday>	weekday
+%type <number>	duration occurrence endMarker time
 %type <dtl>	weekdayTimeList
 %type <wdtl>	weekDayTime
 %type <dt>	weekdayTimePair
-%type <date>	DATE
 %type <enddate> endDate
 
 %% /* Beginning of rules section */
@@ -886,6 +889,7 @@ HandleEndDate(
 	return re;
 }
 
+#ifdef MINUTE
 /*
  * Create a RepeatEvent for the minute portion of a rule.
  */
@@ -907,6 +911,7 @@ DeriveMinuteEvent(
 
 	return re;
 }
+#endif /* MINUTE */
 
 /*
  * Create a RepeatEvent for the daily portion of a rule.

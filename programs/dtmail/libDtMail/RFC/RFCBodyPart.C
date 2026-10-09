@@ -1047,7 +1047,7 @@ char *from_cs, char *to_cs)
 		   case EILSEQ:  // input byte does not belong to input codeset
 		   case EINVAL:  // invalid input
              		 mb_ret = mblen(ip, MB_LEN_MAX);
-             		 if ( (mb_ret > 0) && (oleft >= mb_ret) ) {
+             		 if ( (mb_ret > 0) && (oleft >= (size_t) mb_ret) ) {
              		   strncat(op_start, ip, mb_ret);
              		   ip += mb_ret;
              		   op += mb_ret;

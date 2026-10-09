@@ -461,7 +461,7 @@ if (savtc)
 
 if (savex)
     {
-    while (wc = *string++)
+    while ((wc = *string++))
 	{
 	bufflen = wctomb(exbuff, wc);
 	if ((exbuff[0] == M_RE) && (bufflen == 1))

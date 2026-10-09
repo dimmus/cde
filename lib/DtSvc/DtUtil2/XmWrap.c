@@ -187,9 +187,9 @@ _DtGetImage(
         char *image_name,
         XImage **image)
 {
+#ifdef DtUse_XmFunctions
     Boolean result;
 
-#ifdef DtUse_XmFunctions
     if( (result=_XmGetImage(screen, image_name, image)) == False )
 	return False;
     else

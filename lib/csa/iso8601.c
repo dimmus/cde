@@ -118,9 +118,8 @@ _csa_iso8601_to_tick(char *buf, time_t *tick_out)
 	struct tm	time_str;
 	char		tz_orig[BUFSIZ];
 	boolean_t	orig_tzset = B_FALSE;
-	int 		scan_ret=0;
 
-	scan_ret=sscanf(buf, "%4d%2d%2dT%2d%2d%2dZ",
+	sscanf(buf, "%4d%2d%2dT%2d%2d%2dZ",
 	    &year, &month, &day, &hour, &min, &sec);
 
 	if (validate_iso8601(buf) != 0)
@@ -168,9 +167,13 @@ _csa_tick_to_iso8601(time_t tick, char *buf_out)
 {
 	struct tm	*time_str;
 	time_t		tk=tick;
-	char 		tz_orig[BUFSIZ], *s;
+	char 		*s;
+#if !defined(__linux__) && !defined(CSRG_BASED)
+	char 		tz_orig[BUFSIZ];
 	boolean_t	orig_tzset = B_FALSE;
+#else
         _Xgtimeparams   gmtime_buf;
+#endif
 
 	/* tick must be +ve to be valid */
 	if (tick < 0) {
@@ -197,6 +200,7 @@ _csa_tick_to_iso8601(time_t tick, char *buf_out)
 
 #else 
 	/* let's use something a little more reasonable */
+        (void) gmtime_buf;	/* unused unless XTHREADS */
         time_str = _XGmtime(&tk, gmtime_buf);
 #endif /* !linux && !CSGRC_BASED */
 

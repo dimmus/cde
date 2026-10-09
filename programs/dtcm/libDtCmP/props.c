@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static char sccsid[] = "@(#)props.c 1.13 94/11/07 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <sys/param.h>
 #include <Dt/MsgCatP.h>
@@ -227,7 +223,7 @@ p_get_props_entry(Props *p, Props_op op) {
 */
 extern boolean_t
 cal_convert_cmrc(Props *p) {
-	char		*c_ptr, fn[MAXPATHLEN], *val;
+	char		fn[MAXPATHLEN], *val;
 	Props_op	op;
 	Resource	*cm_rdb = NULL;
 
@@ -276,7 +272,7 @@ get_char_prop(Props *p, Props_op op) {
 
 extern char*
 get_char_prop_default(Props_op op) {
-	char		*val, *ptr, *user, *host;
+	char		*val, *user, *host;
 
 	switch(op) {
 	case CP_MAILTO:
@@ -333,7 +329,6 @@ init_props(void)
     static int		is_inited = 0;
     nl_catd		libdtcm_catd;
     const char		*dflt, *str;
-    OrderingType	ordering;
 
     if (is_inited) return;
 

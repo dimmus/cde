@@ -293,7 +293,7 @@ char buffer[100];
 
     DirectoryIterator dir(dirspec);
     struct dirent * direntry;
-    while (direntry = dir()) {
+    while ((direntry = dir())) {
         /*# ifdef should_be_sun_but_this_dont_work*/
 	regex_t re;
 	regcomp (&re, filespec.data(), 0);
@@ -329,7 +329,7 @@ void UnixEnvironment::removeDeadLinks
 {
     DIR * dir = opendir(dirspec.data());
     struct dirent * direntry;
-    while (direntry = readdir(dir)) {
+    while ((direntry = readdir(dir))) {
 	if (isLink(dirspec + "/" + direntry->d_name))
 	    if (!isFile(dirspec + "/" + direntry->d_name) &&
 		!isDirectory(dirspec + "/" + direntry->d_name))

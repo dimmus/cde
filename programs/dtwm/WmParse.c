@@ -67,8 +67,6 @@
  * Internal routines
  */
 
-static DtWmpParseBuf * _DtWmpIncBuf (
-    DtWmpParseBuf *pWmPB);
 
 
 
@@ -671,65 +669,6 @@ _DtWmParseNewBuf ( void )
 
 /*************************************<->*************************************
  *
- *  (DtWmParseBuf *) _DtWmpIncBuf (pWmPB)
- *
- *
- *  Description:
- *  -----------
- *  Increases the size of the line buffer in the parse buffer
- *
- *  Inputs:
- *  ------
- *  pWmPB 	= pointer to a parse buffer
- *
- * 
- *  Outputs:
- *  -------
- *  Return	= ptr to parse buffer record, NULL if memory allocation
- *		  error.
- *
- *
- *  Comments:
- *  --------
- * 
- *************************************<->***********************************/
-
-static DtWmpParseBuf * 
-_DtWmpIncBuf (
-    DtWmpParseBuf *pWmPB)
-
-{
-    if (pWmPB)
-    {
-	int ix;
-
-	if (pWmPB->pFile)
-	{
-	    /* save index into old string */
-	    ix = pWmPB->pchNext - pWmPB->pchLine;
-	}
-
-	pWmPB->pchLine = (unsigned char *) 
-	    XtRealloc ((char *)pWmPB->pchLine, (pWmPB->cLineSize + MAXLINE));
-	if (pWmPB->pchLine)
-	{
-	    pWmPB->cLineSize += MAXLINE;
-
-	    if (pWmPB->pFile)
-	    {
-		/* restore index into new string */
-		pWmPB->pchNext = pWmPB->pchLine + ix;
-	    }
-	}
-    }
-
-    return (pWmPB);
-
-} /* END OF FUNCTION _DtWmpIncBuf */
-
-
-/*************************************<->*************************************
- *
  *  _DtWmParseDestroyBuf (pWmPB)
  *
  *
@@ -1309,7 +1248,7 @@ _DtWmParseFilenameExpand (
     )
 
 {
-    unsigned char *pchN, *pchNew, *pchO;
+    unsigned char *pchNew, *pchO;
     unsigned char *pchEnv, *pchEnv0, *pchEnv1;
     unsigned char chSave;
     int len, n, nx, ix;
@@ -1737,7 +1676,6 @@ _DtWmParseMakeQuotedString (unsigned char *pchLine)
 {
     unsigned char *pchRet;
     int iLen0, iLen1;
-    int cSpecial;
     int i,j;
     int   chlen;
 

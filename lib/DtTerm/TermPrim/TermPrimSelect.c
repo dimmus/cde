@@ -372,7 +372,6 @@ bufferRowColToPos
 )
 {
     DtTermPrimData   tpd        = tw->term.tpd;
-    short lrow, lcol;
     XmTextPosition pos;
 
     /* assume row, col in the history buffer or there is no history */
@@ -395,7 +394,6 @@ scan
     Boolean                 inclusive
 )
 {
-    int              i;
     DtTermPrimData   tpd        = tw->term.tpd;
     TermSelectInfo   selectInfo = tpd->selectInfo;
     XmTextPosition   position   = scanStart;
@@ -498,6 +496,8 @@ scan
             position = bufferRowColToPos(tw,pb,row,col) ;
             break;
         }
+        break;
+      default:
         break;
     }
     return(position);
@@ -1082,8 +1082,6 @@ _DtTermPrimSelectIsInSelection
     XmTextPosition          position;
     XmTextPosition          begin;
     XmTextPosition          end;
-    short                   beginRow, beginCol;
-    short                   endRow  , endCol;
 
     position    = rowColToPos(tw, row, startCol);
     endPosition = position + width;
@@ -1503,7 +1501,6 @@ doHandleTargets
 )
 {
     _TermSelectPrimaryRec  *primSelect = (_TermSelectPrimaryRec *) closure;
-    DtTermPrimitiveWidget   tw         = (DtTermPrimitiveWidget)w;
     XTextProperty           tmpProp;
     XmTextBlockRec          block;
     int                     i, status;
@@ -1627,7 +1624,6 @@ handleTargets
     char                   *abcString;
     XTextProperty           tmpProp;
     int                     status;
-    XtPointer               closures[2];
     Atom                    targets[2];
     int                     i;
 
@@ -1704,7 +1700,6 @@ handleTargets
     {
         primSelect->target = targets[0] = XA_STRING;
     }
-    closures[0] = (char *)primSelect;
 
     primSelect->ref_count = 1;
     /*
@@ -2193,8 +2188,6 @@ _DtTermPrimSelectMoveLines
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     TermSelectInfo selectInfo = tw->term.tpd->selectInfo;
-    short selectLineBegin;
-    short selectLineEnd;
     TermBuffer pb;
     short row,col;
 
@@ -2222,7 +2215,6 @@ _DtTermPrimSelectDeleteLines
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     TermSelectInfo selectInfo = tw->term.tpd->selectInfo;
     short selectLineBegin;
-    short selectLineEnd;
     TermBuffer pb;
     short row,col;
 
@@ -2263,7 +2255,6 @@ _DtTermPrimSelectInsertLines
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     TermSelectInfo selectInfo = tw->term.tpd->selectInfo;
     short selectLineBegin;
-    short selectLineEnd;
 
     /* if there are no lines, return... */
     if ((len <= 0) || !selectInfo->ownPrimary)  {
@@ -2294,7 +2285,6 @@ _DtTermPrimSelectAll
     DtTermPrimitiveWidget   tw       = (DtTermPrimitiveWidget)w;
     DtTermPrimData          tpd      = tw->term.tpd;
     TermSelectInfo          selectInfo = tpd->selectInfo;
-    XButtonEvent           *btnEvent = (XButtonEvent *) event;
     XmTextPosition	    begin;
     XmTextPosition	    end;
     
@@ -2323,10 +2313,7 @@ _DtTermPrimSelectPage
 )
 {
     DtTermPrimitiveWidget   tw       = (DtTermPrimitiveWidget)w;
-    XButtonEvent           *btnEvent = (XButtonEvent *) event;
     XmTextPosition begin, end;
-    short lastRow, width;
-    TermBuffer pb;
 
     begin = xyToPos(tw, 1, 1);
     end   = xyToPos(tw, tw->core.width-1, tw->core.height-1);
@@ -2370,7 +2357,6 @@ DropTransferCallback(
     doHandleTargets((Widget)tw,NULL,seltype,type,value,length,format) ;
     if (transfer_rec->move) {
        XmDropTransferEntryRec transferEntries[1];
-       XmDropTransferEntryRec *transferList = NULL;
 
        transferEntries[0].client_data = (XtPointer) transfer_rec;
        transferEntries[0].target = XmInternAtom(XtDisplay(w),"DELETE",
@@ -2433,11 +2419,9 @@ HandleDrop( Widget w, XmDropProcCallbackStruct *cb )
 {
     Widget drag_cont, initiator;
     /* XmTextWidget tw = (XmTextWidget) w;  */
-    DtTermPrimitiveWidget   tw          = (DtTermPrimitiveWidget)w;
     Cardinal numExportTargets, n;
     Atom *exportTargets;
     Arg args[10];
-    XmTextPosition insert_pos, left, right;
     XtCallbackRec *dropDestroyCB, *dd_cb;
     dropDestroyCBClientData *clientData;
 
@@ -2670,7 +2654,6 @@ GetXFromPos(Widget w, XmTextPosition pos)
    DtTermPrimData tpd = tw->term.tpd;
    TermBuffer pb;
    short row,col;
-   TermCharInfoRec charInfoRec ;
    
    posToBufferRowCol(tw,pos,&pb,&row,&col) ;
    return(tpd->offsetX+col*tpd->cellWidth);
@@ -2688,7 +2671,6 @@ _DtTermPrimSelectProcessBDrag(
     TermSelectInfo  selectInfo =
                     ((DtTermPrimitiveWidget)w)->term.tpd->selectInfo;
     XmTextPosition position, left, right;
-    Position left_x, left_y, right_x, right_y;
     /* InputData data = tw->text.input->data; */
 
     selectInfo->cancel = False;
@@ -2721,7 +2703,6 @@ _DtTermPrimSelectCopyClipboard
     Time copy_time
 )
 {
-    DtTermPrimitiveWidget   tw          = (DtTermPrimitiveWidget)w;
     XmTextPosition begin;
     XmTextPosition end;
 
@@ -2820,20 +2801,15 @@ _DtTermPrimSelectPasteClipboard
       Widget w 
 )
 {
-      XmTextPosition sel_left = 0;
-      XmTextPosition sel_right = 0;
-      XmTextPosition paste_pos_left, paste_pos_right, cursorPos;
       int status;                                /* clipboard status        */
       char * buffer;                             /* temporary text buffer   */
       unsigned long length;                      /* length of buffer        */
       unsigned long outlength = 0L;              /* length of bytes copied  */
       long private_id = 0L;                      /* id of item on clipboard */
-      Boolean dest_disjoint = True;
-      XmTextBlockRec block, newblock;
+      XmTextBlockRec block;
       Display *display = XtDisplay(w);
       Window window = XtWindow(w);
       Boolean get_ct = False;
-      Boolean freeBlock;
       XTextProperty tmp_prop;
       int malloc_size = 0;
       int num_vals;
@@ -2982,7 +2958,6 @@ XmTestInSelection(
     DtTermPrimitiveWidget   tw          = (DtTermPrimitiveWidget)w;
     TermSelectInfo  selectInfo = tw->term.tpd->selectInfo;
     XmTextPosition position, left, right;
-    Position left_x, right_x, dummy;
 
     position = xyToPos(tw, event->xbutton.x, event->xbutton.y);
 
@@ -3051,9 +3026,7 @@ _DtTermPrimSelectProcessCancel(
 {
     DtTermPrimitiveWidget   tw          = (DtTermPrimitiveWidget)w;
     TermSelectInfo  selectInfo = tw->term.tpd->selectInfo;
-    XmTextPosition left_x, right_x;
 
-    XmParentInputActionRec  p_event ;
 
     if (!tw->term.allowOsfKeysyms) {
       _DtTermPrimActionKeyInput(w,event,params,num_params);

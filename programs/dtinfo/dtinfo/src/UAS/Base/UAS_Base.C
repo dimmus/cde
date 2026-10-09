@@ -44,6 +44,6 @@ UAS_Base::unreference() {
 }
 
 int
-UAS_Base::operator == (const UAS_Base &b) {
+UAS_Base::operator == (const UAS_Base &b) const {
     return this == &b;
 }

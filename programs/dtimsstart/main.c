@@ -70,13 +70,12 @@ static bool	do_usage = False;
 int main (int argc, char **argv)
 {
     int		ret = NoError;
-    int		ret2;
 
     init_command(argv[0]);
 
     ret = parse_options(argc, argv);
 
-    ret2 = set_locale_env(Opt.LocaleName);	/* set LANG, LC_ALL, msg cat */
+    set_locale_env(Opt.LocaleName);	/* set LANG, LC_ALL, msg cat */
 	/* get_user_environ() does check ErrNoLocale */
 
     if (do_usage) {	/* '-help' option */
@@ -226,6 +225,8 @@ static int	IsNoError(ximsError error)
 	case ErrNoSelectionFile: case ErrNoSelection: case ErrSaveSelection:
 	case ErrDisabled:
 		return True;
+	default:
+		break;
     }
     return False;
 }
@@ -239,6 +240,8 @@ static int	EnvNeeded(ximsError error)
 	/* case ErrImsExecution: case ErrImsAborted: */
 	case ErrOpenResource:	/* case ErrSignaled: */
 		return True;
+	default:
+		break;
     }
     return False;
 }
@@ -254,6 +257,8 @@ static int	ErrMsgDisabled(ximsError error)
 		return (Verbose <= 2);
 	case ErrInvState: case ErrInternal:
 		return (Verbose <= 3);
+	default:
+		break;
     }
     return False;
 }
@@ -265,6 +270,8 @@ int	ErrFilePathNeeded(ximsError error)
 	case ErrMissEntry: case ErrNoExecutable: case ErrImsAborted:
 	case ErrOpenResource:
 		return True;
+	default:
+		break;
     }
     return False;
 }
@@ -276,15 +283,19 @@ int	InWaitingState(void)
     	case State_Finish_Defered:
 	case State_Mode_Done:
 	    return True;
+	default:
+	    break;
     }
     return False;
 }
 
 void	ximsMain(void)
 {
+#ifdef	DEBUG
     static int	call_cnt = 0;
 
     call_cnt++;
+#endif
 
     DPR(("\nximsMain(call_cnt=%d): OpState=%s  OpErrCode=%s[%d]\n",
 		call_cnt, StateName(), error_name(OpErrCode), OpErrCode));
@@ -647,7 +658,7 @@ static int	set_locale_env(char *locale)
 	if (!*buf || strcmp(locale, buf)) {
 	    bp = strcpyx(buf, env_name); *bp++ = '=';
 	    strcpyx(bp, locale);
-	    putenv(bp = NEWSTR(buf));
+	    putenv(bp = NEWSTR(&buf[0]));
 	    FREE(last_lang_env[0]);
 	    last_lang_env[0] = bp;
 	}
@@ -663,7 +674,7 @@ static int	set_locale_env(char *locale)
     if (!*buf2 || strcmp(locale, buf2)) {
 	bp = strcpyx(buf2, env_name); *bp++ = '=';
 	strcpyx(bp, locale);
-	putenv(bp = NEWSTR(buf2));
+	putenv(bp = NEWSTR(&buf2[0]));
 	FREE(last_lang_env[1]);
 	last_lang_env[1] = bp;
     }
@@ -709,7 +720,7 @@ static void	init_command(char *progname)
 {
 	/* globals */
     ProgramName = progname;
-    if (progname = strrchr(progname, '/'))
+    if ((progname = strrchr(progname, '/')))
 	ProgramName = progname + 1;
 #ifdef	unused
     if (strstr(ProgramName, "mode"))		ProgramType = MODE_MODE;

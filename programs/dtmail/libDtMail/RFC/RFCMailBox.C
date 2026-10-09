@@ -167,7 +167,6 @@ static jmp_buf sigbus_env;
  */
 static void	SigBusHandler(LCL_SIG_HANDLER_SIGNATURE);
 static int	isMailGroupSystemMailbox(const char *mailboxPath);
-static int	isInboxMailbox(const char *mailboxPath);
 static char	*getInboxPath(DtMail::Session *session);
 
 /*
@@ -262,7 +261,7 @@ RFCMailBox::RFCMailBox(DtMailEnv & error,
 		       void * client_data,
 		       const char * impl_name)
 : DtMail::MailBox(error, session, space, arg, cb, client_data),
-_msg_list(128), _mappings(4)
+_mappings(4), _msg_list(128)
 {
     // We are using a condition to block any threads from
     // trying to use this object until it is open. We will
@@ -472,7 +471,7 @@ static int isMailGroupSystemMailbox(const char * mailboxPath)
 static char *getMailspoolPath(DtMail::Session *session)
 {
     DtMailEnv		 error;
-    DtMail::MailRc	*mailrc = session->mailRc(error);
+    session->mailRc(error);
     char		*mailspoolpath = 0;
     char		*syspath = new char[MAXPATHLEN];
     passwd		 pw;
@@ -556,9 +555,8 @@ RFCMailBox::alterPageMappingAdvice(MapRegion *map, int advice)
 {
   int me = _mappings.length();
   for (int m = 0; m < me; m++) {
-    MapRegion *map_t = _mappings[m];
-
 #if !defined(__linux__) && !defined(sun)
+    MapRegion *map_t = _mappings[m];
     // no madvise on these systems
     if (map_t == map || map == (MapRegion *)-1)
       madvise(map_t->map_region, (size_t) map_t->map_size, advice);
@@ -638,7 +636,7 @@ void
 RFCMailBox::append(DtMailEnv &error, char *buf, int len)
 {
     int		status;
-    off_t	end = lseek(_fd, 0, SEEK_END);
+    lseek(_fd, 0, SEEK_END);
 
     // Add a new-line at the end to distinguish separate messages.
     status = SafeWrite(_fd, buf, len);
@@ -1146,7 +1144,7 @@ RFCMailBox::copyMessage(DtMailEnv & error,
     
     int status;
     
-    off_t end = lseek(_fd, 0, SEEK_END);
+    lseek(_fd, 0, SEEK_END);
     status = SafeWrite(_fd, rfc_msg->_msg_start, 
 	rfc_msg->_msg_end - rfc_msg->_msg_start + 1);
     
@@ -1567,7 +1565,7 @@ RFCMailBox::realFileSize(DtMailEnv & error, struct stat * stat_buf)
 
     error_code = SafeFStat(_fd, &buf);
     if (error_code >= 0) {
-	if (buf.st_nlink != _links) {
+	if (buf.st_nlink != (nlink_t) _links) {
 	    mode_t	old_mode;
 
     	    DEBUG_PRINTF( ("realFileSize:  (buf.st_nlink!=_links\n") );
@@ -1898,7 +1896,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	    pname, err_phase,
 	    map->map_size, PROT_READ, flags, _fd, _real_path, map->offset,
 	    map->map_region, errno);
-	writeToDumpFile(
+      writeToDumpFile(
 	    "%s(%d): statbuf: ino=%d, dev=%d, nlink=%d, size=%ld\n",
 	    pname, err_phase,
 	    statbuf.st_ino, statbuf.st_dev, statbuf.st_nlink, statbuf.st_size);
@@ -1916,7 +1914,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	if (_errorLogging)
 	{
 	  for (i=(int)offset_from_map, cnt=0;
-	       i<map->file_size+offset_from_map;
+	       (unsigned long) i<map->file_size+offset_from_map;
 	       i++)
 	    if (map->map_region[i] == '\0') cnt++;
 
@@ -2039,7 +2037,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
     lseek(_fd, (off_t) map->offset, SEEK_SET);
     size_t bytesToRead = (size_t)(statbuf.st_size - map->offset);
     ssize_t readResults = SafeRead(_fd, map->map_region, bytesToRead);
-    if ( (readResults != bytesToRead) ||
+    if ( ((size_t) readResults != bytesToRead) ||
 	 (readResults && (map->map_region[0] == '\0')) ||
 	 (readResults && (map->map_region[readResults-1] == '\0')) ||
 	 (readResults && (map->map_region[offset_from_map] == '\0')) ||
@@ -2052,7 +2050,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	    "%s(%d):  SafeRead(%d(%s), 0x%08lx, %d) == %d, errno == %d\n",
 	    pname, err_phase, _fd, _real_path, map->map_region, bytesToRead,
 	    readResults, errno);
-        writeToDumpFile(
+      writeToDumpFile(
 	    "%s(%d):  stat buf: ino=%d, dev=%d, nlink=%d, size=%ld\n",
 	    pname, err_phase, statbuf.st_ino, statbuf.st_dev,
 	    statbuf.st_nlink, statbuf.st_size);
@@ -2232,9 +2230,8 @@ RFCMailBox::parseFile(DtMailEnv & error, int map_slot)
     // We will give the kernel a clue what we are up to and perhaps
     // help our parsing time in the process.
     //
-    unsigned long pagelimit = _mappings[map_slot]->map_size;
-
 #if !defined(__linux__) && !defined(sun)
+    unsigned long pagelimit = _mappings[map_slot]->map_size;
     // no madvise; don't use optimization
     madvise(
 	(char *)_mappings[map_slot]->map_region,
@@ -2757,7 +2754,7 @@ RFCMailBox::NewMailEvent(
 
     MutexLock lock_object(_obj_mutex);
 
-    if (size == _file_size)
+    if ((unsigned long) size == _file_size)
     {
         _session->setBusyState(error1, DtMailBusyState_NotBusy);
         if (_hide_access_events!=DTM_TRUE && info.st_atime<=info.st_mtime)
@@ -2765,7 +2762,7 @@ RFCMailBox::NewMailEvent(
 
         return;
     }
-    else if (size > _file_size)
+    else if ((unsigned long) size > _file_size)
     {
 	incorporate(error, already_locked);
         if (_hide_access_events!=DTM_TRUE && info.st_atime<=info.st_mtime)
@@ -3422,12 +3419,6 @@ RFCMailBox::writeMailBox(DtMailEnv &error, DtMailBoolean hide_access)
 
   assert(map->file_size == bytesWritten);
 
-  DtMailBoolean file_grew;
-  if (map->file_size > _file_size)
-    file_grew = DTM_TRUE;
-  else 
-    file_grew = DTM_FALSE;
-
   _file_size = map->file_size;
 
   struct stat info;
@@ -3441,7 +3432,7 @@ RFCMailBox::writeMailBox(DtMailEnv &error, DtMailBoolean hide_access)
   }
   else
   {
-      if (info.st_size != _file_size)
+      if ((unsigned long) info.st_size != _file_size)
       {
           error.logError(DTM_TRUE,
 		     "%s: new mailbox size not consistent with expected size = %d\nfstat: st_ino = %d, st_dev = %d, st_nlink = %d, st_size = %ld\n",
@@ -4862,7 +4853,6 @@ RFCMailBox::createMailRetrievalAgent(char *password)
 {
     DtMailEnv		localError;
     char		*path = _session->expandPath(localError, (char*) _arg);
-    DtMailServer	*server = NULL;
     char		*protocol;
 
     if (! isInboxMailbox(_session, path))

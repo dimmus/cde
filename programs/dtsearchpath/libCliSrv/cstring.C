@@ -89,7 +89,7 @@ char & CString::operator[]
     if (index < 0)
 	return contents[0];
 
-    if (index > strlen(contents))
+    if ((size_t)index > strlen(contents))
 	return contents[strlen(contents)-1];
 
     return contents[index];
@@ -258,9 +258,9 @@ CString CString::copy
     if (isNull())
 	return *this;
 
-    for (int i = 0; i < strlen(delim); i++) {
+    for (int i = 0; (size_t)i < strlen(delim); i++) {
 	char * q;
-	if (q = strchr(contents,delim[i])) {
+	if ((q = strchr(contents,delim[i]))) {
 	    char remember = *q;
 	    *q = 0;
 	    CString result(&contents[start]);
@@ -280,12 +280,12 @@ CString CString::copy
     if (isNull())
 	return *this;
 
-    for (int i = 0; i < strlen(delim1); i++) {
+    for (int i = 0; (size_t)i < strlen(delim1); i++) {
 	char * q;
-	if (q = strchr(contents,delim1[i])) {
-	    for (int j = 0; j < strlen(delim2); j++) {
+	if ((q = strchr(contents,delim1[i]))) {
+	    for (int j = 0; (size_t)j < strlen(delim2); j++) {
 		char * p;
-		if (p = strchr(q+1,delim2[j])) {
+		if ((p = strchr(q+1,delim2[j]))) {
 		    char remember = *p;
 		    *p = 0;
 		    CString result(q+1);
@@ -310,7 +310,7 @@ char * q;
     if (isNull())
 	return *this;
 
-    if (q = strstr(contents,cs))
+    if ((q = strstr(contents,cs)))
 	return CString(q);
 
     return *this;
@@ -405,7 +405,7 @@ int CString::contains
 	search += cs;
 	char *q, *r = 0;
 	char *p = contents;
-	while (q = strstr(p, search.data())) {
+	while ((q = strstr(p, search.data()))) {
 	    r = q + strlen(leader);
 	    p = q + 1;
 	}
@@ -432,7 +432,7 @@ char * q;
     if (isNull())
 	return;
 
-    if (q = strstr(contents,to_be_replaced.data())) {
+    if ((q = strstr(contents,to_be_replaced.data()))) {
 	*q = 0;
 	char * prefix = new char [strlen(contents) + 1];
 	strcpy(prefix,contents);
@@ -464,7 +464,7 @@ int CString::isNull() const
 
 
 CTokenizedString::CTokenizedString()
-	: CString(""), finished(0), cursor(0), delimiter(0)
+	: CString(""), cursor(0), delimiter(0), finished(0)
 {}
 
 
@@ -517,7 +517,7 @@ int i;
 	if (strlen(delimiter) == 1)
 	    q = strchr(cursor,delimiter[0]);
 	else {
-	    for (i = 0; i < strlen(cursor); i++)
+	    for (i = 0; (size_t)i < strlen(cursor); i++)
 		if (strchr(delimiter,cursor[i])) {
 		    q = &cursor[i];
 		    break;

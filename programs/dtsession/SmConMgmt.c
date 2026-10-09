@@ -104,8 +104,8 @@ int clientRunning;
  */
 #if !defined(__linux__)
 static struct nlist namelist[3];
-#endif
 static int freemem_loc, gpgslim_loc, gpgslim, freemem;
+#endif
 static int clientTimeout;
 
 /*
@@ -275,9 +275,6 @@ GetMemoryUtilization(void)
 void 
 WaitForClientMap( void )
 {
-    XtInputMask 	isThere;
-    XEvent 		event;
-    XClientMessageEvent	*cEvent = (XClientMessageEvent *) &event;
     XtIntervalId	clientTimerId;
     
     XtAddEventHandler(smGD.topLevelWid,

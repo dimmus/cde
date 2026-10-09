@@ -168,7 +168,6 @@ menubar_initialize(
 )
 {
     ABObj	iobj;
-    ABObj	module = obj_get_module(obj);
     String  cascades[3];
     int		i;
 

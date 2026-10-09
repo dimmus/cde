@@ -55,10 +55,19 @@ rtable2_clnt.c rtable3_clnt.c rtable4_clnt.c cm_clnt.c:
 	cat EUSinclude > $@
 	rpcgen -l $(@:_clnt.c=.x) | sed -f namechange1.sed | sed -f namechange2.sed >> $@
 
+# rpcgen declares "register int32_t *buf;" in every xdr routine but uses it
+# only in some of them; drop the declaration where it is unused.
+XDR_DROP_UNUSED_BUF = $(AWK) '/^[{]/ { n = 0; used = 0; infn = 1 } \
+	infn { l[++n] = $$0; \
+	       if ($$0 ~ /[^A-Za-z0-9_]buf[^A-Za-z0-9_]/ && $$0 !~ /int32_t \*buf;/) used = 1; \
+	       if ($$0 ~ /^[}]/) { for (i = 1; i <= n; i++) if (used || l[i] !~ /int32_t \*buf;/) print l[i]; infn = 0 } \
+	       next } \
+	{ print }'
+
 rtable2_xdr.c rtable3_xdr.c rtable4_xdr.c agent_xdr.c:
 	$(RM) $@
 	cat EUSinclude > $(@:.x=_xdr.c)
-	rpcgen -c $(@:_xdr.c=.x) | sed -f namechange1.sed | sed -f namechange2.sed >> $(@:.x=_xdr.c)
+	rpcgen -c $(@:_xdr.c=.x) | sed -f namechange1.sed | sed -f namechange2.sed | $(XDR_DROP_UNUSED_BUF) >> $(@:.x=_xdr.c)
 
 rtable4_clnt.c rtable4_xdr.c: rtable4.h namechange1.sed namechange2.sed
 rtable3_clnt.c rtable3_xdr.c: rtable3.h namechange1.sed namechange2.sed

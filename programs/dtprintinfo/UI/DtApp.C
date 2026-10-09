@@ -84,7 +84,6 @@ DtApp::DtApp(char *progname, int *argc, char **argv) :
    save_state = false;
    connect_timeout = 15;
    old_dbsearchpath = NULL;
-   uid_t old_uid;
    single_printer = NULL;
    app_mode = SINGLE_PRINTER;
    char *app_name = MESSAGE(ApplicationName2L);
@@ -302,7 +301,7 @@ DtApp::DtApp(char *progname, int *argc, char **argv) :
 			        MESSAGE(FindAcceleratorL),
 				MESSAGE(FindAcceleratorKeySeq)); 
       find->Order(0);
-      Button *filter = new Button(window->viewMenu, MESSAGE(ModifyShowChoiceL),
+      new Button(window->viewMenu, MESSAGE(ModifyShowChoiceL),
 			          PUSH_BUTTON, ModifyCB, window,
 			          MESSAGE(ModifyShowMnemonicL));
     }
@@ -841,7 +840,7 @@ void DtApp::ActionCB(BaseUI *obj, char *actionReferenceName)
 	 confirm->Visible(true);
 	 boolean answer = confirm->Answer();
 	 delete confirm;
-	 delete title;
+	 delete [] title;
 	 delete [] message;
 	 if (answer == false)
 	    return;
@@ -1267,7 +1266,7 @@ void DtApp::RestoreApp()
    window->setPrefD->Apply();
 
    int interval = 30;
-   if (value = Restore("UpdateInterval"))
+   if ((value = Restore("UpdateInterval")))
     {
       interval = atoi(value);
       if (interval < 5 || interval > 300)
@@ -1298,7 +1297,7 @@ void DtApp::RestoreApp()
 	  }
        }
       UpdateStatusLine();
-      delete attribute;
+      delete [] attribute;
     }
    else
     {
@@ -1342,7 +1341,6 @@ void DtApp::UpdateQueues()
    // Get Print Subsystem children, (these are queues)
    Queue **queues = (Queue **)prt->Children();
 
-   BaseUI *lpdest = NULL;
    char *LPDEST = getenv("LPDEST");
    if (app_mode == SINGLE_PRINTER)
     {

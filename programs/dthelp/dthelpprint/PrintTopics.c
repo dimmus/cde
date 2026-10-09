@@ -430,109 +430,6 @@ int TocNewEntry(
    return 0;        /* RETURN: ok */
 }       /*$END$*/
 
-
-#if DOC
-===================================================================
-$PFUNBEG$:  IconvFile()
-$1LINER$:  Compares cur env and volume and iconv file if necessary 
-$DESCRIPT$:
-$RETURNS$:
-0:  no conversion needed or not possible to determine if needed
-1:  conversion needed & successful
--1: conversion needed and failed
-$ARGS$:
-========================================================$SKIP$=====*/
-#endif /*DOC*/
-
-static
-int IconvFile(
-      _DtHPrOptions * options,
-      VolumeHandle helpVolumeHandle,
-      char * * srcFile)
-{       /*$CODE$*/
-#define CUR_LOCALE    0
-#define CUR_CODESET   1
-#define VOL_LOCALE    2
-#define VOL_CODESET   3
-#define FROM_CODESET  4
-#define TO_CODESET    5
-#define NUMSTRS       6
-
-   int    ret;
-   int    i;
-   char * loc[NUMSTRS];
-   char * destFile = NULL;
-   char * codeset;
-   char   buf[1000];
-
-   for (i=0; i<NUMSTRS; i++) loc[i] = NULL;
-   
-   /* get the normalized current codeset */
-   _DtHelpCeGetLcCtype(&loc[CUR_LOCALE], NULL, &loc[CUR_CODESET]);
-
-   /* get the normalized volume codeset */
-   loc[VOL_LOCALE] = _DtHelpCeGetVolumeLocale(helpVolumeHandle);
-
-   /* codeset begins after the '.'; find it */
-   codeset = NULL;
-   if (    loc[VOL_LOCALE]
-        && _DtHelpCeStrchr(loc[VOL_LOCALE], ".", 1, &codeset) == 0)
-   {
-       codeset++;
-   }
-   loc[VOL_CODESET] = (NULL != codeset ? strdup(codeset) : NULL);
-
-   /* if either locale is NULL or if they are the same string
-      then don't iconv the file */
-   if (   NULL == loc[CUR_CODESET]
-       || NULL == loc[VOL_CODESET]
-       || strcmp(loc[CUR_CODESET],loc[VOL_CODESET]) == 0 )
-   {
-       ret = 0;                   /* RETURN:  no iconv needed/possible */
-       goto cleanup;
-   }
-
-   /* get the source codeset */
-   loc[FROM_CODESET] = strdup(loc[VOL_LOCALE]);
-
-   /* get the target codeset */
-   loc[TO_CODESET] = strdup(loc[CUR_LOCALE]);
-
-   /* construct the command line */
-   destFile = _DtHPrCreateTmpFile(TMPFILE_PREFIX,TMPFILE_SUFFIX);
-   if (NULL == destFile)
-   {
-       ret = -1;                   /* error */
-       goto cleanup;
-   }
-
-   sprintf(buf,options->iconvCmdAndArgs,
-                 loc[FROM_CODESET],loc[TO_CODESET],*srcFile, destFile);
-
-   /* do the conversion */
-   if(options->debugHelpPrint) printf("%s\n",buf);
-   ret = system(buf);
-   ret = (ret == 0 ? 1 : -1);    /* 1: success; -1: failure */
-
-   /* if successful conversion, change the src file */
-   if (ret >= 0)
-   {
-      unlink(*srcFile);
-      free(*srcFile);
-      *srcFile = destFile;
-   }
-   else
-   {
-      unlink(destFile);
-   }
-
-cleanup:
-   /* free memory */
-   for (i=0; i<NUMSTRS; i++) if (loc[i]) free(loc[i]);
-
-   return ret;
-} /* count lines */
-
 #define ICONV_INBUF_TYPE	ICONV_CONST char **
 
 #define WORKSIZE 1024*10	/* 10k */
@@ -555,7 +452,6 @@ static void _converter_( iconv_t CD,
     size_t        InBytesLeft;
     char          *OutBuf = NULL;
     size_t        OutBytesLeft = 0;
-    size_t        _OutBytesLeft = 0;
     size_t        iconv_ret;
     size_t        converted_num = 0;
     unsigned long to_len;
@@ -729,7 +625,6 @@ int IconvBuffer(
    int    i;
    char * loc[NUMSTRS];
    char * codeset;
-   char   buf[1000];
    static int isFirst = ~0;
    static iconv_t CD = (iconv_t)-1;
 
@@ -1204,7 +1099,8 @@ void GenHeadFootFormatStr(
        {  /* and replace it with the argref */
           unused = False;
           strcpy(substr, sym->argref);
-          strcpy(substr + strlen(sym->argref), substr + strlen(sym->symbol));
+          memmove(substr + strlen(sym->argref), substr + strlen(sym->symbol),
+                  strlen(substr + strlen(sym->symbol)) + 1);
        }
        /* if unused, add to unused list */
        if (unused) strcat(unusedSyms,sym->argref);
@@ -1300,7 +1196,6 @@ int PrintHeadFootStr(
   char *          formattedStr,
   int             lineCnt)
 {       /*$CODE$*/
-    char * newLine = "\n";
     int    lastValid = 0;
     char   sectNumStr[MAXSECTS * 4 + 5];	/* $SECTNUM */
     char   buf[3000];
@@ -1499,7 +1394,6 @@ int ProcessOneTopic(
 {       /*$CODE$*/
    char * * helpList = NULL;
    char * * ptrToLst;
-   int      lineCount;
    int      availLines;
    char sectNumStr[MAXSECTS * 4 + 5];
 
@@ -2086,7 +1980,6 @@ int ProcessToc(
        wchar_t * wctitle;
        int    lhsWidth;
        int    titlelen;
-       int    fillerChar;
        int    blanksCnt;
 
        /* get the data to print */
@@ -2270,7 +2163,6 @@ int ProcessTopics(
    /* if processing subtopics, start processing at the top */
    if ( processSubTopics )
    {
-      int    offset;
 
       /* get the top topic of the volume */
       ret = _DtHelpCeGetTopTopicId(state->volHandle, &state->currentLocId);
@@ -2487,10 +2379,9 @@ int DoHelpTopicsProcessing(
    /* only do the operation if there are valid files */
    if (validFile)
    {
-      int rv;
       sprintf(next,"> %s", *ret_resultsFile);
       if(options->debugHelpPrint) printf("%s\n",buf);
-      rv = system(buf);
+      system(buf);
    }
    free(buf);
    ret = 0;
@@ -2605,8 +2496,6 @@ int _DtHPrPrintHelpTopic(
   _DtHPrOptions * options)
 {       /*$CODE$*/
    char * printCommand;
-   char   cmdFormat[100];
-   char   prOffsetArg[30];
    char * tmpFile;
    int    status;
    char * path;

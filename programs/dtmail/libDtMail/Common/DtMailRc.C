@@ -863,12 +863,12 @@ DtMail::MailRc::commands(char* iline)
 	    if (line[n] != '\\')
 		break;
 	    line[n++] = ' ';
-	    if (n > LINESIZE - strlen(linebuf) - 1)
+	    if ((size_t) n > LINESIZE - strlen(linebuf) - 1)
 		break;
 	    strcat(linebuf, line);
 	}
 	n = LINESIZE - strlen(linebuf) - 1;
-	if (strlen(line) > n) {
+	if (strlen(line) > (size_t) n) {
 	    fprintf(stderr,
 		    "Line plus continuation line too long:\n\t%s\n\nplus\n\t%s\n",
 		    linebuf, line);
@@ -1364,7 +1364,7 @@ DtMail::MailRc::nalias(char * key, void * data, void * client_data)
 		 + strlen((char *)data) + strlen(" = ") + 1;
 	new_alias = (char *)malloc(m_size);
     
-	sprintf(new_alias, "%s%s = %s",key, white_space, (char *) data);
+	snprintf(new_alias, m_size, "%s%s = %s",key, white_space, (char *) data);
 
       }
     else

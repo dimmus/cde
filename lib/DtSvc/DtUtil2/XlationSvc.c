@@ -2205,9 +2205,9 @@ int _DtXlateGetXlateEnv(
 
       /* cat release version and do a translation on it to a std value */
       /* then convert the std value to a integer */
-      strncpy(version,names.release,sizeof(names.release)-1);
-      version[sizeof(names.release)-1] = EOS;
-      strncat(version,names.version,sizeof(names.version)-1);
+      snprintf(version, sizeof(version), "%.*s%.*s",
+               (int)(sizeof(names.release)-1), names.release,
+               (int)(sizeof(names.version)-1), names.version);
       ret = _DtXlateOpToStdValue(db,names.sysname,0,
                    _DtXLATE_OPER_VERSION,version,&stdVer,NULL);
       if (ret == 0)
@@ -2246,7 +2246,7 @@ int _DtXlateGetXlateEnv(
        ===========================*/
 
 #if !defined(OSMAJORVERSION) && !defined(OSMINORVERSION)
-#warning "OSMAJORVERSION and OSMINORVERSION not defined, assuming 99.0:
+#warning "OSMAJORVERSION and OSMINORVERSION not defined, assuming 99.0"
 #define OSMAJORVERSION 99
 #define OSMINORVERSION 0
 #endif

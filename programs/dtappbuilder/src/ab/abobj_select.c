@@ -71,10 +71,6 @@ const int AB_selected_rect_size = 7;
 **                                                                      **
 **************************************************************************/
 
-static void    	select_feedback(
-               	    ABObj 	selObj,
-		    BOOL  	on
-        	);
 static void	select_footer(
 		    ABObj 	obj,
 		    BOOL  	on
@@ -116,9 +112,6 @@ static void    	select_feedback_redraw(
 **		    		    		    		          **
 **************************************************************************/
 static GC 	  AB_grab_handle_gc;
-static XRectangle rb_rect;
-static Widget     rb_widget; 
-static BOOL	  first_time = TRUE;
 
 
 /*************************************************************************
@@ -135,7 +128,6 @@ abobj_select(
     ABObj obj
 )
 {
-    AB_CONTAINER_TYPE	cont_type;
     ABObj		rootObj = obj_get_root(obj);
     ABObj    		selObj;
 
@@ -185,7 +177,6 @@ abobj_deselect(
     ABObj obj
 )
 {
-    AB_CONTAINER_TYPE	cont_type;
     ABObj		rootObj = obj_get_root(obj);
     ABObj    		selObj;
 
@@ -363,41 +354,6 @@ abobj_sort_sel_list(
 	}
     }
 }
-/*
- * render select feedback for objects which do not have grab handles
- */
-static void
-select_feedback(
-    ABObj selObj,
-    BOOL  on
-)
-{
-    Widget  selWidget;
-    Pixel   contrast;
-
-    selWidget = (Widget)selObj->ui_handle;
-
-    if (selWidget == NULL)
-    {
-        if (util_get_verbosity() > 0)
-            fprintf(stderr, "select_feedback: %s :no selection widget\n",
-		obj_get_name(selObj));
-        return;
-    }
-
-    if (on)
-    {
-	contrast = x_contrast_color(selWidget);
-        XtVaSetValues(selWidget, 
-			XmNborderWidth,   (XtArgVal)2, 
-			XmNborderColor,	  contrast,
-			NULL);
-    }
-    else
-        XtVaSetValues(selWidget, XmNborderWidth,   (XtArgVal)0, NULL);
- 
-}
-
 static void
 select_footer(
     ABObj	selObj,
@@ -636,7 +592,6 @@ monitor_cursor(
 )
 {
     ABObj	     selObj = (ABObj)clientdata;
-    XMotionEvent     *mevent;
     Cursor           resize_cursor;
     RESIZE_DIR       dir;
     static Boolean   cursor_changed = FALSE;
@@ -648,8 +603,6 @@ monitor_cursor(
     {
     	if (event->type != MotionNotify)
             return;
-    	else
-            mevent = (XMotionEvent*)event;
 
     	dir = abobjP_find_resize_direction(selObj, selWidget, event);
     }

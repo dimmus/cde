@@ -148,15 +148,12 @@ abmfP_write_app_res_file(
 			STRING	resFileName
 )
 {
-    int		return_value = 0;
     int		rc = 0;
     assert(obj_is_project(project));
     assert(resFile.file = file);
 
     rc = abmfP_res_file_append_intermediate_files(file, project);
     write_footer(file, resFile.isIntermediate);
-
-    return_value = rc;
 
     return rc;
 }
@@ -233,10 +230,8 @@ abmfP_res_file_merge(
 {
     int		return_value = 0;
     int		rc = 0;
-    long	userSegOff = 0;
     File	mergedFile = NULL;
     int		iChar = 0;
-    int		iLastChar = 0;
     int		i = 0;
     UserSegsRec	vanillaUserSegs;
     UserSegsRec	modifiedUserSegs;
@@ -402,7 +397,6 @@ find_user_seg_begin(File modifiedResFile)
     char	magicLine[256];
     int		magicLineLen = 0;
     int		iChar = 0;
-    int		iLastChar = 0;
     *lineBuf = 0;
     *magicLine = 0;
 
@@ -432,13 +426,11 @@ find_user_seg_begin(File modifiedResFile)
 			    userSegOff = ftell(modifiedResFile);
 			    break;
 			}
-			iLastChar = iChar;
 		    }
 		    lineOff = 0;
 		}
 	    }
 	}
-	iLastChar = iChar;
     }
 
     /*
@@ -451,7 +443,6 @@ find_user_seg_begin(File modifiedResFile)
 	    userSegOff = ERR_EOF;
 	}
     }
-    else if (userSegOff >= 0)
 
     return userSegOff;
 }
@@ -542,7 +533,6 @@ abmfP_get_app_res_file_name(
 			int	nameMax
 )
 {
-    ABObj	project = obj_get_project(obj);
     STRING	fileName = NULL;
 
     strcpy(fileNameOut, obj_get_name(obj));

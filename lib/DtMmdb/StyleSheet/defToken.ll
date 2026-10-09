@@ -1,4 +1,5 @@
 %option noyywrap
+%option nounput
 
 %a 30000
 %e 10000

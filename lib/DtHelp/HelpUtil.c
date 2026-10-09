@@ -856,7 +856,6 @@ int _DtHelpFilterExecCmd(
     char *		     hv_path)
 {     
    ModalMsgDlgCBStruct msgDlgCBStruct;
-   Boolean goodCmd;
    Boolean invalidAlias;
    Boolean execPermitted;
    Boolean queryNeeded;
@@ -869,7 +868,7 @@ int _DtHelpFilterExecCmd(
    Widget  noexecBtn;
    Widget  execBtn;
 
-   goodCmd = _DtHelpFilterExecCmdStr(helpWidget, executionPolicy, 
+   _DtHelpFilterExecCmdStr(helpWidget, executionPolicy, 
                  commandStr, &filteredCmdStr, &invalidAlias, 
                  &execPermitted, &queryNeeded, hv_path);
 
@@ -1000,7 +999,6 @@ void _DtHelpExecFilteredCmd(
     _DtHelpDisplayWidgetStuff * pDisplayStuff,
     _DtHelpCommonHelpStuff * pHelpStuff)
 {     
-   Boolean goodCmd;
    Boolean invalidAlias;
    Boolean execPermitted;
    Boolean queryNeeded;
@@ -1060,10 +1058,12 @@ void _DtHelpExecFilteredCmd(
       the other code is left here, should a change be wished. */
 #if 1
    /* This function runs a filter for policy and alias but posts no dialog  */
-   goodCmd=_DtHelpFilterExecCmdStr(helpWidget, 
+   _DtHelpFilterExecCmdStr(helpWidget, 
               pDisplayStuff->executionPolicy, commandStr, 
                &filteredCmdStr, &invalidAlias, &execPermitted, &queryNeeded, hv_path);
 #else
+   Boolean goodCmd;
+
     /* This function does an synchronous filter; i.e. the code runs a filter
        for policy and alias, and if policy denies exec and the command is
        valid, then posts a modal dialog and waits for the user to decide
@@ -1366,41 +1366,6 @@ static Widget  LocateWidgetId(
 
 
 
-/*****************************************************************************
- * Function:	   Boolean RememberDir(String path)
- *
- * Parameters:		path		Specifies the path to check.
- *
- * Return Value:	Boolean		if the path name is good.
- *
- * Description:	Use the directory caching mechanism to improve performance
- *		by remembering the directories that have already been
- *		stat'ed.
- *
- *****************************************************************************/
-static	Boolean
-RememberDir(String path)
-{
-    int		 result = 0;
-    char        *ptr;
-    struct stat  buf;
-
-    if (path == NULL || *path == '\0')
-	return False;
-
-    if (_DtHelpCeStrrchr(path, "/", MB_CUR_MAX, &ptr) == 0 && ptr != path)
-      {
-	*ptr   = '\0';
-	result = _DtHelpCeCheckAndCacheDir(path);
-	*ptr   = '/';
-      }
-    if (result == 0 && access(path, R_OK) == 0 &&
-				stat(path, &buf) == 0 && S_ISREG(buf.st_mode))
-	return True;
-
-    return False;
-}
-
 /*****************************************************************************
  * Function:	   Boolean _DtHelpResolvePathname(
  *
@@ -2312,7 +2277,6 @@ void _DtHelpSetButtonPositions(
          All buttons are 5% apart. */
       /* This code is specifically written to handle 3 buttons
          and assumes that the first 3 strings are to the ActionBtn */
-   Dimension minWidthWithSpace = 0;
    Dimension borderWidth = 0;
    Dimension sumWidth = 0;
    Dimension leftPos = 0;
@@ -2352,8 +2316,6 @@ void _DtHelpSetButtonPositions(
 
    /* calc the space */
    sumWidth = maxBtnWidth * numBtns;
-   minWidthWithSpace = sumWidth + minBetweenBtnSpace * (numBtns * 2);
-   if (minWidthWithSpace > minWidthWithSpace) minFormWidth = minWidthWithSpace;
    spaceWidth = ((int)(minFormWidth - sumWidth) / (numBtns * 2));
 
    /* scale pixels to percent */

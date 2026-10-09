@@ -141,7 +141,7 @@ void ** _DtCmGetHash(void * t, const unsigned char * key)
   hash_entry * new;
 
   if(tbl->hash_type == String_Key)
-    tmp = tbl->table[bucket = hash_string(key, tbl->size)];
+    tmp = tbl->table[bucket = hash_string((const char *)key, tbl->size)];
   else
     tmp = tbl->table[bucket = abs((long)key) % tbl->size];
 
@@ -189,7 +189,7 @@ void ** _DtCmFindHash(void * t, const unsigned char * key)
 
   if(tbl->hash_type == String_Key)
     {
-      tmp = tbl->table[hash_string(key, tbl->size)];
+      tmp = tbl->table[hash_string((const char *)key, tbl->size)];
       for(;tmp!=NULL; tmp = tmp->next_entry)
 	if(!strcmp((char *)tmp->key, (char *)key))
 	  return((void *)&tmp->data);

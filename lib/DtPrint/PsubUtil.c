@@ -75,10 +75,12 @@ static int SpanNonWhitespace(
 			     char* string);
 static int SpanWhitespace(
 			  char* string);
+#if 0 && defined(PRINTING_SUPPORTED)
 static int StringToCompoundText(
 				Display* display,
 				char** compound_text,
 				const char* string);
+#endif /* PRINTING_SUPPORTED */
 static Boolean TrimWhitespace(
 			      String s);
 
@@ -290,6 +292,7 @@ SpanWhitespace(char* string)
     return ptr - string;
 }
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: StringToCompoundText
@@ -328,6 +331,7 @@ StringToCompoundText(
 
     return status;
 }
+#endif /* PRINTING_SUPPORTED */
 
 /*
  * ------------------------------------------------------------------------
@@ -664,8 +668,10 @@ _DtPrintGetXpServerList(
 {
     XtResource res_struct;
     String xp_server_list;
+#if 0 && defined(PRINTING_SUPPORTED)
     int error_base;
     int event_base;
+#endif /* PRINTING_SUPPORTED */
     String* server_list;
     int i;
     /*

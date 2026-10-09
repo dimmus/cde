@@ -970,9 +970,7 @@ DrawArrow(
     Widget wid )
 {
 	GC gc, tsGC, bsGC;
-	Pixel tsc, bsc;
 	int ht,st;
-	unsigned int text_height;
 
 	DtMenuButtonWidget mb = (DtMenuButtonWidget) wid ;
 	Window win = XtWindow(wid);
@@ -980,10 +978,6 @@ DrawArrow(
 	
 	ht = mb->primitive.highlight_thickness;
 	st = mb->primitive.shadow_thickness;
-	text_height = Lab_TextRect_height(mb);
-
-	tsc =  mb->primitive.top_shadow_color;
-	bsc =  mb->primitive.bottom_shadow_color;
 
 	tsGC = mb->primitive.top_shadow_GC;
 	bsGC = mb->primitive.bottom_shadow_GC;

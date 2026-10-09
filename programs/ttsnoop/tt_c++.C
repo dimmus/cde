@@ -92,6 +92,8 @@ operator<<(
 	    case TT_NOTICE:		string = "TT_NOTICE";		break;
 	    case TT_REQUEST:		string = "TT_REQUEST";		break;
 	    case TT_OFFER:		string = "TT_OFFER";		break;
+	    default:
+	        break;
 	}
 	if (string != 0) {
 		sink << string;
@@ -113,6 +115,8 @@ operator<<(
 	    case TT_IN:			string = "TT_IN";		break;
 	    case TT_OUT:		string = "TT_OUT";		break;
 	    case TT_INOUT:		string = "TT_INOUT";		break;
+	    default:
+	        break;
 	}
 	if (string != 0) {
 		sink << string;
@@ -134,6 +138,8 @@ operator<<(
 	    case TT_OBJECT:		string = "TT_OBJECT";		break;
 	    case TT_HANDLER:		string = "TT_HANDLER";		break;
 	    case TT_OTYPE:		string = "TT_OTYPE";		break;
+	    default:
+	        break;
 	}
 	if (string != 0) {
 		sink << string;
@@ -153,6 +159,8 @@ operator<<(
 	switch (action) {
 	    case TT_CALLBACK_CONTINUE:	string = "TT_CALLBACK_CONTINUE";break;
 	    case TT_CALLBACK_PROCESSED:	string = "TT_CALLBACK_PROCESSED";break;
+	    default:
+	        break;
 	}
 	if (string != 0) {
 		sink << string;
@@ -196,6 +204,8 @@ tt_message_copy(
 			tt_message_bcontext_set( msg2, slot, bval, len );
 			tt_free( (caddr_t)bval );
 			break;
+		    default:
+			break;
 		}
 		tt_free( slot );
 	}
@@ -220,6 +230,8 @@ tt_message_copy(
 			tt_message_arg_bval( msg1, arg, &bval, &len );
 			tt_message_barg_add( msg2, mode, vtype, bval, len );
 			tt_free( (caddr_t)bval );
+			break;
+		    default:
 			break;
 		}
 		tt_free( vtype );

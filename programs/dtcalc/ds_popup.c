@@ -168,7 +168,6 @@ _DtChildPosition(
    if(space <= 0)
    {
       pos = posRight;
-      sWidth - (pX + pWidth + myWidth);
       if (pX - myWidth > space)
       {
          pos = posLeft;

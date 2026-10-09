@@ -123,8 +123,8 @@ MailRetrievalOptions::MailRetrievalOptions (
 {
     DtMail::Session	*d_session = theRoamApp.session()->session();
     PropUiItem		*pui = (PropUiItem  *) NULL;
-    Widget		*menu_buttons, w;
-    int			n, nitems;
+    Widget		w;
+    int			nitems;
     char		**strings;
     void		**data;
     XmString		xms;
@@ -773,7 +773,6 @@ MailRetrievalOptions::~MailRetrievalOptions (void)
 {
     int i;
     PropUiItem		*pui;;
-    IndexedOptionMenu	*iom;
 
     if (_propui_array)
     {
@@ -805,7 +804,6 @@ MailRetrievalOptions::isValidInboxPath(PropUiItem* pui, void* data)
     char		*s, *t, *tmp;
     char		*expanded_path = NULL;
     Widget		text;
-    int			status;
 
     text = pui->getWidget();
     if (text) inbox_path = XmTextFieldGetString(text);
@@ -945,10 +943,10 @@ MailRetrievalOptions::rememberPasswordChangedCB(
 {
     MailRetrievalOptions
 		*mro = (MailRetrievalOptions*) client_data;
+#if 0
     XmToggleButtonCallbackStruct
 		*cbs = (XmToggleButtonCallbackStruct*) call_data;
 
-#if 0
     if (XmSET == cbs->set)
     {
 	XtVaSetValues(mro->_password_label, XmNsensitive, True, NULL);
@@ -976,7 +974,7 @@ MailRetrievalOptions::retrievalTBSValueChangedCB(
 		*cbs = (XmToggleButtonCallbackStruct*) call_data;
 
     int		i;
-    Widget	opt, tb;
+    Widget	tb;
 
     if (XmUNSET == cbs->set)
     {
@@ -991,6 +989,7 @@ MailRetrievalOptions::retrievalTBSValueChangedCB(
     }
 
 #if 0
+    Widget	opt;
     if (w == mro->_system_tb)
     {
         for (i=0; i<mro->_server_options->length(); i++)

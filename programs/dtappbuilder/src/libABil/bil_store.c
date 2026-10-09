@@ -776,6 +776,8 @@ get_object_attrs(
                 returnAttrs = attrs;
             }
 	    break;
+	    default:
+	        break;
 	}
     }
     else	
@@ -1059,6 +1061,8 @@ get_object_attrs(
                     returnAttrs = attrs;
 		}
 		break;
+		default:
+		    break;
 	    }
         }
 	break;
@@ -1623,6 +1627,9 @@ get_object_attrs(
 		returnAttrs = attrs;
 	}
 	break;
+
+	default:
+	break;
 	}
     } /* !AB_TYPE_ITEM */
 
@@ -2019,6 +2026,8 @@ store_attribute(
 		case AB_TYPE_LABEL:
 		    abio_puts(outFile, bilP_alignment_to_string(obj_get_label_alignment(obj)));
 		    break;
+		default:
+		    break;
 	    }
 	    break;
 
@@ -2203,6 +2212,8 @@ store_attribute(
 		case AB_FUNC_CODE_FRAG:
 		    abio_put_string(outFile, obj_get_func_code(obj));
 		    break;
+		default:
+		    break;
 	    }
 	    break;
 	}
@@ -2250,6 +2261,8 @@ store_attribute(
 		    case AB_FUNC_HELP_VOLUME:
 		        abio_puts(outFile, get_from_name(obj));
                         break;
+		    default:
+                        break;
             	}  /* End Switch */
 	    }
 	    break;
@@ -2288,6 +2301,8 @@ store_attribute(
 	      case AB_FUNC_ON_ITEM_HELP:
 	      case AB_FUNC_HELP_VOLUME:
 		break;
+	      default:
+		break;
 	    }
 	    break;
 	}
@@ -2321,6 +2336,8 @@ store_attribute(
 			    abio_put_string(outFile, 
 				obj_get_arg_string(obj));
 			}
+			break;
+		    default:
 			break;
 		}
 	    }
@@ -2387,6 +2404,8 @@ store_attribute(
 		case AB_ATTACH_POINT:
 		case AB_ATTACH_NONE:
 		    abio_put_integer(outFile, 0);
+		    break;
+                default:
 		    break;
             }
 	    abio_putc(outFile, ' ');
@@ -2934,6 +2953,8 @@ bilP_write_tree_conn_objs(
 	    case AB_FUNC_HELP_VOLUME:
 		store_action(outFile, action_obj, save_type);
 		break;
+	    default:
+		break;
 	}
     }
     return 0;
@@ -3033,9 +3054,7 @@ bil_save_tree(
 )
 {
     int		return_value = OK;
-    STRING	errmsg = NULL;
     FILE	*bilOutFile= NULL;
-    int		filesWritten = 0;
     STRING	old_file = NULL;
     int		old_file_len = 0;
 
@@ -3229,7 +3248,6 @@ bilP_obj_verify(
 {
     int			rc = 0;			/* return code */
     AB_OBJECT_TYPE	type = AB_TYPE_UNDEF;
-    ABObj		project = NULL;
     char		name[1024];
     *name = 0;
 
@@ -3241,8 +3259,6 @@ bilP_obj_verify(
     {
 	return rc;
     }
-
-    project = obj_get_project(obj);
 
     /* Check object type */
     type = obj_get_type(obj);
@@ -3463,6 +3479,8 @@ bilP_obj_verify(
 			return bad_obj(obj, "user code");
 		    }
 		    break;
+		default:
+		    break;
 	    }
 
 	    if (obj_get_from(obj) == NULL)
@@ -3579,7 +3597,6 @@ bilP_obj_verify(
     if (obj_is_window(obj))
     {
 	ABObj	parent = obj_get_parent(obj);
-	ABObj	root_window = obj_get_root_window(project);
 	ABObj	win_parent = obj_get_win_parent(obj);
 
 	if (!obj_is_module(parent))
@@ -3657,6 +3674,8 @@ attachment_is_ok(
 	    if (obj_verify(attach_obj) < 0) 
 	        attachment_ok = FALSE;
 	break;
+	default:
+	    break;
     }
 
     return (attachment_ok);

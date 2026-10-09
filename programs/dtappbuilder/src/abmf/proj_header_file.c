@@ -161,7 +161,6 @@ write_user_or_auto_decls(
     AB_TRAVERSAL        trav;
     ABObj               action = NULL;
     AB_ACTION_INFO     *actinfo = NULL;
-    STRING              func_name = NULL;
 
     for (trav_open(&trav, project, AB_TRAV_ACTIONS);
 	 (action = trav_next(&trav)) != NULL;)
@@ -179,7 +178,6 @@ write_user_or_auto_decls(
 	}
 
 	actinfo = &(action->info.action);
-	func_name = abmfP_get_action_name(action);
 	if (!util_xor(actinfo->auto_named, auto_named))
 	{
 	    abmfP_write_action_func_decl(genCodeInfo, action);

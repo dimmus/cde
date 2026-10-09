@@ -87,32 +87,6 @@ extern int	debugging_loadlang;
 #define UNMALLOC(ptr)  if(ptr){free(ptr);ptr=NULL;}
 
 
-/********************************/
-/*				*/
-/*	   dump_dblk		*/
-/*				*/
-/********************************/
-/* Dumps values from passed dblk.
- * Used only for debugging initialization.
- */
-static void     dump_dblk (char *msgprefix, DBLK *d)
-{
-    int		i;
-    fprintf (aa_stderr, "%s: DBLK v#%d name='%s' label='%s', path='%s'\n",
-	NULLORSTR (msgprefix), d->vistano, NULLORSTR (d->name),
-	NULLORSTR (d->label), NULLORSTR (d->path));
-    fprintf (aa_stderr, " mx=%d kt=", d->maxhits);
-    for (i = 0; i < d->ktcount; i++) {
-	fputc (' ', aa_stderr);
-	if (d->keytypes[i].is_selected)
-	    fputc ('*', aa_stderr);
-	fputc (d->keytypes[i].ktchar, aa_stderr);
-    }
-    fputc ('\n', aa_stderr);
-    return;
-}  /* dump_dblk() */
-
-
 /************************************************/
 /*						*/
 /*		  oe_initialize			*/
@@ -290,6 +264,7 @@ DELETE_DB:
         struct tm 	*time_ptr;
 	_Xltimeparams	localtime_buf;
 
+	(void) localtime_buf;	/* unused unless XTHREADS */
 	if (*OE_expiration != 0)
 	  {
 	    time_ptr = _XLocaltime(OE_expiration, localtime_buf);

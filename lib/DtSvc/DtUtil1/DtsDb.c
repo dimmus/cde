@@ -111,9 +111,7 @@ void
 _DtDtsDbPrint(FILE *org_fd)
 {
 	int		db;
-	int		rec;
 	DtDtsDbDatabase	*db_ptr;
-	DtDtsDbRecord	*rec_ptr;
 	FILE		*fd = org_fd;
 
 	_DtSvcProcessLock();

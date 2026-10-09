@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)tempbr.c 1.48 95/03/28 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <Xm/Xm.h>
@@ -87,7 +83,6 @@ static  char sccsid[] = "@(#)tempbr.c 1.48 95/03/28 Copyr 1991 Sun Microsystems,
 #endif
 
 static void tb_cancel_cb();
-static void tb_close_cb();
 static void tempbr_show_cb(Widget w, XtPointer data, XtPointer cbs);
 #if defined(__linux__)
 #include <string.h>
@@ -161,7 +156,9 @@ tempbr_show_cb(Widget w, XtPointer data, XtPointer cbs)
 	char *name;
 	Tempbr	*tb = (Tempbr *)data;
 	char msg_buf[256];
+#ifdef FNS
 	char buf[256];
+#endif
 
 	if ((name = XmTextGetString(tb->name_text)) == NULL) {
 		return;
@@ -414,12 +411,3 @@ tb_cancel_cb(
         return;
 }
 
-static void
-tb_close_cb(Widget w, XtPointer data, XtPointer cbs)
-{
-	Tempbr	*tb = (Tempbr *)data;
-
-	XtPopdown(tb->frame);
-
-	return;
-}

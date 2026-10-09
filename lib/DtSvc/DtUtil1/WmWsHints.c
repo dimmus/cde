@@ -163,7 +163,6 @@ _DtWsmGetWorkspaceHints(
         Window window,
         DtWorkspaceHints **ppWsHints)
 {
-    unsigned int iSizeWsHints;
     Atom property;
     DtWorkspaceHints *pWsH;
     long *pP = NULL;

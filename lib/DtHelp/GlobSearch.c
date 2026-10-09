@@ -1510,7 +1510,6 @@ static int VolHitsUndisplay (
    _DtHelpGlobSrchHit * hit;
    Boolean           nonVisibleItems;
    int               listPos = vol->startPosition; /* vol item position */
-   int               itemCnt;
    int               curDelPos;
    int               undisItemCnt;
    int               visItemCnt;
@@ -1546,7 +1545,7 @@ static int VolHitsUndisplay (
    if (nonVisibleItems)
    {  /* delete all items with a position > topNonVisPos */
       curDelPos = listPos + 1;   /* starting position */
-      for ( hit = vol->hitListHead, itemCnt = 0; 
+      for ( hit = vol->hitListHead; 
             NULL != hit;
             hit = hit->next )
       {
@@ -1563,7 +1562,7 @@ static int VolHitsUndisplay (
          XmListDeletePos(hw->help_dialog.srch.resultList, curDelPos);
          /* undisplay any topics */
          if ( hit->topicsDisplayed )
-            itemCnt += HitTopicsUndisplay(hw,file,hit,curDelPos);
+            HitTopicsUndisplay(hw,file,hit,curDelPos);
       }
    } /* if non visible items */
 
@@ -1575,7 +1574,7 @@ static int VolHitsUndisplay (
       at listPos+1. */
  
    curDelPos = listPos + 1;   /* starting position */
-   for ( hit = vol->hitListHead, itemCnt = 0; 
+   for ( hit = vol->hitListHead; 
          (NULL != hit) && (curDelPos < topNonVisPos);
          hit = hit->next )
    {
@@ -4275,12 +4274,11 @@ static void CreateGlobSrchDialog(
    XtTranslations btnTransTable;
    /* XtTranslations listTransTable; */
    /* XtTranslations mgrTransTable; */
-   Boolean        curVolAvailable;
    int            n;
    Arg            args[20];
 
    /* get state of the volume */
-   curVolAvailable = VolumeHasIndexP (
+   VolumeHasIndexP (
                           hw->help_dialog.srch.srchSources,
                           hw->help_dialog.display.helpType,
                           hw->help_dialog.display.helpVolume);

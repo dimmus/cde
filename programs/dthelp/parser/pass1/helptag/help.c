@@ -250,10 +250,6 @@ else
 /* This procedure starts a CHAPTER */
 void chapstart(M_WCHAR *id)
 {
-M_WCHAR *p, *q, *wc;
-int i;
-char *mbyte, *pc;
-int   length;
 
 char *chapterPrefixString =
   GetDefaultHeaderString("ChapterElementDefaultHeadingString",
@@ -350,7 +346,7 @@ static int mb_getqualified(char *qualname, char *unqualname)
 {
 FILE *f;
 char fn[FNAMELEN];
-char tokstr [ 20 ], *gp, *p, *pp, *fnp, curdir[FNAMELEN-1];
+char tokstr [ 20 ], *gp, *p, *pp, *fnp;
 int roomleft = FNAMELEN - 1;
 
 if (!unqualname)
@@ -645,7 +641,7 @@ int	 count, metaCount;
 char	*item_id;
 char	 label_id[SDLNAMESIZ+10];
 int	 listtype;
-char	*type;
+char	*type = NULL;
 char	*loose;
 char	*first;
 LOGICAL  isBullet, isLoose, isFirst;
@@ -765,7 +761,7 @@ if (listtype == ORDER)
 	    type = alphaString;
 	    break;
 	case ARABIC:
-	    if (metaCount = (count / 100))
+	    if ((metaCount = (count / 100)))
 		strncat(orderString, &numbers[metaCount], 1);
 	    if (metaCount || ((count / 10) % 10))
 		strncat(orderString, &numbers[(count / 10) % 10], 1);
@@ -920,8 +916,7 @@ void starthelpnode(M_WCHAR *ssi,
 		   M_WCHAR *id,
 		   int	    level)
 {
-int i;
-char *mbyte, *mb_ssi;
+char *mb_ssi;
 char mb_nodeid[NODEID_LENGTH+1], nodenum[32];
 
 if (outfile != m_outfile)
@@ -1041,7 +1036,6 @@ void StartList(M_WCHAR *type,
 LIST *nextlist;
 CONTCHAIN *chain;
 CONTCHAIN *xchain;
-M_WCHAR *wc;
 char *mb_spacing;
 static char def_spacing[]  = "LOOSE";
 char *list_type;
@@ -1180,7 +1174,6 @@ void EndList(void)
 {
 LIST *curlist ;
 CONTCHAIN *chain, *xchain ;
-char *ncols;
 
 curlist = lastlist->lastlist ;
 
@@ -1219,13 +1212,9 @@ M_WCHAR *content;
 unsigned char wheredef;
 M_WCHAR *name;
 M_WCHAR *qfile;
-LOGICAL icon;
-SEARCH *searchp;
 char *p;
 int ic;
-int i;
 M_WCHAR wsl;
-M_WCHAR *wc;
 
 /* Check .XRF file */
 strcpy(helpext, ".xrh");
@@ -1273,11 +1262,10 @@ m_openchk(&indexfp, helpbase, "wb");
 strcpy(helpext, ".snb");
 m_openchk(&snbfp, helpbase, "wb");
 
-while (name = m_cyclent(init, &type, &content, &wheredef))
+while ((name = m_cyclent(init, &type, &content, &wheredef)))
     {
     init = FALSE;
     qfile = NULL;
-    icon = FALSE;
 
     if (type == M_SYSTEM)
 	qfile = searchforfile(content);
@@ -1762,7 +1750,7 @@ M_WCHAR *p;
 M_WCHAR  dterm[MAXTERM+1];
 M_WCHAR  wnl, wsp;
 char     buffer[BIGBUF];
-int	 idn;
+int	 idn = 0;
 
 if (!(m_mblevel("HEAD")       ||
       m_mblevel("EXAMPLESEG") ||
@@ -2492,7 +2480,6 @@ unsigned char wheredef;
 M_WCHAR **content;
 M_WCHAR  *name;
 char	 *mb_content;
-M_WCHAR  *newContent;
 static char mb_newContent[] = "<SPC NAME=\"[123456]\">";
 
 name = CycleEnt(TRUE, &type, &content, &wheredef);
@@ -2516,7 +2503,7 @@ do  {
 	m_free(mb_content, "multi-byte SDATA entity content");
 	}
     }
-while (name = CycleEnt(FALSE, &type, &content, &wheredef));
+while ((name = CycleEnt(FALSE, &type, &content, &wheredef)));
 }
 
 

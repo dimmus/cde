@@ -230,15 +230,7 @@ PrintSetupCreate(
 		XtCallbackProc setupCB, XtPointer setupClosure
 		)
 {
-    Widget	w;
-    XmString	xms;
-    unsigned char is_set;
     PrintSetup	*pSetup;
-    Widget	*menu_buttons;
-    int		nitems;
-    char	**strings;
-    void	**data;
-    int		i;
 
     pSetup = (PrintSetup *) XtMalloc( sizeof(PrintSetup) );
     pSetup->parent = parent;
@@ -614,7 +606,6 @@ _psUiToSetup(PrintSetup *pSetup)
     Widget		frame, w;
     PrintOptions	*pOption;
     char		*marginSpec;
-    Boolean		error = FALSE;
 
     if (pSetup == NULL ||
 	pSetup->dtprintSetup == NULL ||
@@ -684,16 +675,13 @@ _psUiToSetup(PrintSetup *pSetup)
 static Boolean
 _psUiSpecsAreValid(PrintSetup *pSetup)
 {
-    unsigned char	isSet;
     Widget		frame, w;
-    PrintOptions	*pOption;
     char		*marginSpec;
 
     if (pSetup == NULL ||
 	pSetup->dtprintSetup == NULL ||
 	pSetup->widgets == NULL)
       return 0;
-    pOption = &pSetup->options;
 
     frame = pSetup->widgets->marginFrame;
 
@@ -918,9 +906,7 @@ _psCreatePrintSetupDialog(Widget parent, Editor *pPad)
     Arg		args[2];
     int		nargs;
     psWidgets	*widgets;
-    Widget	w;
     XmString	xms;
-    unsigned char is_set;
     int		nitems;
     char	**strings;
     void	**data;
@@ -1190,7 +1176,6 @@ _psPrintSetupPrintCB(
 		XtPointer call_data)
 {
     PrintSetup	*pSetup = (PrintSetup*) client_data;
-    Boolean	error = FALSE;
 
     if (! _psUiSpecsAreValid(pSetup)) return;
 

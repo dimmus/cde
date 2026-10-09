@@ -188,7 +188,6 @@ void huff::calculate_code()
 
 ostream& huff::print_alphabet(ostream& out)
 {
-   unsigned long total_uncmp = 0;
    unsigned long int total_cmp = 0;
 
    for (unsigned int i=0; i<cts; i++ ) {
@@ -196,7 +195,6 @@ ostream& huff::print_alphabet(ostream& out)
       if ( e_units[i] == 0 )
          continue;
  
-      total_uncmp += (e_units[i] -> word -> size()) * (e_units[i] -> freq); 
       total_cmp += (e_units[i] -> bits) * (e_units[i] -> freq); 
 
       out << *(e_units[i] -> word) << ":" << e_units[i]->bits << "\n";

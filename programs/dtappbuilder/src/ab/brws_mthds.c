@@ -235,14 +235,7 @@ static VNode		get_child_of_proj(
     			    int		which_child
 			);
 
-static int		get_num_children_ui(
-                            VNode bnode
-		        );
 
-static ViewerNode	*get_child_ui(
-                            VNode	bnode,
-                            int		which_child
-                        );
 
 static unsigned long		get_toplevel_drawarea(
 				    Vwr		v
@@ -354,14 +347,7 @@ static void		render_node_bbox(
                             ViewerNode	*node
                         );
 
-static void		draw_zoom_in(
-			    Vwr	 	b,
-			    VNode	node
-			);
 
-static void		draw_zoom_out(
-			    Vwr		b
-			);
 
 static void		draw_collapsed_feedback(
 			    VNode	node
@@ -650,7 +636,7 @@ init_proj_vnode(
     /*
      * If a projwin vnode already exists, return it.
      */
-    if (cur_node = (*m->get_viewer_data)(obj))
+    if ((cur_node = (*m->get_viewer_data)(obj)))
 	return (cur_node);
 
     props = aob_browser_properties(b);
@@ -961,7 +947,6 @@ free_node(
     VNode	prev,
 		next;
     VMethods	m;
-    int		i;
 
     if (!vnode || !obj_data)
 	return;
@@ -997,7 +982,6 @@ free_elements(
     ViewerNode	*vnode
 )
 {
-    AB_OBJ		*obj;
     ViewerNodeElm	*elm;
     VElmMethods		*elm_methods;
     int			i;
@@ -1007,7 +991,6 @@ free_elements(
 		!vnode->elements || !vnode->elements)
 	return;
 
-    obj = (AB_OBJ *)vnode->obj_data;
     elm = vnode->elements;
     elm_methods = vnode->elm_methods;
 
@@ -1120,7 +1103,6 @@ insert_projview_tree
     			browsed_module = NULL,
         		insert_module = NULL,
     			cur_obj;
-    Vwr			b_list;
     AB_TRAVERSAL	trav;
     VNode		bnode,
 			module_node;
@@ -1285,7 +1267,6 @@ insert_proj_tree
 )
 {
     AB_OBJ		*root = (AB_OBJ *)obj_data;
-    Vwr			b_list;
     AB_TRAVERSAL	trav;
     AB_OBJ		*cur_obj;
     VNode		bnode;
@@ -1346,7 +1327,6 @@ insert_entire_tree
     			browsed_module = NULL,
     			insert_module = NULL,
     			cur_obj;
-    Viewer		*b_list;
     VNode		bnode,
 			module_node;
     ViewerMethods	*m;
@@ -1510,7 +1490,6 @@ remove_tree
 )
 {
     AB_OBJ		*root = (AB_OBJ *)obj_data;
-    Vwr			b_list;
     AB_TRAVERSAL	trav;
     AB_OBJ		*cur_obj;
     ViewerMethods	*m;
@@ -1784,64 +1763,6 @@ get_salient_child(
     return(child_bnode);
 }
 
-static BOOL
-has_ui
-(
-    AB_OBJ	*obj
-)
-{
-    if (obj_is_project(obj) || obj_is_module(obj))
-        return(True);
-
-    if (obj->ui_handle)
-        return(True);
-
-    return(False);
-}
-
-static int
-get_num_children_ui
-(
-    ViewerNode	*bnode
-)
-{
-    AB_OBJ	*obj;
-
-    if (!bnode)
-	return(-1);
-
-    obj = (AB_OBJ *)bnode->obj_data;
-
-    return(obj_get_num_children_cond(obj, has_ui));
-}
-
-static ViewerNode *
-get_child_ui(
-    ViewerNode	*bnode,
-    int			which_child
-)
-{
-    AB_OBJ		*obj,
-			*child;
-    Viewer		*browser;
-    ViewerNode	*child_bnode = NULL;
-
-    if (!bnode)
-	return(NULL);
-
-    obj = (AB_OBJ *)bnode->obj_data;
-    browser = bnode->browser;
-
-    if (!obj || !browser)
-	return (NULL);
-
-    child = obj_get_child_cond(obj, which_child, has_ui);
-
-    child_bnode = aob_find_bnode(child, browser);
-
-    return(child_bnode);
-}
-
 /*
  * Apply the (x, y) offset to all the elements of the passed
  * node
@@ -1955,9 +1876,6 @@ compute_tree
 {
     VNode		top;
     AB_OBJ		*obj;
-    int			i, num_child,
-    			max_x = BRWS_X_ORIGIN,
-			max_y = BRWS_Y_ORIGIN;
 
     if (!b || !b->current_tree)
         return;
@@ -1994,9 +1912,6 @@ compute_matrix
 {
     VNode		top;
     AB_OBJ		*obj;
-    int			i, num_child,
-    			max_x = BRWS_X_ORIGIN,
-			max_y = BRWS_Y_ORIGIN;
     Widget		draw_area;
     XRectangle		w_rect;/* widget width,height,x,y */
 
@@ -2042,7 +1957,6 @@ compute_subtree
 )
 {
     ViewerMethods	*m;
-    AB_OBJ		*obj;
     Viewer		*b;
     int			i,
 			tmp,
@@ -2051,7 +1965,6 @@ compute_subtree
     if (!tree)
         return;
 
-    obj = (AB_OBJ *)tree->obj_data;
     b = tree->browser;
     m = b->methods;
 
@@ -2204,7 +2117,6 @@ compute_submatrix
 )
 {
     ViewerMethods	*m;
-    AB_OBJ		*obj;
     Vwr			b;
     VNode		child;
     BrowserProps	props;
@@ -2218,7 +2130,6 @@ compute_submatrix
     if (!tree)
         return;
 
-    obj = (AB_OBJ *)tree->obj_data;
     b = tree->browser;
     m = b->methods;
     props = aob_browser_properties(b);
@@ -2485,57 +2396,6 @@ compute_node(
 
 }
 
-
-/*
- * compute the coordinates of one collapsed node.
- */
-static void
-compute_collapsed_node(
-    ViewerNode	*node,
-    int			x,
-    int			y
-)
-{
-    Viewer			*b;
-    BrowserUiObjects	*ui;
-    ViewerNodeElm		*elm;
-    XFontStruct			*sm_font;
-    int				elm_shown;
-    int				font_ascent,
-				font_descent,
-				cur_height = 0,
-				cur_width = 0,
-				cur_x_offset,
-				cur_y_offset,
-				i;
-    char			*collapsed_str = ". . .";
-    XCharStruct			overall = {0};
-    int				ascent, descent, direction;
-
-    b = node->browser;
-    ui = (BrowserUiObjects *)b->ui_handle;
-    elm_shown = browser_get_elm_shown(b);
-    sm_font = ui->sm_font;
-    font_ascent = sm_font->max_bounds.ascent;
-    font_descent = sm_font->max_bounds.descent;
-    elm = node->elements;
-
-    /*
-    cur_x_offset = 0;
-    cur_height = cur_y_offset =
-        BRWS_ELM_BBOX_MARGIN + BRWS_ELM_BORDER_WIDTH;
-    */
-    cur_x_offset = cur_y_offset = 0;
-
-    node->x = x;
-    node->y = y;
-
-    XTextExtents(sm_font, collapsed_str, strlen(collapsed_str),
-		&direction, &ascent, &descent, &overall);
-
-    node->height = ascent + descent + BRWS_ELM_BBOX_MARGIN;
-    node->width = overall.width + BRWS_ELM_BBOX_MARGIN;
-}
 
 /*
  * Render module tree
@@ -2854,25 +2714,18 @@ render_node
     Display			*dpy;
     Widget			draw_area;
     Viewer			*b;
-    AB_OBJ			*obj;
     VMethods			m;
     VNode			parent;
     ViewerNodeElm		*elm;
     VElmMethods			*elm_methods;
     int				elm_shown;
-    int				cur_height = 0,
-				cur_width = 0,
-				cur_x_offset = 0,
-				cur_y_offset = 0,
-				i;
+    int				i;
 
     if (!node)
         return;
 
     b = node->browser;
     m = b->methods;
-
-    obj = (AB_OBJ *)node->obj_data;
 
     elm_shown = browser_get_elm_shown(b);
 
@@ -3155,7 +3008,7 @@ locate_node
     {
         VNode	tmp;
 
-        if (tmp = (*m->locate_node)(child, x, y))
+        if ((tmp = (*m->locate_node)(child, x, y)))
             return tmp;
     }
 
@@ -3211,109 +3064,6 @@ locate_elements(
 
 
 /*
- * Draw the zoom out feed back on the canvas.
- */
-static void
-draw_zoom_out
-(
-    Viewer	*b
-)
-{
-    BrowserUiObjects	*ui_handle;
-    int		x, y, width, height;
-    Widget	draw_area;
-
-    draw_area = brws_draw_area(b);
-
-    XtVaGetValues(draw_area,
-                    XtNx, &x,
-                    XtNy, &y,
-                    XtNwidth, &width,
-                    XtNheight, &height,
-                    NULL);
-
-    ui_handle = aob_ui_from_browser(b);
-
-    while (width > 0 || height > 0)
-    {
-        /*
-         * Draw the rectangle.
-         */
-        XDrawRectangle(XtDisplay(draw_area), XtWindow(draw_area),
-			ui_handle->normal_gc, x, y, width, height);
-        XClearArea(XtDisplay(draw_area), XtWindow(draw_area),
-                    x-4, y-4, width+8, height+8, FALSE);
-                    x+=4; y+=4; width-=8; height-=8;
-        if (width < 0)
-            width = 0;
-        if (height < 0)
-            height = 0;
-    }
-}
-
-
-/*
- * Draw the zoom in feedback on the canvas.
- */
-static void
-draw_zoom_in
-(
-    Viewer		*b,
-    ViewerNode	*node
-)
-{
-    BrowserUiObjects	*ui_handle;
-    Widget			draw_area;
-    int				x, y, width, height,
-				canvas_x, canvas_y,
-				canvas_width, canvas_height;
-
-    if (!node)
-        return;
-
-    draw_area = brws_draw_area(b);
-
-    XtVaGetValues(draw_area,
-		XtNx, &canvas_x,
-		XtNy, &canvas_y,
-		XtNwidth, &canvas_width,
-		XtNheight, &canvas_height,
-		NULL);
-
-    x = node->x + node->width/2;
-    y = node->y + node->height/2;
-    width = 2;
-    height = 2;
-
-    ui_handle = aob_ui_from_browser(b);
-
-    while (width < canvas_width || height < canvas_height)
-    {
-        /*
-        * Draw the rectangle.
-        */
-        XDrawRectangle(XtDisplay(draw_area), XtWindow(draw_area),
-			ui_handle->normal_gc, x, y, width, height);
-
-        x-=4; y-=4; width+=8; height+=8;
-        if (width > canvas_width)
-            width = canvas_width;
-        if (height > canvas_height)
-            height = canvas_height;
-        if (x < canvas_x)
-            x = canvas_x;
-        if (y < canvas_y)
-            y = canvas_y;
-
-        /*
-         * Erase the rectangle.
-         */
-        XClearArea(XtDisplay(draw_area), XtWindow(draw_area),
-            x, y, width, height, FALSE);
-    }
-}
-
-/*
  * Draw  bounding box of one node
  */
 static void
@@ -3322,32 +3072,21 @@ render_node_bbox
     ViewerNode	*node
 )
 {
-    XFontStruct			*sm_font;
     Display			*dpy;
     Widget			draw_area;
     Viewer			*b;
-    BrowserUiObjects	*ui;
-    ViewerNodeElm		*elm;
-    unsigned long		elm_shown;
     Pixel		hc, bg;
     Pixmap		hp;
     GC			highlightGC;
     XGCValues			gcv;
     XtGCMask		gcm;
-    int				num_elm_shown, i, font_ascent;
 
     if (!node)
         return;
 
     b = node->browser;
-    ui = aob_ui_from_browser(b);
-    num_elm_shown = browser_num_elm_shown(b);
     draw_area = brws_draw_area(b);
     dpy = XtDisplay(draw_area);
-    elm = node->elements;
-    sm_font = ui->sm_font;
-    font_ascent = sm_font->max_bounds.ascent;
-    elm_shown = browser_get_elm_shown(b);
 
     XtVaGetValues(draw_area,
             XmNbackground, &bg,
@@ -3397,29 +3136,6 @@ erase_viewer(Viewer *v)
 		w_rect.width,
 		w_rect.height,
 		FALSE);
-}
-
-/*
- * Erase a node.
- */
-static void
-erase_node
-(
-    ViewerNode	*node
-)
-{
-    Viewer	*b;
-    Widget	draw_area;
-
-    if (!node)
-	return;
-
-    b = node->browser;
-
-    draw_area = brws_draw_area(b);
-
-    XClearArea(XtDisplay(draw_area), XtWindow(draw_area), node->x, node->y,
-			node->width, node->height, FALSE);
 }
 
 static void

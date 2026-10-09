@@ -154,10 +154,6 @@ static void CloseQuickCB (
                         Widget w,
                         XtPointer clientData,
                         XtPointer callData);
-static void HelpButtonCB (
-                        Widget w,
-                        XtPointer clientData,
-                        XtPointer callData);
 static void PrintQuickHelpCB (
                         Widget w,
                         XtPointer clientData,

@@ -884,7 +884,6 @@ Initialize(Widget rw, Widget w, Arg *args, Cardinal *num_args)
 	if (XtIsShell(XtParent(w))) {
 	    char *geometry;
 	    XSizeHints hints;
-	    int flags;
 	    int x;
 	    int y;
 	    int width;
@@ -1646,6 +1645,9 @@ GeometryManager(Widget child, XtWidgetGeometry *desired,
 	    case XtGeometryNo:
 		result = XtGeometryNo;
 		break;
+
+	    default:
+		break;
 	    }
 
 	    /* set the window manager hints now...
@@ -1753,6 +1755,9 @@ ChangeManaged(Widget w)
 	     */
 	    (void) XtMakeResizeRequest(w, widthReturn, heightReturn,
 		    (Dimension *) 0, (Dimension *) 0);
+	    break;
+
+	default:
 	    break;
     }
 
@@ -2090,6 +2095,9 @@ _DtTermViewGetChild(Widget w, _DtTermViewChildType child)
     case DtTermSCROLLBAR_WIDGET:
 	return(tw->termview.scrollBar.widget);
 	/*NOTREACHED*/
+	break;
+
+    default:
 	break;
     }
 

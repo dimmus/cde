@@ -83,7 +83,6 @@ obj_destruct_action_list(ABObj obj)
 static int
 obj_destruct_button(ABObj obj)
 {
-    AB_BUTTON_INFO     *info = &(obj->info.button);
     return 0;
 }
 
@@ -98,7 +97,6 @@ obj_destruct_drawing_area(ABObj obj)
 static int
 obj_destruct_combo_box(ABObj obj)
 {
-    AB_COMBO_BOX_INFO  *info = &(obj->info.combo_box);
     return 0;
 }
 
@@ -161,7 +159,6 @@ obj_destruct_layers(ABObj obj)
 static int
 obj_destruct_menu(ABObj obj)
 {
-    AB_MENU_INFO       *info = &(obj->info.menu);
     return 0;
 }
 
@@ -188,21 +185,18 @@ obj_destruct_choice(ABObj obj)
 static int
 obj_destruct_separator(ABObj obj)
 {
-    AB_SEPARATOR_INFO  *info = &(obj->info.separator);
     return 0;
 }
 
 static int
 obj_destruct_scale(ABObj obj)
 {
-    AB_SCALE_INFO      *info = &(obj->info.scale);
     return 0;
 }
 
 static int
 obj_destruct_spin_box(ABObj obj)
 {
-    AB_SPIN_BOX_INFO   *info = &(obj->info.spin_box);
     return 0;
 }
 

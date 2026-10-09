@@ -50,13 +50,6 @@
 
 #include <regex.h>
 
-#ifdef STORAGE
-#ifndef lint
-static char *tr_h_RCSid =
-  "$XConsortium: translate.h /main/3 1996/06/19 17:13:31 drk $";
-#endif
-#endif
-
 #define L_CURLY		'{'
 #define R_CURLY		'}'
 

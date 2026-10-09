@@ -129,13 +129,11 @@ static void MyInsert( Widget w, XEvent *event, char **params,
 static void MyBackspace( Widget w, XEvent *event, char **params,
                         Cardinal *num_params) ;
 static int  ErrorHandler( Display *dpy, XErrorEvent *event) ;
-static void xtErrorHandler( String msg ) ;
+static void xtErrorHandler( String msg ) _X_NORETURN;
 static void xtWarningHandler( String msg ) ;
 static void MakeOptionsProc( XtPointer data, XtIntervalId *id) ;
 static SIGVAL Terminate( int arg ) ;
-static char * GetLangName( char * label );
 static void MakeAltDtButtons( void );	
-static void DebugWidgetResources(Widget w);
 static char * GetDisplayName();
 
 
@@ -351,7 +349,6 @@ int
 main( int argc, char **argv )
 {
 
-    char 	*session;
     int		i;		/* index for argt			   */
     char	**p;		/* temp pointer to traverse argv	   */
     Boolean	nograb=FALSE;	/* debugging option to not grab server/key */
@@ -830,8 +827,6 @@ char        *startup_name;
 XrmValue    startup_value; 
 char 	    temp[MAXPATHLEN] = "\0";
 char 	    *session;
-FILE	    *ls;
-char	    lastsess[MAXPATHLEN];
 Widget	    default_dt = NULL;
 int	    default_is_custom_dt = True;
 int 	    found_alt_dt = False;
@@ -1024,9 +1019,6 @@ MakeButtons( void )
     Dimension	max_height;	/* maximum height of a set of widgets	   */
     Dimension	thick1;		/* defaultButtonShadowThickness */
     Dimension	thick2;		/* shadowThickness */
-
-    int		origin;		/* horizontal origin for button placement  */
-    int		spacing;	/* spacing between buttons (width/32)      */
 
 #ifdef VG_TRACE
     vg_TRACE_EXECUTION("MakeButtons:  entered ...");
@@ -1338,6 +1330,9 @@ MakeDialog( DialogType dtype )
 
 	passwd_message = w;
 	break;
+
+    default:
+	break;
     }
 
     /*
@@ -1350,6 +1345,8 @@ MakeDialog( DialogType dtype )
       case expassword:
         XtAddCallback(w, XmNokCallback,     RespondDialogCB, NULL);
         XtAddCallback(w, XmNcancelCallback, RespondDialogCB, NULL);
+        break;
+      default:
         break;
     }
 
@@ -1638,11 +1635,8 @@ static void
 MakeLogin( void )
 {
     int i;
-    int	j;
     LoginTextPtr textdata; 
-    XtTranslations      textTable;
     Widget passwd_text;
-    String greetstr;
 
 #ifdef VG_TRACE
     vg_TRACE_EXECUTION("MakeLogin:  entered ...");
@@ -1705,7 +1699,7 @@ MakeLogin( void )
 
 
     XtAddActions(textActions, 2);
-    textTable = XtParseTranslationTable(textEventBindings);
+    (void) XtParseTranslationTable(textEventBindings);
 
 #if 0
     XtSetArg(argt[i], XmNtranslations,          textTable               ); i++;
@@ -2131,45 +2125,6 @@ Terminate( int arg )
 
 
 
-
-/***************************************************************************
- *
- *  DebugWidgetResources
- *
- *  Get widget resources
- ***************************************************************************/
-
-typedef struct resource_values {
-    int	height;
-    int	width;
-    int	x;
-    int	y;
-    int rightAttachment;
-    int leftAttachment;
-    int topAttachment;
-    int bottomAttachment;
-} ResourceValues;
-
-static void
-DebugWidgetResources(Widget w)
-
-{
-    struct resource_values	values;
-    int i;
-
-    i = 0;
-    bzero((char *) &values, sizeof(values));
-    XtSetArg(argt[i], XmNheight,	&values.height); i++;
-    XtSetArg(argt[i], XmNwidth,		&values.width); i++;
-    XtSetArg(argt[i], XmNx,		&values.x); i++;
-    XtSetArg(argt[i], XmNy,		&values.y); i++;
-    XtSetArg(argt[i], XmNrightAttachment,	&values.rightAttachment); i++;
-    XtSetArg(argt[i], XmNleftAttachment,	&values.leftAttachment); i++;
-    XtSetArg(argt[i], XmNtopAttachment,		&values.topAttachment); i++;
-    XtSetArg(argt[i], XmNbottomAttachment,	&values.bottomAttachment); i++;
-
-    XtGetValues(w, argt, i);
-}
 
 /***************************************************************************
  *

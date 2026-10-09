@@ -246,7 +246,7 @@ static int getptypair(Wire *wire)
     for (d = 0; d < 15; d++) {	/* 2nd char:  0..9,a..f */
 
       /* Get the next hex number in order */
-      *(mptr+1) = hexdigits[d];
+      *(mptr+1) = hexdigits[(unsigned char)d];
 
       /* Attempt to open this master side of pty */
 
@@ -255,7 +255,7 @@ static int getptypair(Wire *wire)
 	continue;
       }
 
-      *(sptr+1) = hexdigits[d];
+      *(sptr+1) = hexdigits[(unsigned char)d];
 
       /* check that we can eventually open the slave side, using
 	 the access system call */
@@ -344,7 +344,6 @@ int master_pty(int fd, struct termios *state)
 /*----------------------------------------------------------------------+*/
 {
   /* Make any special circumstances required on master side of pty */
-  int enable = 1;
 
   if (fd < 0)
     return(TRUE);
@@ -559,9 +558,7 @@ int post_fork_pty_channel_object(SPC_Channel_Ptr channel,
 {
   int result;
   int iomode=channel->IOMode;
-  int fd=channel->file_descs[STDIN];
   int stdinfd, stdoutfd, stderrfd;
-  int pid;
   char c;
       
   call_parent_method(channel, post_fork, (channel, parentp), result);
@@ -587,7 +584,6 @@ int post_fork_pty_channel_object(SPC_Channel_Ptr channel,
 
 
     setsid();
-    pid = getpid();
     
     if(IS_SPCIO_STDIN(iomode)) {
       if((stdinfd=open(channel->wires[STDIN]->slave_name, O_RDWR))<0) {
@@ -709,15 +705,13 @@ int add_input_pty_channel_object(SPC_Channel_Ptr channel,
 /*----------------------------------------------------------------------+*/
 {
   int result, fd;
-  Wire *wirelist, *stdinwire;
+  Wire *wirelist;
   
   call_parent_method(channel, add_input, (channel, handler, data), result);
 
   if(result==SPC_ERROR)
     return(SPC_ERROR);
   
-  stdinwire=channel->wires[STDIN];
-
   for(wirelist=channel->wire_list; wirelist; wirelist=wirelist->next) {
 
     if((wirelist->read_toolkit_id   != -1) ||
@@ -897,7 +891,7 @@ static int send_eof_pty_channel_object(SPC_Channel_Ptr channel)
 {
   Wire *wire = channel->wires[STDIN];
   char output_char;
-  int fd, ret;
+  int fd;
 
   if(wire == NULL)
     return(TRUE);
@@ -910,8 +904,8 @@ static int send_eof_pty_channel_object(SPC_Channel_Ptr channel)
   
   /* Write twice -- once to flush output, and once to have 0 bytes sent. */
   
-  ret = write(fd, &output_char, 1);
-  ret = write(fd, &output_char, 1);
+  write(fd, &output_char, 1);
+  write(fd, &output_char, 1);
 
   return(TRUE);
 }

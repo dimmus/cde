@@ -97,9 +97,7 @@ IndexedOptionMenuUiItem::IndexedOptionMenuUiItem(
 void IndexedOptionMenuUiItem::writeFromUiToSource()
 {
   char 	*value;
-  Widget w;
-  
-  w = this->getWidget();
+
   value = (char*) _iom->getDataSpec();
   prop_source->setValue(value);
 }

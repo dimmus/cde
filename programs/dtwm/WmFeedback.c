@@ -898,13 +898,6 @@ void ConfirmAction (WmScreenData *pSD, int nbr)
 
 void ShowWaitState (Boolean flag)
 {
-    unsigned int width;
-    unsigned int height;
-    unsigned int xHotspot;
-    unsigned int yHotspot;
-    Pixmap       pixmap;
-    Pixmap       maskPixmap;
-    XColor       xcolors[2];
 
    _DtGetHourGlassCursor(DISPLAY);
 

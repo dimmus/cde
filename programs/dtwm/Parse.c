@@ -81,7 +81,7 @@ StringToInt (char * parse_source,
    char   chr;
 
 
-   while (chr = *source_ptr++) 
+   while ((chr = *source_ptr++)) 
    {
       if (chr >= '0' && chr <= '9') 
       {
@@ -414,8 +414,6 @@ StringToPositionHints (char * parse_source,
                        void ** parse_return)
 
 {
-   Boolean status;
-
    _DtWmParseToLower (parse_source);
 
    if (strcmp (parse_source, "first") == 0)
@@ -423,7 +421,7 @@ StringToPositionHints (char * parse_source,
    else if (strcmp (parse_source, "last") == 0)
       parse_source = "100";
 
-   status = StringToInt (parse_source, parse_return);
+   StringToInt (parse_source, parse_return);
 
    if ((long) *parse_return < 0 || (long) *parse_return > 100)
    {

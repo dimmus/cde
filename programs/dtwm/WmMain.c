@@ -113,7 +113,7 @@ main (int argc, char *argv [], char *environ [])
      *  of string space reduction optimization.)
      */
      {
-	 char * foo = ((char *)GETMESSAGE(44, 1, ""));
+	 (void) GETMESSAGE(44, 1, "");
      }
     XtSetLanguageProc (NULL, (XtLanguageProc)NULL, NULL);
 

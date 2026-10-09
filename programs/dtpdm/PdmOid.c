@@ -595,7 +595,7 @@ PdmOidLinkedListHasOid(PdmOidLinkedList* me,
 PdmOid
 PdmOidLinkedListFirstOid(PdmOidLinkedList* me)
 {
-    if(me->current = me->head)
+    if((me->current = me->head))
 	return me->current->oid;
     else
 	return pdmoid_none;
@@ -614,7 +614,7 @@ PdmOidLinkedListFirstOid(PdmOidLinkedList* me)
 PdmOid
 PdmOidLinkedListNextOid(PdmOidLinkedList* me)
 {
-    if(me->current ? me->current = me->current->next : False)
+    if(me->current ? (me->current = me->current->next) : False)
 	return me->current->oid;
     else
 	return pdmoid_none;
@@ -913,7 +913,6 @@ PdmOidMediumSSGetTraysSizes(PdmOidMediumSS* me,
 			    PdmOidList** sizes)
 {
     int i_mss, i_ds, i_itm, i_its;
-    PdmOidMediumDiscreteSizeList* ds_list;
     int tray_count;
     PdmOid current_tray, current_medium;
     PdmOidMediumDiscreteSizeList* unspecified_tray_ds;
@@ -990,6 +989,7 @@ PdmOidMediumSSGetTraysSizes(PdmOidMediumSS* me,
 	 * if the tray was not matched, use the unspecifed tray size list
 	 */
 	if(tray_ds == (PdmOidMediumDiscreteSizeList*)NULL)
+	{
 	    if(unspecified_tray_ds == (PdmOidMediumDiscreteSizeList*)NULL)
 	    {
 		/*
@@ -1000,6 +1000,7 @@ PdmOidMediumSSGetTraysSizes(PdmOidMediumSS* me,
 	    }
 	    else
 		tray_ds = unspecified_tray_ds;
+	}
 	/*
 	 * loop through the discrete sizes list, looking for a size that
 	 * matches the medium for the current input tray
@@ -1662,6 +1663,7 @@ const char* PdmOidNotifyString(PdmOidNotify notify)
 	return NOTIFY_EMAIL_STR;
 	break;
     }
+    return (const char*)NULL;
 }
 
 /*

@@ -20,7 +20,6 @@
  * to the Free Software Foundation, Inc., 51 Franklin Street, Fifth
  * Floor, Boston, MA 02110-1301 USA
  */
-static char sccsid[] = "$XConsortium: md5.c /main/2 1996/03/25 10:28:16 rswiston $";
 /*
  *   COMPONENT_NAME: desktop
  *
@@ -229,7 +228,7 @@ void MD5Update (MD5_CTX *context, unsigned char *input, unsigned int inputLen)
    digest, message digest
    context, context
    */
-void MD5Final (unsigned char digest[16], MD5_CTX *context)
+void MD5Final (unsigned char *digest, MD5_CTX *context)
 {
     unsigned char bits[8];
     unsigned int index, padLen;

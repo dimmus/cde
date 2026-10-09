@@ -127,8 +127,9 @@ ProcessTabletEvent(
 #ifdef DEBUG
   Arg args[10];
   Dimension db_width, db_height;
+  int i;
 #endif
-  int x, y, width, height, i, n, xGrid, yGrid;
+  int x, y, width, height, xGrid, yGrid;
   char tmpstr[20];
   XmString str;
 

@@ -573,9 +573,10 @@ PrintOutputGetNumLines(PrintOutput *pOutput)
 {
     XtArgVal p;
     int	total = 0;
-    int saveTop;
 
 #ifdef USE_DTEDITOR
+    int saveTop;
+
     saveTop = pOutput->currentLine;
     PrintOutputFirstPage(pOutput);
     while (PrintOutputPageDown(pOutput))
@@ -872,7 +873,6 @@ extern DtEditorErrorCode
 _poEditorValidateFileAccess( char *file, int accessType )
 {
    struct stat statbuf;
-   unsigned short tmpMode;
 
    if (file && *file ) return DtEDITOR_INVALID_FILENAME;
 

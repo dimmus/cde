@@ -80,7 +80,7 @@ M_ELEMENT m_eltname(void)
   {
     M_ELEMENT eltid ;
 
-    if (eltid = m_packedlook(m_entree, m_name)) return(eltid) ;
+    if ((eltid = m_packedlook(m_entree, m_name))) return(eltid) ;
     else {
       m_err1("Undefined element %s", m_name) ;
       return(FALSE) ;
@@ -89,10 +89,7 @@ M_ELEMENT m_eltname(void)
 
 int get_mb_cur_max(void)
 {
-char *l;
 int   i;
-
-l = getenv("LANG");
 
 i = MB_CUR_MAX;
 

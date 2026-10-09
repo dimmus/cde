@@ -156,13 +156,14 @@ CreateWellKnownSockets (void)
     if (chooserFd > WellKnownSocketsMax)
 	WellKnownSocketsMax = chooserFd;
     FD_SET (chooserFd, &WellKnownSocketsMask);
+    return 1;
 }
 
 int
 GetChooserAddr (char *addr, int *lenp)
 {
     struct sockaddr_in	in_addr;
-    int			len;
+    socklen_t		len;
 
     len = sizeof in_addr;
     if (getsockname (chooserFd, (struct sockaddr *)&in_addr, &len) < 0)

@@ -258,7 +258,6 @@ int reset_pipe_channel_object(SPC_Channel_Ptr channel)
 /*----------------------------------------------------------------------+*/
 {
   int result;  
-  int iomode=channel->IOMode;
   Wire *wirelist;
   
   call_parent_method(channel, reset, (channel), result);

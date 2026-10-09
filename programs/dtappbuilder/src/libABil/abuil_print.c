@@ -88,9 +88,6 @@ static int	indent(
 		    FILE *fp,
 		    int spaces
 		);
-static int	print(
-		    ABObjPtr obj
-		);
 static int	print_indented(
 		    FILE *fp,
 		    ABObjPtr obj
@@ -629,7 +626,6 @@ output_ui_arg(FILE *fp, ABObj obj, Arg *arg)
 static int
 handle_dtterm(FILE *fp, ABObj obj)
 {
-    ABObjPtr		child_obj	= NULL;
     ArgList		argList;
     Arg			*arg = NULL;
 
@@ -811,7 +807,6 @@ handle_combo_box(FILE *fp, ABObj obj)
 static int
 handle_spin_box(FILE *fp, ABObj obj)
 {
-    ABObjPtr		child_obj	= NULL;
     ArgList		argList;
     Arg			*arg = NULL;
 
@@ -859,7 +854,6 @@ handle_spin_box(FILE *fp, ABObj obj)
 static int
 handle_menu_button(FILE *fp, ABObj obj)
 {
-    ABObjPtr		child_obj	= NULL;
     ArgList		argList;
     Arg			*arg = NULL;
 

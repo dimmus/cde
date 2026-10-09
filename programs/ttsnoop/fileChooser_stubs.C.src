@@ -72,7 +72,6 @@ _DtFileChooserSet(
 {
 	char *okString;
 	char *title;
-	char *valueLabel;
 	switch (choice) {
 	    case _DtFileChoosePatternAdd:
 		okString = "Add";
@@ -215,7 +214,6 @@ fileOkayed(
     std::ostringstream script;
     switch (info->choice) {
 	    Tt_pattern *pats;
-	    Tt_message msg;
 	    Tt_status status;
 	    int ival;
 	    char *sess, *val;

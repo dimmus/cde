@@ -670,7 +670,7 @@ XmTextEditor::loadFile(const char * path, const int pos)
 	// Of course in the case of an even page size file we must
 	// copy the buffer, terminate it and then give it to XmText.
 	//
-	if (info.st_size < map_size) {
+	if ((size_t) info.st_size < map_size) {
 	    XmTextInsert(_w, pos, map);
 	}
 	else {

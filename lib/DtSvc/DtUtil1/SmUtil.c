@@ -161,7 +161,6 @@ getSessionPath(
     Display 		*display;
     char 		*tmpPath = NULL;
     char        	*property = NULL;
-    char                *fileName;
     struct stat  	buf;
     int 		status;
     

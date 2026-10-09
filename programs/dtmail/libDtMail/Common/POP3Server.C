@@ -161,7 +161,6 @@ POP3Server::ptrans_retrieve_start(int msg, int *lenp)
 DTMailError_t
 POP3Server::ptrans_authorize(char*)
 {
-    static char		*pname = "POP3Server::ptrans_authorize";
     DTMailError_t	ok;
 
     ok = do_transaction("USER %s", _username);
@@ -180,7 +179,6 @@ POP3Server::ptrans_authorize(char*)
 DTMailError_t
 POP3Server::ptrans_fldstate_read(int *countp, int *newp)
 {
-    static char		*pname = "POP3Server::ptrans_fldstate_read";
     DTMailError_t	ok;
     char		buf[DTMAS_POPBUFSIZE+1];
 
@@ -272,7 +270,6 @@ POP3Server::ptrans_fldstate_read(int *countp, int *newp)
 DTMailError_t
 POP3Server::ptrans_msgsizes(int, int *sizes)
 {
-    static char		*pname = "POP3Server::ptrans_msgsizes";
     char		buf[DTMAS_POPBUFSIZE+1];
     DTMailError_t	ok;
 

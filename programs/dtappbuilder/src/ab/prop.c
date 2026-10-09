@@ -576,7 +576,6 @@ prop_fixed_dialog_init(
     Widget	objlist
 )
 {
-    Widget	shell = XtParent(dialog);
 
     init_prop_state_info(dialog, palitem, objlist, NULL);
 
@@ -1798,6 +1797,8 @@ prop_setup_label_field(
 	    if (graphic_hint)
 		ui_set_active(graphic_hint, False);
 	    break;
+	default:
+	   break;
     }
     if (field_val != NULL)
     {
@@ -2500,7 +2501,7 @@ propP_field_chgCB(
 )
 {
      Widget      changebar = (Widget)clientdata;
-     XtArgVal    field_mode, cb_state;
+     XtArgVal    field_mode;
 
      XtVaGetValues(widget, XmNuserData, &field_mode, NULL);
 /*
@@ -2983,7 +2984,6 @@ fixed_invoke_props(
 {
     Widget      	prop_dialog;
     PropStateInfo 	*pstate;
-    char        	title[64];
     static BOOL		first_time = True;
 
     if (palitem->fix_prop_dialog == NULL)
@@ -3206,6 +3206,8 @@ handle_auto_apply(
                 ui_list_select_item(pstate->objlist, modname, FALSE);
                 util_free(modname);
 		*result = pstate->palitem;
+	default:
+		break;
     }
 
     return answer;
@@ -3853,7 +3855,6 @@ invoke_attach_editorCB(
     XtPointer   calldata
 )
 {
-    AB_PROP_TYPE type = (AB_PROP_TYPE)client_data;
     PropStateInfo	*pstate;
 
     pstate = get_prop_state_info(widget);
@@ -3874,7 +3875,6 @@ invoke_connectionsCB(
     XtPointer   calldata
 )
 {
-    AB_PROP_TYPE 	type = (AB_PROP_TYPE)client_data;
     PropStateInfo	*pstate;
 
     pstate = get_prop_state_info(widget);
@@ -3897,7 +3897,6 @@ invoke_help_editorCB(
     XtPointer	calldata
 )
 {
-    AB_PROP_TYPE 	type = (AB_PROP_TYPE)client_data;
     PropStateInfo	*pstate;
 
     pstate = get_prop_state_info(widget);
@@ -4215,10 +4214,8 @@ menulist_buildCB(
     Widget      menus_item = (Widget)client_data;
     Widget      menus_menu = NULL;
     Widget      menus_menuitem;
-    Widget      menu_field;
     STRING      menu_name;
-    int         num_children;
-    int         i, j;
+    int         j;
 
     XtVaGetValues(widget, XmNsubMenuId, &submenu, NULL);
     XtVaGetValues(menus_item, XmNuserData, &pms, NULL);

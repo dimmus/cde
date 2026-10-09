@@ -400,7 +400,7 @@ void DtFindD::Stop()
 	      }
 	     else
                 fields->fields[1] = number;
-             _JobIcon *icon = new _JobIcon(found_container, job, fields);
+             new _JobIcon(found_container, job, fields);
 	   }
           delete []matches;
 	  delete fields->fields;
@@ -449,7 +449,7 @@ void DtFindD::UpdateQueue()
          icon1->FindByName(value, 0, &n_matches, NULL, _select_proc,
                            exact_match->Selected() ? false : true,
 			   ignore_case->Selected() ? false : true);
-	 delete value1;
+	 delete [] value1;
 	 if (n_matches)
 	    no_children = false;
 	 else

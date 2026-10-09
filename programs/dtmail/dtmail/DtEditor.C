@@ -122,7 +122,6 @@ CDEM_DtWidgetEditor::initialize()
     int i = 0;
 
     Arg args[10];
-    int n = 0;
 
 #if 0
     short rows, cols;
@@ -195,7 +194,6 @@ char*
 CDEM_DtWidgetEditor::get_contents()
 {
     
-    DtEditorErrorCode status;
     static DtEditorContentRec content;
 
     content.type = DtEDITOR_TEXT;
@@ -230,7 +228,7 @@ CDEM_DtWidgetEditor::get_contents()
 
     XtSetArg( args[0], DtNwordWrap, &ww );
     XtGetValues( my_text, args, 1 );
-    status = DtEditorGetContents(my_text, &content, ww, TRUE);
+    DtEditorGetContents(my_text, &content, ww, TRUE);
     
     return(content.value.string);
 }
@@ -242,14 +240,13 @@ CDEM_DtWidgetEditor::set_contents(
 )
 {
     DtEditorContentRec content;
-    DtEditorErrorCode status;
 
     this->my_owner->needBuf(&_buffer, &_buf_len, len + 1);
     this->my_owner->stripCRLF(&_buffer, contents, len);
 
     content.type = DtEDITOR_TEXT;
     content.value.string = _buffer;
-    status = DtEditorSetContents(my_text, &content);
+    DtEditorSetContents(my_text, &content);
 
 }
 
@@ -269,11 +266,10 @@ CDEM_DtWidgetEditor::clear_contents()
 //    DtEditorReset(my_text);
 
     DtEditorContentRec content;
-    DtEditorErrorCode status;
 
     content.type = DtEDITOR_TEXT;
     content.value.string = NULL;
-    status = DtEditorSetContents(my_text, &content);
+    DtEditorSetContents(my_text, &content);
 
 }
 

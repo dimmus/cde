@@ -79,7 +79,7 @@ Widget PasswordDialogManager::createDialog ( Widget parent )
 				      dialog,
 				      NULL, 0 );
 
-  Widget _user_label = XtCreateManagedWidget
+  XtCreateManagedWidget
     ( "UserLabel",
       xmLabelWidgetClass,
       rc,
@@ -91,7 +91,7 @@ Widget PasswordDialogManager::createDialog ( Widget parent )
       rc,
       NULL, 0);
 
-  Widget _password_label = XtCreateManagedWidget
+  XtCreateManagedWidget
     ( "PasswordLabel",
       xmLabelWidgetClass,
       rc,

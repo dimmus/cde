@@ -125,8 +125,6 @@ _DtCreateMenuSystem(
    Boolean firstMenuPane = True;
    Widget child;
    XmString labelString;
-   int pulldownIndex = 1;
-   int menuPaneIndex = 1;
    int menuBtnIndex = 1;
 
    /* Use our own menu control functions, if none specified */
@@ -176,7 +174,6 @@ _DtCreateMenuSystem(
             XtManageChild(child);
             XmStringFree(labelString);
             lastCascadeBtn = menuDesc[i].widget = child;
-            pulldownIndex++;
             break;
          }
 
@@ -212,7 +209,6 @@ _DtCreateMenuSystem(
             XtSetArg(args[0], XmNsubMenuId, lastMenuPane);
             XtSetValues(lastCascadeBtn, args, 1);
             menuBtnIndex = 1;
-            menuPaneIndex++;
             break;
          }
 

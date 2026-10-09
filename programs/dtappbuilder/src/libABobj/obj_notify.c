@@ -802,6 +802,8 @@ event_destruct(ObjEvent event, BOOL wasBatched)
 	case OBJEV_UPDATE_WITH_DATA:
 	    return_value= cleanup_ev_update_with_data(event);
 	    break;
+	default:
+	    break;
     }
 
     return return_value;
@@ -1055,30 +1057,6 @@ event_print(OBJ_EVENT *event, FILE *outFile, BOOL addNewline, STRING name)
 }
 
 
-static int
-event_queue_print(void)
-{
-    int		oldFirst= firstEventIndex;
-    int		oldLast= lastEventIndex;
-
-    if (queue_is_empty())
-    {
-	printf("queue is empty!\n");
-	return 0;
-    }
-
-    printf("Event queue:\n");
-    while (!queue_is_empty())
-    {
-	event_print(&(eventQueue[firstEventIndex]), stdout, TRUE, NULL);
-	firstEventIndex= queue_next_index(firstEventIndex);
-    }
-    printf("\n");
-    firstEventIndex= oldFirst;
-    lastEventIndex= oldLast;
-    return 0;
-}
-
 
 /*************************************************************************
 **                                                                      **
@@ -1265,6 +1243,8 @@ events_equal(ObjEvent event1, ObjEvent event2)
 				== info2->update_data_free_func) );
 	}
 	break;
+	default:
+	    break;
     }
 
     return equal;

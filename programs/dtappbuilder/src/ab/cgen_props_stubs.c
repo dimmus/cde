@@ -289,8 +289,6 @@ cgenP_reset_default_propsCB(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     DtbCgenPropsCgenPropsDlgInfo props_dlg =
                         (DtbCgenPropsCgenPropsDlgInfo)clientData;
-    int			num_selected_mods = 0, i;
-    XmStringTable	gen_module_list   = NULL;
     Widget              opmenu_label      = NULL;
     XmString		lbl_str           = NULL;
     
@@ -362,7 +360,6 @@ cgenP_apply_propsCB(
 
     DtbCgenPropsCgenPropsDlgInfo props_dlg = 
                         (DtbCgenPropsCgenPropsDlgInfo)clientData;
-    int			i;
     int			num_selected_mods = 0;
     Widget		merge_toggle;
     Boolean		no_merge = False;
@@ -457,8 +454,7 @@ cgenP_reset_propsCB(
 
     DtbCgenPropsCgenPropsDlgInfo props_dlg =
                         (DtbCgenPropsCgenPropsDlgInfo)clientData;
-    int			num_selected_mods = 0, i, pos;
-    XmStringTable	gen_module_list = NULL;
+    int			i, pos;
     XmString		mod = NULL;
     Widget              opmenu_label = NULL;
     XmString		lbl_str = NULL;
@@ -682,6 +678,7 @@ cgenP_add_update_list_cb(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }

@@ -133,7 +133,7 @@ void EncryptedTextFieldUiItem::writeFromSourceToUi()
     validateLength(strlen(value));
     strcpy(_text, value);
 
-    for (i=0, s=value; i<strlen(value); i++, s++)
+    for (i=0, s=value; (size_t) i<strlen(value); i++, s++)
       *s = '*';
 
     _loading = DTM_TRUE;
@@ -182,7 +182,7 @@ void EncryptedTextFieldUiItem::verify(XmTextVerifyPtr cbs)
     else
       *s = '\0';
 
-    if (strlen(_text) >= cbs->endPos)
+    if (strlen(_text) >= (size_t) cbs->endPos)
     {
         t = _text+cbs->endPos;
 	if (strlen(t))

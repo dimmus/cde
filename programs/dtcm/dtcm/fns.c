@@ -48,10 +48,6 @@
  */
 
 
-#ifndef lint
-static 	char sccsid[] = "@(#)fns.c 1.3 94/11/07 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 /*
  * Copyright 1993 Sun Microsystems, Inc.  All rights reserved
  */

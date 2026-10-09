@@ -60,7 +60,9 @@ extern u_long	_DtCm_transient;
 #define MAXDAY_LOOKUP		15
 #define MAXDAY_LOOKUP_SECS	((DAYSEC*MAXDAY_LOOKUP)+1)
 
+#ifdef CM_DEBUG
 static char *errfmt = "cm: %s() unexpected return status %d.\n";
+#endif
 
 /*****************************************************************************
  * forward declaration of static functions

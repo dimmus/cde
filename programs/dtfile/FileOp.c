@@ -341,7 +341,6 @@ PipeReadString(
 {
    short len;
    char *s;
-   int n;
 
    /* get the length */
    if (PipeRead(fd, &len, sizeof(short)) != sizeof(short))
@@ -568,11 +567,10 @@ FileMoveCopyProcess(
         DesktopRec *desktopWindow)
 {
    char * target_dir, * from = NULL, * to;
-   int i, j, rc, result;
+   int i, j, rc;
    Boolean return_val = False;
    Boolean isContainer;
-   long current;
-   char *tmpStr, *target_file;
+   char *target_file;
    struct stat stat_buf, from_stat_buf;
    short pipe_msg;
    int sameCount = 0;
@@ -1643,6 +1641,7 @@ FileOpPipeCB(
    pipe_msg = -1;
    n = PipeRead(*fd, &pipe_msg, sizeof(short));
    DPRINTF(("FileOpPipeCB: n %d, pipe_msg %d\n", n, pipe_msg));
+   (void) n; /* used only in DPRINTF */
 
    done = False;
    switch (pipe_msg)
@@ -2487,7 +2486,7 @@ ChangeIconPipeCB(
    FileMgrData *file_mgr_data = NULL;
    FileMgrRec *file_mgr_rec = NULL;
    short pipe_msg;
-   int i, j, n;
+   int i, n;
    int rc;
    char *title, *err_msg, *err_arg;
    long modify_time;
@@ -2514,6 +2513,7 @@ ChangeIconPipeCB(
    pipe_msg = -1;
    n = PipeRead(*fd, &pipe_msg, sizeof(short));
    DPRINTF(("ChangeIconPipeCB: n %d, pipe_msg %d\n", n, pipe_msg));
+   (void) n; /* used only in DPRINTF */
 
    if (pipe_msg == PIPEMSG_FILE_MODIFIED)
    {
@@ -3175,6 +3175,7 @@ MakeFilePipeCB(
    }
 
    DPRINTF(("MakeFilePipeCB: n %d, pipe_msg %d, rc %d\n", n, pipe_msg, rc));
+   (void) n; /* used only in DPRINTF */
 
    /* arrange for the modified directory to be updated */
    DirectoryEndModify(cb_data->to_host, cb_data->to_dir);
@@ -3356,10 +3357,7 @@ CreateFileFromBuffer(int    pipe_s2m,
   int fnew = -1;
   int rc=0;
   unsigned int mode;
-  Boolean BufferIsExecutable=FALSE;
   char *err_msg, *err_arg, *tmpStr;
-  char *format_str, *strerror_str;
-  int format_param_len=20;
   int savedError = 0;
 
 
@@ -3461,6 +3459,7 @@ DisplayDuplicateOpError(
   if (cb_data->mode == MOVE_FILE)
   {
     if(cb_data->callback_data == NULL)
+    {
       if(initiating_view == NULL)
         return;
       else
@@ -3471,6 +3470,7 @@ DisplayDuplicateOpError(
         sprintf(title,"%s %s",tchar,GETMESSAGE(9,94,"Error"));
         XtFree(tchar);
         err_msg = GETMESSAGE(11,135,"Cannot move object %s onto itself");
+      }
     }
   }
   else if (cb_data->mode == COPY_FILE)

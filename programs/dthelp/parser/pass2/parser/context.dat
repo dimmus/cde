@@ -495,7 +495,7 @@ m_name
             {
               int i ;
 
-              if (m_scanel = m_eltname()) {
+              if ((m_scanel = m_eltname())) {
                 for (i = 0 ; i < m_element[m_scanel - 1].parcount ; i++)
                   m_poccur[i] = 0 ;
                 }
@@ -503,7 +503,7 @@ m_name
               }
             }
   eelement:etagend {
-            if (m_scanel = m_eltname()) m_stacktop->holdre = FALSE ;
+            if ((m_scanel = m_eltname())) m_stacktop->holdre = FALSE ;
             else
               if (m_element[m_stacktop->element - 1].content == M_CDATA ||
                   m_element[m_stacktop->element - 1].content == M_RCDATA) {

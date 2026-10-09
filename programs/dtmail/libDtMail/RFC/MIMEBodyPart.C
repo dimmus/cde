@@ -356,7 +356,6 @@ MIMEBodyPart::getDtType(DtMailEnv & error)
 	return;
     }
 
-    int istext = (strcasecmp(mime_type, "text/plain") == 0);
     char * name = getNameHeaderVal(error);
     char * type = DtDtsBufferToDataType(_body, _body_decoded_len, name);
 
@@ -968,7 +967,6 @@ MIMEBodyPart::parameterValue(
 			const char * parameter,
 			DtMailBoolean isCaseSensitive)
 {
-    char *lasts=NULL;
     char *ptok, *vtok;
     char *parm, *val;
     int rtn = 0;

@@ -188,7 +188,6 @@ DtDndDragStart(
 	DtDragInfo *	dtDragInfo;
 	DragSettings	settings;
 	DtDndDragSource	sourceType;
-	DtDndTransfer *	transfer;
 	Arg *		args;
 	int		ii, nn, savedEventType;
 	Atom *		exportTargets;
@@ -410,7 +409,6 @@ dndDropStartCallback(
 	XtPointer	callData)
 {
 	DtDragInfo     *dtDragInfo	= (DtDragInfo *) clientData;
-	DtDndContext   *dragData;
 	XmDragContext   xmDragContext = (XmDragContext)dtDragInfo->dragContext;
 	XmDropStartCallbackStruct *xmDropInfo = (XmDropStartCallback) callData;	
 	DtDndTransferCallbackStruct	dropCallData;

@@ -77,7 +77,7 @@ _DtTermPrimGetPty(char **ptySlave, char **ptyMaster)
         Debug('T', timeStamp("_DtTermPrimGetPty() unlockpt() finished"));
 
         /* get the pty slave name... */
-        if (c = ptsname(ptyFd)) {
+        if ((c = ptsname(ptyFd))) {
             *ptySlave = malloc(strlen(c) + 1);
             (void) strcpy(*ptySlave, c);
             return(ptyFd);

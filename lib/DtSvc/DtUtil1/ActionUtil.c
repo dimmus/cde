@@ -456,6 +456,7 @@ _DtIsSameHost(const char *host1, const char *host2)
 	struct hostent		*host_ret;
 	_Xgethostbynameparams	host_buf;
 	char *tp;
+	(void) host_buf; /* unused unless XTHREADS */
 
 	/*
 	 * If either parameter is null; use the local host name in its stead
@@ -927,13 +928,14 @@ _DtRemoveTrailingBlanksInPlace(char **s)
 int
 _DtExecuteAccess( const char *path )
 {
-	int i, amode, rval;
+	int i;
         uid_t euid;
         struct stat s;
 	gid_t *pgid;
 	gid_t groupids[NGROUPS_MAX_VALUE];
 	struct group *gr;
 	_Xgetgrparams grp_buf;
+	(void) grp_buf; /* unused unless XTHREADS */
 
         if (stat( path, &s ) == -1 ) {
 		/* could not stat file, no access */ 
@@ -1227,7 +1229,6 @@ int _DtActDeleteChildRec( _DtActInvRecT *invp, _DtActChildRecT *childp)
 int _DtActDeleteInvRec( DtActionInvocationID id )
 {
     int i;
-    CallbackData *data;
 
     _DtSvcProcessLock();
     for ( i = 0; i < _actInvRecArraySize; i++ ) 

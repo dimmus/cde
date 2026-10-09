@@ -263,8 +263,6 @@ tmodeP_window_list_iterate(
     ABObjListIterFn fn
 )
 {
-    int    i;
-    ABObj  obj = NULL;
     
     if (!wlist)
 	return;

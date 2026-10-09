@@ -89,7 +89,6 @@ doScroll(Widget w, short lines)
 void
 _DtTermFuncScroll(Widget w, int count, FunctionSource functionSource)
 {
-    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
 
     /* make sure the cursor is off... */
     (void) _DtTermPrimCursorOff(w);
@@ -104,7 +103,6 @@ void
 _DtTermFuncBeginningOfBuffer(Widget w, int count, FunctionSource functionSource)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
-    DtTermWidget vtw = (DtTermWidget) w;
     struct termData *tpd = tw->term.tpd;
 
     EXIT_IF_MARGINS_SET(tw)
@@ -293,6 +291,9 @@ termFuncErase
 		    tpd->cursorColumn + count + (tpd->mbCurMax > 1 ? 1:0),
 		    tpd->cursorRow);
 	break;
+
+      default:
+	break;
     }
 }
 
@@ -332,7 +333,6 @@ _DtTermFuncEraseCharacter
 void
 _DtTermFuncClearToEndOfBuffer(Widget w, int count, FunctionSource functionSource)
 {
-    DtTermPrimitiveWidget      tw        = (DtTermPrimitiveWidget) w;
 
     /* turn the cursor off... */
     (void) _DtTermPrimCursorOff(w);
@@ -347,7 +347,6 @@ _DtTermFuncClearBuffer(Widget w, int count, FunctionSource functionSource)
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     DtTermWidget vtw = (DtTermWidget) w;
     struct termData *tpd = tw->term.tpd;
-    int i;
 
     /* turn the cursor off... */
     (void) _DtTermPrimCursorOff(w);
@@ -728,8 +727,6 @@ _DtTermFuncInsertLine(Widget w, int count, FunctionSource functionSource)
     struct termData *tpd = tw->term.tpd;
     int insertedRows = 0;
     int moveCount;
-    int src;
-    int i;
 
     /* as with delete line, turn the cursor off now since we will
      * pretty much need to turn it off later to change the cursor
@@ -1064,7 +1061,6 @@ _DtTermFontEnhancement(Widget w,int value)
 {
     DtTermPrimitiveWidget      tw        = (DtTermPrimitiveWidget) w;
     DtTermPrimData        tpd        = tw->term.tpd;
-    DtTermWidget      vtw        = (DtTermWidget) w;
 
     (void)_DtTermPrimBufferSetEnhancement(tpd->termBuffer,
               tpd->topRow + tpd->cursorRow, tpd->cursorColumn, enhFont, value);

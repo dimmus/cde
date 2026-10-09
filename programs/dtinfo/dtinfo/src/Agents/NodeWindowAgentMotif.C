@@ -1720,11 +1720,11 @@ NodeWindowAgent::create_ui()
   f_form = XtCreateWidget("form", xmFormWidgetClass, mainw, args, n);
 
 
-  f_title_menu = (WXmPulldownMenu*)(Widget)WXmPulldownMenu((WComposite&)f_form, (char*)"title_menu");
+  f_title_menu = (WXmPulldownMenu*)(Widget)WXmPulldownMenu(reinterpret_cast<WComposite&>(f_form), (char*)"title_menu");
   n = 0;
   XtSetArg(args[n], XmNsubMenuId, (Widget) f_title_menu); n++;
   f_title_option = (WXmOptionMenu*)(Widget)
-                   WXmOptionMenu ((WComposite&)f_form, (char*)"title", AM, args, n);
+                   WXmOptionMenu (reinterpret_cast<WComposite&>(f_form), (char*)"title", AM, args, n);
   help_agent().add_help_cb ((Widget)*f_title_option);
 
   f_tab_area = (WXmRowColumn*)(Widget) WXmRowColumn (f_form, "tab_area");

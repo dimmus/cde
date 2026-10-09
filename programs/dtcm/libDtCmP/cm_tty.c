@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)cm_tty.c 1.91 95/07/27 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -203,7 +199,7 @@ mini_err_msg(
 
 	if (appt_what && appt_what[0] != '\0') {
 		buf = cm_strdup(appt_what);
-		if (ptr = strrchr(buf, '\n'))
+		if ((ptr = strrchr(buf, '\n')))
 			*ptr = '\0';
 		fprintf(stderr, "%s '%s'\n", 
 				CATGETS(catd, 1, 1045, "Cancelled for"),
@@ -427,7 +423,6 @@ cm_tty_insert(nl_catd catd, CSA_session_handle target, int version,
 	CSA_entry_handle	new_entry;
 	CmDataList		*list = CmDataListCreate();
 	Validate_op		op;
-	CSA_attribute		*attrs;
 	CSA_return_code		status;
 	Dtcm_appointment	*appt;
 
@@ -521,7 +516,7 @@ cm_tty_insert(nl_catd catd, CSA_session_handle target, int version,
 		ret_stat = -1;
 
 	for (cnt = 1; cnt <= list->count; cnt++)
-		if (appt = (Dtcm_appointment *)CmDataListGetData(list, cnt))
+		if ((appt = (Dtcm_appointment *)CmDataListGetData(list, cnt)))
 			free_appt_struct(&appt);
 	CmDataListDestroy(list, B_FALSE);
 
@@ -557,7 +552,7 @@ cm_tty_lookup(nl_catd catd, CSA_session_handle target, int version, char *date, 
 	int			span, day, lineno = 1, last_day = -1, i;
 	CSA_uint32		a_total;
 	char			start_buf[MAXNAMELEN], end_buf[MAXNAMELEN];
-	char			buf[MAXNAMELEN], date_str[MAXNAMELEN], *what;
+	char			buf[MAXNAMELEN], date_str[MAXNAMELEN];
 	time_t			tick, start, stop;
 	Lines			*lines = NULL, *next_line;
 	DisplayType		dt;
@@ -565,7 +560,6 @@ cm_tty_lookup(nl_catd catd, CSA_session_handle target, int version, char *date, 
 	CSA_attribute		*range_attrs;
 	Dtcm_appointment	*appt;
 	Tick			start_tick, end_tick = 0;
-	CSA_return_code		status;
 
 	/*
 	 * Preliminary stuff - set defaults
@@ -610,7 +604,7 @@ cm_tty_lookup(nl_catd catd, CSA_session_handle target, int version, char *date, 
 	stop = next_ndays(start, span) - 1;
 	setup_range(&range_attrs, &ops, &i, start, stop, CSA_TYPE_EVENT,
 		    0, B_FALSE, version);
-	status = csa_list_entries(target, i, range_attrs, ops, &a_total, list, NULL);
+	csa_list_entries(target, i, range_attrs, ops, &a_total, list, NULL);
 	free_range(&range_attrs, &ops, i);
 
 	appt = allocate_appt_struct(appt_read,
@@ -1013,7 +1007,7 @@ build_new_attrval(CSA_attribute *attrval, char *name, char *tag, char *value)
 				l_ptr->rights = atoi(b_ptr);
 
 				b_ptr = s_ptr + 1;
-				if (s_ptr = strchr(b_ptr, '\n'))
+				if ((s_ptr = strchr(b_ptr, '\n')))
 					*s_ptr = '\0';
 
 				l_ptr->user->user_name = cm_strdup(b_ptr);
@@ -1155,7 +1149,7 @@ read_new_appt(FILE *fp, Dtcm_appointment **appt, Props *p, int version)
 		a_name = a_tag = a_value = NULL;
 
 		b_ptr = line;
-		if (c_ptr = strchr(line, ':'))
+		if ((c_ptr = strchr(line, ':')))
 		{
 			*c_ptr = '\0';
 			a_name = cm_strdup(b_ptr);
@@ -1169,7 +1163,7 @@ read_new_appt(FILE *fp, Dtcm_appointment **appt, Props *p, int version)
 		if (!*b_ptr)
 			break;
 
-		if (c_ptr = strchr(b_ptr, ':'))
+		if ((c_ptr = strchr(b_ptr, ':')))
                 {       
                         *c_ptr = '\0';
                         a_tag = cm_strdup(b_ptr);
@@ -1253,8 +1247,7 @@ dow_str(
 static void
 generate_recurrence_rule(Dtcm_appointment *appt, int version) {
 
-	char            *str,
-                         rule_buf1[32],
+	char            rule_buf1[32],
                          rule_buf2[32];
 	CSA_sint32	repeat_type;
 	CSA_uint32	repeat_nth = 0;
@@ -1778,7 +1771,6 @@ attrs_to_string(CSA_attribute * attrs, int num_attrs)
 char *
 entry_to_attrval_string(CSA_session_handle target, CSA_entry_handle entry)
 {
-	int 			i;
 	char			*ptr;
 	CSA_attribute_reference *names;
 	CSA_attribute   	*attrs_ret;
@@ -1806,7 +1798,6 @@ entry_to_attrval_string(CSA_session_handle target, CSA_entry_handle entry)
 char *
 calendar_to_attrval_string(CSA_session_handle cal)
 {
-	int 			i;
 	CSA_uint32		num_attrs, num_attrs_ret;
 	CSA_attribute_reference	*names;
 	char			*ptr;
@@ -1832,8 +1823,6 @@ extern char*
 parse_appt_to_string(CSA_session_handle target, CSA_entry_handle entry, Props *p, int version) {
 	char			*ret_val, *attr_string;
 	Dtcm_appointment	*appt;
-	CSA_uint32      	na_ret; /* num of attributes actually read */
-	CSA_attribute   	a_ret;  /* list of attrs actually read */
 
 	attr_string = entry_to_attrval_string(target, entry);
 
@@ -1854,7 +1843,7 @@ parse_appt_to_string(CSA_session_handle target, CSA_entry_handle entry, Props *p
 
 extern char*
 parse_attrs_to_string(Dtcm_appointment *appt, Props *p, char *attr_string) {
-	int		nlcount, duration, repeat_nth, repeat_wk, wk;
+	int		nlcount, repeat_nth, repeat_wk, wk;
 	char		*whatstr, d_buf[MAXNAMELEN],
 			s_buf[MAXNAMELEN], e_buf[MAXNAMELEN], w_buf[MAXNAMELEN],
 			r_buf[MAXNAMELEN], f_buf[MAXNAMELEN], *appt_what,
@@ -1967,9 +1956,6 @@ create_rfc_message(char *address_list,
 		char *subject, 
 		char **appointment_objects,
 		int  num_objects) {
-
-	char *unique_label;
-
 	/* do *not* put these header strings in a message catalog.  
 	   These are invariants specified by MIME */
 
@@ -2143,7 +2129,7 @@ static char *periodstrings[] = {
 extern void
 str_to_period(char *ps, CSA_sint32 *repeat_type, int *repeat_nth) {
 	boolean_t	compute_times = B_FALSE;
-	char		*ps2, *ptr, *ptr2, *unit;
+	char		*ps2, *ptr, *unit;
  
 	*repeat_type = '\0';
 	*repeat_nth = 0;

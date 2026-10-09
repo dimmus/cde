@@ -209,11 +209,12 @@ BuildPrinterLists(
 {
     String* server_list;
     int server_count;
-    int i, j;
+    int i;
     Display* display;
+#if 0 && defined(PRINTING_SUPPORTED)
+    int j;
     int error_base;
     int event_base;
-#if 0 && defined(PRINTING_SUPPORTED)
     XPPrinterList xp_printer_list;
 #endif /* PRINTING_SUPPORTED */
     DtPrintSelectPrinterList printer_list;
@@ -344,13 +345,11 @@ BuildPrinterSelectionItems(
     int current_item;
     String name, full_name, desc;
     char* server_name;
-    int server_len;
     
     items = (XmStringTable)XtCalloc(item_count, sizeof(XmString));
     for(i = 0, current_item = 0; i < dpd->xp_server_count; i++)
     {
 	server_name = dpd->xp_server_list[i];
-	server_len = strlen(server_name);
 	
 	for(j = 0; j < dpd->printer_counts[i]; j++, current_item++)
 	{
@@ -596,9 +595,9 @@ CreatePrinterInfoBox(
     XmString title_xmstr;
     Widget manager;
     Widget description_label, description;
-    Widget name_label, name;
-    Widget format_label, format;
-    Widget model_label, model;
+    Widget name_label;
+    Widget format_label;
+    Widget model_label;
     XmString label;
     
     title_xmstr = XmStringCreateLocalized(PRINTER_INFO_TITLE);
@@ -687,8 +686,7 @@ CreatePrinterInfoBox(
 				XmNtopOffset,        5,
 				NULL);
     XmStringFree(label);
-    name = 
-	XtVaCreateManagedWidget("Name",
+    XtVaCreateManagedWidget("Name",
 				xmLabelWidgetClass,
 				manager,
 				XmNleftAttachment,   XmATTACH_WIDGET,
@@ -712,8 +710,7 @@ CreatePrinterInfoBox(
 				XmNtopOffset,        5,
 				NULL);
     XmStringFree(label);
-    format = 
-	XtVaCreateManagedWidget("Format",
+    XtVaCreateManagedWidget("Format",
 				xmLabelWidgetClass,
 				manager,
 				XmNleftAttachment,   XmATTACH_WIDGET,
@@ -737,8 +734,7 @@ CreatePrinterInfoBox(
 				XmNtopOffset,        5,
 				NULL);
     XmStringFree(label);
-    model = 
-	XtVaCreateManagedWidget("Model",
+    XtVaCreateManagedWidget("Model",
 				xmLabelWidgetClass,
 				manager,
 				XmNalignment,        XmALIGNMENT_BEGINNING,

@@ -168,7 +168,7 @@ ttsnoop.C ttsnoop.h dtb_utils.c dtb_utils.h: ttsnoop.bip ttsnoop.C.src
 	-e 's/\(MoreButton;\)/\1Boolean _DtCanHelp( const char * );/' \
 	-e 's/\(XtManageChild(Quick_help\)/XtSetSensitive(MoreButton,_DtCanHelp(help_data->help_text));\1/' \
 	-e 's/\(buffer, vol = NULL, loc = NULL;\)/\1Boolean _DtHelped( Widget );/' \
-	-e 's/\(if( (cp=strrchr\)/if (_DtHelped( help_dialog)) return;\1/' \
+	-e 's/\(if( (cp=strrchr\)/if (_DtHelped( help_dialog)) { return; }\1/' \
 	dtb_utils.c > dtb_utils.c.patched
 	mv dtb_utils.c.patched dtb_utils.c
 

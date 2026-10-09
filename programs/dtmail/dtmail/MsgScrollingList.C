@@ -455,7 +455,6 @@ MsgScrollingList::load_headers(
     // Create an XmString and toss it into the XmStrCollector. 
 
     select_item = 0;
-    int n_vis = 0;
     MsgStruct *ms;
 
     for (tmpMH = mbox->getFirstMessageSummary(error, _header_info, info);
@@ -470,7 +469,6 @@ MsgScrollingList::load_headers(
 	}
  	else {
 	    insertMsg(tmpMH);
-	    n_vis += 1;
 	}
 
     	ms = get_message_struct(get_num_messages());
@@ -559,7 +557,6 @@ MsgScrollingList::load_headers(
 #endif
     XmString complete_header; // read status + attach + header_text.
     int num_items;
-    int num_new = 0, num_vis = 0;
     DtMailHeaderLine info;
     DtMailEnv error;
     DtMail::MailBox * mbox = this->parent()->mailbox();
@@ -591,8 +588,7 @@ MsgScrollingList::load_headers(
 
     for (tmpMH = mbox->getNextMessageSummary(error, last, _header_info, info);
 	 tmpMH && !error.isSet();
-	 tmpMH = mbox->getNextMessageSummary(error, tmpMH, _header_info, info),
-	 num_new++) {
+	 tmpMH = mbox->getNextMessageSummary(error, tmpMH, _header_info, info)) {
 
 	DtMail::Message * msg = mbox->getMessage(error, tmpMH);
 	if (msg->flagIsSet(error, DtMailMessageDeletePending) == DTM_TRUE) {
@@ -601,7 +597,6 @@ MsgScrollingList::load_headers(
 	}
 	else {
 	    insertMsg(tmpMH);
-	    num_vis += 1;
 	}
 
     	ms = get_message_struct(get_num_messages());
@@ -1233,7 +1228,7 @@ MsgScrollingList::display_message(
     //
 
     DtMail::Message * msg = mbox->getMessage(mail_error, msg_num);
-    DtMail::Envelope * env = msg->getEnvelope(mail_error);
+    msg->getEnvelope(mail_error);
 
 
     // There are multiple paths to this place:
@@ -1564,7 +1559,7 @@ MsgScrollingList::select_all_and_display_last(
     // Select this message in the scrolling list and IF
     // it is the last message, display it.
     //
-    if (handleOffset == elements - 1) {
+    if ((unsigned int) handleOffset == elements - 1) {
       display_and_select_message(error, handleArray[handleOffset]);
     } else {
       XmListSelectPos(_w, item_pos + 1, FALSE);
@@ -1606,7 +1601,6 @@ void
 MsgScrollingList::viewInSeparateWindow(DtMailEnv &mail_error)
 {
     FORCE_SEGV_DECL(const char, title);
-    FORCE_SEGV_DECL(char, header_txt);
     FORCE_SEGV_DECL(MsgStruct, tmpMS);
     DtMailMessageHandle  msgHandle;
     DtMail::MailBox	*mbox=parent()->mailbox();
@@ -2032,9 +2026,7 @@ void
 MsgScrollingList::undelete_messages(MsgHndArray *tmpMHlist)
 {
     FORCE_SEGV_DECL(MsgStruct, tmpMS);
-    FORCE_SEGV_DECL(XmString, deleted_headers);
     int  i, num_entries, entry_position, del_pos;
-    int whichToSelectDisplay = 0;
     DtMail::MailBox	*mbox=parent()->mailbox();
     DtMail::Message * tmpMsg;
     DtMailEnv mail_error;
@@ -2347,7 +2339,7 @@ MsgScrollingList::checkDisplayProp(void)
     for (int fr = 0; fr < _msgs->length(); fr++) {
 	XmStringFree(normal_list[fr]);
     }
-    delete normal_list;
+    delete [] normal_list;
 
     UndelFromListDialog * del_dialog = _parent->get_undel_dialog();
     if (del_dialog) {
@@ -2373,7 +2365,7 @@ MsgScrollingList::checkDisplayProp(void)
 	for (int fr2 = 0; fr2 < _deleted_messages->length(); fr2++) {
 	    XmStringFree(del_list[fr2]);
 	}
-	delete del_list;
+	delete [] del_list;
     }
 }
 
@@ -2486,7 +2478,7 @@ MsgScrollingList::updateListItems(int current,
 
     XtVaSetValues (_w, XmNselectionPolicy, XmEXTENDED_SELECT, NULL);
     XtVaSetValues (_w, XmNselectionMode, XmNORMAL_MODE, NULL);
-    delete newList;
+    delete [] newList;
 }
 
 XmString
@@ -2775,9 +2767,6 @@ void
 MsgScrollingList::shutdown()
 {
     int num_entries, i;
-    FORCE_SEGV_DECL(MsgStruct, tmpMS);
-    DtMailMessageHandle tmpMH;
-    DtMail::MailBox	*mbox=parent()->mailbox();
     DtMailEnv mail_error;
 
     // Initialize the mail_error.
@@ -2788,9 +2777,6 @@ MsgScrollingList::shutdown()
     num_entries = _deleted_messages->length();
 
     for (i = 0; i < num_entries; i++) {
-	tmpMS = _deleted_messages->at(i);
-	tmpMH = tmpMS->message_handle;
-
 //	mbox->deleteMsg(mail_error, tmpMH);
 	
     }

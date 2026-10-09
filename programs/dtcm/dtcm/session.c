@@ -83,8 +83,7 @@ CMSaveSessionCB (
 			*command,
 			*name;
 	FILE 		*fp;
-	int  		 n, 
-			 actualFormat,
+	int  		 actualFormat,
 			 command_len,
 			 save_session = True;
 	Position 	 x, y;
@@ -210,7 +209,6 @@ void
 GetSessionInfo(
 	Calendar  	*c)
 {
-    XrmDatabase 	 db;
     char 		*path;
     XrmName 		 xrm_name[5];
     XrmRepresentation 	 rep_type;

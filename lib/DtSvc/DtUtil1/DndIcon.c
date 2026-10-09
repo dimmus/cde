@@ -183,7 +183,6 @@ selectDragSource(
 	DtDndDragSource	sourceType,
 	Widget		sourceIcon)
 {
-	Display		*dpy 		= XtDisplayOfObject(xmScreen);
 	Widget 		validIcon, invalidIcon, noneIcon,
 			moveIcon, copyIcon, linkIcon,
 			defSourceIcon;
@@ -380,10 +379,9 @@ makeDragCollection(
 	Widget		widget)
 {
 	DragCollection	*dc		= XtNew(DragCollection);
-	Display		*dpy 		= XtDisplayOfObject(widget);
 	Screen		*screen		= XtScreenOfObject(widget);
-	Window		root 		= RootWindowOfScreen(screen);
-	Widget		xmScreen 	= XmGetXmScreen(screen);
+
+	(void) XmGetXmScreen(screen);
 
 	/*
 	 * Text & Data State Cursors

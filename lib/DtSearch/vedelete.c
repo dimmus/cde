@@ -444,7 +444,7 @@ NOTHING_TO_DO:
 	    CRSET (PROGNAME "178", &dba, vistano);
 	    CRREAD (PROGNAME "179", OR_OBJKEY, charbuf, vistano);
 	    fprintf (aa_stderr, " #%d\tdba=%ld:%ld  key='%s'\n",
-		i, dba>>24, dba & 0xffffff, charbuf);
+		i, (long)(dba>>24), (long)(dba & 0xffffff), charbuf);
 	  }
     }
     /* Sort the array of database addresses.

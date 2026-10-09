@@ -884,7 +884,7 @@ static void _DtEnvMapIt(
 
     char **pathList;
 
-    int    availPathListSize, pathListCount, availEnvStrSize, len, tmpi, i;
+    int    availPathListSize, pathListCount, availEnvStrSize, tmpi, i;
     int    considerMapping;
     _Xstrtokparams	strtok_buf;
 
@@ -1232,7 +1232,6 @@ void _DtEnvMapForRemote (char *targetHost)
 {
     int    i, cacheRegen;
     char  *mapListStr, *tmpPtr;
-    char **mapList;
 
     cacheForTargetHost *targetCache;
     int ttMark = 0;

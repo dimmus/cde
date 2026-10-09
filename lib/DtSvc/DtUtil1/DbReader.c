@@ -263,7 +263,6 @@ _DtDbRead (
    static Boolean first_time = True;
    static char local_host[MAXHOSTNAMELEN];
    Boolean versionCanBeSet;
-   char * verString;
    int NumberFieldsAllocated = 0;
    char *tmpBuffer = NULL;	/* Buffer to store a field value that may
 				   grow to an unlimited size */
@@ -313,7 +312,6 @@ _DtDbRead (
    for (i=0; dirs->dirs[i] != NULL; i++) 
    {
       char *host = NULL,
-	   *dir = NULL,
 	   *pch = NULL,
 	   *tmp = NULL,
 	   *host_prefix = NULL;
@@ -335,7 +333,6 @@ _DtDbRead (
          char * lastChar;
          char * hpx;
 
-	 dir = pch + 1;
 	 *pch = '\0';
 	 if (strcmp (local_host, host)) 
 	 {
@@ -493,7 +490,7 @@ get_variable (
     * The variable name was not found in the variable list, so look
     * for it in the environment data.
     */
-       for (i=0, ppchar = environ; *ppchar; *ppchar++, i++) 
+       for (i=0, ppchar = environ; *ppchar; ppchar++, i++) 
        {
 	  if ((tmp = (char *) DtStrrchr (*ppchar, '=')) != NULL)
 	  {
@@ -953,7 +950,6 @@ ReadNextEntry(
 	char **tmpLine) 
 {
    int i;
-   int len;
    int indx = 0;
    Boolean multi_line = False;	/* Previous line. */
    Boolean line_cont = False;	/* Current line. */

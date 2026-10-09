@@ -62,12 +62,8 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
     short chunkLineWidth;
     wchar_t *linePtr;
     wchar_t *wc;
-    TermFont termFont;
-    int currentColorPair = 0;
-    int currentVideo = 0;
     short chunkStartColumn;
     short chunkWidth;
-    short chunkLength;
     short thisStartColumn = 0;
     short thisEndColumn = 0;
     enhValues enhancements;
@@ -79,7 +75,6 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
     TermEnhInfoRec enhInfo;
     Boolean checkSelection = False;
     Boolean inSelection;
-    int selectionEnd;
     Pixel tmpPixel;
     XmTextPosition  begin, end;
     TermCharInfoRec startCharInfo;
@@ -117,7 +112,6 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 
     if (!tpd->renderGC.gc) {
 	/* get a drawImageString GC... */
-	int i;
 	XGCValues values;
 
 	/***********************************************************

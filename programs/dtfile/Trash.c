@@ -263,9 +263,6 @@ static char * TRASH_DIR = ".dt/Trash";
 static char * TRASH_INFO_FILE = ".dt/Trash/.trashinfo";
 static char * NEW_TRASH_INFO_FILE = ".dt/.tmptrashinfo";
 
-static char * RM = "/bin/rm";
-static char * RM_ARGS = "-rf";
-
 static Widget * selectAllBtn = NULL;
 static Widget * restoreBtn = NULL;
 static Widget * removeBtn = NULL;
@@ -288,7 +285,9 @@ static int sacred_dir_count = 0;
 
 static Boolean verifyPromptsEnabled;     /* do we prompt the user? */
 
+#ifndef SUN_PERF
 static Tt_message global;
+#endif /* SUN_PERF */
 #ifdef SUN_PERF
 static Tt_message *global_msg_list ;
 static int global_msg_cnt = 0 ;
@@ -341,8 +340,6 @@ void CloseTrash(
                         Widget w,
                         XtPointer client_data,
                         XtPointer call_data) ;
-static String GetBasePath(
-                        String fullPath) ;
 static Boolean ReadTrashList( void ) ;
 static void RemoveOkCB(
                         Widget w,
@@ -458,7 +455,7 @@ InitializeTrash( Boolean enableVerifyPrompt )
   sacred_dir_list[sacred_dir_count++] = XtNewString(TrashInfoFileName);
 
   ptr = TrashInfoFileName + 1;
-  while(ptr = DtStrchr(ptr, '/'))
+  while((ptr = DtStrchr(ptr, '/')))
   {
     /* All parent components of the user's home dir cannot be deleted */
     *ptr = '\0';
@@ -685,7 +682,6 @@ ReadTrashList( void )
 static Boolean
 WriteTrashEntries( void )
 {
-   static String path = NULL;
    FILE * newFile;
    int i;
 
@@ -1035,8 +1031,6 @@ TrashDisplayHandler(
       Colormap colormap;
       XClassHint classHints;
       FileMgrRec * file_mgr_rec;
-      unsigned int width;
-      unsigned int height;
       Pixmap pixmap;
       Arg args[3];
 
@@ -1332,7 +1326,6 @@ void
 TrashRemoveHandler(
    Tt_message msg)
 {
-   char *ptr;
    char *str;
    int number;
    char **file_list;
@@ -2716,7 +2709,7 @@ MoveToTrashProcess(
    DIR * dirp;
    struct dirent * entry;
    Boolean success;
-   int i, rc, rv;
+   int i, rc;
    char savechar;
 
    for (i = 0; i < file_count; i++)
@@ -2731,8 +2724,8 @@ MoveToTrashProcess(
          pipe_msg = PIPEMSG_OTHER_ERROR;
          rc = BAD_FILE_ERROR;
          DPRINTF(("MoveToTrashProcess: sending BAD_FILE_ERROR\n"));
-         rv = write(pipe_fd, &pipe_msg, sizeof(short));
-         rv = write(pipe_fd, &rc, sizeof(int));
+         write(pipe_fd, &pipe_msg, sizeof(short));
+         write(pipe_fd, &rc, sizeof(int));
          continue;
       }
       if (path && MatchesSacredDirectory(path))
@@ -2742,8 +2735,8 @@ MoveToTrashProcess(
          pipe_msg = PIPEMSG_OTHER_ERROR;
          rc = BAD_FILE_SACRED;
          DPRINTF(("MoveToTrashProcess: sending BAD_FILE_SACRED\n"));
-         rv = write(pipe_fd, &pipe_msg, sizeof(short));
-         rv = write(pipe_fd, &rc, sizeof(int));
+         write(pipe_fd, &pipe_msg, sizeof(short));
+         write(pipe_fd, &rc, sizeof(int));
          continue;
       }
 
@@ -2781,8 +2774,8 @@ MoveToTrashProcess(
            XtFree(path);
            pipe_msg = PIPEMSG_OTHER_ERROR;
            DPRINTF(("MoveToTrashProcess: sending BAD_TRASH message\n"));
-           rv = write(pipe_fd, &pipe_msg, sizeof(short));
-           rv = write(pipe_fd, &rc, sizeof(int));
+           write(pipe_fd, &pipe_msg, sizeof(short));
+           write(pipe_fd, &rc, sizeof(int));
            continue;
          }
          else if (CheckAccess(path, W_OK) != 0 && !S_ISLNK(s1.st_mode))
@@ -2792,8 +2785,8 @@ MoveToTrashProcess(
             pipe_msg = PIPEMSG_OTHER_ERROR;
             rc = VERIFY_FILE;
             DPRINTF(("MoveToTrashProcess: sending VERIFY_FILE\n"));
-            rv = write(pipe_fd, &pipe_msg, sizeof(short));
-            rv = write(pipe_fd, &rc, sizeof(int));
+            write(pipe_fd, &pipe_msg, sizeof(short));
+            write(pipe_fd, &rc, sizeof(int));
             continue;
          }
 
@@ -2827,8 +2820,8 @@ MoveToTrashProcess(
                pipe_msg = PIPEMSG_OTHER_ERROR;
                rc = VERIFY_DIR;
                DPRINTF(("MoveToTrashProcess: sending VERIFY_DIR\n"));
-               rv = write(pipe_fd, &pipe_msg, sizeof(short));
-               rv = write(pipe_fd, &rc, sizeof(int));
+               write(pipe_fd, &pipe_msg, sizeof(short));
+               write(pipe_fd, &rc, sizeof(int));
                continue;
             }
          }
@@ -2844,7 +2837,7 @@ MoveToTrashProcess(
       {
          pipe_msg = PIPEMSG_DONE;
          DPRINTF(("MoveToTrashProcess: sending DONE\n"));
-         rv = write(pipe_fd, &pipe_msg, sizeof(short));
+         write(pipe_fd, &pipe_msg, sizeof(short));
          PipeWriteString(pipe_fd, path);
          PipeWriteString(pipe_fd, to);
       }
@@ -2889,6 +2882,7 @@ MoveToTrashPipeCB(
    pipe_msg = -1;
    n = PipeRead(*fd, &pipe_msg, sizeof(short));
    DPRINTF(("MoveToTrashPipeCB: n %d, pipe_msg %d\n", n, pipe_msg));
+   (void) n; /* used only in DPRINTF */
 
    switch (pipe_msg)
    {
@@ -2965,7 +2959,6 @@ MoveToTrashPipeCB(
         if (badCount < 8)
         {
            char *tmpmsg;
-           Boolean errflg = False;
            if(cb_data->rc[i] == BAD_TRASH_DIRECTORY)
            {
               tmpmsg = GETMESSAGE(27, 113,
@@ -3156,7 +3149,7 @@ MoveToTrashPipeCB(
      else
      {
        buf = XtRealloc(buf,strlen(buf)+strlen(file_error)+3);
-       sprintf(buf,"%s%s\n",buf,file_error);
+       sprintf(buf + strlen(buf),"%s\n",file_error);
      }
      XtFree(file_error);
    }
@@ -3170,7 +3163,7 @@ MoveToTrashPipeCB(
      else
      {
        buf = XtRealloc(buf,strlen(buf)+strlen(no_file_error)+3);
-       sprintf(buf,"%s%s\n",buf,no_file_error);
+       sprintf(buf + strlen(buf),"%s\n",no_file_error);
      }
      XtFree(no_file_error);
    }
@@ -3184,7 +3177,7 @@ MoveToTrashPipeCB(
      else
      {
        buf = XtRealloc(buf,strlen(buf)+strlen(sacred_error)+3);
-       sprintf(buf,"%s%s\n",buf,sacred_error);
+       sprintf(buf + strlen(buf),"%s\n",sacred_error);
      }
      XtFree(sacred_error);
    }
@@ -3451,14 +3444,13 @@ RestoreProcess(
 	int *rc,
 	Boolean CheckedAlready)
 {
-   int i, j, rv;
+   int i, j;
    char *full_dirname;
    char *from, *to;
    char *ptr;
    char buf[MAX_PATH];
    short pipe_msg;
    int status;
-   char **RestoreList= NULL;
 
    /* get full path name of target directory */
    if (target_dir)
@@ -3472,8 +3464,8 @@ RestoreProcess(
         pipe_msg = PIPEMSG_DONE;
         rc[0] = -1;
         DPRINTF(("RestoreProcess: Unable to Resolve local path name\n"));
-        rv = write(pipe_fd, &pipe_msg, sizeof(short));
-        rv = write(pipe_fd, rc, sizeof(int));
+        write(pipe_fd, &pipe_msg, sizeof(short));
+        write(pipe_fd, rc, sizeof(int));
         return;
       }
    }
@@ -3543,8 +3535,8 @@ RestoreProcess(
    /* send return codes back trough the pipe */
    pipe_msg = PIPEMSG_DONE;
    DPRINTF(("RestoreProcess: sending DONE\n"));
-   rv = write(pipe_fd, &pipe_msg, sizeof(short));
-   rv = write(pipe_fd, rc, file_count * sizeof(int));
+   write(pipe_fd, &pipe_msg, sizeof(short));
+   write(pipe_fd, rc, file_count * sizeof(int));
 
    XtFree(full_dirname);
 }
@@ -3566,17 +3558,17 @@ RestorePipeCB(
    int i, j, k, n, rc;
    char *title, *err_msg, *err_arg;
    String buf;
-   int bufsize,index;
+   int bufsize;
    int RestoreIndex=0;
    char **ToRestoreList=NULL;
    char **FromRestoreList=NULL;
    char *target_host,*target_dir;
-   Tt_status msg;
 
    /* read the next msg from the pipe */
    pipe_msg = -1;
    n = PipeRead(*fd, &pipe_msg, sizeof(short));
    DPRINTF(("RestorePipeCB: n %d, pipe_msg %d\n", n, pipe_msg));
+   (void) n; /* used only in DPRINTF */
 
    switch (pipe_msg)
    {
@@ -3835,7 +3827,7 @@ EmptyTrashProcess(
 	int del_count,
 	int *rc)
 {
-   int i, rv;
+   int i;
    short pipe_msg;
 
    /*
@@ -3851,8 +3843,8 @@ EmptyTrashProcess(
    /* send return codes back trough the pipe */
    pipe_msg = PIPEMSG_DONE;
    DPRINTF(("EmptyTrashProcess: sending DONE\n"));
-   rv = write(pipe_fd, &pipe_msg, sizeof(short));
-   rv = write(pipe_fd, rc, del_count * sizeof(int));
+   write(pipe_fd, &pipe_msg, sizeof(short));
+   write(pipe_fd, rc, del_count * sizeof(int));
 }
 
 
@@ -3880,6 +3872,7 @@ EmptyTrashPipeCB(
    pipe_msg = -1;
    n = PipeRead(*fd, &pipe_msg, sizeof(short));
    DPRINTF(("EmptyTrashPipeCB: n %d, pipe_msg %d\n", n, pipe_msg));
+   (void) n; /* used only in DPRINTF */
 
    switch (pipe_msg)
    {
@@ -4232,7 +4225,7 @@ CheckDeletePermissionRecur(
 
   first_file = True;
 
-  while (dp = readdir (dirp))
+  while ((dp = readdir (dirp)))
   {
     if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
     {
@@ -4282,9 +4275,7 @@ RestoreObject(
         Boolean CheckedAlready)
 {
   struct stat statsrc,stattar;
-  Boolean status;
   char *localdir = NULL,*chrptr;
-  int rv;
 
   if(!CheckedAlready)
   {
@@ -4373,10 +4364,8 @@ RestoreVerifyOk(
     }
     else
     {
-      int status,j,k;
+      int status;
       struct stat s1;
-      char *realTarget,*tptr;
-      Boolean moveop;
       char **FileList;
 
       if(lstat(dirs[1],&s1) < 0)

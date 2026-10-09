@@ -157,7 +157,6 @@ DtkshCvtStringToScreen(
         XrmValuePtr toval )
 {
    static Screen * screen;
-   char * errmsg;
    char * p;
 
    if (fval->size <= 0 || fval->addr == NULL) 
@@ -408,7 +407,6 @@ DtkshCvtStringToCallback(
 {
    static XtCallbackList cb;
    dtksh_client_data_t *cdata;
-   classtab_t *c = DTKSHConversionClass;
    wtab_t *w = DTKSHConversionWidget;
    char * errmsg;
 
@@ -501,7 +499,6 @@ DtkshCvtWidgetToString(
         XrmValuePtr toval,
         XtPointer data )
 {
-   char *wname;
    Widget widget;
    wtab_t *w;
    char * errmsg;
@@ -639,7 +636,6 @@ DtkshCvtWidgetClassToString(
         XrmValuePtr toval,
         XtPointer data )
 {
-   static char result[16];
    char * errmsg;
    WidgetClass wc;
    int i;
@@ -691,10 +687,8 @@ DtkshCvtStringToWidgetClass(
         XrmValuePtr toval,
         XtPointer data )
 {
-   static char result[16];
    char * errmsg;
    static WidgetClass wc;
-   int i;
    char * wcName;
    char * hashInfo;
    classtab_t * classtab;

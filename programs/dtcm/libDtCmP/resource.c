@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)resource.c 1.9 94/11/07 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdlib.h>
 #include <stdio.h>

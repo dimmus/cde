@@ -261,10 +261,9 @@ int
 main(int argc, char **argv)
 {
     int tscreen;
-    XtInputId xtid;
     Window sel_window;
     Display *sel_display;
-    char *display_str, *auth_file;
+    char *display_str;
     Bool security_flag;
     XEvent report;
     struct sigaction svec;
@@ -278,7 +277,6 @@ main(int argc, char **argv)
     g.default_pdm = DEFAULT_PDM_EXECUTABLE;
     g.override_pdm = (char *) NULL;
     display_str = getenv("DISPLAY");
-    auth_file = (char *) NULL;
     g.log_file  = (char *) NULL;
     security_flag  = False;
 
@@ -302,7 +300,7 @@ main(int argc, char **argv)
             security_flag = True;
         }
         else if (!strcmp (*argv, "-f")) {
-            auth_file = *++argv;
+            ++argv;
         }
         else if (!strcmp (*argv, "-l")) {
             g.log_file = *++argv;
@@ -368,7 +366,7 @@ main(int argc, char **argv)
 	fprintf( stderr , "\n" );
 	exit(0);
     }
-    xtid = XtAppAddInput( g.context, xtkick_pipeG[0],
+    XtAppAddInput( g.context, xtkick_pipeG[0],
 			  (XtPointer) XtInputReadMask,
 			  xtkick_proc, (XtPointer) NULL );
 

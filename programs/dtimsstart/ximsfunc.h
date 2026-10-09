@@ -225,7 +225,8 @@ void	*_mp_;
 #define	next_field(p)	\
 	for ((p)++; *(p) && !is_white(*(p)); (p)++) ; skip_white(p)
 #define	cut_field(p)	\
-	for ((p)++; *(p) && !is_white(*(p)); (p)++) ; *(p)++ = 0; skip_white(p)
+	for ((p)++; *(p) && !is_white(*(p)); (p)++) ; \
+	*(p)++ = 0; skip_white(p)
 
 	/* misc */
 #define Max(a, b)	((a) < (b) ? (b) : (a))

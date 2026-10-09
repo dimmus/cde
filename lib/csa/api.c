@@ -700,7 +700,6 @@ csa_unregister_callback(
 	Calendar	*cal;
 	boolean_t	match_one = B_FALSE;
 	boolean_t	match_all = B_FALSE;
-	boolean_t	matched;
 	CSA_flags	all = 0, unreg;
 	_DtCmCallbackEntry *cb, *ncb;
 
@@ -731,7 +730,6 @@ csa_unregister_callback(
 	 */
 	cb = cal->cb_list;
 	while (cb) {
-		matched = B_TRUE;
 		ncb = cb->next;
 
 		if (!(reason & cb->reason) ||
@@ -744,7 +742,7 @@ csa_unregister_callback(
 
 		match_one = B_TRUE;
 
-		if (cb->reason = (cb->reason | reason) ^ reason) {
+		if ((cb->reason = (cb->reason | reason) ^ reason)) {
 			all = all | cb->reason;
 		} else {
 			/* remove entry */

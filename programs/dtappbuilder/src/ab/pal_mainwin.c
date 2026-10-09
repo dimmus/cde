@@ -514,13 +514,11 @@ mainwin_prop_apply(
 )
 {
     PropMainwinSettingsRec 	*pms = &(prop_mainwin_settings_rec[type]);
-    ABObj			module;
     ABObj			area;
     BOOL			area_set;
     STRING			value, icon, icon_mask, icon_label;
     BOOL			reset_bg = False;
     BOOL			reset_fg = False;
-    BOOL                        size_chg = False;
     int				new_w, new_h;
 
     if (!verify_props(type))
@@ -557,8 +555,6 @@ mainwin_prop_apply(
     }
     if (prop_changed(pms->areas.changebar))
     {
-	module = obj_get_module(pms->current_obj);
-
 	/* Menubar */
 	area = objxm_comp_mainwin_get_area(pms->current_obj, AB_CONT_MENU_BAR);
 	area_set = prop_checkbox_get_value(&(pms->areas), AB_CONT_MENU_BAR);
@@ -593,8 +589,6 @@ mainwin_prop_apply(
     {
 	abobj_set_size_policy(pms->current_obj,
 		prop_radiobox_get_value(&(pms->size_policy)) == SIZE_FIXED_KEY);
-
-	size_chg = True;
     }
     if (prop_changed(pms->geometry.changebar))
     {

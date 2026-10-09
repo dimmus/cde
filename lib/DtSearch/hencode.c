@@ -253,7 +253,7 @@ int             process_char (UCHAR ch, char *bitstr)
 		convert_str_2_char (&coded_char);
 		bitstr[total_num_chars - 1] = coded_char;
 		num_of_bits_in_code -= bits_left;
-		strcpy (temp_code, &huff_code[i][bits_left]);
+		strcpy (temp_code, &huff_code[i][(int)bits_left]);
 		bit_pos = 0;
 	    }
 	}	/* end of else loop */

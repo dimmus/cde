@@ -223,10 +223,6 @@ static int    	initiate_resize(
 		    RESIZE_DIR 	dir
         	);
 
-static int      initiate_mselect(
-                    Widget     	widget,
-                    ABObj      	obj
-                );
 
 /*************************************************************************
 **                                                                      **
@@ -286,7 +282,6 @@ extern const int AB_drag_threshold;
 
 static RESIZE_DIR resize_dir      = NONE;
 static Boolean just_moved         = False;
-static Boolean just_mselected	  = False;
 static Boolean potential_move	  = False;
 static Boolean move_in_progress   = False;
 static Boolean resize_in_progress = False;
@@ -441,7 +436,6 @@ abobjP_enable_build_actions(
     Widget 	widget
 )
 {
-    ABObj 	 evObj;
     ABObj 	 rootObj = obj_get_root(obj);
 
     if (obj_has_flag(obj, BuildActionsFlag))
@@ -506,11 +500,6 @@ abobjP_enable_build_actions(
 		XtNtranslations, build_transtbl,
         	NULL);
 
-    if (obj_is_item(obj))
-	evObj = obj_get_parent(obj);
-    else
-	evObj = obj;
-
     /* The DtMenuButton widget uses an internal event-handler to post its menu,
      * so our standard translations will not get called. Therefore,  we use
      * an event-handler to get these buttons events before the widget does.
@@ -553,7 +542,6 @@ abobjP_disable_build_actions(
     Widget  	widget
 )
 {
-    ABObj	   evObj;
     ABObj          rootObj = obj_get_root(obj);
     XtTranslations orig_trans;
 
@@ -575,11 +563,6 @@ abobjP_disable_build_actions(
 
     if (!obj_has_flag(obj, BuildActionsFlag))
 	return;  /* No actions to disable */
-
-    if (obj_is_item(obj))
-        evObj = obj_get_parent(obj);
-    else
-        evObj = obj;
 
     abobj_deselect(obj);
  
@@ -1100,8 +1083,6 @@ interpose_button_event(
     static XEvent		event_cpy;
     static DoubleClickInfo	*d_click = NULL;
     static XtIntervalId		timer_id = 0;
-    ABObj               	obj = (ABObj)client_data;
-    ABObj               	moveObj;
     
     if (event->type == ButtonPress || event->type == ButtonRelease)
     {

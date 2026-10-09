@@ -205,7 +205,7 @@ void
 forceUpdate( Widget w )
 {
   Widget diashell, topshell;
-  Window diawindow, topwindow;
+  Window diawindow;
   XtAppContext cxt = XtWidgetToApplicationContext( w );
   Display		*dpy;
   XWindowAttributes	xwa;
@@ -217,7 +217,6 @@ forceUpdate( Widget w )
 
   dpy=XtDisplay(diashell);
   diawindow=XtWindow( diashell );
-  topwindow=XtWindow(topshell);
   while ( XGetWindowAttributes(dpy,diawindow,&xwa)  
           && XEventsQueued( dpy, QueuedAlready) ) {
       
@@ -414,7 +413,6 @@ Tt_message attachmt_msg_handler(
     				char *file,
     				char *docname)
 {
-   static const char *thisFcn = "attachmt_msg_handler()";
    Tt_status status = TT_OK;
    Tt_pattern *pattern;
    SendMsgDialog *compose;
@@ -549,7 +547,9 @@ tooltalk_msg_handler(
     char *docname 
 )
 {
+#ifdef WM_TT
     static const char *thisFcn = "RoamApp::tooltalk_msg_handler()";
+#endif
     Tt_status status = TT_OK;
     SendMsgDialog *compose;
     RoamApp *roamapp = (RoamApp *) client_data;
@@ -736,7 +736,6 @@ tooltalk_msg_handler(
 	    // simply make sure it's displayed in the current workspace.
 	    if (ses->isMboxOpen(file))
 	    {
-		Widget w = NULL;
 		roamwin = ses->getRMW(file);
 		ses->activateRMW(roamwin);
 		if (NULL != roamwin) roamwin->displayInCurrentWorkspace();
@@ -787,7 +786,6 @@ tooltalk_msg_handler(
 	      (MsgHandlerDoneCbData*) XtMalloc(sizeof(MsgHandlerDoneCbData));
 	    if (ses->isMboxOpen(file))
 	    {
-		Widget w = NULL;
 		roamwin = ses->getRMW(file);
 		ses->activateRMW(roamwin);
 		if (NULL != roamwin) roamwin->displayInCurrentWorkspace();
@@ -961,7 +959,6 @@ nl_catd DT_catd = (nl_catd) -1;    // catgets file descriptor
 
 void RoamApp::initialize(int *argcp, char **argv)
 {
-    char		**av = argv;
     struct sigaction	*action;
     struct sigaction	action_buf;
     Tt_status		status;
@@ -974,7 +971,6 @@ void RoamApp::initialize(int *argcp, char **argv)
     _quitQuickly = FALSE;
     _shutdownWorkprocID = 0;
 
-    int n = 1;
     char * mail_file = NULL;
     char * dead_letter = NULL;
     char *session_file = NULL;
@@ -1054,7 +1050,6 @@ void RoamApp::initialize(int *argcp, char **argv)
 		// Started by ToolTalk
 		started_by_tt++;
 		num_legit_args++;
-		n = 2;
 		break;
 
 	  case 'h':
@@ -1322,8 +1317,6 @@ void RoamApp::initialize(int *argcp, char **argv)
 
         if ((DTMailError_t)mail_error == DTME_BadRunGroup) {
             char	buf[512];
-    	    int answer = 0;
-
     	    DtMailGenDialog *install_errDialog =
 		new DtMailGenDialog("Dialog", theApplication->baseWidget());
             sprintf(buf, "%s", CATGETS(DT_catd, 2, 4,
@@ -1337,7 +1330,7 @@ is incorrectly set."));
 
             // No choice at this state other than to OK.
             helpId = DTMAILHELPBADGROUPID;
-            answer = install_errDialog->post_and_return(
+            install_errDialog->post_and_return(
                                 CATGETS(DT_catd, 3, 9, "OK"),
                                 helpId);
 	    XtRemoveAllCallbacks(
@@ -1643,14 +1636,12 @@ RoamApp::timeout( XtIntervalId * )
 long
 RoamApp::lastInteractiveEventTime(void * client_data)
 {
-    RoamApp * self = (RoamApp *)client_data;
     return (theApplication->lastInteractiveEventTime());
 }
 
 void
 RoamApp::disableGroupPrivileges(void * client_data)
 {
-    RoamApp * self = (RoamApp *)client_data;
     theApplication->disableGroupPrivileges();
     return;
 }
@@ -1658,7 +1649,6 @@ RoamApp::disableGroupPrivileges(void * client_data)
 void
 RoamApp::enableGroupPrivileges(void * client_data)
 {
-    RoamApp * self = (RoamApp *)client_data;
     theApplication->enableGroupPrivileges();
     return;
 }

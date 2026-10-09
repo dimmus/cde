@@ -287,10 +287,12 @@ static Boolean SetValues(
 			 Widget nw,
 			 ArgList args,
 			 Cardinal *num_args) ;
+#if 0 && defined(PRINTING_SUPPORTED)
 static int SpanNonWhitespace(
 			     const char* string);
 static int SpanWhitespace(
 			  const char* string);
+#endif /* PRINTING_SUPPORTED */
 static void SynthGetFileName(
 			     DtPrintSetupBoxWidget psub);
 static void SynthGetPrinterName(
@@ -2353,6 +2355,9 @@ PrintSetupBoxCallback(
 			       (XtPointer)&cbs);
 	}
 	break;
+
+    default:
+	break;
     }
 }
 
@@ -2667,6 +2672,7 @@ SetValues(
     return False;
 }
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: SpanNonWhitespace
@@ -2708,6 +2714,7 @@ SpanWhitespace(const char* string)
 	ptr = DtNextChar((char*)ptr));
     return ptr - string;
 }
+#endif /* PRINTING_SUPPORTED */
 
 /*
  * ------------------------------------------------------------------------

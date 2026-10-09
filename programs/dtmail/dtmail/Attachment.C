@@ -134,7 +134,6 @@ String typeName;
 void runit_callback( int *data );
 void norunit_callback( int *data );
 #endif /* DEAD_WOOD */
-static void okcb(XtPointer);
 
 
 /*
@@ -167,15 +166,15 @@ Attachment::Attachment(
     _parent(classparent),
     _body_part(body_part),
     _index(indx),
-    _canKillSelf(TRUE),
-    _myActionIds(5),
+    _subtype(NULL),
+    _haveContents(FALSE),
     _myAllocContents(NULL),
     _myContents(NULL),
     _myContentsSize(0),
-    _haveContents(FALSE),
     _myType(NULL),
-    _subtype(NULL),
-    _myActionsList(NULL)
+    _canKillSelf(TRUE),
+    _myActionsList(NULL),
+    _myActionIds(5)
 {
     if(strchr(name, '/') == NULL) // The name does not include a slash
 	_label = XmStringCreateLocalized(name);
@@ -490,14 +489,6 @@ Attachment::handleDoubleClick()
     _parent->attachmentFeedback(FALSE);
 }
 
-static void okcb( XtPointer )
-{
-    //Empty
-    // This function exists so that the OK button will appear on the
-    // Info Dialog. It doesn't have to do anything because the dialog
-    // automatically pops down. It is for information only.
-}
-
 #ifdef DEAD_WOOD
 void
 runit_callback(int *data)
@@ -651,7 +642,7 @@ Attachment::saveToFile(DtMailEnv &, char *filename)
 	return;
     }
 
-    if (SafeWrite(fd, _myContents, (unsigned int)_myContentsSize) < _myContentsSize) {
+    if ((unsigned long) SafeWrite(fd, _myContents, (unsigned int)_myContentsSize) < _myContentsSize) {
 	sprintf(buf, CATGETS(DT_catd, 3, 45, "Unable to create %s."),
 		filename);
         helpId = DTMAILHELPNOCREATE;
@@ -763,7 +754,6 @@ Attachment::action(
 {
     DtActionBuffer	bufArg;
     DtMailEnv	mail_error;
-    int answer;
     char *buf = new char[2048];
     const void * lclContents(NULL);
     unsigned long lclContentsSize(0);
@@ -890,7 +880,7 @@ Attachment::action(
 		CATGETS(
 			DT_catd, 3, 91, "Cannot execute invalid action."));
 
-	answer = parent()->handleErrorDialog(CATGETS(DT_catd, 1, 86, "Mailer"),
+	parent()->handleErrorDialog(CATGETS(DT_catd, 1, 86, "Mailer"),
 					     buf);
 
 	unregisterAction(id);	
@@ -904,7 +894,7 @@ Attachment::action(
 	sprintf(buf, "%s",
 		CATGETS(DT_catd, 3, 92, "Executing action failed!"));
 
-	answer = parent()->handleErrorDialog(CATGETS(DT_catd, 1, 86, "Mailer"),
+	parent()->handleErrorDialog(CATGETS(DT_catd, 1, 86, "Mailer"),
 					     buf);
 
 	unregisterAction(id);	

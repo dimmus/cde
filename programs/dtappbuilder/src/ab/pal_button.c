@@ -145,11 +145,6 @@ static void	labeltypeCB(
 		    XtPointer 	clientdata,
 		    XtPointer 	calldata
 		);
-static void	size_policyCB(
-		    Widget   	widget,
-                    XtPointer 	clientdata,
-                    XmToggleButtonCallbackStruct *state
-                );
 
 /*************************************************************************
 **                                                                      **
@@ -765,7 +760,7 @@ verify_props(
         return False;
 
     if ((prop_changed(pbs->label_type.changebar) || prop_changed(pbs->label.changebar)) &&
-	(AB_BUILTIN_ACTION)prop_options_get_value(&(pbs->label_type)) == AB_LABEL_GLYPH &&
+	(AB_LABEL_TYPE)prop_options_get_value(&(pbs->label_type)) == AB_LABEL_GLYPH &&
         !prop_graphic_filename_ok(pbs->label.field, False))
         return False;
 
@@ -881,6 +876,8 @@ setup_labeltype_setting(
             ui_set_active(pbs->menuname.menubutton, True);
             ui_set_active(pbs->menuname.field,   True);
             break;
+        default:
+            break;
     }
     /*
       HACK: when arrow_item is set inactive, ie grayed out for AB_BUT_DRAWN
@@ -936,6 +933,8 @@ setup_label_field(
            ui_set_active(pbs->arrow_dir.optionbox, True);
 	   ui_set_active(pbs->graphic_hint, False);
            break;
+        default:
+           break;
     }
     /* WORKAROUND: for Motif bug */
     XtVaSetValues(pbs->label.label, XmNalignment, XmALIGNMENT_END, NULL);
@@ -959,26 +958,4 @@ labeltypeCB(
     if (value != AB_LABEL_ARROW_DOWN)
         ui_field_select_string(pbs->label.field, True);
 
-}
-
-static void
-size_policyCB(
-    Widget	w,
-    XtPointer	clientdata,
-    XmToggleButtonCallbackStruct *state
-)
-{
-    AB_PROP_TYPE        type = (AB_PROP_TYPE)clientdata;
-    PropButtonSettingsRec *pbs = &(prop_button_settings_rec[type]);
-    XtArgVal		value;
-
-    /* Width/Height fields should ONLY be editable if Size Policy
-     * is "Fixed"
-     */
-    if (state->set)
-    {
-    	XtVaGetValues(w, XmNuserData, &value, NULL);
-        ui_field_set_editable(pbs->geometry.w_field, value == SIZE_FIXED_KEY);
-        ui_field_set_editable(pbs->geometry.h_field, value == SIZE_FIXED_KEY);
-    }
 }

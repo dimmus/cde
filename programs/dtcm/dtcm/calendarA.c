@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)calendarA.c 1.196 95/04/12 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,7 +154,6 @@ extern int cmtt_init(char *, Calendar *, XtAppContext, Widget);
 extern void show_about(Widget, XtPointer, XtPointer);
 
 
-static struct itimerval timer;
 extern u_long gettransient();
 extern void xtcallback(XtPointer, int *, XtInputId *);
 extern int getfdset(fd_set);
@@ -186,7 +181,6 @@ extern void _DtI18NXlateOpToStdLocale(
 static void resize_proc(Widget, XtPointer, XtPointer);
 static void update_handler (CSA_session_handle, CSA_flags, CSA_buffer, CSA_buffer, CSA_extension *);
 static Boolean init_fonts(Calendar *);
-static XFontSet get_bold_font(Widget, String);
 static void logon_retry(XtPointer data, XtIntervalId *dummy);
 static int newXErrorHandler(Display *, XErrorEvent *);
 
@@ -242,7 +236,7 @@ invalidate_cache(Calendar *c) {
 
 	if (bl) {
 		i = 1;
-		while (bd = (BlistData *)CmDataListGetData(bl->blist_data, i)) {
+		while ((bd = (BlistData *)CmDataListGetData(bl->blist_data, i))) {
 			if (bd->cal_handle == c->cal_handle) {
                 		destroy_paint_cache(bd->cache, bd->cache_size);
                 		bd->cache = NULL;
@@ -681,12 +675,9 @@ prev_button(Widget w, XtPointer client_data, XtPointer cbs)
 {
 	Tick date;
 	Calendar *c = calendar;
-	new_XContext *xc;
-	Editor *e = (Editor *) calendar->editor;
 
 	invalidate_cache(c);
 
-	xc = c->xcontext;
 	switch(c->view->glance) {
 		case weekGlance:
 			date = last_ndays(c->view->date, 7);
@@ -760,12 +751,9 @@ next_button(Widget w, XtPointer client_data, XtPointer cbs)
 {
 	Tick date;
 	Calendar *c = calendar;
-	new_XContext *xc;
-	Editor *e = (Editor *) calendar->editor;
 
 	invalidate_cache(c);
 
-	xc = c->xcontext;
 	switch(c->view->glance) {
 		case weekGlance:
 			date = next_ndays(c->view->date, 7);
@@ -841,10 +829,8 @@ today_button(Widget w, XtPointer client_data, XtPointer cbs)
 {
 	Tick today, date;
 	Calendar *c = calendar;
-	new_XContext *xc;
 	int mo_da, mo_to;
 	pr_pos xy;
-	Editor *e = (Editor *) calendar->editor;
 
 	invalidate_cache(c);
 
@@ -866,7 +852,6 @@ today_button(Widget w, XtPointer client_data, XtPointer cbs)
 	case monthGlance:
 		if (mo_da != mo_to || year(date) != year(today)) {
 			XtUnmapWidget(c->canvas);
-			xc = c->xcontext;
 			(void)prepare_to_paint_monthview(c, NULL);
 			XtMapWidget(c->canvas);
 		}
@@ -991,7 +976,7 @@ make_view_menu(Calendar *c)
 {
 	void view_appt_cb(), view_todo_cb();
         Widget view_menu, day, week, month, year, appt_list, tz,
-		view_btn, sep, find, go_to;
+		view_btn, find, go_to;
         XmString day_str, week_str, month_str, year_str, tz_str, apptlist_str,
 		todo_str, view_str, findappts, gotodate;
 	Arg al[10];
@@ -1037,7 +1022,7 @@ make_view_menu(Calendar *c)
         XtAddCallback(year, XmNactivateCallback, year_button, NULL);
 
 	ac = 0;
-	sep = XmCreateSeparatorGadget(view_menu, "separator1", al, ac);
+	XmCreateSeparatorGadget(view_menu, "separator1", al, ac);
 
         ac = 0;
         XtSetArg(al[ac], XmNlabelString, apptlist_str); ac++;
@@ -1052,7 +1037,7 @@ make_view_menu(Calendar *c)
 			view_todo_cb, NULL);
 
 	ac = 0;
-	sep = XmCreateSeparatorGadget(view_menu, "separator2", al, ac);
+	XmCreateSeparatorGadget(view_menu, "separator2", al, ac);
 
 	ac = 0;
 	XtSetArg(al[ac], XmNlabelString, findappts); ac++;
@@ -1223,8 +1208,11 @@ edit_menu_cb(Widget w, XtPointer cl_data, XtPointer cbs)
 
 static void 
 browse_cb(Widget w, XtPointer client_data, XtPointer cbs) {
-	int		rcode, idx = (int) (intptr_t) client_data;
+	int		idx = (int) (intptr_t) client_data;
+#ifdef FNS
+	int		rcode;
 	char		buf[MAXNAMELEN];
+#endif
 	Calendar	*c = calendar;
 	Props_pu	*p = (Props_pu *)c->properties_pu;
 	BlistData	*bd;
@@ -1267,7 +1255,7 @@ browse_cb(Widget w, XtPointer client_data, XtPointer cbs) {
 static void
 make_file_menu(Calendar *c)
 {
-	Widget file_menu, print, pr_current, opts, exit, file_btn, sep;
+	Widget file_menu, print, pr_current, opts, exit, file_btn;
 	XmString xmstr;
 	Arg al[10];
 	int ac;
@@ -1291,7 +1279,7 @@ make_file_menu(Calendar *c)
 	XmStringFree(xmstr);
 
 	ac = 0;
-	sep = XmCreateSeparatorGadget(file_menu, "separator1", al, ac);
+	XmCreateSeparatorGadget(file_menu, "separator1", al, ac);
 
 	ac = 0;
 	xmstr = XmStringCreateLocalized(
@@ -1302,7 +1290,7 @@ make_file_menu(Calendar *c)
 	XmStringFree(xmstr);
 
 	ac = 0;
-	sep = XmCreateSeparatorGadget(file_menu, "separator2", al, ac);
+	XmCreateSeparatorGadget(file_menu, "separator2", al, ac);
 
 	ac = 0;
 	xmstr = XmStringCreateLocalized(CATGETS(c->DT_catd, 1, 73, "Exit"));
@@ -1327,7 +1315,7 @@ static void
 make_edit_menu(Calendar *c)
 {
 	Widget edit_menu, edit_button;
-	Widget appt, props;
+	Widget appt;
 	XmString edit_str, appt_str, todo_str;
 	Arg al[10];
 	int ac;
@@ -1373,7 +1361,7 @@ make_help_menu(Calendar *c)
 	int ac;
 	XmString help, overview, tasks, ref, onitem, using, about;
 	Widget	cascade, help_menu, w_overview, w_tasks, w_ref, w_onitem, 
-		w_using, w_about, w_sep;
+		w_using, w_about;
 
         help = XmStringCreateLocalized(CATGETS(c->DT_catd, 1, 77, "Help"));
         overview = XmStringCreateLocalized(
@@ -1397,7 +1385,7 @@ make_help_menu(Calendar *c)
 			(XtPointer)HELP_OVERVIEW); 
 
 	ac = 0;
-	w_sep = XmCreateSeparatorGadget(help_menu, "separator1", al, ac);
+	XmCreateSeparatorGadget(help_menu, "separator1", al, ac);
 
         ac = 0;
         XtSetArg(al[ac], XmNlabelString, tasks); ac++;
@@ -1418,7 +1406,7 @@ make_help_menu(Calendar *c)
 			(XtPointer)HELP_ONITEM);
 
 	ac = 0;
-	w_sep = XmCreateSeparatorGadget(help_menu, "separator2", al, ac);
+	XmCreateSeparatorGadget(help_menu, "separator2", al, ac);
 
         ac = 0;
         XtSetArg(al[ac], XmNlabelString, using); ac++;
@@ -1427,7 +1415,7 @@ make_help_menu(Calendar *c)
 			(XtPointer)HELP_USINGHELP);
 
 	ac = 0;
-	w_sep = XmCreateSeparatorGadget(help_menu, "separator2", al, ac);
+	XmCreateSeparatorGadget(help_menu, "separator2", al, ac);
 
         ac = 0;
         XtSetArg(al[ac], XmNlabelString, about); ac++;
@@ -1802,9 +1790,6 @@ get_next_reminder(Calendar *c, time_t tick, CSA_uint32 *num_reminders, CSA_remin
 	return stat;
 }
 
-static char *daystring[31] = {"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31"};
-
-
 /*
 **  Reset the reminders
 */
@@ -1865,8 +1850,6 @@ reset_timer(Calendar *c) {
 void
 center_today_button(Calendar *c)
 {
-	char buf[BUFSIZ];
-	XmString today_buf;
 	Dimension width;
 
 	/*
@@ -1988,50 +1971,9 @@ sig_int_handler(
 	exit(0);
 }
 
-static int myabort(Display *dpy, XErrorEvent  *event)
-{
-/*
-char buffer[MAXNAMELEN];
-  char mesg[MAXNAMELEN];
-  char number[32];
-  char *mtype = "XlibMessage";
-  FILE *fp = stdout;
-
-  XGetErrorText( dpy, event->error_code, buffer, MAXNAMELEN );
-  XGetErrorDatabaseText( dpy, mtype, "XError", "X Error (intercepted)",
-                         mesg, MAXNAMELEN );
-  ( void )fprintf( fp, "%s:  %s\n  ", mesg, buffer );
-  XGetErrorDatabaseText( dpy, mtype, "MajorCode", "Request Major code %d",
-                         mesg, MAXNAMELEN );
-  ( void )fprintf( fp, mesg, event->request_code );
-  sprintf( number, "%d", event->request_code );
-  XGetErrorDatabaseText( dpy, "XRequest", number, "", buffer, MAXNAMELEN );
- ( void )fprintf(fp, " (%s)", buffer );
-  fputs("\n  ", fp );
-  XGetErrorDatabaseText( dpy, mtype, "MinorCode", "Request Minor code",
-                         mesg, MAXNAMELEN );
-  ( void )fprintf( fp, mesg, event->minor_code );
-  fputs("\n  ", fp );
-  XGetErrorDatabaseText( dpy, mtype, "ResourceID", "ResourceID 0x%x",
-                         mesg, MAXNAMELEN );
-  ( void )fprintf(fp, mesg, event->resourceid );
-  fputs("\n  ", fp );
-  XGetErrorDatabaseText( dpy, mtype, "ErrorSerial", "Error Serial #%d",
-                         mesg, MAXNAMELEN );
-  ( void )fprintf( fp, mesg, event->serial );
-   fputs("\n  ", fp );
-  XGetErrorDatabaseText( dpy, mtype, "CurrentSerial", "Current Serial #%d",
-                         mesg, MAXNAMELEN );
-  ( void )fprintf( fp, mesg, NextRequest(dpy)-1 );
-fputs( "\n", fp );
-        abort();
-*/
-return(0);
-}
-
 static void
 error_open(Calendar *c) {
-	char		buf[MAXNAMELEN], buf2[MAXNAMELEN];
+	char		buf[MAXNAMELEN];
 	char		*name, *host;
 	Props_pu	*p = (Props_pu *)c->properties_pu;
 
@@ -2480,12 +2422,10 @@ init_calendar(int argc, char **argv)
 {
 	int start, stop;
 	int i;
-	char *s_ptr, *d_ptr;
+	char *d_ptr;
 	Props *p;
 	Tick today;
-	char bind_home[MAXPATHLEN];
-	XRectangle clip;
-	Dimension w, h, label_width;
+	Dimension w, h;
         String translations =
         	"<Btn1Down>: view_event()               \n\
          	<Btn1Motion>: view_event()";
@@ -2496,10 +2436,7 @@ init_calendar(int argc, char **argv)
 		{"dtcm-process-press",
 		   DtcmProcessPress}
         };
-	DtCmAppResources app_data;
 	Atom xa_WM_SAVE_YOURSELF;
-	unsigned long valuemask;
-	XSetWindowAttributes attrs;
 	Arg al[20];
 	int ac=0;
 	Tt_status status;
@@ -2938,8 +2875,6 @@ today_inrange(Calendar *c, time_t day_in_range) {
 void
 init_strings(void)
 {
-	char *display_lang="C";
-
 	months[1] = strdup(CATGETS(calendar->DT_catd, 1, 114, "January"));
 	months[2] = strdup(CATGETS(calendar->DT_catd, 1, 115, "February"));
 	months[3] = strdup(CATGETS(calendar->DT_catd, 1, 116, "March"));
@@ -3058,7 +2993,6 @@ switch_it(Calendar *c, char *new_calendar, WindowType win)
 	Tempbr			*tb = (Tempbr*)c->tempbr;
 	CSA_return_code		status;
 	CSA_session_handle	new_cal_handle;
-	Dtcm_calendar		*cal;
 	CSA_calendar_user	csa_user;
 	CSA_extension		logon_ext;
 

@@ -424,9 +424,7 @@ build_selectedList(char ** saverList,
 
    char * selectedList = NULL;
    int i = 0;
-   char * tmpStr;
    int len = 0;
-   int tmplen = 0;
    
    if (saverList == NULL)
      return(NULL);
@@ -499,21 +497,15 @@ build_screenDialog(
     int     i, m, n;
     Arg              args[MAX_ARGS];
     Widget           form;
-    Boolean          sel_matched = False;
     int              sel_found = 1;
     int		     old_selsaverCount = 0;
     Widget           widget_list1[12]; 
-    Widget           widget_list2[12]; 
     int              list1_count = 0;
-    int              list2_count = 0;
     XmString         button_string[NUM_LABELS]; 
     XmString         string;
     XmString         *listStrings;
-    XColor           color;
-    Colormap         cmap;              
     Dimension        MaxLabelWidth = 0;
     Dimension        LabelWidth = 0;
-    Atom             delete_window_atom;
     Boolean          low_res = False;
     XtArgVal         scratch;
 
@@ -763,7 +755,6 @@ build_screenDialog(
 	    if (sel_found == 0) {
 	      XmListSelectPos (screen.saverList, m+1, False);
 	      savers.selPositions[n]=m+1;
-	      sel_matched = True; 
 	    } else {
 	      /* This selected saver isn't valid, need to get rid of it.
 	         Do this by shifting each selected saver in the array
@@ -1554,10 +1545,7 @@ _DtmapCB_screenDialog(
         XtPointer call_data )
 {
   static int    first_time = 1;
-  int  n;
-  Arg           args[MAX_ARGS];
   XmString      string;
-  Boolean       lock_on, saver_on;  
 
   if (first_time)
     {
@@ -1811,10 +1799,7 @@ no_svr_ext_DtmapCB_screenDialog(
         XtPointer call_data )
 {
   static int    first_time = 1;
-  int  n;
-  Arg           args[MAX_ARGS];
   XmString      string;
-  int           mintime;
     
   if (first_time)
     {
@@ -2015,10 +2000,7 @@ saverToggleCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-  int     n;
-  Arg              args[MAX_ARGS];
   Boolean          set;
-  XmString string;
   XmToggleButtonCallbackStruct *cb = (XmToggleButtonCallbackStruct *)call_data;
   
   set = (Boolean) cb->set;
@@ -2129,10 +2111,7 @@ no_svr_ext_saverToggleCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int     n;
-    Arg              args[MAX_ARGS];
     Boolean          set;
-    XmString string;
     XmToggleButtonCallbackStruct *cb = (XmToggleButtonCallbackStruct *)call_data;
 
     set = (Boolean) cb->set;
@@ -2184,8 +2163,6 @@ lockToggleCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int     n;
-    Arg              args[MAX_ARGS];
     Boolean          set;
     XmToggleButtonCallbackStruct *cb = (XmToggleButtonCallbackStruct *)call_data;
     
@@ -2250,10 +2227,7 @@ saversToggleCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-  int     n;
-  Arg              args[MAX_ARGS];
   Boolean          set;
-  XmString string;
   XmToggleButtonCallbackStruct *cb = (XmToggleButtonCallbackStruct *)call_data;
   
   set = (Boolean) cb->set;
@@ -2402,14 +2376,10 @@ ButtonCB(
 	 XtPointer client_data,
 	 XtPointer call_data )
 {
-  int        i, n, m;
-  Arg                 args[MAX_ARGS];
-  Boolean             sel_matched = False;
+  int        i;
   Boolean             lockset;
   Boolean             saverset;
-  Boolean             flag;
   static char         screenres[48];
-  int                 mintime;
   XtArgVal            scratch;
   
   DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;
@@ -2619,13 +2589,9 @@ no_svr_ext_ButtonCB(
 		     XtPointer client_data,
 		     XtPointer call_data )
 {
-  int        i, n, m;
-  Arg                 args[MAX_ARGS];
-  Boolean             sel_matched = False;
+  int        i;
   Boolean             saverset;
-  Boolean             flag;
   static char         screenres[48];
-  int                 mintime;
   XtArgVal            scratch;
   
   DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;
@@ -3127,6 +3093,7 @@ IconHandler(
   /* run the current screen saver only if the useSaversOn/saverOn toggle is enabled 
      and valid saver exist and one is not already running*/
   else if (savers.saverCount && event->type == 19 && !savers.saverstate)
+    {
     if (style.smState.smLockOnTimeoutStatus)
       {
 	if (XmToggleButtonGadgetGetState(screen.saverOn) && savers.saverCount)
@@ -3151,6 +3118,7 @@ IconHandler(
 	    XmStringFree(string);	    
 	  }
       }
+    }
 }
 
 

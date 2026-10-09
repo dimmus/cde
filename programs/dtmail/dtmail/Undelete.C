@@ -82,8 +82,6 @@ void
 UndelMsgScrollingList::deleteSelected(Boolean)
 {
     // SR - Added stuff below.  Made code more efficient also.
-    FORCE_SEGV_DECL(MsgStruct, a_del_msg_struct);
-    FORCE_SEGV_DECL(MsgStruct, tmpMS);
     int  position_in_list, i;
     FORCE_SEGV_DECL(int, position_list);
     int position_count;
@@ -105,7 +103,6 @@ UndelMsgScrollingList::deleteSelected(Boolean)
     for (i=0; i < position_count; i++ ) {
         position_in_list = *(position_list + i);
  
-        a_del_msg_struct = get_message_struct(position_in_list);
         _msgs->mark_for_delete(position_in_list - 1);
            
     }
@@ -370,12 +367,8 @@ UndelFromListDialog::createWorkArea ( Widget parent )
     DtMail::Session * d_session = theRoamApp.session()->session();
     DtMail::MailRc * mailrc = d_session->mailRc(error);
     const char * value;
-    int msgnums = False;
 
     mailrc->getValue(error, "showmsgnum", &value);
-    if (error.isNotSet()) {
-        msgnums = True;
-    }
     if (NULL != value)
       free((void*) value);
 

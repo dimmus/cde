@@ -262,7 +262,7 @@ MenuItem	prop_menu[] =
 	 NULL, (XtPointer)ABMenuProps, NULL, 0, TRUE },
 	{ NULL, NULL/*"Fixed..."*/, AB_LABEL_STRING, &xmPushButtonWidgetClass, fix_propCB, 
 	 NULL, (XtPointer)ABMenuProps, NULL, 0, TRUE },
-	NULL
+	{ NULL }
 };
 
 MenuItem	align_menu[] =
@@ -299,7 +299,7 @@ MenuItem	align_menu[] =
 	  &xmPushButtonWidgetClass, alignCB, (XtPointer) TO_GRID, 
 	  (XtPointer)ABMenuAlign, NULL, 0, TRUE, align_grid_width,
 	  align_grid_height, align_grid_bits },
-	NULL
+	{ NULL }
 };
 
 MenuItem	distribute_menu[] =
@@ -324,7 +324,7 @@ MenuItem	distribute_menu[] =
 	  (XtPointer)ABMenuDistribute, NULL, 0, TRUE,
 	  distribute_vcenter_width, distribute_vcenter_height,
 	  distribute_vcenter_bits },
-	NULL
+	{ NULL }
 };
 
 MenuItem	obj_menu_items[] = 
@@ -366,7 +366,7 @@ MenuItem	obj_menu_items[] =
 	  &xmSeparatorWidgetClass, NULL, NULL, NULL, NULL, 0, TRUE, 0, 0, NULL },
 	{ NULL, NULL/*"NextLayer"*/, AB_LABEL_STRING, 
 	  &xmPushButtonWidgetClass, next_layerCB, NULL, (XtPointer)ABMenuNextLayer, NULL, 0, TRUE, 0, 0, NULL },
-	NULL
+	{ NULL }
 };
 
 MenuItem	browser_menu_items[] = 
@@ -408,7 +408,7 @@ MenuItem	browser_menu_items[] =
 	  &xmPushButtonWidgetClass, expandAllCB, NULL, (XtPointer)ABMenuExpandAll, NULL, 0, TRUE, 0, 0, NULL },
 	{ NULL, NULL/*"Collapse"*/, AB_LABEL_STRING, 
 	  &xmPushButtonWidgetClass, collapseCB, NULL, (XtPointer)ABMenuCollapse, NULL, 0, TRUE, 0, 0, NULL },
-	NULL
+	{ NULL }
 };
 
 
@@ -426,7 +426,7 @@ MenuItem	layout_menu_items[] =
 	  &xmPushButtonWidgetClass, make_paneCB, NULL, (XtPointer)ABMenuPane, NULL, 0, TRUE, 0, 0, NULL },
 	{ NULL, NULL/*"Unmake Paned Window"*/, AB_LABEL_STRING, 
 	  &xmPushButtonWidgetClass, unmake_paneCB, NULL, (XtPointer)ABMenuUnpane, NULL, 0, TRUE, 0, 0, NULL },
-	NULL
+	{ NULL }
 };
 
 static ABSelectedRec sel;
@@ -727,7 +727,6 @@ set_item_flags(
     ABObj	selobj;
     ABObj	selparent;
     ABObj	pane_parent;
-    Widget	popup_menu;
     unsigned int item_flags = ABMenuNone;
     int		i, j;
     BOOL	all_groups = TRUE;
@@ -871,17 +870,8 @@ abobj_popup_menu(
     XButtonEvent  *event
 )
 {
-    ABObj	selobj;
-    ABObj	selparent;
-    ABObj	pane_parent;
     Widget	popup_menu;
     unsigned int item_flags = ABMenuNone;
-    int		i, j;
-    BOOL	all_groups = TRUE;
-    BOOL	all_panes = TRUE;
-    BOOL	all_panedwins = TRUE;
-    BOOL	same_parent = TRUE;
-    BOOL	already_in_panedwin = FALSE;
 
     popup_menu = get_edit_menu_from_cache(mtype, origin);
 

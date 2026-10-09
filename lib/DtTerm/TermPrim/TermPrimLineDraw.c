@@ -371,8 +371,6 @@ LineDrawFont
 _DtTermPrimLineDrawCreateFont(Widget w, GlyphInfo glyphInfo, int numGlyphs,
 	int width, int ascent, int descent)
 {
-    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
-    int fontNumber;
     LineDrawFont lineDrawFont;
     int i;
     int height = ascent + descent;

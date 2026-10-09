@@ -128,7 +128,9 @@ match_locale(char *locale, char line[MAX_LINE_LEN])
 static void           *_i18nwork1 = NULL;
 static unsigned long  _i18nsize1 = 0;
 static int            shouldAlloc1 = ~0;
+#ifdef _AIX
 static int	      isFirstCall = ~0;
+#endif
 static iconv_t        CD = (iconv_t)-1;
 static int	      amI_932 = ~0;
 
@@ -141,7 +143,6 @@ void _converter_( void *from, unsigned long from_len,
     size_t        InBytesLeft;
     char          *OutBuf = NULL;
     size_t        OutBytesLeft = 0;
-    size_t        _OutBytesLeft = 0;
     size_t        iconv_ret;
     size_t        converted_num = 0;
 

@@ -176,12 +176,6 @@
 #define DEFINE
 #include "global.h"
 #include "htag.tss"
-static char ident1[]="@(#)CDE Help Tag Parser";
-static char ident2[]="@(#)Version Number: C.00.00";
-static char ident3[]="@(#) (c) Copyright 1993, 1994 Hewlett-Packard Company";
-static char ident4[]="@(#) (c) Copyright 1993, 1994 International Business Machines Corp.";
-static char ident5[]="@(#) (c) Copyright 1993, 1994 Sun Microsystems, Inc.";
-static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a subsidiary of Novell, Inc.";
 
 <GLOBAL-DECLARE>
 #include "global.h"
@@ -193,7 +187,7 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
   char *q ;
 
   /* Pick version number out of sign-on message */
-  if (p = strstr(m_signon, VERSION)) {
+  if ((p = strstr(m_signon, VERSION))) {
     p += strlen(VERSION) + 1 ;
     for (q = p ; *q && *q != '\n'; q++) ;
     if (*q == '\n') {
@@ -223,7 +217,6 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
     }
 
 <END-CODE>
-  int i;
   if (outfile)
     {
     prebye = ftell(outfile) ;
@@ -454,8 +447,6 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
     termp = term;
     tooutput = FALSE;
   <END-CODE>
-    char *mb_nodeid;
-
     tooutput = TRUE;
     *termp = M_EOS ;
     /* trim possible (perhaps) last space */
@@ -894,7 +885,6 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 <ELEMENT HELPVOLUME>
   <START-CODE>
     char   hostname[BIGBUF];
-    char **tossline = toss;
     char  *mb_language, *mb_charset;
     long   timeStamp;
 
@@ -981,7 +971,7 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
     mbtowc(&wsp, " ", 1);
 
     pwc = print;
-    while (pwc = w_strchr(pwc, wnl))
+    while ((pwc = w_strchr(pwc, wnl)))
 	*pwc = wsp;
     mb_print = MakeMByteString(print);
     if (w_strlen(sort) > 0)
@@ -989,7 +979,7 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 	char *mb_sort;
 
 	pwc = sort;
-	while (pwc = w_strchr(pwc, wnl))
+	while ((pwc = w_strchr(pwc, wnl)))
 	    *pwc = wsp;
 	mb_sort = MakeMByteString(sort);
 	if (w_strlen(subsort) > 0 || w_strlen(subprint) > 0)
@@ -1000,23 +990,27 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 
 	    pwcSub = (w_strlen(subsort) > 0) ? subsort : subprint;
 	    pwc = pwcSub;
-	    while (pwc = w_strchr(pwc, wnl))
+	    while ((pwc = w_strchr(pwc, wnl)))
 		*pwc = wsp;
 	    mb_sub = MakeMByteString(pwcSub);
 
 	    /* strip trailing spaces */
 	    mb_nospace1 = mb_sort;
-	    while (*mb_nospace1++); --mb_nospace1; /* end of string */
+	    while (*mb_nospace1++);
+	    --mb_nospace1; /* end of string */
 	    while (*--mb_nospace1 == ' ') *mb_nospace1 = '\0';
 	    mb_nospace2 = mb_sub;
-	    while (*mb_nospace2++); --mb_nospace2; /* end of string */
+	    while (*mb_nospace2++);
+	    --mb_nospace2; /* end of string */
 	    while (*--mb_nospace2 == ' ') *mb_nospace2 = '\0';
 
 	    /* strip leading spaces */
 	    mb_nospace1 = mb_sort;
-	    while (*mb_nospace1++ == ' '); --mb_nospace1;
+	    while (*mb_nospace1++ == ' ');
+	    --mb_nospace1;
 	    mb_nospace2 = mb_sub;
-	    while (*mb_nospace2++ == ' '); --mb_nospace2;
+	    while (*mb_nospace2++ == ' ');
+	    --mb_nospace2;
 
 	    fprintf(indexfp, "%s, %s", mb_nospace1, mb_nospace2);
 	    m_free(mb_sub,"multi-byte string");
@@ -1025,12 +1019,14 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 	    { /* plain sort */
 	    /* strip trailing spaces */
 	    mb_nospace1 = mb_sort;
-	    while (*mb_nospace1++); --mb_nospace1; /* end of string */
+	    while (*mb_nospace1++);
+	    --mb_nospace1; /* end of string */
 	    while (*--mb_nospace1 == ' ') *mb_nospace1 = '\0';
 
 	    /* strip leading spaces */
 	    mb_nospace1 = mb_sort;
-	    while (*mb_nospace1++ == ' '); --mb_nospace1;
+	    while (*mb_nospace1++ == ' ');
+	    --mb_nospace1;
 
 	    fprintf(indexfp, "%s", mb_nospace1);
 	    }
@@ -1046,23 +1042,27 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 
 	    pwcSub = (w_strlen(subsort) > 0) ? subsort : subprint;
 	    pwc = pwcSub;
-	    while (pwc = w_strchr(pwc, wnl))
+	    while ((pwc = w_strchr(pwc, wnl)))
 		*pwc = wsp;
 	    mb_sub = MakeMByteString(pwcSub);
 
 	    /* strip trailing spaces */
 	    mb_nospace1 = mb_print;
-	    while (*mb_nospace1++); --mb_nospace1; /* end of string */
+	    while (*mb_nospace1++);
+	    --mb_nospace1; /* end of string */
 	    while (*--mb_nospace1 == ' ') *mb_nospace1 = '\0';
 	    mb_nospace2 = mb_sub;
-	    while (*mb_nospace2++); --mb_nospace2; /* end of string */
+	    while (*mb_nospace2++);
+	    --mb_nospace2; /* end of string */
 	    while (*--mb_nospace2 == ' ') *mb_nospace2 = '\0';
 
 	    /* strip leading spaces */
 	    mb_nospace1 = mb_print;
-	    while (*mb_nospace1++ == ' '); --mb_nospace1;
+	    while (*mb_nospace1++ == ' ');
+	    --mb_nospace1;
 	    mb_nospace2 = mb_sub;
-	    while (*mb_nospace2++ == ' '); --mb_nospace2;
+	    while (*mb_nospace2++ == ' ');
+	    --mb_nospace2;
 
 	    fprintf(indexfp, "%s, %s", mb_nospace1, mb_nospace2);
 	    m_free(mb_sub,"multi-byte string");
@@ -1071,12 +1071,14 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 	    { /* plain print */
 	    /* strip trailing spaces */
 	    mb_nospace1 = mb_print;
-	    while (*mb_nospace1++); --mb_nospace1; /* end of string */
+	    while (*mb_nospace1++);
+	    --mb_nospace1; /* end of string */
 	    while (*--mb_nospace1 == ' ') *mb_nospace1 = '\0';
 
 	    /* strip leading spaces */
 	    mb_nospace1 = mb_print;
-	    while (*mb_nospace1++ == ' '); --mb_nospace1;
+	    while (*mb_nospace1++ == ' ');
+	    --mb_nospace1;
 
 	    fprintf(indexfp, "%s", mb_nospace1);
 	    }
@@ -1089,23 +1091,27 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 	char *mb_subprint;
 
 	pwc = subprint;
-	while (pwc = w_strchr(pwc, wnl))
+	while ((pwc = w_strchr(pwc, wnl)))
 	    *pwc = wsp;
 	mb_subprint = MakeMByteString(subprint);
 
 	/* strip trailing spaces */
 	mb_nospace1 = mb_print;
-	while (*mb_nospace1++); --mb_nospace1; /* end of string */
+	while (*mb_nospace1++);
+	--mb_nospace1; /* end of string */
 	while (*--mb_nospace1 == ' ') *mb_nospace1 = '\0';
 	mb_nospace2 = mb_subprint;
-	while (*mb_nospace2++); --mb_nospace2; /* end of string */
+	while (*mb_nospace2++);
+	--mb_nospace2; /* end of string */
 	while (*--mb_nospace2 == ' ') *mb_nospace2 = '\0';
 
 	/* strip leading spaces */
 	mb_nospace1 = mb_print;
-	while (*mb_nospace1++ == ' '); --mb_nospace1;
+	while (*mb_nospace1++ == ' ');
+	--mb_nospace1;
 	mb_nospace2 = mb_subprint;
-	while (*mb_nospace2++ == ' '); --mb_nospace2;
+	while (*mb_nospace2++ == ' ');
+	--mb_nospace2;
 
 	fprintf(indexfp, "%s, %s", mb_nospace1, mb_nospace2);
 	m_free(mb_subprint,"multi-byte string");
@@ -1114,12 +1120,14 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
 	{
 	/* strip trailing spaces */
 	mb_nospace1 = mb_print;
-	while (*mb_nospace1++); --mb_nospace1; /* end of string */
+	while (*mb_nospace1++);
+	--mb_nospace1; /* end of string */
 	while (*--mb_nospace1 == ' ') *mb_nospace1 = '\0';
 
 	/* strip leading spaces */
 	mb_nospace1 = mb_print;
-	while (*mb_nospace1++ == ' '); --mb_nospace1;
+	while (*mb_nospace1++ == ' ');
+	--mb_nospace1;
 
 	fprintf(indexfp, "%s", mb_nospace1);
 	}
@@ -2111,7 +2119,6 @@ static char ident6[]="@(#) (c) Copyright 1993, 1994 Unix System Labs, Inc., a su
          needabstracthead = FALSE;
          }
   <START-CODE DEFINITION>
-    M_WCHAR *p ;
     char     id[SDLNAMESIZ+10];
 
     sprintf(id, "%s%d", sdlReservedName, lastTermId);

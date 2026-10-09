@@ -154,6 +154,7 @@ void DtSetPref::Representation(IconStyle value)
      case LARGE_ICON: by_icon->Selected(true); break;
      case SMALL_ICON: by_smallIcon->Selected(true); break;
      case DETAILS: by_properties->Selected(true); break;
+     default: break;
     }
    show_labels->Active(by_properties->Selected());
 }

@@ -76,7 +76,6 @@ int
 Mirror_Image(
         int orientation )
 {
-  XRectangle tmp_box;
   XImage *new_image, *old_image, *new_mono, *old_mono;
   unsigned long n;
   int i, j;
@@ -555,4 +554,5 @@ skip:   for (x++; x<=x2 && XGetPixel(color_image, x, y)!=old_pixel; x++)
         l = x;
     } while (x<=x2);
   }
+  return 1;
 }

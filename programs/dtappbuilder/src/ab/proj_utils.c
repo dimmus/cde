@@ -306,8 +306,6 @@ proj_update_stat_region(
     Vwr				proj_vwr = NULL;
     DtbProjProjMainInfoRec	*projInfo = NULL;
     BrowserUiObj		ui;
-    static Widget       projwin_mod_path = NULL;
-    static Widget       projwin_proj_path = NULL;
     Widget              path_value = NULL;
     String              nullstr = "        ";
 
@@ -336,6 +334,8 @@ proj_update_stat_region(
         case PROJ_STATUS_PROJ_PATH:
             path_value = projInfo->project_path;
 	    util_dprintf(2, "\tcase PROJ_STATUS_PROJ_PATH\n");
+            break;
+        default:
             break;
     }
     if (value == NULL)
@@ -628,7 +628,6 @@ save_proj_as_bip(
     BOOL		Edited = FALSE;
     BOOL                ProjHasBeenSaved = (obj_get_file(project) != NULL);
     int			iRet = 0;
-    char		msg[MAXPATHLEN];
     DTB_MODAL_ANSWER	answer = DTB_ANSWER_ACTION1;
     DtbObjectHelpDataRec	help_data;
 
@@ -789,7 +788,6 @@ proj_show_name_dlg(
     STRING              init_name = (STRING) NULL;
     STRING              seln_str = (STRING) NULL;
     UI_MODAL_ANSWER     answer = UI_ANSWER_NONE;
-    Widget              dlg = (Widget) NULL;
     int                 i, num_cascades = 0;
     WidgetList          cascades = (WidgetList) NULL;
     DtbObjectHelpData   help_data = NULL;
@@ -880,6 +878,8 @@ proj_show_name_dlg(
 	    {
 		name_module(module, seln_str);
 	    }
+	    break;
+	default:
 	    break;
     }    
 }
@@ -1172,6 +1172,8 @@ proj_overwrite_existing_file(
 
         case DTB_ANSWER_HELP:
             break;
+        default:
+            break;
     }
 
     XmStringFree(xm_buf);
@@ -1408,13 +1410,11 @@ proj_save_exploded(
     STRING              old_name = NULL;
     STRING              old_file = NULL;
     DTB_MODAL_ANSWER    answer = DTB_ANSWER_NONE;
-    BOOL                DiffFile = TRUE;
     char                tmp_path[MAXPATHLEN],
                         mod_exp_file[MAXPATHLEN];
     ABObj               module;
     AB_TRAVERSAL        trav;
     int                 iRet = 0;
-    XmString            xm_buf = (XmString) NULL;
     STRING              old_proj_dir = NULL;
  
     *name = 0;
@@ -1902,11 +1902,10 @@ verify_name(
 {
     STRING              seln_str = NULL;
     char                new_name[MAXPATHLEN];
-    char                title[MAXPATHLEN];
     Boolean             retval = True;
     Prompt_Info_Rec     *prompt_info;
     Boolean             ObjIsModule;
-    ABObj               obj = NULL, newObj = NULL;
+    ABObj               newObj = NULL;
 
     prompt_info = (Prompt_Info_Rec  *) client_data;
     newObj = (ABObj)prompt_info->client_data;
@@ -2112,7 +2111,6 @@ save_proj_as_bix(
 )
 {
     char                bix_file[MAXPATHLEN];
-    STRING              errmsg = (STRING) NULL;
     DTB_MODAL_ANSWER    answer = DTB_ANSWER_NONE;
     int			iRet = 0;
     XmString		xm_buf = (XmString) NULL;
@@ -2200,7 +2198,6 @@ export_uil_file(
 )
 {
     FILE 		*fp;
-    STRING		errmsg = NULL;
     Boolean		retval = FALSE;
     DTB_MODAL_ANSWER	answer = DTB_ANSWER_NONE;
     XmString            xm_buf = (XmString) NULL;
@@ -2506,6 +2503,8 @@ proj_set_menus(
                 XtSetSensitive(save_mod_item, active);
                 XtSetSensitive(export_item, active);
             }
+            break;
+        default:
             break;
     }
 }

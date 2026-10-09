@@ -108,6 +108,7 @@ void _DtHelpOSGetHomeDirName(
    _Xgetpwparams	pwd_buf;
    struct passwd *	pwd_ret;
 
+    (void) pwd_buf;	/* unused unless XTHREADS */
     _DtHelpProcessLock();
     if (ptr == NULL) {
 	if((ptr = (char *)getenv("HOME")) == NULL) {

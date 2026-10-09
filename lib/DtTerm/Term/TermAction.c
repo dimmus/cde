@@ -213,6 +213,9 @@ _DtTermActionScroll(Widget w, XEvent *event,
     case scrollLine:
 	    _DtTermFuncScroll(w, count, fromAction);
 	break;
+
+    default:
+	break;
     }
     return;
 }
@@ -413,7 +416,6 @@ _DtTermActionFunctionKeyExecute(Widget w, XEvent *event, String *params,
     Boolean shift = False;
     long keyNumber;
     char *ret;
-    int i;
 
     /* must have a key number, may have a shift/unshift as well... */
     if (*num_params < 1) {
@@ -462,9 +464,6 @@ _DtTermActionKeypadKeyExecute(Widget w, XEvent *event, String *params,
         Cardinal *num_params)
 {
     DtTermWidget    tw  = (DtTermWidget)w;
-    Boolean shift = False;
-    long keyNumber;
-    char *ret;
     int type;
     DtTermData  td = tw->vt.td;
 
@@ -568,9 +567,6 @@ _DtTermActionEditKeyExecute(Widget w, XEvent *event, String *params,
         Cardinal *num_params)
 {
     DtTermWidget    tw  = (DtTermWidget)w;
-    Boolean shift = False;
-    long keyNumber;
-    char *ret;
     int i;
 
     if (*num_params < 1) {

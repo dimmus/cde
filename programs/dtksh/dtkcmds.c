@@ -91,8 +91,6 @@ static int do_single_widget_arg_func(
                         int (*func)(),
                         int argc,
                         char **argv) ;
-static void mainloopsighandler( 
-                        int sig) ;
 static int XtCallCallbacks_usage( 
                         char *arg0) ;
 static void RegisterCmdStr( 
@@ -134,8 +132,6 @@ static Boolean ProcessInput(
                         int source,
                         XtInputId id,
                         Boolean eofFound) ;
-static int VerifyString_usage( 
-                        char *arg0) ;
 static int XtSetSensitive_usage( 
                         char *arg0) ;
 static int GetDisplayHandle(
@@ -546,7 +542,7 @@ parse_args(
 	Boolean postponePixmaps )
 {
 	int i;
-	char *colon, *resource, *val, *p;
+	char *colon, *resource, *val;
 	XtArgVal argval;
 	int freeflag, len;
         char * errmsg;
@@ -700,10 +696,9 @@ _CreateWidget(
 	Widget widget;
 	classtab_t *class;
 	char *arg0 = argv[0];
-	wtab_t *w, *pw, *wtab;
+	wtab_t *pw, *wtab;
 	char *wname, *wclass, *parentid, *var;
 	Arg	args[MAXARGS];
-	int	i;
 	int n;
         char * errmsg;
 	int pargc;
@@ -777,10 +772,9 @@ do_XtCreateApplicationShell(
 	Widget widget;
 	classtab_t *class;
 	char *arg0 = argv[0];
-	wtab_t *w, *wtab;
+	wtab_t *wtab;
 	char *wname, *wclass, *var;
 	Arg	args[MAXARGS];
-	int	i;
 	int n;
         char * errmsg;
 	int pargc;
@@ -953,7 +947,6 @@ do_single_widget_test_func(
         char **argv )
 {
 	wtab_t *w;
-	int i;
         char * errmsg;
 
 	if (argc != 2) {
@@ -988,7 +981,6 @@ do_XtIsShell(
         char *argv[] )
 {
    wtab_t *w;
-   int i;
    char * errmsg;
 
    if (argc != 2) 
@@ -1317,11 +1309,9 @@ do_XtHasCallbacks(
         char **argv )
 {
    wtab_t *w;
-   char *arg0 = argv[0];
    char * msg = "";
    char * variable = argv[1];
    XtCallbackStatus callbackStatus;
-   XrmValue fval, tval;
    char * errmsg;
 
    if (argc != 4)
@@ -1684,10 +1674,10 @@ do_XtGetValues(
         int argc,
         char **argv )
 {
-	int i, j;
+	int i;
 	int n;
 	char *arg0 = argv[0];
-	char *val, *p, *str;
+	char *p, *str;
 	Arg args[MAXARGS];
 	char *envar[MAXARGS];
 	wtab_t *w;
@@ -1943,7 +1933,6 @@ do_XtAddTimeOut(
         char *argv[] )
 {
    unsigned long milliseconds = 0;
-   wtab_t *w;
    char *variable;
    char *cmd;
    char buf[256];
@@ -2349,7 +2338,6 @@ do_XtRemoveAllCallbacks(
         char *argv[] )
 {
 	wtab_t *w;
-	int i;
         char * errmsg;
 
 	if (argc != 3) {
@@ -2392,6 +2380,7 @@ CatchNonFatalFontError(
 
 {
    invalidFont = True;
+   return(0);
 }
 
 static int
@@ -2481,10 +2470,9 @@ invokeXDrawFunction(
    int srcX = 0, srcY = 0;
    int destX = 0, destY = 0;
    unsigned int width = 0, height = 0;
-   char *s;
    char *sp;
    int i;
-   int mode, parse = 0;
+   int parse = 0;
    int text = FALSE;
    int (*func)() = NULL;
    int argtype = 0;
@@ -2964,7 +2952,7 @@ do_XDrawArc(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_ARC, argc, argv);
+   return(invokeXDrawFunction(DRAW_ARC, argc, argv));
 }
 
 int
@@ -2972,7 +2960,7 @@ do_XDrawImageString(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_IMAGE_STRING, argc, argv);
+   return(invokeXDrawFunction(DRAW_IMAGE_STRING, argc, argv));
 }
 
 int
@@ -2980,7 +2968,7 @@ do_XDrawLine(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_LINE, argc, argv);
+   return(invokeXDrawFunction(DRAW_LINE, argc, argv));
 }
 
 int
@@ -2988,7 +2976,7 @@ do_XDrawLines(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_LINES, argc, argv);
+   return(invokeXDrawFunction(DRAW_LINES, argc, argv));
 }
 
 int
@@ -2996,7 +2984,7 @@ do_XDrawPoint(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_POINT, argc, argv);
+   return(invokeXDrawFunction(DRAW_POINT, argc, argv));
 }
 
 int
@@ -3004,7 +2992,7 @@ do_XDrawPoints(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_POINTS, argc, argv);
+   return(invokeXDrawFunction(DRAW_POINTS, argc, argv));
 }
 
 int
@@ -3012,7 +3000,7 @@ do_XDrawRectangle(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_RECTANGLE, argc, argv);
+   return(invokeXDrawFunction(DRAW_RECTANGLE, argc, argv));
 }
 
 int
@@ -3031,7 +3019,7 @@ do_XCopyArea(
       return(1);
    }
 
-   invokeXDrawFunction(COPY_AREA, argc, argv);
+   return(invokeXDrawFunction(COPY_AREA, argc, argv));
 }
 
 int
@@ -3039,7 +3027,7 @@ do_XDrawSegments(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_SEGMENTS, argc, argv);
+   return(invokeXDrawFunction(DRAW_SEGMENTS, argc, argv));
 }
 
 int
@@ -3047,7 +3035,7 @@ do_XDrawString(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(DRAW_STRING, argc, argv);
+   return(invokeXDrawFunction(DRAW_STRING, argc, argv));
 }
 
 int
@@ -3055,7 +3043,7 @@ do_XFillArc(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(FILL_ARC, argc, argv);
+   return(invokeXDrawFunction(FILL_ARC, argc, argv));
 }
 
 int
@@ -3063,7 +3051,7 @@ do_XFillPolygon(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(FILL_POLYGON, argc, argv);
+   return(invokeXDrawFunction(FILL_POLYGON, argc, argv));
 }
 
 int
@@ -3071,7 +3059,7 @@ do_XFillRectangle(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(FILL_RECTANGLE, argc, argv);
+   return(invokeXDrawFunction(FILL_RECTANGLE, argc, argv));
 }
 
 int
@@ -3079,7 +3067,7 @@ do_XClearArea(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(CLEAR_AREA, argc, argv);
+   return(invokeXDrawFunction(CLEAR_AREA, argc, argv));
 }
 
 int
@@ -3087,7 +3075,7 @@ do_XClearWindow(
         int argc,
         char *argv[] )
 {
-   invokeXDrawFunction(CLEAR_WINDOW, argc, argv);
+   return(invokeXDrawFunction(CLEAR_WINDOW, argc, argv));
 }
 
 int
@@ -3100,7 +3088,6 @@ ConvertTypeToString(
         XtArgVal val,
         char **ret )
 {
-	char *from_type;
 	XtResourceList res;
 	XrmValue    fr_val, to_val;
 	char *nam;
@@ -3176,7 +3163,6 @@ ConvertStringToType(
         int *freeit,
         Boolean postponePixmaps )
 {
-	char *to_type;
 	XtResourceList res;
 	XrmValue    fr_val, to_val;
 	char *nam;
@@ -3314,11 +3300,9 @@ do_XtAddInput(
    int fd;
    char *arg0 = argv[0];
    char *variable;
-   char *cmd;
    inputrec_t *inp;
    XtInputId id;
    char buf[256];
-   char * errmsg;
    unsigned char modeFlags = LINE_INPUT_MODE;
 
 
@@ -3626,7 +3610,6 @@ stdCB(
    Namval_t * np2;
    WidgetClass class;
    Namdisc_t * discipline = NULL;
-   int i;
    char * oldCB_WIDGET_value = NULL;
    char * oldCB_CALL_DATA_value = NULL;
    char * ptr;
@@ -3764,7 +3747,6 @@ stdWSCB(
    dtksh_client_data_t *cdata = (dtksh_client_data_t *)clientData;
    Namval_t * np;
    Namval_t * np2;
-   int i;
    char * oldCB_WIDGET_value = NULL;
    char * oldCB_CALL_DATA_value = NULL;
    char * ptr;
@@ -3811,11 +3793,7 @@ stdInputCB(
         XtInputId *id )
 {
    char buf[LINESIZE];
-   char cmdbuf[LINESIZE];
-   int cmd;
-   char *p;
    int i, n, j;
-   char * errmsg;
    int len;
 
    /* If in 'raw' mode, then simply let the handler do all the work */
@@ -4024,9 +4002,6 @@ do_XRaiseWindow(
         int argc,
         char *argv[] )
 {
-   Boolean discard;
-   XrmValue fval, tval;
-   wtab_t *w;
    char *p;
    Display * display;
    Window window;
@@ -4163,8 +4138,6 @@ do_XtUninstallTranslations(
         char *argv[] )
 {
    wtab_t *w;
-   XtTranslations * translationTable;
-   XrmValue fval, tval;
    char * errmsg;
 
    if (argc != 2)
@@ -4235,7 +4208,6 @@ do_XtLastTimestampProcessed(
         int argc,
         char **argv )
 {
-   char *arg0 = argv[0];
    Display * display;
    char * p;
    char buf[128];
@@ -4372,7 +4344,6 @@ stdEH(
 {
    char buf[128];
    dtksh_event_handler_data_t *ehdata;
-   int i;
    Namval_t * np;
    Namval_t * np2;
    Namfun_t * clonedDisc;
@@ -4564,7 +4535,6 @@ do_DtShellIsIconified(
         char *argv[] )
 {
    wtab_t *w;
-   Boolean status;
    Atom actual_type;
    int  actual_format;
    unsigned long nitems;
@@ -4706,11 +4676,9 @@ WsmCommonProc(
         char *argv[],
 	void (*func)())
 {
-   wtab_t *w;
    Display * display;
    Window window;
    char * p;
-   char buf[256];
    char * errmsg;
 
    if (argc != 3) 
@@ -4751,7 +4719,6 @@ do_DtWsmGetCurrentWorkspace(
         int argc,
         char *argv[] )
 {
-   wtab_t *w;
    Display * display;
    Window rootWindow;
    char * p;
@@ -4846,7 +4813,6 @@ GetWorkspaceList(
         int argc,
         char *argv[] )
 {
-   wtab_t *w;
    char * p;
    Display * display;
    Window root;
@@ -4958,8 +4924,6 @@ do_DtWsmSetWorkspacesOccupied(
    Window window;
    unsigned long numWS;
    Atom * wsList;
-   char * buf;
-   int i;
    char * nextAtom;
    char * errmsg;
 
@@ -5133,9 +5097,6 @@ DtTurnOnOrOffHourGlass(
         int argc,
         char *argv[] )
 {
-   char * p;
-   Cursor cursor;
-   char buf[128];
    wtab_t *w;
    char * errmsg;
 
@@ -5181,8 +5142,6 @@ do_DtWsmAddCurrentWorkspaceCallback(
 {
    wtab_t *w;
    dtksh_client_data_t *cdata;
-   char * p;
-   Atom propAtom;
    DtWsmCBContext handle;
    char buf[128];
    char * errmsg;
@@ -5903,7 +5862,6 @@ do_ttdt_open(
    char * procId;
    Boolean sendStarted;
    XrmValue toVal;
-   Cardinal nargs;
    char * statusString;
    char buf[25];
    int ttfd;
@@ -5968,7 +5926,7 @@ do_ttdt_close(
 {
    char * errmsg;
    Boolean sendStopped;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    char * procId;
@@ -6077,7 +6035,7 @@ do_ttdt_session_join(
    char * errmsg;
    Boolean join;
    char * sessId;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    char buf[25];
@@ -6152,7 +6110,7 @@ do_ttdt_session_quit(
    char * errmsg;
    Boolean quit;
    char * sessId;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    Tt_pattern * patterns;
@@ -6459,7 +6417,7 @@ do_ttdt_file_quit(
         char *argv[] )
 {
    char * errmsg;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    Boolean quit;
@@ -6660,7 +6618,7 @@ do_tt_error_pointer(
         char *argv[] )
 {
    char * errmsg;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    void * errPtr;
    char buf[25];
@@ -6697,7 +6655,7 @@ message_DestroyOrReply(
         char *argv[] )
 {
    char * errmsg;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    Tt_message message;
@@ -6762,7 +6720,7 @@ message_FailOrReject(
         char *argv[] )
 {
    char * errmsg;
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    Tt_message message;
@@ -6853,12 +6811,10 @@ tt_netfile_handler(
         int argc,
         char *argv[] )
 {
-   XrmValue fval, tval;
+   XrmValue tval;
    Tt_status ttStatus;
    char * statusString;
    char * convertedName;
-   Cardinal cargc;
-   XrmValue cargv[1];
 
    if (argc != paramCount) 
    {
@@ -7383,7 +7339,6 @@ ProcessXmStringTable(
 {
    Namval_t * np2;
    char * buf;
-   int i;
 
    np2 = GetNameValuePair(name);
    buf = _CvtXmStringTableToString(table, count);
@@ -7427,8 +7382,6 @@ ProcessXmStringValue(
         Namfun_t *fp )
 {
    Namval_t * np2;
-   char buf[128];
-   wtab_t * w;
    char * value;
 
    np2 = GetNameValuePair(name);
@@ -7454,7 +7407,6 @@ ProcessHyperType(
 {
    Namval_t * np2;
    char buf[128];
-   wtab_t * w;
    XrmValue f, t;
    char * value;
 
@@ -7919,7 +7871,6 @@ dftCreateDisc(
         Namfun_t *fp )
 {
    Namval_t * np2;
-   char buf[128];
    XmAnyCallbackStruct * cbData;
    char * cbDataAddrStr;
    char * p;
@@ -7959,7 +7910,6 @@ ehCreateDisc(
         Namfun_t *fp )
 {
    Namval_t * np2;
-   char buf[128];
    XEvent * event;
    char * eventAddrStr;
    char * p;
@@ -7990,7 +7940,6 @@ transCreateDisc(
         Namfun_t *fp )
 {
    Namval_t * np2;
-   char buf[128];
    XEvent * event;
    char * eventAddrStr;
    char * p;
@@ -9297,7 +9246,6 @@ SetTextFormat(
         Namfun_t *fp )
 {
    XrmValue fval, tval;
-   Boolean doit = True;
    char * cbDataAddrStr;
    XmTextVerifyCallbackStruct * cbData;
    char * p;
@@ -9328,7 +9276,6 @@ SetTextWCSptr(
    char * p;
    Namval_t *cbDataNp;
    static wchar_t * wcBuf = NULL;
-   int count;
 
    if (cbDataNp = nv_open("CB_CALL_DATA", sh.var_tree, 0))
    {
@@ -9343,7 +9290,7 @@ SetTextWCSptr(
        * XtFree(wcBuf);
        */
       wcBuf = (wchar_t *)XtMalloc((strlen(name) + 1) * sizeof(wchar_t));
-      count = mbstowcs(wcBuf, name, strlen(name)+1);
+      mbstowcs(wcBuf, name, strlen(name)+1);
       cbData->text->wcsptr = wcBuf;
    }
 }

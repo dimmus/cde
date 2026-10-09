@@ -687,17 +687,12 @@ ArmAndActivate(
 	String *params,
         Cardinal *num_params )
 {
-   DtButtonCallbackStruct call_value;
    DtButtonGadget bg = (DtButtonGadget) w ;
 
    B_Armed (bg) = True;
    Redisplay ( w, event, FALSE); 
 
    XFlush (XtDisplay (bg));
-
-   call_value.reason = XmCR_ACTIVATE;
-   call_value.event = event;
-   call_value.click_count = 1;  /* always 1 in kselect */
 
    if (bg->button.callback)
    {

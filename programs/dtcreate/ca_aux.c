@@ -216,7 +216,6 @@ void putCAactionHelpText (struct _ActionData *ca_struct)
 /******************************************************************************/
 void putCAfileTypes (struct _ActionData *pAD)
 {
- pFiletypeData  pFtD;
  int            i;
 
   if (pAD->cFiletypes) {
@@ -437,7 +436,6 @@ initAD( ActionData *pAD )
 /******************************************************************************/
 void FreeAndClearAD (ActionData *pAD)
 {
-  FiletypeData  *pFtD;
   int           i;
 
   if (pAD->pszName) XtFree(pAD->pszName);
@@ -495,7 +493,6 @@ void clear_CreateActionAppShell_fields(void)
 void activateCB_FileNew (Widget wid, XtPointer cdata,
                          XtPointer cbstruct)
 {
-  char          pszFile[MAXBUFSIZE];
 
   /**************************************************************************/
   /* Clear the fields in the gui and set fields to default.                 */
@@ -543,14 +540,11 @@ void activateCB_FileNew (Widget wid, XtPointer cdata,
 void  activateCB_FileOpen(Widget wid, XtPointer cdata,
                           XtPointer cbstruct)
 {
-  Widget filter;
-
   XtVaSetValues (OpenFile, RES_CONVERT(XmNdirMask, "~/.dt/types/*.dt"),
                  RES_CONVERT(XmNdirSpec, "~/.dt/types/"),
                  RES_CONVERT(XmNdirectory, "~/.dt/types/"),
                  NULL);
 
-  filter = XmFileSelectionBoxGetChild (OpenFile, XmDIALOG_FILTER_TEXT);
   /*XtVaSetValues (filter, XmNeditable, False, NULL);*/
   UxPopupInterface (OpenFile, no_grab);
   return;
@@ -718,7 +712,6 @@ void valueChangedCB_ColorMonoOption (Widget wid, XtPointer client_data,
 {
   int        toggle_set= tcb->set;
   IconData   *pIconData;
-  Widget     widIcon;
   Widget     widIcons[3];
   int        i;
 

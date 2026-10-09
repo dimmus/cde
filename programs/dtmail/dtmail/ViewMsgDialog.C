@@ -381,7 +381,7 @@ ViewMsgDialog::construct_attachment_menu()
 {
 
     // Separator for menu items
-    SeparatorCmd *separator = new SeparatorCmd("Separator", "Separator", TRUE );
+    new SeparatorCmd("Separator", "Separator", TRUE );
 
     _attach_save_as	= new SaveAttachCmd (
 				"Save As...",
@@ -530,7 +530,6 @@ ViewMsgDialog::save_selected_attachment(
    // Get selected attachment, if none selected, then return.
    if ( attachment == NULL ) {
 	  // Let User know that no attachment has been selected???
-	  int answer = 0;
 	  char *helpId = NULL;
 
 
@@ -538,7 +537,7 @@ ViewMsgDialog::save_selected_attachment(
 		    CATGETS(DT_catd, 1, 177, "Mailer"),
 		    CATGETS(DT_catd, 2, 20, "An attachment needs to be selected before issuing the\n\"Save As\" command to save to a file.") );
 	  helpId = DTMAILHELPSELECTATTACH;
-	  answer = _genDialog->post_and_return(
+	  _genDialog->post_and_return(
 			CATGETS(DT_catd, 3, 75, "OK"), helpId );
 	  return;
       }

@@ -61,7 +61,6 @@ _DtCm_register_xtcallback(XtAppContext appct)
 {
 	XtInputId	id;
 	int	i;
-	fd_set	fdset = svc_fdset;
 
 	DP(("xtclient.c: _DtCm_register_xtcallback()\n"));
 
@@ -82,6 +81,7 @@ _DtCm_register_xtcallback(XtAppContext appct)
 
               DP(("xtclient.c: id %d for input at fd %d\n",
                   id, i));
+              (void) id;	/* used only by DP() */
             }
         }
 }

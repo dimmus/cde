@@ -678,6 +678,9 @@ update_message(const _Tt_c_message_ptr &msg, Tt_state newstate)
 		if ((msg->state() != TT_SENT) && (msg->state() != TT_STARTED)) {
 			return TT_ERR_STATE;
 		}
+		break;
+	    default:
+		break;
 	}
 	// if this message is already in a "final" state then
 	// don't allow the state change
@@ -686,6 +689,8 @@ update_message(const _Tt_c_message_ptr &msg, Tt_state newstate)
 	      case TT_HANDLED:
 	      case TT_RETURNED:
 		return TT_ERR_STATE;
+	      default:
+		break;
 	}
 
 	msg->add_voter( this, newstate );

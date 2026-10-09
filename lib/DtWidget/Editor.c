@@ -80,6 +80,7 @@
 #include "EditorP.h"
 #include <Dt/Dnd.h>
 #include "X11/Xutil.h"
+#include <X11/XKBlib.h>
 #include <X11/StringDefs.h>
 #include <X11/keysymdef.h>
 #include <Xm/Form.h>
@@ -3735,7 +3736,8 @@ GetModeSwitchModifier(
     for (mapIndex = 3*pMap->max_keypermod; mapIndex < mapSize; mapIndex++) {
         /* look only at the first 4 columns of key map */
         for (keyCol = 0; keyCol < 4; keyCol++) {
-          keySym = XKeycodeToKeysym(dpy, pMap->modifiermap[mapIndex], keyCol);
+          keySym = XkbKeycodeToKeysym(dpy, pMap->modifiermap[mapIndex],
+                                      keyCol >> 1, keyCol & 1);
           if (keySym == XK_Mode_switch)
              modeSwitchModMask |= 1 << (mapIndex / pMap->max_keypermod);
         }
@@ -4923,20 +4925,6 @@ HelpEditWindowCB(
 /****
  * Status Line help callbacks
  */
-
-/* XXX
- * Who uses this??
- */
-
-/* ARGSUSED */
-static void
-HelpStatusLineCB(
-        Widget w,
-        caddr_t client_data,
-        caddr_t call_data )
-{
-    CallHelpCallback((DtEditorWidget)client_data, DtEDITOR_HELP_STATUS_LINE);
-}
 
 /* ARGSUSED */
 static void

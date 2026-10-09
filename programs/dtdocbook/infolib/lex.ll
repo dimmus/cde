@@ -1,4 +1,5 @@
 %option noyywrap
+%option nounput
 
 %{ /* -*- c++ -*- */
 /* $XConsortium: lex.l /main/5 1996/11/19 16:55:12 drk $ */

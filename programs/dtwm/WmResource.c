@@ -3935,8 +3935,6 @@ ResCat (String s1, String s2, String s3, String s4)
 
     int count;
 
-    Boolean useResourceClass = True;
-
     wmGD.tmpBuffer[0] = '\0';
 
     count = MAXBUF - 1;
@@ -3956,11 +3954,9 @@ ResCat (String s1, String s2, String s3, String s4)
 	 *
 	 */
 	{
-		useResourceClass = False;
 	}
 	else if (!strcmp (s1, DT_WM_RESOURCE_CLASS))
 	{
-		useResourceClass = False;
 	}
 	else
 	{
@@ -6093,7 +6089,9 @@ SetupDefaultResources (WmScreenData *pSD)
 {
     KeySpec *nextKeySpec;
     String keyBindings;
+#ifdef NO_MESSAGE_CATALOG
     MenuSpec *menuSpec;
+#endif
 
 
 /*

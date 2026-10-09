@@ -160,14 +160,8 @@ abmfP_write_project_c_file(
 )
 {
     File                codeFile = genCodeInfo->code_file;
-    STRING              errmsg = NULL;
-    STRING             *p = NULL;
-    ABObj               win_obj = NULL;
-    ABObj               obj = NULL;
     ABObj               action = NULL;
-    AB_ACTION_INFO     *action_info = NULL;
     AB_TRAVERSAL        trav;
-    ABObj		module = NULL;
     int			numFuncsWritten = 0;
     char		projectName[1024];
     *projectName = 0;
@@ -219,8 +213,6 @@ abmfP_write_project_c_file(
     for (trav_open(&trav, project, AB_TRAV_ACTIONS);
 	 (action = trav_next(&trav)) != NULL;)
     {
-	action_info = &(action->info.action);
-
 	/* If the function name for the action is not NULL AND
 	 * the action is a cross-module connection OR the action
 	 * is a shared connection, then write it out.
@@ -453,11 +445,11 @@ write_map_window(
 {
     File	codeFile = genCodeInfo->code_file;
     ABObj	project = obj_get_project(window);
-    ABObj	proj_root_window = abmfP_get_root_window(project);
     ABObjRec	showActionRec;
     ABObj	showAction = &showActionRec;
     ABObj	winParent = NULL;
     char	winParentName[1024];
+    abmfP_get_root_window(project);	/* caches the root window */
     obj_construct(showAction, AB_TYPE_ACTION, NULL);
     *winParentName = 0;
 
@@ -497,7 +489,6 @@ write_main(GenCodeInfo genCodeInfo, ABObj project)
     int                 returnValue = 0;
     File                codeFile = genCodeInfo->code_file;
     ABObj               window = NULL;
-    int                 initialized = FALSE;
     ABObj		main_window= NULL;
     AB_TRAVERSAL        trav;
     BOOL		mainWindowHasIcon = FALSE;
@@ -1022,7 +1013,6 @@ write_main_tooltalk_local_vars(
 )
 {
     File        codeFile;
-    int         ret_val = 0;
 
     if (!genCodeInfo || !project ||
 	obj_get_tooltalk_level(project) == AB_TOOLTALK_NONE)
@@ -1052,7 +1042,6 @@ write_main_tooltalk_init(
     STRING		vendor, version;
     ABObj		action;
     File        	codeFile; 
-    int         	ret_val = 0; 
  
     if (!genCodeInfo || !project ||
         (tt_level = obj_get_tooltalk_level(project)) == AB_TOOLTALK_NONE)

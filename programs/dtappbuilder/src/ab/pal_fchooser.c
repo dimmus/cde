@@ -158,10 +158,8 @@ fchooser_initialize(
     STRING	name;
     ABObj	module = obj_get_module(obj);
     ABObj	win;
-    ABObj	bobj;
     int		num_wins;
     int		i;
-    int		startpos, endpos;
     char        nameBuf[5001] = "";
 
     /* Find BaseWindow to be Custom Dialog's Motif parent.

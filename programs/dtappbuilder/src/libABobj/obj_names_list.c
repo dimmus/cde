@@ -130,6 +130,8 @@ objP_get_names_list(ABObj obj)
 	    return obj->info.module.obj_names_list;
 	case AB_TYPE_PROJECT:
 	    return obj->info.project.obj_names_list;
+	default:
+	    break;
     }
 
     return NULL;

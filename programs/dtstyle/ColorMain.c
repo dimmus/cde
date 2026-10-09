@@ -259,7 +259,6 @@ int     NumOfPalettes = 0;
 /* palette names without the .dp */
 static char *WHITE_BLACK = "WhiteBlack";
 static char *BLACK_WHITE = "BlackWhite";
-static char *WHITE_ONLY = "White";
 static char *BLACK_ONLY = "Black";
 
 static char *PALETTEDLG = "paletteDlg";
@@ -322,7 +321,7 @@ loadDatabase(void)
   pl_desc = (char *)XtMalloc(strlen("/usr/dt/palettes/desc.") + strlen(lang) + 1);
   strcpy (pl_desc,"/usr/dt/palettes/desc.");
   strcat (pl_desc, lang);
-  if(sys_pl_DB = XrmGetFileDatabase (pl_desc))
+  if((sys_pl_DB = XrmGetFileDatabase (pl_desc)))
     XrmMergeDatabases(sys_pl_DB, &pl_DB);
   XtFree(pl_desc);
   
@@ -331,7 +330,7 @@ loadDatabase(void)
   pl_desc = (char *)XtMalloc(strlen("/etc/dt/palettes/desc.") + strlen(lang) + 1);
   strcpy (pl_desc,"/etc/dt/palettes/desc.");
   strcat (pl_desc, lang);
-  if (adm_pl_DB = XrmGetFileDatabase (pl_desc))
+  if ((adm_pl_DB = XrmGetFileDatabase (pl_desc)))
     XrmMergeDatabases(adm_pl_DB, &pl_DB);
   XtFree(pl_desc);
 
@@ -339,7 +338,7 @@ loadDatabase(void)
   pl_desc = (char *) XtMalloc(strlen(style.home) +(strlen("/.dt/palettes/desc.palettes") + 1));
   strcpy (pl_desc, style.home);
   strcat (pl_desc, "/.dt/palettes/desc.palettes");
-  if (hm_pl_DB = XrmGetFileDatabase (pl_desc))
+  if ((hm_pl_DB = XrmGetFileDatabase (pl_desc)))
     XrmMergeDatabases(hm_pl_DB, &pl_DB);
   XtFree(pl_desc);
 
@@ -360,7 +359,6 @@ void
 Customize(
         Widget shell )
 {
-    int     i;
 
     /*  
     **  Main routine does the following:
@@ -681,7 +679,7 @@ InitializePaletteList(
       
       /* if the item is the same as the default name provided by the
 	 color Server, save it */
-      if(!save.restoreFlag || defaultName_restore == NULL) {
+      if(!save.restoreFlag) {
 	if (!(strcmp(loop_palette->name, defaultName)))
 	  loop_palette2 = loop_palette;
       }
@@ -1134,9 +1132,7 @@ addOkCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-  int     n, i;
-  Arg              args[6];
-  XmString         string;
+  int     i;
   char             *name, *filename, *tmpstr;
   palette         *tmpPalette, *newPalette;
   int              count;
@@ -1479,10 +1475,6 @@ deletePaletteCB(
     Arg              args[10];
     char            *tmpStr;
     palette         *tmp_palette;
-    char            *string;
-    char            *class_str;
-    char            *str_type_return;
-    XrmValue         value_return;
 
     tmp_palette = pHeadPalette;
 
@@ -1718,10 +1710,6 @@ colorUseCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    Arg              args[4];
-    XmToggleButtonCallbackStruct *cb = 
-            (XmToggleButtonCallbackStruct *)call_data;
-
     colorDialog.currentColorUse = (int) (intptr_t) client_data;
     switch (colorDialog.currentColorUse)
     {
@@ -1888,7 +1876,6 @@ _DtmapCB_colorUse(
 
     char *str_type_return;
     XrmValue value_return;
-    XrmValue    cvt_value;
     XrmDatabase db;
     Boolean status;
     char *string;
@@ -1902,9 +1889,9 @@ _DtmapCB_colorUse(
     sprintf (instanceString, "dtsession*%d*colorUse",style.screenNum);
     sprintf (nameString, "Dtsession*%d*ColorUse",style.screenNum);
 
-    if (status = XrmGetResource (db, instanceString,
+    if ((status = XrmGetResource (db, instanceString,
                                  nameString,
-                                 &str_type_return, &value_return))
+                                 &str_type_return, &value_return)))
     {
         /* make local copy of string */
         string = (char *) XtMalloc( value_return.size );
@@ -2338,7 +2325,6 @@ restoreColor(
     XrmName xrm_name[5];
     XrmRepresentation rep_type;
     XrmValue value;
-    palette *tmp_palette;
 
     /*"paletteDlg" is the resource name of the dialog shell we are saving for.*/
     xrm_name [0] = XrmStringToQuark (PALETTEDLG);
@@ -2562,7 +2548,6 @@ GetDefaultPal(
     XrmDatabase db;
     Boolean status;
     char *p;
-    char *string;
     char instanceName[30], instanceClass[30];
 
     /* get the current default palette from the Reource Manager Property */
@@ -2580,8 +2565,8 @@ GetDefaultPal(
         sprintf(instanceClass,"Dtsession.%d.ColorPalette", style.screenNum);
     }
 
-    if (status = XrmGetResource (db, instanceName, instanceClass,
-                                     &str_type_return, &value_return))
+    if ((status = XrmGetResource (db, instanceName, instanceClass,
+                                     &str_type_return, &value_return)))
     {
         /* copy string to defaultName */
         defaultName = (char *) XtMalloc( value_return.size );

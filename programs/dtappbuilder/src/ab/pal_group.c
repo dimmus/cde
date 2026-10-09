@@ -69,21 +69,6 @@
 
 
 /*
- * Bitmaps
- */
-#include "bitmaps/ggp_as_is.xbm"
-#include "bitmaps/ggp_col.xbm"
-#include "bitmaps/ggp_row.xbm"
-#include "bitmaps/ggp_rowcol.xbm"
-#include "bitmaps/align_top.xbm"
-#include "bitmaps/align_hcenter.xbm"
-#include "bitmaps/align_bottom.xbm"
-#include "bitmaps/align_left.xbm"
-#include "bitmaps/align_labels.xbm"
-#include "bitmaps/align_vcenter.xbm"
-#include "bitmaps/align_right.xbm"
-
-/*
  * Defines
  */
 
@@ -155,9 +140,6 @@ static void	setup_grouptype_settings(
 		    AB_PROP_TYPE type,
 		    AB_GROUP_TYPE gtype
 		);
-static void	set_new_group_size(
-		    ABObj obj
-		);
 
 static void	group_objects(
 		    ABObj	newgroup,
@@ -179,9 +161,6 @@ static void	group_align_hcenters(
 		    BOOL    init
 		);
 
-static void	group_align_horiz_same_size(
-		    ABObj   obj
-		);
 
 static void	group_align_bottoms(
 		    ABObj   obj
@@ -316,12 +295,10 @@ void
 abobj_group_selected_objects(void)
 {
     ABObj	  project = proj_get_project();
-    ABObj 	  obj;
     ABObj         newgroup;
     ABObj	  obj_parent;
     ABSelectedRec sel;
     XRectangle    current_rect;
-    int		  i;
 
     /* Creation may take awhile, so set busy cursor */
     ab_set_busy_cursor(True);
@@ -367,7 +344,6 @@ group_objects(
 )
 {
     ABObj 	  obj;
-    ABSelectedRec sel;
     XRectangle    current_rect;
     int		  i;
 
@@ -466,7 +442,6 @@ ungroup_objects(
 {
     ABObj	  group;
     ABObj	  group_parent;
-    ABObj	  parent_list = NULL;
     XRectangle    group_rect,
 			rect;
     AB_TRAVERSAL  trav;
@@ -620,10 +595,6 @@ group_initialize(
     ABObj    obj
 )
 {
-    ABObj	   iobj, mobj;
-    AB_GROUP_TYPE group_type;
-    int		   i;
-    ABObj	   parent = obj_get_parent(obj);
     ABSelectedRec  sel;
     XRectangle     current_rect;
 
@@ -1024,6 +995,8 @@ group_prop_load(
 				obj_get_voffset(obj), False);
 		break;
 
+	default:
+		break;
 	}
 
 	/* Load Object Size */
@@ -1060,7 +1033,6 @@ group_prop_apply(
     AB_GROUP_TYPE   		gtype;
     int		    		num_rc;
     int		    		space_val;
-    int		    		i;
     ABObj	    		obj;
     BOOL	    		changed = False;
     BOOL			reset_bg = False;
@@ -1186,6 +1158,8 @@ group_prop_apply(
 			prop_field_get_numeric_value(&(pgs->vspacing)));
 		    */
                 }
+                break;
+            default:
                 break;
         }
         abobj_set_group_type(obj, gtype);
@@ -1386,7 +1360,6 @@ setup_grouptype_settings(
     AB_GROUP_TYPE gtype
 )
 {
-    PropGroupSettingsRec *pgs = &(prop_group_settings_rec[type]);
     DtbGroupPropDialogInfo	cgen;
 
     if (type == AB_PROP_REVOLVING)
@@ -1421,6 +1394,8 @@ setup_grouptype_settings(
             ui_set_active(cgen->valign_grp, True);
             ui_set_active(cgen->halign_grp, True);
             ui_set_active(cgen->grid_rowcol_grp, True);
+            break;
+        default:
             break;
     }
 }
@@ -1509,43 +1484,6 @@ undo_ungroup(
 }
 
 void
-set_new_group_size(
-    ABObj obj
-)
-{
-    ABObj 	  oobj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
-    int		  member_count;
-    ABObj	  *member_list;
-    int		  width, height;
-    XRectangle    rect;
-
-    create_member_list(oobj, &member_list, &member_count);
-
-    /*
-     * Reset groups width and height. for rows, the new height is that of
-     * the tallest member, the new width is the width of the
-     * rect occupied by all of the members. For colums, the new
-     * width is that of the widest member, the new height is the
-     * height of the rect occupied by all of the members.
-     */
-    abobj_get_rect_for_objects(member_list, member_count, &rect);
-    abobj_get_greatest_size(member_list, member_count,
-				 &width, &height,
-				 (ABObj *) NULL, (ABObj *) NULL);
-    if (obj_get_group_type(oobj) == AB_GROUP_ROWS)
-    {
-	abobj_set_pixel_width(obj, rect.width, 0);
-	abobj_set_pixel_height(obj, height, 0);
-    }
-    else if (obj_get_group_type(oobj) == AB_GROUP_ROWS)
-    {
-        abobj_set_pixel_width(obj, width, 0);
-        abobj_set_pixel_height(obj, rect.height, 0);
-    }
-    util_free(member_list);
-}
-
-void
 abobj_layout_group(
     ABObj	obj,
     BOOL	init
@@ -1555,8 +1493,6 @@ abobj_layout_group(
     ABObj	  child;
     AB_GROUP_TYPE type;
     int 	  i;
-    int	  	  child_old_x, child_old_y;
-    int	  	  group_new_x, group_new_y;
     XRectangle    rect;
 
 
@@ -1575,9 +1511,6 @@ abobj_layout_group(
      * x and y.
      */
     child = obj_get_child(pobj, 0);
-
-    child_old_x = obj_get_x(child);
-    child_old_y = obj_get_y(child);
 
     abobj_clear_layout(pobj, True, (type != AB_GROUP_IGNORE));
 
@@ -1611,6 +1544,8 @@ abobj_layout_group(
 	case AB_GROUP_ROWSCOLUMNS:
 	    group_align_rows(obj, init);
 	    group_align_cols(obj, init);
+	    break;
+	default:
 	    break;
     }
 
@@ -1720,6 +1655,8 @@ abobj_register_group_expose_handler(
 		(col_alignment == AB_ALIGN_LABELS))
 		register_expose = True;
 	    break;
+	default:
+	    break;
     }
 
     if (register_expose)
@@ -1750,10 +1687,7 @@ group_expose_handler(
 {
     ABObj		obj = (ABObj)client_data;
     WidgetList		children_list;
-    int			i,
-			num_children = 0;
-    Boolean		relayout_all = False,
-			register_align_handler = False;
+    int			num_children = 0;
 
 
     if (event->type != Expose)
@@ -1875,7 +1809,6 @@ group_align_hcenters(
 {
     ABAttachment	attach;
     ABObj	child,
-		previous_child,
     		oobj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
     AB_GROUP_TYPE type = obj_get_group_type(obj);
     int		num_children = obj_get_num_children(oobj),
@@ -1883,7 +1816,6 @@ group_align_hcenters(
 		num_rows,
 		cell_width,
 		cell_height,
-		group_width,
 		group_height = 0,
 		offset,
 		gridline,
@@ -1957,71 +1889,6 @@ group_align_hcenters(
 	abobj_set_pixel_width(obj, -1, 0);
 	abobj_instantiate_changes(obj);
     }
-}
-
-static void
-group_align_horiz_same_size(
-	ABObj	obj
-)
-{
-    ABObj sibling, previous_sibling;
-    ABObj oobj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
-    int	  num_children = obj_get_num_children(oobj);
-    int   i;
-
-    sibling = obj_get_child(oobj, num_children - 1);
-    /*
-     * Set up childrens attachments from right to left.
-     * All objects North and South attachments are to
-     * the form.
-     */
-    for (i = num_children - 2; i >= 0; i--)
-    {
-	previous_sibling = obj_get_child(oobj, i);
-
-	obj_set_attachment(sibling,
-		AB_CP_NORTH,
-		AB_ATTACH_OBJ,
-	    	(void *) oobj,
-		0);
-
-	obj_set_attachment(sibling,
-		AB_CP_WEST,
-		AB_ATTACH_OBJ,
-		(void *) previous_sibling,
-		obj_get_hoffset(oobj));
-
-	obj_set_attachment(sibling,
-		AB_CP_SOUTH,
-		AB_ATTACH_OBJ,
-	    	(void *) oobj,
-		0);
-
-	objxm_obj_set_attachment_args(sibling, OBJXM_CONFIG_BUILD);
-        obj_clear_flag(sibling, BeingDestroyedFlag);
-
-	sibling = previous_sibling;
-    }
-
-    obj_set_attachment(sibling,
-	    AB_CP_NORTH,
-	    AB_ATTACH_OBJ,
-	    (void *) oobj,
-	    0);
-    obj_set_attachment(sibling,
-	    AB_CP_WEST,
-	    AB_ATTACH_OBJ,
-	    (void *) oobj,
-	    0);
-
-    obj_set_attachment(sibling,
-	    AB_CP_SOUTH,
-	    AB_ATTACH_OBJ,
-	    (void *) oobj,
-	    0);
-
-    objxm_obj_set_attachment_args(sibling, OBJXM_CONFIG_BUILD);
-    obj_clear_flag(sibling, BeingDestroyedFlag);
 }
 
 static void
@@ -2194,7 +2061,6 @@ group_align_labels(
 {
     ABAttachment	attach;
     ABObj	child,
-		previous_child,
     		oobj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ),
 		*one_col = NULL,
 		*child_list,
@@ -2292,7 +2158,6 @@ group_align_vcenters(
 {
     ABAttachment	attach;
     ABObj	child,
-		previous_child,
     		oobj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
     AB_GROUP_TYPE type = obj_get_group_type(obj);
     int		num_children = obj_get_num_children(oobj),
@@ -2301,7 +2166,6 @@ group_align_vcenters(
 		cell_width,
 		cell_height,
 		group_width = 0,
-		group_height,
 		offset,
 		gridline,
 		i,
@@ -2577,16 +2441,12 @@ get_cell_size(
     int		*cell_height
 )
 {
-    AB_GROUP_TYPE type;
-
     if (!group)
     {
 	*cell_width = *cell_height = -1;
 
 	return;
     }
-
-    type = obj_get_group_type(group);
 
     /*
     if (type == AB_GROUP_ROWSCOLUMNS)

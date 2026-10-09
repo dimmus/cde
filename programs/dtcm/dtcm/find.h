@@ -87,6 +87,5 @@ typedef struct {
 }Find;
 
 extern caddr_t	make_find(Calendar*);
-static Tick f_get_searchdate(Widget, Props*);
 
 #endif

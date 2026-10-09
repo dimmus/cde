@@ -736,15 +736,8 @@ convert_selection(
         unsigned long *length,
         int *format )
 {
-  char pixels[50];
   int i, screen_number = 0;
   char *temp;
-  char *str_type_return;
-  XrmValue value_return;
-  XrmValue    cvt_value;
-  XrmDatabase db;
-  char instanceName[30], instanceClass[30];
-  Boolean status;
   struct _palette *palette;
   int typeOfMonitor;
 

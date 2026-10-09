@@ -99,12 +99,11 @@ mb_init_array(Browser *b, int begin, int end) {
 
 static void
 reset_ticks(Calendar *c, Boolean use_sel_idx) {
-	int	beg, end;
+	int	beg;
 	Props	*p = (Props *)c->properties;
         Browser	*b = (Browser*)c->browser;
 
 	beg = get_int_prop(p, CP_DAYBEGIN);
-	end = get_int_prop(p, CP_DAYEND);
 
 	if (b->date <= get_bot()) {
 		b->date = get_bot();
@@ -226,8 +225,7 @@ make_browser(Calendar *c)
 {
 	Browser 	*b;
 	Props 		*p = (Props*) c->properties;
-	Widget 		separator1;
-	Dimension 	w, h, height;
+	Dimension 	height;
 	XmString 	xmstr;
 	XmString goto_label, prev_week, this_week, next_week, prev_month, next_month;
 	int 		num_children;
@@ -594,9 +592,6 @@ static void
 browselist_from_browser(Widget w, XtPointer client_data, XtPointer call_data)
 {
         Calendar *c = (Calendar *)client_data;
-        Browselist	*bl;
-
-        bl = (Browselist *)c->browselist;
 
 	show_browselist(c);
 }
@@ -605,7 +600,6 @@ static void
 goto_date_cb(Widget w, XtPointer client_data, XtPointer call_data) 
 {
         Calendar *c = (Calendar *)client_data;
-	Browser *b;
 
 	set_entry_date(c);
 }
@@ -659,7 +653,6 @@ bcanvas_repaint(Widget w, XtPointer client_data, XtPointer call_data)
         Calendar *c = (Calendar *)client_data;
 	Browser *b;
 	XRectangle clip;
-	XEvent ev;
         new_XContext    *xc;
 	XmDrawingAreaCallbackStruct *cbs = (XmDrawingAreaCallbackStruct*)call_data;
 
@@ -713,8 +706,8 @@ browser_to_gaccess_list(Calendar *c) {
 	 */
 	XmListGetSelectedPos(b->browse_list, &pos_list, &pos_cnt);
 	for (i = 0; i < pos_cnt; i++) {
-		if (bd = (BlistData *)CmDataListGetData(bl->blist_data,
-							pos_list[i]))
+		if ((bd = (BlistData *)CmDataListGetData(bl->blist_data,
+							pos_list[i])))
 			add_to_gaccess_list(bd->name, bd->cal_handle,
 				bd->user_access, bd->version, ge, True);
 	}
@@ -728,7 +721,6 @@ void mb_update_busystatus(Browser *b, Calendar *c)
 	int			i, j, r_cnt;
 	CSA_uint32		num_entries;
 	char			buf[BUFSIZ + 5];
-	Boolean 		match = False;
 	XmString		xmstr;
         Browselist 		*bl = (Browselist *)c->browselist;
 	time_t			start, stop;
@@ -740,7 +732,7 @@ void mb_update_busystatus(Browser *b, Calendar *c)
 	Tick			start_tick, end_tick;
 
 	j = 1;
-	while (bd = (BlistData *)CmDataListGetData(bl->blist_data, j)) {
+	while ((bd = (BlistData *)CmDataListGetData(bl->blist_data, j))) {
 		if (!XmListPosSelected(b->browse_list, j++))
 			continue;
 
@@ -793,9 +785,8 @@ bcanvas_event(Widget w, XtPointer client_data, XtPointer call_data)
 	Browser *b;
 	XmDrawingAreaCallbackStruct *cbs = (XmDrawingAreaCallbackStruct*) call_data;
         XEvent  *event = cbs->event;
-	Tick start;
         static XEvent lastevent;
-	int x, y, boxw, boxh;
+	int x, y;
 	pr_pos xy;
 
         if ((event == NULL) || (event->type == ButtonRelease))
@@ -850,16 +841,9 @@ schedule_cb(Widget w, XtPointer client_data, XtPointer call_data)
 {
         Calendar *c = (Calendar *)client_data;
 	Browser *b;
-	Props *p;
-        OrderingType    ord_t;
-        SeparatorType   sep_t;
-	XmPushButtonCallbackStruct *cbs = (XmPushButtonCallbackStruct*) call_data;
 
 	b = (Browser *)c->browser;
-	p = (Props *)c->properties;
 	_DtTurnOnHourGlass(b->frame);
-        ord_t = get_int_prop(p, CP_DATEORDERING);
-        sep_t = get_int_prop(p, CP_DATESEPARATOR);
 	show_geditor(c, b->begin_hr_tick, b->end_hr_tick);
 	browser_to_gaccess_list(c);
 	_DtTurnOffHourGlass(b->frame);
@@ -1108,7 +1092,6 @@ register_names(char *name, Calendar *c)
 	CSA_flags		flags = 0;
 	CSA_extension   	cb_ext;
 	CSA_extension		logon_ext;
-	char			buf[BUFSIZ];
 
 	if (blank_buf(name))
 		return False;
@@ -1372,7 +1355,7 @@ mb_init_datefield(Browser *b, Calendar *c)
 static void
 mb_init_browchart(Browser *b, Calendar *c)
 {
-        int		char_width, char_height, day_len, day_of_week;
+        int		char_width, char_height, day_len;
         int		label_height, label_width;
         Props		*p = (Props *)c->properties;
 	Dimension	canvas_width, canvas_height;

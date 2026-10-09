@@ -158,12 +158,11 @@ static Widget
 build_keyboardDlg(
         Widget shell )
 {
-    int     i, n;
+    int n;
     Arg              args[MAX_ARGS];
     Widget           widget_list[12]; 
     int              count = 0;
     Widget           form;
-    Pixel            foreground, background;
     Boolean          set;
     XmString         button_string[NUM_LABELS]; 
     XmString         string;

@@ -166,7 +166,7 @@ t_list_select_proc(Widget w, XtPointer client_data, XtPointer data) {
 	ToDo			*t = (ToDo *)client_data;
 	XmListCallbackStruct	*cbs = (XmListCallbackStruct *)data;
 
-	if (a = t_nth_appt(t, cbs->item_position - 1))
+	if ((a = t_nth_appt(t, cbs->item_position - 1)))
 		appt_to_form(t, a);
 	XtSetSensitive(t->delete_button, True);
         XtSetSensitive(t->change_button, True);
@@ -177,7 +177,6 @@ t_list_select_proc(Widget w, XtPointer client_data, XtPointer data) {
 */
 static void
 t_build_expand(ToDo *t) {
-	Props		*p = (Props *)t->cal->properties;
 	Widget		widgets[20];
 	WidgetList	children;
 	int		i = 0,
@@ -251,7 +250,7 @@ t_build_expand(ToDo *t) {
 
 static void
 clear_view_changes(ToDo *t){
-	TodoView		*step, *last = NULL;
+	TodoView		*step;
 
 	step = t->view_list;
 
@@ -469,7 +468,6 @@ t_view_filter_proc(Widget w, XtPointer client_data, XtPointer cbs) {
 
 extern Widget
 create_filter_menu(Widget parent, XtCallbackProc cb_func, XtPointer data) {
-	int			i;
 	Widget			menuitem;
 	Widget			menu;
 	Widget			cascade;
@@ -719,10 +717,9 @@ t_build_view_popup(ToDo *t) {
 static void
 t_expand_ui_proc(Widget w, XtPointer client_data, XtPointer data) {
 	ToDo		*t = (ToDo *)client_data;
-	Props_pu	*p = (Props_pu *)t->cal->properties_pu;
 	XmString	xmstr;
 	Dimension	h1, h2;
-	Dimension       h, height, width;
+	Dimension       h, width;
 	static Boolean	expand_state_closed = True;
 
 	/* This is really hokey.  There is a problem in the Motif code 
@@ -951,13 +948,11 @@ t_form_to_appt(ToDo *t) {
 */
 static void
 t_insert_proc(Widget w, XtPointer client_data, XtPointer data) {
-	int			wk;
 	ToDo			*t = (ToDo *)client_data;
 	Props_pu		*p = (Props_pu *)t->cal->properties_pu;
 	CSA_entry_handle	new_a;
 	CSA_return_code		stat;
 	Dtcm_appointment	*appt;
-	CSA_enum		scope;
 	static int		answer;
 	Repeat_menu_op	 op = ONE_TIME;
 	RFP		*rfp = &t->rfp;
@@ -1019,7 +1014,6 @@ t_insert_proc(Widget w, XtPointer client_data, XtPointer data) {
 		 * the change/delete style, this is here so in case
 		 * later the same type of dialog is required.
 		 */
-		scope = CSA_SCOPE_ALL;
 		break;
 	}
 
@@ -1367,7 +1361,6 @@ t_change_proc(Widget w, XtPointer client_data, XtPointer data) {
 	Props_pu		*p = (Props_pu *)t->cal->properties_pu;
 	CSA_entry_handle	old_a;
 	Dtcm_appointment	*new_a;
-	static int		answer;
 
 	_DtTurnOnHourGlass(t->frame);
 	if (!XmListGetSelectedPos(t->todo_list, &item_list, &item_cnt)) {
@@ -1375,7 +1368,7 @@ t_change_proc(Widget w, XtPointer client_data, XtPointer data) {
 		char *text = XtNewString(CATGETS(c->DT_catd, 1, 585,
 				"Select a To Do and CHANGE again."));
 		char *ident1 = XtNewString(CATGETS(c->DT_catd, 1, 95, "Continue"));
-		answer = dialog_popup(t->frame,
+		dialog_popup(t->frame,
 			DIALOG_TITLE, title,
 			DIALOG_TEXT, text,
 			BUTTON_IDENT, 1, ident1,
@@ -1393,7 +1386,7 @@ t_change_proc(Widget w, XtPointer client_data, XtPointer data) {
 		char *text = XtNewString(CATGETS(c->DT_catd, 1, 1009,
 				"Internal error selecting To Do.\nTo Do was not changed."));
 		char *ident1 = XtNewString(CATGETS(c->DT_catd, 1, 95, "Continue"));
-		answer = dialog_popup(t->frame,
+		dialog_popup(t->frame,
 			DIALOG_TITLE, title,
 			DIALOG_TEXT, text,
 			BUTTON_IDENT, 1, ident1,
@@ -2455,7 +2448,6 @@ todo_insert(Dtcm_appointment *appt, CSA_entry_handle *new_a, Calendar *c) {
 	CSA_return_code	stat;
 	ToDo		*t = (ToDo *)c->todo;
 	Props_pu	*p = (Props_pu *)c->properties_pu;
-	CSA_enum		scope;
 	static int		answer=0;
 
 	/* the gui does not support specifying the sequence end date */
@@ -2501,7 +2493,6 @@ todo_insert(Dtcm_appointment *appt, CSA_entry_handle *new_a, Calendar *c) {
 		 * the change/delete style, this is here so in case
 		 * later the same type of dialog is required.
 		 */
-		scope = CSA_SCOPE_ALL;
 		break;
 	}
 

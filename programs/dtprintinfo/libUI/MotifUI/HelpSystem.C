@@ -99,7 +99,6 @@ boolean HelpSystem::SetVisiblity(boolean flag)
 
 void HelpSystem::HyperlinkCB(Widget, XtPointer data, XtPointer)
 {
-   HelpSystem *obj = (HelpSystem *)data;
 }
 
 void HelpSystem::CloseCB(Widget, XtPointer data, XtPointer)

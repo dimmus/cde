@@ -47,7 +47,7 @@ static pam_handle_t *pamh;
 static int PamStart(const char *service_name, const char *user,
 		    const char *display_name)
 {
-    int status;
+    int status = PAM_SUCCESS;
     char *colon, *hostname;
 
     if (pamh) {
@@ -74,7 +74,7 @@ static int PamStart(const char *service_name, const char *user,
 	goto done;
     }
 
-    if (colon = strrchr(hostname, ':')) *colon = '\0';
+    if ((colon = strrchr(hostname, ':'))) *colon = '\0';
 
     status = pam_set_item(pamh, PAM_RHOST, hostname);
 
@@ -187,7 +187,6 @@ static int login_conv(int num_msg, const struct pam_message **msg,
 {
     const struct pam_message	*m;
     struct pam_response	*r;
-    char 			*temp;
     int			k;
 
 #ifdef lint

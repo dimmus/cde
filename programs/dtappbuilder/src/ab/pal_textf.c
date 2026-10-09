@@ -160,7 +160,6 @@ textf_initialize(
     ABObj    obj
 )
 {
-    AB_TEXT_INFO *info = &(obj->info.text);
 
     obj_set_unique_name(obj, "textfield");
 

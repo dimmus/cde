@@ -347,6 +347,8 @@ _tttk_message_in_final_state(
 		return (theState == TT_HANDLED) || (theState == TT_FAILED);
 	    case TT_OFFER:
 		return theState == TT_RETURNED;
+	    default:
+		break;
 	}
 	return 0;
 }
@@ -472,6 +474,8 @@ _ttTkNoteReplyStatus(
 			//
 			*result = -TT_DESKTOP_EPROTO;
 		}
+		break;
+	    default:
 		break;
 	}
 	tttk_message_destroy( msg );

@@ -510,8 +510,8 @@ static char *get_report_type_string(CMGraphicsInfo *);
 #if 0 && defined(PRINTING_SUPPORTED)
 static void filePrintDoneCB(Display *, XPContext, XPGetDocStatus,
 			    XPointer);
-#endif /* PRINTING_SUPPORTED */
 static void filePrintReportStatus(Calendar *, Boolean);
+#endif /* PRINTING_SUPPORTED */
 static void showBadAllocError(Calendar *);
 
 /* X Graphics stuff. */
@@ -979,7 +979,6 @@ static Boolean
 cm_load_font(CMGraphicsInfo *gInfo, CMFontEnum fontEnum,
 	     char *fontPattern)
 {
-  int i;
   CMFontInfo *fInfo = cm_find_font(gInfo, fontEnum);
 
   if (fInfo != (CMFontInfo *)NULL)
@@ -1668,7 +1667,6 @@ cm_count_appts(CMGraphicsInfo *gInfo, CSA_entry_handle *list, int a_total,
   Dtcm_appointment	*appt;
   Calendar		*c = gInfo->c;
   Props			*p = (Props*)c->properties;
-  Tick			start_tick;
   int			apptCount = 0;
 
   meoval = get_int_prop(p, CP_PRINTPRIVACY);
@@ -2116,7 +2114,6 @@ filePrintDoneCB(Display *dsp, XPContext context, XPGetDocStatus status,
   else
       filePrintReportStatus(c, (status == XPGetDocFinished));
 }
-#endif /* PRINTING_SUPPORTED */
 
 static void
 filePrintReportStatus(Calendar *c, Boolean ok)
@@ -2156,6 +2153,7 @@ filePrintReportStatus(Calendar *c, Boolean ok)
   XtFree(title);
   XtFree(errText);
 }
+#endif /* PRINTING_SUPPORTED */
 
 static void
 showBadAllocError(Calendar *c)
@@ -2205,6 +2203,7 @@ x_open_file(Calendar *c)
   int nChildren;
   static Boolean getResources = True;
   _Xltimeparams localtime_buf;
+  (void) localtime_buf;	/* unused unless XTHREADS */
 
   if (getResources)
   {
@@ -2959,10 +2958,10 @@ x_print_multi_appts(void *gInfoP,
 void
 x_finish_printer(void *gInfoP)
 {
+#ifdef GR_DEBUG
   CMGraphicsInfo *gInfo = (CMGraphicsInfo *)gInfoP;
   Widget w = gInfo->drawingArea;
 
-#ifdef GR_DEBUG
   if (inDebugMode(gInfo->c))
     tmpSpin(w);
   else
@@ -2979,7 +2978,6 @@ x_print_list_range(Calendar *c, CSA_sint32 appt_type, int item_data,
 	char		buf[MAXNAMELEN], buf2[MAXNAMELEN];
 	void		*xp;
 	Props		*p = (Props *)c->properties;
-	Glance		glance;
 	todo_view_op	todo_view = VIEW_ALL;
 	OrderingType	ot = get_int_prop(p, CP_DATEORDERING);
 	time_t 		start, end;
@@ -2995,9 +2993,7 @@ x_print_list_range(Calendar *c, CSA_sint32 appt_type, int item_data,
 
 	if (appt_type ==  CSA_TYPE_TODO) {
 		todo_view = (todo_view_op)item_data;
-		glance = c->view->glance;
-	} else
-		glance = (Glance)item_data;
+	}
 
 	x_init_printer(xp, PORTRAIT);
 	x_init_list(xp);
@@ -3040,7 +3036,6 @@ void
 x_init_list(void *gInfoP)
 {
   CMGraphicsInfo *gInfo = (CMGraphicsInfo *)gInfoP;
-  CMFontInfo *fInfo;
   int hIndent;
   int vIndent;
 
@@ -3288,7 +3283,6 @@ void
 x_init_std_year(void *gInfoP)
 {
   CMGraphicsInfo *gInfo = (CMGraphicsInfo *)gInfoP;
-  CMFontInfo *fInfo;
 
   gInfo->reportType = PR_YEAR_VIEW;
 
@@ -3310,7 +3304,6 @@ x_init_std_year(void *gInfoP)
 void
 x_std_year_name(void *gInfoP, int yr)
 {
-  CMGraphicsInfo *gInfo = (CMGraphicsInfo *)gInfoP;
   char yearBuf[BUFFERSIZE];
 
   /* --- print year centered at top --- */
@@ -3465,7 +3458,7 @@ x_week_sched_boxes(void *gInfoP)
   int num_hours;
   int boxIndent;
   int boxX1, boxY1, boxX2, boxY2, boxWd, boxHt;
-  int x1, y1, x2, y2;
+  int x1, y1, x2;
   int i;
   int ulOff = gInfo->thickWd / 2;
   int brOff = (gInfo->thickWd - 1) / 2;
@@ -3547,7 +3540,6 @@ void
 x_week_daynames(void *gInfoP, char *dayName, int dayIndex, Boolean more)
 {
   CMGraphicsInfo *gInfo = (CMGraphicsInfo *)gInfoP;
-  Calendar *c = gInfo->c;
   int x1, y1, x2, y2;
   int innerOffset, innerWd;
   char dayBuf[BUFFERSIZE];
@@ -3711,7 +3703,6 @@ x_month_daynames(void *gInfoP, int nRows)
   CMGraphicsInfo *gInfo = (CMGraphicsInfo *)gInfoP;
   char *day_of_week[DAYS_IN_WEEK];
   int i;
-  Calendar *c = gInfo->c;
   int x1, y1, x2, y2;
   int dayBoxHt;
 
@@ -3875,7 +3866,7 @@ x_month_timeslots(void *gInfoP, Tick tick, Boolean more)
   int nrows = gInfo->u.monthInfo.nRows;
   int x1, y1;
   int boxX1, boxY1, boxWd, boxHt;
-  int ulOffset, brOffset;
+  int ulOffset;
   int dayRow, dayCol;
   char dateBuf[BUFFERSIZE];
 
@@ -3884,7 +3875,6 @@ x_month_timeslots(void *gInfoP, Tick tick, Boolean more)
   boxWd = gInfo->u.monthInfo.boxWd;
   boxHt = gInfo->u.monthInfo.boxHt - gInfo->u.monthInfo.tab1;
   ulOffset = (gInfo->normalWd + 1) / 2;
-  brOffset = (gInfo->normalWd / 2) + 1;
 
   /* Write date into appropriate box. */
   cm_set_font(gInfo, MV_DATE_FONT);

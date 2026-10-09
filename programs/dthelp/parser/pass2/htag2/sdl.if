@@ -811,6 +811,8 @@
 	    else
 		pPrev->u.u_refitem.pHead = pCurrentElement;
 	    break;
+	default:
+	    break;
 	}
     
     pPrev = pCurrentElement;
@@ -1684,7 +1686,7 @@
     tossEnt = (M_ENTITY *) m_lookfortrie(wc_name, m_enttrie);
     if (tossEnt)
 	{
-	if (tossFile = m_openent(tossEnt->content))
+	if ((tossFile = m_openent(tossEnt->content)))
 	    {
 	    fclose(tossFile);
 	    saveSysECnt = m_sysecnt;

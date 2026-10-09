@@ -165,7 +165,6 @@ int _DtHPrGenFileOrPrint(
 {       /*$CODE$*/
    int    status;
    char * tmpfile;
-   char   cmdFormat[30];
    
    /* put into specified output file?? */
    if (options->outputFile[0] != EOS) 

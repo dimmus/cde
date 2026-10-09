@@ -627,7 +627,6 @@ _DtFindMatchingFiles(
    DIR *dirp;		/* Variables for walking through the directory
 			   	entries. */
    char * next_file;
-   struct dirent *dp = NULL;
    char *file_suffix;
    int suffixLen, nameLen;
    int nextIndex;
@@ -637,6 +636,7 @@ _DtFindMatchingFiles(
 
    _Xreaddirparams dirEntryBuf;
    struct dirent *result;
+   (void) dirEntryBuf; /* unused unless XTHREADS */
 
 /* CODE */   
    if (dirs == NULL)
@@ -784,22 +784,16 @@ _DtDbGetDataBaseEnv( void )
 DtDirPaths * 
 _DtGetDatabaseDirPaths( void )
 {
-   XrmValue resource_value;
-   char *rep_type;
-   char *dir_string, *remote_hosts;
+   char *dir_string;
    char *nwh_host;		/* Holds the host portion of the user's
 				   network-home. */
    char **dir_vector;		/* The list of directories are turned into
 				   a vector of strings.  This points to the
 				   start of the vector. */
-   char **hosts_vector;
    char **next_dir;		/* A pointer used to walk through dir_vector. */
-   char **next_host;
    char *dir;                   /* Points to next dir being processed */
    int valid_dirs;		/* A count of the number of valid directories
 				   found. */
-   char *home;
-   char *nextc;
    DtDirPaths * ret_paths;
    char * internal;
    int i;

@@ -199,7 +199,7 @@ void m_entexpand(M_ENTITY *openent)
     /* Content of entity -- scan for end to reverse string */
     if (openent->type == M_CDATAENT) dchar = M_CDCHAR ;
     else dchar = M_ENTNORMAL ;
-    if (p = openent->content)
+    if ((p = openent->content))
       while (*p) p++;
     if (p != openent->content) {
       p-- ;
@@ -625,7 +625,7 @@ void m_litproc(int delim)
         }
       } /* End for i */
     m_error("Literal too long") ;
-    m_literal[i] = wc_null ;
+    m_literal[M_LITLEN] = wc_null ;
     m_curcon = savecon ;
     }
 
@@ -1129,7 +1129,7 @@ LOGICAL m_vldentref(void)
       m_getname((M_WCHAR) next) ;
       if (! m_gettoken(&next, &dchar, ENTREF))
         if (next != M_RE) m_ungetachar(next, dchar, TRUE) ;
-      if (openent = (M_ENTITY *) m_lookfortrie(m_name, m_enttrie))
+      if ((openent = (M_ENTITY *) m_lookfortrie(m_name, m_enttrie)))
         m_entexpand(openent) ;
       else m_err1("Reference to undefined entity '%s'", m_name) ;
       return(TRUE) ;

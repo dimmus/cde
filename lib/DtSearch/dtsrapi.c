@@ -639,7 +639,6 @@ QUERY_ERROR:
     /* Final engine call, the search itself... */
     Opera_Engine ();
 
-END_OF_SEARCH:
     if (usrblk.debug & USRDBG_SRCHCMPL) {
 	/* count msgs */
 	i = 0;

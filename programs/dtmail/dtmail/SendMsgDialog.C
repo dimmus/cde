@@ -445,7 +445,7 @@ SendMsgDialog::makeMessage(void)
 	return(NULL);
     }
     
-    DtMail::BodyPart * bp = msg->newBodyPart(error, NULL);
+    msg->newBodyPart(error, NULL);
     
     // For now, reserve the first body part for text.
     setFirstBPHandled(TRUE);
@@ -460,10 +460,9 @@ void
 SendMsgDialog::updateMsgHnd()
 {
     DtMailEnv error;
-    DtMail::Envelope * env;
     int textLen = 0;
 
-    env = _msgHandle->getEnvelope(error);
+    _msgHandle->getEnvelope(error);
     storeHeaders();
 
     char * widget_text = this->text();
@@ -1114,7 +1113,6 @@ void
 SendMsgDialog::send_message(const char * trans_impl, int trans_type)
 {
     DtMailEnv mail_exec_error;
-    DtMailOperationId id;
     DtMail::Transport * mail_transport;
     DtMail::Session * d_session = theRoamApp.session()->session();
     DtMailEditor *editor = this->get_editor();
@@ -1267,7 +1265,7 @@ SendMsgDialog::send_message(const char * trans_impl, int trans_type)
 	// Tell the transport where the callback is
 	theRoamApp.default_transport()->initTransportData( _transfds,
 		&(SendMsgDialog::sendmailErrorProc), this);
-	id = theRoamApp.default_transport()->submit(mail_exec_error,
+	theRoamApp.default_transport()->submit(mail_exec_error,
 		_msgHandle, _log_msg);
 
     } else {
@@ -1302,7 +1300,7 @@ SendMsgDialog::send_message(const char * trans_impl, int trans_type)
 	// Tell the transport where the callback is
 	mail_transport->initTransportData(_transfds,
 		&(SendMsgDialog::sendmailErrorProc), this);
-	id = mail_transport->submit(mail_exec_error, _msgHandle, _log_msg);
+	mail_transport->submit(mail_exec_error, _msgHandle, _log_msg);
     }
   
     popupMemoryError (mail_exec_error);
@@ -1827,7 +1825,7 @@ void
 SendMsgDialog::add_att(char *name, DtMailBuffer buf)
 {
     if (_confirm_attachment_threshold &&
-	_confirm_attachment_threshold < buf.size)
+	(unsigned long) _confirm_attachment_threshold < buf.size)
     {
         if (! confirm_add_attachment("", buf.size)) return;
     }
@@ -1872,7 +1870,6 @@ SendMsgDialog::save_selected_attachment(
     // Get selected attachment, if none selected, then return.
     if ( attachment == NULL ) {
 	// Let User know that no attachment has been selected???
-	int answer = 0;
 	char *helpId = NULL;
 	
 	
@@ -1880,7 +1877,7 @@ SendMsgDialog::save_selected_attachment(
 				     CATGETS(DT_catd, 1, 120, "Mailer"),
 				     CATGETS(DT_catd, 2, 19, "An attachment needs to be selected before issuing the\n\"Save As\" command to save to a file.") );
 	helpId = DTMAILHELPSELECTATTACH;
-	answer = _genDialog->post_and_return(
+	_genDialog->post_and_return(
 					     CATGETS(DT_catd, 3, 74, "OK"), helpId );
 	return;
     }
@@ -2005,7 +2002,6 @@ void
 SendMsgDialog::createMenuPanes()
 {
     CmdList *cmdList;
-    Cardinal n = 0;
     DtMailEnv error;
     const char * value = NULL;
 
@@ -2413,7 +2409,7 @@ SendMsgDialog::createAliasList(DtVirtArray<PropStringPair*> *aliases)
 
     mail_rc->getAliasList(alias_stuffing_func, aliases);
 
-    if (nalias = aliases->length())
+    if ((nalias = aliases->length()))
     {
 	PropStringPair	**prop_pairs = NULL;
 
@@ -2493,7 +2489,7 @@ SendMsgDialog::aliasMenuButtonHandler(
     XButtonEvent	*be = (XButtonEvent *) event;
 
     if (event->xany.type != ButtonPress) return;
-    if(be->button == theApplication->bMenuButton())
+    if(be->button == (unsigned int) theApplication->bMenuButton())
     {
         XmMenuPosition(menu, (XButtonEvent *)event);
         XtManageChild(menu);
@@ -3403,7 +3399,7 @@ and then choose rename"));
 	
 	char * helpId = DTMAILHELPSELECTONEATTACH;
 	
-	int answer = _genDialog->post_and_return(helpId);
+	_genDialog->post_and_return(helpId);
 	
 	delete [] buf;
 	return(FALSE);
@@ -3788,7 +3784,6 @@ Compose::getUnusedWin()
     if (NULL == _compose_head) return NULL;
    
     Compose::Compose_Win* a_node = NULL; 
-    Compose::Compose_Win* the_node = NULL; 
     
     // Find a node with unused smd.  Return smd
     for (a_node=_compose_head; a_node; a_node=a_node->next)
@@ -4001,7 +3996,7 @@ SendMsgDialog::hasAddressee()
 {
   DtMailEnv error;
   
-  DtMail::Envelope * env = _msgHandle->getEnvelope(error);
+  _msgHandle->getEnvelope(error);
   
   // Walk through the headers. 
   // Return TRUE if the message has a value for either of the

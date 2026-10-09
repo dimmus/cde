@@ -269,7 +269,6 @@ Create(
    Arg args[15];
    Dimension offset, screenHeight;
    int n;
-   char * tmpStr;
 
    /*  Allocate the change directory dialog instance record.  */
 
@@ -1352,8 +1351,6 @@ WriteResourceValues(
         char **name_list )
 {
    PreferencesData * preferences_data = (PreferencesData *) values->data;
-   PreferencesRec * preferences_rec;
-   Arg args[2];
 
 
    /*  If the dialog is currently displayed, update the geometry  */
@@ -1362,7 +1359,6 @@ WriteResourceValues(
    if (preferences_data->displayed == True)
    {
       _DtGenericUpdateWindowPosition(values);
-      preferences_rec = (PreferencesRec *) _DtGetDialogInstance (values);
    }
 
    _DtDialogPutResources (fd, name_list, PreferencesName, values->data, 
@@ -1440,19 +1436,14 @@ ToggleCallback(
         XtPointer call_data )
 {
    PreferencesRec * preferences_rec;
-   DialogData * dialog_data;
-   PreferencesData * preferences_data;
    Boolean set;
    unsigned char *viewP;
    Arg args[1];
    Arg false_args[1];
    Arg true_args[1];
-   int tmp_view;
 
 
    preferences_rec = (PreferencesRec *) client_data;
-   dialog_data = _DtGetInstanceData ((XtPointer)preferences_rec);
-   preferences_data = (PreferencesData *) dialog_data->data;
 
    XtSetArg (false_args[0], XmNset, False);
    XtSetArg (true_args[0], XmNset, True);

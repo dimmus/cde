@@ -211,6 +211,7 @@ DoDay(
 				 next_time = 0;
 	Time			*time_list = RE_DAILY(re)->dd_time;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	target_tm = *_XLocaltime((const time_t *)&target_time, localtime_buf);
 	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
@@ -342,11 +343,11 @@ DoWeek(
 				 start_time = _start_time,
 				 base_time,
 				 begin_time,
-				 adj_start_time,
 				 next_time = 0;
 	DayTime			*day_list = RE_WEEKLY(re)->wd_daytime;
 	RepeatEventState	*unused;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/* Make sure the start time is on the first real event slot. */
 	if (_target_time) {
@@ -475,8 +476,7 @@ DoMonthDay(
 	RepeatEventState	*res)
 {
 	int			 num_intervals,
-				 event_day,
-				 nmonths;
+				 event_day;
 	unsigned int		 ndays = RE_MONTHLY(re)->md_nitems;
 	struct tm		 target_tm,
 				 start_tm,
@@ -485,6 +485,7 @@ DoMonthDay(
 				 next_time = 0;
 	unsigned int		*day_list = RE_MONTHLY(re)->md_days;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	target_tm = *_XLocaltime((const time_t *)&target_time, localtime_buf);
 	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
@@ -509,7 +510,7 @@ DoMonthDay(
 
 			if (day < target_tm.tm_mday)
 				continue;
-			if (day == target_tm.tm_mday)
+			if (day == target_tm.tm_mday) {
 				/* If it is on the same day, the event time
 				 * must be later than the target time.
 				 */
@@ -521,6 +522,7 @@ DoMonthDay(
 					next_interval = FALSE;
 					break;
 				}
+			}
 			if (day > target_tm.tm_mday) {
 					event_day = day;
 					next_interval = FALSE;
@@ -591,8 +593,7 @@ DoMonthPos(
 	const RepeatEvent	*re,
 	RepeatEventState	*res)
 {
-	int			 num_intervals,
-				 nmonths;
+	int			 num_intervals;
 	unsigned int		 ndays = RE_MONTHLY(re)->md_nitems;
 	struct tm		 target_tm,
 				 start_tm,
@@ -600,6 +601,7 @@ DoMonthPos(
 	Tick			 base_time = 0;
 	WeekDayTime		*wdt_list = RE_MONTHLY(re)->md_weektime;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	target_tm = *_XLocaltime((const time_t *)&target_time, localtime_buf);
 	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
@@ -672,6 +674,7 @@ DoYearByMonth(
 	unsigned int		*month_list = RE_YEARLY(re)->yd_items;
 	RepeatEventState	*unused;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/* Make sure the start time is on the first real event slot. */
 	if (_target_time) {
@@ -776,6 +779,7 @@ DoYearByDay(
 	unsigned int		*day_list = RE_YEARLY(re)->yd_items;
 	RepeatEventState	*unused;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/* Make sure the start time is on the first real event slot. */
 	if (_target_time) {
@@ -890,6 +894,7 @@ DoDSTAdjustment(
 	Tick		 dst_adj,
 			 _begin_time = begin_time;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/* By moving ahead one day we might have crossed a dst border.*/
 	next_day = *_XLocaltime(&begin_time, localtime_buf);
@@ -940,6 +945,7 @@ MonthDayNumIntervals(
 			 last_time,
 			 target_time;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         /* The 28th - 31st may not exist in a given month thus if only these
          * days are specified in a rule it is necessary to calculate the
@@ -1017,6 +1023,7 @@ MonthPosNumIntervals(
 			 base_time,
 			 target_time;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	for (i = 0; i < nwdt_list; i++) {
 		for (j = 0; j < wdt_list[i].wdt_nweek; j++) {
@@ -1085,8 +1092,8 @@ FillInRepeatEvent(
         RepeatEvent		*re)
 {
 	struct tm		*start_tm;
-	int			 i;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	start_tm = _XLocaltime(&start_time, localtime_buf);
 

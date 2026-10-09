@@ -1544,7 +1544,6 @@ getStringValue(
 {
     XmTextWidget	 tw = (XmTextWidget) M_text(editor);
     int			 bufSize;
-    char		*lastChar;
     DtEditorErrorCode	 returnVal = DtEDITOR_NO_ERRORS;
 
     /*
@@ -1562,7 +1561,7 @@ getStringValue(
     if (DtEDITOR_NO_ERRORS != returnVal) return returnVal;
 
     *buf = (char *) XtMalloc(bufSize);
-    lastChar = _DtEditorCopyDataOut(tw, *buf, insertNewlines);
+    (void) _DtEditorCopyDataOut(tw, *buf, insertNewlines);
 
     return returnVal;
 } /* end getStringValue */

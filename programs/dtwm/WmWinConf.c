@@ -38,6 +38,7 @@
 
 #define XK_MISCELLANY
 #include <X11/keysymdef.h>
+#include <X11/XKBlib.h>
 
 
 #define MOVE_OUTLINE_WIDTH	2
@@ -279,7 +280,7 @@ void HandleClientFrameMove (ClientData *pcd, XEvent *pev)
 		  keyMultiplier++;
 	    }
 
-	    keysym = XKeycodeToKeysym (DISPLAY, pev->xkey.keycode, 0);
+	    keysym = XkbKeycodeToKeysym (DISPLAY, pev->xkey.keycode, 0, 0);
 	    control = (pev->xkey.state & ControlMask) != 0;
 	    tmpX = tmpY = 0;
 
@@ -692,7 +693,7 @@ Boolean HandleResizeKeyPress (ClientData *pcd, XEvent *pev)
 	  keyMult++;
     }
 
-    keysym = XKeycodeToKeysym (DISPLAY, pev->xkey.keycode, 0);
+    keysym = XkbKeycodeToKeysym (DISPLAY, pev->xkey.keycode, 0, 0);
     control = (pev->xkey.state & ControlMask) != 0;
 
     switch (keysym) {
@@ -4047,7 +4048,6 @@ StartMarqueeSelect(WmScreenData *pSD, XEvent *pev)
 {
     Window grab_win, junk_win;
     Boolean grabbed;
-    int big_inc;
     int junk;
 
     if (!pSD->bMarqueeSelectionInitialized)
@@ -4116,9 +4116,6 @@ StartMarqueeSelect(WmScreenData *pSD, XEvent *pev)
     marqueeWidth0 = marqueeWidth = 0;
     marqueeHeight0 = marqueeHeight = 0;
     marqueeAnchor = ANCHOR_NW;
-
-    /* compute increment value for dynamic update */
-    big_inc = DisplayWidth (DISPLAY, pSD->screen) / 20;
 
     /* set configuring data */
     wmGD.configAction = MARQUEE_SELECT;
@@ -4313,7 +4310,6 @@ void UpdateMarqueeSelectData (WmScreenData *pSD)
 Boolean HandleMarqueeKeyPress (WmScreenData *pSD, XEvent *pev)
 {
     KeySym keysym;
-    Boolean control;
     int keyMult;
     XEvent KeyEvent;
 
@@ -4328,8 +4324,7 @@ Boolean HandleMarqueeKeyPress (WmScreenData *pSD, XEvent *pev)
 	  keyMult++;
     }
 
-    keysym = XKeycodeToKeysym (DISPLAY, pev->xkey.keycode, 0);
-    control = (pev->xkey.state & ControlMask) != 0;
+    keysym = XkbKeycodeToKeysym (DISPLAY, pev->xkey.keycode, 0, 0);
 
     switch (keysym) {
 

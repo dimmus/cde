@@ -47,9 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static 	char sccsid[] = "@(#)cmtt.c 1.13 95/05/01 Copyr 1993 Sun Microsystems, Inc.";
-#endif
 #include <EUSCompat.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -66,9 +63,9 @@ static 	char sccsid[] = "@(#)cmtt.c 1.13 95/05/01 Copyr 1993 Sun Microsystems, I
 #include "debug.h"
 
 
+#ifdef FNS_DEMO
 static Tt_message load_cb();
 
-#ifdef FNS_DEMO
 static const char *ptype = "Sun_DtCm";
 
 static void
@@ -101,7 +98,7 @@ DieFromToolTalkError(Calendar *c, char *errfmt, Tt_status status)
 {
     Arg		 args[10];
     Widget	 dialog, dialogShell;
-    char	*errmsg, *statmsg, *title;
+    char	*errmsg, *statmsg;
     XmString	 xms_errmsg, xms_ok, xms_title;
     int		 n;
 

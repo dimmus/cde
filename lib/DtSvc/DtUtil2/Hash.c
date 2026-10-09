@@ -189,7 +189,7 @@ _DtUnregisterHashEntry(
         DtHashTable tab,
         DtHashEntry entry )
 {
-    int 		idx, rehash;
+    int 		idx;
     DtHashEntry	*entries = tab->entries;
     DtHashKey			key = KEY(tab, entry);
 
@@ -207,7 +207,7 @@ ExpandHashTable(
 {
     unsigned int oldmask;
     DtHashEntry *oldentries, *entries;
-    int oldidx, newidx, rehash, len;
+    int oldidx, newidx;
     DtHashEntry entry;
     DtHashKey key;
 
@@ -252,8 +252,8 @@ _DtKeyToHashEntry(
         DtHashTable tab,
         DtHashKey key )
 {
-    int idx, rehash, len;
-    DtHashEntry entry, *entries = tab->entries;
+    int idx;
+    DtHashEntry *entries = tab->entries;
 
     if (!key) return NULL;
     idx = GetTableIndex(tab, key, False);

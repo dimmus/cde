@@ -240,7 +240,6 @@ ui_list_replace_item_prefix(
     int		old_prefix_len = 0;
     char	new_item_buf[2048] = "";
     char	*new_item_buf_ptr = NULL;
-    int		new_prefix_len = 0;
     XmString	new_xmitem_array[1] = {NULL};
     int		i = 0;
 
@@ -253,7 +252,6 @@ ui_list_replace_item_prefix(
 	return ERR_BAD_PARAM;
     }
     old_prefix_len = strlen(old_item_prefix);
-    new_prefix_len = strlen(new_item_prefix);
 
     XtVaGetValues(list,
 	XmNitemCount, &num_items,

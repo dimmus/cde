@@ -287,7 +287,7 @@ STRING	util_cvt_bool_to_string(BOOL bool_value, STRING buf, int buf_size);
 
 /* check 1st chars before calling strcmp - avoids a lot of calls */
 #define util_streq(s1,s2) \
-   (   ((s1) == (s2)) \
+   (   ((const void *)(s1) == (const void *)(s2)) \
     || (((s1) != NULL) && ((s2) != NULL) && (((s1)[0] == (s2)[0]) && (strcmp(s1,s2) == 0))) \
    )
 

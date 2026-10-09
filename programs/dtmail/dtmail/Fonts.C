@@ -164,7 +164,6 @@ load_app_font(
 	unsigned long	 pixel_size;
 	Display		*dpy = XtDisplay(w);
 	char		 font_name[128],
-			*font_name_ptr = font_name,
 		       **font_names;
 	int		 nnames;
 	Atom		 pixel_atom = XmInternAtom(dpy, "PIXEL_SIZE", FALSE);

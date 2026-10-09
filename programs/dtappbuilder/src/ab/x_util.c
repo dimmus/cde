@@ -87,7 +87,6 @@ static Bool	expose_count_predicate(
 **************************************************************************/
 static GC      box_gc;
 static GC      fullscreen_gc;
-static GC      grid_gc;
 
 
 /*************************************************************************
@@ -728,7 +727,6 @@ x_conn_fullscreen_chord(
 )
 {
     Display    *display;
-    int        tmp;
 
     display = XtDisplay(w);
     XDrawLine(display, rootwin, fullscreen_gc, x0, y0, x1, y1);

@@ -49,10 +49,6 @@ static Reminder_2 * reminder4_to_reminder2(Reminder_4 *r4);
 static Table_Res_Type_2 tablerestype4_to_tablerestype2(Table_Res_Type_4 t);
 static void tablereslist4_to_tablereslist2(Table_Res_List_4 *from,
 		Table_Res_List_2 *to);
-static Table_Args_Type_2 argstag4_to_argstag2(Table_Args_Type_4 t);
-static void args4_to_args2(Args_4 *from, Args_2 *to);
-static Table_Args_2 * tableargs4_to_tableargs2(Table_Args_4 *a4);
-static Registration_2 * reg4_to_reg2(Registration_4 *r4);
 
 /**************** DATA TYPE (4->2) CONVERSION ROUTINES **************/
 
@@ -476,14 +472,6 @@ abb4_to_abb2(Abb_Appt_4 *a4)
 	return(head);
 }
 
-static void
-apptid4_to_apptid2(Apptid_4 *from, Apptid_2 *to)
-{
-        if (from==NULL || to==NULL) return;
-        _DtCm_id4_to_id2(from->oid, to->oid);
-        to->new_appt = _DtCm_appt4_to_appt2(from->new_appt);
-}
-
 static Reminder_2 *
 reminder4_to_reminder2(Reminder_4 *r4)
 {
@@ -554,88 +542,3 @@ tablereslist4_to_tablereslist2(Table_Res_List_4 *from, Table_Res_List_2 *to)
         }
 }
  
-static Table_Args_Type_2
-argstag4_to_argstag2(Table_Args_Type_4 t)
-{
-        switch(t) {
-        case TICK_4:
-                return(TICK_2);
-        case APPTID_4:
-                return(APPTID_2);
-        case UID_4:
-                return(UID_2);
-        case APPT_4:
-                return(APPT_2);
-        case RANGE_4:
-                return(RANGE_2);
-        default:
-                return(TICK_2);
-        }
-}
-
-static void
-args4_to_args2(Args_4 *from, Args_2 *to)
-{
-	if (from==NULL || to==NULL) return;
-	to->tag = argstag4_to_argstag2(from->tag);
-	switch(from->tag) {
-	case TICK_4:
-		to->Args_2_u.tick = from->Args_4_u.tick;
-		break;
-	case APPTID_4:
-		to->Args_2_u.apptid.oid = (Id_2 *)calloc(1, sizeof(Id_2));
-		apptid4_to_apptid2(
-			&(from->Args_4_u.apptid),
-			&(to->Args_2_u.apptid));
-		break;
-	case UID_4:
-		to->Args_2_u.key = _DtCm_uid4_to_uid2(from->Args_4_u.key);
-		break;
-	case APPT_4:
-		to->Args_2_u.appt = _DtCm_appt4_to_appt2(from->Args_4_u.appt);
-		break;
-	case RANGE_4:
-		to->Args_2_u.range = _DtCm_range4_to_range2(from->Args_4_u.range);
-		break;
-	default:
-		break;
-	}
-}
-
-static Table_Args_2 *
-tableargs4_to_tableargs2(Table_Args_4 *a4)
-{
-	Table_Args_2 *a2;
-	
-	if (a4==NULL) return((Table_Args_2 *)NULL);
-	a2 = (Table_Args_2 *)calloc(1, sizeof(Table_Args_2));
-	a2->target = buffer4_to_buffer2(a4->target);
-	args4_to_args2(&(a4->args), &(a2->args));
-	return(a2);
-}
-
-static Registration_2 *
-reg4_to_reg2(Registration_4 *r4)
-{
-        Registration_2 *r2, *head, *prev;
-
-	prev = head = NULL;
-	while (r4 != NULL) {
-		r2 = (Registration_2 *)calloc(1, sizeof(Registration_2));
-		r2->target = buffer4_to_buffer2(r4->target);
-		r2->prognum = r4->prognum;
-		r2->versnum = r4->versnum;
-		r2->procnum = r4->procnum;
-		r2->next = NULL;
-
-		if (head == NULL)
-			head = r2;
-		else
-			prev->next = r2;
-		prev = r2;
-
-		r4 = r4->next;
-	}
-	return(head);
-}
-

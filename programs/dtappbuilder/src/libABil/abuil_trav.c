@@ -112,9 +112,6 @@ static void	output_text(
 static void	print_uil_source_info(
 		    sym_entry_header_type	*hdr
 		);
-static void	print_uil_obj_header(
-		    sym_obj_entry_type	*az_obj_entry
-		);
 static void	print_uil_include_file(
 		    sym_include_file_entry_type	*az_symbol_entry
 		);
@@ -998,52 +995,6 @@ print_uil_source_info(
     sym_entry_header_type	*hdr
 )
 {
-}
-
-/*
- * Prints the common header of "object" entries.
- */
-static void
-print_uil_obj_header(
-    sym_obj_entry_type	*az_obj_entry
-)
-{
-    printf("%s(0x%lx)",
-     get_tag_text(az_obj_entry->header.b_tag),
-     (unsigned long) az_obj_entry);
-
-    if (az_obj_entry->obj_header.az_name != NULL)
-    {
-	printf("  name: 0x%lx", (unsigned long) az_obj_entry->obj_header.az_name);
-    }
-
-    if (az_obj_entry->obj_header.az_reference != NULL)
-    {
-	printf("  reference: 0x%lx",
-		      (unsigned long) az_obj_entry->obj_header.az_reference);
-    }
-
-    if (az_obj_entry->obj_header.az_next != NULL)
-    {
-	printf("  next: 0x%lx", (unsigned long) az_obj_entry->obj_header.az_next);
-    }
-
-    if (az_obj_entry->obj_header.b_flags & sym_m_private)
-    {
-	printf(" private");
-    }
-
-    if (az_obj_entry->obj_header.b_flags & sym_m_exported)
-    {
-	printf(" exported");
-    }
-
-    if (az_obj_entry->obj_header.b_flags & sym_m_imported)
-    {
-	printf(" imported");
-    }
-
-    printf("\n");
 }
 
 

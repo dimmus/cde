@@ -249,7 +249,7 @@ Read_File(
     netfile = tt_host_file_netfile(fnameIn, tmp+1);
     localfile = tt_netfile_file(netfile);
 
-    strncpy(fname, localfile, MAXPATHLEN);
+    snprintf(fname, sizeof(fname), "%s", localfile);
     tmp[0] = ':';
 
     tt_free(netfile);
@@ -913,10 +913,9 @@ SetFileIODialogInfo( void )
   static char tmpStr[MAX_FNAME];
 
   Arg args[10];
-  int  n,dirlen=0,filelen=0,tst, ln;
+  int  n,tst, ln;
   char *strOrig = NULL;
   XmString  tmpXmStr;
-  char tmp[MAX_FNAME];
   char *tmp1= NULL;
   char *tmp2= NULL;
   int c;
@@ -1025,7 +1024,7 @@ SetFileIODialogInfo( void )
 
              /* make and insert the directory name */
              ln = strlen(last_fname) - strlen(tmp1);
-             strncpy(dirStr, last_fname, ln);
+             memcpy(dirStr, last_fname, ln);
              dirStr[ln] = '\0';
 	 }
 	 else

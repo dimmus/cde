@@ -140,8 +140,12 @@ _tt_dir_entries(const _Tt_string &path, bool_t follow_symlinks )
 		epath = epath.cat("/").cat( ename );
 		entries->push( epath );
 	}
+#ifdef TT_DEBUG
 	int closedir_err = closedir( dirp );
 	ASSERT(closedir_err == 0, "Could not close directory");
+#else
+	closedir( dirp );
+#endif
 	return entries;
 
 } /* dir_entries() */

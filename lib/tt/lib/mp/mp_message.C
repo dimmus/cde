@@ -678,6 +678,8 @@ update_message(const _Tt_message_ptr &m)
 			set_awaiting_reply( 0 );
 		}
 		break;
+	    default:
+		break;
 	}
 	m->_full_msg_guards = 0;
 	// XXX holtz 20 Jul 94  Why change given message?

@@ -59,7 +59,6 @@
 
 const    int    combo_box_init_width  = 100;
 
-static const	int input_rows = 3;
 
 typedef struct  PROP_COMBOBOX_SETTINGS
 {
@@ -134,11 +133,6 @@ static int	combobox_obj_destroy_CB(
 /*
  * Xt Callbacks
  */
-static void	wth_policyCB(
-		    Widget   	widget,
-                    XtPointer 	clientdata,
-                    XmToggleButtonCallbackStruct *state
-                );
 
 /*************************************************************************
 **                                                                      **
@@ -773,25 +767,3 @@ combobox_obj_destroy_CB(ObjEvDestroyInfo destroyInfo)
     }
     return 0;
 }
-
-static void
-wth_policyCB(
-    Widget	w,
-    XtPointer	clientdata,
-    XmToggleButtonCallbackStruct *state
-)
-{
-    AB_PROP_TYPE        	type = (AB_PROP_TYPE)clientdata;
-    PropComboboxSettingsRec     *pcs = &(prop_combobox_settings_rec[type]);
-    XtArgVal			value;
-
-    /* Width field should ONLY be editable if Size Policy
-     * is "Fixed"
-     */
-    if (state->set)
-    {
-    	XtVaGetValues(w, XmNuserData, &value, NULL);
-    	ui_field_set_editable(pcs->wth.w_field, value == SIZE_FIXED_KEY);
-    }
-}
-

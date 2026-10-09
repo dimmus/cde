@@ -213,10 +213,6 @@ static void TmpFileCreateError(
 			Widget w,
 			char *actionName,
 			char *dirName) ;
-static void TmpFileOpenError(
-			Widget w,
-			char *actionName,
-			char *fileName) ;
 static void TmpFileWriteError(
 			Widget w,
 			char *actionName,
@@ -328,17 +324,6 @@ static void CmdInvSuccessfulRequest(
 static void CmdInvFailedRequest( 
                         char *message,
                         void *data2) ;
-static void InitiateDtRequest(
-                        Widget w,
-                        ActionRequest *request) ;
-static Boolean ResolveDtNotifyMessagePieces(
-                        Widget w,
-                        ActionRequest *request,
-                        char * relPathHost,
-                        char * relPathDir ) ;
-static void InitiateDtNotifyMessage(
-                        Widget w,
-                        ActionRequest *request ) ;
 static void PrepareAndExecuteAction( 
                         Widget w,
                         ActionRequest *request);
@@ -502,7 +487,6 @@ DtActionInvoke(
         DtActionCallbackProc statusUpdateCb,
         XtPointer       client_data)
 {
-    int	i;
     ActionRequest	*request;
     char 		*contextHost= NULL;/* dummy to replace old parameter */
     _DtActInvRecT	*invp;		/* pointer to invocation record */
@@ -1179,21 +1163,6 @@ TmpFileCreateError( Widget w, char *actionName, char *dirName)
 }
 
 static void
-TmpFileOpenError( Widget w, char *actionName, char *fileName)
-{
-        XmString    msg;
-        char        *msgbuf = XtMalloc(_DtAct_MAX_BUF_SIZE);
-        
-        sprintf(msgbuf,TmpFileOpenErrorMsg,_DtActNULL_GUARD(fileName),
-             actionName);
-
-	msg  = XmStringCreateLocalized(msgbuf);
-        _DtCreateErrorDialog(w, actionName, msg);
-        XmStringFree(msg);
-        XtFree(msgbuf);
-}
-
-static void
 TmpFileWriteError( Widget w, char *actionName, char *fileName)
 {
         XmString    msg;
@@ -1298,7 +1267,7 @@ CreateActionRequest(
         _DtActInvRecT *invp )
 
 {
-   int i, j;
+   int i;
    int numObjects = 0;
    ObjectData * objectDataArray;
    ObjectData objectData;
@@ -1737,10 +1706,8 @@ ParseFileArgument(
         Boolean typeFile )
 
 {
-   int i, j;
    String dirName;
    String host;
-   String dir;
    int hostId;
    char *resolvedPath=NULL;
 
@@ -2446,7 +2413,6 @@ __ExtractCWD(
         Boolean useObjectInfo )
 
 {
-   String msg;
    String lastCh;
    int lastChLen;
    ActionPtr action = request->clonedAction;
@@ -3421,9 +3387,6 @@ InsertArgumentString(
         unsigned long processingMask )
 
 {
-   int len;
-   String lastCh;
-   int lastChLen;
    char * path;
    char * value;
    char * dataType;
@@ -3591,7 +3554,6 @@ InsertUnmappedArgumentString(
         Boolean addLeadingSpace )
 
 {
-   char * host = NULL;
    int size;
 
    /* No mapping is necessary here. */
@@ -3938,8 +3900,6 @@ CancelPromptDialog(
         XtPointer call_data )
 
 {
-   unsigned long evalStatus;
-   unsigned long userStatus;
    _DtActInvRecT *invp;
 
    /* Destroy the dialog */
@@ -4092,8 +4052,6 @@ ProcessPromptDialog(
    if (ProcessRequest(dialog->associatedWidget, dialog->request))
    {
        _DtActInvRecT	*invp;
-       unsigned long    evalStatus;
-       unsigned long    userStatus;
 
        if ( (invp = _DtActFindInvRec(dialog->request->invocId)) )
        {
@@ -4497,8 +4455,6 @@ CancelRequest(
 {
    int i;
    ContinueDialog *dialog = (ContinueDialog *)user_data;
-   unsigned long evalStatus;
-   unsigned long userStatus;
    _DtActInvRecT *invp;
 
    /* Destroy the dialog */

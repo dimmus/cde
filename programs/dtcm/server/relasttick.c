@@ -119,6 +119,7 @@ DoDay(
 	if (re->re_duration != RE_NOTSET) {
 		struct tm	*start_tm;
 		_Xltimeparams	 localtime_buf;
+		(void) localtime_buf;	/* unused unless XTHREADS */
 
 		start_tm = _XLocaltime((const time_t *)&start_time, localtime_buf);
 
@@ -154,6 +155,7 @@ DoWeek(
 				 last_time2 = EOT;
 	RepeatEventState        *res;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (re->re_end_date) {
 		last_time1 = LastTickFromEndDate(start_time, re);
@@ -225,6 +227,7 @@ DoMonthDay(
 				 last_time1 = EOT,
 				 last_time2 = EOT;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (re->re_end_date) {
 		last_time1 = LastTickFromEndDate(start_time, re);
@@ -297,6 +300,7 @@ DoMonthPos(
 	WeekDayTime		*wdt_list = RE_MONTHLY(re)->md_weektime;
 	RepeatEventState        *res;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (re->re_end_date) {
 		last_time1 = LastTickFromEndDate(start_time, re);
@@ -366,6 +370,7 @@ DoYearByMonth(
 				 last_time2 = EOT;
 	RepeatEventState        *res;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (re->re_end_date) {
 		last_time1 = LastTickFromEndDate(start_time, re);
@@ -417,12 +422,12 @@ DoYearByDay(
 	RepeatEvent		*re)
 {
 	struct tm               *start_tm;
-	int			 start_day; 
 	Tick			 _start_time,
 				 last_time1 = EOT,
 				 last_time2 = EOT;
 	RepeatEventState        *res;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (re->re_end_date) {
 		last_time1 = LastTickFromEndDate(start_time, re);
@@ -490,9 +495,9 @@ LastOccurence(
         for (i = 0; i < nwdt_list; i++) {
                 for (j = 0; j < wdt_list[i].wdt_nweek; j++) {
                         for (k = 0; k < wdt_list[i].wdt_nday; k++) {
-                                if (current_time = WeekNumberToDay(cur_time,
+                                if ((current_time = WeekNumberToDay(cur_time,
                                                 wdt_list[i].wdt_week[j],
-                                                wdt_list[i].wdt_day[k])) {
+                                                wdt_list[i].wdt_day[k]))) {
 					if (current_time > oldest_time)
 						oldest_time = current_time;
 					

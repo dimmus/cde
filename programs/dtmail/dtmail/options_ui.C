@@ -1629,8 +1629,6 @@ dtb_options_dialog_create(
     Widget parent
 )
 {
-    XmString	label_xmstring = NULL;
-    Display	*display= (parent == NULL? NULL:XtDisplay(parent));
     Arg	args[8];	/* need 3 args (add 5 to be safe) */
     int	n = 0;
     
@@ -1807,7 +1805,6 @@ dtb_options_category_opmenu_create(
     XmString	label_xmstring = NULL;
     Arg	args[22];	/* need 17 args (add 5 to be safe) */
     int	n = 0;
-    Widget	category_opmenu_menu_items[8];
     
     if (instance->category_opmenu_rowcolumn == NULL) {
         instance->category_opmenu_rowcolumn =
@@ -2388,7 +2385,6 @@ dtb_options_checkbox_create(
     XmString	label_xmstring = NULL;
     Arg	args[23];	/* need 18 args (add 5 to be safe) */
     int	n = 0;
-    Widget	checkbox_items[2];
     
     if (instance->checkbox == NULL) {
         n = 0;
@@ -2588,7 +2584,6 @@ dtb_options_deleted_msg_cb_create(
     XmString	label_xmstring = NULL;
     Arg	args[23];	/* need 18 args (add 5 to be safe) */
     int	n = 0;
-    Widget	deleted_msg_cb_items[2];
     
     if (instance->deleted_msg_cb == NULL) {
         n = 0;
@@ -3669,7 +3664,6 @@ dtb_options_hidden_fields_list_create(
     Widget parent
 )
 {
-    XmString	label_xmstring = NULL;
     Arg	args[21];	/* need 16 args (add 5 to be safe) */
     int	n = 0;
     int	i = 0;
@@ -3905,7 +3899,6 @@ dtb_options_wrap_checkbox_create(
     XmString	label_xmstring = NULL;
     Arg	args[22];	/* need 17 args (add 5 to be safe) */
     int	n = 0;
-    Widget	wrap_checkbox_items[1];
     
     if (instance->wrap_checkbox == NULL) {
         n = 0;
@@ -4516,7 +4509,6 @@ dtb_options_list_create(
     Widget parent
 )
 {
-    XmString	label_xmstring = NULL;
     Arg	args[21];	/* need 16 args (add 5 to be safe) */
     int	n = 0;
     int	i = 0;
@@ -5047,7 +5039,6 @@ dtb_options_dpy_up_mbox_cb_create(
     XmString	label_xmstring = NULL;
     Arg	args[14];	/* need 9 args (add 5 to be safe) */
     int	n = 0;
-    Widget	dpy_up_mbox_cb_items[1];
     
     if (instance->dpy_up_mbox_cb == NULL) {
         n = 0;
@@ -5191,7 +5182,6 @@ dtb_options_log_cb_create(
     XmString	label_xmstring = NULL;
     Arg	args[14];	/* need 9 args (add 5 to be safe) */
     int	n = 0;
-    Widget	log_cb_items[1];
     
     if (instance->log_cb == NULL) {
         n = 0;
@@ -5703,7 +5693,6 @@ dtb_options_vacation_rb_create(
     XmString	label_xmstring = NULL;
     Arg	args[22];	/* need 17 args (add 5 to be safe) */
     int	n = 0;
-    Widget	vacation_rb_items[2];
     
     if (instance->vacation_rb == NULL) {
         n = 0;
@@ -6919,7 +6908,6 @@ dtb_options_adv_def_cb_create(
     XmString	label_xmstring = NULL;
     Arg	args[23];	/* need 18 args (add 5 to be safe) */
     int	n = 0;
-    Widget	adv_def_cb_choice_items[6];
     
     if (instance->adv_def_cb_rowcolumn == NULL) {
         instance->adv_def_cb_rowcolumn =

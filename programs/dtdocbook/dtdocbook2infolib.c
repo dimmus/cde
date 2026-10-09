@@ -1105,8 +1105,7 @@ static void
 addCatFile(char *catalog, bool needed)
 {
     char pathBuf[(2 * MAXPATHLEN) + 10];
-    char *ptr1, *ptr2;
-    int catlen;
+    char *ptr1;
 
     if (!checkStat(catalog, FSTAT_IS_READABLE)) {
 	if (!needed)

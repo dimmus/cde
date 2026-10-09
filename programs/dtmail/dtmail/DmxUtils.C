@@ -235,7 +235,7 @@ phrase(char *name, int token, int comma)
 {
 	char c;
 	char *cp, *cp2;
-	char *bufend, *nbufp;
+	char *bufend, *nbufp, *mbufp = NULL;
 	int gotlt, lastsp, didq;
 	char nbuf[LINESIZE];
 	int nesting;
@@ -243,7 +243,7 @@ phrase(char *name, int token, int comma)
 	if (name == NOSTR)
 		return(NOSTR);
 	if (strlen(name) >= (unsigned)LINESIZE)
-		nbufp = (char *)malloc(strlen(name));
+		nbufp = mbufp = (char *)malloc(strlen(name));
 	else
 		nbufp = nbuf;
 	gotlt = 0;
@@ -357,7 +357,7 @@ phrase(char *name, int token, int comma)
 	}
 	*cp2 = 0;
 	return (token ? --cp : equal(name, nbufp) ? name :
-	    nbufp == nbuf ? savestr(nbuf) : nbufp);
+	    nbufp == nbuf ? savestr(nbuf) : mbufp);
 }
 
 

@@ -116,8 +116,6 @@ static int  SaveSelectedValues(I18nEnv *env);
 static void SetFileSelValues(I18nEnv *env);
 static void ResetLastSavedValues(I18nEnv *env);
 
-static void OkWarnCB(Widget w, XtPointer client_data, XtPointer call_data);
-static void CancelWarnCB(Widget w, XtPointer client_data, XtPointer call_data);
 
 static void ListItemSelectCB(Widget w, XtPointer client_data, 
 			     XtPointer call_data);
@@ -158,8 +156,6 @@ typedef struct {
 static I18n i18n;
 
 static saveRestore save = {FALSE, 0, };
-
-static char i18nRes[150]="";
 
 static char *defaultPreedit[] = 
 { "OnTheSpot",
@@ -365,7 +361,7 @@ static Widget
 BuildI18nDlg(
       Widget shell )
 {
-    int     i, n;
+    int n;
     Arg              args[MAX_ARGS];
     XmString         button_string[NUM_LABELS]; 
     XmString         string; 
@@ -786,9 +782,6 @@ MapCB(
         XtPointer call_data )
 {
 
-    static int  first_time = 1;
-    int         n;
-    Arg         args[MAX_ARGS];
 
 
     DtWsmRemoveWorkspaceFunctions(style.display, XtWindow(XtParent(w)));
@@ -949,8 +942,6 @@ ButtonCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-  int         n;
-  int         ret = NoError;
   I18nEnv     *env;
   DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;
 
@@ -960,7 +951,7 @@ ButtonCB(
     {
     case OK_BUTTON:
 
-      ret = SaveSelectedValues(env);
+      SaveSelectedValues(env);
       XtUnmanageChild (w);
 
       break;
@@ -1072,7 +1063,6 @@ SetFileSelValues(
      I18nEnv *env
 )
 {
-    char *hostname;
     Cardinal i;
     XtArgVal n;
     Widget *im_tog;
@@ -1215,38 +1205,6 @@ saveI18n(
 	snprintf(bufr, sizeof(bufr), "*i18nDlg.height: %d\n", height);
         WRITE_STR2FD(fd, bufr);
     }
-}
-
-
-/*+++++++++++++++++++++++++++++++++++++++*/
-/* cancelWarnCB - callback for the       */
-/* cancel button of the warnDialog       */
-/*+++++++++++++++++++++++++++++++++++++++*/
-
-static void 
-CancelWarnCB(
-        Widget w,
-        XtPointer client_data,
-        XtPointer call_data )
-{
-    return;
-}
-
-
-
-
-/*+++++++++++++++++++++++++++++++++++++++*/
-/* okWarnCB - callback for the           */
-/* OK button of the warnDialog           */
-/*+++++++++++++++++++++++++++++++++++++++*/
-
-static void 
-OkWarnCB(
-        Widget w,
-        XtPointer client_data,
-        XtPointer call_data )
-{
-    return;
 }
 
 

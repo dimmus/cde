@@ -670,7 +670,6 @@ KEEP_READING:
  */
 static void     deleter (char *infname)
 {
-    int             i;
     long            records_deleted;
     time_t          start_time, minutes, hours, seconds, elapsed;
     char            buf[128];

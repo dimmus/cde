@@ -92,8 +92,6 @@ static char * makeEnv(
 static SIGVAL MakeLangAbort(
 			int arg	);
 
-static int MatchesFileSuffix(const char *filename, const char *suffix);
-
 static void   ScanNLSDir(
 			char * dirname );
 
@@ -511,28 +509,6 @@ MakeLangList( void )
 
     free(savelist);
 
-}
-
-
-static int
-MatchesFileSuffix(const char *filename, const char *suffix)
-{
-    int		retval = 0;
-#if defined(_AIX) || defined(SVR4) || defined(__linux__) || defined(CSRG_BASED)
-    int		different = 1;
-
-    /*
-     * The assumption here is that the use of strrstr is
-     * to determine if "dp->d_name" ends in ".cat".
-     */
-    if (strlen(filename) >= strlen(suffix)) {
-      different = strcmp(filename + (strlen(filename) - strlen (suffix)), suffix);
-    }
-
-    return (different == 0);
-#else
-    return (strrstr(filename, suffix) != NULL);
-#endif
 }
 
 /***************************************************************************

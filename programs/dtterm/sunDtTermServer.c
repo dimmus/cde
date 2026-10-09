@@ -98,16 +98,13 @@ static void TimeOut(XtPointer clientData, XtIntervalId *id);
 Boolean
 FinalizeToolTalkSession(void)
 {
-    Tt_status 	ttRc;
-    int 	i;
-
     if (DtTermToolTalkPattern && tt_ptr_error(DtTermToolTalkPattern) == TT_OK) {
-        ttRc = ttdt_session_quit(NULL, DtTermToolTalkPattern, 1);
+        ttdt_session_quit(NULL, DtTermToolTalkPattern, 1);
         if (ProcessToolTalkInputId)
             XtRemoveInput(ProcessToolTalkInputId);
         return(True);
     }
-    ttRc = ttdt_close(NULL, NULL, sendStopped);
+    ttdt_close(NULL, NULL, sendStopped);
     return(True);
 }
 
@@ -120,8 +117,6 @@ SessionCallback( Tt_message msg, void * client_data, Tt_message contract)
     tt_free(opString);
 
     switch (op) {
-        int i;
-
         default:
             break;
         case TTDT_QUIT:
@@ -238,12 +233,11 @@ dttermNewHandler(
     Tt_message msg)
 {
     Widget                shellWidget;
-    int                   pid = -1;
     Arg                   arglist[20];
     int                   argcnt = 0;
     char                  *msgFile;
     char                  numArgs;
-    int                   i, j, k;
+    int                   i;
     char                  *displayEnv, *newDisplayString = NULL;
 
     msgFile = tt_message_file(msg);
@@ -361,7 +355,7 @@ DieFromToolTalkError(Widget parent, char *errfmt, Tt_status status)
 {
     Arg		 args[10];
     Widget	 dialog, dialogShell;
-    char	*errmsg, *statmsg, *title;
+    char	*errmsg, *statmsg;
     XmString	 xms_errmsg, xms_ok, xms_title;
     int		 n;
 

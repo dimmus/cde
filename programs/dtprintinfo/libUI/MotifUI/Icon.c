@@ -505,7 +505,7 @@ GuiIconGetFieldNameWidth(
         XmeWarning(w, "Cannot get field name width of non-subclass of GuiIcon");
         return 0;
       }
-    if (fields = Fields(w))
+    if ((fields = Fields(w)))
 	return fields->name_width;
     else
 	return 0;
@@ -533,7 +533,7 @@ GuiIconSetField(
         XmeWarning(w, "Cannot set icon fields of non-subclass of GuiIcon");
         return;
       }
-    if (fields = Fields(w))
+    if ((fields = Fields(w)))
       {
 	if (index >= 0 && index < fields->n_fields)
 	  {
@@ -602,7 +602,7 @@ GuiIconGetField(
         XmeWarning(w, "Cannot get icon fields of non-subclass of GuiIcon");
         return;
       }
-    if (fields = Fields(w))
+    if ((fields = Fields(w)))
       {
 	if (index >= 0 && index < fields->n_fields)
 	  {
@@ -2024,14 +2024,16 @@ QueryGeometry(
       {
 	int i;
 	if (Fields(w)->draw_fields)
+	  {
 	    for (i = 0; i < Fields(w)->n_fields; i++)
 		if (Fields(w)->draw_fields[i])
 		  {
 		    show_fields = True;
 		    break;
 		  }
-	else
-	    show_fields = True;
+		else
+		    show_fields = True;
+	  }
       }
     if (ResizeWidth(w) == False || show_fields)
 	desired->width = XtWidth(w);
@@ -2049,6 +2051,7 @@ QueryGeometry(
 	desired->width = 1;
     if (desired->height == 0)
 	desired->height = 1;
+    return XtGeometryYes;
 }
 
 /*

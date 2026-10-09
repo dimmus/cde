@@ -152,6 +152,8 @@ actions_equal(ABObj action1, ABObj action2)
 				equal= istr_equal(act1->func_value.code_frag,
 						act2->func_value.code_frag);
 			break;
+			default:
+			    break;
 		}
 	}
 	return equal;

@@ -69,24 +69,6 @@ invokeAction(Widget w, char *transmitString, TermFunction function, int count)
     return;
 }
 
-typedef struct {
-    const char *string;
-    char value;
-} EnumType;
-
-static int
-stringToEnum(char *c, EnumType *enumTypes, int numEnumTypes)
-{
-    int i;
-
-    for (i = 0; i < numEnumTypes; i++) {
-	if (!strcmp(enumTypes[i].string, c))
-	    return(i);
-    }
-
-    return(-1);
-}
-
 
 /*** INSERT CHAR/LINE *********************************************************
  * 
@@ -156,10 +138,6 @@ void
 _DtTermPrimActionTab(Widget w, XEvent *event,
 	String *params, Cardinal *num_params)
 {
-    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
-    Boolean shiftedTab = False;
-    Boolean numericTab = False;
-    int i;
 
     (void) _DtTermPrimSendInput(w, (unsigned char *) "\t", 1);
     return;
@@ -228,7 +206,6 @@ void
 _DtTermPrimActionKeymap(Widget w, XEvent *event, String *params, Cardinal *num_params)
 {
     XtTranslations keymap;
-    char buffer[BUFSIZ];
     static XtTranslations original = (XtTranslations) 0;
     static XtResource key_resources[] = {
 	{XtNtranslations, XtCTranslations, XtRTranslationTable,

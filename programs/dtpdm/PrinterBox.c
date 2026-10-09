@@ -284,7 +284,9 @@ static void PlexCtlDisable(PlexCtl* me);
 #define PlexCtlGetWidget(me) ((me)->widget)
 static void PlexCtlCreatePulldown(PlexCtl* me);
 static void PlexCtlUpdateIcon(PlexCtl* me);
+#if 0 && defined(PRINTING_SUPPORTED)
 static PdmOid PlexCtlGetPlex(PlexCtl* me);
+#endif /* PRINTING_SUPPORTED */
 static void PlexCtlResizeCB(Widget w,
 			    XtPointer client_data, XtPointer call_data);
 static void PlexCtlSetSelectedItem(PlexCtl* me, int selected_item);
@@ -306,7 +308,9 @@ static void TrayCtlCreate(TrayCtl* me,
 			  const PdmOidList* tray_sizes);
 static void TrayCtlCreateWindow(TrayCtl* me, Widget parent);
 #define TrayCtlGetWidget(me) ((me)->widget)
+#if 0 && defined(PRINTING_SUPPORTED)
 static PdmOid TrayCtlGetTray(TrayCtl* me);
+#endif /* PRINTING_SUPPORTED */
 static void TrayCtlDisable(TrayCtl* me);
 static void TrayCtlResizeCB(Widget w,
 			    XtPointer client_data, XtPointer call_data);
@@ -332,7 +336,9 @@ static void SizeCtlCreate(SizeCtl* me,
 static void SizeCtlCreateWindow(SizeCtl* me, Widget parent);
 #define SizeCtlGetWidget(me) ((me)->widget)
 static void SizeCtlUpdate(SizeCtl* me);
+#if 0 && defined(PRINTING_SUPPORTED)
 static PdmOid SizeCtlGetSize(SizeCtl* me);
+#endif /* PRINTING_SUPPORTED */
 static void SizeCtlResizeCB(Widget w,
 			    XtPointer client_data, XtPointer call_data);
 static void SizeCtlSetSingleSizeMode(SizeCtl* me, PdmOid size);
@@ -528,10 +534,10 @@ static void
 PdmPrinterBoxGetAttr(PdmSetupBox* me, PdmXp* pdm_xp)
 {
     PdmPrinterBoxData* data = (PdmPrinterBoxData*)me->subclass_data;
+#if 0 && defined(PRINTING_SUPPORTED)
     const char* strval;
     PdmOidMediumSS* medium_ss_supported;
     PdmOidTrayMediumList* input_trays_medium = NULL;
-#if 0 && defined(PRINTING_SUPPORTED)
     /*
      * printer model description
      */
@@ -680,7 +686,6 @@ PdmPrinterBoxCreateWindow(PdmSetupBox* me, Widget parent)
     PdmPrinterBoxData* data = (PdmPrinterBoxData*)me->subclass_data;
     Widget manager;
     Widget row;
-    Widget w;
     Widget draw_area;
     XmString label;
     /*
@@ -708,7 +713,7 @@ PdmPrinterBoxCreateWindow(PdmSetupBox* me, Widget parent)
 	/*
 	 * create the printer model label
 	 */
-	w = XtVaCreateManagedWidget("PrinterModelLabel",
+	XtVaCreateManagedWidget("PrinterModelLabel",
 				    xmLabelGadgetClass,
 				    row,
 				    NULL);
@@ -721,7 +726,7 @@ PdmPrinterBoxCreateWindow(PdmSetupBox* me, Widget parent)
 	    *ptr = '\0';
 	label = XmStringCreateLocalized(desc);
 	XtFree(desc);
-	w = XtVaCreateManagedWidget("PrinterModel",
+	XtVaCreateManagedWidget("PrinterModel",
 				    xmLabelGadgetClass,
 				    row,
 				    XmNlabelString, label,
@@ -745,7 +750,7 @@ PdmPrinterBoxCreateWindow(PdmSetupBox* me, Widget parent)
 	/*
 	 * create the document format label
 	 */
-	w = XtVaCreateManagedWidget("DocumentFormatLabel",
+	XtVaCreateManagedWidget("DocumentFormatLabel",
 				    xmLabelGadgetClass,
 				    row,
 				    NULL);
@@ -753,7 +758,7 @@ PdmPrinterBoxCreateWindow(PdmSetupBox* me, Widget parent)
 	 * create the document format
 	 */
 	label = XmStringCreateLocalized(data->document_format);
-	w = XtVaCreateManagedWidget("DocumentFormat",
+	XtVaCreateManagedWidget("DocumentFormat",
 				    xmLabelGadgetClass,
 				    row,
 				    XmNlabelString, label,
@@ -1839,6 +1844,7 @@ PlexCtlUpdateIcon(PlexCtl* me)
 		      NULL);
 }
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: PlexCtlGetPlex
@@ -1860,6 +1866,7 @@ PlexCtlGetPlex(PlexCtl* me)
     else
 	return PdmOidListGetOid(me->plexes_supported, me->selected_item);
 }
+#endif /* PRINTING_SUPPORTED */
 
 /*
  * ------------------------------------------------------------------------
@@ -2097,6 +2104,7 @@ TrayCtlResizeCB(Widget w, XtPointer client_data, XtPointer call_data)
     XtVaSetValues(me->option_menu, XmNx, 0, XmNy, menu_y, NULL);
 }
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: TrayCtlGetTray
@@ -2118,6 +2126,7 @@ TrayCtlGetTray(TrayCtl* me)
     else
 	return PdmOidListGetOid(me->input_trays, me->selected_item - 1);
 }
+#endif /* PRINTING_SUPPORTED */
 
 /*
  * ------------------------------------------------------------------------
@@ -2388,7 +2397,6 @@ SizeCtlCreate(SizeCtl* me,
 	      const PdmOidList* tray_sizes,
 	      PdmOidLinkedList* sizes_supported)
 {
-    Boolean supported;
     int i;
     PdmOid oid;
     PdmOidLinkedList* sizes_ready_ll;
@@ -2815,6 +2823,7 @@ SizeCtlSetMultiSizeMode(SizeCtl* me)
 
 
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: SizeCtlGetSize
@@ -2836,6 +2845,7 @@ SizeCtlGetSize(SizeCtl* me)
     else
 	return me->selected_size;
 }
+#endif /* PRINTING_SUPPORTED */
 
 /*
  * ------------------------------------------------------------------------
@@ -2930,6 +2940,8 @@ SizeCtlSelectCB(Widget w,
 	    me->selected_size =
 		PdmOidListGetOid(me->sizes_supported, cbs->item_position - 1);
 	    break;
+	default:
+	    break;
 	}
     }
 }
@@ -2956,7 +2968,6 @@ CreateOptionMenuPulldown(String pulldown_name,
 			 int item_count,
 			 int initial_item)
 {
-    Widget cascade_button;
     Widget button;
     Widget initial_selected = (Widget)NULL;
     Widget pulldown;

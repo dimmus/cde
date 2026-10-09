@@ -224,7 +224,6 @@ _DtCmsReminderRefToReminder(
 {
 	CSA_return_code	stat = CSA_SUCCESS;
 	Reminder_4	*head, *prev, *rptr;
-	char		buf[30];
 
 	prev = head = NULL;
 	while (rems != NULL) {
@@ -685,10 +684,10 @@ _DtCmsAttrsToAppt4(
 
 	if (stat == CSA_SUCCESS && (typeindex >= 0 || typeindex >= 0)) {
 		if (typeindex >= 0) {
-			if (stat = _DtCm_attrs_to_eventtype4(
+			if ((stat = _DtCm_attrs_to_eventtype4(
 			    attrs[typeindex].value,
 			    (stypeindex >= 0 ? attrs[stypeindex].value : NULL),
-			    appt->tag)) {
+			    appt->tag))) {
 				if (check == B_FALSE) {
 					/* this is the case where we are
 					 * converting appt for clients
@@ -750,10 +749,8 @@ static CSA_return_code
 _AttrsToAbbrAppt(uint size, cms_attribute *attrs, Abb_Appt_4 *appt)
 {
 	CSA_return_code	stat = CSA_SUCCESS;
-	char		*ptr;
 	time_t		endtick;
 	int		i, typeindex = 0, stypeindex = -1, enddateindex = -1;
-	char		buf[BUFSIZ];
 
 	for (i = 0; i < size && stat == CSA_SUCCESS; i++) {
 		switch (attrs[i].name.num) {
@@ -936,7 +933,7 @@ _Appt4ToCmsentryAttrs(
 	Attribute_4		*reminders = a4->attr;
 	char			buf[BUFSIZ];
 	CSA_opaque_data		opq;
-	int			index, ntimes, count = 0;
+	int			ntimes, count = 0;
 	char			*ptr1, *ptr2;
 
 	if (num_attrs == NULL || attrs_r == NULL)

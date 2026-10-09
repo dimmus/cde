@@ -71,6 +71,7 @@
 #include <X11/Xatom.h>
 #include <X11/StringDefs.h>
 #include <X11/keysymdef.h>
+#include <X11/XKBlib.h>
 #include <Dt/DtP.h>
 #include <Dt/Connect.h>
 #include <Dt/UserMsg.h>
@@ -153,18 +154,6 @@ static int PrintPointerMapping(
                         XrmDatabase *smBase,
                         char *buttonRet,
                         int numButton) ;
-static void PrintWorkHintString( 
-                        FILE *hintFile,
-                        char *hintString) ;
-static void PrintCmdHintString( 
-                        FILE *hintFile,
-                        char *hintString) ;
-static void PrintCmdString( 
-                        FILE *cmdFile,
-                        char *cmdString) ;
-static void PrintRemoteCmdString( 
-                        FILE *cmdFile,
-                        char *cmdString) ;
 
 
 /*
@@ -317,10 +306,6 @@ SaveState(
 int 
 CompleteSave (void)
 {
-
-  FILE 			*convertFP;
-  unsigned char		*propData;
-  char			*tmpPath, tmpVersion[20];
 
   Boolean 		saveToHome = saveHome;
   int			mode = saveMode;
@@ -821,7 +806,6 @@ NotifyProxyClients (void)
   unsigned long 	nitems;
   unsigned long 	leftover;
   unsigned char 	* data = NULL;
-  Boolean		containedClient;
   int 			i, j;
   int			numClients = 0;
 
@@ -845,15 +829,6 @@ NotifyProxyClients (void)
       {
 	  topLevelWindowInfo=topList[i];
 
-	  if(i >= topListLength)
-	  {
-	      containedClient = True;
-	  }
-	  else
-	  {
-	      containedClient = False;
-	  }
-      
 	  /*
 	   * If this window is my window - skip it I don't want to
 	   * save myself because I will be started automatically
@@ -971,12 +946,10 @@ PrintStartupInfo(
   char 			** wargv;
   char 			*clientMachine;
   XWindowAttributes 	windowAttr;
-  Boolean		remoteHost;
   Boolean		xsmpClient;
   ProxyClientDBRec 	dbRec;
   char			** argv;
   int			i;
-  Status		status;
 
 #ifdef _SUN_OS /* pull out quotes from OpenWindow tools commands */
   char 			* ptr;
@@ -1327,7 +1300,7 @@ QueryServerSettings( void )
 		return(-1);
 	    }
 	}
-	tmpMod = XKeycodeToKeysym(smGD.display, modMap->modifiermap[i], 0);
+	tmpMod = XkbKeycodeToKeysym(smGD.display, modMap->modifiermap[i], 0, 0);
 	sprintf(tmpChar,"%ld", tmpMod);
 	strcat(resSpec, tmpChar);
 	if(i != numLoops)
@@ -1597,9 +1570,6 @@ SaveCustomizeSettings( void )
 static int 
 OutputResource( void )
 {
-    Atom 		actualType;
-    int	 		actualFormat;
-    unsigned long	nitems, leftover; 
     char	 	*data = NULL;
     XrmDatabase		db;
     Status		newStat;

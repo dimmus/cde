@@ -142,6 +142,8 @@ _Tt_trace::init(
 		delete *_pstream;
 		*_pstream = 0;
 		return any_tracing();
+	    default:
+		break;
 	}
 	if (! (*_pstream)->follow_val()) {
 		// unset TRACE_SCRIPT so children are not traced
@@ -586,6 +588,8 @@ _Tt_trace::entry(
 	    case TT_RELEASE:
 		// These return void, so we are done
 		**_pstream << "\n";
+		break;
+	    default:
 		break;
 	}
 	(*_pstream)->set_is_entered(1);

@@ -46,8 +46,6 @@
 #include "props_pu.h"
 #include "revision.h"
 
-#include "icon_pixmap_xbm"
-
 #ifdef CREDITS
 char *main_credits[] = {
 	"Mary Hamilton",
@@ -79,7 +77,9 @@ extern Dimension ComputeMaxWidth(Widget, Widget, Widget, Widget);
 
 static void close_about(Widget, XtPointer, XtPointer);
 static void destroy_about(Widget, XtPointer, XtPointer);
+#ifdef CREDITS
 static void do_credits(Widget, XtPointer, XtPointer);
+#endif
 
 extern String XmGetIconFileName( 
                         Screen *screen,
@@ -103,16 +103,24 @@ show_about(
 	Pixmap		 image = 0;
 	char		 buf[64],
 			*image_filename;
-	XmbTextItem	 text[1];
 	Pixel		 fg, bg;
 	Widget		 icon_label, main_form, sub_form, name_label, 
-			 version_label, version_date, copyright_label,
+			 version_label,
+			 separator, close_button, dialog,
+			 server_version_label; 
+#if defined(DTCM_SHOW_ABOUT_COPYRIGHT)
+	Widget		 version_date, copyright_label,
 			 hp_label, ibm_label, novell_label, sun_label,
-			 separator, close_button, more_button, dialog,
-			 data_version_label, server_version_label; 
+			 data_version_label;
+#endif
+#ifdef CREDITS
+	Widget		 more_button;
+#endif
 	Display		*dpy = XtDisplay(c->frame);
 	Screen          *screen = XtScreen(c->frame);
+#if defined(DTCM_SHOW_ABOUT_COPYRIGHT)
 	struct tm	 tm;
+#endif
 	char		*title;
 #if DTCM_INTERNAL_REV > 0
 	char		 buf2[64];
@@ -276,7 +284,9 @@ show_about(
 			        c->my_cal_version);
 
         xstr = XmStringCreateLocalized(buf);
+#if defined(DTCM_SHOW_ABOUT_COPYRIGHT)
 	data_version_label =
+#endif
 	    XtVaCreateWidget("data_version",
 		xmLabelWidgetClass,
 		sub_form,
@@ -532,6 +542,8 @@ destroy_about(
 	calendar->about_dialog = NULL;
 }
 
+#ifdef CREDITS
+
 static void
 destroy_credits(
         Widget                   w,
@@ -551,8 +563,6 @@ close_credits(
 	XtDestroyWidget(calendar->credits_dialog);
 	calendar->credits_dialog = NULL;
 }
-
-#ifdef CREDITS
 
 /*
  * Create and popup the Credits dialog.

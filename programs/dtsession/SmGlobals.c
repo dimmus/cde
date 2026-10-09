@@ -407,9 +407,6 @@ InitSMGlobals( void )
 {
     int i;
     PropDtSmWindowInfo property;
-    struct utsname nameRec;
-    char *firstSlash;
-    char *keyNum;
 
     smGD.userSetWaitWmTimeout = True; /* assume it is */
 
@@ -707,7 +704,7 @@ SetRestorePath(
      * Need to know if the session is for a specific display
      */
     smGD.displaySpecific = True;
-    if (session_option = strrchr (smGD.savePath, '/')) 
+    if ((session_option = strrchr (smGD.savePath, '/'))) 
     {
 	session_option++;
 	if (!strcmp (session_option, DtSM_SESSION_DIRECTORY))
@@ -792,9 +789,7 @@ SetSysDefaults( void )
 {
     int status;
     struct stat buf;
-    String tmpString;
     char        *langSpec;
-    char        *tempPath;
 
     /*
      * No files exist for restoration - use the
@@ -1317,7 +1312,7 @@ RemoveFiles(
         char *path )
 {
     pid_t  clientFork;
-    int    execStatus, childStatus, i, statLoc;
+    int    execStatus, statLoc;
     String tmpString;
 
     /*
@@ -1408,7 +1403,7 @@ MoveDirectory(
 {
     struct stat buf;
     pid_t  clientFork;
-    int    status, execStatus, childStatus, i, statLoc;
+    int    status, execStatus, statLoc;
     String tmpString;
 
     /*
@@ -1505,8 +1500,6 @@ MoveDirectory(
 void 
 InitNlsStrings( void )
 {
-    char        *tmpString;
-
     /*
      * Malloc failure error message - THIS MESSAGE MUST BE INITIALIZED FIRST
      */

@@ -147,9 +147,9 @@ void Queue::LoadAttributes(int /*n_attrs*/, Attribute **attrs)
    int i;
    for (i = 0; i < 3; i++)
     {
-      if (s1 = strchr(s, ':'))
+      if ((s1 = strchr(s, ':')))
          *s1++ = '\0';
-      else if (s1 = strchr(s, '\n'))
+      else if ((s1 = strchr(s, '\n')))
          *s1++ = '\0';
       dollar[i] = s;
       s = s1;
@@ -397,7 +397,7 @@ void Queue::ProcessJobs(char *jobs)
 void Queue::ParseOutput(char *job_list, int n_jobs)
 {
    int i;
-   char *printer = DtStrtok(job_list, "|");
+   DtStrtok(job_list, "|");
    for (i = 0; i < n_jobs; i++)
     {
       char *JobName = DtStrtok(NULL, "|");
@@ -411,7 +411,7 @@ void Queue::ParseOutput(char *job_list, int n_jobs)
 
       new PrintJob(this, JobName, JobNumber, Owner, Date, Time, Size);
       delete [] Size;
-      printer = DtStrtok(NULL, "|");
+      DtStrtok(NULL, "|");
     }
 }
 

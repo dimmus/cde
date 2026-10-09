@@ -419,7 +419,6 @@ appfw_editor_apply(
      ***************/
     if (prop_changed(afs->vendor.changebar))
     {
-	STRING	new_vendor, new_version;
 
 	new_value = prop_field_get_value(&(afs->vendor));
 	if (util_strcmp(new_value, obj_get_vendor(project)) != 0)
@@ -558,6 +557,8 @@ gencode_arg_class_is_supported(AB_ARG_CLASS argClass)
 	case AB_ARG_CLASS_OTHER:
 	case AB_ARG_CLASS_VALUE:
 	    return TRUE;
+	default:
+	    break;
     }
     return FALSE;
 }
@@ -651,8 +652,6 @@ appfw_editor_prevent_closeCB(
     	{   
 	    DtbObjectHelpData	help_data = NULL;
 	    XmString		xm_buf;
-	    char		*msg = NULL,
-				*help_text = NULL;
 	    /*
 	     * Initialize warning message object if necessary
 	     */
@@ -1064,6 +1063,7 @@ appfw_register_save_btn(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     XtVaSetValues(widget, XmNuserData, AB_WHEN_SESSION_SAVE, NULL);
@@ -1084,6 +1084,7 @@ appfw_register_restore_btn(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     XtVaSetValues(widget, XmNuserData, AB_WHEN_SESSION_RESTORE, NULL);
@@ -1104,6 +1105,7 @@ appfw_register_ttalk_btn(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     XtVaSetValues(widget, XmNuserData, AB_WHEN_TOOLTALK_DO_COMMAND, NULL);

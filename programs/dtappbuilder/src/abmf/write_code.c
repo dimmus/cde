@@ -244,6 +244,8 @@ abmfP_obj_has_struct_field(ABObj obj)
     {
 	case AB_TYPE_ITEM:
 	    return FALSE;	/* all items are substruct fields */
+	default:
+	    break;
     }
 
     if (obj_has_flag(obj, NoCodeGenFlag))
@@ -257,6 +259,8 @@ abmfP_obj_has_struct_field(ABObj obj)
 	case AB_TYPE_PROJECT:
 	case AB_TYPE_UNKNOWN:
 	    return FALSE;
+	default:
+	    break;
     }
 
     return TRUE;
@@ -305,16 +309,6 @@ abmfP_obj_is_substruct_obj(ABObj obj)
 
 epilogue:
     return mfobj_has_flags(obj, CGenFlagIsSubstructObj);
-}
-
-
-/*
- * The substruct consists of our composite subobjects and items
- */
-static int
-count_possible_substruct_fields(ABObj obj)
-{
-    return obj_get_num_items(obj);
 }
 
 

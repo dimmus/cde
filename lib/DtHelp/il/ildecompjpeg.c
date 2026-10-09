@@ -111,11 +111,10 @@ static ilError ilDecompRawExecute (
     long                nBytesPerRow[ILJPG_MAX_COMPS];
     int                 i;
     ilImagePlaneInfo   *pPlane;
-    ilImageInfo *pSrcImage, *pDstImage;
+    ilImageInfo *pSrcImage;
 
     pPriv = (ilJPEGPrivPtr)pData->pPrivate;
     pSrcImage = pData->pSrcImage;
-    pDstImage = pData->pDstImage;
 
         /*  If first strip, setup iljpg data and call iljpg Init() function */
     if (pPriv->firstStrip) {

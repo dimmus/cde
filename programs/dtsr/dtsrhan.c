@@ -1610,14 +1610,11 @@ void            cleanup (void)
 **************************************************************************/
 void            write_record (void)
 {
-    static int	    dotcount = 0;
-    char           *ptr;
     struct key_id  *abst;
     struct rec     *record;
     char            value[200];
     int             lvalue;
     int             i;
-    int             good = FALSE;
     char            buffer[200];
 
     /* Line #1 is fzkey */
@@ -1753,7 +1750,6 @@ void	process_record (void)
     char	value[200];
     int		lvalue;
     int		i;
-    int		linelen;
     char	date_value[256];
     int		dummy;
     int		meaningless;
@@ -2056,7 +2052,6 @@ void            process_infile (void)
     char            buffer[200];
     int             cant_be;
     time_t          startime = 0L;
-    int             i;
     int             rc;
 
     if (!strcmp (infile, "-"))
@@ -2213,7 +2208,7 @@ static void	usage_msg (void)
 /* Process any user arguments passed thru the command line parameters. */
 static void	user_arg_processor (int argc, char **argv)
 {
-    char	*cptr, *argptr;
+    char	*argptr;
     char	*pos;
 
     if (argc <= 1) {

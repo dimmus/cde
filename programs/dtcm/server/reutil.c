@@ -168,6 +168,7 @@ DayToWeekNumber(
 	_Xltimeparams	 localtime_buf;
         struct tm       *date_tm = _XLocaltime(&date, localtime_buf);
         int              week_number;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         week_number = date_tm->tm_mday / 7;
  
@@ -194,11 +195,12 @@ WeekNumberToDay(
                          day_of_month,
                          initial_month_number = date_tm->tm_mon;
 	Tick		 _date;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         /* From the first day (or last day in the WK_L* cases) of the month
          * work forward (or backward) to find the weekday requested. 
          */
-        if (week <= (const WeekDay)WK_F5) {
+        if (week <= (const WeekNumber)WK_F5) {
                 day_of_month = 1;
                 first_weekday = fdom(date);
                 if (weekday != first_weekday)
@@ -213,7 +215,7 @@ WeekNumberToDay(
         /* Now move forward or backward through the month added or subtracting
          * the appropriate number of weeks to get to the correct location.
          */
-        if (week <= (const WeekDay)WK_F5) {
+        if (week <= (const WeekNumber)WK_F5) {
                 date_tm->tm_mday = day_of_month + (int)week * 7;
         } else {
                 /* ((int)week - WK_L1) normalizes the WK_L* to the values
@@ -260,6 +262,7 @@ same_week(
 	struct tm	 tm22 = *tm2;
 	Tick		 time1, time2;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm11.tm_mday -= tm11.tm_wday;
 	tm22.tm_mday -= tm22.tm_wday;

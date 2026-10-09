@@ -264,7 +264,7 @@ _DtTtMessageWidgetUpdate(
 	}
 	XtVaSetValues( instance->scopeChoice, XmNmenuHistory, choice, NULL );
 
-	switch (tt_message_disposition( msg )) {
+	switch ((int)tt_message_disposition( msg )) {
 	    case TT_DISCARD:
 	    default:
 		choice = instance->dispositionChoice_items.DISCARD_item;
@@ -1448,6 +1448,8 @@ msgGenAction(
 		    action << "\tTT_ARG" << arg << "_VALUE\t" << val << "\n";
 		    tt_free( val );
 		    break;
+		default:
+		    break;
 	    }
     }
     // XXX emit commented warnings for e.g. TT_OFFER, TT_HANDLER
@@ -1551,6 +1553,8 @@ msgGenC(
 			}
 			code << ");\n";
 			tt_free( val );
+			break;
+		    default:
 			break;
 		}
 		tt_free( vtype );

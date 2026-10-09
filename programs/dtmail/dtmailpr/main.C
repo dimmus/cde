@@ -68,9 +68,8 @@ main (int argc, char **argv)
 	// parse command-line options
 	int	c;
 	extern char *optarg;
-	extern int optind;
 	char	*ffile = NULL;
-	int	aflag = 0, pgflag = 0;
+	int	pgflag = 0;
 	int	errflag = 0;
 
         // we have to be set-gid to group "mail" when opening and storing
@@ -102,7 +101,6 @@ main (int argc, char **argv)
 				//printf ("Print each message on its own page\n");
 				break;
 			case 'a':
-				aflag++;
 				//printf ("Strip attachments\n");
 				break;
 			case 'f':

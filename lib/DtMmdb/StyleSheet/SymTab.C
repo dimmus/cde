@@ -27,7 +27,7 @@ SymbolName::SymbolName(const char *name)
 {
 }
 
-unsigned int SymbolName::operator==(const SymbolName &string)
+unsigned int SymbolName::operator==(const SymbolName &string) const
 {
   return !compareTo(string, exact);
 }

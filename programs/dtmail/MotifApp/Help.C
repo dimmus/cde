@@ -54,6 +54,7 @@
 extern nl_catd catd;
 
 void DisplayMain( Widget, char *, char *);
+static void CloseMainCB(Widget, XtPointer, XtPointer);
 static Widget helpMain = NULL;
 static Widget helpError = NULL;
 static Widget versionMain = NULL;
@@ -76,7 +77,7 @@ getHelpId (Widget w)
     char *helpId;
     char *buf;
     char *index;
-    int i = 0, j = 0;
+    int i = 0;
  
     if (XtParent(w) == NULL) {
         helpId = (char *) malloc(1000);
@@ -238,10 +239,6 @@ ProcessLinkCB (
 {
 //    Arg 	args[20];
 //    Position 	xPos, yPos;
-    int 	appLinkNum = 0;
-
-    DtHelpDialogCallbackStruct * hyperData =
-		(DtHelpDialogCallbackStruct *) callData;
     
 }
 
@@ -388,7 +385,6 @@ HelpTexteditCB (
 {
 
      char *locationId = NULL;
-     Widget wEditor = (Widget) clientData;
      DtEditorHelpCallbackStruct *editorHelp =
                          (DtEditorHelpCallbackStruct *) callData;
  

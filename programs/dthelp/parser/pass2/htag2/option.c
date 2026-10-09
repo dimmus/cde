@@ -48,7 +48,7 @@ nameofoptfile = (char *) m_malloc(strlen(install) + strlen(TAGDOTOPT) + 1,
 				  "installation helptag.opt");
 strcpy(nameofoptfile, install);
 strcat(nameofoptfile, TAGDOTOPT);
-if (optfile = fopen(nameofoptfile, "r"))
+if ((optfile = fopen(nameofoptfile, "r")))
     {
     while (fscanf(optfile, "%512s", option) != EOF)
 	setopt(option, filelenonly);
@@ -85,7 +85,7 @@ if (indir)
     }
 else nameofoptfile = TAGDOTOPT;
 
-if (optfile = fopen(nameofoptfile, "r"))
+if ((optfile = fopen(nameofoptfile, "r")))
     {
     while (fscanf(optfile, "%512s", option) != EOF)
 	setopt(option, filelenonly);
@@ -105,7 +105,7 @@ if (indir) strcpy(nameofoptfile, indir);
 strcat(nameofoptfile, nodirbase);
 strcat(nameofoptfile, DOTOPT);
 
-if (optfile = fopen(nameofoptfile, "r"))
+if ((optfile = fopen(nameofoptfile, "r")))
     {
     while (fscanf(optfile, "%512s", option) != EOF)
 	setopt(option, filelenonly);
@@ -117,7 +117,7 @@ m_free(nameofoptfile, "basename.opt");
 for (i = 3 ; i < m_argc ; i++)
     if (*m_argv[i] == '@')
 	{
-	if (optfile = fopen(m_argv[i] + 1, "r"))
+	if ((optfile = fopen(m_argv[i] + 1, "r")))
 	    {
 	    while (fscanf(optfile, "%512s", option) != EOF)
 	    setopt(option, filelenonly);
@@ -158,7 +158,7 @@ if (optval)
     return;
     }
 
-if (p = strchr(string, '='))
+if ((p = strchr(string, '=')))
     {
     *p = M_EOS;
     for (thisopt = 0 ; thisopt < NUMOPTIONS ; thisopt++)
@@ -197,9 +197,6 @@ else switch(thisopt + 1)
 /* Process a value for a command line option */
 LOGICAL setvalopt(int thisopt, char *string, LOGICAL filelenonly)
 {
-char *p;
-int i;
-char *tempstr;
 
 /* Ignore leading = (occurs if "option =val" is entered in .opt file) */
 if (*string == '=') string++;

@@ -175,6 +175,8 @@ objxm_get_resource_for_when(
     {
         case AB_WHEN_DESTROYED: res= XmNdestroyCallback;
         break;
+        default:
+            break;
     }
 
 
@@ -189,6 +191,8 @@ objxm_get_resource_for_when(
             break;
             case AB_WHEN_SHOWN: res= XmNpopupCallback;
             break;
+            default:
+                break;
 	}
     break;
 
@@ -197,6 +201,8 @@ objxm_get_resource_for_when(
         {
             case AB_WHEN_ACTIVATED: res= XmNactivateCallback; 
             break;
+            default:
+                break;
         }
     break;
 
@@ -218,6 +224,8 @@ objxm_get_resource_for_when(
             break;
             case AB_WHEN_SHOWN: res= XmNpopupCallback;
             break;
+            default:
+                break;
         }
     break;
 
@@ -228,6 +236,8 @@ objxm_get_resource_for_when(
             break;
             case AB_WHEN_AFTER_RESIZED: res= XmNresizeCallback;
             break;
+            default:
+                break;
         }
     break;
 
@@ -241,6 +251,8 @@ objxm_get_resource_for_when(
             case AB_WHEN_HIDDEN: res= XmNpopdownCallback;
                 break;
             case AB_WHEN_SHOWN: res= XmNpopupCallback;
+                break;
+	    default:
                 break;
 	}
     break;
@@ -263,6 +275,8 @@ objxm_get_resource_for_when(
 		    case AB_WHEN_TOGGLED:
 			    res = XmNvalueChangedCallback;
 		        break;
+		    default:
+		        break;
 		}
 	    break;
 	    case AB_ITEM_FOR_LIST:
@@ -283,8 +297,12 @@ objxm_get_resource_for_when(
 		    case AB_WHEN_ACTIVATED: 
 			res = XmNactivateCallback;
 		    break;
+		    default:
+		        break;
 		}
 	    break;
+	    default:
+	        break;
 	}
     break;
 
@@ -312,11 +330,15 @@ objxm_get_resource_for_when(
 		    case AB_SELECT_BROWSE_MULTIPLE:
 			res = XmNextendedSelectionCallback;
 		 	break;
+		    default:
+		 	break;
 		}
 		break;
 	
 	    case AB_WHEN_DOUBLE_CLICKED_ON:
 		res = XmNdefaultActionCallback;
+		break;
+	    default:
 		break;
 	}
     break;
@@ -328,6 +350,8 @@ objxm_get_resource_for_when(
             break;
             case AB_WHEN_POPPED_DOWN: res= XmNpopdownCallback;
             break;
+            default:
+                break;
         }
     break;
 
@@ -347,6 +371,8 @@ objxm_get_resource_for_when(
 	
 	    case AB_WHEN_DRAGGED: res = XmNdragCallback;
 	    break;
+            default:
+	    break;
         }
     break;
 
@@ -364,7 +390,12 @@ objxm_get_resource_for_when(
             case AB_WHEN_TEXT_CHANGED: 
 		res= XmNvalueChangedCallback;
             break;
+            default:
+                break;
         }
+    break;
+
+    default:
     break;
     } /* switch obj_get_type() */
 
@@ -414,6 +445,8 @@ objxm_get_resource_for_builtin_action(
     case AB_STDACT_SET_VALUE:
 	resource = get_resource_for_set_value(compObj, obj);
     break;
+    default:
+        break;
     }
 
     return resource;

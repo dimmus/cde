@@ -179,7 +179,6 @@ ShowRenameFileDialog(
   Arg args[20];
   Widget mbar;
   FileMgrData * file_mgr_data;
-  char * directory_name;
   int n;
 
    /*  Set the menu item to insensitive to prevent multiple  */
@@ -212,7 +211,6 @@ ShowRenameFileDialog(
   if( file_view_data == NULL )
     file_view_data = file_mgr_data->selection_list[0];
 
-  directory_name = ((DirectorySet *) file_view_data->directory_set)->name;
 
   /*  Create the widget hierarchy for the dialog  */
 
@@ -289,7 +287,9 @@ ShowCopyFileDialog(
    Arg args[20];
    int n;
    Widget mbar;
+#ifdef _CHECK_FOR_SPACES
    XtTranslations trans_table;
+#endif
    Atom delete_window_atom;
 
    /*  Set the menu item to insensitive to prevent multiple  */
@@ -363,7 +363,9 @@ ShowCopyFileDialog(
    XtSetValues (XtParent(shell), args, 1);
 
 
+#ifdef _CHECK_FOR_SPACES
    trans_table = XtParseTranslationTable(translations_space);
+#endif
 
    n = 0;
    XtSetArg (args[n], XmNmarginWidth, 1);                n++;
@@ -764,7 +766,9 @@ ShowMoveFileDialog(
    Arg args[20];
    int n;
    Widget mbar;
+#ifdef _CHECK_FOR_SPACES
    XtTranslations trans_table;
+#endif
    Atom delete_window_atom;
 
    /*  Set the menu item to insensitive to prevent multiple  */
@@ -835,7 +839,9 @@ ShowMoveFileDialog(
    XtSetValues (XtParent(shell), args, 1);
 
 
+#ifdef _CHECK_FOR_SPACES
    trans_table = XtParseTranslationTable(translations_space);
+#endif
 
    n = 0;
    XtSetArg (args[n], XmNmarginWidth, 1);		 n++;
@@ -1089,7 +1095,9 @@ ShowLinkFileDialog(
    Arg args[20];
    int n;
    Widget mbar;
+#ifdef _CHECK_FOR_SPACES
    XtTranslations trans_table;
+#endif
    Atom delete_window_atom;
 
    /*  Set the menu item to insensitive to prevent multiple  */
@@ -1157,7 +1165,9 @@ ShowLinkFileDialog(
    XtSetValues (XtParent(shell), args, 1);
 
 
+#ifdef _CHECK_FOR_SPACES
    trans_table = XtParseTranslationTable(translations_space);
+#endif
 
    n = 0;
    XtSetArg (args[n], XmNmarginWidth, 1);                n++;
@@ -1657,9 +1667,6 @@ GetToPath (
         char *host_in,
         char *dir_in)
 {
-   char *ptr;
-   char *host_name;
-   char *directory_name;
    char *path;
    Tt_status tt_status;
 
@@ -1772,7 +1779,7 @@ FileTypePreview(
    else if ( *new_name == 0x0 &&
              call_struct->original_physical_type == DtDATA )
       file_type = XtNewString(LT_DATA);
-   else if (link_path = _DtFollowLink(whole_name))
+   else if ((link_path = _DtFollowLink(whole_name)))
    {
       if (strcmp(orig_name, whole_name) == 0)
         file_type = (char *) DtDtsDataToDataType(orig_name, NULL, 0, NULL,
@@ -1887,7 +1894,8 @@ FileTypePreview(
       if (pixmapData)
         XtSetArg (args[n], XmNimageName, pixmapData->iconFileName);
       else
-        XtSetArg (args[n], XmNimageName, NULL);                 n++;
+        XtSetArg (args[n], XmNimageName, NULL);
+      n++;
       XtSetValues (call_struct->file_type_widget, args, n);
 
       _DtCheckAndFreePixmapData(file_type,
@@ -2494,11 +2502,6 @@ MakeFileDone(
 
    char *title;
    char *msg;
-   FileViewData *file_view_data;
-   FileMgrData *file_mgr_data;
-   DialogData *dialog_data;
-   DirectorySet *directory_set;
-   int i;
 
    /*
     * If the file/directory create was successful, unmanage the dialog
@@ -2555,6 +2558,12 @@ MakeFileDone(
       XtFree((char *) call_struct);
 
 #ifdef FOO
+   FileViewData *file_view_data;
+   FileMgrData *file_mgr_data;
+   DialogData *dialog_data;
+   DirectorySet *directory_set;
+   int i;
+
       /* @@@
        * The code below wants to make the file that was just created
        * be selected and scroll the view so the new file is visible.
@@ -2733,16 +2742,9 @@ ApplyFileDone(
         int rc)
 {
    MakeFileDoneData *data = (MakeFileDoneData *)client_data;
-   DialogCallbackStruct *call_struct = data->call_struct;
-   FileMgrRec *file_mgr_rec = (FileMgrRec *) call_struct->file_mgr_rec;
 
    char *title;
    char *msg;
-   FileViewData *file_view_data;
-   FileMgrData *file_mgr_data;
-   DialogData *dialog_data;
-   DirectorySet *directory_set;
-   int i;
 
    /*
     * If the file/directory create was successful, unmanage the dialog

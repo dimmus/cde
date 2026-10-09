@@ -85,32 +85,35 @@
 #include "dtpad.h"
 
 static void	_pjCreatePrintShell(PrintJob *pJob);
+#if 0 && defined(PRINTING_SUPPORTED)
 static void	_pjCreateOutputWidgets(PrintJob *pJob);
+#endif /* PRINTING_SUPPORTED */
 static void	_pjDoPrint(PrintJob*);
+#if 0 && defined(PRINTING_SUPPORTED)
 static void	_pjUpdatePageHeaders(
 				PrintJob*,
 				PrintStringTypeEnum,
 				PrintStringTypeEnum,
 				PrintStringTypeEnum,
 				PrintStringTypeEnum);
-#if 0 && defined(PRINTING_SUPPORTED)
 static void	_pjFinishedPrintToFile(
 				Display*,
 				XPContext,
 				XPGetDocStatus,
 				XPointer);
-#endif /* PRINTING_SUPPORTED */
 static char *	_pjGetPageHeaderString(PrintJob*, PrintStringTypeEnum);
+#endif /* PRINTING_SUPPORTED */
 
 static void	_pjCancelCB (Widget, XtPointer client_data, XtPointer);
 static void	_pjCloseDisplayCB (Widget, XtPointer client_data, XtPointer);
 static void	_pjPdmSetupCB (Widget, XtPointer client_data, XtPointer);
-static void	_pjPdmNotificationCB (Widget, XtPointer client_data, XtPointer);
 static void	_pjPrintCB (Widget, XtPointer client_data, XtPointer);
+#if 0 && defined(PRINTING_SUPPORTED)
+static void	_pjPdmNotificationCB (Widget, XtPointer client_data, XtPointer);
 static void	_pjPrintOnePageCB(Widget, XtPointer, XtPointer);
+#endif /* PRINTING_SUPPORTED */
 
 static void	_pjRegisterActivePrintDisplay(Display*);
-static void	_pjUnregisterActivePrintDisplay(Display*);
 
 static Display	*_pjErrorPrintDisplay = NULL;
 static Display	**_pjActivePrintDisplay = NULL;
@@ -348,20 +351,6 @@ _pjRegisterActivePrintDisplay(Display *display)
     _pjMaxActivePrintDisplay *= 2;
 }
 
-/************************************************************************
- * _pjUnregisterActivePrintDisplay
- *	Delete the Display pointer for an active print display connection
- ************************************************************************/
-static void
-_pjUnregisterActivePrintDisplay(Display *display)
-{
-    int i;
-
-    for (i = 0; i < _pjMaxActivePrintDisplay; i++)
-      if (display == _pjActivePrintDisplay[i])
-	_pjActivePrintDisplay[i] = NULL;
-}
-
 
 /************************************************************************
  * _pjCreatePrintShell
@@ -371,14 +360,13 @@ _pjUnregisterActivePrintDisplay(Display *display)
 static void
 _pjCreatePrintShell(PrintJob *pJob)
 {
-    DtPrintSetupData    *psd = NULL;
-
     if (pJob == NULL ||
 	pJob->pShell != NULL ||
 	pJob->parentShell == NULL ||
 	pJob->pSetup == NULL) return;
 
 #if 0 && defined(PRINTING_SUPPORTED)
+    DtPrintSetupData    *psd = NULL;
     
     /*
      * Create the print shell and
@@ -452,6 +440,7 @@ _pjCreatePrintShell(PrintJob *pJob)
 
 
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /************************************************************************
  * _pjCreateOutputWidgets
  *	Actually run the specified PrintJob.
@@ -464,8 +453,6 @@ _pjCreateOutputWidgets(PrintJob *pJob)
 {
     DtEditorErrorCode	errorCode;
     Boolean		parseError;
-    DtPrintSetupData    *psd = NULL;
-    int                 save_data;
 
     /*
      * Notify the user that we're printing
@@ -579,6 +566,7 @@ _pjCreateOutputWidgets(PrintJob *pJob)
     pJob->npagesTotal /= PrintOutputGetLinesPerPage(pJob->pOutput);
     pJob->npagesDone = 0;
 }
+#endif /* PRINTING_SUPPORTED */
 
 
 
@@ -666,6 +654,7 @@ _pjDoPrint(PrintJob *pJob)
 
 }
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /************************************************************************
  * _pjUpdatePageHeaders
  *	Configures the header and footer string in the PrintOutput. 
@@ -789,6 +778,7 @@ _pjGetPageHeaderString(PrintJob *pJob, PrintStringTypeEnum type)
     }
     return buf;
 }
+#endif /* PRINTING_SUPPORTED */
 
 
 /*
@@ -856,7 +846,6 @@ static void
 _pjCloseDisplayCB (Widget widget, XtPointer client_data, XtPointer call_data)
 {
     PrintJob *pJob = (PrintJob *) client_data;
-    DtPrintSetupCallbackStruct *pbs = (DtPrintSetupCallbackStruct *) call_data;
 
     if (pJob->pShell != NULL)
     {
@@ -919,6 +908,7 @@ _pjPdmSetupCB(Widget print_setup, XtPointer client_data, XtPointer call_data)
 }
 
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /************************************************************************
  * _pjPdmNotificationCB
  *	XmNpdmNotificationCallback for the XmPrintShell
@@ -951,9 +941,11 @@ _pjPdmNotificationCB (Widget widget, XtPointer client_data, XtPointer call_data)
       Warning( pJob->pPad, message, XmDIALOG_WARNING);
 #endif  /* PRINTING_SUPPORTED */
 }
+#endif /* PRINTING_SUPPORTED */
 
 
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /************************************************************************
  * _pjPrintOnePageCB
  *	XmNpageSetupCallback for the XmPrintShell
@@ -1072,3 +1064,4 @@ _pjPrintOnePageCB(
 
 #endif /* PRINTING_SUPPORTED */
 }
+#endif /* PRINTING_SUPPORTED */

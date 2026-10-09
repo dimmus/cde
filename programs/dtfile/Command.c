@@ -675,7 +675,7 @@ ProcessMoveCopyLink (
 
 {
    unsigned int modifiers = 0;
-   int numFiles, i;
+   int numFiles;
    char ** file_set = NULL;
    char ** host_set = NULL;
    Boolean trashFile;
@@ -900,7 +900,6 @@ ProcessBufferDropOnFolder (
      Widget drop_window)
 
 {
-   unsigned int modifiers = 0;
    int num_of_buffers, i;
    char ** file_set = NULL;
    char ** host_set = NULL;
@@ -1262,18 +1261,16 @@ MoveCopyLinkHandler(
 {
    struct stat fileInfo;
    char title[256];
-   int numArgs, i;
-   char *ptr, *toName, *fileNames = NULL, *type = NULL, *fileList;
-   char *files = NULL;
+   int i;
+   char *ptr, *toName, *fileList;
    char ** file_set = NULL;
    char ** host_set = NULL;
    unsigned int modifiers = 0;
    int file_count = 0;
    int file_set_size = 0;
-   int errorCount = 0;
 
    toName = tt_message_file( ttMsg );
-   fileNames = fileList = tt_message_arg_val( ttMsg, 1 );
+   fileList = tt_message_arg_val( ttMsg, 1 );
 
    if( tt_is_err( tt_ptr_error( toName ) ) )
    { /* No file name */

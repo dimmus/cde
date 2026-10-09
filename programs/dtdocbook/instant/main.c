@@ -59,13 +59,6 @@
  * ________________________________________________________________________
  */
 
-#ifndef lint
-static char *RCSid =
-  "$XConsortium: main.c /main/14 1996/11/27 11:47:17 cde-hp $";
-static char *CopyRt =
- "Copyright 1993 Open Software Foundation, Inc., Cambridge, Mass.  All rights reserved.";
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>

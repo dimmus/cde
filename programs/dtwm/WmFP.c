@@ -724,11 +724,8 @@ WmPanelistShow (Widget w)
 
 {
    SwitchData * switch_data;
-   Dimension switch_rc_height;   
-   Dimension switch_button_height;   
 
    Dimension width = XtWidth(panel.shell);
-   Dimension height = XtHeight(panel.shell);
    Position x = XtX(panel.shell);
    Position y = XtY(panel.shell);
    Dimension screen_width;

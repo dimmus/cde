@@ -825,7 +825,6 @@ SwitchButtonCB (Widget    w,
    Widget        old_switch_button;
    BoxData     * box_data;
    SwitchData  * switch_data;
-   Atom          atom_name;
 
    int i;
    int ac;
@@ -1102,7 +1101,6 @@ SwitchRenameLabel (Widget    switch_button,
    Dimension  toggle_width;
    Dimension  toggle_height;
    XmFontList toggle_font_list;
-   Pixel      toggle_background;
 
    Position  switch_rc_x;
    Position  switch_rc_y;
@@ -1358,7 +1356,6 @@ PushCB (Widget    w,
    Boolean           push_recall;
    Boolean           unpost_subpanel = True;
 
-   BoxData      * box_data;
    SubpanelData * subpanel_data;
    ControlData  * main_control_data = NULL;
 
@@ -1449,14 +1446,13 @@ PushCB (Widget    w,
    {
       if (event->xany.type == KeyPress)
       {
-         int count;
 	 char buffer[10];
 	 int bufsize = 10;
 	 KeySym keysym;
 	 XComposeStatus compose;
          static Boolean first = True;
 
-         count = XLookupString ((XKeyEvent *)event, buffer, bufsize,
+         XLookupString ((XKeyEvent *)event, buffer, bufsize,
                                 &keysym, &compose);
 
          if (keysym == XK_Escape)
@@ -1640,7 +1636,6 @@ PushCB (Widget    w,
                   String     func_arg = NULL;
                   String     s1, s1save;
                   char     * client_name;
-                  char     * client_title;		  
 
                   WmGlobalData    * wm_global_data = (WmGlobalData *) panel.global_data;
                   ClientData      * wm_client_data = NULL;
@@ -1663,9 +1658,6 @@ PushCB (Widget    w,
                   if (client_name == NULL)
                      client_name = 
 		        (char *) control_data->element_values[CONTROL_LABEL].parsed_value;
-
-                  client_title = 
-		     (char *) control_data->element_values[CONTROL_LABEL].parsed_value;
 
                   if (control_type == CONTROL_FILE && ! control_data->is_action)
 		  {
@@ -1762,7 +1754,7 @@ DropCB (Widget    w,
 
    ControlData    * control_data;
    Arg              al[1];
-   int              i, j, k, l;
+   int              l;
    DtActionArg    * aap;
    char           * save_name = NULL;
 
@@ -2278,7 +2270,6 @@ CustomizeDropCB (Widget    w,
          	 XtPointer call_data) 
 
 {
-   BoxData      * box_data;
    ControlData  * main_control_data;
    SubpanelData * subpanel_data;
    DtDndDropAnimateCallbackStruct * animate_data =
@@ -2288,7 +2279,6 @@ CustomizeDropCB (Widget    w,
    ElementValue * element_values;
    char * data_type;
 
-   Boolean drop_of_fp;
    Boolean bad_control;
    Boolean control_monitor;
    intptr_t position_hints;
@@ -2319,7 +2309,6 @@ CustomizeDropCB (Widget    w,
    XtGetValues (w, al, 1);
 
    main_control_data = subpanel_data->parent_control_data;
-   box_data = (BoxData *) main_control_data->parent_data;
    
    file_count = animate_data->dropData->numItems;
    file_list = animate_data->dropData->data.files;
@@ -2345,7 +2334,6 @@ CustomizeDropCB (Widget    w,
 
       if (!strcmp (data_type, "FP"))
       {
-         drop_of_fp = True;
          InitParse (file_list[i], &element_values);
 
 
@@ -2391,7 +2379,6 @@ CustomizeDropCB (Widget    w,
       }
       else
       {
-         drop_of_fp = False;
          GetValuesFromDataType (data_type, file_list[i], 
                                 subpanel_data, &element_values);
       }
@@ -2415,7 +2402,7 @@ CustomizeDropCB (Widget    w,
          if (strcmp (control_name, new_control_name) == 0)
          {
             ControlData control_data;
-            String title, del_ctrl, ctrl_name, del_msg, message;
+            String title, del_ctrl, del_msg, message;
 	 
 
             /*  Display an error dialog for the unusable drop data  */

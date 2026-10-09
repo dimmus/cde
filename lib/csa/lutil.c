@@ -168,6 +168,7 @@ _DtCmGetUserName(void)
         if (name == NULL) {
 	  name = malloc(BUFSIZ);
 
+	  (void) pwd_buf;	/* unused unless XTHREADS */
 	  if ((pwd_ret = _XGetpwuid(geteuid(), pwd_buf)) == NULL)
 	    strcpy(name, "nobody");
 	  else
@@ -186,6 +187,7 @@ _DtCmIsUserName(char *user)
 	_Xgetpwparams	pwd_buf;
 	struct passwd *	pwd_ret;
 
+	(void) pwd_buf;	/* unused unless XTHREADS */
 	pwd_ret = _XGetpwnam(user, pwd_buf);
 	if (pwd_ret == NULL)
 		return (B_FALSE);

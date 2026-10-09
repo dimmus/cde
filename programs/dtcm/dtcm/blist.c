@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static 	char sccsid[] = "@(#)blist.c 1.66 95/03/28 Copyr 1994 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -154,7 +150,7 @@ bl_list_selection_cb(Widget w, XtPointer data, XtPointer cbs) {
  */
 static void
 blist_removenames(Widget widget, XtPointer client_data, XtPointer call_data) {
-	int		i, idx, valid_cnt, *pos_list, pos_cnt;
+	int		i, *pos_list, pos_cnt;
 	Calendar	*c = (Calendar *)client_data;
 	BlistData	*bd = NULL;
 	Browselist	*bl = (Browselist *)c->browselist;
@@ -422,7 +418,6 @@ blist_cancel_cb(Widget widget, XtPointer client_data, XtPointer call_data) {
 static void
 blist_reset_cb(Widget widget, XtPointer client_data, XtPointer call_data) {
 	Calendar	*c = (Calendar *)client_data;
-	Browselist	*bl = (Browselist *)c->browselist;
 
 	blist_reset(c);
 }
@@ -526,8 +521,6 @@ blist_reset(Calendar *c) {
 
 static void
 blist_quit_handler(Widget w, XtPointer cdata, XtPointer data) {
-	Browselist	*bl = (Browselist *)cdata;
-
 	XtPopdown(w);
 }
 

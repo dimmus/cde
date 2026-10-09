@@ -410,7 +410,6 @@ AddPersistentWindows(
 
 {
     WmScreenData *pSD = pWS->pSD;
-    int i;
     ClientListEntry *pCLE;
 
     /*
@@ -566,7 +565,7 @@ DeleteWorkspace(
 
 {
     WmWorkspaceData *pWSdest;		/* destination WS */
-    int i, iNextWs;
+    int iNextWs;
     ClientData *pCD;
     WmScreenData *pSD = pWS->pSD;
     Atom aOldId;
@@ -1588,7 +1587,7 @@ GenerateWorkspaceName(
 
 {
     static unsigned char nameReturned[13];
-    int i, j;
+    int i;
 
     /*
      * Nice n-squared algorithm...
@@ -3378,7 +3377,6 @@ SaveWorkspaceResources(
     int cum_len;
 
     char screenName[1024];
-    char tmpScreenName[10];
 
     Position clientX;
     Position clientY;
@@ -3572,7 +3570,7 @@ SaveWorkspaceResources(
 					  wmGD.windowContextType, 
 					  (XtPointer)&pCD_Panel)))
     {
-	Position midX, midY, tmpX, tmpY;
+	Position midX, midY;
 	Dimension screenWidth, screenHeight;
 
 	clientX = pCD_Panel->clientX;

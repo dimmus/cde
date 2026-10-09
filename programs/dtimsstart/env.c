@@ -41,9 +41,6 @@ static int	shell_type(/* shell */);
 int	set_cmd_env(void)
 {
     int		ret = NoError;
-    char	**aliases = (char **)0;
-    char	*p;
-    UserEnv	*uenv = &userEnv;
 
     if ((ret = get_user_environ()) != NoError)
 	return ret;
@@ -104,13 +101,13 @@ int	get_user_environ(void)
 	    return ErrNoDisplay;
     }
 
-    if (p = getenv("XMODIFIERS"))
+    if ((p = getenv("XMODIFIERS")))
 	uenv->xmodifiers = NEWSTR(p);
     else
 	uenv->xmodifiers = NULL;
 
     gethostname(buf, BUFSIZ);
-    uenv->hostname = NEWSTR(buf);
+    uenv->hostname = NEWSTR(&buf[0]);
 
     if (!(p = getlogin()))
       {
@@ -122,7 +119,7 @@ int	get_user_environ(void)
     uenv->username = NEWSTR(p);
 
     n = 0;
-    if (p = std_dpy_str(uenv->displayname, &n))
+    if ((p = std_dpy_str(uenv->displayname, &n)))
 	uenv->displaydir = p;
     else
 	uenv->displaydir = NEWSTR(uenv->displayname);
@@ -162,7 +159,7 @@ int	expand_string(char *in_str, char *out_str, int out_len, ImsConf *ims)
 		case 'A':	ep = conf->userAltDir; break;
 		case 'C':	ep = conf->dt->confDir; break;
 		case 'U':	ep = conf->dt->userDir; break;
-		case 'L':	if (ep = uenv->real_locale)	break;
+		case 'L':	if ((ep = uenv->real_locale))	break;
 		case 'l':	ep = uenv->locale; break;
 		case 'H':	ep = uenv->homedir; break;
 		case 'u':	ep = uenv->username; break;
@@ -219,7 +216,7 @@ static int	shell_type(char *shell)
     if (strchr(p = shell, '/')) {
 	for (len = strlen(p); len > 1 && p[len - 1] == '/'; len--) ;
 	shell[len] = 0;
-	if (p = strrchr(shell, '/'))	shell = p + 1;
+	if ((p = strrchr(shell, '/')))	shell = p + 1;
     }
     if (strstr(shell, "ksh") != NULL)
 	return K_Shell;
@@ -235,12 +232,11 @@ int	make_new_environ(OutEnv *oenv, UserSelection *sel)
     ImsConf	*ims;
     EnvEnt	*ep, *ep2;
     int		num, i;
-    int		proto;
     char	*p, **pp;
     char	buf[BUFSIZ], *bp;
     char	*xmod, *xinput;
     char	**setp, **unsetp;
-    bool	xmod_done, xinput_done;
+    bool	xmod_done;
     RunEnv	*renv;
 
     /* if (!oenv)	return ErrInternal; */
@@ -252,8 +248,6 @@ int	make_new_environ(OutEnv *oenv, UserSelection *sel)
     xmod = ENV_XMODIFIERS;
     xmod_done = False;
     xinput = NULL;
-    xinput_done = True;
-    proto = renv ? renv->proto : default_protocol(ims);
 
     setp = unsetp = 0;
     if (ims->env_set)	setp = parse_strlist(ims->env_set, ' ');
@@ -273,7 +267,7 @@ int	make_new_environ(OutEnv *oenv, UserSelection *sel)
 	ep->name = NEWSTR(xmod);
 	bp = strcpyx(bp = buf, ENV_MOD_IM);	/* "@im=" */
 	bp = strcpyx(bp, renv->im_mod);
-	ep->value = NEWSTR(buf);
+	ep->value = NEWSTR(&buf[0]);
 	ep++;
 	xmod_done = True;
     }
@@ -400,7 +394,7 @@ int	set_remote_env(char *ptr, char *env_pass)
     if (Conf.remote->passEnv
 		&& (ls = parse_strlist(Conf.remote->passEnv, ' '))) {
 	for (pp = ls; *pp; pp++)
-	    if (ep = getenv(*pp)) {
+	    if ((ep = getenv(*pp))) {
 		*bp++ = ' '; bp = strcpyx(bp, *pp); *bp++ = '=';
 		*bp++ = '"'; bp = strcpyx(bp, ep); *bp++ = '"';
 	    }

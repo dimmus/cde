@@ -1,4 +1,5 @@
 %option noyywrap
+%option nounput
 
 %{ /* -*- c++ -*- */
 /* $XConsortium: ReplaceIdIdref.l /main/3 1996/11/19 16:54:45 drk $ */
@@ -35,7 +36,9 @@
 #define DBG(level) if (0)
 #endif
 
+#ifdef DEBUG
 static int dbgLevel=-1;
+#endif
 
 /*
  * Forward declaration for my_input

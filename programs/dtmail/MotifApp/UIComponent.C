@@ -145,11 +145,11 @@ UIComponent::displayInCurrentWorkspace(Widget shell)
 	    if (Success==DtWsmGetWorkspacesOccupied(display, window, &ws, &num))
 	    {
 		/* Already in this workspace? */
-		for (k = 0; k < num; k++)
+		for (k = 0; (unsigned long) k < num; k++)
 		  if (ws[k] == pCurrent) break;
 
 		/* Add to the workspace */
-		if (k >= num)
+		if ((unsigned long) k >= num)
 		{
 		    size_t nbytes = sizeof(Atom) * (num+1);
 		    ws = (Atom*) XtRealloc((char*) ws, nbytes);

@@ -206,6 +206,8 @@ dnd_load_buffer(
             	case DTB_ANSWER_CANCEL:
 		    iRet = -1;
                     break;
+            	default:
+                break;
             }
 	}
 	else
@@ -253,6 +255,8 @@ dnd_load_buffer(
 			case DTB_ANSWER_CANCEL:
 			    iRet = -1;
 			    break;
+			default:
+			    break;
 		    }   
         	}
 		else
@@ -268,6 +272,8 @@ dnd_load_buffer(
 	    case DTB_ANSWER_CANCEL:
 		iRet = -1;
 		break;
+	    default:
+			    break;
 	}
     }
    
@@ -321,6 +327,8 @@ dnd_load_file(
                     case DTB_ANSWER_CANCEL:
                     	iRet = -1;
                     break;
+                    default:
+                    break;
             	}
             }
             else
@@ -344,6 +352,8 @@ dnd_load_file(
 
 		case DTB_ANSWER_CANCEL:
 		    iRet = -1;
+		    break;
+		default:
 		    break;
  	    }
 	}
@@ -383,6 +393,8 @@ dnd_load_file(
                             case DTB_ANSWER_CANCEL:
                             	iRet = -1;
                             	break;
+			    default:
+				break;
                     	}
                     }
 		    else
@@ -407,12 +419,16 @@ dnd_load_file(
                 	case DTB_ANSWER_CANCEL:
                     	    iRet = -1;
                     	break;
+                	default:
+                    	break;
             	    }
                     break;
  
             	case DTB_ANSWER_CANCEL:
                     iRet = -1;
                     break;
+            	default:
+				break;
 	    }
 	}
     }

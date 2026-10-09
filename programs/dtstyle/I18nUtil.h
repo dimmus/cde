@@ -66,7 +66,7 @@
 #define	is_white(c)		((c) == ' ' || (c) == '\t' || (c) == '\n')
 #define	skip_white(p)		while (is_white(*(p)))	(p)++
 #define	cut_field(p)	\
-	for ((p)++; *(p) && !is_white(*(p)); (p)++) ; *(p)++ = 0; skip_white(p)
+	for ((p)++; *(p) && !is_white(*(p)); (p)++) {} *(p)++ = 0; skip_white(p)
 
 
 void start_tag_line(char  *fname);

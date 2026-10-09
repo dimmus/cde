@@ -327,10 +327,8 @@ void
 Init_Editor(
         Widget wid )
 {
-  Window win;
   Arg args[10];
   int i;
-  Position lx, ly;
 
 /*** window ID of tablet ***/
   tablet_win = 0;
@@ -356,7 +354,6 @@ Init_Editor(
 
 /*** Xlib-related globals ***/
   dpy = XtDisplay(wid);
-  win = XtWindow(wid);
   root = DefaultRootWindow(dpy);
   screen = DefaultScreen(dpy);
   screen_ptr = XtScreen(wid);
@@ -955,7 +952,6 @@ void
 Init_Pen_Colors(
         Widget wid )
 {
-  Window win;
   Pixel  transFg;
   XColor exact_def;
   Arg arg[10];
@@ -1098,7 +1094,6 @@ void
 Init_Color_Table( void )
 {
   int i, j;
-  XColor cval;
   char ***colorTable;
 
   cmap_size = XDisplayCells(dpy, screen);
@@ -1340,7 +1335,6 @@ Init_Icons(
         Dimension height,
         Boolean saveFlag )
 {
-  Pixmap tmpPix;
   Pixmap tmp_color, tmp_mono;
   char text[40];
   Arg args[10];
@@ -2236,9 +2230,9 @@ Set_Gfx_Labels(
 
 static int jskXerrorDebug(Display *disp, XErrorEvent *error_event)
 {
+#ifdef DEBUG
     char error_msg[MAX_MSG_STR];
 
-#ifdef DEBUG
     if (debug)
         stat_out("\n\nX Protocol Error:\n");
 
@@ -2514,7 +2508,7 @@ ChangeTitle(void)
 
     if (*last_fname)
     {
-        if (name = strrchr(last_fname, '/'))
+        if ((name = strrchr(last_fname, '/')))
             name++;
         else
             name = last_fname;

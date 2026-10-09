@@ -46,7 +46,7 @@
 #    if defined(__STDC__) || defined(__cplusplus) || defined(c_plusplus)
 /* ANSI Version */
 #      define myassert(EX)	\
-	((EX)? 1 : (fprintf(stderr,"STDC Assertion failed: \""#EX"\"\n\tFile: %s\n\tLine: %d\n",__FILE__,__LINE__),0))
+	((EX)? (void)0 : (void)fprintf(stderr,"STDC Assertion failed: \""#EX"\"\n\tFile: %s\n\tLine: %d\n",__FILE__,__LINE__))
 #    else
 /* NON-ANSI C */
 #      define myassert(EX)	\

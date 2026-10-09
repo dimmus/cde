@@ -109,7 +109,6 @@ ab_load_bil_file(
     ABObj			mod = NULL;
     STRING			init_msg = NULL;
     STRING			modfile = NULL;
-    int				pLinesRead = 0;
     ABProfiledIntervalRec	totalTime;
     ABProfiledIntervalRec	loadTime;
     ABProfiledIntervalRec	configTime;
@@ -472,6 +471,8 @@ ab_check_and_open_bip(
 
         	    case DTB_ANSWER_HELP:
 			break;
+		    default:
+			break;
 	    }
 	}
     }
@@ -527,7 +528,6 @@ ab_check_and_import_bil(
 {
     BOOL                read_OK, write_OK;
     DTB_MODAL_ANSWER    answer = DTB_ANSWER_NONE;
-    ABObj       	project = proj_get_project();
     int			iRet = 0;
     XmString		xm_buf = (XmString) NULL;
     DtbObjectHelpData	help_data = NULL;
@@ -579,6 +579,8 @@ ab_check_and_import_bil(
 
         	    case DTB_ANSWER_CANCEL:
 		    case DTB_ANSWER_HELP:
+			break;
+		    default:
 			break;
 		}
 	    }

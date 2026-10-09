@@ -71,7 +71,6 @@ m_errline(",\n");
 /* Process error message text */
 void m_errline(char *p)
 {
-char c;
 
 for ( ; *p ; p++)
     {
@@ -138,7 +137,6 @@ int m_getc(void *m_ptr)
 {
 int  c;
 M_WCHAR wc;
-char badch[2];
 char mbyte[32]; /* make this bigger than any possible multi-byte char */
 int  length;
 static M_WCHAR wcr = 0, wsb, wsp, wtb;
@@ -297,7 +295,7 @@ void m_signmsg(char *p)
     char *q;
     char *pCopy;
 
-    if (q = strstr(p, VERSION)) {
+    if ((q = strstr(p, VERSION))) {
       pCopy = strdup(p);
       q = strstr(pCopy, VERSION);
       *q = M_EOS;
@@ -329,7 +327,7 @@ if (! filelist)
     }
 else
     { /* list files that make up document */
-    while (name = m_cyclent(init, &type, &content, &wheredef))
+    while ((name = m_cyclent(init, &type, &content, &wheredef)))
 	{
 	init = FALSE;
 	qfile = NULL;

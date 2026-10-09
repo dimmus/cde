@@ -314,14 +314,6 @@ static void RelocateDesktopIcon(
                         int root_y);
 static void BuildObjectPositions(
                         FileMgrData *file_mgr_data);
-static void moveCopyLinkCancel(
-                        Widget w,
-                        XtPointer client_data,
-                        XtPointer call_data );
-static void moveCopyLinkOK(
-                        Widget w,
-                        XtPointer client_data,
-                        XtPointer call_data );
 static void DropOnRootCB (
                         Widget w,
                         XtPointer client_data,
@@ -399,13 +391,13 @@ static struct TreePx {
   Pixmap px[3];          /*   small, medium, and large pixmap */
 } TreePxTab[tpxN] =
 {
-  { "Dttvnor", 0 },
-  { "Dttverr", 0 },
-  { "Dttvmor", 0 },
-  { "Dttvlss", 0 },
-  { "Dttvbth", 0 },
-  { "Dttvemp", 0 },
-  { "Dttvnil", 0 },
+  { "Dttvnor", { 0 } },
+  { "Dttverr", { 0 } },
+  { "Dttvmor", { 0 } },
+  { "Dttvlss", { 0 } },
+  { "Dttvbth", { 0 } },
+  { "Dttvemp", { 0 } },
+  { "Dttvnil", { 0 } },
 };
 
 static char *TreePxSuffix[3] = { ".s", ".m", ".l" };
@@ -896,7 +888,7 @@ FilterFiles(
 {
    FileViewData **file_view_data;
    FilterData *   filter_data;
-   int   i, j, k;
+   int   i, j;
    Boolean        show_hidden;
    String         filter;
    Boolean        mustMatch, matches;
@@ -1933,7 +1925,9 @@ NewConvertDelete(
         char ** fileList,
         int numFiles)
 {
+#ifdef DEBUG
       static char *pname = "NewConvertDelete";
+#endif
       int     i;
       int     child_pid = 0;
 
@@ -1993,7 +1987,7 @@ NewConvertFileName(
    FileMgrData * fileMgrData;
    DesktopRec * desktopRec;
    int selectedCount;
-   int dt, i, count;
+   int dt, i;
    char * directoryName;
    char * fileName;
    char * path;
@@ -2125,7 +2119,6 @@ DragFinishCB(Widget w, XtPointer client, XtPointer call)
 {
    DtDndDragFinishCallback cb = (DtDndDragFinishCallback) call;
    int                  i;
-   static Window root = 0;
 
    DPRINTF(("DragFinishCB: dragActive -> False\n"));
 
@@ -2231,27 +2224,7 @@ InitiateIconDrag(
    FileMgrData * fileMgrData;
    DtIconGadget iconG;
    Widget dragIcon;
-   char * typeSet;
-   char * fileSet;
-   char * directoryName;
-   Pixmap dragPixmap;
-   XRectangle dragMask[2];
-   Pixel  bg;
-   XRectangle pRect, lRect;
-   unsigned char flags;
-   int stringSize;
-   int i;
-   Arg args[10];
-   Boolean allowDropInInitiatingWindow;
-   int rectCount;
-   int minX, minY;
-   Boolean minXUndefined, minYUndefined;
    DesktopRec * desktopRec;
-   int btn;
-   char * hostName;
-   Boolean spaces = False;
-   Boolean trash = False;
-   char *tmpStr, *link_path, *ptr;
 
    /* Don't allow multi-drags to start */
    if (dragActive)
@@ -2270,12 +2243,6 @@ InitiateIconDrag(
 
    dragIcon = fileViewData->widget;
    (void)IsDesktopPtr(fileViewData, &fileMgrData, &desktopRec);
-
-   /* if what we are dragging is a trash item, we want the objects to be
-    * real objects, not their links
-    */
-   if(fileMgrData == trashFileMgrData && trashFileMgrData != NULL)
-      trash = True;
 
    /*
     * We need to mark the icon which initiated the drag as no longer
@@ -2436,7 +2403,7 @@ FileIconMotion(
       if ((ABS(diffX) >= dragThreshold) || (ABS(diffY) >= dragThreshold))
       {
          /* Map the original (x,y) into a gadget Id */
-         if (dragIcon =(Widget)InputForGadget(w, initialDragX, initialDragY))
+         if ((dragIcon =(Widget)InputForGadget(w, initialDragX, initialDragY)))
          {
             /* Map the icon into its fileViewData structure */
             /* Check for desktop icon first */
@@ -2570,7 +2537,6 @@ RelocateDesktopIcon(
    Widget pu_shell;
    Dimension width, height;
    Arg args[10];
-   XSizeHints wmSizeHints;
 
    pu_shell = desktopRec->shell;
 
@@ -4262,23 +4228,23 @@ TypeToDropOperations (
 
    /* does object have MOVE, COPY, and/or LINK actions */
    /*    -- or no actions at all                       */
-   if (action = DtDtsDataTypeToAttributeValue(file_type,
+   if ((action = DtDtsDataTypeToAttributeValue(file_type,
                                               DtDTS_DA_MOVE_TO_ACTION,
-                                              NULL))
+                                              NULL)))
    {
       operations = operations | XmDROP_MOVE;
       DtDtsFreeAttributeValue(action);
    }
-   if (action = DtDtsDataTypeToAttributeValue(file_type,
+   if ((action = DtDtsDataTypeToAttributeValue(file_type,
                                               DtDTS_DA_COPY_TO_ACTION,
-                                              NULL))
+                                              NULL)))
    {
       operations = operations | XmDROP_COPY;
       DtDtsFreeAttributeValue(action);
    }
-   if (action = DtDtsDataTypeToAttributeValue(file_type,
+   if ((action = DtDtsDataTypeToAttributeValue(file_type,
                                               DtDTS_DA_LINK_TO_ACTION,
-                                              NULL))
+                                              NULL)))
    {
       operations = operations | XmDROP_LINK;
       DtDtsFreeAttributeValue(action);
@@ -4371,8 +4337,7 @@ PositionFileView(
      FileMgrData *file_mgr_data)
 {
    Position x, y;
-   Arg args[1];
-   int value, size, increment, page, max;
+   int value, size, increment, page;
    FileMgrRec * file_mgr_rec = (FileMgrRec *)(file_mgr_data->file_mgr_rec);
    Widget p;
 
@@ -4909,13 +4874,10 @@ DropOnRootCB (
    char * ptr;
    char ** file_set = NULL;
    char ** host_set = NULL;
-   FileMgrRec * file_mgr_rec;
+   FileMgrRec * file_mgr_rec = NULL;
    FileMgrData * file_mgr_data;
-   char   *next;
    int i, j;
    int wsNum;
-   String end;
-   String tmpStr;
    int numFiles;
    int effScreenWidth = 0;
    int effScreenHeight = 0;
@@ -5007,13 +4969,18 @@ DropOnRootCB (
          for (;;)
          {
            /* cacluclate how many will fit (add up icons on all diagonals) */
-           int n = 0, nd = 0;
+           int n = 0;
+#ifdef DEBUG
+           int nd = 0;
+#endif
            for (root_x = start_x; root_x <= effScreenWidth; root_x += dstep)
            {
              int nx = (effScreenWidth - root_x)/step + 1;
              int ny = (effScreenHeight - start_y)/step + 1;
              n += (nx <= ny)? nx: ny;
+#ifdef DEBUG
              nd++;
+#endif
            }
 
            DPRINTF(("start_x %d, start_y %d, nd %d, n %d\n",
@@ -5722,7 +5689,8 @@ UpdateOneFileIcon(
        file_mgr_data->show_type != MULTIPLE_DIRECTORY)
       XtSetArg (args[n], XmNpixmapPosition, XmPIXMAP_TOP);
    else
-      XtSetArg (args[n], XmNpixmapPosition, XmPIXMAP_LEFT);            n++;
+      XtSetArg (args[n], XmNpixmapPosition, XmPIXMAP_LEFT);
+   n++;
 
    /* See if we can re-use the same or some other icon gadget */
    if (file_view_data->widget)
@@ -6106,7 +6074,6 @@ CreateTreeIcons(Widget w)
   Pixel  background_color = 0;
   Pixel  foreground_color = 0;
   int i, j;
-  TreePxId px;
   char pxname[128];
   unsigned int width, height, dummy;
 
@@ -6228,7 +6195,6 @@ GetIconLayoutParms(
    Dimension shadowThickness;
    Dimension marginWidth;
    Dimension maxWidth = ld->pixmap_width;
-   Dimension gadgetWidth;
 
    /* determine pixmap size */
    if (file_mgr_data->view == BY_NAME)
@@ -6454,7 +6420,6 @@ RedrawTreeLines(
         FileMgrRec *file_mgr_rec,
         FileMgrData *file_mgr_data)
 {
-   static char *empty_msg = NULL;
 
    FileViewData *file_view_data;
    IconLayoutData *layout_data;
@@ -6469,9 +6434,6 @@ RedrawTreeLines(
    Position y, y0, y1;
    int level;
    Bool more[256];
-   XFontSetExtents *extents;
-   int font_height;
-   int font_yoffset;
    int tmp;
 
    if (!XtIsManaged(w))
@@ -6661,7 +6623,6 @@ DisplaySomeIcons(
    XmManagerWidget file_window;
    FileViewData **order_list;
    int order_count;
-   Arg args[10];
    Arg args_dso_get[1];
    Arg args_dso_set[1];
    IconLayoutData *layout_data;
@@ -6673,16 +6634,13 @@ DisplaySomeIcons(
    int workCount2;
    Dimension grid_width, grid_height;
    Dimension icon_width, icon_height;
-   Dimension extra_height;
    int i, k;
    Position x, y;
    FileViewData  *file_view_data;
    Boolean changed;
    Widget child;
-   DtIconGadget g;
    int level;
    unsigned char operations;
-   Widget *wp;
    ObjectPosition *position_data;
    XRectangle textExtent;
 
@@ -6927,9 +6885,6 @@ do_this_entry:
       else /* file_mgr_data->show_type == MULTIPLE_DIRECTORY */
       {
          GetLevel(file_view_data, &level);
-         extra_height = GetExtraHeight(file_mgr_data, file_view_data,
-                                       layout_data->treebtn_size);
-
          /* check position of tree button, if any */
          if (file_view_data->treebtn)
          {
@@ -7049,6 +7004,8 @@ do_this_entry:
    /* unregister drop sites of unused icon gadgets */
    workCount2 = 0;
 #ifdef DELAYED_UNREGISTER
+   Widget *wp;
+
    for (wp = layout_data->next_icon_to_use;
         (child = *wp) != NULL;
         wp++)
@@ -8133,7 +8090,7 @@ LayoutDesktopIcons (
 
 {
    XmManagerWidget file_window;
-   int directory_count, largest_x, largest_y;
+   int largest_x, largest_y;
    int value = 0, size, increment, page;
    Dimension current_wd;
    Dimension current_ht;
@@ -8143,7 +8100,6 @@ LayoutDesktopIcons (
    FileViewData * object;
    ObjectPosition * position_data;
    ObjectPosition * bottom;
-   ObjectPtr top;
    int i, j, k;
    Boolean set_size = False;
    char * edit_name;
@@ -8180,15 +8136,15 @@ LayoutDesktopIcons (
       object = order_list[i];
       if (object->displayed)
       {
-         if (position_data = GetPositionalData(file_mgr_data, object, 0, False))
+         if ((position_data = GetPositionalData(file_mgr_data, object, 0, False)))
          {
             /* Save; used later during redraw */
             position_data->file_view_data = object;
             object->position_info = (ObjectPtr)position_data;
          }
       }
-      else if (position_data = GetPositionalData(file_mgr_data, object, 0,
-                                                 False))
+      else if ((position_data = GetPositionalData(file_mgr_data, object, 0,
+                                                 False)))
       {
          /*
           * If an object has position information, but is currently

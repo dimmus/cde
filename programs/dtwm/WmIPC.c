@@ -140,9 +140,6 @@ _DtPerfChkpntMsgSend("End   action database load");
 void
 dtInitializeMessaging(Widget toplevel)
 {
-    int 		i;
-    WmScreenData *	pSD;
-    String		sName;
 
     Tt_status		status;
     Tt_pattern		notice_pattern, request_pattern;
@@ -919,7 +916,7 @@ ToolTalkError(Widget parent, char *errfmt, Tt_status status)
 {
     Arg		 args[10];
     Widget	 dialog, dialogShell;
-    char	*errmsg, *statmsg, *title;
+    char	*errmsg, *statmsg;
     XmString	 xms_errmsg, xms_ok, xms_title;
     int		 n;
 

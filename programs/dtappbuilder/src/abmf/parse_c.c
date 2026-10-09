@@ -113,37 +113,12 @@ static STRING	magicCommentUserStart = "DTB_USER_CODE_START";
 static STRING	magicCommentUserEnd = "DTB_USER_CODE_END";
 
 
-static int	write_func_var_decl(FILE *file, CSeg cseg);
-static int	write_func_as_strings(FILE *file, CSeg cseg);
 static int	get_seg(BFile file, CSeg cseg);
 static int	skip_line(BFile file);
 static int	skip_string_const(BFile file);
 static int	skip_char_const(BFile file);
-static int	skip_white(BFile file);
 static int	skip_white_and_comment(BFile file);
-static int 	write_c_string(FILE *file, STRING value);
 static int	find_user_seg_end(BFile file, CUserSegs userSegs);
-static int	find_func_name(
-			BFile	file, 
-			long	funcOff, 
-			long	bodyOff,
-			long	*nameOffPtr,
-			long	*nameLenPtr);
-static int	find_func_proto(
-			BFile	file,
-			long	funcOff,
-			long	nameOff,
-			long	bodyOff,
-			long	*protoOff,
-			long	*protoLen);
-
-static int	trim_opening_comment(
-			BFile	file,
-			long	*funcOffPtr,
-			long	*funcLenPtr,
-			long	protoOff
-		);
-
 static int 	grab_string_from_file(
 			STRING *stringPtr,
 			BFile	file,
@@ -172,11 +147,6 @@ static int	find_matching(
 
 static BOOL	char_is_legal_for_ident(int iChar, BOOL firstChar);
 
-static int	skip_comment(
-			BFile 			file, 
-			COMMENT_TYPE		type,
-			MAGIC_COMMENT_TYPE	*magicCommentTypeOutPtr
-		);
 static int	skip_slash_star_comment(
 			BFile 			file, 
 			MAGIC_COMMENT_TYPE	*magicCommentTypeOutPtr
@@ -200,7 +170,6 @@ static int	get_char_from_c_file(
 			MAGIC_COMMENT_TYPE	*magicCommentTypeOutPtr
 		);
 
-static COMMENT_TYPE	find_comment_start(BFile file, long *commentOffOut);
 static int	reverse_string(STRING buf);
 static int	cvt_offset_to_line(BFile file, long offset);
 static int	set_user_seg_next_pointers(CSegArray segArray, BFile file);
@@ -793,19 +762,11 @@ get_seg(BFile file, CSeg cseg)
 {
     int		return_value = 0;
     int		rc = 0;		/* return code */
-    BOOL	foundSeg = FALSE;
     CSEG_TYPE	segType = CSEG_UNDEF;
     long	segOff = -1;
     long	segLen = -1;
     long	bodyOff = -1;
     long	bodyLen = -1;
-    long	nameOff = -1;
-    long	nameLen = -1;
-    long	protoOff = -1;
-    long	protoLen = -1;
-    BOOL	abort = FALSE;
-    BOOL	err = FALSE;
-    long	off = 0;
     char	segName[1024];
     int		i = 0;
     CUserSegsRec	userSegs;
@@ -889,7 +850,6 @@ find_matching(
     long	matchOff = -1;
     BOOL	foundMatching = FALSE;
     BOOL	quit = FALSE;
-    long	startOff = bfile_get_off(file);
     MAGIC_COMMENT_TYPE	magicCommentType =  MAGIC_CMT_UNDEF;
 
     while ((!quit) && (!bfile_eof(file)))
@@ -942,6 +902,8 @@ find_matching(
 		    util_printf_err("Bad DTB_USER segment at line %d\n", 
 			    cvt_offset_to_line(file, bfile_get_off(file))-1);
 		    return_code(-1);
+	        break;
+	        default:
 	        break;
 	    }
         } /* userSegs != NULL */
@@ -1095,23 +1057,6 @@ skip_char_const(BFile file)
 
 
 static int
-skip_white(BFile file)
-{
-    int	iChar = bfile_get_char(file);
-
-    while ((iChar != EOF) && (isspace(iChar)))
-    {
-	iChar = bfile_get_char(file);
-    }
-    if (iChar != EOF)
-    {
-	bfile_backup(file, 1);
-    }
-    return 0;
-}
-
-
-static int
 skip_white_and_comment(BFile file)
 {
     int	iChar = get_char_from_c_file(file, NULL);
@@ -1207,37 +1152,6 @@ get_char_from_c_file(
     } /* while !done */
 
     return iChar;
-}
-
-
-static int
-skip_comment(
-			BFile			file,
-			COMMENT_TYPE 		commentType, 
-			MAGIC_COMMENT_TYPE	*magicCommentTypeOutPtr
-)
-{
-    int		return_value = -1;
-
-    if (magicCommentTypeOutPtr != NULL)
-    {
-        *magicCommentTypeOutPtr = MAGIC_CMT_UNDEF;
-    }
-
-    switch(commentType)
-    {
-	case COMMENT_SLASH_STAR:
-	    return_value = skip_slash_star_comment(
-				file, magicCommentTypeOutPtr);
-	break;
-
-	case COMMENT_SLASH_SLASH:
-	    return_value = skip_slash_slash_comment(
-				file, magicCommentTypeOutPtr);
-	break;
-    }
-
-    return return_value;
 }
 
 
@@ -1869,9 +1783,11 @@ main(int argc, char *argv[])
 
 /* DTB_USER_CODE_START */
 
+#ifdef MAIN
 static int
 myfunc(void)
 {
     return 0;
 }
+#endif /* MAIN */
 /* DTB_USER_CODE_END*/

@@ -39,7 +39,7 @@ const char* toUpperCase(unsigned char* string)
 {
    static char buffer[512];
    int j=0;
-   for ( int i=0; i<strlen((const char*)string); i++ ) 
+   for ( int i=0; i<(int)strlen((const char*)string); i++ ) 
    {
 		 if (islower(string[i]))
 		   buffer[j] = toupper(string[i]) ;
@@ -707,7 +707,7 @@ SGMLGI : SGMLGI_CONTENT
           /* char handling better too? */
            if ( gGI_CASE_SENSITIVE == false )
              {
-               for (int i=0; i<strlen((const char*)$1); i++)
+               for (int i=0; i<(int)strlen((const char*)$1); i++)
                  if ( islower($1[i]) )
                    $1[i] = toupper($1[i]);
              }
@@ -744,7 +744,7 @@ dimension : DIMENSION
 	{
           int i;
 
-          for (i=0; i<strlen((const char*)$1); i++) {
+          for (i=0; i<(int)strlen((const char*)$1); i++) {
 
             if ( isalpha($1[i]) ) 
                break;

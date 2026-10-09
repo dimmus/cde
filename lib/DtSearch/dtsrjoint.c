@@ -584,6 +584,7 @@ static DtSrResult *ditto_sort (DtSrResult * lst)
 		ditsort_type);
 	    DtSearchExit (32);
     }
+    return NULL;
 }  /* ditto_sort() */
 
 

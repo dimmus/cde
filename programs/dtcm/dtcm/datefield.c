@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)datefield.c 1.7 94/11/07 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <Xm/Xm.h>

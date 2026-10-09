@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static char sccsid[] = "@(#)dayglance.c 1.76 95/04/24 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <Xm/Xm.h>
@@ -103,8 +99,6 @@ static Boolean in_moboxes(Calendar *, int, int);
 extern void
 paint_day_header(Calendar *c, Tick date, void *rect)
 {
-	Props *p = (Props*)c->properties;
-	OrderingType ot = get_int_prop(p, CP_DATEORDERING);
 	int pfy, x;
 	char buf[100];
 	Boolean inrange = False;
@@ -113,6 +107,7 @@ paint_day_header(Calendar *c, Tick date, void *rect)
 	XFontSetExtents fontextents;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&date, localtime_buf);
 
@@ -217,7 +212,7 @@ paint_dayview_appts(Calendar *c, Paint_cache *cache, int a_total, void *rect)
 			(void) sprintf(buf, "%d%s", hr, am ? "a" : "p");
 		}
 		else
-			(void) sprintf(buf, "%02d", hr);
+			(void) snprintf(buf, sizeof(buf), "%02d", hr);
 		x_off = gr_center(hrbox_margin, buf, pf); 
 
 /* REVISIT: unclear why we're still distinguishing between gr_text[_rgb]
@@ -536,6 +531,7 @@ monthbox_datetoxy(Calendar *c)
 	int row_h = day_info->row_h;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	CalFontExtents(c->fonts->labelfont, &fontextents);
 	pfy = fontextents.max_logical_extent.height;
@@ -598,14 +594,13 @@ extern void
 paint_dayview(Calendar *c, Boolean repaint, XRectangle *rect, Boolean update_months)
 {
 	Props 		*p = (Props*)c->properties;
-	int 		num_hrs;
 	int 		beg = get_int_prop(p, CP_DAYBEGIN);
 	int 		end = get_int_prop(p, CP_DAYEND);
 	time_t 		start, stop;
 	CSA_attribute 		*range_attrs;
         CSA_entry_handle 	*list;
 	CSA_enum 	*ops;
-	int 		i, j;
+	int 		j;
 	CSA_uint32 	a_total;
 	int		panel0_year, panel0_month;
 	int		panel1_year, panel1_month;
@@ -616,7 +611,6 @@ paint_dayview(Calendar *c, Boolean repaint, XRectangle *rect, Boolean update_mon
 	int		top_panel = 0;
 	int		bottom_panel = 2;
 
-	num_hrs = end - beg + 1;
 	if (c->paint_cache == NULL) {
 		start = (time_t) lower_bound(0, c->view->date);
         	stop = (time_t) next_nhours(start, end+1) - 1;
@@ -795,13 +789,11 @@ print_day_range(Calendar *c, Tick start_tick, Tick end_tick)
 static int
 count_day_pages(Calendar *c, int lines_per_page, Tick tick)
 {
-	int	n, i, j, timeslots, num_appts, pages, max = 0; 
+	int	i, j, num_appts, pages, max = 0; 
 	Props *p = (Props *)c->properties;
 	int       daybegin = get_int_prop(p, CP_DAYBEGIN);
 	int       dayend   = get_int_prop(p, CP_DAYEND);
-        char 	*location;
 	time_t 	start, end;
-        CSA_return_code stat;
         CSA_entry_handle *list;
         CSA_attribute *range_attrs;
 	CSA_enum *ops;
@@ -839,14 +831,11 @@ _print_day(Calendar *c,
     Boolean first)
 {
     char buf[100];
-    int n, i, j, timeslots, num_appts, pages;
-    int max = 0;
+    int i, j, timeslots, num_appts;
     int daybegin = get_int_prop(p, CP_DAYBEGIN);
     int dayend   = get_int_prop(p, CP_DAYEND);
     OrderingType ord_t = get_int_prop(p, CP_DATEORDERING);
     Boolean more, done = False, all_done = True;
-    char *location;
-    CSA_return_code stat;
     CSA_entry_handle *list;
     CSA_attribute *range_attrs;
     CSA_enum *ops;
@@ -927,6 +916,7 @@ day_xytoclock(Calendar *c, int x, int y, Tick t)
 	struct tm tm;
 	Props *p;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	p	= (Props *)c->properties;
 	daybegin = get_int_prop(p, CP_DAYBEGIN);
@@ -953,8 +943,8 @@ day_event(XEvent *event)
         static int lastcol, lastrow;
         static XEvent lastevent;
         pr_pos xy;
-        int x, y, i, j;
-        int boxw, boxh, margin, id;
+        int x, y, j;
+        int boxw, boxh, margin;
         Calendar *c = calendar;
         Tick date = c->view->date;
         Boolean in_mbox = False; /* in month boxes ? */
@@ -1247,7 +1237,6 @@ day_btn_cb(Widget w, XtPointer client, XtPointer call)
         XmMonthPanelCallbackStruct *cbs = (XmMonthPanelCallbackStruct *) call;
         Calendar *c = (Calendar *)client;
         int monthno, year;
-        int date = c->view->date;
  
 	invalidate_cache(c);
 

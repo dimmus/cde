@@ -165,6 +165,8 @@ abmfP_write_create_proc_decls(GenCodeInfo genCodeInfo)
 		case AB_CONT_MENU_BAR:
 	            returnValue = write_menubar_defs(genCodeInfo, obj);
 		break;
+		default:
+		break;
 	    }
 	break;
 	case AB_TYPE_LIST:
@@ -192,6 +194,8 @@ abmfP_write_create_proc_decls(GenCodeInfo genCodeInfo)
 	break;
 	case AB_TYPE_TERM_PANE:
 	    returnValue = write_termp_defs(genCodeInfo, obj);
+	break;
+	default:
 	break;
     }
 
@@ -355,11 +359,9 @@ static int
 write_combobox_defs(GenCodeInfo genCodeInfo, ABObj combobox)
 {
     File                codeFile = genCodeInfo->code_file;
-    ABObj               first_item = NULL;
     int                 num_items = 0;
 
     num_items = obj_get_num_items(combobox);
-    first_item= obj_get_item(combobox, 0);
 
     if (num_items > 0)
     {
@@ -396,7 +398,6 @@ write_list_defs(GenCodeInfo genCodeInfo, ABObj list)
 {
     File                codeFile = genCodeInfo->code_file;
     ABObj               first_item = NULL;
-    ABObj		item= NULL;
     int                 num_args= 0;
     int                 num_items = 0;
 
@@ -433,7 +434,6 @@ write_spinbox_defs(GenCodeInfo genCodeInfo, ABObj spinbox)
 {
     File                codeFile = genCodeInfo->code_file;
     ABObj               first_item = NULL;
-    ABObj               item= NULL;
     int                 num_args= 0;
     int                 num_items = 0;
 
@@ -824,7 +824,6 @@ write_define_pattern_xmstr_var(GenCodeInfo genCodeInfo)
 static int
 write_general_label_defs(GenCodeInfo genCodeInfo, ABObj obj)
 {
-    File	codeFile = genCodeInfo->code_file;
     BOOL	hasGlyphLabel = FALSE;
     BOOL	hasStringLabel = FALSE;
 

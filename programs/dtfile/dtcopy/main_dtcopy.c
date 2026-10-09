@@ -118,7 +118,6 @@ int debug = 0;
 #endif
 
 static XtAppContext app_context;
-static Display *display;
 static Boolean is_mapped = False;
 static int nfiles = 0;
 static int ndirs = 0;
@@ -507,7 +506,6 @@ EventCheck(void)
 /* process X events until there are no more pending events queued */
 {
   XEvent event;
-  unsigned long pend_result;
 
   for (;;) {
     if (!G_pause_copy) {
@@ -579,13 +577,9 @@ ConfirmHandler(
 	int ttype,
 	char *link)
 {
-  char msg[1024];
-  Arg args[5];
   Boolean is_overwrite = False;
   Boolean overwrite_dialog = False;     /* was overwrite dialog invoked? */
-  char *fname;
   int rc = 0;
-  SyncParams sync;
 
   /* update copy counts */
   if (op == op_sync)
@@ -766,8 +760,10 @@ main(int argc, char *argv[])
   char msg[1024];
   XEvent event;
   Arg args[3];
-  int rc, n,perm_status=0;
+  int rc, n;
+#ifdef DEBUG
   char * tmpStr;
+#endif
 
   Boolean copy_status;
 

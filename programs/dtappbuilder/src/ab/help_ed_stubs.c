@@ -143,11 +143,6 @@ static void     help_back_hdlr(
                     XtPointer callData
                 );
 
-static void	help_attr_chgCB(
-		    Widget      widget,
-		    XtPointer   client_data,
-		    XtPointer   call_data
-		);
 
 static void	select_instanceCB(
 		    Widget      widget,
@@ -155,9 +150,6 @@ static void	select_instanceCB(
 		    XmListCallbackStruct *listdata
 		);
 
-static int	object_was_created(
-		    ObjEvCreateInfo	info
-		);
 
 static int	object_was_deleted(
 		    ObjEvDestroyInfo	info
@@ -196,8 +188,6 @@ static BOOL	help_obj_is_target_type(
 		    ABObj obj
 		);
 
-static void	help_test_onitem_help(
-		);
 
 static void	verify_closeCB(
 		    Widget	w,
@@ -242,6 +232,8 @@ editable_obj_test(
 	    if (ed_obj_info->subtype != AB_ITEM_FOR_CHOICE)
 		needed = False;
             break;
+        default:
+            break;
     }
  
     return needed;
@@ -257,9 +249,6 @@ ab_popup_help(
 {
     DtbHelpEdHelpEditorInfo	help_ed = &dtb_help_ed_help_editor;
     extern Widget		AB_toplevel;
-    Widget			dialog_parent;
-    int				top_pos, bottom_pos;
-    char 			*objname;
     STRING			modname;
     ABSelectedRec		sel;
     HelpEditorSettingsRec	*hes = &Help_Editor_Settings_Rec;
@@ -405,23 +394,6 @@ ab_set_help_obj(
 	    HelpObjTypeInfo.type = (AB_OBJECT_TYPE) NULL;
 	    HelpObjTypeInfo.subtype = AB_NO_SUBTYPE;
 	}
-}
-
-/*
-** This callback is invoked every time a change is made to one of the
-** text fields in the Help Editor.  This lets us keep track of whether 
-** the user has made any changes, and therefore makes it possible to
-** control the appearance of change bars and handle auto_apply.
-*/
-static void
-help_attr_chgCB(
-    Widget      w,
-    XtPointer   client_data,
-    XtPointer   call_data
-)
-{
-    /* Increment change counter */
-    /* Change_count++; */
 }
 
 /*
@@ -585,6 +557,8 @@ do_auto_apply(
 		    ui_list_select_item(list,old_name,FALSE);
 		}
 		break;
+	default:
+		break;
     }
 
     if (old_obj != (ABObj)NULL) XtFree(old_name);
@@ -727,20 +701,10 @@ help_obj_is_target_type(
 }
 
 static int
-object_was_created(
-    ObjEvCreateInfo info
-)
-{
-    return abobj_list_obj_created(HelpObjList, info->obj, help_list_test);
-}
-
-
-static int
 object_was_deleted(
     ObjEvDestroyInfo info
 )
 {
-    HelpEditorSettingsRec	*hes = &Help_Editor_Settings_Rec;
 
     /* 
     ** If this happens to be the object currently being displayed,
@@ -971,78 +935,6 @@ help_dispatchCB(Widget widget, XtPointer clientData, XtPointer callData)
 }
 
 /*
-** This function is used in Test Mode to exercise on-item help in an
-** application under development.  It is special because it needs to be
-** able to transform the widget returned by DtHelpReturnSelectedWidget()
-** into the help obj for composite objects.
-**
-** See dtb_do_onitem_help() (in dtb_utils.c) for the version used by 
-** App Builder to do its own on-item help.  (That function is the one
-** apps built with App Builder will use as well.)
-*/
-static void
-help_test_onitem_help(void)
-{
-    ABObj	obj, root_obj, help_obj;
-    Widget 	target;
-    char	*name;
-    STRING 	help_vol, help_id, help_text;
-    AB_TRAVERSAL    trav;
-
-    /* Call the DtHelp routine that supports interactive on-item help. */
-    if(DtHelpReturnSelectedWidgetId(AB_toplevel,(Cursor)NULL,&target)
-        != DtHELP_SELECT_VALID) return;
-	
-    /* Convert the widget returned by DtHelp into an (sub)object */
-    if( (obj = objxm_get_obj_from_widget(target)) == NULL) return;
-
-    /* Make sure we have the root object for whatever the user selected */
-    root_obj = obj_get_root(obj);
-
-    name = abobj_get_moduled_name(root_obj);
-    util_dprintf(2,"on-item help: target is %s (obj %lx, widget %lx)\n",
-	name,root_obj,target);
-
-    /* If this object has help, call the help callback on the help subobj */
-    if(obj_has_help_data(obj) == True) {
-	help_obj = objxm_comp_get_subobj(root_obj,AB_CFG_HELP_OBJ);
-	if(help_obj != NULL) {
-	    obj_get_help_data(obj,&help_vol,&help_id,&help_text);
-	    util_dprintf(2,"Object help text:\n%s\n",help_text);
-    	    XtCallCallbacks((Widget)help_obj->ui_handle,XmNhelpCallback,
-		(XtPointer)NULL);
-	}
-    }
-    /* 
-    ** Nope, no help on this object, so wander up the object hierarchy
-    ** looking for one that does have help.  If we find it, invoke it.
-    */
-    else {
-	/* 
-	** Do conditional traversal, where the condition is our obj_has_help
-	** function.  Combined with TRAV_PARENTS, this means that a single
-	** trav_next call will either return a parent with help or NULL.
-	*/
-    	trav_open_cond(&trav,obj,AB_TRAV_PARENTS,obj_has_help_data);
-	root_obj = trav_next(&trav);
-	trav_close(&trav);
-    	if(root_obj == (ABObj)NULL) {
-		return;		/* No help to display! */
-	}
-	else {
-	    /* Found obj w/help.  Get help subobj & post help info */
-	    help_obj = objxm_comp_get_subobj(root_obj,AB_CFG_HELP_OBJ);
-	    if(help_obj != NULL) {
-	        obj_get_help_data(obj,&help_vol,&help_id,&help_text);
-	        util_dprintf(2,"Object help text:\n%s\n",help_text);
-    	        XtCallCallbacks((Widget)help_obj->ui_handle,XmNhelpCallback,
-		    (XtPointer)NULL);
-	    }
-	}
-    }
-}
-
-/*
 ** Called when the user attempts to dismiss the Help Editor via the Motif
 ** window menu.
 */
@@ -1150,7 +1042,6 @@ update_object_menu_from_obj(
 )
 {
     PalItemInfo*	palitem = (PalItemInfo*)NULL;
-    STRING		name;
     XmString		xmlabel;
     Widget		menu_selection;
 
@@ -1355,7 +1246,7 @@ help_resetCB(
 static void
 help_back_hdlr(Widget widget, XtPointer clientData, XtPointer callData)
 {
-    String		buffer, text, vol, loc;
+    String		buffer, text;
     char		*cp;
     Widget		more_button;
     Widget		help_dialog = (Widget)clientData;
@@ -1396,7 +1287,6 @@ more_help_dispatch(Widget widget, XtPointer clientData, XtPointer callData)
     char		*cp;
     static Widget	GeneralHelpDialog = (Widget) NULL;
     Widget		help_dialog = (Widget)clientData;
-    Widget		more_button;
 
     /* Fetch the saved volume/locationID information from the dialog widget */
     XtVaGetValues(help_dialog,

@@ -601,7 +601,6 @@ pw_panelist_selectCB(
     ABObj               module = NULL;
     ABObj               selected_obj = NULL;
     STRING              name = NULL;
-    int			ret = 0;
     AB_PROP_TYPE	type;
     PropPanedWinSettingsRec   *pws;
 
@@ -610,7 +609,7 @@ pw_panelist_selectCB(
     name = objxm_xmstr_to_str(listdata->item);
     if (name)
     {
-	ret = abobj_moduled_name_extract(name, &module, &selected_obj);
+	abobj_moduled_name_extract(name, &module, &selected_obj);
 	pws->current_pane_obj = selected_obj;
 	panedwin_pane_prop_load(selected_obj, type);
 	util_free(name);
@@ -773,7 +772,6 @@ pw_obj_reparentedOCB(
     ObjEvReparentInfo     info
 )
 {
-    ABObj	parent = NULL;
     int		ret = 0, i;
     PropPanedWinSettingsRec   *pws;
 
@@ -786,7 +784,6 @@ pw_obj_reparentedOCB(
      * the pw_obj_renamedOCB callback handle it (i.e. add 
      * it to the pane list).
      */
-    parent = obj_get_parent(info->obj);
     if (obj_get_name(info->obj) != NULL)
     {
 	/* Either a new paned window obj was created (via
@@ -806,8 +803,8 @@ pw_obj_reparentedOCB(
 		pws = &(prop_pw_settings_rec[i]);
 		if (pws->current_pane_obj == info->obj)
 		    panedwin_prop_clear_geom((AB_PROP_TYPE) i);
-		    ret = abobj_list_obj_reparented(pws->panelist, info,
-				pw_child_test_func);
+		ret = abobj_list_obj_reparented(pws->panelist, info,
+			    pw_child_test_func);
 	    }
 	}
     }
@@ -834,7 +831,7 @@ abobj_make_panedwin(void)
     ABObj         	pw_obj = (ABObj) NULL;
     ABObj         	obj_parent = (ABObj) NULL;
     ABSelectedRec 	sel;
-    int		  	i, xpos = 0, ypos = 0;
+     int		  	i;
     AB_ATTACH_TYPE	attach_type = AB_ATTACH_UNDEF,
 			next_attach_type = AB_ATTACH_UNDEF;
     void		*attach_val = NULL,

@@ -771,7 +771,7 @@ RFCMIME::writeBase64(Buffer & buf, const char * bp, const unsigned long len)
     int lf = 0;
 
     int block;
-    for (block = 0; block < main_len; block += 3) {
+    for (block = 0; (unsigned long) block < main_len; block += 3) {
 	enc_char = (ubp[block] >> 2) & 0x3f;
 	line[lf++] = base64_chars[enc_char];
 
@@ -857,7 +857,7 @@ RFCMIME::readTextEnriched(char * buf, int & off, const char * bp, const unsigned
       }
       else {
 	for (i=0, p=token; (c = *cur) && (cur < ebp) && (c != '>'); i++, cur++) {
-	  if (i < sizeof(token)-1)
+	  if ((size_t) i < sizeof(token)-1)
 	    *p++ = isupper(c) ? tolower(c) : c;
 	}
 	*p = '\0';
@@ -1821,6 +1821,8 @@ RFCMIME::rfc1522cpy(Buffer & buf, const char * value)
 		} else {
 		    writeQPrint(tmp, cur, scan_c - cur);
 		}
+		break;
+	    default:
 		break;
 	    }
 

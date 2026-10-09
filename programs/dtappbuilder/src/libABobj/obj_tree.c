@@ -52,8 +52,6 @@
 #include "obj_names_listP.h"
 
 /* reads get verified at a higher debug leve */
-static int verify_obj_read(ABObj obj);		/* verify data read */
-static int verify_obj_write(ABObj obj);		/* verify data write */
 
 #ifdef DEBUG
 static int verify_obj_read_impl(ABObj obj, STRING file, int line);
@@ -587,10 +585,11 @@ obj_replace(ABObj obj, ABObj replacement)
 	    case AB_REF_WIN_PARENT:
 	        obj_set_win_parent(refObj, replacement);
 	    break;
+	    default:
+	        break;
 	}
     } /* for i */
 	
-epilogue:
     objlist_destroy(refList);
     return return_value;
 }

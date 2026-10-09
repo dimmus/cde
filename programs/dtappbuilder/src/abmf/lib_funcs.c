@@ -782,7 +782,6 @@ dtb_set_label_from_image_file(
     int		rc = 0;		/* return code */
     Pixmap	labelPixmap = NULL;
     Pixmap	insensitivePixmap = NULL;
-    int		depth;
 
     rc = dtb_cvt_image_file_to_pixmap(widget, fileName, &labelPixmap);
     if (rc < 0)
@@ -1205,7 +1204,7 @@ dtb_help_back_hdlr(
     XtPointer 	callData
 )
 {
-    String		buffer, text, vol, loc;
+    String		buffer, text;
     char		*cp;
     Widget		more_button;
     Widget		help_dialog = (Widget)clientData;
@@ -1250,7 +1249,6 @@ dtb_more_help_dispatch(
     char		*cp;
     static Widget	GeneralHelpDialog = (Widget) NULL;
     Widget		help_dialog = (Widget)clientData;
-    Widget		more_button;
 
     /* Fetch the saved volume/locationID information from the dialog widget */
     XtVaGetValues(help_dialog,
@@ -1560,7 +1558,6 @@ dtb_session_restore(
 {
     DtbClientSessionRestoreCB	session_restoreCB;
     char			*session_file_path;
-    Boolean			status;
 
     /*
      * If parameters are NULL, return.
@@ -1583,7 +1580,7 @@ dtb_session_restore(
      * Call client session restore callback
      */
     if (session_restoreCB)
-        status = session_restoreCB(widget, session_file_path);
+        session_restoreCB(widget, session_file_path);
 
     /*
      * CDE Sessioning API states that the path
@@ -2209,6 +2206,8 @@ center_widget(
 		NULL);
 	}
 	break;
+	default:
+	break;
     }
 }
 
@@ -2272,6 +2271,8 @@ uncenter_widget(
 		XmNtopOffset, 0,
 		NULL);
 	break;
+	default:
+	break;
     }
 }
 
@@ -2314,8 +2315,7 @@ get_label_widget(
 {
     WidgetList	children_list;
     Widget	label_widget = NULL;
-    int		i,
-		num_children = 0;
+    int		num_children = 0;
     char	*subobj_name = NULL,
 		*label_name = NULL;
     char	*underscore_ptr = NULL;
@@ -2400,7 +2400,6 @@ get_label_width(
     Widget	widget
 )
 {
-    WidgetList	children_list;
     Widget	lbl_widget = NULL;
     Dimension	lbl_width = 0;
 
@@ -2556,8 +2555,7 @@ get_group_cell_size(
 )
 {
     WidgetList	children_list = NULL;
-    int		i,
-		num_children = 0;
+    int		num_children = 0;
 
     /*
      * Get children list
@@ -2737,6 +2735,8 @@ dtb_children_align(
 	    num_cols = 0;
 	break;
 
+	default:
+	break;
     }
 
     group_info = (DtbGroupInfo *)XtMalloc(sizeof(DtbGroupInfo));
@@ -2840,8 +2840,7 @@ align_handler(
 {
     DtbGroupInfo	*group_info = (DtbGroupInfo *)client_data;
     WidgetList	children_list;
-    int		i,
-		num_children = 0;
+    int		num_children = 0;
     Boolean	relayout_all = False;
 
 
@@ -2862,12 +2861,9 @@ align_handler(
 
     if (event->type == ConfigureNotify) {
         XConfigureEvent	*xcon = &event->xconfigure;
-	Widget		resized_child;
 
 	if (xcon->window != xcon->event)
 	{
-            resized_child = XtWindowToWidget(XtDisplay(widget), xcon->window);
-
             switch(group_info->group_type)
             {
                 case DTB_GROUP_NONE:
@@ -2899,8 +2895,6 @@ align_handler(
      * Relayout when new widgets are created
      */
     if (event->type == CreateNotify) {
-        XCreateWindowEvent	*xcreate = &event->xcreatewindow;
-
 	relayout_all = True;
     }
 
@@ -2908,12 +2902,6 @@ align_handler(
      * Relayout when widgets are destroyed
      */
     if (event->type == DestroyNotify) {
-        XDestroyWindowEvent	*xdestroy = &event->xdestroywindow;
-	Widget			destroyed_child;
-
-        destroyed_child = XtWindowToWidget(XtDisplay(widget), 
-			xdestroy->window);
-
 	relayout_all = True;
     }
 
@@ -2938,8 +2926,7 @@ expose_handler(
 {
     DtbGroupInfo	*group_info = (DtbGroupInfo *)client_data;
     WidgetList	children_list;
-    int		i,
-		num_children = 0;
+    int		num_children = 0;
     Boolean	relayout_all = False,
 		register_align_handler = False;
 
@@ -3311,12 +3298,9 @@ align_labels(
 {
     WidgetList	children_list = NULL,
 		one_col = NULL;
-    Widget	previous_child = NULL,
-		child,
-		ref_widget,
+    Widget	child,
 		previous_ref_widget = NULL;
-    Dimension	ref_lbl_width = 0,
-		max_label_width = 0,
+    Dimension	max_label_width = 0,
 		max_value_width = 0;
     int		num_children = 0,
 		num_rows,
@@ -3325,8 +3309,7 @@ align_labels(
 		cell_height,
 		offset,
 		i,
-		j,
-		ref_x;
+		j;
 
     if (!parent || !group_info)
 	return;
@@ -3414,8 +3397,7 @@ align_vcenter(
 )
 {
     WidgetList	children_list;
-    Widget	child, 
-		previous_child;
+    Widget	child;
     DTB_GROUP_TYPES group_type;
     int		num_children = 0,
 		num_columns,
@@ -3423,7 +3405,6 @@ align_vcenter(
 		cell_width,
 		cell_height,
 		group_width,
-		group_height,
 		offset,
 		gridline,
 		i,
@@ -3514,8 +3495,7 @@ align_top(
 {
     WidgetList	children_list;
     Widget	previous_child = NULL,
-		child,
-		cur_child;
+		child;
     int		num_children = 0,
 		num_columns,
 		num_rows,
@@ -3617,7 +3597,6 @@ align_bottom(
     WidgetList	children_list;
     Widget	child, 
 		previous_child;
-    DTB_GROUP_TYPES group_type;
     int		num_children = 0,
 		num_columns,
 		num_rows,
@@ -3722,15 +3701,13 @@ align_hcenter(
 )
 {
     WidgetList	children_list = NULL;
-    Widget	child, 
-		previous_child;
+    Widget	child;
     DTB_GROUP_TYPES group_type;
     int		num_children = 0,
 		num_columns,
 		num_rows,
 		cell_width,
 		cell_height,
-		group_width,
 		group_height,
 		offset,
 		gridline,
@@ -4505,7 +4482,6 @@ dtb_drag_site_register(
 )
 {
     DtbDragSite dragSite = (DtbDragSite)XtCalloc(1,sizeof(DtbDragSiteRec));
-    Widget	sourceIcon = NULL;
 
     if (dragSite != NULL)
     {

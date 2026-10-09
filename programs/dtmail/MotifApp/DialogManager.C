@@ -409,7 +409,7 @@ void
 DialogManager::forceUpdate( Widget w )
 {
   Widget diashell, topshell;
-  Window diawindow, topwindow;
+  Window diawindow;
 
   Display		*dpy;
   XWindowAttributes	xwa;
@@ -429,7 +429,6 @@ DialogManager::forceUpdate( Widget w )
 //  if (XtIsRealized(diashell) && XtIsRealized(topshell)){
     dpy=XtDisplay(diashell);
     diawindow=XtWindow(diashell);
-    topwindow=XtWindow(topshell);
     while ( XGetWindowAttributes(dpy,diawindow,&xwa) && 
 	    xwa.map_state != IsViewable && XEventsQueued(dpy,QueuedAlready)){
 //	if ( XGetWindowAttributes( dpy, topwindow, &xwa ) &&

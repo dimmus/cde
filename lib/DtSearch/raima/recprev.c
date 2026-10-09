@@ -87,7 +87,6 @@ int d_recprev(int dbn)
    RECORD_ENTRY *rec_ptr;	/* RECORD ENTRY for this record */
    INT rectype;			/* record type from record */
    F_ADDR rno;			/* current slot we're scanning */
-   FILE_NO ft;			/* normalized file */
 
 
    DB_ENTER(DB_ID TASK_ID LOCK_SET(RECORD_IO));
@@ -109,7 +108,6 @@ int d_recprev(int dbn)
 
       rno = last;
    }
-   ft = NUM2INT( fno, ft_offset );
    
    /* scan backwards looking for a record of the same type */
    rno--;

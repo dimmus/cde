@@ -348,6 +348,9 @@ AC_PATH_X
 AC_PATH_XTRA
 
 dnl check some compiler flags
+C_FLAG_CHECK([-Wall])
+CXX_FLAG_CHECK([-Wall])
+
 C_FLAG_CHECK([-Wno-format-truncation])
 CXX_FLAG_CHECK([-Wno-format-truncation])
 

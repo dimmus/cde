@@ -129,6 +129,8 @@ init_time(void)
 	time_t	t;
 	_Xltimeparams localtime_buf;
 	_Xgtimeparams gmtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
+	(void) gmtime_buf;	/* unused unless XTHREADS */
 
 	t		= time(0);
 	tm		= *_XLocaltime(&t, localtime_buf);
@@ -151,6 +153,7 @@ _DtCms_adjust_appt_startdate(Appt_4 *appt)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (appt->period.period < monThruFri_4 ||
 	    appt->period.period > tueThur_4)
@@ -176,6 +179,8 @@ _DtCms_adjust_appt_startdate(Appt_4 *appt)
 						appt->appt_id.tick,
 						appt->period);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -186,9 +191,10 @@ extern int
 _DtCms_get_ninstance_v4(Appt_4 *appt)
 {
 	struct tm *tm;
-	int i, pdelta, ndelta, ninstance, timesperweek;
+	int pdelta, ndelta, ninstance, timesperweek;
 	double dninstance;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (appt->ntimes == _DtCM_OLD_REPEAT_FOREVER)
 		return(appt->ntimes);
@@ -261,6 +267,7 @@ _DtCms_get_new_ntimes_v4(Period_4 period, time_t tick, int ninstance)
 	int ntimes;
 	int delta = 0, firstweek, timesperweek;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	switch (period.period) {
 	case everyNthDay_4:
@@ -338,6 +345,7 @@ _DtCms_closest_tick_v4(time_t target, time_t ftick, Period_4 period, int *ordina
 	struct tm *tm;
 	struct tm tm1, tm2;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm1.tm_isdst = 0;
 	tm2.tm_isdst = 0;
@@ -472,6 +480,9 @@ _DtCms_closest_tick_v4(time_t target, time_t ftick, Period_4 period, int *ordina
 			*ordinal = delta * ntimes_this_week((u_int)period.nth,0)
 					+ ntimes_this_week((u_int)period.nth,
 						tm->tm_wday);
+			break;
+		default:
+			break;
 		}
 
 		/* delta*daysperweek+(lastapptofweek-firstday in first week) */
@@ -527,8 +538,8 @@ _DtCms_last_tick_v4(time_t ftick, Period_4 period, int ntimes)
 	struct tm *tm;
 	double dltick;
 	time_t ltick = 0;
-	int i;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (ntimes >= _DtCM_OLD_REPEAT_FOREVER)
 		return(EOT);
@@ -638,6 +649,7 @@ _DtCms_next_tick_v4(time_t tick, Period_4 period)
         time_t next = 0;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         switch(period.period) {
                 case weekly_4:
@@ -700,6 +712,7 @@ _DtCms_prev_tick_v4(time_t tick, Period_4 period)
         time_t prev = 0;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         switch(period.period) {
                 case weekly_4:
@@ -811,6 +824,7 @@ next_ndays(time_t t, int n)
 	time_t next;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_sec	= 0;
@@ -833,6 +847,7 @@ next_nmins(time_t t, int m)
 	time_t next;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm              = *_XLocaltime(&t, localtime_buf);
         tm.tm_sec       = 0;
@@ -849,6 +864,7 @@ _DtCmsBeginOfDay(time_t t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		=  *_XLocaltime(&t, localtime_buf);
 	tm.tm_sec	=  0;
@@ -862,6 +878,7 @@ _DtCmsTimeOfDay(time_t t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		=  *_XLocaltime(&t, localtime_buf);
 	tm.tm_sec	=  0;
@@ -911,6 +928,7 @@ nthweekdayofmonth(time_t t, int *nth)
 	struct tm tm, tm2, tmfirstday;
 	time_t	firstday;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tmfirstday = tm = *_XLocaltime(&t, localtime_buf);
 
@@ -945,6 +963,7 @@ next_nmonth(time_t t, int n)
 	struct tm tm;
 	int	n12;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	n12 = n/12;
 	n = n%12;
@@ -972,6 +991,7 @@ adjust_dst(time_t start, time_t next)
 	struct tm oldt;
 	struct tm newt;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	oldt = *_XLocaltime(&start, localtime_buf);
 	newt = *_XLocaltime(&next, localtime_buf);
@@ -991,6 +1011,7 @@ prev_nmonth(time_t t, int n)
 	struct tm tm;
 	int	n12;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	n12 = n/12;
 	n = n%12;
@@ -1019,7 +1040,7 @@ extern int
 leapyr(int y)
 {
 	return
-	 (y % 4 == 0 && y % 100 !=0 || y % 400 == 0);
+	 ((y % 4 == 0 && y % 100 !=0) || y % 400 == 0);
 }
 
 extern int
@@ -1028,6 +1049,7 @@ monthlength(Tick t)
 	int mon;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	mon = tm.tm_mon;
@@ -1039,6 +1061,7 @@ fdom(Tick t)
 {
         struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm              = *_XLocaltime(&t, localtime_buf);
         tm.tm_mday      = 1;
@@ -1053,6 +1076,7 @@ ldom(Tick t /* find dow(0-6) that last dom falls on */ )
 {
         struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm              = *_XLocaltime(&t, localtime_buf);
         tm.tm_mday      = monthlength(t);
@@ -1088,6 +1112,7 @@ nextnyear(time_t t, int n)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm	= *_XLocaltime(&t, localtime_buf);
 	tm.tm_year += n;
@@ -1110,6 +1135,7 @@ prevnyear(time_t t, int n)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	tm.tm_year -= n;
@@ -1127,6 +1153,7 @@ prevmonth_exactday(time_t t)
 	struct tm tm;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	sdelta = tm.tm_hour * hrsec + tm.tm_min * minsec + tm.tm_sec; 
@@ -1160,6 +1187,7 @@ nextmonth_exactday(time_t t)
 	struct tm tm;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	sdelta = tm.tm_hour * hrsec + tm.tm_min * minsec + tm.tm_sec; 
@@ -1190,6 +1218,7 @@ previousmonth(time_t t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	tm.tm_hour=0;
@@ -1218,6 +1247,7 @@ monthseconds(time_t t)
 	int mon;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 	
 	tm = *_XLocaltime(&t, localtime_buf);
 	mon = tm.tm_mon;
@@ -1236,6 +1266,7 @@ get_ndelta(time_t startdate, Period_4 period, int ntimes)
 	time_t lastdate;
 	double dlastdate;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (period.enddate == 0)
 		return(ndelta);
@@ -1279,6 +1310,8 @@ get_ndelta(time_t startdate, Period_4 period, int ntimes)
 	case daysOfWeek_4:
 		ndelta = ntimes_this_week((u_int)period.nth, tm->tm_wday) - 1;
 		break;
+	default:
+		break;
 	}
 	return(ndelta);
 }
@@ -1291,6 +1324,7 @@ lastnthweekday(time_t t, int nth, int ntimes)
 	int delta;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/*
 	 * if nth is not specified, assume it's the
@@ -1341,6 +1375,7 @@ nextnthweekday(time_t t, int nth)
 	int delta;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/*
 	 * if nth is not specified, assume it's the
@@ -1387,6 +1422,7 @@ prevnthweekday(time_t t, int nth)
 	int delta;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/*
 	 * if nth is not specified, assume it's the
@@ -1490,6 +1526,7 @@ nextnmth_exactday(time_t t, int n)
 	boolean_t done = B_FALSE;
 	time_t next;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm1 = *_XLocaltime(&t, localtime_buf);
 	while (!done) {
@@ -1532,6 +1569,7 @@ prevnmth_exactday(time_t t, int n)
 	boolean_t done = B_FALSE;
 	time_t prev;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm1 = *_XLocaltime(&t, localtime_buf);
 	while (!done) {
@@ -1567,6 +1605,7 @@ nextmonTofri(time_t t)
 	struct tm *tm;
 	time_t next;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 
@@ -1585,6 +1624,7 @@ prevmonTofri(time_t t)
 	struct tm *tm;
 	time_t prev;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 
@@ -1603,6 +1643,7 @@ nextmonwedfri(time_t t)
 	struct tm *tm;
 	time_t next;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 
@@ -1623,6 +1664,7 @@ prevmonwedfri(time_t t)
 	struct tm *tm;
 	time_t prev;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 
@@ -1643,6 +1685,7 @@ nexttuethur(time_t t)
 	struct tm *tm;
 	time_t next;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 
@@ -1664,6 +1707,7 @@ prevtuethur(time_t t)
 	struct tm *tm;
 	time_t prev;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 
@@ -1690,6 +1734,7 @@ nextdaysofweek(time_t t, int weekmask)
 	int i, ndays, daymask;
 	time_t next;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	doublemask = weekmask | (weekmask << 7);
 	tm = _XLocaltime(&t, localtime_buf);
@@ -1717,6 +1762,7 @@ prevdaysofweek(time_t t, int weekmask)
 	int i, ndays;
 	time_t prev;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	doublemask = weekmask | (weekmask << 7);
 	tm = _XLocaltime(&t, localtime_buf);

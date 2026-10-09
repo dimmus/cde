@@ -97,8 +97,6 @@ static Boolean SetValues(
                         Widget current_w,
                         Widget request_w,
                         Widget new_w) ;
-static void ChangeManaged( 
-                        Widget manager) ;
 static void InsertChild( 
                         Widget child) ;
 static void DeleteChild( 
@@ -447,52 +445,6 @@ SetValues(
 **-------------------------------------------------------------
 */
 
-/*-------------------------------------------------------------
-**	ChangeManaged
-**		Handle change in set of managed children.
-*/
-static void 
-ChangeManaged(
-        Widget manager )
-{
-	DtDialogBoxWidget	mgr 	= (DtDialogBoxWidget) manager;
-	Dimension		w 	= M_Width (mgr),
-				h 	= M_Height (mgr);
-	DlgGetSizeProc		get_size;
-	XtWidgetProc		resize;
-/*	Compute desired size.
-*/
-	_DtProcessLock();
-	get_size = C_GetSize((DtDialogBoxWidgetClass) XtClass(mgr));
-	resize = XtCoreProc(manager, resize);
-	_DtProcessUnlock();
-	(*get_size) ((Widget)mgr, 0, 0, 0, 0, &w, &h);
-
-	/* check for resize policy if not first time ?? */
-
-/*	Try to change size to fit children
-*/
-	if (w != M_Width (mgr) || h != M_Height (mgr))
-	{
-		switch (XtMakeResizeRequest ((Widget) mgr, w, h, &w, &h))
-		{
-			case XtGeometryAlmost:
-				XtMakeResizeRequest ((Widget) mgr, w, h,
-					NULL, NULL);
-			case XtGeometryYes:
-			case XtGeometryNo:
-			default:
-				break;
-		}
-	}
-	
-/*	Set positions and sizes of children.
-*/
-	(*resize) (manager);
-}
-
-
-
 /*-------------------------------------------------------------
 **	InsertChild
 **		Add a child.

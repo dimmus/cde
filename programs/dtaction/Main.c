@@ -581,7 +581,6 @@ AddSuLog(
     struct tm  *localtime ();
 
        FILE * f;
-    struct stat st;
     time_t    timenow;
     struct tm  *now;
 

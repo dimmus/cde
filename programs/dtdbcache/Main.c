@@ -49,16 +49,13 @@ int
 main(int argc, char **argv)
 {
 	XtAppContext    appContext;
-	Widget          toplevel, form;
-	char           *tmp;
-	int		c;
+	Widget          toplevel;
 	int		more = 1;
 	Tt_message	msg;
 	Tt_status	status;
 	int		count = 0;
 	int		slp = 0;
 	int		init_flag;
-	int		i;
 	char		*locale = setlocale(LC_ALL, "");
 
 
@@ -118,8 +115,6 @@ main(int argc, char **argv)
 			}
 			else
 			{
-				Tt_message m;
-
 				if (!_DtDtsMMInit(1))
 				{
 				    tt_message_reply(msg);

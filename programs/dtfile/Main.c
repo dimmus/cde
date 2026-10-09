@@ -285,7 +285,7 @@ static void ErrorHandler(
                         Display *disp,
                         XErrorEvent *event) ;
 static void ToolkitErrorHandler(
-                        char *message) ;
+                        char *message) _X_NORETURN;
 static void Usage(
                         char **argv) ;
 static void RestrictModeUsage(
@@ -324,11 +324,6 @@ static void ViewHomeDirectoryHandler(
                         Tt_message msg);
 static void ViewToolsDirectoryHandler(
                         Tt_message msg);
-static void ExitHandler(
-                        Tt_message msg,
-                        XtPointer clientData,
-                        String * messageFields,
-                        int numFields);
 static void ReloadDatabases( void );
 static void ViewAccept(
                         View *view,
@@ -992,16 +987,11 @@ main(
    struct passwd * pwInfo;
    char * homeDir;
    XEvent event;
-   XtInputMask pending;
-   Boolean eventDebugging;
-   int offset;
    int displayHeight;
    int displayWidth;
    Arg args[10];
    int n;
    char * tmpStr;
-   XSetWindowAttributes sAttributes;
-   Window root;
 #ifdef SHAPE
    int base1, base2;
 #endif
@@ -1083,7 +1073,7 @@ _DtPerfChkpntMsgSend("Begin XtInitialize");
 
    /* Open the message catalog - DO NOT PERFORM until after XtInitialize! */
    {
-      char * foo = ((char *)GETMESSAGE(18, 1, ""));
+      (void) GETMESSAGE(18, 1, "");
    }
 
    /* set application name for later */
@@ -1147,8 +1137,6 @@ _DtPerfChkpntMsgSend("Begin XtInitialize");
    wm_state_atom = XmInternAtom (display, "WM_STATE", False);
    command_atom = XA_WM_COMMAND;
    save_mode = XmInternAtom (display, _XA_DT_RESTORE_MODE, False);
-
-   root = RootWindowOfScreen(XtScreen(toplevel));
 
    /* Set session property on the top level window */
    XmAddWMProtocols(toplevel, &save_yourself_atom, 1);
@@ -1784,7 +1772,6 @@ _DtPerfChkpntMsgSend("Begin XtInitialize");
    InitializeDirectoryRead (toplevel);
 
    /* Process and dispatch incoming events */
-   eventDebugging = getenv("EVENT_DEBUGGING") != NULL;
 
 #ifdef DT_PERFORMANCE
    printf("  InitializeToolTalkSession\n");
@@ -2132,7 +2119,6 @@ static void
 MoveDefaultSettings(
         int mode )
 {
-   int status;
    char *toolSavePath=NULL;
    char *homeSavePath=NULL;
    char *dirName=NULL;
@@ -2184,17 +2170,17 @@ MoveDefaultSettings(
 
 
   /* get rid of the tool settings file that is already in home or current */
-   status = unlink(toolSavePath);
+   unlink(toolSavePath);
 
   /* get rid of the home settings file that is already in home or current */
-   status = unlink(homeSavePath);
+   unlink(homeSavePath);
 
 
   /* now save tool settings file in home or current determined by savePath */
-   status = link(toolMovePath, toolSavePath);
+   link(toolMovePath, toolSavePath);
 
   /* now save home settings file in home or current determined by savePath */
-   status = link(homeMovePath, homeSavePath);
+   link(homeMovePath, homeSavePath);
 
    /* free up space */
    XtFree(homeMovePath);
@@ -2859,11 +2845,8 @@ ForceMyIconOpen (
    FileMgrData * fmd;
    char * parent;
    char * fname;
-   char * ptr;
-   char * full_path;
    int i, j, k;
-   char *icon_name, *new_file_type_name, *file_type_name;
-   Arg args[5];
+   char *file_type_name;
 
    /* if directory_name is passed in a NULL, we want to go through all
       existing open directories and check to see if there are any open
@@ -4221,7 +4204,7 @@ static void
 ViewDirectoryHandler(
    Tt_message msg)
 {
-   int i, j, k;
+   int i;
    char *msgFile;
    int numArgs;
 
@@ -4466,7 +4449,7 @@ static void
 ViewHomeDirectoryHandler(
    Tt_message msg)
 {
-   int i, j, k;
+   int i;
    struct passwd * pwInfo;
    char * homeDir;
    char * tmp_path;
@@ -4906,27 +4889,6 @@ ViewToolsDirectoryHandler(
 }
 
 
-/************************************************************************
- *
- *  ExitHandler
- *      This function is called upon the DtSTOP message.
- *
- ************************************************************************/
-
-static void
-ExitHandler(
-   Tt_message msg,
-   XtPointer clientData,
-   String * messageFields,
-   int numFields)
-{
-   tt_message_reply( msg );
-   tttk_message_destroy( msg );
-   FinalizeToolTalkSession( );
-   exit(0);
-}
-
-
 /*
  * This is the message handling function responsible for reloading
  * the filetype and action databases, and then updating our collection
@@ -5050,7 +5012,6 @@ CheckForOpenDirectory(
      char * logical_type)
 {
    int i;
-   char *ptr;
    char *file_type_name, *new_file_type_name;
    char directory_name[MAX_PATH];
    char * real_dir_name;
@@ -5446,7 +5407,7 @@ static unsigned char
     /* skip to next word */
     while (pchIn && (mblen ((char *)pchIn, MB_CUR_MAX) == 1) && isspace (*pchIn))
     {
-        *pchIn++;
+        pchIn++;
     }
 
     *ppchNext = pchIn;
@@ -5937,7 +5898,6 @@ BuildAndShowIconName(
    Widget widget)
 {
    char *new_file_type_name;
-   char *ptr;
    Arg args[1];
    PixmapData *pixmapData;
 

@@ -283,6 +283,9 @@ dispatch(int observers_only)
 	    case TT_REQUEST:
 	    case TT_OFFER:
 		set_awaiting_reply();
+		break;
+	    default:
+		break;
 	}
 	_Tt_msg_trace trace( *this, old_state );
 	if (args.status == TT_ERR_FILE) {

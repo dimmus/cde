@@ -335,7 +335,6 @@ PanicSave(void)
     Editor *pPad;
     struct stat statbuf;        /* Information on a file. */
     Boolean addNewLines;
-    DtEditorErrorCode errorCode;
 
     for (pPad = pPadList; pPad != (Editor *)NULL; pPad = pPad->pNextPad) {
 	char *fileName = pPad->fileStuff.fileName;
@@ -356,7 +355,7 @@ PanicSave(void)
 	}
 	addNewLines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
-	errorCode = DtEditorSaveContentsToFile(
+	DtEditorSaveContentsToFile(
 			pPad->editor,
 			fileName,
 			False,		/* don't overwrite existing file */

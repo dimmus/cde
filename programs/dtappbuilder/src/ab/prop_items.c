@@ -495,6 +495,8 @@ prop_item_editor_apply(
 	    case AB_ITEM_FOR_MENUBAR:
 	    case AB_ITEM_FOR_CHOICE:
 		real_widget = (Widget*)util_malloc(num_items*sizeof(Widget));
+	    default:
+		break;
 	}
     }
 
@@ -620,6 +622,8 @@ prop_item_editor_apply(
                     	    DtSpinBoxDeletePos(parent, real_pos[i]);
                     	    DtSpinBoxAddItem(parent, xmitem, real_pos[i]);
 			    break;
+		        default:
+		  	    break;
                     }
                     XmStringFree(xmitem);
 		}
@@ -781,6 +785,8 @@ prop_item_change(
 		    graphic_path = newlabel = prop_field_get_value(pis->item_label_pfs);
 		    basename = get_graphic_namebase(graphic_path);
 		}
+		break;
+	    default:
 		break;
 	}
 	if (pis->current_item->label_type == AB_LABEL_STRING)
@@ -1026,15 +1032,12 @@ delete_selected_item(
     PropItemsSetting  pis
 )
 {
-    ABObj	current_obj;
     ABObj	*iobj_list;
     ABObj	*new_iobj_list = NULL;
     int		num_items;
     int		select_pos;
     int		i, j;
 
-    current_obj = *(pis->current_obj_ptr);
- 
     XtVaGetValues(pis->item_list,
                 XmNuserData,    &iobj_list,
                 NULL);
@@ -1507,7 +1510,6 @@ select_itemCB(
     XtPointer   call_data
 )
 {
-    XmListCallbackStruct *listdata = (XmListCallbackStruct *)call_data;
     PropItemsSetting	pis = (PropItemsSetting)client_data;
     ABObj	 	iobj_copy;
     int		 	pos;

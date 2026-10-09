@@ -253,10 +253,9 @@ init(void)
     if(tokens[bucket].first_token == -1)
       tokens[bucket].first_token = i;
     else {
-      int j = 0;
       bucket = tokens[bucket].first_token;
       while(tokens[bucket].next_token != -1)
-	j++, bucket = tokens[bucket].next_token;
+	bucket = tokens[bucket].next_token;
       tokens[bucket].next_token = i;
     }
   }
@@ -274,7 +273,6 @@ yyylex(void)
 
   while(1) {
     u_char * ptr = parse_buffer;
-    u_char c;
 
     switch(initial_mask[ *ptr = input_char()]) {
 
@@ -447,7 +445,7 @@ hash_string(char *s)
   unsigned result = 0;
   int sum;
   
-  while(sum = *s++)
+  while((sum = *s++))
     result = (result << 4) + sum;
   
   return(result % NUMTOKES);

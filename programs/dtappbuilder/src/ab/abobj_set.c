@@ -643,6 +643,8 @@ abobj_set_button_type(
 	    case AB_BUT_MENU:
 		obj_set_class_name(subObj, _dtMenuButton);
 		break;
+	    default:
+		break;
 	}
 	obj_clear_flag(subObj, InstantiatedFlag);
 
@@ -713,7 +715,6 @@ abobj_set_label(
 	{
 	    ABObj		p_obj = obj_get_parent(obj);
 	    Widget		parent = objxm_get_widget(p_obj);
-	    AB_ITEM_TYPE 	itype = (AB_ITEM_TYPE)obj_get_subtype(obj);
 	    int			pos;
 	    int			num_items;
 	    XmString		xmitem;
@@ -1223,8 +1224,8 @@ abobj_set_size_policy(
     ABObj	subObj;
     int		init_width, init_height;
 
-    if (obj_get_width(obj) != -1 && !fixed_size ||
-	 obj_get_width(obj) == -1 && fixed_size)
+    if ((obj_get_width(obj) != -1 && !fixed_size) ||
+	 (obj_get_width(obj) == -1 && fixed_size))
     {
         abobj_set_save_needed(obj_get_module(obj), TRUE);
 
@@ -2046,8 +2047,8 @@ abobj_set_min_max_values(
     ABObj       subObj;
 
     if (min != obj_get_min_value(obj) ||
-	max != obj_get_max_value(obj) &&
-        (obj_is_scale(obj) || obj_is_spin_box(obj)))
+	(max != obj_get_max_value(obj) &&
+        (obj_is_scale(obj) || obj_is_spin_box(obj))))
     {
         /* A change has occurred in the module so set the save flag */
         abobj_set_save_needed( obj_get_module(obj), TRUE);
@@ -2161,6 +2162,8 @@ abobj_set_pattern_type(
                 break;
             case AB_FILE_ANY:
                 value = XmFILE_ANY_TYPE;
+                break;
+            default:
                 break;
         }
         objxm_obj_set_ui_arg(subObj, AB_ARG_LITERAL, XmNfileTypeMask, value);

@@ -87,14 +87,13 @@ ErrorHandler(Display *dpy, XErrorEvent *event)
 int 
 ApplyFontPathMods( struct display *d, Display *dpy )
 {
-    FILE *fin;
-    char *s,*t;
+    char *s;
     char *fph = NULL;
     char *fpt = NULL;
     char **fontPath,**newList;
     int numHeads = 0;
     int numTails = 0;
-    int i,j,k,numPaths;
+    int i,j,numPaths;
 
     Debug("ApplyFontPathMods() for %s\n",d->name);
 
@@ -142,7 +141,8 @@ ApplyFontPathMods( struct display *d, Display *dpy )
             for (s=fph, i=j=0; j<numHeads; j++) {
                 if (!PathInPList(s,newList,i))
                     newList[i++] = s;
-                while (*s) s++; s++;
+                while (*s) s++;
+                s++;
             }
             for (j=0; j<numPaths; j++) {
                 if (!PathInPList(fontPath[j],newList,i) &&
@@ -153,7 +153,8 @@ ApplyFontPathMods( struct display *d, Display *dpy )
             for (s=fpt, j=0; j<numTails; j++) {
                 if (!PathInPList(s,newList,i))
                     newList[i++] = s;   
-                while (*s) s++; s++;
+                while (*s) s++;
+                s++;
             }
             if (debugLevel > 0)
                 DebugFontPath("Request (XSetFontPath)",newList,i);
@@ -239,7 +240,8 @@ PathInZList(char *path, char *fplist, int listlen)
             s++; while (*s == '/') s++;
         }
         if (!*s && !*t) return 1;
-        while (*t) t++; t++;
+        while (*t) t++;
+        t++;
     }
     return 0;    
 }
@@ -265,7 +267,7 @@ SeparateParts( char **path )
     char *t,*s;
     int nparts = 0;
     if (path && *path)
-	for (s=*path; t=strtok(s,","); s=NULL, nparts++);
+	for (s=*path; (t=strtok(s,",")); s=NULL, nparts++);
     return nparts;
 }
 

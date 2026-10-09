@@ -65,8 +65,6 @@
  ******************************************************************************/
 static boolean_t _InSequence(List_node *node, time_t time);
 static CSA_return_code _AddException(cms_attribute *attr, time_t time);
-static CSA_return_code _AddEndDateToRule(cms_attribute *attr, RepeatEvent *re,
-					time_t time);
 static void _TruncateExceptionDates(cms_entry *newe, time_t ltick);
 
 /*****************************************************************************

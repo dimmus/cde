@@ -577,11 +577,8 @@ Create(
    Widget current_directory_frame;
    Widget current_directory_drop;
    Widget current_directory_icon;
-   Widget directory_list_form;
    Widget work_frame;
    Widget status_form;
-   Widget status_separator;
-   Widget status_line;
 
    Pixel background;
    Pixel foreground;
@@ -599,8 +596,7 @@ Create(
    int n;
    int font_height;
    int curdir_height;
-   int temp;
-   int icon_offset, cur_dir_offset;
+   int cur_dir_offset;
    Dimension shadow_thickness;
    Dimension highlight_thickness;
    XtTranslations trans_table, trans_table1;
@@ -1297,10 +1293,7 @@ GetResourceValues(
    char * directory_name;
    char * new_name_list[20];
    int name_list_count;
-   struct passwd * pwInfo;
-   char * homeDir;
    char number[10];
-   int i, j, count;
    char * tmpStr;
 
    if (first)
@@ -1659,7 +1652,6 @@ SetValues(
    FileViewData ** order_list;
    int directory_count;
    char * file_name;
-   char * realPath;
    char * textString;
    char *tmpStr, *tempStr;
    Arg args[8];
@@ -2062,12 +2054,9 @@ WriteResourceValues(
         char **name_list )
 {
    FileMgrData * file_mgr_data = (FileMgrData *) values->data;
-   FileMgrRec * file_mgr_rec;
    char * new_name_list[20];
    int name_list_count;
-   Arg args[2];
    char number[10];
-   int i;
    char * tmpStr;
 
    /*  If the dialog is currently displayed, update the geometry  */
@@ -2076,7 +2065,6 @@ WriteResourceValues(
    if (file_mgr_data->displayed == True)
    {
       _DtGenericUpdateWindowPosition(values);
-      file_mgr_rec = (FileMgrRec *) _DtGetDialogInstance (values);
    }
 
 
@@ -2306,22 +2294,11 @@ ActivateClist(
         String *params,
         Cardinal *num_params )
 {
-  XmDrawingAreaCallbackStruct cb ;
   FileMgrRec * fileMgrRec;
-  int x, y ;
-  Widget input_on_gadget ;
 
-    if ((event->type == KeyPress)
-        ||(event->type == KeyRelease))
-    {
-        x = event->xkey.x ;
-        y = event->xkey.y ;
-    }
-    else
+    if ((event->type != KeyPress)
+        &&(event->type != KeyRelease))
       return ;
-
-    cb.reason = XmCR_INPUT;
-    cb.event = event;
 
     if( *(params[0]) != '@' )
     {
@@ -2476,7 +2453,6 @@ GetPixmapData(
    char * full_name;
    char * short_name;
    char * ftype;
-   char * icon_name;
    PixmapData * pixmapData;
    Tt_status tt_status;
 
@@ -2540,11 +2516,10 @@ BranchListToString(
    int i;
    Boolean first = True;
    char * branch_name;
-   int rv;
 
    if (*value != NULL)
    {
-      rv = write (fd, out_buf, strlen (out_buf));
+      write (fd, out_buf, strlen (out_buf));
 
       i = 0;
       branch_name = (*value)[i];
@@ -2552,17 +2527,17 @@ BranchListToString(
       while (branch_name != NULL)
       {
          if (!first)
-            rv = write (fd, ", ", strlen (", "));
+            write (fd, ", ", strlen (", "));
          else
             first = False;
 
-         rv = write (fd, branch_name, strlen (branch_name));
+         write (fd, branch_name, strlen (branch_name));
 
          i++;
          branch_name = (*value)[i];
       }
 
-      rv = write (fd, "\n", strlen ("\n"));
+      write (fd, "\n", strlen ("\n"));
    }
 }
 
@@ -2585,11 +2560,10 @@ SelectionListToString(
    Boolean first = True;
    FileViewData * file_view_data;
    DirectorySet * directory_set;
-   int rv; /* probably should actually check this... */
 
    if (*value != NULL)
    {
-      rv = write (fd, out_buf, strlen (out_buf));
+      write (fd, out_buf, strlen (out_buf));
 
       i = 0;
       file_view_data = (*value)[i];
@@ -2600,24 +2574,24 @@ SelectionListToString(
          directory_set  = (DirectorySet *) file_view_data->directory_set;
 
          if (!first)
-             rv =  write (fd, ", ", strlen (", "));
+             write (fd, ", ", strlen (", "));
          else
             first = False;
 
 
-         rv = write (fd, directory_set->name, strlen (directory_set->name));
+         write (fd, directory_set->name, strlen (directory_set->name));
 
          if (strcmp (directory_set->name, "/") != 0)
-            rv = write (fd, "/", strlen ("/"));
+            write (fd, "/", strlen ("/"));
 
-         rv = write (fd, file_view_data->file_data->file_name,
-                     strlen (file_view_data->file_data->file_name));
+         write (fd, file_view_data->file_data->file_name,
+                strlen (file_view_data->file_data->file_name));
 
          i++;
          file_view_data = (*value)[i];
       }
 
-      rv = write (fd, "\n", strlen ("\n"));
+      write (fd, "\n", strlen ("\n"));
    }
 
 }
@@ -3143,7 +3117,6 @@ ShowNewDirectory(
 {
    FileMgrRec * file_mgr_rec;
    Arg args[1];
-   char   tmp_directory_name[MAX_PATH];
    char **branch_list;
    int i;
    char *tmp_type;
@@ -3176,7 +3149,6 @@ ShowNewDirectory(
    }
    else if (strcmp(tmp_type, LT_TRASH) == 0)
    {
-      DtActionArg *action_args;
       char *pwd_dir;
 
       pwd_dir = XtNewString(file_mgr_data->current_directory);
@@ -3698,7 +3670,6 @@ ProcessDropOnObject(
      DtDndDropCallbackStruct *dropInfo,
      FileViewData *file_view_data)
 {
-   char *fileType;
 
    DirectorySet *directory_data =
                 (DirectorySet *) file_view_data->directory_set;
@@ -3801,7 +3772,6 @@ FileMgrPropagateSettings(
         FileMgrData *dst_data )
 {
 
-   PreferencesData * src_preferences_data;
    PreferencesData * dst_preferences_data;
 
    FilterData * src_filter_active_data;
@@ -3815,7 +3785,6 @@ FileMgrPropagateSettings(
 
    /* Copy the preferences data from src to dst data */
 
-   src_preferences_data = (PreferencesData *) src_data->preferences->data;
    dst_preferences_data = (PreferencesData *) dst_data->preferences->data;
 
    dst_data->show_type = dst_preferences_data->show_type = src_data->show_type;
@@ -4541,7 +4510,6 @@ UpdateBranchState(
         int op,
         Boolean busy)
 {
-  TreeShow old_ts = ip->ts;
 
   if (ip->ts == tsReading && op == BRANCH_UPDATE)
   {
@@ -4569,7 +4537,7 @@ UpdateBranchState(
   {
     if (file_mgr_data->tree_files == TREE_FILES_NEVER)
     {
-      if (ip->ts == tsNone || !showEmptySet && ip->ndir == 0)
+      if (ip->ts == tsNone || (!showEmptySet && ip->ndir == 0))
         ip->ts = tsDirs;
       else
         ip->ts = tsNone;
@@ -4624,7 +4592,7 @@ UpdateBranchState(
 
     if (file_mgr_data->tree_files == TREE_FILES_NEVER)
     {
-      if (ip->ts == tsNone || !showEmptySet && ip->ndir == 0)
+      if (ip->ts == tsNone || (!showEmptySet && ip->ndir == 0))
         ip->ts = tsDirs;
       else
         ip->ts = tsNone;
@@ -4666,7 +4634,7 @@ DirTreeExpand(
 {
   FileMgrRec *file_mgr_rec = (FileMgrRec *) file_mgr_data->file_mgr_rec;
   DirectorySet *directory_set;
-  int level, i, n, old_count, rc;
+  int level, i, rc;
   char path[1024];
   Pixmap px;
   Arg args[20];
@@ -4728,7 +4696,7 @@ DirTreeExpand(
       }
 
       if (rc != 0 ||
-          ip->ts == tsError && file_mgr_data->busy_status == busy_readdir)
+          (ip->ts == tsError && file_mgr_data->busy_status == busy_readdir))
          ip->ts = tsError;
       else
          ip->ts = tsNone;
@@ -4928,14 +4896,11 @@ SetIconAttributes(
    char * new_directory_name;
    Pixel background, foreground, top_shadow, bottom_shadow, select;
    Colormap colormap;
-   unsigned int width;
-   unsigned int height;
    Pixmap pixmap;
    Arg args[3];
    Boolean havePixmap = False;
    Boolean haveMask = False;
    Boolean root = False;
-   char * tmpStr;
    char *ptr, *fileLabel, *fileName;
 
    if (tool_icon == XmUNSPECIFIED_PIXMAP)
@@ -4972,9 +4937,9 @@ SetIconAttributes(
 
    /* set icon name */
 
-   if (fileLabel = DtDtsFileToAttributeValue(directory_name, DtDTS_DA_LABEL))
+   if ((fileLabel = DtDtsFileToAttributeValue(directory_name, DtDTS_DA_LABEL)))
       ptr = fileLabel;
-   else if (fileName = strrchr(directory_name, '/'))
+   else if ((fileName = strrchr(directory_name, '/')))
       ptr = fileName + 1;
    else
       ptr = "";
@@ -5071,7 +5036,6 @@ ShowChangeDirField (
    FileMgrData * file_mgr_data;
    Arg args[1];
    Widget mbar;
-   int begin_x;
 
 
    /*  Set the menu item to insensitive to prevent multiple  */
@@ -5451,7 +5415,7 @@ RemoveIconInWorkspace(
          char * workspaceName )
 {
   DesktopRec *desktopWin;
-  int i, j;
+  int i;
   char iconName[MAX_PATH];
 
 
@@ -5518,7 +5482,7 @@ CheckMoveType(
    char * tmpStr;
    char *Str;
    int number;
-   int i, j;
+   int i;
    char *target_host;
    char directory[MAX_PATH];
    Window   rootWindow;
@@ -5527,7 +5491,6 @@ CheckMoveType(
    int      screen;
    char * workspace_name = NULL;
    Display  *display;
-   Boolean value;
 
 #ifdef _CHECK_FOR_SPACES
    if (_DtSpacesInFileNames(file_set, file_count))
@@ -5723,7 +5686,6 @@ CheckMoveType(
       }
       else
       {
-        int len = strlen(to);
         char notHere = 0x0;
         int workspace_num = 1;
 
@@ -5748,7 +5710,7 @@ CheckMoveType(
                           file_mgr_data->restricted_directory );
              for( i = 0; i < number; ++i )
              {
-               char *ptr, *ptr1;
+               char *ptr;
 
                from = (char *)XtNewString( file_set[i] );
                ptr = strrchr( from, '/' );
@@ -5837,10 +5799,10 @@ CheckMoveType(
            sprintf( directory, "%s/%s", directory_data->name,
                     file_view_data->file_data->file_name );
            DtEliminateDots(directory);
-           value = FileMoveCopyDesktop (file_view_data, directory,
-                                        host_set, file_set, file_count,
-                                        modifiers, desktopWindow,
-                                        NULL, NULL);
+           FileMoveCopyDesktop (file_view_data, directory,
+                                host_set, file_set, file_count,
+                                modifiers, desktopWindow,
+                                NULL, NULL);
            break;
 
        case NOT_DESKTOP_DIR:
@@ -5848,10 +5810,10 @@ CheckMoveType(
            sprintf( directory, "%s/%s", directory_data->name,
                     file_view_data->file_data->file_name );
            DtEliminateDots(directory);
-           value = FileMoveCopy (file_mgr_data,
-                                 NULL, directory, target_host,
-                                 host_set, file_set, file_count,
-                                 modifiers, NULL, NULL);
+           FileMoveCopy (file_mgr_data,
+                         NULL, directory, target_host,
+                         host_set, file_set, file_count,
+                         modifiers, NULL, NULL);
            break;
 
        default:/* view == NOT_DESKTOP */
@@ -5863,15 +5825,17 @@ CheckMoveType(
            RepositionIcons(file_mgr_data, file_set, file_count, drop_x,
                            drop_y, True);
 */
-           value = FileMoveCopy(file_mgr_data,
-                                NULL, directory, target_host,
-                                host_set, file_set, file_count,
-                                modifiers, NULL, NULL);
+           FileMoveCopy(file_mgr_data,
+                        NULL, directory, target_host,
+                        host_set, file_set, file_count,
+                        modifiers, NULL, NULL);
            break;
    }
 
 
 #ifdef FOO
+   int j;
+
    /*
     * If this was a move and any of the files is referenced by a
     * Desktop object we need to change the reference to the new
@@ -6259,10 +6223,7 @@ DoTheMove(
    int file_count;
    char **file_set;
    char **host_set;
-   int i, j;
-   char *file, *next, *end;
    char directory[MAX_PATH];
-   Boolean result = True;
 
    file_count = global_file_count;
    file_set = global_file_set;
@@ -6274,11 +6235,13 @@ DoTheMove(
 /*
            RepositionIcons(fm, file_set, file_count, dx, dy, True);
 */
-           result = FileMoveCopy(fm,
-                                 NULL, fm->current_directory, fm->host,
-                                 host_set, file_set, file_count,
-                                 (unsigned int)0, NULL, NULL);
+           FileMoveCopy(fm,
+                        NULL, fm->current_directory, fm->host,
+                        host_set, file_set, file_count,
+                        (unsigned int)0, NULL, NULL);
 #ifdef FOO
+           int i, j;
+
            CheckDesktop();
            if(type == DESKTOP)
            {
@@ -6343,10 +6306,10 @@ DoTheMove(
        case NOT_DESKTOP_DIR:
            sprintf( directory, "%s/%s", dd->name, fv->file_data->file_name );
 
-           result = FileMoveCopy (fm,
-                                  NULL, directory, fm->host,
-                                  host_set, file_set, file_count,
-                                  (unsigned int) 0, NULL, NULL);
+           FileMoveCopy (fm,
+                         NULL, directory, fm->host,
+                         host_set, file_set, file_count,
+                         (unsigned int) 0, NULL, NULL);
 
            CheckDesktop();
            break;
@@ -6358,9 +6321,9 @@ DoTheMove(
              sprintf( directory, "%s/%s", directory_data->name,
                       fv->file_data->file_name );
 
-             result = FileMoveCopyDesktop (fv, directory, host_set, file_set,
-                                           file_count, mod, dtWindow,
-                                           NULL, NULL);
+             FileMoveCopyDesktop (fv, directory, host_set, file_set,
+                                  file_count, mod, dtWindow,
+                                  NULL, NULL);
            }
            break;
    }
@@ -6377,16 +6340,9 @@ FMInput(
 {
   XmDrawingAreaCallbackStruct cb ;
   FileMgrRec * fileMgrRec;
-  int x, y ;
-  Widget input_on_gadget ;
 
-    if ((event->type == KeyPress)
-        ||(event->type == KeyRelease))
-    {
-        x = event->xkey.x ;
-        y = event->xkey.y ;
-    }
-    else
+    if ((event->type != KeyPress)
+        &&(event->type != KeyRelease))
       return ;
 
     cb.reason = XmCR_INPUT ;

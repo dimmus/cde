@@ -274,7 +274,6 @@ pathlist_lstt_archive_list(
 	_Tt_string	last_path;
 	_Tt_string	this_path;
 	int		num_specs	= 0;
-	int		num_links	= 0;
 	bool_t		last_path_valid	= FALSE;
 	Object_kind	obj_kind	= NO_KIND;
 	Lstar_string_map_table_ptr	spec_map;
@@ -358,18 +357,13 @@ pathlist_lstt_archive_list(
 			if (last_path_valid) {
 				if (obj_kind == SPEC) {
 					num_specs--;
-				} else if (obj_kind == SUN_LINK) {
-					num_links--;
 				}
 				printf( "%s %d %s\n",
 				        (char *)last_path, num_specs,
 				        (num_specs == 1 ? "spec" : "specs" ));
 				num_specs = 0;
-				num_links = 0;
 				if (obj_kind == SPEC) {
 					num_specs = 1;
-				} else if (obj_kind == SUN_LINK)  {
-					num_links = 1;
 				}
 			}
 			last_path = this_path;
@@ -395,7 +389,6 @@ path_lstt_archive(
 	_Tt_string_list	       *specs;
 	Object_kind		obj_kind;
 	int			num_specs_archived = 0;
-	int			num_links_archived = 0;
 	bool_t			val2return	   = TRUE;
 
 	specs		= new _Tt_string_list;

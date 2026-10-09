@@ -63,7 +63,7 @@ class SymbolName : public CC_String
 {
 public:
   SymbolName(const char *);
-  unsigned int operator==(const SymbolName &);
+  unsigned int operator==(const SymbolName &) const;
   ostream &print(ostream &) const ;
 };
 

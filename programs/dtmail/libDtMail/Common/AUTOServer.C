@@ -168,8 +168,6 @@ AUTOServer::ptrans_msgsizes(int count, int *sizes)
 int
 AUTOServer::ptrans_msgisold(int num)
 {
-    static char	*pname = "AUTOServer::ptrans_msgisold";
-
     if (_server) return _server->ptrans_msgisold(num);
 
     return 0;

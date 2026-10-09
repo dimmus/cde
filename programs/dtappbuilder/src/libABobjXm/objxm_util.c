@@ -80,9 +80,6 @@ ObjxmPostInstantiateFunc	ObjxmP_post_instantiate_cb = NULL;
 **                                                                      **
 *************************************************************************/ 
 
-static int 	indent(
-		    FILE *file, int spaces
-		);
 
 static int	convert_filebase_to_pixmap(
    		    Widget	widget,
@@ -189,7 +186,6 @@ objxm_filebase_to_pixmap(
     Pixmap      *pixmap_p
 )
 {
-    int         status = 0;                 /* return code */
 
     if (util_strempty(filebase))
         return ERR_BAD_PARAM2;
@@ -303,7 +299,6 @@ convert_file_to_pixmap(
     Pixmap      *pixmap_p
 )
 {
-    int		rc = 0;			/* return code */
     Screen      *screen = NULL; 
     Pixel       fgPixel = 0;
     Pixel       bgPixel = 0; 
@@ -422,7 +417,6 @@ objxm_xmstr_to_str(
     XmStringCharSet   char_set_tag;
     XmStringDirection dir;
     Boolean           sep;
-    Boolean           status = FALSE;
     char	      buf[MAXPATHLEN], *seg, *p;
 
     p = buf;
@@ -604,15 +598,4 @@ objxm_tree_print_indented(ABObj obj, int spaces, int verbosity)
     return 0;
 }
 
-
-static int
-indent (FILE *file, int spaces)
-{
-    int i= 0;
-    for (i= 0; i < spaces; ++i)
-    {
-	fputc(' ', file);
-    }
-    return 0;
-}
 

@@ -95,7 +95,6 @@ typedef struct
 
 static int          log_construct(GenLog);
 static int          log_destruct(GenLog);
-static int          log_sort_by_date(GenLog);
 static GenLogEntry  log_find_entry_by_name(GenLog, STRING file_name);
 
 static int		log_add_entry(
@@ -105,7 +104,6 @@ static int		log_add_entry(
 	      			BOOL merged
 			);
 
-static int          log_dump(GenLog);
 /* private methods */
 static int          logP_release_data(GenLog);
 static int          logP_read(GenLog);
@@ -196,7 +194,6 @@ static int	print_skipping_message(
 			STRING		fileName, 
 			ABMF_SKIP_WHY	why
 		);
-static int          count_possible_substruct_fields(ABObj obj);
 
 static int compare_file_times(
 		   STRING input_file,
@@ -292,7 +289,6 @@ abmf_generate_code(
     AB_TRAVERSAL        trav;
     ABObj               module = NULL;
     char                resFileName[MAX_PATH_SIZE];
-    BOOL                writeAll = FALSE;
     GenCodeInfoRec      genCodeInfoRec;
     GenCodeInfo         genCodeInfo = &genCodeInfoRec;
     GenLogRec           genLogRec,
@@ -319,24 +315,6 @@ abmf_generate_code(
     genCodeInfo->dumped_resources = dumped_resources_in;
     genCodeInfo->i18n_method = i18n_method_in;
     appResFileComplete = FALSE;
-
-    /*
-     * Determine if we're writing EVERYTHING
-     */
-    if (obj_get_write_me(project))
-    {
-	writeAll = TRUE;
-	for (trav_open(&trav, project, AB_TRAV_MODULES);
-	     (module = trav_next(&trav)) != NULL;)
-	{
-	    if (!obj_get_write_me(module))
-	    {
-		writeAll = FALSE;
-		break;
-	    }
-	}
-	trav_close(&trav);
-    }
 
     abmfP_tree_set_action_names(project);
 
@@ -527,7 +505,6 @@ write_module_files(
     char                stubsBakFileName[MAX_PATH_SIZE];
     BOOL                needStubsMerge = FALSE;
     STRING              curFileName = NULL;
-    BOOL                curFileSkipped = FALSE;
     ABMF_SKIP_WHY	curFileSkipReason = ABMF_SKIP_UNDEF;
     *uiHeaderFileName = 0;
     *uiHeaderDefineName = 0;
@@ -1813,6 +1790,8 @@ print_skipping_message(STRING fileName, ABMF_SKIP_WHY why)
 		util_printf(CATGETS(Dtb_project_catd, 1, 70,
 		    "skipping due to errors %s\n"), fileName);
 		break;
+	    default:
+		break;
 	}
     }
     return 0;
@@ -2140,41 +2119,6 @@ log_add_entry(GenLog log, STRING file_name, time_t mod_time, BOOL merged)
 
 epilogue:
     return return_value;
-}
-
-
-
-static int
-log_dump(GenLog log)
-{
-#ifndef DEBUG
-    return 0;
-#else
-    int                 i = 0;
-    GenLogEntry         entry = NULL;
-
-    if (log == NULL)
-    {
-	util_dprintf(0, "NULL log\n");
-	return 0;
-    }
-    if (log->num_entries == 0)
-    {
-	util_dprintf(0, "Empty log file:%s\n", istr_string_safe(log->log_file));
-	return 0;
-    }
-    util_dprintf(0, "===== Gen Log (file %s) =====\n",
-		 istr_string_safe(log->log_file));
-    for (i = 0; i < log->num_entries; ++i)
-    {
-	entry = &(log->entries[i]);
-	util_dprintf(0, "%s %ld merged:%d\n",
-	       istr_string_safe(entry->file_name), (long) (entry->mod_time),
-		     entry->merged);
-    }
-    util_dprintf(0, "===================\n");
-    return 0;
-#endif				/* DEBUG */
 }
 
 

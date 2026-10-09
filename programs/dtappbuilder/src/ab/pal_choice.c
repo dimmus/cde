@@ -122,17 +122,6 @@ static void	turnoff_changebars(
 		);
 
 
-static void	load_item(
-		    ABObj	iobj,
-		    AB_PROP_TYPE type
-		);
-static ABObj	init_new_item(
-    		    AB_PROP_TYPE type
-		);
-static void	change_item(
-		    AB_PROP_TYPE type,
-		    ABObj	 iobj
-		);
 
 static void	setup_type_settings(
     		    AB_PROP_TYPE        type,
@@ -193,7 +182,6 @@ choice_initialize(
 )
 {
     AB_CHOICE_TYPE choice_type;
-    ABObj	module = obj_get_module(obj);
     ABObj	iobj;
     String  items[2];
     int		i;
@@ -768,7 +756,7 @@ verify_props(
         return False;
  
     if ((prop_changed(pcs->label_type.changebar) || prop_changed(pcs->label.changebar)) &&
-	(AB_BUILTIN_ACTION)prop_options_get_value(&(pcs->label_type)) == AB_LABEL_GLYPH &&
+	(AB_LABEL_TYPE)prop_options_get_value(&(pcs->label_type)) == AB_LABEL_GLYPH &&
         !prop_graphic_filename_ok(pcs->label.field, False))
         return False;
 

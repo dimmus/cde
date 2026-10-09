@@ -98,7 +98,7 @@ extern void
 rfp_set_repeat_values(RFP *rfp)
 
 {
-	int 		i, limit;
+	int 		limit;
 	XmString 	xmstr;
 	Widget 		list;
 
@@ -325,7 +325,7 @@ rfp_cancel_proc(Widget w, XtPointer client_data, XtPointer cbs) {
 */
 static void
 rfp_repeat_every_popup(RFP *rfp) {
-	Widget		label, apply_button, cancel_button, separator;
+	Widget		label, separator;
 	XmString	xmstr;
         Calendar	*c = rfp->cal;
 	char		*title;
@@ -843,7 +843,6 @@ extern Boolean
 rfp_form_flags_to_appt(RFP *rfp, Dtcm_appointment *a, char *name, int *flagsP)
 {
 	int		wk;
-	char		buf[MAXNAMELEN];
 	time_t		tick;
 	Calendar	*c = rfp->cal;
 	Props_pu	*p = (Props_pu *)rfp->cal->properties_pu;

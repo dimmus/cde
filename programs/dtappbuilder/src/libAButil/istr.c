@@ -118,7 +118,7 @@ static int	hashtable_init(void);
 
 static int	istrP_errmsg_noexist(int istr_value);
 
-#define check_init()		((hash_count == 0) && (hashtable_init() >= 0))
+#define check_init()		((void)((hash_count == 0) && (hashtable_init() >= 0)))
 #ifdef DEBUG
 #define int_array_set(ptr)	(int_array = (ptr), debug_istr= int_array)
 #else

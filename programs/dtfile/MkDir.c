@@ -95,7 +95,9 @@ RunFileCommand(
         char *argument2,
         char *argument3)
 {
+#ifdef DEBUG
    static char *pname = "RunFileCommand";
+#endif
    int child;           /* process id of command process */
    int wait_return;     /* return value from wait */
             int exit_value;      /* command exit value */

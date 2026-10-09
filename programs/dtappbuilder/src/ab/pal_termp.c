@@ -515,7 +515,6 @@ termp_prop_apply(
     ABObj			pobj;
     STRING			value;
     int				border, metric, new_w, new_h;
-    BOOL			size_chg = False;
     BOOL			reset_bg = False;
     BOOL			reset_fg = False;
 
@@ -532,8 +531,6 @@ termp_prop_apply(
     {
         abobj_set_scrollbar_state(pts->current_obj,
             (AB_SCROLLBAR_POLICY)prop_radiobox_get_value(&(pts->scrolling)));
-
-        size_chg = True;
     }
 
     pobj = obj_get_root(obj_get_parent(pts->current_obj));
@@ -575,7 +572,6 @@ termp_prop_apply(
             abobj_set_pixel_height(pts->current_obj,
                 metric == SIZE_IN_PIXELS_KEY? new_h : -1, border);
         }
-        size_chg = True;
     }
     if (prop_changed(pts->pstring.changebar))
     {

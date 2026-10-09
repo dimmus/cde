@@ -144,7 +144,7 @@ e_list_select_proc(Widget w, XtPointer client_data, XtPointer data) {
 	Editor			*e = (Editor *)client_data;
 	XmListCallbackStruct	*cbs = (XmListCallbackStruct *) data;
 
-	if (a = editor_nth_appt(e, cbs->item_position - 1))
+	if ((a = editor_nth_appt(e, cbs->item_position - 1)))
 		appt_to_form(e, a);
 
 	XtSetSensitive(e->delete_button, True);
@@ -306,8 +306,6 @@ static void
 e_build_expand(
 	Editor 		*e)
 {
-	Props		*p = (Props *)e->cal->properties;
-
 	/*
 	**  Build the rfp "widget"
 	*/
@@ -345,7 +343,6 @@ e_build_expand(
 static void
 e_expand_ui_proc(Widget w, XtPointer client_data, XtPointer data) {
 	Editor		*e = (Editor *)client_data;
-	Props_pu	*p = (Props_pu *)e->cal->properties_pu;
 	XmString	xmstr;
 	Dimension       h, height, width;
 	static Boolean	expand_state_closed = True;
@@ -1112,7 +1109,6 @@ add_all_appt(Editor *e) {
 	char		*date;
 	Tick		tick;
 	Props		*p;
-	Calendar	*c = e->cal;
 	CSA_entry_handle	*entry_list;
 	OrderingType	o;
 	SeparatorType	s;
@@ -1408,7 +1404,7 @@ trim_end_date_from_rule(char *rule, char *newrule)
 	 * one end date in the rule and that the end date is
 	 * is always at the end of the rule
 	 */
-	if (ptr = strchr(rule, 'Z')) {
+	if ((ptr = strchr(rule, 'Z'))) {
 		while (*ptr != ' ')
 			ptr--;
 		*ptr = '\0';
@@ -1741,7 +1737,6 @@ editor_insert(Dtcm_appointment *appt, CSA_entry_handle *new_a, Calendar *c) {
 	CSA_return_code	stat;
 	Editor		*e = (Editor *)c->editor;
 	Props_pu	*p = (Props_pu *)c->properties_pu;
-	CSA_enum		scope;
 	static int		answer=0;
 
 	/* the gui does not support specifying the sequence end date */
@@ -1788,7 +1783,6 @@ editor_insert(Dtcm_appointment *appt, CSA_entry_handle *new_a, Calendar *c) {
 		 * the change/delete style, this is here so in case
 		 * later the same type of dialog is required.
 		 */
-		scope = CSA_SCOPE_ALL;
 		break;
 	}
 

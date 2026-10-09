@@ -73,8 +73,10 @@
 #include "yearglance.h"
 
 static char *printErrorTitle = "Calendar : Error - Print";
+#if 0 && defined(PRINTING_SUPPORTED)
 static char *setupErrorTitle = "Calendar : Error - Print Setup";
 static char *pdmErrorText = "Print Dialog Manager error - setup failed.";
+#endif
 
 typedef struct {
    /* widget handles */
@@ -110,7 +112,9 @@ static void print_cb(Widget, XtPointer, XtPointer);
 static void print_setup_cb(Widget, XtPointer, XtPointer);
 static void close_print_display_cb(Widget, XtPointer, XtPointer);
 static void cancel_cb(Widget, XtPointer, XtPointer);
+#if 0 && defined(PRINTING_SUPPORTED)
 static void pdm_notify_cb(Widget, XtPointer, XtPointer);
+#endif
 static void report_option_cb(Widget, XtPointer, XtPointer);
 static void from_modify_verify_cb(Widget, XtPointer, XtPointer);
 static void to_modify_verify_cb(Widget, XtPointer, XtPointer);
@@ -147,9 +151,6 @@ static Boolean
 pd_set_start_date(Calendar *c, Tick tick)
 {
   _DtCmPrintData *pd = (_DtCmPrintData *)c->print_data;
-  Props *p = (Props *)c->properties;
-  OrderingType ot = get_int_prop(p, CP_DATEORDERING);
-  SeparatorType st = get_int_prop(p, CP_DATESEPARATOR);
   Arg args[5];
   int nargs;
 
@@ -190,9 +191,6 @@ static Boolean
 pd_set_end_date(Calendar *c, Tick tick)
 {
   _DtCmPrintData *pd = (_DtCmPrintData *)c->print_data;
-  Props *p = (Props *)c->properties;
-  OrderingType ot = get_int_prop(p, CP_DATEORDERING);
-  SeparatorType st = get_int_prop(p, CP_DATESEPARATOR);
   Arg args[5];
   int nargs;
 
@@ -411,7 +409,6 @@ from_modify_verify_cb(Widget w, XtPointer uDataP, XtPointer cbDataP)
   Calendar *c = (Calendar *)uDataP;
   XmSpinBoxCallbackStruct *cbStruct = (XmSpinBoxCallbackStruct *)cbDataP;
   _DtCmPrintData *pd = (_DtCmPrintData *)c->print_data;
-  int newPos;
   Tick newTick;
 
   cbStruct->doit = False;
@@ -1254,10 +1251,10 @@ report_error(Calendar *c, char *title, char *errText)
   XtFree(label);
 }
 
+#if 0 && defined(PRINTING_SUPPORTED)
 static void
 pdm_notify_cb(Widget w, XtPointer uData, XtPointer cbData)
 {
-#if 0 && defined(PRINTING_SUPPORTED)
   XmPrintShellCallbackStruct *cbStruct =
     (XmPrintShellCallbackStruct *)cbData;
   Calendar *c = (Calendar *)uData;
@@ -1285,8 +1282,8 @@ pdm_notify_cb(Widget w, XtPointer uData, XtPointer cbData)
     XtFree(title);
     XtFree(errText);
   }
-#endif  /* PRINTING_SUPPORTED */
 }
+#endif  /* PRINTING_SUPPORTED */
 
 /*
  * Called when print dialog box's print display is closed.
@@ -1376,11 +1373,7 @@ void
 print_report(Calendar *c)
 {
   _DtCmPrintData *pd = (_DtCmPrintData *)c->print_data;
-  Props 	*p = (Props *) c->properties;
-  Props_pu	*pu = (Props_pu *) c->properties_pu;
   int 		r = pd_get_report_type(c);
-  OrderingType 	ot = get_int_prop(p, CP_DATEORDERING);
-  SeparatorType st = get_int_prop(p, CP_DATESEPARATOR);
   Tick		start_date = pd_get_start_date(c);
   Tick		end_date = pd_get_end_date(c);
   char *text = (char *)NULL;

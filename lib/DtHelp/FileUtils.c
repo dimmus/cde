@@ -445,9 +445,9 @@ char * _DtHelpFileLocate (
     /*** second, check if its relative to the current directory ***/
     /* if filespec begins with . or .. then stop after the cwd path */
     if (    searchCurDir
-         || (      MB_CUR_MAX == 1 
+         || ((     MB_CUR_MAX == 1 
                 || mblen(filespec, MB_CUR_MAX) == 1)  /* 1st char is 1 byte */
-             && *filespec == '.')  		      /* and its a . */
+             && *filespec == '.'))  		      /* and its a . */
     {     /* we're looking at a cwd-relative path; ignore others */
        /*** this is monstrously inefficient--but it shouldn't get called often ***/
 

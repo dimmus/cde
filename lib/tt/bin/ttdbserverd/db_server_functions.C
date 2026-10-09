@@ -2094,7 +2094,7 @@ _tt_get_all_sessions_1(_tt_get_all_sessions_args * args,
 	} else {
 	  results.session_list.values_val = (_tt_string *)NULL;
 	}
-	for (offset = 0 ; offset < results.session_list.values_len ; offset++) {
+	for (offset = 0 ; (u_int)offset < results.session_list.values_len ; offset++) {
 		propValue = list->top();
 		results.session_list.values_val[offset].value = strdup(propValue);
 		list->pop();
@@ -2599,7 +2599,9 @@ _tt_garbage_collect(void * /*NOTUSED*/)
 int
 _tt_run_garbage_collect(int in_parallel)
 {
+#if defined(OPT_GARBAGE_THREADS) || defined(OPT_AUTO_GARBAG_COLLECT)
 	extern FILE	*errstr;
+#endif
 
 	/* Make sure in_parallel is used to quiet warnings */
 	if (in_parallel) {}

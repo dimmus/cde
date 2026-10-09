@@ -124,7 +124,7 @@ ShowModAttrDialog(
    DirectorySet * directory_set;
    FileViewData * file_view_data;
    ModAttrRec *modAttr_rec;
-   int count, i;
+   int i;
    Boolean loadOk=True;
    char * errorMsg=NULL;
    char * title=NULL;
@@ -327,9 +327,9 @@ AttrChangePipeCB(
 {
    AttrChangeCBData *cb_data = (AttrChangeCBData *)client_data;
    short pipe_msg;
-   char *title, *err_msg, *err_arg;
+   char *err_msg;
    long modify_time;
-   int i, n, rc;
+   int n, rc;
 
    /* read the msg from the pipe */
    pipe_msg = -1;
@@ -349,6 +349,7 @@ AttrChangePipeCB(
    }
 
    DPRINTF(("AttrChangePipeCB: n %d, pipe_msg %d, rc %d\n", n, pipe_msg, rc));
+   (void) n; /* used only in DPRINTF */
 
    /* if error, post error message */
    if (rc)
@@ -541,8 +542,6 @@ ModAttrClose(
    FileMgrRec  * file_mgr_rec = (FileMgrRec *) client_data;
    FileMgrData * file_mgr_data;
    DialogData  * dialog_data;
-   int count;
-   int i, j;
 
 
 

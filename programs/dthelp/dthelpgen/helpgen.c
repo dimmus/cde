@@ -85,7 +85,6 @@ static const int NL_CAT_LOCALE = 0;
 /*****************************************************************************
  *	static strings.
  *****************************************************************************/
-static	const char *ShellCmd    = "sh";
 static	const char *UsageStr    =
 	"%s -dir <directory> [-generate] [-file <name>] [-lang <language>]\n";
 static	const char *TopLocId    = "_hometopic";
@@ -205,7 +204,6 @@ GetMessage (
     char  *s)
 {
    char *msg;
-   char *lang;
    char  *catFileName=NULL;
    static nl_catd nlmsg_fd;
    static int first = 1;
@@ -939,7 +937,6 @@ main(
     int      result;
     int      foundFamily;
     int      foundVolumes;
-    int      usedUser = 0;
     int      doGen    = 0;
 
     char     tmpVolume  [MAXPATHLEN + 2];
@@ -950,7 +947,6 @@ main(
     char     headerName [MAXPATHLEN + 2];
     char     baseName   [MAXPATHLEN + 2];
     char     baseNameTemp[sizeof(baseName)];
-    char     tempName   [MAXPATHLEN + 2];
     char   **next;
     char    *charSet;
     char    *topicTitle;

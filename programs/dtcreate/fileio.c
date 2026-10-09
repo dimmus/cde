@@ -327,7 +327,7 @@ char * MakeExecString(char *pszCmd, char *pszPrompt)
 #define   ARGSIZE  7    /* sizeof "%Arg_n%" */
 
   pArgSrc = pszCmd;
-  while (pArgSrc = strchr(pArgSrc, '$')) {
+  while ((pArgSrc = strchr(pArgSrc, '$'))) {
 #ifdef DEBUG
     printf("%d  pArgSrc = %s\n", cArgs, pArgSrc);
 #endif
@@ -356,7 +356,7 @@ char * MakeExecString(char *pszCmd, char *pszPrompt)
   strcpy(pszExecString, pszCmd);
   pArgSrc = pszCmd;
   pTmp = pszExecString;
-  while (pArgSrc = strchr(pArgSrc, '$')) {
+  while ((pArgSrc = strchr(pArgSrc, '$'))) {
     pArgDst = strchr(pTmp, '$');
     pTmp = pArgDst;
     *pArgDst = '\0';
@@ -956,7 +956,6 @@ ushort CopyFile(char *pszSource, char *pszDest)
 /*****************************************************************************/
 char * CreateDirName(void)
 {
-  char  *pszNewName = (char *)NULL;
   char  *pszDirName = (char *)NULL;
   char  *pszEnvVar;
   char  *msgPtr, *errPtr;

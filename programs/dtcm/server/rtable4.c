@@ -103,9 +103,6 @@ extern	char	*pgname;
  * forward declaration of static functions used within the file
  *****************************************************************************/
 
-static Appt_4 * rtable_lookup_internal(_DtCmsCalendar *cal, char **p_src,
-			Id_4 *key);
-
 static Access_Status_4 csastat2accessstat(CSA_return_code stat);
 
 static Registration_Status_4 csastat2regstat(CSA_return_code stat);
@@ -387,7 +384,6 @@ _DtCm_rtable_insert_4_svc(Table_Args_4 *args, struct svc_req *svcrq)
 	static Table_Res_4	res;
 	_DtCmsCalendar		*cal;
 	CSA_return_code		stat;
-	char			*author;
 	char			*user;
 	uint			access;
 	Appt_4			*ap, *appt, *prev=NULL, *a;
@@ -895,11 +891,6 @@ _DtCm_rtable_lookup_next_reminder_4_svc(
 	char			*user;
 	uint			access;
 	_DtCmsCalendar		*cal;
-	Reminder_4		*p_reminder;
-	Rm_que			*p_node;
-	Rm_que			*p_prev;
-	Rm_que			*p_new;
-	Rm_que			*p_next;
 	time_t			tick;
 	cms_reminder_ref	*rems;
 
@@ -1028,8 +1019,8 @@ _DtCm_rtable_flush_table_4_svc(Table_Args_4 *args, struct svc_req *svcrq)
 	/* Flushing the single appointment tree. */
 	key.key = 0;
 	key.tick = args->args.Args_4_u.tick;
-	while (p_appt = (Appt_4 *) rb_lookup_next_larger(APPT_TREE(cal),
-	    (caddr_t)&key)) {
+	while ((p_appt = (Appt_4 *) rb_lookup_next_larger(APPT_TREE(cal),
+	    (caddr_t)&key))) {
 		p_node = rb_delete (APPT_TREE(cal),
 				(caddr_t)&(p_appt->appt_id));
 		if (p_node != NULL)
@@ -1304,7 +1295,7 @@ _DtCm_rtable_get_access_4_svc(Access_Args_4 *args, struct svc_req *svcrq)
 	static Access_Args_4	res;
 	CSA_return_code		stat;
 	_DtCmsCalendar		*cal;
-	char			*target, *user;
+	char			*user;
 	uint			access;
 	boolean_t		useronly = B_FALSE;
 	cms_access_entry	aentry;
@@ -1427,6 +1418,7 @@ _DtCm_rtable_gmtoff_4_svc(void *args, struct svc_req *svcrq)
 	_Xltimeparams	 localtime_buf;
 	time_t ctime;
 	struct tm *t;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 #endif
 
 	if (debug)
@@ -1466,7 +1458,7 @@ _DtCm_rtable_create_4_svc(Table_Op_Args_4 *args, struct svc_req *svcrq)
 
 	/* check domain if domain info is available */
 	/* only user in the local domain can create file */
-	if (ptr = strchr(source, '.')) {
+	if ((ptr = strchr(source, '.'))) {
 		if (debug)
 			fprintf(stderr, "rpc.cmsd: %s %s(target) and %s(sender)\n",
 				"check domains, comparing",
@@ -1586,83 +1578,6 @@ initrtable4(program_handle ph)
 /******************************************************************************
  * static functions used within the file
  ******************************************************************************/
-
-static Exception_4
-append_exception_list(Appt_4 *p_appt, int ordinal)
-{
-	Exception_4 p_excpt;
-	Exception_4 p_prev;
-	Exception_4 p_ex;
-
-	if ((p_excpt = (Exception_4)calloc(1, sizeof(*p_excpt))) == NULL)
-		return (NULL);
-	p_excpt->ordinal = ordinal;
-	p_prev = NULL;
-	p_ex = p_appt->exception;
-	while (p_ex != NULL)
-	{
-		/* Exception list is in descending order for faster access */
-		if (ordinal > p_ex->ordinal)
-			break;
-		p_prev = p_ex;
-		p_ex = p_ex->next;
-	}
-	if (p_prev == NULL)
-	{
-		p_excpt->next = p_appt->exception;
-		p_appt->exception = p_excpt;
-	}
-	else
-	{
-		p_excpt->next = p_prev->next;
-		p_prev->next = p_excpt;
-	}
-
-	return (p_excpt);
-}
-
-static Appt_4 *
-rtable_lookup_internal(_DtCmsCalendar *cal, char **p_src, Id_4 *key)
-{
-	Appt_4	*p_appt;
-	Privacy_Level_4	p_level;
-
-	/* Check if it hits a single appointment */
-	p_appt = (Appt_4 *)rb_lookup(APPT_TREE(cal), (caddr_t)key);
-
-	if (p_appt != NULL) {
-		switch (_DtCmCheckPrivacyLevel(p_src, p_appt)) {
-		case public_4:
-			p_appt = _DtCm_copy_one_appt4(p_appt);
-			return(p_appt);
-		case semiprivate_4:
-			p_appt = _DtCm_copy_semiprivate_appt4(p_appt);
-			return(p_appt);
-		case private_4:
-		default:
-			return(NULL);
-		}
-	}
-	
-	/* Check if it hits an event in any repeating appointment */
-	p_appt = (Appt_4 *) hc_lookup (REPT_LIST(cal), (caddr_t)key);
-
-	if (p_appt != NULL) {
-		if ((p_level = _DtCmCheckPrivacyLevel(p_src, p_appt)) != private_4)
-		{
-			if (_DtCms_in_repeater (key, p_appt, B_FALSE)) {
-				if (p_level == public_4)
-					p_appt = _DtCm_copy_one_appt4(p_appt);
-				else
-					p_appt = _DtCm_copy_semiprivate_appt4(p_appt);
-				APPT_TICK(p_appt) = key->tick;
-				return(p_appt);
-			}
-		}
-	}
-
-	return (NULL);
-}
 
 static Appt_4 *
 repeater_next_larger(List_node *p_lnode, Id_4 *key)
@@ -1797,7 +1712,6 @@ table_lookup_next(
 {
 	static	Table_Res_4 res;
 	CSA_return_code stat;
-	Privacy_Level_4 p_level;
 	Id_4	key;
 	_DtCmsCalendar *cal;
 	Appt_4	*p_appt;

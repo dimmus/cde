@@ -84,7 +84,6 @@ cgenP_get_envCB(
     DtbCgenEnvDialogInfo        env_dlg = (DtbCgenEnvDialogInfo)clientData;
     STRING                      var_name = NULL;
     STRING                      var_value = NULL;
-    int                         index = 0;
 
     var_name = XmTextFieldGetString(env_dlg->name_textf);
     if (util_strempty(var_name))
@@ -225,6 +224,7 @@ cgenP_init_env_list(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }

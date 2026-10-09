@@ -178,7 +178,7 @@ void
 SetSaveAsDirAndFile(Editor *pPad)
 {
     char dirbuf[MAX_DIR_PATH_LEN], *currentVal, *directoryVal,
-	 *lastSlash, *pColon;
+	 *lastSlash;
     int firstSelect = -1, lastSelect = -1;
     Widget textField;
     Arg args[5];
@@ -439,7 +439,6 @@ GetFileName(
     char dirbuf[MAX_DIR_PATH_LEN];
     Arg al[5];
     int ac;
-    int firstSelect = -1;
     XmString dirString, tmpStr;
     Select *pSelect = &pPad->fileStuff.fileWidgets.select;
     FileStuff *pStuff = &pPad->fileStuff;
@@ -487,7 +486,6 @@ GetFileName(
                    strcat(dirbuf, "/");
                }
 
-               firstSelect = strlen(dirbuf);
                strcat(dirbuf, "[^.]*");
                dirString = XmStringCreateLocalized(dirbuf);
                ac = 0;

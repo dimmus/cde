@@ -87,7 +87,13 @@ _isapplmr(int isfd, char *buffer)
 
     _isseekpg(fcb->datfd, ISCNTLPGOFF);
     (void)read(fcb->datfd, cntl_page, sizeof(cntl_page));
-    strncpy(buffer, cntl_page + CP_APPLMAGIC_OFF, CP_APPLMAGIC_LEN);
+    {
+	/* The field need not be NUL-terminated: copy it like strncpy() would. */
+	size_t len = strnlen(cntl_page + CP_APPLMAGIC_OFF, CP_APPLMAGIC_LEN);
+
+	memcpy(buffer, cntl_page + CP_APPLMAGIC_OFF, len);
+	memset(buffer + len, '\0', CP_APPLMAGIC_LEN - len);
+    }
 
     _amseterrcode(&fab->errcode, ISOK);
     _isam_exithook();

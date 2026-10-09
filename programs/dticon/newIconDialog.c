@@ -56,7 +56,6 @@
     Includes, Defines, and Global variables from the Declarations Editor:
 *******************************************************************************/
 
-static  Widget  newSeparator;
 static  Widget  newWidthLabel;
 static  Widget  newHeightLabel;
 

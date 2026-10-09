@@ -392,6 +392,7 @@ CheckAndSwitchPoints(
 	*pt2 = *pt1;
 	*pt1 = temp;
       }
+    return 0;
 }
 
 /*****************************************************************************
@@ -1361,6 +1362,8 @@ _DtCanvasProcessSelection (
 		if (mode == _DtCvSELECTION_END)
 		    CheckAndSwitchPoints(&(canvas->select_start),
 							&(canvas->select_end));
+		break;
+	default:
 		break;
       }
 }

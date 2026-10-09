@@ -228,7 +228,7 @@ void MainWindow::PopupMenu(Widget widget, XtPointer client_data,
    Display *           display = XtDisplay(widget);
 
    ev = (XButtonEvent *) event;
-   if (ev->button != MotifUI::bMenuButton)
+   if (ev->button != (unsigned int) MotifUI::bMenuButton)
       return;
    child = XtWindow(widget);
    while (child)

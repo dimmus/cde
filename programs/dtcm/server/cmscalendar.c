@@ -315,12 +315,7 @@ _DtCmsSetFileVersion(_DtCmsCalendar *cal, int version)
 extern CSA_return_code
 start_log(_DtCmsCalendar *cal, char *filename)
 {
-	int	fd;
 	FILE	*f;
-	char	firstline[80], *numptr;
-	int	version;
-	struct stat info;
-	struct passwd *pw;
 	extern void setinput(FILE *);
 	extern int yyyparse();
 	extern int yyywrap(FILE *);
@@ -611,6 +606,7 @@ _DtCmsRbToCsaStat(Rb_Status rb_stat)
 	case rb_other:
 		return (CSA_E_FAILURE);
 	}
+	return (CSA_E_FAILURE);
 }
 
 extern void
@@ -760,8 +756,8 @@ _DtCmsGetAllCalAttrs(
 						B_TRUE);
 				} else {
 					/* just return the attribute name */
-					if (attrs[j].name.name = strdup(
-					    cattrs[i].name.name)) {
+					if ((attrs[j].name.name = strdup(
+					    cattrs[i].name.name))) {
 						attrs[j].name.num =
 							cattrs[i].name.num;
 					} else
@@ -811,7 +807,6 @@ _DtCmsGetCalAttrNames(
 	uint		*num_names_r,
 	cms_attr_name	**names_r)
 {
-	CSA_return_code	stat = CSA_SUCCESS;
 	cms_attribute	*attrs = cal->attrs;
 	cms_attr_name	*names;
 	uint		i, j, num_attrs = cal->num_attrs;
@@ -827,7 +822,7 @@ _DtCmsGetCalAttrNames(
 		    i == CSA_X_DT_CAL_ATTR_DATA_VERSION_I ||
 		    i == CSA_CAL_ATTR_ACCESS_LIST_I))
 		{
-			if (names[j].name = strdup(attrs[i].name.name)) {
+			if ((names[j].name = strdup(attrs[i].name.name))) {
 				names[j].num = attrs[i].name.num;
 				j++;
 			} else {
@@ -1009,7 +1004,7 @@ get_file_owner(char *calname, char **owner)
 
 		if (res == 0) {
 
-			if (pw = getpwuid(info.st_uid))
+			if ((pw = getpwuid(info.st_uid)))
 				snprintf(buf, sizeof(buf), "%s", pw->pw_name);
 			else
 				return (CSA_E_FAILURE);
@@ -1071,9 +1066,6 @@ init_cal_attrs(_DtCmsCalendar *cal)
 static CSA_return_code
 _CopyCalendarAttr(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 {
-	cms_attribute		tmp;
-	cms_attribute_value	tmpval;
-
 	if (cal->attrs && cal->attrs[index].value)
 		return (_DtCm_copy_cms_attribute(attr,
 				&cal->attrs[index], B_TRUE));
@@ -1089,7 +1081,7 @@ _GetCalendarSize(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 
 	if ((stat = _DtCmsGetFileSize(cal->calendar, &size)) == CSA_SUCCESS) {
 		attr->name.num = CSA_CAL_ATTR_CALENDAR_SIZE_I;
-		if (attr->name.name = strdup(CSA_CAL_ATTR_CALENDAR_SIZE))
+		if ((attr->name.name = strdup(CSA_CAL_ATTR_CALENDAR_SIZE)))
 			return (_DtCm_set_uint32_attrval((uint)size,
 				&attr->value));
 		else
@@ -1106,7 +1098,7 @@ _GetNumberEntries(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 	size = rb_size(cal->tree) + hc_size(cal->list);
 
 	attr->name.num = CSA_CAL_ATTR_NUMBER_ENTRIES_I;
-	if (attr->name.name = strdup(CSA_CAL_ATTR_NUMBER_ENTRIES))
+	if ((attr->name.name = strdup(CSA_CAL_ATTR_NUMBER_ENTRIES)))
 		return (_DtCm_set_uint32_attrval(size, &attr->value));
 	else
 		return (CSA_E_INSUFFICIENT_MEMORY);
@@ -1150,7 +1142,7 @@ _GetCalendarName(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 			&cal->attrs[CSA_CAL_ATTR_CALENDAR_NAME_I], B_TRUE));
 	} else {
 		attr->name.num = CSA_CAL_ATTR_CALENDAR_NAME_I;
-		if (attr->name.name = strdup(CSA_CAL_ATTR_CALENDAR_NAME)) {
+		if ((attr->name.name = strdup(CSA_CAL_ATTR_CALENDAR_NAME))) {
 			return (_DtCm_set_string_attrval(cal->calendar,
 				&attr->value, CSA_VALUE_STRING));
 		} else {
@@ -1167,7 +1159,7 @@ _GetCalendarOwner(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 			&cal->attrs[CSA_CAL_ATTR_CALENDAR_OWNER_I], B_TRUE));
 	} else {
 		attr->name.num = CSA_CAL_ATTR_CALENDAR_OWNER_I;
-		if (attr->name.name = strdup(CSA_CAL_ATTR_CALENDAR_OWNER)) {
+		if ((attr->name.name = strdup(CSA_CAL_ATTR_CALENDAR_OWNER))) {
 			return (_DtCm_set_user_attrval(cal->owner,
 				&attr->value));
 		} else {
@@ -1180,7 +1172,7 @@ static CSA_return_code
 _GetServerVersion(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 {
 	attr->name.num = CSA_X_DT_CAL_ATTR_SERVER_VERSION_I;
-	if (attr->name.name = strdup(CSA_X_DT_CAL_ATTR_SERVER_VERSION))
+	if ((attr->name.name = strdup(CSA_X_DT_CAL_ATTR_SERVER_VERSION)))
 		return (_DtCm_set_uint32_attrval((uint)TABLEVERS, &attr->value));
 	else
 		return (CSA_E_INSUFFICIENT_MEMORY);
@@ -1195,7 +1187,7 @@ _GetDataVersion(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 			cal->fversion : _DtCM_FIRST_EXTENSIBLE_DATA_VERSION - 1;
 
 	attr->name.num = CSA_X_DT_CAL_ATTR_DATA_VERSION_I;
-	if (attr->name.name = strdup(CSA_X_DT_CAL_ATTR_DATA_VERSION))
+	if ((attr->name.name = strdup(CSA_X_DT_CAL_ATTR_DATA_VERSION)))
 		return (_DtCm_set_uint32_attrval(version, &attr->value));
 	else
 		return (CSA_E_INSUFFICIENT_MEMORY);
@@ -1205,7 +1197,7 @@ static CSA_return_code
 _GetProductId(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 {
 	attr->name.num = CSA_CAL_ATTR_PRODUCT_IDENTIFIER_I;
-	if (attr->name.name = strdup(CSA_CAL_ATTR_PRODUCT_IDENTIFIER)) {
+	if ((attr->name.name = strdup(CSA_CAL_ATTR_PRODUCT_IDENTIFIER))) {
 		return (_DtCm_set_string_attrval(_DtCM_PRODUCT_IDENTIFIER,
 			&attr->value, CSA_VALUE_STRING));
 	} else {
@@ -1217,7 +1209,7 @@ static CSA_return_code
 _GetSupportedVersion(_DtCmsCalendar *cal, int index, cms_attribute *attr)
 {
 	attr->name.num = CSA_CAL_ATTR_VERSION_I;
-	if (attr->name.name = strdup(CSA_CAL_ATTR_VERSION)) {
+	if ((attr->name.name = strdup(CSA_CAL_ATTR_VERSION))) {
 		return (_DtCm_set_string_attrval(_DtCM_SPEC_VERSION_SUPPORTED,
 			&attr->value, CSA_VALUE_STRING));
 	} else {

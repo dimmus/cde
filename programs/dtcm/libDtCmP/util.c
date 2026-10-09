@@ -103,8 +103,6 @@ extern int   	pclose(FILE *);
 extern char*
 cm_def_printer(void)
 {
-        FILE *fp;
-        char message[257];
 	char *tmp=NULL;
         char *printer_name=NULL;
 
@@ -120,6 +118,8 @@ cm_def_printer(void)
 	   machines.  Just fall back to "lp" here */
 
 #ifndef AIX
+	        FILE *fp;
+	        char message[257];
 	        _Xstrtokparams strtok_buf;
 
         	fp = (FILE *)popen("lpstat -d", "r");
@@ -183,8 +183,6 @@ cm_strcpy(char *s1, char *s2)
 extern int 
 cm_strlen(char *s)
 {
-        int n;
- 
 	if (s==NULL) return 0;
 	return (strlen(s));
 }
@@ -349,6 +347,7 @@ print_tick(Tick t)
 {
         char *a;
 	_Xctimeparams ctime_buf;
+	(void) ctime_buf;	/* unused unless XTHREADS */
  
         a = _XCtime(&t, ctime_buf);
         (void) fprintf (stderr, "%ld %s\n", (long)t, a);
@@ -506,8 +505,6 @@ get_head(char *str, char sep)
 extern char *
 get_tail(char *str, char sep)
 {
-        char *ptr;
- 
         if (str == NULL)
                 return(NULL);
  
@@ -831,10 +828,6 @@ match_backward(char *str1, char *str2)
 extern boolean_t
 same_path(char *str1, char *str2)
 {
-	char *ptr1,*ptr2;
-	char *user;
-	int res, n;
-
 	if (str1 == NULL || str2 == NULL)
 		return(B_FALSE);
 
@@ -857,9 +850,7 @@ extern boolean_t
 same_user(char *user1, char *user2)
 {
 	char *str1, *str2;
-	char *host, *domain;
 	char buf[BUFSIZ];
-	boolean_t res;
 
 	if (user1 == NULL || user2 == NULL)
 		return B_FALSE;
@@ -939,7 +930,7 @@ embedded_blank(char *buf)
         while (ptr && *ptr) {
                 if ((*ptr == ' ') || (*ptr == '\t'))
                         return B_TRUE;
-                *ptr++;
+                ptr++;
         }
  
         return B_FALSE;
@@ -948,7 +939,6 @@ embedded_blank(char *buf)
 extern int
 get_data_version(CSA_session_handle session) {
 	int		ver = 0;
-	Dtcm_calendar	*c;
 	CSA_attribute_reference names[1];
 	CSA_uint32	number_attrs_returned;
 	CSA_attribute	*attrs_returned;
@@ -972,7 +962,6 @@ get_data_version(CSA_session_handle session) {
 extern int
 get_server_version(CSA_session_handle session) {
 	int		ver = 0;
-	Dtcm_calendar	*c;
 	CSA_attribute_reference names[1];
 	CSA_uint32	number_attrs_returned;
 	CSA_attribute	*attrs_returned;
@@ -1123,6 +1112,7 @@ format_tick(Tick tick, OrderingType order, SeparatorType sep, char *buff) {
 	char		*str = separator_str(sep);
         struct tm	*tm;
 	_Xltimeparams	localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
         buff[0] = '\0';
         tm = _XLocaltime(&tick, localtime_buf);
@@ -1172,10 +1162,6 @@ format_time(Tick t, DisplayType dt, char *buffer) {
  *
  * IF YOU UPDATE THE STRUCTURES, MAKE SURE YOU UPDATE THESE COUNT CONSTANTS!!
  */
-static const int APPT_ATTR_COUNT = 35;
-static const int RW_APPT_ATTR_COUNT = 15;
-static const int CAL_ATTR_COUNT = 12;
-static const int RW_CAL_ATTR_COUNT = 2;
 static const int DEF_V5_APPT_ATTR_COUNT = 22;
 static const int DEF_V4_APPT_ATTR_COUNT = 20;
 static const int DEF_V3_APPT_ATTR_COUNT = 17;
@@ -2160,7 +2146,7 @@ CmDataListGetData(CmDataList *list, int position)
 
 {
 	void		*data;
-	CmDataItem	*p, *item;
+	CmDataItem	*p;
 	int		n;
 
 	if (list->head == NULL) {

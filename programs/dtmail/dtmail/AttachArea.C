@@ -323,7 +323,7 @@ void AttachArea::addToList( Attachment *attachment )
     int i;
 
     newList = new Attachment*[ _iconCount + 1 ];
-    for(i=0; i < _iconCount; i++)
+    for(i=0; (unsigned int) i < _iconCount; i++)
 	newList[i] = _attachmentList[i];
  
     if (_attachmentList)
@@ -434,7 +434,7 @@ int AttachArea::getSelectedIconCount()
     Attachment **list = getList();
     int num_selected = 0;
 
-    for (int i = 0; i < getIconCount(); i++) {
+    for (int i = 0; (unsigned int) i < getIconCount(); i++) {
 	if (!list[i]->isDeleted() && list[i]->isSelected())
 	    num_selected++;
     }
@@ -480,7 +480,7 @@ AttachArea::MenuButtonHandler(
 
 	XButtonEvent *be = (XButtonEvent *)event;
 
-	if(be->button == theApplication->bMenuButton())
+	if(be->button == (unsigned int) theApplication->bMenuButton())
 		obj->_myOwner->owner()->postAttachmentPopup(event);
 }
 
@@ -526,7 +526,7 @@ void AttachArea::resize(
     _attachAreaWidth = wid;
     XtVaSetValues(_clipWindow, XmNwidth, _attachAreaWidth, NULL);
 
-    for (i=0; i<getIconCount(); i++)
+    for (i=0; (unsigned int) i<getIconCount(); i++)
       list[i]->unmanageIconWidget();
 
     CalcAllAttachmentPositions();
@@ -589,7 +589,6 @@ AttachArea::addAttachment(
     Boolean validtype = TRUE;
     DtMail::BodyPart * bp = NULL;
     DtMailEnv mail_error;
-    int answer;
     char *helpId = NULL;
 
     mail_error.clear();
@@ -612,7 +611,7 @@ AttachArea::addAttachment(
     if (SafeAccess(filename, F_OK) != 0) {
 	sprintf(buf, CATGETS(DT_catd, 3, 34, "%s does not exist."),
 		filename);
-	answer = this->handleErrorDialog(CATGETS(DT_catd, 1, 81, "Mailer"),
+	this->handleErrorDialog(CATGETS(DT_catd, 1, 81, "Mailer"),
 					 buf);
 	delete [] buf;
 	delete [] errormsg;
@@ -649,7 +648,7 @@ AttachArea::addAttachment(
 	validtype = FALSE;
     }
     if(validtype == FALSE) {
-	answer = this->handleErrorDialog(CATGETS(DT_catd, 1, 81, "Mailer"),
+	this->handleErrorDialog(CATGETS(DT_catd, 1, 81, "Mailer"),
 					 errormsg,
                                          NULL);
 	delete [] buf;
@@ -662,7 +661,7 @@ AttachArea::addAttachment(
     if (fd < 0) {
 	sprintf(buf, CATGETS(DT_catd, 3, 35, "Unable to open %s."), filename);
         helpId = DTMAILHELPNOOPEN;
-	answer = this->handleErrorDialog(CATGETS(DT_catd, 1, 82, "Mailer"),
+	this->handleErrorDialog(CATGETS(DT_catd, 1, 82, "Mailer"),
 					 buf,
                                          helpId);
 	delete [] buf;
@@ -688,7 +687,7 @@ AttachArea::addAttachment(
             sprintf(buf, "%s",
 		    CATGETS(DT_catd, 3, 36, "Unable to allocate memory."));
             helpId = DTMAILHELPNOALLOCMEM;
-	    answer = this->handleErrorDialog(CATGETS(DT_catd, 1, 83, "Mailer"),
+	    this->handleErrorDialog(CATGETS(DT_catd, 1, 83, "Mailer"),
 					     buf,
                                              helpId);
 	    return(NULL);
@@ -869,7 +868,7 @@ void AttachArea::manageList( )
     int i;
     Attachment **list = getList();
 
-    for (i=0; i<getIconCount(); i++)
+    for (i=0; (unsigned int) i<getIconCount(); i++)
       list[i]->unmanageIconWidget();
 
     CalcAllAttachmentPositions();
@@ -920,9 +919,9 @@ void AttachArea::DisplayAttachmentsInRow(unsigned int X)
         unmanageIconList = (WidgetList) XtMalloc(sizeof(Widget)*getIconCount());
      
         managecount = unmanagecount = 0;
-        for(i=0;i<getIconCount();i++) {
+        for(i=0;(unsigned int) i<getIconCount();i++) {
  	    if(!list[i]->isDeleted()) {
- 	        if(list[i]->getRow() == X) {
+ 	        if((unsigned int) list[i]->getRow() == X) {
 		    if(!list[i]->isManaged()) {
 		        manageIconList[managecount] = list[i]->baseWidget();
 		        managecount++;
@@ -958,7 +957,7 @@ void AttachArea::CalcAllAttachmentPositions()
     Attachment **list = getList();
  
     j = -1;
-    for(i=0;i<getIconCount();i++) {
+    for(i=0;(unsigned int) i<getIconCount();i++) {
 	if(!list[i]->isDeleted()) {
 	    calculate_attachment_position(
 			(j == -1) ? (Attachment *)NULL : list[j],
@@ -1042,7 +1041,7 @@ void AttachArea::dragSlider( XtPointer callData )
 {
     XmScrollBarCallbackStruct *cbs = (XmScrollBarCallbackStruct *)callData;
 
-    if(cbs->value == _currentRow)
+    if((unsigned int) cbs->value == _currentRow)
 	return;
     _currentRow = cbs->value;
     DisplayAttachmentsInRow(_currentRow);
@@ -1058,7 +1057,7 @@ void AttachArea::CalcLastRow()
     unsigned row = 0;
      Attachment **list = getList();
  
-     for(i=0;i<getIconCount();i++) {
+     for(i=0;(unsigned int) i<getIconCount();i++) {
  	if(!list[i]->isDeleted()) {
  	    row = list[i]->getRow();
  	}
@@ -1113,7 +1112,7 @@ AttachArea::setSelectedAttachName(
     XmString nn = XmStringCopy(new_name);
 
     // Set name of first selected attachment to new_name
-    for(i=0;i<this->getIconCount() && !set;i++)
+    for(i=0;(unsigned int) i<this->getIconCount() && !set;i++)
  	if(list[i]->isSelected()) {
 	    list[i]->rename(nn);
 	    set = TRUE;
@@ -1196,7 +1195,6 @@ AttachArea::parseAttachments(
 {
     DtMail::BodyPart * tmpBP;
     int index = 1;
-    int num_attachments = 0;
     char * name;
 
 
@@ -1235,7 +1233,6 @@ AttachArea::parseAttachments(
     }
     
     while (tmpBP != NULL) {
-	num_attachments++;
 	tmpBP->getContents(
 			mail_error,
 			NULL,
@@ -1351,7 +1348,7 @@ AttachArea::unmanage()
     Attachment **list = getList();
 
     // Unmanage the widgets it currently has
-    for (i=0; i<getIconCount(); i++)
+    for (i=0; (unsigned int) i<getIconCount(); i++)
       list[i]->unmanageIconWidget();
 
     XtRemoveCallback(
@@ -1381,7 +1378,7 @@ AttachArea::removeCurrentAttachments()
 
     // Unmanage the widgets it currently has
 
-    for (i=0; i<getIconCount(); i++) {
+    for (i=0; (unsigned int) i<getIconCount(); i++) {
 
 	list[i]->unmanageIconWidget();
 	list[i]->deleteIt();
@@ -1412,7 +1409,7 @@ AttachArea::clearAttachArea()
 
     // Unmanage the widgets it currently has
 
-    for (i=0; i<getIconCount(); i++) {
+    for (i=0; (unsigned int) i<getIconCount(); i++) {
 
 	list[i]->unmanageIconWidget();
 	delete list[i];
@@ -1452,7 +1449,7 @@ AttachArea::deleteSelectedAttachments(
     Attachment **list = getList();
     int i;
     
-    for (i = 0; i<getIconCount(); i++) {
+    for (i = 0; (unsigned int) i<getIconCount(); i++) {
 	if (list[i]->isSelected() && !list[i]->isDeleted()) {
 
 	    // unselect it first.  Else, when undeleted it comes
@@ -1468,7 +1465,7 @@ AttachArea::deleteSelectedAttachments(
     // Their positions need to get recomputed and the undeleted
     // ones get remanaged in manageList().
 
-    for (i=0; i<getIconCount(); i++) {
+    for (i=0; (unsigned int) i<getIconCount(); i++) {
 	list[i]->unmanageIconWidget();
     }
 
@@ -1511,7 +1508,7 @@ AttachArea::undeleteLastDeletedAttachment(
 	// do something
     }
 
-    for (i=1; i<getIconCount(); i++) {
+    for (i=1; (unsigned int) i<getIconCount(); i++) {
 	if (list[i]->isDeleted()) {
 	    tmpTime = list[i]->getBodyPart()->getDeleteTime(mail_error);
 	    if (mail_error.isSet()) {
@@ -1531,7 +1528,7 @@ AttachArea::undeleteLastDeletedAttachment(
     // Their positions need to get recomputed and the deleted
     // ones get remanaged in manageList().
 
-    for (i=0; i<getIconCount(); i++) {
+    for (i=0; (unsigned int) i<getIconCount(); i++) {
 	list[i]->unmanageIconWidget();
     }
 
@@ -1555,7 +1552,7 @@ AttachArea::unselectOtherSelectedAttachments(
 
     	list = getList(); 
 
-    	for (i=0; i < getIconCount(); i++) 
+    	for (i=0; (unsigned int) i < getIconCount(); i++) 
 	    if (list[i]->isSelected() && list[i] != attachment) 
 		list[i]->unselect();
     } 

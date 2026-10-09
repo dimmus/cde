@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)graphics.c 1.23 94/11/29 Copyr 1994 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -216,8 +212,6 @@ gr_clear_box (new_XContext *xc, int x, int y, int w, int h) {
 extern void
 gr_make_grayshade(new_XContext *xc, int x, int y, int w, int h, int shade) {
 
-        XColor colorcell_del, rgb_db_ref;
- 
 	XSetForeground((Display*)xc->display, (GC)xc->gc, (unsigned long)xc->colorcell_del[shade].pixel);
  
         XSetFillStyle(xc->display, xc->gc, FillSolid);
@@ -307,9 +301,7 @@ gr_draw_rgb_box(
 	Colormap	cms)
 
 {
-        XColor colorcell_del, rgb_db_ref;
         unsigned long pixel;
-        int     gc_changed = 0;
 
         switch(shade) {
                 case RED:
@@ -487,24 +479,6 @@ gr_draw_glyph(new_XContext *src_xc, new_XContext *dst_xc, Pixmap pixmap,
         XFillRectangle(src_xc->display, dst_xc->xid, src_xc->gc, x, y, w, h);
 }
  
-static void
-saturate(XColor *xclr)
-
-{
-	unsigned short n;
-
-	n = MAX(xclr->red, xclr->green);
-	n = MAX(n, xclr->blue);
-
-	n = USHRT_MAX - n;
-
-	xclr->red += n;
-	xclr->blue += n;
-	xclr->green += n;
-
-	return;
-}
- 
 /*
  * Allocate and initialize an XContext
  */
@@ -513,11 +487,8 @@ gr_create_xcontext(Calendar *c, Widget widget, GR_depth depth, XtAppContext app)
 {
 
         new_XContext	*xc;
-        Colormap	cms = 0;
         XGCValues	gc_vals, tmp_vals;
 	GC		hilight_gc;
-	XColor		exact_color;
-	XColor		def_color;
  
         /* X Drawing Stuff */
         if ((xc = (new_XContext *) ckalloc(sizeof(new_XContext))) == NULL)

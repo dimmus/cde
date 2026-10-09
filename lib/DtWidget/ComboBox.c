@@ -2476,10 +2476,10 @@ activate_cb(	Widget w,
     /* Resolution Independent Handling */
     XtSetArg(args[0], XmNunitType, &unit_type);
     XtGetValues((Widget)combo_w, args, 1);
-   /* Getting Focus */
-   if ( !_XmFocusIsHere( (Widget)combo_w) )
-    XmProcessTraversal((Widget)combo_w, 
-			(XmTraversalDirection) XmTRAVERSE_CURRENT);
+    /* Getting Focus */
+    if ( !_XmFocusIsHere( (Widget)combo_w) )
+	XmProcessTraversal((Widget)combo_w, 
+			   (XmTraversalDirection) XmTRAVERSE_CURRENT);
 
     if (Type(combo_w) == DtDROP_DOWN_COMBO_BOX)
 	TextFieldActivate(combo_p, call_data);

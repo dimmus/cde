@@ -274,7 +274,7 @@ popup_mouseBB( Widget shell )
 static Widget 
 build_mouseDialog( Widget shell )
 {
-    int     i, n;
+    int n;
     Arg              args[MAX_ARGS];
     int              nmap;
     XmString         button_string[NUM_LABELS]; 
@@ -1041,7 +1041,7 @@ dclickTestCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    Arg  color[3], args[10];       /*  arg list            */
+    Arg  color[3];       /*  arg list            */
     int    n;             /*  arg count           */
     XmPushButtonCallbackStruct *cb = (XmPushButtonCallbackStruct *)call_data;
     static int selectstate = False;
@@ -1110,7 +1110,6 @@ warnToggleCB(
   int     n;
   Arg              args[10];
   XmString         string;
-  Boolean          set;
 
 
   if (w == mouse.leftToggle && mouse.handed == LEFT_HANDED) 
@@ -1166,7 +1165,6 @@ midwarnToggleCB(
   int     n;
   Arg              args[10];
   XmString         warnstring;
-  Boolean          set;
   
   if (w == mouse.adjustToggle && mouse.function == ADJUST)
     {
@@ -1227,9 +1225,6 @@ cancelWarnCB(
         XtPointer call_data )
 {
 
-  int     n;
-  Arg              args[10];
-  XmString         string;
   
   if (mouse.handed == RIGHT_HANDED)
     {
@@ -1256,9 +1251,6 @@ midcancelWarnCB(
         XtPointer call_data )
 {
 
-  int     n;
-  Arg              args[10];
-  XmString         string;
   
   if (mouse.function == TRANSFER)
     {
@@ -1286,7 +1278,6 @@ reverseToggleCB(
   int     n;
   int              i, j;
   Arg              args[MAX_ARGS];
-  Boolean          set;
   Boolean          toggle;
   
   toggle = (Boolean) (intptr_t) client_data;
@@ -1363,10 +1354,6 @@ midreverseToggleCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int     n;
-    int              i, j;
-    Arg              args[MAX_ARGS];
-    Boolean          set;
     Boolean          toggle;
 
      toggle = (Boolean) (intptr_t) client_data;
@@ -1490,17 +1477,15 @@ ButtonCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int           n, i, j;
+    int           n;
     Arg           args[MAX_ARGS];
     DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;
     Bool          do_accel, do_thresh;
-    Bool          set;
     char          message1[6], message2[50], message3[6], message4[6];
     char          pointerStr[128];
     static char   dclickRes[40];
     static char   enableBtn1Res[40];
-    int           dclick;
-    int     new_acceln, new_acceld, new_thresh;
+    int     new_acceln, new_thresh;
 
     switch (cb->button_position)
     {
@@ -1567,11 +1552,13 @@ ButtonCB(
 	 mouse.dclickChanged = False;
 
 	 if (mouse.btn2Changed)
-	   if(mouse.function == TRANSFER)
-	     sprintf(enableBtn1Res, enableBtn1TransferString, "button2_transfer");
-	   else
-	     sprintf(enableBtn1Res, enableBtn1TransferString, "True");
-	   _DtAddToResource(style.display,enableBtn1Res);
+	   {
+	     if(mouse.function == TRANSFER)
+	       sprintf(enableBtn1Res, enableBtn1TransferString, "button2_transfer");
+	     else
+	       sprintf(enableBtn1Res, enableBtn1TransferString, "True");
+	   }
+	 _DtAddToResource(style.display,enableBtn1Res);
 
 	 break;
 	 

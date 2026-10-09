@@ -3388,8 +3388,6 @@ CompressTable(
 	    retSeg = NULL;
 	    if (NULL != rowIds && NULL != *rowIds)
 	      {
-		_DtCvSegment *prevSeg = NULL;
-
 		/*
 		 * look through the table's list for the one segment
 		 * to fill the one column/row table.
@@ -3397,7 +3395,6 @@ CompressTable(
 		while (NULL != tableSegs && NULL != *tableSegs &&
 		   _DtCvStrCaseCmpLatin1(*rowIds, _DtCvContainerIdOfSeg(*tableSegs)))
 		  {
-		    prevSeg = *tableSegs;
 		    tableSegs++;
 		  }
 
@@ -4176,7 +4173,6 @@ ResolveAsyncBlock(
     char       *next;
     char       *start  = NULL;
     char      **rowIds = _DtCvCellIdsOfTableSeg(table_seg);
-    _DtCvFrmtOption *colJ;
     _DtCvSegment **cellSegs;
     _DtCvSegment  *newSeg;
     _DtCvSegment  *asyncSegs;
@@ -4188,7 +4184,6 @@ ResolveAsyncBlock(
 	 * get the start of the row ids
 	 */
 	next = *rowIds;
-	colJ = _DtCvColJustifyOfTableSeg(table_seg);
 	while (NULL != next && '\0' != *next)
 	  {
 	    /*
@@ -4312,8 +4307,6 @@ ResolveAsyncBlock(
 		*/
 	       *next = c;
 	      }
-
-	    colJ++;
 	  }
 
 	/*
@@ -5454,6 +5447,8 @@ ParseElementStart(
 		 */
 		segPtr->type = _DtCvSetTypeToRegion(segPtr->type);
 		break;
+	default:
+		break;
       }
 
     if (my_struct->cur_link != -1)
@@ -5492,6 +5487,8 @@ ParseElementStart(
 		 * data goes directly into this table.
 		 */
 		ElTable(my_struct) = newSeg;
+		break;
+	default:
 		break;
       }
 
@@ -5937,6 +5934,8 @@ ParseElementEnd(
 
 		    my_struct->add_seg = newSeg;
 		    break;
+		default:
+		    break;
 	      }
 	  }
 
@@ -6121,7 +6120,7 @@ GetInterpCmd(SdlOption	interp_type)
 {
     const _CEInterpData *interp = InterpData;
 
-    while (interp->type != _DtCvOPTION_BAD)
+    while (interp->type != SdlOptionBad)
       {
 	if (interp->type == interp_type)
 	    return interp->cmd;
@@ -6591,6 +6590,8 @@ RegisterLink(
 	case SdlWindowNew: winType = _DtCvWindowHint_NewWindow;
 			break;
 	case SdlWindowPopup: winType = _DtCvWindowHint_PopupWindow;
+			break;
+	default:
 			break;
       }
 
@@ -8756,6 +8757,8 @@ SetGhostLink(
 								link_idx);
 	segments = _DtCvNextSeg(segments);
       }
+
+    return 0;
 
 } /* End SetGhostLink */
 

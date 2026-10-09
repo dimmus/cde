@@ -95,7 +95,7 @@ char *find_system_locale_name(char *CDE_locale)
 
 char	*strcpyx(char *dest, char *src)
 {
-    while (*dest++ = *src++) ;
+    while ((*dest++ = *src++)) ;
     return(--dest);
 }
 
@@ -186,7 +186,7 @@ char	**parse_strlist(char *ptr, char sep_ch)
     bp = pbuf; pbuf[0] = NULL;
     new = (char **) 0;
     while (ptr) {
-	if (sep = strchr(ptr, sep_ch))	*sep++ = 0;
+	if ((sep = strchr(ptr, sep_ch)))	*sep++ = 0;
 	p = trim_line(ptr);
 	if (*p) {
 	    *bp++ = NEWSTR(p);
@@ -260,7 +260,7 @@ bool	parse_dpy_str(char *display_str, char **host, int *dnum, int *snum, int *dn
 	gethostname(hostbuf, BUFSIZ);
 	hp = hostbuf;
     }
-    if (p = strchr(hp, '.'))	*p = 0;
+    if ((p = strchr(hp, '.')))	*p = 0;
 
 	/* extract display number */
     for (p = pdnum; *p && isdigit(*p); p++) ;
@@ -307,7 +307,7 @@ char	*std_dpy_str(char *display_str, int *snum)
 					display_str, buf, *snum));
 
     FREE(host);
-    return NEWSTR(buf);
+    return NEWSTR(&buf[0]);
 }
 
 
@@ -338,7 +338,7 @@ char	*dirname(char *path)
     memcpy(dname, path, dlen);
     dname[dlen] = 0;
 
-    if (p = strrchr(dname, '/')) {
+    if ((p = strrchr(dname, '/'))) {
 	if (p == dname)
 	    dname[1] = 0;
 	else {
@@ -511,7 +511,7 @@ int	put_xims_log(char *fmt, void *arg1, void *arg2, void *arg3)
 
     /* if (Verbose < 1)	return False; */
 
-    if (fp = fopen(logpath, "a")) {
+    if ((fp = fopen(logpath, "a"))) {
 	char	time_str[80];
 	time_t	tm = time((time_t *)0);
 

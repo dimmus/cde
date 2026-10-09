@@ -2393,6 +2393,8 @@ _DtCanvasMoveTraversal (
 			return _DtCvSTATUS_BAD;
 		  }
 		break;
+	default:
+		break;
       }
 
     /*

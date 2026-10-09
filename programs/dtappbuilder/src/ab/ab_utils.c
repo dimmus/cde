@@ -756,6 +756,8 @@ ab_update_stat_region(
             widget = cur_module;
 	    if (value == NULL)
 		value = "( None )";
+        default:
+            break;
     }
     if (value == NULL)
         value = nullstr;
@@ -1082,13 +1084,11 @@ format_dir_name_for_user(
 )
 {
     STRING      home= getenv(home_env_var_name);
-    int         home_name_len = 0;
     int         i= 0;
  
     if (home != NULL)
     {
         char    home_relative[MAXPATHLEN];
-        home_name_len = strlen(home);
 	*home_relative = 0;
 
         util_cvt_path_to_relative(ugly_dir, home, home_relative, MAXPATHLEN);
@@ -1296,6 +1296,8 @@ ab_exit_dtbuilder(void)
                 case DTB_ANSWER_ACTION1:
                     exit(0);
                 case DTB_ANSWER_CANCEL:
+                    break;
+                default:
                     break;
             }
             Up = False;

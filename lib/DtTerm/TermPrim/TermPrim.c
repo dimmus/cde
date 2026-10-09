@@ -30,8 +30,6 @@
  * (c) Copyright 1996 Hitachi.						*
  */
 
-extern char _DtTermPrimPullInTermWhatString[];
-static char *termWhatString = _DtTermPrimPullInTermWhatString;
 extern char * _DtTermPrimGetMessage( char *filename, int set, int n, char *s );
 
 #include <stdio.h>
@@ -918,16 +916,12 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     DtTermPrimData tpd;
-    XmFontContext fontContext;
-    XmFontListEntry fontListEntry;
-    XmFontType fontType;
     XModifierKeymap *modifierMapping;
     KeySym *keyboardMapping;
     int minKeycodes;
     int maxKeycodes;
     int keysymsPerKeycode;
     XmRepTypeId shadowTypeID;
-    int i;
 
     Debug('T', timeStamp("TermPrim Initialize() starting"));
 
@@ -1358,7 +1352,6 @@ InitializeVerticalScrollBar(Widget w, Boolean initCallbacks)
     DtTermPrimData tpd = tw->term.tpd;
     Arg arglist[20];
     int i;
-    int value;
 
     if (initCallbacks) {
 	/* set up the scrollbar callbacks... */
@@ -1849,7 +1842,6 @@ InitOrResizeTermBuffer(Widget w)
 static void
 Resize(Widget w)
 {
-    DtTermPrimitiveWidget	  tw = (DtTermPrimitiveWidget) w;
 
     if (XtIsRealized(w)) {
 	/* the first time through, if our size is changed during interactive
@@ -2137,6 +2129,9 @@ SetValues(Widget cur_w, Widget ref_w, Widget w, ArgList args,
 
 	case XtGeometryNo:
 	    break;
+
+	default:
+	    break;
 	}
 
 	if (XtIsRealized(w)) {
@@ -2357,8 +2352,9 @@ Realize(Widget w, XtValueMask *p_valueMask, XSetWindowAttributes *attributes)
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     Mask valueMask = *p_valueMask;
     sigset_t sigNew;
+#ifdef	SETENV_LINES_AND_COLS
     char buffer[BUFSIZ];
-    char **newEnv = (char **) 0;
+#endif	/* SETENV_LINES_AND_COLS */
     char **oldEnv = (char **) 0;
     extern char **environ;
     char *newEnvStrings[4];
@@ -2439,7 +2435,6 @@ Realize(Widget w, XtValueMask *p_valueMask, XSetWindowAttributes *attributes)
 
     /* allocate a pty if appropriate... */
     if (tw->term.ptyAllocate) {
-        int mode;
 
 	/* turn on suid root...  */
 	_DtTermPrimToggleSuidRoot(True);
@@ -2875,7 +2870,6 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
     int len;
     unsigned char *dangleBuffer;
     int dangleBufferLen;
-    int retLen;
     PendingTextChunk chunk = (PendingTextChunk) 0;
 
     Debug('i', fprintf(stderr, ">>readPty() starting\n"));
@@ -2941,7 +2935,7 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
         }
  
         if (tw->term.log_on) {
-            _DtTermPrimWriteLog(tw, buffer, len) ;
+            _DtTermPrimWriteLog(tw, (char *) buffer, len) ;
         }
 
 	if (tw->term.outputLogCallback) {
@@ -3357,6 +3351,7 @@ _DtTermPrimActionFocusOut(Widget w, XEvent *event, String *params,
     (void) _XmPrimitiveFocusOut(w, event, params, num_params);
 }
 
+#ifdef	KEY_TRANSLATE_HACK
 static void
 KeyTranslator
 (
@@ -3373,6 +3368,7 @@ KeyTranslator
     /* and reinstall the Motif translator for the next widget/event... */
     (void) XtSetKeyTranslator(display, (XtKeyProc) XmTranslateKey);
 }
+#endif	/* KEY_TRANSLATE_HACK */
     
 /*ARGSUSED*/
 static void

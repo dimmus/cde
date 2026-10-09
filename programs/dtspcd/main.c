@@ -982,7 +982,6 @@ int Client_Application_Data(protocol_request_ptr prot)
 int Client_Server_Debug(protocol_request_ptr prot)
 /*----------------------------------------------------------------------+*/
 {
-  SPC_Channel_Ptr channel=prot->channel;
   buffered_data_ptr pdata=prot->dataptr;
   XeChar filename[MAXPATHLEN];
   time_t timeval;

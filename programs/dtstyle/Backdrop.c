@@ -329,7 +329,6 @@ void
 BackdropDialog(
         Widget parent )
 {
-    int i;
     
     if (style.backdropDialog == NULL) 
     {
@@ -363,7 +362,7 @@ static int
 CreateBackdropDialog(
         Widget parent )
 {
-    int     i, n;
+    int n;
     Arg              args[20];
     Widget           mainForm;
     Widget           list;
@@ -402,7 +401,7 @@ CreateBackdropDialog(
     bd_desc = (char *)XtMalloc(strlen("/usr/dt/backdrops/desc.") + strlen(lang) + 1);
     strcpy (bd_desc,"/usr/dt/backdrops/desc.");
     strcat (bd_desc, lang);
-    if(sys_bd_DB = XrmGetFileDatabase (bd_desc))
+    if((sys_bd_DB = XrmGetFileDatabase (bd_desc)))
       	XrmMergeDatabases(sys_bd_DB, &bd_DB);
     XtFree(bd_desc);
     
@@ -411,7 +410,7 @@ CreateBackdropDialog(
     bd_desc = (char *)XtMalloc(strlen("/etc/dt/backdrops/desc.") + strlen(lang) + 1);
     strcpy (bd_desc,"/etc/dt/backdrops/desc.");
     strcat (bd_desc, lang);
-    if (adm_bd_DB = XrmGetFileDatabase (bd_desc))
+    if ((adm_bd_DB = XrmGetFileDatabase (bd_desc)))
 	XrmMergeDatabases(adm_bd_DB, &bd_DB);
     XtFree(bd_desc);
 
@@ -420,7 +419,7 @@ CreateBackdropDialog(
     bd_desc = (char *)XtMalloc(strlen(style.home) + strlen("/.dt/backdrops/desc.backdrops") + 1);
     strcpy (bd_desc, style.home);
     strcat (bd_desc, "/.dt/backdrops/desc.backdrops");
-    if (hm_bd_DB = XrmGetFileDatabase (bd_desc))
+    if ((hm_bd_DB = XrmGetFileDatabase (bd_desc)))
 	XrmMergeDatabases(hm_bd_DB, &bd_DB);
     XtFree(bd_desc);
 
@@ -626,11 +625,6 @@ cmpstringp(const void *p1, const void *p2)
 static int
      ReadBitmaps( void )
 {
-  int            status;
-  Pixmap         tmpPix = 0;
-  int            width, height, x, y;
-  Window         win;
-  int            num;
   int   i;
   char          *string;
   /* allocate space for temporary bitmap info */
@@ -712,7 +706,6 @@ static Boolean
 CreatePixmaps( void )
 
 {
-    static int     pixmapsCreated=0;
     int            i;
     Pixmap         tmpPixmap;
     
@@ -869,7 +862,6 @@ DrawBitmap(
         XtPointer call_data )
 {
     XGCValues     gcValues;
-    Arg           args[3];
         
     if (backdrops.selected == -1)
         return;
@@ -993,7 +985,6 @@ FreeListStrings(
         XmString *listPtr )
 {
     int         i;
-    int         n;
     XmString   *list = listPtr;
 
     for (i = 0; i < backdrops.numBitmaps; i++)
@@ -1036,8 +1027,7 @@ ButtonCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int      n, num;
-    Arg      args[MAX_ARGS];
+    int num;
     DtWsmBackdropImageType imageType;
 
     DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;
@@ -1121,8 +1111,6 @@ static void
 GetColors( void )
 {
     DtWsmWorkspaceInfo   *wInfo=NULL;
-    unsigned long    num=0;
-    Pixel            fg, bg;
     XGCValues        gcValues;
     Atom	     aWS;
 

@@ -86,7 +86,6 @@ int _DtHPrPrintStringData(
    char *printCommand;
    char cmdFormat[100];
    char prOffsetArg[30];
-   int status;
    int retval;
 
     if ( NULL == options->stringData )
@@ -146,7 +145,6 @@ int _DtHPrPrintDynamicStringData(
    char *printCommand;
    char cmdFormat[100];
    char prOffsetArg[30];
-   int status;
    int retval;
 
     if ( NULL == options->stringData )
@@ -204,7 +202,6 @@ int _DtHPrPrintManPage(
 {       /*$CODE$*/
    char *printCommand;
    char cmdFormat[100];
-   int status;
    int retval;
 
     if ( NULL == options->manPage )
@@ -261,7 +258,6 @@ int _DtHPrPrintHelpFile(
    char *printCommand;
    char  cmdFormat[100];
    char prOffsetArg[30];
-   int status;
    int retval;
 
     if ( NULL == options->helpFile )

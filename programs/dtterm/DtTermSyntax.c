@@ -235,7 +235,7 @@ void Syntax(char *programName, char *badOption)
      * warning...
      */
     /*SUPPRESS 624*/
-    if (c = getenv("COLUMNS"))  cols = atoi(c);
+    if ((c = getenv("COLUMNS"))) cols = atoi(c);
     else                        cols = 80;
 
     (void) fprintf(stderr, (GETMESSAGE(NL_SETN_Syntax,47,

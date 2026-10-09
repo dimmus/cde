@@ -92,7 +92,6 @@ static void quick_button_cb(Widget, XtPointer, XtPointer);
 static void display_hot_btn(Calendar *, int, int);
 static void clear_hot_btn(Calendar *, int);
 static void allocator(Calendar *);
-static void deallocator(Calendar *);
 static Boolean print_week (Calendar *c,
 			   int num_page, 
 			   void *xp,
@@ -118,6 +117,7 @@ format_week_header(Tick date, OrderingType order, char *buf)
         Calendar *c = calendar;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&date, localtime_buf);
 
@@ -144,7 +144,6 @@ static int
 count_week_pages (Calendar *c, int lines_per_page, Tick start_date)
 {
 	time_t start, stop;
-        CSA_return_code stat;
         CSA_entry_handle *list;
         CSA_attribute *range_attrs;
 	CSA_enum *ops;
@@ -186,12 +185,11 @@ print_week (Calendar *c,
 	Boolean first)
 {
         Boolean more, done = False, all_done = True;
-        int num_appts, day_of_week;
+        int num_appts;
         char    buf[128];
         int     i, j;
 	OrderingType ot = get_int_prop(p, CP_DATEORDERING);
 	time_t start, stop;
-        CSA_return_code stat;
         CSA_entry_handle *list;
         CSA_attribute *range_attrs;
 	CSA_enum *ops;
@@ -412,7 +410,6 @@ week_button (Widget widget, XtPointer data, XtPointer cbs)
 extern void
 cleanup_after_weekview(Calendar *c)
 {
-	int n;
         Week *w = (Week *)c->view->week_info;
 
 	invalidate_cache(c);
@@ -470,34 +467,6 @@ allocator(Calendar *c)
 }
 
 /*
- * allocate storage & subwidgets used by week view
- */
-static void 
-deallocator(Calendar *c)
-{
-        Week *w = (Week *)c->view->week_info;
-	int n;
-
-	/* hot buttons */
-	for (n=0; n<7; n++)
-		XtDestroyWidget(w->hot_button[n]);
-
-	/* array that held navigation buttons */
-	free(w->hot_button);
-
-	/* selection info */
-	free(w->current_selection);
-
-	/* allocated in init_week */
-        if (w->time_array != NULL)
-                free(w->time_array);
-
-	/* structure holding week information */
-	free(w);
-	c->view->week_info = NULL;
-}
-
-/*
  * Set up data needed to draw this particular week
  */
 static void
@@ -508,7 +477,6 @@ init_week(Calendar *c, Boundary *boundary)
         Props   *p;
         int     num_hrs,        day_of_week;
         int     empty_space, day_box;
-	int	skip_days = 0;
 	XFontSetExtents regfontextents, boldfontextents;
 
 	*boundary = okay;
@@ -595,7 +563,7 @@ init_week(Calendar *c, Boundary *boundary)
         /* left over empty space above chart after round off error */
         empty_space = day_box - w->chart_height;
         /* add pixels to the height of each hour box in chart to fill gap*/
-        if (w->add_pixels = ((double)empty_space / (double)num_hrs)) {
+        if ((w->add_pixels = ((double)empty_space / (double)num_hrs))) {
                 w->chart_y -= w->add_pixels * num_hrs;
                 w->chart_height += w->add_pixels * num_hrs;
         }
@@ -834,26 +802,23 @@ draw_week(Calendar *c, XRectangle *rect, Boundary boundary)
         int    x, y;
         int             char_height;
         int             start_date;
-        char            **day_names;
         char            label[80];
 	char		buf[MAXNAMELEN];
 	char		*footer_message = NULL;
         int             start_ind, end_ind;
-        int             today_dom, day_om;
+        int             day_om;
         new_XContext        *xc;
         Props           *p = (Props*)c->properties;
         XRectangle      chartrect;
 	OrderingType	ot = get_int_prop(p, CP_DATEORDERING);
 	Tick		start_tick, end_tick;
 	time_t start, stop;
-        CSA_return_code stat;
         CSA_entry_handle *list;
         CSA_attribute *range_attrs;
 	CSA_enum *ops;
 	CSA_uint32 a_total;
         int i, lower_bound = 0, upper_bound = 0;
 	XFontSetExtents regfontextents, boldfontextents;
-	int	notused, width1, width2, width3;
         
 	CalFontExtents(w->font, &regfontextents);
 	char_height = regfontextents.max_logical_extent.height;
@@ -877,18 +842,6 @@ draw_week(Calendar *c, XRectangle *rect, Boundary boundary)
 
         gr_clear_box(xc, 0, 0, w->canvas_w, w->canvas_h);
  
-	CalTextExtents(w->font, days2[3], cm_strlen(days2[3]), 
-		       &notused, &notused, &width1, &notused);
-	CalTextExtents(w->font, "  00", cm_strlen("  00"),
-		       &notused, &notused, &width2, &notused);
-	CalTextExtents(w->font, "Wed 00", cm_strlen("Wed 00"), 
-		       &notused, &notused, &width3, &notused);
-        if (width1 + width2 <= w->day_width - 2)
-                day_names = days2;
-        else if (width3 <= w->day_width - 2)
-                day_names = days;
-        else
-                day_names = days3;
         x = w->x;
         y = w->y;
         
@@ -931,7 +884,6 @@ draw_week(Calendar *c, XRectangle *rect, Boundary boundary)
         x = w->x;
         y = w->y;
         current_day = start_date;
-        today_dom = dom(time(0));
  
 	/* Crock alert!!!!  The obscure code below is doing something 
 	   really nasty.  The variable boundary indicates whether the 
@@ -1023,6 +975,7 @@ format_entry(Paint_cache *cache_entry, char *buf1, char *buf2,
         char    *s1, *s2;
         struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         if (cache_entry == NULL || cache_entry->summary == NULL) return;
 
@@ -1130,8 +1083,6 @@ static void
 fill_day(Calendar *c, Week *w, int x, int y, int day, 
 		Paint_cache *cache, int a_total, XRectangle *rect)
 {
-	CSA_return_code stat;
-	Dtcm_appointment *appt;
         int    lower = (int)lowerbound(day);
         int    upper = (int)next_ndays(day, 1);
         int    i, loop, n;
@@ -1141,7 +1092,6 @@ fill_day(Calendar *c, Week *w, int x, int y, int day,
 	int 	char_height;
         int     maxlines;
         int     maxchars;
-	Tick	tick;
  
 	CalFontExtents(w->small_font, &fontextents);
         char_width = fontextents.max_logical_extent.width;
@@ -1248,10 +1198,9 @@ extern void
 week_event(XEvent *event)
 {
 	Calendar *c = calendar;
-        Props *p = (Props*)c->properties;
         static int lastdate;
         static XEvent lastevent;
-        int x, y, i, j, hr, id;
+        int x, y, j, hr;
         Week    *w = (Week *)c->view->week_info;
         Selection *wsel;
         Editor *e = (Editor *)c->editor;
@@ -1393,7 +1342,6 @@ quick_button_cb(Widget widget, XtPointer client, XtPointer call)
         Calendar *c = calendar;
         Week    *w = (Week *)c->view->week_info;
 	int dow = (int) (intptr_t) client;
-	char buf[BUFSIZ];
 
 	if (c->view->date != get_bot()) {
 		c->view->olddate = c->view->date;

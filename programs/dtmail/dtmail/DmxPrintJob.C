@@ -394,7 +394,6 @@ void
 DmxPrintJob::createOutputWidgets (void)
 {
     DtMailEnv		dmxenv;
-    DtMail::Session	*d_session = theRoamApp.session()->session();
     DtMailBoolean	parse_error = DTM_FALSE;
     const char		*top;
     const char		*right;
@@ -1051,7 +1050,6 @@ void
 DmxPrintJob::closeDisplayCB (Widget, XtPointer client_data, XtPointer call_data)
 {
     DmxPrintJob *thisJob = (DmxPrintJob *) client_data;
-    DtPrintSetupCallbackStruct *pbs = (DtPrintSetupCallbackStruct *) call_data;
 
     if (thisJob->_pshell != NULL)
     {

@@ -780,56 +780,6 @@ Process_GridState( void )
 }
 /***************************************************************************
  *                                                                         *
- * Routine:   ConvertDropName                                              *
- *                                                                         *
- * Purpose:  Convert the "object" received from bms to a full path name    *
- *           note:  I am making BIG assumptions about the format of the    *
- *                  file I am getting from dtfile. "<host> - <path>"      *
- *                                                                         *
- ***************************************************************************/
-static char *
-ConvertDropName( char *objects)
-{
-    char *host;
-    char *path;
-    char *fullName;
-    char *tmp;
-    char *netfile;
-
-    host = objects;
-    tmp = strchr(objects,' ');
-    if (tmp==NULL)      /* shouldn't happen */
-      return (strdup(strchr(objects, '/')));
-
-    /* check if same host */
-    tmp[0] = '\0';
-    if (DtIsLocalHostP(host))
-    {
-        char *slash = NULL;
-        tmp[0] = ' ';
-        slash = strchr(objects, '/');
-        if(slash) {
-            return strdup(slash);
-        } else {
-            return NULL;
-        }
-    }
-
-    /* different host... get full path name */
-    path = tmp+3;      /* skip past the " - " */
-
-    /* Convert to a valid name on the local host. */
-    netfile = tt_host_file_netfile(host, path);
-    fullName = tt_netfile_file(netfile);
-    tt_free(netfile);
-
-    tmp[0] = ' ';      /* put back the " " after host name */
-    return (fullName);
-}
-
-
-/***************************************************************************
- *                                                                         *
  * Routine:   Process_DropCheckOp                                          *
  *                                                                         *
  * Purpose:   Validate the drag-n-drop operation that just occurred on the  *

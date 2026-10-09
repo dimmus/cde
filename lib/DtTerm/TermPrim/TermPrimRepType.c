@@ -37,6 +37,7 @@
 #include "TermPrimP.h"
 #include "TermPrimRepType.h"
 
+#ifdef NotDefined
 static void CvtStringToTerminalSizeDestroy
 (
 	XtAppContext app,
@@ -45,6 +46,7 @@ static void CvtStringToTerminalSizeDestroy
 	XrmValue *args,
 	Cardinal *num_args
 );
+#endif /* NotDefined */
 
 static void CvtStringToTerminalSizeListDestroy
 (
@@ -55,6 +57,7 @@ static void CvtStringToTerminalSizeListDestroy
 	Cardinal *num_args
 );
 
+#ifdef NotDefined
 static Boolean CvtStringToTerminalSize
 (
 	Display *display,
@@ -64,6 +67,7 @@ static Boolean CvtStringToTerminalSize
 	XrmValue *to,
 	XtPointer *converter_data
 );
+#endif /* NotDefined */
 
 static Boolean CvtStringToTerminalSizeList
 (
@@ -228,8 +232,6 @@ CvtStringToTerminalSizeList
     static DtTermTerminalSizeList _sizeList;
     DtTermTerminalSizeList *sizeList = &_sizeList;
     char *c1;
-    char *c2;
-    char *tmpStr;
     int numSizes = 0;
     int sizesSize = 0;
     DtTermTerminalSize *sizes = (DtTermTerminalSize *) 0;

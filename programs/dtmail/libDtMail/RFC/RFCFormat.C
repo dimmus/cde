@@ -177,7 +177,7 @@ RFCFormat::writeHeaders(DtMailEnv & error,
 	}
 
         //add _is_write_bcc for fixing aix defect 177096
-	if (*hdr || strcasecmp(name, "bcc") == 0 && !_is_write_bcc ) {
+	if (*hdr || (strcasecmp(name, "bcc") == 0 && !_is_write_bcc) ) {
 	    free(name);
 	    continue; // We will generate these headers.
 	}

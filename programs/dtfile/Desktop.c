@@ -187,9 +187,6 @@ static void BuildDesktopLinks ( Display *display ) ;
 static int InitializeNewWorkspaces (
                       Display *display,
                       char *workspaceName) ;
-static void TimerEvent(
-                      Widget widget,
-                      XtIntervalId *id) ;
 static void DropOnDesktopObject (
                       Widget w,
                       XtPointer client_data,
@@ -527,7 +524,7 @@ void
 DesktopObjectRemoved( DesktopRec *desktopWindow )
 {
   WorkspaceRec * workSpace;
-  int i, j, k, l;
+  int j, k, l;
 
   /* Remove the object from the screen*/
   XtPopdown(desktopWindow->shell);
@@ -1082,7 +1079,7 @@ LoadDesktopInfo(
       if (fgets(message, bufferSize, fptr))
       {
           len = strlen(message); message[len-1] = 0x0;
-          desktopWindow->file_name = XtNewString(message);
+          desktopWindow->file_name = (XtNewString)(message);
       }
       else
           desktopWindow->file_name = NULL;
@@ -1090,7 +1087,7 @@ LoadDesktopInfo(
       if (fgets(message, bufferSize, fptr))
       {
           len = strlen(message); message[len-1] = 0x0;
-          workSpace = XtNewString(message);
+          workSpace = (XtNewString)(message);
       }
       else
           workSpace = NULL;
@@ -1499,7 +1496,6 @@ DrawAInput (
 
    if(event == NULL)
    {
-      Position x, y;
       Dimension width, height;
       int displayWidth, displayHeight;
       DtIconGadget g;
@@ -1805,7 +1801,6 @@ renameDT (
 void
 SelectDTFile (DesktopRec *desktopWindow)
 {
-   int selection_count;
    int i,j;
 
    Display *display;
@@ -2239,7 +2234,6 @@ IsAFileOnDesktop2(
    char *filesOnDesktop;
    char *filename1,*filename2;
    int newLen, stat_result;
-   Tt_status tt_status;
    static Tt_message dummy_msg = NULL;
    struct stat stat_buf;
 
@@ -2262,7 +2256,7 @@ IsAFileOnDesktop2(
       }
       else
       {
-         tt_status = tt_message_file_set(dummy_msg, file_set[i]);
+         tt_message_file_set(dummy_msg, file_set[i]);
          filename1 = tt_message_file(dummy_msg);
          Link = False;
       }
@@ -2283,7 +2277,7 @@ IsAFileOnDesktop2(
            filename2 = XtNewString(tmp_filename);
         else
         {
-           tt_status = tt_message_file_set (dummy_msg, tmp_filename);
+           tt_message_file_set (dummy_msg, tmp_filename);
            filename2 = tt_message_file(dummy_msg);
         }
         filename2 = (char *)XtRealloc(filename2, strlen(filename2)
@@ -2305,7 +2299,7 @@ IsAFileOnDesktop2(
           {
             newLen = strlen(filesOnDesktop) + strlen(filename1) + 6;
             filesOnDesktop = (char *)XtRealloc(filesOnDesktop, newLen);
-            sprintf(filesOnDesktop, "%s   %s\n", filesOnDesktop, filename1);
+            sprintf(filesOnDesktop + strlen(filesOnDesktop), "   %s\n", filename1);
           }
           *number += 1;
           break;
@@ -2512,10 +2506,10 @@ void RegisterPanelInGrid(int workspace,  int displayWidth, int displayHeight )
 void
 InitializeDesktopGrid( int displayWidth, int displayHeight)
 {
-   int i,j,k;
+   int i;
 
    desktop_grid_size = desktop_data->numWorkspaces * numColumns * numRows;
-   desktop_grid = (Boolean *)XtCalloc(1, desktop_grid_size);
+   desktop_grid = (unsigned char *)XtCalloc(1, desktop_grid_size);
 
    for(i = 1; i <= desktop_data->numWorkspaces; i++)
    {
@@ -3214,7 +3208,6 @@ FreeCachedIcons (
 {
    int i, new_size;
    DesktopRec *desktop;
-   DesktopRec *tmpDesktop;
 
    new_size = (desktop_data->numCachedIcons + desktop_data->numIconsUsed) -
                                                               iconsToBeFreed;
@@ -3586,7 +3579,6 @@ InitializeNewWorkspaces (
        Display *display,
        char *workspaceName)
 {
-   struct stat statBuf;
    Atom     *paWS;
    int       numInfo;
    Window   rootWindow;
@@ -3656,7 +3648,7 @@ InitializeNewWorkspaces (
    /* now lets add more desktop grids for the new workspaces */
 
    desktop_grid_size = numInfo * numColumns * numRows;
-   desktop_grid = (Boolean *)XtRealloc((char *)desktop_grid,desktop_grid_size);
+   desktop_grid = (unsigned char *)XtRealloc((char *)desktop_grid,desktop_grid_size);
    for(i = desktop_data->numWorkspaces; i < numInfo; i++)
    {
       for(j = 0; j < numColumns; j++)
@@ -3681,23 +3673,6 @@ InitializeNewWorkspaces (
    /* should never get here */
    return(0);
 }
-
-/************************************************************************
- *
- *  TimerEvent
- *      This function is called when dtfile does an _DtActionInvoke. All
- *      it does is turn off the Hourglass cursor.
- *
- ************************************************************************/
-
-static void
-TimerEvent(
-        Widget widget,
-        XtIntervalId *id )
-{
-  _DtTurnOffHourGlass (widget);
-}
-
 
 /**********************************************************************
  *
@@ -4121,7 +4096,7 @@ WorkSpaceRemoved (
 		      desktop_data->workspaceData[new_index]->
 	 	       selectedDTWindows[k] = desktop_data->
 			  workspaceData[new_index]-> selectedDTWindows[k+1];
-		      desktop_data->workspaceData[new_index]->files_selected--;
+		    desktop_data->workspaceData[new_index]->files_selected--;
 		    break;
 		  }
                }
@@ -4233,7 +4208,7 @@ PutOnWorkspaceHandler(
   DesktopRec * desktopWindow;
   struct stat fileInfo;
   char title[256], invalidWorkspace = 0x0;
-  int numArgs, i, screen, ws;
+  int numArgs, i, ws;
   char * fullName, * fileName = NULL, * dirName = NULL, * workspace = NULL;
   char * requestWorkspace = NULL;
 

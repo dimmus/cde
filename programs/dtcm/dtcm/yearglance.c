@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static char sccsid[] = "@(#)yearglance.c 1.37 95/07/27 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,18 +93,18 @@ static char sccsid[] = "@(#)yearglance.c 1.37 95/07/27 Copyr 1991 Sun Microsyste
 This specifies row and col for easy selection in year view */
 int month_row_col[12][2] =
 {
-  0, 0,
-  0, 1,
-  0, 2,
-  1, 0,
-  1, 1,
-  1, 2,
-  2, 0,
-  2, 1,
-  2, 2,
-  3, 0,
-  3, 1,
-  3, 2,
+  {0, 0},
+  {0, 1},
+  {0, 2},
+  {1, 0},
+  {1, 1},
+  {1, 2},
+  {2, 0},
+  {2, 1},
+  {2, 2},
+  {3, 0},
+  {3, 1},
+  {3, 2},
 };
 
 extern int prolog_found;
@@ -120,7 +116,6 @@ static void 	create_month_panels(Calendar *);
 static void	year_btn_cb(Widget , XtPointer , XtPointer );
 static void	update_year(Calendar *);
 static void	allocator(Calendar *);
-static void	deallocator(Calendar *);
 static Boolean  allocated(Calendar *);
 
 
@@ -150,35 +145,6 @@ allocator(Calendar *c)
 
 	/* create the month panel widgets */
 	create_month_panels(c);
-}
-
-
-/*
- * release memory used for year view
- */
-static void
-deallocator(Calendar *c)
-{
-        Year *y = (Year *)c->view->year_info;
-/*
-	int i;
-*/
-
-	XtDestroyWidget(y->form);
-	XtDestroyWidget(y->label_form);
-
-	/* Destroy Monthpanels and free space for caching them */
-/*
-	for (i=0; i<12; i++)
-		XtDestroyWidget(y->month_panels[i]);
-*/
- 
-        free(y->month_panels); 
-
-	/* free memory stored in calendar for year stuff */
-	free(y);
-	c->view->year_info = NULL;
-
 }
 
 extern CSA_return_code
@@ -293,6 +259,7 @@ update_year(Calendar *c)
         int year_num = year(c->view->date);
 	int i;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	/* change year label in yearview */
 	/* NL_COMMENT

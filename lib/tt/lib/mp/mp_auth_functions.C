@@ -95,7 +95,7 @@ _tt_AuthFileName ()
     static int	bsize;
     int	    	size;
 
-    if (name = getenv ("TTAUTHORITY"))
+    if ((name = getenv ("TTAUTHORITY")))
 	return (name);
 
     name = getenv ("HOME");

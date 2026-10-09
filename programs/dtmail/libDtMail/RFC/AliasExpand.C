@@ -111,16 +111,6 @@ AliasKey::hashValue(void)
     return(genericHashValue(_str, strlen(_str)));
 }
 
-// deleteAllocatedKey: used to iterate through a hash table to remove
-// all key values that are allocated during the duration of rfcAliasExpand
-//
-static int
-deleteAllocatedKey(ObjectKey & object, AliasKey *, void *) {
-  assert(&object != NULL);
-  delete &object;
-  return(1);
-}
-
 		   
 void
 rfcAliasExpand(DtMailEnv & error,

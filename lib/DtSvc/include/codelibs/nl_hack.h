@@ -72,7 +72,7 @@
 
 # define CHARAT(p)	(__NLH_CHAR(p))
 
-# define CHARADV(p)	(__NLH_CHAR(p),	\
+# define CHARADV(p)	((void)mbtowc(__nlh_char, p, MB_CUR_MAX),	\
 			 (p) += __NLH_WIDTH(p), __nlh_char[0])
 
 # define WCHAR(c, p)	(wctomb(p, (wchar_t)c), c)

@@ -602,8 +602,6 @@ menu_prop_apply(
 {
     PropMenuSettingsRec 	*pms = &(prop_menu_settings_rec[type]);
     STRING	    		value;
-    BOOL	    		reset_bg = False;
-    BOOL	    		reset_fg = False;
 
     if (!verify_props(type))
         return ERROR;
@@ -622,8 +620,6 @@ menu_prop_apply(
     {
         value = prop_colorfield_get_value(&(pms->fg_color));
         abobj_set_foreground_color(pms->current_obj, value);
-	if (util_strempty(value))
-	    reset_fg = True;
         util_free(value);
         prop_colorfield_set_value(&(pms->fg_color),
 		obj_get_fg_color(pms->current_obj), False);
@@ -632,8 +628,6 @@ menu_prop_apply(
     {
         value = prop_colorfield_get_value(&(pms->bg_color));
         abobj_set_background_color(pms->current_obj, value);
-	if (util_strempty(value))
-	    reset_bg = True;
         util_free(value);
         prop_colorfield_set_value(&(pms->bg_color),
 		obj_get_bg_color(pms->current_obj), False);
@@ -855,11 +849,8 @@ menu_editCB(
     char		namebuf[512];
     STRING		name;
     AB_EDIT_TYPE 	etype;
-    ABObj		module;
     ABObj		newmenu;
     ABObj		delmenu;
-
-    module = proj_get_cur_module();
 
     XtVaGetValues(widget, XmNuserData, &etype, NULL);
 

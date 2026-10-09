@@ -58,17 +58,17 @@ void m_endaction(M_ELEMENT m_elt)
         sprintf(buffer,
 		"%s%s%s",
 		m_etago,
-		m_nameofelt(m_elt),
+		(char *) m_nameofelt(m_elt),
 		m_tagc);
         m_trace(buffer);
         }
       m_toptstat = M_OTHER;
       }
-    if (m_action = m_findact(m_elt, m_ecarray)) {
+    if ((m_action = m_findact(m_elt, m_ecarray))) {
       m_stackpar = m_stacktop;
       m_endcase(m_action);
       }
-    if (m_action = m_findact(m_elt, m_etarray)) {
+    if ((m_action = m_findact(m_elt, m_etarray))) {
       m_stackpar = m_stacktop->stparam;
       m_textout(&m_string[m_action - 1], FALSE, TRUE);
       }
@@ -169,14 +169,14 @@ void m_strtaction(M_ELEMENT m_elt)
     m_start = TRUE;
     m_getline(&m_stacktop->file, &m_stacktop->line);
     if (m_tagtrace) {
-      sprintf(buffer, "%s%s", m_stago, m_nameofelt(m_elt));
+      sprintf(buffer, "%s%s", m_stago, (char *) m_nameofelt(m_elt));
       m_trace(buffer);
       for (m_i = 0, m_par = m_element[m_elt - 1].parptr;
            m_i < m_element[m_elt - 1].parcount;
            m_i++, m_par++)
         if (m_stacktop->param[m_i]) {
           sprintf(buffer, "%s%s%s",
-                  newpar, &m_pname[m_parameter[m_par - 1].paramname], quote);
+                  newpar, (char *) &m_pname[m_parameter[m_par - 1].paramname], quote);
           m_trace(buffer);
           buffer[1] = M_EOS;
           for (m_p = m_stacktop->param[m_i] ; *m_p ; m_p++)
@@ -201,23 +201,23 @@ void m_strtaction(M_ELEMENT m_elt)
       m_trace(buffer);
       m_toptstat = M_TOPTSTARTTAG;
       }
-    if (m_action = m_findact(m_elt, m_scarray)) {
+    if ((m_action = m_findact(m_elt, m_scarray))) {
       m_stackpar = m_stacktop;
       m_strtcase(m_action);
       }
-    if (m_action = m_findact(m_elt, m_stcarray)) {
+    if ((m_action = m_findact(m_elt, m_stcarray))) {
       m_stacktop->stccase = m_action;
       m_stacktop->stparam = m_stacktop;
       }
-    if (m_action = m_findact(m_elt, m_starray)) {
+    if ((m_action = m_findact(m_elt, m_starray))) {
       m_stackpar = m_stacktop->stparam;
       m_textout(&m_string[m_action - 1], TRUE, FALSE);
       }
-    if (m_action = m_findact(m_elt, m_tcarray)) {
+    if ((m_action = m_findact(m_elt, m_tcarray))) {
       m_stacktop->cdcase = m_action;
       m_stacktop->cdparam = m_stacktop;
       }
-    if (m_action = m_findact(m_elt, m_pcarray)) {
+    if ((m_action = m_findact(m_elt, m_pcarray))) {
       m_stacktop->picase = m_action;
       m_stacktop->piparam = m_stacktop;
       }

@@ -314,7 +314,7 @@ static void send_session_trace(_Tt_trace_optobj& myopts)
 		exit(2);
 	}
 	
-	Tt_message inmsg = tt_message_receive();
+	tt_message_receive();
 	
 	// Make sure the stop-tracing message is sent upon exit
 		

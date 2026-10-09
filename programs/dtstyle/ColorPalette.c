@@ -137,8 +137,6 @@ AllocatePaletteCells(
 int 
 ReColorPalette( void )
 {
-    int     n;
-    Arg              args[MAX_ARGS];
     int              i;
     int              j=0;
     XColor           colors[XmCO_MAX_NUM_COLORS * 5];

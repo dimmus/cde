@@ -218,8 +218,6 @@ _getStringArrayResource(XrmDatabase xrmDB, char *fmtStr,
 {
     XrmQuark resourceName[3];
     XrmQuark resourceClass[3];
-    char *resourceType;
-    XrmValue resourceValue;
     int nStrings;
 
     resourceName[0] = resourceName[1] = anyQuark;
@@ -498,8 +496,7 @@ OpenOutputClientDB(char *fileName,
     /* Open fileName for writing. */
     if ((outputDB->xrmDBFile = fopen(fileName, "w")) == (FILE *)NULL)
     {
-        int rv;
-	rv = rename(outputDB->tmpDBFileName, fileName);
+	rename(outputDB->tmpDBFileName, fileName);
 	XtFree(outputDB->xrmDBFileName);
 	XtFree(outputDB->tmpDBFileName);
 	XtFree((char *)outputDB);
@@ -706,10 +703,9 @@ CloseClientDB(ClientDB clientDBPtr, Boolean writeDB)
     }
     else
     {
-      int rv;
 	/* Close file and remove it; restore original DB. */
 	fclose(clientDB->xrmDBFile);
-	rv = rename(clientDB->tmpDBFileName, clientDB->xrmDBFileName);
+	rename(clientDB->tmpDBFileName, clientDB->xrmDBFileName);
     }
 
     XtFree(clientDB->xrmDBFileName);

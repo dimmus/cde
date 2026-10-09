@@ -269,6 +269,8 @@ add_pattern(const _Tt_s_pattern_ptr &p)
 	    case TT_HANDLE_PUSH:
 		p->set_timestamp( _tt_s_mp->now );
 		break;
+	    default:
+		break;
 	}
 
 	// invoke the set_active method to activate this procid.
@@ -671,6 +673,8 @@ update_message(const _Tt_message_ptr &m, Tt_state newstate)
 					break;
 //					default:
 					  /* TODO what is the default reason? */
+				    default:
+					break;
 				}
 #ifdef OPT_BUG_SUNOS_5
 				{

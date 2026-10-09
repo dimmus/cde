@@ -54,11 +54,6 @@
  * ________________________________________________________________________
  */
 
-#ifndef lint
-static char *RCSid =
-  "$XConsortium: traninit.c /main/3 1996/06/19 17:13:22 drk $";
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -85,7 +80,7 @@ ReadTransSpec(
 )
 {
     FILE	*fp;
-    char	buf[LINESIZE], *cp, *fn, *cp2;
+    char	buf[LINESIZE], *cp, *fn = NULL, *cp2;
     int		lineno=0, c, i;
     Trans_t	T;
     int		giLen;
@@ -345,7 +340,6 @@ ReadCharMap(
 {
     FILE	*fp;
     char	buf[LINESIZE], *name, *val;
-    int		lineno=0;
     int		n_alloc=0;	/* number of slots allocated so far */
 
     if ((fp=OpenFile(filename)) == NULL) {
@@ -362,7 +356,6 @@ ReadCharMap(
     nCharMap = 0;
     while (fgets(buf, LINESIZE, fp))
     {
-	lineno++;
 	/* skip comment and blank lines */
 	if (buf[0] == '#' || buf[0] == NL) continue;
 	stripNL(buf);
@@ -404,7 +397,6 @@ ReadSDATA(
 {
     FILE	*fp;
     char	buf[LINESIZE], *name, *val;
-    int		lineno=0;
 
     if ((fp=OpenFile(filename)) == NULL) {
 	fprintf(stderr, "Can not open SDATA file '%s': %s", filename,
@@ -416,7 +408,6 @@ ReadSDATA(
 
     while (fgets(buf, LINESIZE, fp))
     {
-	lineno++;
 	/* skip comment and blank lines */
 	if (buf[0] == '#' || buf[0] == NL) continue;
 	stripNL(buf);

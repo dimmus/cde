@@ -171,16 +171,6 @@ static void	xm_popup_menu(
 		    Boolean	*cont
 		);
 
-/*
- * Actions 
- */
-static void	popup_menu(
-    		    Widget      widget,
-    		    XEvent      *event,
-    		    String      *params,
-    		    int         num_params
-		);
-
 
 /*************************************************************************
 **                                                                      **
@@ -190,15 +180,6 @@ static void	popup_menu(
 
 static    Widget form_list[MAX_FORMS];
 static 	  int	 form_list_count = 0;
-
-static 	  XtTranslations popup_menu_trans = NULL;
-
-static XtActionsRec menu_actions[] = {
-    {"PopupMenu",     (XtActionProc)popup_menu }
-}; 
- 
-static String menu_trans =
-     "<Btn3Down>:        PopupMenu()"; 
 
 /*************************************************************************
 **                                                                      **
@@ -1480,7 +1461,6 @@ formlist_append(
 static int
 formlist_force_resize(void)
 {
-    Dimension 	f_width, f_height;
     int 	i;
     Widget	phantom;
     Pixel	bgpixel;
@@ -1628,13 +1608,11 @@ instantiate_menu(
     AB_TRAVERSAL trav;
     AB_MENU_TYPE m_type;
     ABObj	sub_menu_ref;
-    ABObj	menu_p;
     ABObj	menu;
     ABObj	item;
     ABObj	tmp_itemobj;
     ABObj	tmp_menuref;
     Widget	menu_w = NULL;
-    Widget	submenu_w = NULL;
     Widget	item_w;
 
     if (menu_ref != NULL)
@@ -1719,7 +1697,7 @@ instantiate_menu(
 			obj_create_ref(obj_get_actual_obj(sub_menu_ref));
                     tmp_menuref->part_of = tmp_itemobj;
                     obj_append_child(tmp_itemobj, tmp_menuref);
-		    submenu_w = instantiate_menu(
+		    instantiate_menu(
 					item, tmp_menuref, item_w, menu_w);
 		}
 	    }
@@ -1746,7 +1724,6 @@ objxm_destroy_menus(
 {
     AB_TRAVERSAL    trav;
     ABObj           obj;
-    ABObj	    menu;
     AB_MENU_TYPE    m_type;
     ABObj           menu_ref;
     ABObj	    menu_p;
@@ -1764,8 +1741,6 @@ objxm_destroy_menus(
         {
 	    if (menu_ref->ui_handle != NULL)
 	    {
-		menu = obj_get_actual_obj(menu_ref);
-
 		/* Destroy Temporary Item objs created ONLY for Test-mode */
 		num_items = obj_get_num_children(menu_ref);
 		item_array = (ABObj*)util_malloc(num_items*sizeof(ABObj));
@@ -1790,8 +1765,6 @@ objxm_destroy_menus(
 
 		    if (m_type == AB_MENU_POPUP) /* Remove EventHandler that pops up menu */
 		    {
-			Widget		parent;
-			XtTranslations 	orig_trans;
 
 		    	menu_p = objxm_comp_get_subobj(obj, AB_CFG_MENU_PARENT_OBJ);
 		    	XtRemoveEventHandler((Widget)menu_p->ui_handle, ButtonPressMask, 
@@ -1840,31 +1813,4 @@ xm_popup_menu(
 	    XtManageChild(menu);
 	}
     }
-}
-
-static void
-popup_menu(
-    Widget      widget,
-    XEvent      *event,
-    String      *params,
-    int         num_params
-)
-{
-    XButtonEvent	*bevent;
-    ABObj		obj, menu_ref;
-    Widget		menu;
-
-    if (event->type == ButtonPress)
-    {
-	bevent = (XButtonEvent*)event;
-	obj = objxm_get_obj_from_widget(widget); 
-
-	menu_ref = objxm_comp_get_subobj(obj, AB_CFG_MENU_OBJ);
-
-        if (menu_ref != NULL && (menu = (Widget)menu_ref->ui_handle) != NULL)
-        {
-            XmMenuPosition(menu, (XButtonPressedEvent*)bevent);
-            XtManageChild(menu);
-        }
-    }    
 }

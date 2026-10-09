@@ -116,11 +116,9 @@ ComposeFamily::Display_entire_msg(DtMailMessageHandle msgno,
     int num_bodyParts;
     DtMail::MailBox *mbox = _menuwindow->mailbox();
     DtMail::Message *msg = mbox->getMessage(error, msgno);
-    DtMail::Envelope *env = msg->getEnvelope(error);
+    msg->getEnvelope(error);
     DtMail::BodyPart *tmpBP = NULL;
     DtMailBuffer tmpBuffer;
-    void *buffer = NULL;
-    unsigned long size = 0;
     
     Editor::InsertFormat ins_format = Editor::IF_NONE;
     Editor::BracketFormat brackets = Editor::BF_NONE;
@@ -351,7 +349,7 @@ ComposeCmd::doit()
 	dialog->setToErrorDialog(CATGETS(DT_catd, 1, 203, "Mailer"),
 				 CATGETS(DT_catd, 1, 204, "Unable to create a compose window."));
 	char * helpId = DTMAILHELPNOCOMPOSE;
-	int answer = dialog->post_and_return(helpId);
+	dialog->post_and_return(helpId);
     }
 
     appendSignature(newsend);
@@ -390,7 +388,7 @@ ForwardCmd::doit()
 	dialog->setToErrorDialog(CATGETS(DT_catd, 1, 205, "Mailer"),
 				 CATGETS(DT_catd, 1, 206, "Unable to create a compose window."));
 	char * helpId = DTMAILHELPNOCOMPOSE;
-	int answer = dialog->post_and_return(helpId);
+	dialog->post_and_return(helpId);
     }
 
     // Put the signature above the message.
@@ -405,7 +403,7 @@ ForwardCmd::doit()
     DtMailEnv error;
     
     // For each selected message, put it in the Compose window.
-    if ( msgList = _menuwindow->list()->selected() ) {
+    if ( (msgList = _menuwindow->list()->selected()) ) {
 	for ( int k = 0;  k < msgList->length();  k++ ) {
 	    tmpMS = msgList->at(k);
 	    msgno = tmpMS->message_handle;
@@ -451,16 +449,14 @@ ReplyCmd::doit()
     FORCE_SEGV_DECL(MsgHndArray, msgList);
     FORCE_SEGV_DECL(MsgStruct, tmpMS);
     DtMailMessageHandle msgno;
-    FORCE_SEGV_DECL(char, from);
     FORCE_SEGV_DECL(char, subject);
-    FORCE_SEGV_DECL(char, cc);
     DtMailEnv error;
     DtMail::MailBox * mbox = _menuwindow->mailbox();
     
     // Initialize the error.
     error.clear();
     
-    if (msgList = _menuwindow->list()->selected())
+    if ((msgList = _menuwindow->list()->selected()))
     {
 	for ( int i=0; i < msgList->length(); i++ ) {
 	    tmpMS = msgList->at(i);
@@ -472,7 +468,7 @@ ReplyCmd::doit()
 		dialog->setToErrorDialog(CATGETS(DT_catd, 1, 207, "Mailer"),
 					 CATGETS(DT_catd, 1, 208, "Unable to create a compose window."));
 		char * helpId = DTMAILHELPNOCOMPOSE;
-		int answer = dialog->post_and_return(helpId);
+		dialog->post_and_return(helpId);
 	    }
 	    XmUpdateDisplay( newsend->baseWidget() );
 	    
@@ -587,8 +583,6 @@ ReplyAllCmd::doit()
     FORCE_SEGV_DECL(MsgHndArray, msgList);
     FORCE_SEGV_DECL(MsgStruct, tmpMS);
     FORCE_SEGV_DECL(char, subject);
-    FORCE_SEGV_DECL(char, to);
-    FORCE_SEGV_DECL(char, buffer);
     DtMailMessageHandle msgno;
     DtMail::MailBox *mbox = _menuwindow->mailbox();
     DtMailEnv error;
@@ -603,7 +597,7 @@ ReplyAllCmd::doit()
     error.clear();
     
     
-    if ( msgList = _menuwindow->list()->selected() )
+    if ( (msgList = _menuwindow->list()->selected()) )
 	for ( int k = 0;  k < msgList->length();  k++ ) {
 	    DtMailValueSeq	value ;
             
@@ -616,7 +610,7 @@ ReplyAllCmd::doit()
 		dialog->setToErrorDialog(CATGETS(DT_catd, 1, 209, "Mailer"),
 					 CATGETS(DT_catd, 1, 210, "Unable to create a compose window."));
 		char * helpId = DTMAILHELPNOCOMPOSE;
-		int answer = dialog->post_and_return(helpId);
+		dialog->post_and_return(helpId);
 	    }
 	    msg = mbox->getMessage(error, msgno);
 	    env = msg->getEnvelope(error);
@@ -771,7 +765,7 @@ TemplateCmd::doit()
 	dialog->setToErrorDialog(CATGETS(DT_catd, 1, 211, "Mailer"),
 				 CATGETS(DT_catd, 1, 212, "The template does not exist."));
 	char * helpId = DTMAILHELPNOTEMPLATE;
-	int answer = dialog->post_and_return(helpId);
+	dialog->post_and_return(helpId);
 	free(fullpath);
 	return;
     }
@@ -781,7 +775,7 @@ TemplateCmd::doit()
 	dialog->setToErrorDialog(CATGETS(DT_catd, 1, 213, "Mailer"),
 				 CATGETS(DT_catd, 1, 214, "The template appears to be corrupt."));
 	char * helpId = DTMAILHELPCORRUPTTEMPLATE;
-	int answer = dialog->post_and_return(helpId);
+	dialog->post_and_return(helpId);
 	SafeClose(fd);
 	free(fullpath);
 	return;
@@ -801,17 +795,17 @@ TemplateCmd::doit()
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 1, 215, "Mailer"),
 				     CATGETS(DT_catd, 1, 216, "There is not enough memory to load the template."));
 	    char * helpId = DTMAILHELPNOMEMTEMPLATE;
-	    int answer = dialog->post_and_return(helpId);
+	    dialog->post_and_return(helpId);
 	    SafeClose(fd);
 	    free(fullpath);
 	    return;
 	}
 
-	if (SafeRead(fd, mbuf.buffer, (unsigned int)mbuf.size) < mbuf.size) {
+	if ((unsigned long) SafeRead(fd, mbuf.buffer, (unsigned int)mbuf.size) < mbuf.size) {
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 1, 217, "Mailer"),
 				     CATGETS(DT_catd, 1, 218, "The template appears to be corrupt."));
 	    char * helpId = DTMAILHELPERROR;
-	    int answer = dialog->post_and_return(helpId);
+	    dialog->post_and_return(helpId);
 	    SafeClose(fd);
 	    delete (char*) mbuf.buffer;
 	    free(fullpath);

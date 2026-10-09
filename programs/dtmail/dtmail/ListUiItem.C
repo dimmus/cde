@@ -67,7 +67,6 @@ ListUiItem::ListUiItem(Widget w,
 void ListUiItem::writeFromUiToSource()
 {
 //  char 	*textfield_value;
-  Widget w = this->getWidget();
 
 //   textfield_value = options_field_get_value(w);
    
@@ -80,7 +79,6 @@ void ListUiItem::writeFromUiToSource()
 void ListUiItem::writeFromSourceToUi()
 {
 //  char *value;
-  Widget w = this->getWidget();
 
 //   value = (char *)prop_source->getValue();
 

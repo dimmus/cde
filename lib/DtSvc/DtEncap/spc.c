@@ -726,7 +726,7 @@ SPC_Channel_Ptr XeSPCHandleTerminator(int fd)
 /*----------------------------------------------------------------------+*/
 {
   SPC_Connection_Ptr connection;
-  SPC_Channel_Ptr channel;
+  SPC_Channel_Ptr channel = NULL;
   protocol_request_ptr prot;
   XeQueue connection_queue;
   

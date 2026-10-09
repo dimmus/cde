@@ -45,13 +45,6 @@
  * ________________________________________________________________________
  */
 
-#ifdef STORAGE
-#ifndef lint
-static char *gen_h_RCSid =
-  "$XConsortium: general.h /main/11 1996/08/08 14:41:50 cde-hp $";
-#endif
-#endif
-
 /* get Tcl header so the variables make sense */
 #include <tcl.h>
 

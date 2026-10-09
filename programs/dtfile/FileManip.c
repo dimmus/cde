@@ -99,7 +99,6 @@
 /*  Local Function Definitions  */
 static char * MOVE_CMD = "/bin/mv";
 static char * LINK_CMD = "/bin/ln";
-static char * REMOVE_CMD = "/bin/rm";
 static char * DTCOPY = CDE_INSTALLATION_TOP "/bin/dtfile_copy";
 
 
@@ -304,12 +303,12 @@ MoveDir(
         char ** targetRtn ,
         int type )
 {
+#ifdef DEBUG
    static char *pname = "MoveDir";
+#endif
    char *p;
 
    char * targetDir;            /* original target dir path */
-   char *link_path;
-   int link_result;
 
    struct stat  s1;             /* status of from file */
    struct stat  s2;             /* status of to file   */
@@ -317,10 +316,9 @@ MoveDir(
    int len, val, val1;
 
    static char buf [BUF_SIZE];  /* generic buffer */
-   char filename [MAX_PATH];    /* buffer to hold the full file name */
    char * msg;
    char * tmpStr;
-   int child_pid, rc;
+   int child_pid;
 
    /* Copy target so we have it for an error dialog if we need it */
    targetDir = XtNewString(target);
@@ -497,10 +495,10 @@ MoveDir(
 
          /* pass in geometry, and other command lines params when available */
 	 if(type == TRASH_DIRECTORY)
-           rc = execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
+           execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
 		 "-confirmErrors", "-popDown","-checkPerms", source, target, NULL);
 	 else
-           rc = execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
+           execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
 		 "-confirmErrors", "-popDown", source, target, NULL);
 
          /* call errorhandler */
@@ -517,8 +515,6 @@ MoveDir(
       XtFree(targetDir);
       return (True);
    }
-
-   link_path = _DtFollowLink(source);
 
 
    if (s1.st_ino != s2.st_ino)
@@ -578,7 +574,9 @@ CopyDir(
         Boolean checkForBusyDir,
         int type )
 {
+#ifdef DEBUG
    static char *pname = "CopyDir";
+#endif
    char * cptr;
    int len;
    char target [MAX_PATH];	/* buffer to hold the full file name */
@@ -1062,11 +1060,13 @@ FileManip(
          {
             /* Fail-safe; do it the hard way */
             if (mode == MOVE_FILE)
+            {
                if (RunFileCommand(MOVE_CMD, from, to, NULL) == 0)
                   return(True);
-            else
-               if (RunFileCommand(LINK_CMD, "-s", from, to) == 0)
-                  return(True);
+               else
+                  if (RunFileCommand(LINK_CMD, "-s", from, to) == 0)
+                     return(True);
+            }
 
             link_result = (-1);
          }
@@ -1167,7 +1167,7 @@ FileManip(
    /*  do the copy  */
 
 
-   while (n = read (fold, buf, BLOCK_SIZE))
+   while ((n = read (fold, buf, BLOCK_SIZE)))
    {
      int result;
 

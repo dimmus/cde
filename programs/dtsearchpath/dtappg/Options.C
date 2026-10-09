@@ -55,7 +55,7 @@ Options::Options
 CString Usage ("Usage: dtappgather [ -v | -r ]");
 
     if (argc > 1) {
-	for (int i = 1; i < argc; i++) {
+	for (int i = 1; i < (int)argc; i++) {
 	    if (strcmp(argv[i],"-v") == 0)
 		flags += 1;
 	    else if (strcmp(argv[i],"-r") == 0)

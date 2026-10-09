@@ -1090,7 +1090,7 @@ void            load_ditto_str (void)
 	if (debugging)
 	    fprintf (aa_stderr,
 		"  --> dba=%ld normwt=%.4lf prox=%d key='%s'\n",
-		dba1, sum3, cur_ditto_mem->proximity,
+		(long)dba1, sum3, cur_ditto_mem->proximity,
 		cur_ditto_mem->reckey);
 
 	/*

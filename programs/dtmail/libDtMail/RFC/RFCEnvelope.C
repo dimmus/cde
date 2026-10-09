@@ -97,7 +97,6 @@ RFCEnvelope::~RFCEnvelope(void)
 	MutexLock lock_scope(_obj_mutex);
 	if (_object_signature == RFCEnvelopeSignature) {
 	    for (int hdr = 0; hdr < _parsed_headers.length(); hdr++) {
-		ParsedHeader * hdrp = _parsed_headers[hdr];
 		delete _parsed_headers[hdr];
 	    }
 	    _object_signature = 0;
@@ -424,7 +423,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
     // Clean up the existing value if need be.
     //
     if (hdr->value_start) {
-      if ( (strlen(val) != hdr->value_len)
+      if ( (strlen(val) != (size_t) hdr->value_len)
 	|| (strncmp(hdr->value_start, val, hdr->value_len)!=0) )	// has value changed??
 	  _dirty = 1;				// yes: header dirty
 	if (hdr->alloc_mask & VALUE_MASK) {
@@ -484,7 +483,6 @@ RFCEnvelope::adjustHeaderLocation(char * headerStart, int headerLength)
       // destroy current headers
       //
       for (int hdr = 0; hdr < _parsed_headers.length(); hdr++) {
-	ParsedHeader * hdrp = _parsed_headers[hdr];
 	delete _parsed_headers[hdr];
 	_parsed_headers.remove(hdr);
 	hdr -=1;
@@ -528,7 +526,6 @@ RFCEnvelope::writeHeaders(char * new_loc)
   for (int hdr = 0; hdr < _parsed_headers.length(); hdr++) {
     ParsedHeader * h = _parsed_headers[hdr];
     
-    const char * new_name = cur_loc;
     memcpy(cur_loc, h->name_start, h->name_len);
     cur_loc += h->name_len;
     if (!first || strncmp(h->name_start, "From", h->name_len) != 0) {
@@ -539,7 +536,6 @@ RFCEnvelope::writeHeaders(char * new_loc)
     
     // Copy the value
     //
-    const char * new_value = cur_loc;
     memcpy(cur_loc, h->value_start, h->value_len);
     cur_loc += h->value_len;
     
@@ -727,7 +723,6 @@ RFCEnvelope::getTransportHeader(DtMailEnv & error,
     // Second pass, find the headers and convert the values to the
     // appropriate type.
     //
-    int ent = 0;
     for (int val = 0; val < _parsed_headers.length(); val++) {
 	if (val == 0 &&	
 	    strncmp(_parsed_headers[val]->name_start, "From ", 5) == 0) {
@@ -817,7 +812,7 @@ RFCEnvelope::makeValue(DtMailEnv & error,
 DtMailBoolean
 RFCEnvelope::matchName(const ParsedHeader & hdr, const char * name)
 {
-    if (hdr.name_len != strlen(name)) {
+    if ((size_t) hdr.name_len != strlen(name)) {
 	return(DTM_FALSE);
     }
 
@@ -998,7 +993,7 @@ RFCEnvelope::makeReply(DtMailEnv & error,
 
 	RFCValue * new_val = new RFCValue(str_addr, strlen(str_addr), _parent->session());
 	value.append(new_val);
-	delete str_addr;
+	delete [] str_addr;
     }
 }
 

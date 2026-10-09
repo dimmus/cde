@@ -180,7 +180,6 @@ DeletePropertiesProc (
 	for (i = 0; i < numProps; i++) {
 
 		PropertyRecPtr   	pProp;
-		PropertyRecPtr   	tmp;
 		PropertyRecPtr   	trail;
 
 		for (pProp = pClient->props, trail = pClient->props ; 
@@ -224,7 +223,6 @@ GetPropertiesProc (
 {
 	ClientRecPtr   		pClient = (ClientRecPtr) managerData;
 	PropertyRecPtr   	pProp;
-	PropertyRecPtr   	trail;
 	int			numProps;
 	int			i, j;
 	SmProp			**pPropsRet;

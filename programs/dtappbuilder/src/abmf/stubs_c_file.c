@@ -107,7 +107,6 @@ static STRING	begin_ss_restore_callback_body =
  * Local functions.
  */
 static int	printf_setval(GenCodeInfo, ABObj, ...);
-static int	printf_getval(GenCodeInfo, ABObj, int nres, ...);
 static int write_tooltalk_cb_vars(GenCodeInfo genCodeInfo, ABObj action);
 static int write_tooltalk_cb_body1(GenCodeInfo genCodeInfo, ABObj action);
 static int write_tooltalk_cb_body2(GenCodeInfo genCodeInfo, ABObj action);
@@ -279,13 +278,7 @@ printf_setval(GenCodeInfo genCodeInfo, ABObj obj, ...)
 {
     int			return_value = 0;
     File		codeFile = genCodeInfo->code_file;
-#if defined(__linux__) || defined(CSRG_BASED)
-/* Define va_list in <va_list.h> as structure of char ** and int
- * Sun define va_list as void * */
-    va_list             paramList = { 0, 0 };
-#else
-    va_list             paramList = NULL;
-#endif /* linux */
+    va_list             paramList;
     STRING              resName = NULL;
     void		*resValue = NULL;
     STRING		objCName = NULL;
@@ -314,6 +307,8 @@ printf_setval(GenCodeInfo genCodeInfo, ABObj obj, ...)
 		util_dprintf(1, 
 		    "Ignoring unsupported connection resource type: WIDGET\n");
 	    break;
+	    default:
+	    break;
 	}
 	abmfP_write_arg_val(genCodeInfo, FALSE, resName, resValue, obj);
 	abio_printf(codeFile, ",\n\t\t");
@@ -327,60 +322,6 @@ printf_setval(GenCodeInfo genCodeInfo, ABObj obj, ...)
     return return_value;
 }
 
-
-/*
- * printf_getval - can only get one resource.  This can be changed at a later
- * date if need be. NOTE: We need to declare local variables in one pass,
- * Then write out an XtVaGetValues on a second pass, if we ever want to get
- * more that one value back.
- */
-static int
-printf_getval(GenCodeInfo genCodeInfo, ABObj obj, int nres,...)
-{
-    int			return_value = 0;
-    File		codeFile = genCodeInfo->code_file;
-    va_list             ap;
-    STRING              resource;
-    ARG_TYPES           type;
-    STRING		objCName = NULL;
-    nres = nres;		/* avoid warning */
-
-    va_start(ap, nres);
-
-    objCName = abmfP_get_c_name(genCodeInfo, obj);
-    resource = va_arg(ap, STRING);
-    type = va_arg(ap, ARG_TYPES);
-
-    /* Print the declaration */
-    switch (type)
-    {
-    case IMMED_TYPE:
-    case INT_TYPE:
-	abio_printf(codeFile, "\tint i;\n\n");
-	break;
-    case STRING_TYPE:
-	abio_printf(codeFile, "\tchar *str;\n\n");
-	break;
-    }
-
-    abio_printf(codeFile, "\tXtVaGetValues(%s,\n\t\t%s, ", objCName, resource);
-
-    /* Print the local variable reference */
-    switch (type)
-    {
-    case IMMED_TYPE:
-    case INT_TYPE:
-	abio_printf(codeFile, "&i");
-	break;
-    case STRING_TYPE:
-	abio_printf(codeFile, "&str");
-	break;
-    }
-    abio_printf(codeFile, ",\n\t\tNULL);\n");
-
-    va_end(ap);
-    return return_value;
-}
 
 static void
 set_up_user_type_variables(GenCodeInfo genCodeInfo, ABObj toObj)
@@ -858,19 +799,14 @@ write_ss_cb_body2(
 static int
 write_action_functions(GenCodeInfo genCodeInfo, ABObj obj)
 {
-    File                codeFile = genCodeInfo->code_file;
-    static char         msg[256],
-                       *s;
     AB_TRAVERSAL        trav;
     ABObj               action = NULL;
-    ABObj               fromObj = NULL;	/* for error reports */
-    int                 i = 0;
 
     /*
      * Auto-named functions
      */
-    for (trav_open(&trav, obj, AB_TRAV_ACTIONS_FOR_OBJ | AB_TRAV_MOD_SAFE), i = 0;
-	 (action = trav_next(&trav)) != NULL; ++i)
+    for (trav_open(&trav, obj, AB_TRAV_ACTIONS_FOR_OBJ | AB_TRAV_MOD_SAFE);
+	 (action = trav_next(&trav)) != NULL; )
     {
 	if (   mfobj_has_flags(action, CGenFlagIsDuplicateDef)
 	    || mfobj_has_flags(action, CGenFlagWriteDefToProjFile))
@@ -890,7 +826,7 @@ write_action_functions(GenCodeInfo genCodeInfo, ABObj obj)
      * User-named functions
      */
     for (trav_reset(&trav);
-	 (action = trav_next(&trav)) != NULL; ++i)
+	 (action = trav_next(&trav)) != NULL; )
     {
 	if (   mfobj_has_flags(action, CGenFlagIsDuplicateDef)
 	    || mfobj_has_flags(action, CGenFlagWriteDefToProjFile))
@@ -921,8 +857,6 @@ abmfP_write_stubs_c_file(
 )
 {
     File                codeFile = genCodeInfo->code_file;
-    STRING              errmsg = NULL;
-    ABObj               win_obj = NULL;
     ABObj               project = obj_get_project(module);
     char		moduleHeaderFileName[MAX_PATH_SIZE];
     char		moduleName[MAX_PATH_SIZE];
@@ -1020,11 +954,10 @@ abmfP_write_action_function(
     BOOL		funcBodyWritten = FALSE;
     BOOL		funcEndWritten = FALSE;
     BOOL		actionPrintfWritten = FALSE;
+    BOOL		fromVarWritten = FALSE;
     int                 return_value = 0;
     ABObj               fromObj = obj_get_from(action);
     ABObj		actualFromObj = NULL;
-    ABObj		toObj = obj_get_to(action);
-    ABObj		module = NULL;
     char		actionName[1024];
     char		actionPrintf[32 + sizeof(actionName)];
 
@@ -1049,6 +982,7 @@ abmfP_write_action_function(
         abmfP_write_xm_callback_begin(genCodeInfo, FALSE, actionName);
         write_instance_ptr_var(genCodeInfo, actualFromObj,
 	    get_from_var_name(), "callData", TRUE, NULL);
+	fromVarWritten = (actualFromObj != NULL);
 	abio_puts(genCodeInfo->code_file, nlstr);
 
     break;
@@ -1130,6 +1064,11 @@ abmfP_write_action_function(
         abmfP_write_user_var_and_code_seg(genCodeInfo, contents);
         abio_puts(codeFile, nlstr);
 	topUserSegWritten = TRUE;
+	if (fromVarWritten)
+	{
+	    /* user code may not reference it */
+	    abio_printf(codeFile, "(void)%s;\n", get_from_var_name());
+	}
 	if (contents != NULL)
 	{
 	    actionPrintfWritten = TRUE;
@@ -1288,7 +1227,6 @@ abmfP_write_builtin_action(
     if (return_value == 0)
 	abio_printf(codeFile, nlstr);
 	
-epiloge:
     abio_printf(codeFile, nlstr);
     return return_value;
 }
@@ -1348,7 +1286,6 @@ write_builtin_action_for_ref(
 	util_dprintf(0, "Unable to obtain references to the object.\n");
     }
 
-epiloge:
     objlist_destroy(refList);
     return return_value;
 }

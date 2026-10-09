@@ -117,12 +117,14 @@ static SyncParams *SP;
 #define DTYPE(delP) ((delP)? (delP)->ftype: ft_noent)
 
 #define CONFIRM(op, sn, st, tn, tt, l, rc) \
+  do { \
   if (periodicCallback && (*periodicCallback)() != 0) return -1; \
   else if (syncConfirmCallback && \
-      (rc = syncConfirmCallback(op, sn, st, tn, tt, l)) != 0) return rc; else
+      (rc = syncConfirmCallback(op, sn, st, tn, tt, l)) != 0) return rc; \
+  } while (0)
 
 #define ERROR_CHECK(op, f, rc) \
-  if (rc < 0 || rc && syncErrorCallback && syncErrorCallback(op, f, rc) < 0) \
+  if (rc < 0 || (rc && syncErrorCallback && syncErrorCallback(op, f, rc) < 0)) \
     return -1; else
 
 
@@ -141,27 +143,6 @@ typedef struct de {
   struct de *teP;      /* source dir: points to correspond. target dir entry */
   struct de *next;     /* next directory entry */
 } DirEntry;
-
-
-/*
- * DumpDir: dump linked list of directory entries to stdout (debugging only)
- */
-static void
-DumpDir(DirEntry *dP)
-{
-  DirEntry *eP;
-
-  for (eP = dP; eP; eP = eP->next)
-    printf(" %-15s %2d  %c %c %c %c  %c  %s\n",
-           eP->name,
-           eP->rc,
-           (eP->ftype & ft_isdir)? 'D': ' ',
-           (eP->ftype & ft_islnk)? 'L': ' ',
-           eP->exclude? 'X': ' ',
-           eP->skip? 'S': ' ',
-           eP->teP? 'F': ' ',
-           eP->link? eP->link: "");
-}
 
 
 /*
@@ -303,7 +284,9 @@ GetDir(char *dirname, PatternList *xl, PatternList *sl, DirEntry **listPP)
   struct dirent *entryP;          /* directory entry */
   DirEntry *deP, *firstP, **linkPP;
   char fname[1024], *fnP;
+#ifdef PATRTNS
   PatternList *pl;
+#endif
   FileOp op;
   int rc;
 
@@ -648,14 +631,14 @@ rpl_target:
      *------------------------------------------------------------------*/
 
     /* check if -dontreplace or -dontadd options apply */
-    if (tP && SP->dontreplace || !tP && SP->dontadd)
+    if ((tP && SP->dontreplace) || (!tP && SP->dontadd))
       return 0;
 
     if (sP->ftype & ft_islnk) {
       /* source is a link */
 
-      if ((sP->ftype & ft_isdir) && !SP->copydirs ||
-          !(sP->ftype & ft_isdir) && !SP->copyfiles)
+      if (((sP->ftype & ft_isdir) && !SP->copydirs) ||
+          (!(sP->ftype & ft_isdir) && !SP->copyfiles))
       {
         /* just copy the link */
         return doCopyLink(sname, sP, tname, tP);
@@ -664,8 +647,8 @@ rpl_target:
     } else {
       /* source is not a link */
 
-      if ((sP->ftype & ft_isdir) && SP->linkdirs ||
-          !(sP->ftype & ft_isdir) && SP->linkfiles)
+      if (((sP->ftype & ft_isdir) && SP->linkdirs) ||
+          (!(sP->ftype & ft_isdir) && SP->linkfiles))
       {
         /* don't copy; just create a link to the target */
         return doSymlink(sname, sP, tname, tP);

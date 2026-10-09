@@ -584,7 +584,6 @@ decode_uue_line(char * buf,
 	    const unsigned char * encodedEndBp)
 {
     unsigned char line_buf[100];
-    const unsigned char * line = line_buf;
     const unsigned char * nextEncodedLineStart;
     const unsigned char * nl;
     unsigned long encodedLen;
@@ -617,13 +616,11 @@ decode_uue_line(char * buf,
 	else {
 	    // We will ignore extra characters at the end of the line.
 	    // (great...)
-	    line = encodedBp;
 	}
 	
 	nextEncodedLineStart = nl + 1;
     }
     else {
-	line = encodedBp;
 	nextEncodedLineStart = encodedBp + encodedLen + 1;
     }
 
@@ -992,8 +989,8 @@ SunV3::encode_uue_line(Buffer & buf,
 
     for (const unsigned char * cur = unencodedBp; cur < (unencodedBp + triplets - 2); cur += 3) {
 	enc[0] = encode_uue_char(*cur >> 2);
-	enc[1] = encode_uue_char((*cur << 4) & 060 | (*(cur + 1) >> 4) & 017);
-	enc[2] = encode_uue_char((*(cur + 1) << 2) & 074 | (*(cur + 2) >> 6) & 03);
+	enc[1] = encode_uue_char(((*cur << 4) & 060) | ((*(cur + 1) >> 4) & 017));
+	enc[2] = encode_uue_char(((*(cur + 1) << 2) & 074) | ((*(cur + 2) >> 6) & 03));
 	enc[3] = encode_uue_char(*(cur + 2) & 077);
 	buf.appendData(enc, 4);
     }
@@ -1021,7 +1018,6 @@ SunV3::uuencode(Buffer & buf,
     // the initial "M", or trailing line termination.
     //
     unsigned long whole_lines = len - (len % 45);
-    unsigned long column = 0;
     for (cur = ubp; cur < (ubp + whole_lines - 2); cur += 45) {
 	buf.appendData("M", 1);
 	encode_uue_line(buf, cur, 45);

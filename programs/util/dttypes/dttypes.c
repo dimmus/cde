@@ -40,7 +40,9 @@
 #define UNGETC(c)     (--sp)
 #define RETURN(c)     return(c)
 #define ERROR(c)      {rexp_errno = c; return((char *)0);}
+#if !defined(CSRG_BASED) && !defined(__linux__)
 static	int	rexp_errno = 0;
+#endif
 #if defined(CSRG_BASED) || defined(__linux__)
 #include	<regex.h>
 #else
@@ -61,14 +63,14 @@ extern	char **	_DtsMMListDb(void);
 int usage(void);
 
 
-static	enum	errors
+enum	errors
 {
 	BAD_DB,
 	NO_ARGUMENT,
 	REC_INFO_IN_STATE,
 	NO_STATE,
 	INVALID_ARG
-} MyErrors;
+};
 
 static	int	read_errors = 0;
 static	char	*error_str[] =
@@ -80,13 +82,13 @@ static	char	*error_str[] =
 	"Unknown option\n"			 /* INVALIDE_ARG */
 };
 
-static	enum
+enum
 {
 	r_info,
 	r_name,
 	f_name,
 	f_value
-} list_shift;
+};
 
 typedef struct
 {
@@ -107,7 +109,6 @@ static int
 init(int *argc, char **argv)
 {
 	Widget		toplevel;
-	XtAppContext	appContext;
 	Arg 		args[20];
 
 
@@ -136,7 +137,6 @@ init(int *argc, char **argv)
 void
 add_rec(int rec, List *l)
 {
-	int	i;
 
 	if(l->rec_total == 0 || l->rec_count >= l->rec_total-2)
 	{
@@ -152,11 +152,9 @@ void
 rec_list(List *l)
 {
 	int		i;
-	int		db;
 	int		rec;
 	int		fld;
 	DtDtsMMDatabase	*db_ptr;
-	DtDtsMMDatabase	*db_ptr_list;
 	DtDtsMMRecord	*rec_ptr;
 	DtDtsMMRecord	*rec_ptr_list;
 	DtDtsMMField	*fld_ptr;
@@ -289,9 +287,9 @@ rec_list(List *l)
 		rec = l->rec_list[i];
 		rec_ptr =  &rec_ptr_list[rec];
 		if(l->display_list&(1<<r_info) ||
-		   l->display_list&(1<<r_name) &&
+		   (l->display_list&(1<<r_name) &&
 		   (l->display_list&(1<<f_name) ||
-		    l->display_list&(1<<f_value)))
+		    l->display_list&(1<<f_value))))
 		{
 			printf(CATGETS(dtcatd, 1, 5, "=============== %s ===============\n"),
 				rec_ptr->recordName?(char *)_DtDtsMMBosonToString(rec_ptr->recordName):CATGETS(dtcatd, 1, 6, ""));
@@ -360,8 +358,6 @@ rec_list(List *l)
 int
 parse_args(List *l, int argc, char **argv)
 {
-	int	*rl;
-	int	df = 0;
 	int	i;
 	int	error = 0;
 	enum	st
@@ -601,10 +597,7 @@ main(int argc, char **argv)
 {
 	List	l;
 	char	**dbs;
-	int	*rl;
-	int	df = 0;
 	int	i;
-	int	error = 0;
 	char	*locale;
 	enum	st
 	{
@@ -612,7 +605,6 @@ main(int argc, char **argv)
 		where,
 		list
 	};
-	enum	st	state = none;
 
 	locale = setlocale(LC_ALL, "");
 	if(!locale)

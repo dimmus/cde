@@ -674,7 +674,7 @@ DmxPrintOptions::stringToPropValue(
 char *
 DmxPrintOptions::isValidMarginSpec(PropUiItem* pui, void* data)
 {
-    char        *i18nMsg;
+    char        *i18nMsg = NULL;
     char	*errMsg = NULL;
     char	*marginSpec = NULL;
     XtEnum	parseError;
