@@ -157,7 +157,10 @@ static const FormatCmds  CcdfFormatCmds[] =
  *		allowed		Specifies the formatting commands allowed
  *				in the data.
  *		strip		Specifies the formatting commands to strip.
- *				from the data.
+ *				from the data.  (Not consulted: no
+ *				formatting command is ever copied into
+ *				'ret_string', so all of them are stripped,
+ *				which is what every caller asks for.)
  *		ret_size	Specifies the current size of
  *					'ret_string'.
  *				Returns the new size of 'ret_string'.

@@ -2284,6 +2284,7 @@ void _DtHelpSetButtonPositions(
    Dimension spaceWidth = 0;
    Dimension btnWidth;
    Dimension maxBtnWidth = 0;
+   int       minWidthWithSpace;
    float scale = 0.0;
    XmFontList fontList = NULL;
    int        i;
@@ -2314,8 +2315,12 @@ void _DtHelpSetButtonPositions(
    } /* for calcing widths */
    numBtns = i;  /* number of valid buttons */
 
-   /* calc the space */
+   /* calc the space; widen the form if the buttons and the minimum
+      space between them do not fit (the -Wall cleanup found this test
+      comparing minWidthWithSpace with itself, so it never did) */
    sumWidth = maxBtnWidth * numBtns;
+   minWidthWithSpace = sumWidth + minBetweenBtnSpace * (numBtns * 2);
+   if (minWidthWithSpace > (int) minFormWidth) minFormWidth = minWidthWithSpace;
    spaceWidth = ((int)(minFormWidth - sumWidth) / (numBtns * 2));
 
    /* scale pixels to percent */

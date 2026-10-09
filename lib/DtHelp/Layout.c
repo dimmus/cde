@@ -344,7 +344,7 @@ static	const	_DtCvSegmentI	BlankTableCell =
 	    0,			  /* rmargin      */
 	    0,			  /* tmargin      */
 	    0,			  /* bmargin      */
-	    { _DtCvBORDER_NONE, NULL },  /* bdr_info     */
+	    { 0, NULL },	  /* bdr_info: no border, width 0 */
 	    NULL 		  /* seg_list     */
 	  } },
 	NULL,			/* next_seg     */
