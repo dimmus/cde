@@ -1167,9 +1167,10 @@ _Tt_old_db::verifyAccess (const _Tt_string        &key,
 			       TT_OLD_DB_ACCESS_MODE_OFFSET);
       mode_t mode = (mode_t)ntohs(n_mode);
 
-      // If the user in the DB is -1, all users match
+      // If the user in the DB is -1, all users match.  (The field is
+      // 16 bits wide, so -1 reads back as 0xffff, never as (uid_t)-1.)
       bool_t user_flag = FALSE;
-      if (user == (uid_t)-1) {
+      if ((short)ntohs(n_user) == -1) {
         user_flag = TRUE;
       }
       else {
@@ -1180,7 +1181,7 @@ _Tt_old_db::verifyAccess (const _Tt_string        &key,
 
       // If the group in the DB is -1, all groups match
       bool_t group_flag = FALSE;
-      if (group == (gid_t)-1) {
+      if ((short)ntohs(n_group) == -1) {
         group_flag = TRUE;
       }
       else {
@@ -1916,7 +1917,7 @@ _Tt_db_results _Tt_old_db::getAccess (const _Tt_string  &key,
       short n_group = *(short *)
 		       ((char *)record_ptr->getRecord()+
 		                TT_OLD_DB_ACCESS_GROUP_OFFSET);
-      access->group = (gid_t)ntohl(n_group);
+      access->group = (gid_t)ntohs(n_group);	// a 16-bit field
 
       short n_mode = *(short *)
 		      ((char *)record_ptr->getRecord()+

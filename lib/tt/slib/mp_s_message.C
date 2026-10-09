@@ -1175,11 +1175,14 @@ match_patterns(_Tt_pattern_list_ptr &patterns, const _Tt_msg_trace &trace,
 	while (pcursor.next()) {
 		_Tt_s_procid_ptr registrant = (_Tt_s_procid *)
 			pcursor->procid().c_pointer();
+		// Skip patterns of absent or inactive procids.  (This
+		// used to return, so one such pattern stopped matching
+		// against every pattern after it in the list.)
 		if (registrant.is_null()) {
-			return(0);
+			continue;
 		}
 		if (! registrant->is_active()) {
-			return(0);
+			continue;
 		}
 		const _Tt_s_pattern *spat;
 		switch (pcursor->category()) {

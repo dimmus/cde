@@ -360,6 +360,7 @@ put_value(_Tt_trace_parser* tp,
 			tp->add_function(value);
 			break;
 		}
+		break;	// (used to fall into set_attributes())
 	    case _TT_TRACE_ATTRIBUTES:
 		tp->set_attributes(token);
 		break;
@@ -452,8 +453,9 @@ static int _is_tt_func(const _Tt_string& fun)
 		entry_len = strlen(_tt_entries[arr_indx]);
 		if (entry_len != name_len) continue;
 	
-		while (_tt_entries[arr_indx][i] == fun[i] &&
-		       i < name_len) i++;
+		i = 0;	// (was never reset between entries)
+		while (i < name_len &&
+		       _tt_entries[arr_indx][i] == fun[i]) i++;
 
 		if (i == name_len) return 1;
 	}

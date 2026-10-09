@@ -52,6 +52,7 @@
 #include "util/tt_base64.h"
 #include "util/tt_host.h"
 #include "util/tt_port.h"
+#include "util/tt_enumname.h"
 #include <errno.h>
 #include <sys/resource.h>
 #include <time.h>
@@ -195,11 +196,12 @@ _Tt_s_mp::init_self()
 	// Use the lame do-loop hack to avoid repeating the drop_mutex
 	// code after every possible failure...
 	
+	Tt_status status = TT_OK;
 	do {
 		//
 		// tt_open(), tt_fd()
 		//
-		Tt_status status = _self->init();
+		status = _self->init();
 		if (status != TT_OK) {
 			break;
 		}
@@ -220,7 +222,14 @@ _Tt_s_mp::init_self()
 
 	_tt_global->drop_mutex();
 
-	return TT_OK;
+	// ttsession carries on without its self-procid (only the
+	// Session_Trace and Saved handling depend on it), but say so
+	// instead of dropping the error.
+	if (status != TT_OK) {
+		_tt_syslog( 0, LOG_WARNING, "_Tt_s_mp::init_self(): %s",
+			    _tt_enumname( status ) );
+	}
+	return status;
 }
 
 Tt_status

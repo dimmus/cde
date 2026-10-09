@@ -598,8 +598,9 @@ _tt_process_transaction()
 		return;
 	}
 	/* Check the transaction flag */
+	// (Compare as signed: a cast of -1 to size_t never tested short.)
 	int nbytes = read(log_fd, _tt_log_buf, sizeof(int));
-	if ((size_t)nbytes < sizeof(int)) {
+	if (nbytes < (int)sizeof(int)) {
 		_tt_syslog(errstr, LOG_ERR, "read(): %m");
 		_tt_dbserver_prog_cleanup(log_fd);
 		UNLOCK_RPC();
@@ -648,7 +649,7 @@ _tt_process_transaction()
 	_Tt_trans_record trec;
 	nbytes = read(log_fd, _tt_log_buf, _TT_TREC_INFO);
 	while (nbytes) {
-		if ((size_t)nbytes < _TT_TREC_INFO) {
+		if (nbytes < (int)_TT_TREC_INFO) {
 			_tt_syslog(errstr, LOG_ERR, "read(): %m");
 			_tt_dbserver_prog_cleanup(log_fd, isfd);
 			UNLOCK_RPC();
@@ -663,8 +664,15 @@ _tt_process_transaction()
 		trec.rec.rec_len = *((u_int *) buf_rec);
 		buf_rec += sizeof(u_int);
 		/* read the record as a whole */
+		if (trec.rec.rec_len > sizeof(_tt_log_buf)) {
+			_tt_syslog(errstr, LOG_ERR, "%s: bad record length %u",
+				   _tt_log_file, trec.rec.rec_len);
+			_tt_dbserver_prog_cleanup(log_fd, isfd);
+			UNLOCK_RPC();
+			return;
+		}
 		nbytes = read(log_fd, _tt_log_buf, trec.rec.rec_len);
-		if ((u_int)nbytes < trec.rec.rec_len) {
+		if (nbytes < 0 || (u_int)nbytes < trec.rec.rec_len) {
 			_tt_syslog(errstr, LOG_ERR, "read(): %m");
 			_tt_dbserver_prog_cleanup(log_fd, isfd);
 			UNLOCK_RPC();
