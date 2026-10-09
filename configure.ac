@@ -35,6 +35,30 @@ AC_PREFIX_DEFAULT(/usr/dt)
 
 PKG_PROG_PKG_CONFIG
 
+dnl systemd unit for dtlogin. By default it is installed only when systemd
+dnl is installed (systemd.pc) and is the running init (/run/systemd/system,
+dnl the sd_booted() test); pass a directory to install it regardless.
+AC_ARG_WITH([systemdsystemunitdir],
+	AS_HELP_STRING([--with-systemdsystemunitdir=DIR],
+		[install dtlogin.service into DIR (default: systemd's unit dir if systemd is installed and running; "no" to skip)]),
+	[], [with_systemdsystemunitdir=auto])
+AC_MSG_CHECKING([where to install dtlogin.service])
+if test "x$with_systemdsystemunitdir" = "xauto" || test "x$with_systemdsystemunitdir" = "xyes"; then
+	def_systemdsystemunitdir=`$PKG_CONFIG --variable=systemdsystemunitdir systemd 2>/dev/null`
+	if test -n "$def_systemdsystemunitdir" && test -d /run/systemd/system; then
+		with_systemdsystemunitdir=$def_systemdsystemunitdir
+	elif test "x$with_systemdsystemunitdir" = "xyes"; then
+		AC_MSG_ERROR([systemd support requested but systemd is not installed or not running])
+	else
+		with_systemdsystemunitdir=no
+	fi
+fi
+AC_MSG_RESULT([$with_systemdsystemunitdir])
+if test "x$with_systemdsystemunitdir" != "xno"; then
+	AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+fi
+AM_CONDITIONAL([HAVE_SYSTEMD], [test "x$with_systemdsystemunitdir" != "xno"])
+
 dnl SOURCE_DEFINES - start with CDE project default
 SOURCE_CPP_DEFINES="-DANSICPP -DMULTIBYTE -DNLS16"
 

@@ -86,3 +86,11 @@ dtchooser_LDADD += -lgen -lresolv -lbsm -lcmd
 dtlogin_SOURCES += solaris.c
 endif
 
+if HAVE_SYSTEMD
+systemdsystemunit_DATA = dtlogin.service
+endif
+CLEANFILES = dtlogin.service
+EXTRA_DIST = $(top_srcdir)/contrib/rc/systemd/dtlogin.service.in
+
+dtlogin.service: $(top_srcdir)/contrib/rc/systemd/dtlogin.service.in Makefile
+	$(AM_V_GEN)sed -e 's|@bindir[@]|$(bindir)|g' $< > $@

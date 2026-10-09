@@ -1,0 +1,14 @@
+[Unit]
+Description=CDE login service
+Documentation=man:dtlogin(1)
+Requires=rpcbind.service
+After=rpcbind.service systemd-user-sessions.service
+# Xservers starts the local X server on tty1.
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+ExecStart=@bindir@/dtlogin -nodaemon
+
+[Install]
+Alias=display-manager.service

@@ -52,6 +52,7 @@ programs/dtimsstart/0020.dtims
 programs/dtimsstart/dtimsstart
 programs/dtlogin/dtchooser
 programs/dtlogin/dtgreet
+programs/dtlogin/dtlogin.service
 programs/dtlogin/dtlogin
 programs/dtlogin/config/dtlogin
 programs/dtmail/dtmail/dtmail
