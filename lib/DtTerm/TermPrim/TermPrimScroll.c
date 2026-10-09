@@ -238,7 +238,7 @@ _DtTermPrimScrollWait(Widget w)
 	/* refresh any lines above the expose zone that have their
 	 * scrollRefreshRows flag set...
 	 */
-	for (i = 0; i < (exposeY - tpd->offsetX) / tpd->cellHeight; i++) {
+	for (i = 0; i < (exposeY - tpd->offsetY) / tpd->cellHeight; i++) {
 	    if (tpd->scrollRefreshRows[i]) {
 		(void) _DtTermPrimRefreshText(w, 0, i, tw->term.columns, i);
 	    }
@@ -254,7 +254,7 @@ _DtTermPrimScrollWait(Widget w)
 	/* refresh any lines below the expose zone that have their
 	 * scrollRefreshRows flag set...
 	 */
-	for (i = (exposeY - tpd->offsetX + exposeHeight) / tpd->cellHeight;
+	for (i = (exposeY - tpd->offsetY + exposeHeight) / tpd->cellHeight;
 		i < tw->term.rows; i++) {
 	    if (tpd->scrollRefreshRows[i]) {
 		(void) _DtTermPrimRefreshText(w, 0, i, tw->term.columns, i);
@@ -913,15 +913,15 @@ _DtTermPrimScrollCompleteIfNecessary(Widget w, short scrollTopRow,
     }
 
     if (tw->term.jumpScroll) {
+	/* flush the queued jump scroll if adding these lines would
+	 * overflow the scroll region...
+	 */
 	maxJumpScrollLines = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
 	if ((lines + tpd->scroll.jump.scrollLines > maxJumpScrollLines) ||
-		(lines + tpd->scroll.jump.scrollLines < -maxJumpScrollLines))
+		(lines + tpd->scroll.jump.scrollLines < -maxJumpScrollLines)) {
 	    (void) _DtTermPrimScrollComplete(w, True);
-	return;
-    } else {
-	if (!tw->term.jumpScroll && tpd->scroll.nojump.pendingScroll) {
-	    (void) _DtTermPrimScrollComplete(w, True);
-	    return;
 	}
+    } else if (tpd->scroll.nojump.pendingScroll) {
+	(void) _DtTermPrimScrollComplete(w, True);
     }
 }

@@ -1066,7 +1066,11 @@ _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length)
                     length--;
                     continue;
                 }
-                break;
+                /* a truncated character at the end of the buffer:
+                 * drop it (otherwise we would loop forever)...
+                 */
+                length = i;
+                continue;
               case  0:
                 /* 
                 ** treat null character same as any other character...
@@ -1089,7 +1093,8 @@ _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length)
 	i           = 0;
         while (i < wcBufferLen)
         {
-            switch (mbLen = mblen(pmb, MIN(((int)MB_CUR_MAX), length - i)))
+            switch (mbLen = mblen(pmb, MIN(((int)MB_CUR_MAX),
+                    length - (int)(pmb - (char *)buffer))))
             {
 	      case -1:
               case  0:

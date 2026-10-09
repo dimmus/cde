@@ -322,7 +322,8 @@ _DtTermPrimPendingTextAppend
         */
         newChunk->len = MIN(len, newChunk->buffLen);
         (void)memcpy(newChunk->buffer, text, newChunk->len);
-        len -= newChunk->buffLen;
+        text += newChunk->len;
+        len -= newChunk->len;
     }    
     return(True);
 }

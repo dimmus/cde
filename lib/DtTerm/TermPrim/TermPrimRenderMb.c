@@ -641,7 +641,7 @@ DoInsertWc(Widget w, wchar_t *wcBuffer, int wcBufferLen, Boolean *wrapped)
     ** worry about _DtTermPrimBufferInsertWc tromping over its overflow buffer...
     */
     wcBufferLen = returnCount;
-    wcBuffer    = (wchar_t *)XtMalloc(wcBufferLen);
+    wcBuffer    = (wchar_t *)XtMalloc(wcBufferLen * sizeof(wchar_t));
     (void) memcpy(wcBuffer, returnChars, wcBufferLen * sizeof(wchar_t));
 
     /*
