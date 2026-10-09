@@ -99,15 +99,165 @@ static	const	CESDLVolume	DefaultSdlVolume =
      NULL,		/* _DtCvSegment *index;    */
      NULL,		/* _DtCvSegment *title;    */
      NULL,		/* _DtCvSegment *snb;      */
+     NULL,		/* _DtCvPointer client_data; */
+     NULL,		/* void (*destroy_region)(); */
      0,			/* short      minor_no; */
      False,		/* short      title_processed; */
+     NULL,		/* void      *id_index; */
   };
+
+/*
+ * Hash index of a volume's list of ids, so that mapping a location id to
+ * its segment is not a linear scan of every id in the volume (it happens
+ * several times per topic shown or printed).  Keys compare like
+ * _DtHelpCeStrCaseCmpLatin1 (ASCII case folded); each table keeps the
+ * first segment of the list with a given key, as the scan did.
+ */
+typedef struct {
+    _DtCvSegment   *list;	/* the id list this index was built for */
+    unsigned int    size;	/* power of two */
+    _DtCvSegment  **by_id;	/* keyed on the container id */
+    _DtCvSegment  **by_rssi;	/* keyed on the rssi (pre SDL 1.1 '_' ids) */
+} SdlIdIndex;
 
 /********    Private Macro Declarations    ********/
 
 /******************************************************************************
  *                          Private Functions
  ******************************************************************************/
+static void
+FreeIdIndex (
+    CESDLVolume	*sdlVol)
+{
+    SdlIdIndex *idx = (SdlIdIndex *) sdlVol->id_index;
+
+    if (idx != NULL)
+      {
+	free(idx->by_id);
+	free(idx->by_rssi);
+	free(idx);
+	sdlVol->id_index = NULL;
+      }
+}
+
+static unsigned int
+IdHash (
+    const char	*id)
+{
+    unsigned int h = 2166136261u;
+    int          c;
+
+    while (*id != '\0')
+      {
+	c  = (unsigned char) *id++;
+	h ^= (unsigned int) _DtCvToLower(c);
+	h *= 16777619u;
+      }
+    return h;
+}
+
+/*
+ * The key of an id segment in the "by_id" or "by_rssi" table.
+ */
+static const char *
+IdKey (
+    _DtCvSegment   *seg,
+    int		    rssi)
+{
+    if (rssi)
+	return (NULL == _SdlSegToSdlIdInfoPtr(seg)) ? NULL :
+				_SdlIdInfoPtrRssi(_SdlSegToSdlIdInfoPtr(seg));
+    return _DtCvContainerIdOfSeg(seg);
+}
+
+/*
+ * Add "seg" unless a segment with an equal key is already there (the
+ * first one in list order wins).
+ */
+static void
+IdIndexInsert (
+    _DtCvSegment  **table,
+    unsigned int    size,
+    int		    rssi,
+    _DtCvSegment   *seg)
+{
+    unsigned int  i;
+    const char   *key = IdKey(seg, rssi);
+
+    if (key == NULL)
+	return;
+
+    for (i = IdHash(key) & (size - 1); table[i] != NULL; i = (i + 1) & (size - 1))
+	if (_DtHelpCeStrCaseCmpLatin1(IdKey(table[i], rssi), key) == 0)
+	    return;
+    table[i] = seg;
+}
+
+static _DtCvSegment *
+IdIndexFind (
+    _DtCvSegment  **table,
+    unsigned int    size,
+    int		    rssi,
+    const char	   *key)
+{
+    unsigned int  i;
+
+    for (i = IdHash(key) & (size - 1); table[i] != NULL; i = (i + 1) & (size - 1))
+	if (_DtHelpCeStrCaseCmpLatin1(IdKey(table[i], rssi), key) == 0)
+	    return table[i];
+    return NULL;
+}
+
+/*
+ * Get the index for the id list starting at "list", building it if
+ * needed.  Returns NULL if it cannot be built (the caller scans).
+ */
+static SdlIdIndex *
+GetIdIndex (
+    CESDLVolume	   *sdlVol,
+    _DtCvSegment   *list)
+{
+    SdlIdIndex   *idx = (SdlIdIndex *) sdlVol->id_index;
+    _DtCvSegment *seg;
+    unsigned int  count = 0;
+    unsigned int  size  = 16;
+
+    if (idx != NULL && idx->list == list)
+	return idx;
+
+    FreeIdIndex(sdlVol);
+
+    for (seg = list; seg != NULL; seg = seg->next_seg)
+	count++;
+    while (size < count * 2)
+	size *= 2;
+
+    idx = (SdlIdIndex *) malloc (sizeof(SdlIdIndex));
+    if (idx == NULL)
+	return NULL;
+    idx->list    = list;
+    idx->size    = size;
+    idx->by_id   = (_DtCvSegment **) calloc (size, sizeof(_DtCvSegment *));
+    idx->by_rssi = (_DtCvSegment **) calloc (size, sizeof(_DtCvSegment *));
+    if (idx->by_id == NULL || idx->by_rssi == NULL)
+      {
+	free(idx->by_id);
+	free(idx->by_rssi);
+	free(idx);
+	return NULL;
+      }
+
+    for (seg = list; seg != NULL; seg = seg->next_seg)
+      {
+	IdIndexInsert(idx->by_id,   size, False, seg);
+	IdIndexInsert(idx->by_rssi, size, True,  seg);
+      }
+
+    sdlVol->id_index = (void *) idx;
+    return idx;
+}
+
+
 /******************************************************************************
  * Function:	void FreeIds (
  *
@@ -850,6 +1000,7 @@ _DtHelpCeCleanSdlVolume (
 	/*
 	 * free the ids
 	 */
+	FreeIdIndex(sdlVol);
 	FreeIds(sdlVol->loids);
 	_DtHelpFreeSegments(sdlVol->loids, _DtCvFALSE, NULL, NULL);
 
@@ -1161,8 +1312,11 @@ _DtHelpCeMapSdlIdToSegment(
     int		    underScore = False;
     short	    minorNo;
     _DtCvSegment   *idSegs;
+    _DtCvSegment   *found  = NULL;
     char	   *idString;
+    char	   *bigStr = NULL;
     char	    resStr[128] = "SDL-RESERVED-";
+    SdlIdIndex	   *idx;
 
     minorNo = _SdlVolumeMinorNumber(_DtHelpCeGetSdlVolumePtr(volume));
 
@@ -1177,30 +1331,60 @@ _DtHelpCeMapSdlIdToSegment(
 	    underScore = True;
 	else
           {
+	    size_t preLen = strlen(resStr);
+	    size_t idLen  = strlen(target_id + 1);
+
 	    target_id++;
-	    strcat(resStr, target_id);
-	    target_id = resStr;
+	    if (preLen + idLen < sizeof(resStr))
+	      {
+	        memcpy(resStr + preLen, target_id, idLen + 1);
+	        target_id = resStr;
+	      }
+	    else
+	      {
+		bigStr = (char *) malloc (preLen + idLen + 1);
+		if (bigStr == NULL)
+		    return NULL;
+		memcpy(bigStr, resStr, preLen);
+		memcpy(bigStr + preLen, target_id, idLen + 1);
+		target_id = bigStr;
+	      }
           }
       }
 
     if (_DtHelpCeGetSdlVolIds(volume, fd, &idSegs) != 0)
-	return NULL;
-
-    while (idSegs != NULL)
       {
-	if (underScore == True)
-	    idString = _SdlIdInfoPtrRssi(_SdlSegToSdlIdInfoPtr(idSegs));
-	else
-	    idString = _DtCvContainerIdOfSeg(idSegs);
-
-	if (idString != NULL &&
-			_DtHelpCeStrCaseCmpLatin1(idString, target_id) == 0)
-	    return idSegs;
-
-	idSegs = idSegs->next_seg;
+	free(bigStr);
+	return NULL;
       }
 
-    return NULL;
+    idx = (idSegs == NULL) ? NULL :
+		GetIdIndex(_DtHelpCeGetSdlVolumePtr(volume), idSegs);
+    if (idx != NULL)
+	found = IdIndexFind(underScore == True ? idx->by_rssi : idx->by_id,
+				idx->size, underScore, target_id);
+    else
+      {
+        while (idSegs != NULL)
+          {
+	    if (underScore == True)
+	        idString = _SdlIdInfoPtrRssi(_SdlSegToSdlIdInfoPtr(idSegs));
+	    else
+	        idString = _DtCvContainerIdOfSeg(idSegs);
+
+	    if (idString != NULL &&
+			_DtHelpCeStrCaseCmpLatin1(idString, target_id) == 0)
+	      {
+	        found = idSegs;
+	        break;
+	      }
+
+	    idSegs = idSegs->next_seg;
+          }
+      }
+
+    free(bigStr);
+    return found;
 }
 
 /*****************************************************************************

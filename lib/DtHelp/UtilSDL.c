@@ -519,6 +519,28 @@ _DtHelpCeReturnSdlElement (
     return 0;
 }
 
+/*
+ * Append one character to the cdata buffer; the common case (room left)
+ * without a function call.  Same semantics as _DtHelpCeAddCharToBuf.
+ */
+static int
+AddCdataChar (
+    char	  c,
+    char	**string,
+    int		 *str_size,
+    int		 *str_max)
+{
+    char *ptr = &c;
+
+    if (string != NULL && *string != NULL && (*str_size + 2) < *str_max)
+      {
+	(*string)[(*str_size)++] = c;
+	(*string)[*str_size]     = '\0';
+	return 0;
+      }
+    return _DtHelpCeAddCharToBuf(&ptr, string, str_size, str_max, 32);
+}
+
 /******************************************************************************
  * Function:	int _DtHelpCeGetSdlCdata (BufFilePtr f, char **string)
  *
@@ -561,6 +583,7 @@ _DtHelpCeGetSdlCdata (
     int        reason  = 0;
     int        len     = 0;
     int        strMB   = 1;
+    int        asciiFast = 0;
     char      *ptr;
     char       buf[MB_LEN_MAX + 1];
 #define	ESC_STR_LEN	4
@@ -576,6 +599,14 @@ _DtHelpCeGetSdlCdata (
 	   *str_max = strSize;
       }
 
+    /*
+     * In a stateless multibyte encoding (every locale glibc supports),
+     * a byte 0x01-0x7f at the start of a character is a character by
+     * itself, so mblen() need only be called for the other bytes.
+     */
+    if (max_mb != 1)
+	asciiFast = _DtHelpCeAsciiIsSingleByte();
+
     do {
 	c = BufFileGet(f);
 
@@ -583,7 +614,12 @@ _DtHelpCeGetSdlCdata (
 	buf[len]   = '\0';
 
 	if (c != BUFFILEEOF && max_mb != 1)
-	    strMB = mblen(buf, max_mb);
+	  {
+	    if (asciiFast && len == 1 && c > 0 && ((unsigned char) c) < 0x80)
+		strMB = 1;
+	    else
+		strMB = mblen(buf, max_mb);
+	  }
 
 	if (c == BUFFILEEOF || (escaped == False && strMB == 1 &&
 		(c == '<' ||
@@ -603,9 +639,7 @@ _DtHelpCeGetSdlCdata (
 
 	    if (lastWasNl == True)
 	      {
-		ptr = " ";
-	        if (_DtHelpCeAddCharToBuf(&ptr, string, &strSize,
-							str_max, 32) == -1)
+	        if (AddCdataChar(' ', string, &strSize, str_max) == -1)
 		    return -1;
 		lastWasSpace = True;
 	      }
@@ -708,7 +742,6 @@ _DtHelpCeGetSdlCdata (
 	        if (c == '\t')
 		    c = ' ';
 
-	        ptr = &c;
 	        if (c == '\n')
 		  {
 		    lastWasSpace = True;
@@ -727,8 +760,7 @@ _DtHelpCeGetSdlCdata (
 		    if ((lastWasSpace == False || type == SdlTypeLiteral ||
 						type == SdlTypeUnlinedLiteral)
 				&&
-	                _DtHelpCeAddCharToBuf(&ptr, string, &strSize,
-							str_max, 32) == -1)
+	                AddCdataChar(c, string, &strSize, str_max) == -1)
 		            return -1;
 
 		    if (type != SdlTypeLiteral &&

@@ -369,9 +369,17 @@ TermStrDraw (
 	int         n;
 	wchar_t     wch;
 
+	int         ascii = _DtHelpCeAsciiIsSingleByte();
+
 	mbtowc(NULL, NULL, 0);
 	while (x < end && byte_len > 0)
 	  {
+	    if (ascii && *mb != '\0' && ((unsigned char) *mb) < 0x80)
+	      {
+		wcStr[x++] = (wchar_t) *mb++;
+		byte_len--;
+		continue;
+	      }
 	    n = mbtowc(&wch, mb, byte_len);
 	    if (n <= 0)
 	      {
