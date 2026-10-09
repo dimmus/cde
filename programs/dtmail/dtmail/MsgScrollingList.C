@@ -2454,7 +2454,9 @@ MsgScrollingList::updateListItems(int current,
 	mbox->clearMessageSummary(info);
     }
 
-    XmListReplaceItemsPos(_w, newList, session_message_number, 1);
+    // newList has one entry per listed (undeleted) message;
+    // session_message_number also counts deleted ones.
+    XmListReplaceItemsPos(_w, newList, nmsgs, 1);
     for (int fr = 0; fr < nmsgs; fr++)
       XmStringFree(newList[fr]);
 

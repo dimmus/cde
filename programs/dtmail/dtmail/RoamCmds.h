@@ -1026,6 +1026,8 @@ class VacationCmd : public Cmd {
     char *_subject;
     const void  *_body;
     DtMail::Message *_msg;
+    void	*_msgBuffer;	// .vacation.msg contents _msg is parsed from
+    size_t	_msgMapSize;	// != 0: _msgBuffer is mmap()ed, else new[]ed
     Boolean _priorVacationRunning;
     DtMailGenDialog *_dialog;
 

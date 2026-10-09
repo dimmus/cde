@@ -858,7 +858,8 @@ class RFCMailBox : public DtMail::MailBox
     void	unlockFile(DtMailEnv &, int fd);
     void	waitForMsgs(int needed);
     void	writeMailBox(DtMailEnv&, DtMailBoolean);
-    void	writeToDumpFile(const char* format, ...);
+    void	writeToDumpFile(const char* format, ...)
+		    __attribute__((format(printf, 2, 3)));
 };
 
 class RFCTransport : public DtMail::Transport {

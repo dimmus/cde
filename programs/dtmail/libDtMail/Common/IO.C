@@ -615,7 +615,7 @@ SafeStrftime(char * buf, size_t buf_size,
 void *SockOpen(char *host, int clientPort, char **errorstring)
 {
     int sockfd;
-    unsigned long inaddr;
+    in_addr_t inaddr;
     struct sockaddr_in ad;
     struct hostent *hp;
     DtMailEnv error;
@@ -624,8 +624,11 @@ void *SockOpen(char *host, int clientPort, char **errorstring)
     memset(&ad, 0, sizeof(ad));
     ad.sin_family = AF_INET;
 
+    // A host name is not a dotted address: inet_addr() returns
+    // INADDR_NONE, which an unsigned long never compared equal to, so
+    // names were never looked up.
     inaddr = inet_addr(host);
-    if (inaddr != (unsigned long) -1)
+    if (inaddr != INADDR_NONE)
       memcpy(&ad.sin_addr, &inaddr, sizeof(inaddr));
     else
     {

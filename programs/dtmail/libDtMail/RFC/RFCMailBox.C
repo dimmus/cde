@@ -1864,7 +1864,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
   // reason fails, then fall back to method #2.
   //
 
-  char *mmap_format_string = "%s(%d): mmap(0, map_size=%ld, prot=0x%04x, flags=0x%04x, fd=%d(%s), %x) == map_region=%x, errno == %d\n";
+#define MMAP_FORMAT_STRING "%s(%d): mmap(0, map_size=%lu, prot=0x%04x, flags=0x%04x, fd=%d(%s), %lx) == map_region=%p, errno == %d\n"
 
   map->map_region = (char *)-1;
   
@@ -1890,16 +1890,18 @@ RFCMailBox::mapFile(DtMailEnv & error,
       DEBUG_PRINTF(
         ("mapFile: Error mmap(1) == %p, errno = %d\n", map->map_region, errno));
 
-      if (_errorLogging)
+      if (_errorLogging) {
         writeToDumpFile(
-	    mmap_format_string,
+	    MMAP_FORMAT_STRING,
 	    pname, err_phase,
 	    map->map_size, PROT_READ, flags, _fd, _real_path, map->offset,
 	    map->map_region, errno);
-      writeToDumpFile(
-	    "%s(%d): statbuf: ino=%d, dev=%d, nlink=%d, size=%ld\n",
+        writeToDumpFile(
+	    "%s(%d): statbuf: ino=%lu, dev=%lu, nlink=%lu, size=%ld\n",
 	    pname, err_phase,
-	    statbuf.st_ino, statbuf.st_dev, statbuf.st_nlink, statbuf.st_size);
+	    (unsigned long) statbuf.st_ino, (unsigned long) statbuf.st_dev,
+	    (unsigned long) statbuf.st_nlink, (long) statbuf.st_size);
+      }
 
       if (map->map_region == (char *) -1)
       {
@@ -1919,7 +1921,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	    if (map->map_region[i] == '\0') cnt++;
 
 	  writeToDumpFile(
-	      "%s(%d):  mmap failed: %d NULLs in map from byte %d to %d:\n",
+	      "%s(%d):  mmap failed: %d NULLs in map from byte %ld to %lu:\n",
 	      pname, err_phase,
 	      cnt, offset_from_map, map->file_size+offset_from_map);
 	}
@@ -1993,13 +1995,15 @@ RFCMailBox::mapFile(DtMailEnv & error,
       {
         error.logError(
 	  DTM_TRUE,
-	  mmap_format_string,
+	  MMAP_FORMAT_STRING,
 	  pname, err_phase,
-	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero, errno);
+	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero,
+	  map->offset, map->map_region, errno);
         writeToDumpFile(
-	  mmap_format_string,
+	  MMAP_FORMAT_STRING,
 	  pname, err_phase,
-	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero, errno);
+	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero,
+	  map->offset, map->map_region, errno);
       }
       if (already_locked == DTM_FALSE) {
         DEBUG_PRINTF( ("%s:  unlocking mailbox\n", pname) );
@@ -2045,15 +2049,17 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	    (map->map_region[offset_from_map+map->file_size-1] == '\0'))
        ) {
 
-      if (_errorLogging)
+      if (_errorLogging) {
         writeToDumpFile(
-	    "%s(%d):  SafeRead(%d(%s), 0x%08lx, %d) == %d, errno == %d\n",
-	    pname, err_phase, _fd, _real_path, map->map_region, bytesToRead,
-	    readResults, errno);
-      writeToDumpFile(
-	    "%s(%d):  stat buf: ino=%d, dev=%d, nlink=%d, size=%ld\n",
-	    pname, err_phase, statbuf.st_ino, statbuf.st_dev,
-	    statbuf.st_nlink, statbuf.st_size);
+	    "%s(%d):  SafeRead(%d(%s), %p, %lu) == %ld, errno == %d\n",
+	    pname, err_phase, _fd, _real_path, map->map_region,
+	    (unsigned long) bytesToRead, (long) readResults, errno);
+        writeToDumpFile(
+	    "%s(%d):  stat buf: ino=%lu, dev=%lu, nlink=%lu, size=%ld\n",
+	    pname, err_phase, (unsigned long) statbuf.st_ino,
+	    (unsigned long) statbuf.st_dev,
+	    (unsigned long) statbuf.st_nlink, (long) statbuf.st_size);
+      }
 
       if (readResults > 0) {
         if (_errorLogging)
@@ -4535,6 +4541,8 @@ RFCMailBox::writeToDumpFile(const char *format, ...)
 
   GET_DUMPFILE_NAME(dumpfilename);
   FILE *df = fopen(dumpfilename, "a");
+  if (df == NULL)
+    return;
   
   const time_t clockTime = (const time_t) time(NULL);
   memset((void*) &ctime_buf, 0, sizeof(_Xctimeparams));
