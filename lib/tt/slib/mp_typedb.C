@@ -56,6 +56,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <poll.h>
+#include <signal.h>
+#include <stdio.h>
 #include "mp_ce_attrs.h"
 #ifdef OPT_CLASSING_ENGINE
 /*
@@ -930,29 +933,110 @@ begin_write(_Tt_typedbLevel /* db */)
 		
 	}
 	_lock_file = dir_path.cat("/.tt_lock");
-	n = 0;
 
 	// mkdir in case the "tt" or ".tt" subdirectory doesn't exist.
 
 	(void)mkdir((char *)dir_path, 0777); // ignore errors, probably EEXIST
 
-	while ((fd = open((char *)_lock_file,
-			  O_WRONLY|O_CREAT|O_EXCL, 0777) == -1)
-		&& errno == EEXIST)
-	{
-		_tt_syslog(stderr, LOG_ERR, "%s: %m",
-			   (char *)_lock_file, strerror(EEXIST));
-		if (n++ == 5) {
+	// The lock is held only while the database is rewritten, so poll
+	// for it with a short backoff (it used to be 5 x sleep(2)) within
+	// the same 10 s budget.  The holder's "pid hostname" is recorded in
+	// the lock so that one left behind by a process that died can be
+	// recognised and removed.
+	int	waited_ms = 0;
+	int	delay_ms = 10;
+	int	warned = 0;
+	int	broken = 0;
+
+	for (;;) {
+		fd = open((char *)_lock_file, O_WRONLY|O_CREAT|O_EXCL, 0777);
+		if (fd != -1 || errno != EEXIST) {
+			// Locked, or locking is impossible here (e.g. a
+			// read-only directory); as before, carry on and let
+			// writing the database report the problem.
+			break;
+		}
+		if (broken < 3 && break_stale_lock()) {
+			broken++;
+			continue;
+		}
+		if (!warned) {
+			errno = EEXIST;
+			_tt_syslog(stderr, LOG_ERR, "%s: %m",
+				   (char *)_lock_file);
+			warned = 1;
+		}
+		if (waited_ms >= 10000) {
 			_flags &= ~(1<<_TT_TYPEDB_LOCKED);
 			return(0);
 		}
-		sleep(2);
+		(void)poll(NULL, 0, delay_ms);
+		waited_ms += delay_ms;
+		delay_ms = delay_ms < 250 ? 2 * delay_ms : 500;
 	}
 	if (fd > -1 ) {
+		char	owner[320];
+		int	len = snprintf(owner, sizeof owner, "%ld %s\n",
+				       (long)getpid(),
+				       (char *)_tt_gethostname());
+
+		if (len > 0 && len < (int)sizeof owner) {
+			(void)::write(fd, owner, len);
+		}
 		close(fd);	// Cleanup
 	}
 	_flags |= (1<<_TT_TYPEDB_LOCKED);
 	return(1);
+}
+
+
+//
+// Removes _lock_file if it records a holder on this host that no longer
+// exists.  Locks written by older versions are empty and are left alone.
+// Returns 1 if the lock was removed.
+//
+int _Tt_typedb::
+break_stale_lock()
+{
+	char		buf[512];
+	char		host[256];
+	long		pid;
+	struct stat	st_open, st_now;
+	int		fd, len;
+
+	fd = open((char *)_lock_file, O_RDONLY);
+	if (fd == -1) {
+		return 0;
+	}
+	len = read(fd, buf, sizeof buf - 1);
+	if (fstat(fd, &st_open) != 0) {
+		len = -1;
+	}
+	close(fd);
+	if (len <= 0) {
+		return 0;
+	}
+	buf[len] = '\0';
+	if (sscanf(buf, "%ld %255s", &pid, host) != 2 || pid <= 0 ||
+	    strcmp(host, (char *)_tt_gethostname()) != 0) {
+		return 0;
+	}
+	if (kill((pid_t)pid, 0) == 0 || errno != ESRCH) {
+		return 0;	// holder is alive (or not ours to judge)
+	}
+	// Remove only the file we judged, not a lock someone else has
+	// meanwhile broken and re-taken.
+	if (stat((char *)_lock_file, &st_now) != 0 ||
+	    st_now.st_dev != st_open.st_dev ||
+	    st_now.st_ino != st_open.st_ino) {
+		return 0;
+	}
+	if (unlink((char *)_lock_file) != 0) {
+		return 0;
+	}
+	_tt_syslog(stderr, LOG_WARNING, "%s: removed stale lock of pid %ld",
+		   (char *)_lock_file, pid);
+	return 1;
 }
 
 

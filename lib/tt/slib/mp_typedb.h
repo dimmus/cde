@@ -65,6 +65,7 @@ class _Tt_typedb : public _Tt_object {
 	int				abort_write();
 	int				begin_write(_Tt_typedbLevel db);
 	int				end_write();
+	int				break_stale_lock();
 	Tt_status			write(const _Tt_string &outfile);
 	Tt_status			write(FILE *outfile);
 
