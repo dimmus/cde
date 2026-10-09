@@ -50,6 +50,9 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#ifdef __GLIBC__
+#include <malloc.h>	/* malloc_usable_size() */
+#endif
 
 /*
  * private includes
@@ -332,6 +335,87 @@ _DtCvStrcspn (
 }
 
 /****************************************************************************
+ * Function:    void **_DtCvAddPtrToArrayN (void **array, int count, void *ptr)
+ *
+ * Parameters:  array           A pointer to a NULL-terminated array
+ *                              of pointers (made by these functions).
+ *              count           The number of pointers in 'array' (the
+ *                              index of its NULL); ignored if 'array'
+ *                              is NULL or empty.
+ *              ptr             The pointer which is to be added to
+ *                              the end of the array.
+ *
+ * Returns:     A pointer to the NULL-terminated array created
+ *              by adding 'ptr' to the end of 'array', or NULL if out of
+ *              memory.
+ *
+ * Purpose:     _DtCvAddPtrToArray for callers that keep count, so the
+ *		array is not walked on every append.
+ *
+ *		Where the allocator can tell an allocation's size, the
+ *		array grows geometrically (appending n items is O(n));
+ *		otherwise it grows by REALLOC_INCR as it always did.
+ *
+ ****************************************************************************/
+void **
+_DtCvAddPtrToArrayN (
+       void  **array,
+       int     count,
+       void   *ptr)
+{
+    void **nextP = NULL;
+
+    /* If this is the first item for the array, malloc the array and set
+       nextP to point to the first element. */
+    if (array == NULL || *array == NULL) {
+        array = (void **) malloc (REALLOC_INCR * sizeof (void *));
+
+        nextP = array;
+    }
+
+    else {
+        int full;
+
+#ifdef __GLIBC__
+        /* room for the new pointer and the NULL? */
+        full = ((size_t) (count + 2) * sizeof (void *)
+				> malloc_usable_size ((void *) array));
+#else
+        /* The array always grows by chunks of size REALLOC_INCR.  So see if
+           it currently is an exact multiple of REALLOC_INCR size (remember to
+           count the NULL pointer).  If it is then it must be full. */
+        full = ((count + 1) % REALLOC_INCR == 0);
+#endif
+
+        /* Also remember to move 'nextP' because the array will probably
+           move in memory. */
+        if (full) {
+            void **newArray;
+            int    newSize = count + 1 + REALLOC_INCR;
+
+#ifdef __GLIBC__
+            if (newSize < (count + 1) * 2)
+                newSize = (count + 1) * 2;
+#endif
+            /* (on failure the old array is not freed, as before: callers
+               may still hold it) */
+            newArray = (void **) realloc (array, newSize * sizeof (void *));
+            array = newArray;
+        }
+        if (array)
+            nextP = array + count;
+    }
+
+    if (nextP)
+      {
+        *nextP++ = ptr;
+        *nextP = NULL;
+      }
+
+    return (array);
+}
+
+/****************************************************************************
  * Function:    void **_DtCvAddPtrToArray (void **array, void *ptr)
  *
  * Parameters:  array           A pointer to a NULL-terminated array
@@ -352,47 +436,14 @@ _DtCvAddPtrToArray (
        void  **array,
        void   *ptr)
 {
+    int numElements = 0;
 
-    void **nextP = NULL;
-    int numElements;
+    /* Find the NULL pointer at the end of the array. */
+    if (array != NULL)
+        while (array[numElements] != NULL)
+            numElements++;
 
-    /* If this is the first item for the array, malloc the array and set
-       nextP to point to the first element. */
-    if (array == NULL || *array == NULL) {
-        array = (void **) malloc (REALLOC_INCR * sizeof (void *));
-
-        nextP = array;
-    }
-
-    else {
-
-        /* Find the NULL pointer at the end of the array. */
-        numElements = 0;
-        for (nextP = array; *nextP != NULL; nextP++)
-                numElements++;
-
-        /* The array always grows by chunks of size REALLOC_INCR.  So see if
-           it currently is an exact multiple of REALLOC_INCR size (remember to
-           count the NULL pointer).  If it is then it must be full, so realloc
-           another chunk.  Also remember to move 'nextP' because the array
-           will probably move in memory. */
-        if ((numElements + 1) % REALLOC_INCR == 0) {
-            array = (void **) realloc (array,
-                        (numElements + 1 + REALLOC_INCR) * sizeof (void *));
-            if (array)
-                nextP = array + numElements;
-            else
-                nextP = NULL;
-        }
-    }
-
-    if (nextP)
-      {
-        *nextP++ = ptr;
-        *nextP = NULL;
-      }
-
-    return (array);
+    return (_DtCvAddPtrToArrayN (array, numElements, ptr));
 }
 
 /******************************************************************************

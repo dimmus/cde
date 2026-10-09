@@ -86,7 +86,8 @@
 static	int	ProcessEntry (
 			_DtHelpVolume	 vol,
 			_DtCvSegment	*p_seg,
-			char		*parent_key);
+			char		*parent_key,
+			int		*num_keys);
 /********    End Private Function Declarations    ********/
 
 /********    Private Variable Declarations    ********/
@@ -424,7 +425,8 @@ static int
 ProcessSubEntries (
     _DtHelpVolume vol,
     _DtCvSegment	*p_seg,
-    char	*parent_key)
+    char	*parent_key,
+    int		*num_keys)
 {
     while (p_seg != NULL)
       {
@@ -434,7 +436,7 @@ ProcessSubEntries (
 	 */
 	if (_DtCvIsSegContainer(p_seg) && NULL != _SdlSegEntryInfo(p_seg)
 		&& ProcessEntry(vol, _DtCvContainerListOfSeg(p_seg),
-						parent_key) == -1)
+						parent_key, num_keys) == -1)
 	    return -1;
 
 	p_seg = p_seg->next_seg;
@@ -617,8 +619,18 @@ ProcessLocations (
     char	*locs,
     char	***list)
 {
-    char  **myList = NULL;
+    /*
+     * Append to *list: it is called for the "main" and then the "locs"
+     * locations of an entry, and used to replace (and leak) the "main"
+     * ones with the "locs" ones.
+     */
+    char  **myList = *list;
     char   *nextLoc;
+    int     count  = 0;
+
+    if (myList != NULL)
+	while (myList[count] != NULL)
+	    count++;
 
     while (locs != NULL && *locs != '\0')
       {
@@ -628,11 +640,17 @@ ProcessLocations (
 
 	if (*nextLoc != '\0')
 	  {
-	    myList = (char **) _DtHelpCeAddPtrToArray ((void **) myList,
+	    myList = (char **) _DtCvAddPtrToArrayN ((void **) myList, count,
 							(void *) nextLoc);
 	    if (myList == NULL)
+	      {
+		*list = NULL;
 		return -1;
+	      }
+	    count++;
 	  }
+	else
+	    free(nextLoc);
       }
 
     *list = myList;
@@ -665,7 +683,8 @@ static int
 ProcessEntry (
     _DtHelpVolume	 vol,
     _DtCvSegment	*p_seg,
-    char		*parent_key)
+    char		*parent_key,
+    int			*num_keys)
 {
     int           strSize;
     char	**topics;
@@ -711,12 +730,16 @@ ProcessEntry (
 
 	if (topics != NULL)
 	  {
-	    vol->keywords = (char **) _DtHelpCeAddPtrToArray (
+	    /* (*num_keys tracks the length of both arrays) */
+	    vol->keywords = (char **) _DtCvAddPtrToArrayN (
 						(void **) vol->keywords,
+						*num_keys,
 						(void *) nextKey);
-	    vol->keywordTopics = (char ***) _DtHelpCeAddPtrToArray (
+	    vol->keywordTopics = (char ***) _DtCvAddPtrToArrayN (
 						(void **) vol->keywordTopics,
+						*num_keys,
 						(void *) topics);
+	    (*num_keys)++;
 	    /*
 	     * If we just malloc'ed ourselves out of existence...
 	     * stop here.
@@ -734,7 +757,7 @@ ProcessEntry (
 		  {
 		    char ***topicList;
 
-		    for (topicList = vol->keywordTopics; topicList; topicList++)
+		    for (topicList = vol->keywordTopics; *topicList; topicList++)
 			_DtHelpCeFreeStringArray (*topicList);
 		    free (vol->keywordTopics);
 		    vol->keywordTopics = NULL;
@@ -744,7 +767,8 @@ ProcessEntry (
 	  }
 
 	if (_DtCvContainerListOfSeg(p_seg) != NULL &&
-	    ProcessSubEntries(vol,_DtCvContainerListOfSeg(p_seg),nextKey) == -1)
+	    ProcessSubEntries(vol,_DtCvContainerListOfSeg(p_seg),nextKey,
+							num_keys) == -1)
 	    return -1;
 
 	if (topics == NULL)
@@ -1223,13 +1247,19 @@ _DtHelpCeGetSdlKeywordList (
 	_DtHelpVolumeHdl	 volume)
 {
     CESDLVolume	*sdlVol =  _DtHelpCeGetSdlVolumePtr(volume);
+    _DtHelpVolume vol   = (_DtHelpVolume) volume;
+    int		  numKeys = 0;
 
     if (_DtHelpCeGetSdlVolIndex(volume) != 0 || NULL == sdlVol->index
 			|| NULL == _DtCvContainerListOfSeg(sdlVol->index))
 	return -1;
 
-    return(ProcessEntry(((_DtHelpVolume) volume),
-			_DtCvContainerListOfSeg(sdlVol->index), NULL));
+    if (vol->keywords != NULL)
+	while (vol->keywords[numKeys] != NULL)
+	    numKeys++;
+
+    return(ProcessEntry(vol, _DtCvContainerListOfSeg(sdlVol->index), NULL,
+								&numKeys));
 }
 
 /*****************************************************************************

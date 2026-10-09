@@ -60,6 +60,10 @@
 extern	void	 **_DtCvAddPtrToArray (
 			void		**array,
 			void		 *ptr);
+extern	void	 **_DtCvAddPtrToArrayN (
+			void		**array,
+			int		  count,
+			void		 *ptr);
 extern	wchar_t	   _DtCvChar (
 			const void	*p1,
 			int		 type,
