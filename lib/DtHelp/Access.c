@@ -1603,6 +1603,299 @@ _DtHelpCeGetVolumeName (
 } /* End __DtHelpCeGetVolumeName */
 
 /*****************************************************************************
+ * Decompressed topic cache.
+ *
+ * Every topic of an SDL volume is stored LZW compressed, and showing,
+ * printing or titling a topic decompressed it again each time (about a
+ * quarter of the CPU time of dthelpprint).  The decompressed bytes of
+ * recently read blocks are kept, keyed on the volume file's identity
+ * (device, inode, size, mtime) and the block's offset, so revisiting a
+ * topic, or parsing it after reading its title, skips the decompression.
+ * Readers get a private copy, read through an in-memory BufFile that
+ * returns exactly the bytes and EOF the decompressing reader returned.
+ *****************************************************************************/
+#define	TOPIC_CACHE_MAX_BYTES	(8 * 1024 * 1024)
+#define	TOPIC_CACHE_MAX_BLOCK	(1024 * 1024)	/* larger blocks stream */
+
+typedef struct _topicCacheEntry {
+    struct _topicCacheEntry *next;
+    dev_t	   dev;
+    ino_t	   ino;
+    off_t	   size;
+    time_t	   mtime_sec;
+    long	   mtime_nsec;
+    int		   offset;
+    char	  *data;
+    int		   len;
+    unsigned long  last_use;
+} TopicCacheEntry;
+
+static TopicCacheEntry *TopicCache      = NULL;
+static unsigned long    TopicCacheBytes = 0;
+static unsigned long    TopicCacheTick  = 0;
+
+/*
+ * In-memory BufFile.  'hidden' points at a MemBufInfo; the data is
+ * served from 'data' and, once that is used up, from 'rest' (the rest
+ * of a block too large to read into memory), if any.
+ */
+typedef struct {
+    char	*data;
+    BufFilePtr	 rest;
+    int		 close_rest;
+} MemBufInfo;
+
+static int
+MemBufRead (BufFilePtr f)
+{
+    MemBufInfo *info = (MemBufInfo *) f->hidden;
+    int		c;
+    int		n;
+
+    if (info->rest != NULL)
+      {
+	for (n = 0; n < BUFFILESIZE; n++)
+	  {
+	    c = BufFileGet(info->rest);
+	    if (c == BUFFILEEOF)
+		break;
+	    f->buffer[n] = (BufChar) c;
+	  }
+	if (n > 0)
+	  {
+	    f->bufp = f->buffer + 1;
+	    f->left = n - 1;
+	    return f->buffer[0];
+	  }
+      }
+    f->left = 0;
+    return BUFFILEEOF;
+}
+
+static int
+MemBufSkip (
+    BufFilePtr	f,
+    int		count)
+{
+    int	n = count;
+
+    while (n > 0 && BufFileGet(f) != BUFFILEEOF)
+	n--;
+    return count - n;
+}
+
+static int
+MemBufClose (
+    BufFilePtr	f,
+    int		doClose)
+{
+    MemBufInfo *info = (MemBufInfo *) f->hidden;
+
+    if (info->rest != NULL)
+	_DtHelpCeBufFileClose(info->rest, info->close_rest && doClose);
+    free(info->data);
+    free(info);
+    return 1;
+}
+
+/*
+ * Make a BufFile reading 'len' bytes of 'data' (taken over), then 'rest'.
+ */
+static BufFilePtr
+MemBufFile (
+    char	*data,
+    int		 len,
+    BufFilePtr	 rest,
+    int		 close_rest)
+{
+    MemBufInfo *info = (MemBufInfo *) malloc (sizeof(MemBufInfo));
+    BufFilePtr	f;
+
+    if (info == NULL)
+	return NULL;
+    info->data       = data;
+    info->rest       = rest;
+    info->close_rest = close_rest;
+    f = _DtHelpCeBufFileCreate((char *) info, MemBufRead, MemBufSkip,
+								MemBufClose);
+    if (f == NULL)
+      {
+	free(info);
+	return NULL;
+      }
+    f->bufp = (BufChar *) data;
+    f->left = len;
+    return f;
+}
+
+static char *
+CopyBytes (
+    const char	*data,
+    int		 len)
+{
+    char *copy = (char *) malloc (len > 0 ? len : 1);
+
+    if (copy != NULL && len > 0)
+	memcpy(copy, data, len);
+    return copy;
+}
+
+/*
+ * Look up the block at 'offset' of the file 'st' describes; on a hit
+ * return a private copy of its bytes and their count.
+ */
+static char *
+TopicCacheGet (
+    const struct stat	*st,
+    int			 offset,
+    int			*ret_len)
+{
+    TopicCacheEntry *e;
+    char	    *copy = NULL;
+
+    _DtHelpProcessLock();
+    for (e = TopicCache; e != NULL; e = e->next)
+	if (e->offset == offset && e->ino == st->st_ino &&
+		e->dev == st->st_dev && e->size == st->st_size &&
+		e->mtime_sec == st->st_mtim.tv_sec &&
+		e->mtime_nsec == st->st_mtim.tv_nsec)
+	  {
+	    copy = CopyBytes(e->data, e->len);
+	    if (copy != NULL)
+	      {
+		*ret_len = e->len;
+		e->last_use = ++TopicCacheTick;
+	      }
+	    break;
+	  }
+    _DtHelpProcessUnlock();
+    return copy;
+}
+
+static void
+TopicCachePut (
+    const struct stat	*st,
+    int			 offset,
+    const char		*data,
+    int			 len)
+{
+    TopicCacheEntry  *e, **pp, **oldest;
+
+    e = (TopicCacheEntry *) malloc (sizeof(TopicCacheEntry));
+    if (e == NULL)
+	return;
+    e->data = CopyBytes(data, len);
+    if (e->data == NULL)
+      {
+	free(e);
+	return;
+      }
+    e->dev        = st->st_dev;
+    e->ino        = st->st_ino;
+    e->size       = st->st_size;
+    e->mtime_sec  = st->st_mtim.tv_sec;
+    e->mtime_nsec = st->st_mtim.tv_nsec;
+    e->offset     = offset;
+    e->len        = len;
+
+    _DtHelpProcessLock();
+    e->last_use   = ++TopicCacheTick;
+    e->next       = TopicCache;
+    TopicCache    = e;
+    TopicCacheBytes += len;
+
+    /* evict the least recently used blocks beyond the limit */
+    while (TopicCacheBytes > TOPIC_CACHE_MAX_BYTES && TopicCache->next != NULL)
+      {
+	oldest = NULL;
+	for (pp = &TopicCache; *pp != NULL; pp = &(*pp)->next)
+	    if (*pp != e &&
+		    (oldest == NULL || (*pp)->last_use < (*oldest)->last_use))
+		oldest = pp;
+	if (oldest == NULL)
+	    break;
+	e = *oldest;
+	*oldest = e->next;
+	TopicCacheBytes -= e->len;
+	free(e->data);
+	free(e);
+	e = TopicCache;
+      }
+    _DtHelpProcessUnlock();
+}
+
+/*
+ * Read the decompressing BufFile 'z' into memory (up to the block
+ * limit) and return a BufFile serving the same bytes; caches the block
+ * when it fits.  Takes over 'z'.
+ */
+static BufFilePtr
+ReadCompressedBlock (
+    BufFilePtr		 z,
+    const struct stat	*st,
+    int			 have_stat,
+    int			 offset,
+    int			 close_fd)
+{
+    char       *data = NULL;
+    char       *newData;
+    int		len  = 0;
+    int		max  = 0;
+    int		c;
+    BufFilePtr	f;
+
+    while (len < TOPIC_CACHE_MAX_BLOCK)
+      {
+	c = BufFileGet(z);
+	if (c == BUFFILEEOF)
+	    break;
+	if (len >= max)
+	  {
+	    max = (max == 0) ? 16384 : max * 2;
+	    newData = (char *) realloc (data, max);
+	    if (newData == NULL)
+	      {
+		/* serve what was read, then keep streaming */
+		BufFilePutBack(c, z);
+		f = MemBufFile(data, len, z, close_fd);
+		if (f == NULL)
+		  {
+		    free(data);
+		    _DtHelpCeBufFileClose(z, close_fd);
+		  }
+		return f;
+	      }
+	    data = newData;
+	  }
+	data[len++] = (char) c;
+      }
+
+    if (len >= TOPIC_CACHE_MAX_BLOCK)
+      {
+	/* too big to keep: serve it, then stream the rest */
+	f = MemBufFile(data, len, z, close_fd);
+	if (f == NULL)
+	  {
+	    free(data);
+	    _DtHelpCeBufFileClose(z, close_fd);
+	  }
+	return f;
+      }
+
+    _DtHelpCeBufFileClose(z, close_fd);
+
+    if (have_stat)
+	TopicCachePut(st, offset, data, len);
+
+    if (data == NULL)
+	data = (char *) malloc (1);
+    f = MemBufFile(data, len, NULL, False);
+    if (f == NULL)
+	free(data);
+    return f;
+}
+
+/*****************************************************************************
  * Function: int _DtHelpCeFileOpenAndSeek (char *name, int offset, int fildes,
  *							BufFilePtr *ret_file)
  *
@@ -1685,6 +1978,29 @@ _DtHelpCeFileOpenAndSeek (
 
 	CECompressInfoPtr myInfo;
 	BufFilePtr	  inputRaw;
+	BufFilePtr	  inputZ;
+	struct stat	  st;
+	int		  haveStat = (fstat(tmpFd, &st) == 0);
+	char		 *cached;
+	int		  cachedLen = 0;
+
+	/*
+	 * already decompressed recently?
+	 */
+	if (haveStat &&
+		(cached = TopicCacheGet(&st, offset, &cachedLen)) != NULL)
+	  {
+	    if (fd == -1)
+	        close (tmpFd);
+	    *ret_file = MemBufFile(cached, cachedLen, NULL, False);
+	    if (*ret_file == NULL)
+	      {
+		free(cached);
+		errno = CEErrorMalloc;
+		return -1;
+	      }
+	    return 0;
+	  }
 
 	/*
 	 * allocate the private information
@@ -1718,10 +2034,23 @@ _DtHelpCeFileOpenAndSeek (
 	    return -1;
 	  }
 
-	*ret_file = _DtHelpCeBufFilePushZ(inputRaw);
-	if (*ret_file == NULL)
+	inputZ = _DtHelpCeBufFilePushZ(inputRaw);
+	if (inputZ == NULL)
 	  {
 	    _DtHelpCeBufFileClose(inputRaw, (fd == -1 ? True : False));
+	    return -1;
+	  }
+
+	/*
+	 * decompress the block into memory (and the cache).  The caller
+	 * closes the returned file with doClose = (fd == -1), which then
+	 * closes tmpFd; it is not needed any more, so close it now.
+	 */
+	*ret_file = ReadCompressedBlock(inputZ, &st, haveStat, offset,
+						(fd == -1 ? True : False));
+	if (*ret_file == NULL)
+	  {
+	    errno = CEErrorMalloc;
 	    return -1;
 	  }
       }
