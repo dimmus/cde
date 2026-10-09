@@ -56,6 +56,7 @@ extern void ProcessClickBPress (XButtonEvent *buttonEvent, ClientData *pCD,
 extern void ProcessClickBRelease (XButtonEvent *buttonEvent, ClientData *pCD, 
 				  Context context, Context subContext);
 extern void PullExposureEvents (void);
+extern void PullQueuedExposureEvents (void);
 extern int SetupKeyBindings (KeySpec *keySpecs, Window grabWindow, 
 			     int keyboardMode, long context);
 extern Boolean WmDispatchMenuEvent (XButtonEvent *event);

@@ -51,7 +51,6 @@
 
 #define NOFRZ_GRAB_MASK (KeyPressMask | ButtonPressMask |\
 			 ButtonReleaseMask)
-#define NOFRZ_PGRAB_MASK (ButtonPressMask | ButtonReleaseMask)
 		    	  
 /*
  * include extern functions
@@ -229,7 +228,7 @@ void StartInteractiveSizing (ClientData *pcd, Time time)
     unsigned int gmask;
 
     /* regrab pointer to change cursor */
-    gmask = (wmGD.freezeOnConfig)? PGRAB_MASK : NOFRZ_PGRAB_MASK;
+    gmask = PGRAB_MASK;
     XChangeActivePointerGrab (DISPLAY, gmask, 
 			      wmGD.sizePlacementCursor, time);
 
@@ -643,7 +642,7 @@ void PlaceWindowInteractively (ClientData *pcd)
 {
     unsigned int gmask;
 
-    gmask = (wmGD.freezeOnConfig)? PGRAB_MASK : NOFRZ_PGRAB_MASK;
+    gmask = PGRAB_MASK;
 
     /*
      * Return if config is in progress or if grabs fail

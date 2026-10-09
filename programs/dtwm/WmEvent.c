@@ -2526,12 +2526,13 @@ Time GetTimestamp (void)
 
 /*************************************<->*************************************
  *
- *  PullExposureEvents ()
+ *  PullQueuedExposureEvents ()
  *
  *
  *  Description:
  *  -----------
- *  Pull in and process all outstanding exposure events 
+ *  Process the exposure events that have already arrived, without a
+ *  round trip to the server.
  *
  *
  *  Inputs:
@@ -2542,19 +2543,18 @@ Time GetTimestamp (void)
  *
  *  Comments:
  *  --------
- *  Useful for cleaning up display after menu popdown
+ *  XCheckMaskEvent flushes the output buffer and reads whatever the
+ *  server has sent, so exposures caused by requests made a little
+ *  earlier are handled; those caused by the latest requests may not
+ *  have arrived yet.  Interactive move and resize call this for every
+ *  pointer step and PullExposureEvents once the pointer stops.
  * 
  *************************************<->***********************************/
-void PullExposureEvents (void)
+void PullQueuedExposureEvents (void)
 {
     XEvent	event;
     Boolean	dispatchEvent;
 
-    /* 
-     * Force the exposure events into the queue
-     */
-    XSync (DISPLAY, False);
-    XSync (DISPLAY1, False);
     /*
      * Selectively extract the exposure events
      */
@@ -2593,6 +2593,40 @@ void PullExposureEvents (void)
 	    XtDispatchEvent (&event);
 	}
     }
+
+} /* END OF FUNCTION PullQueuedExposureEvents */
+
+
+/*************************************<->*************************************
+ *
+ *  PullExposureEvents ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Pull in and process all outstanding exposure events 
+ *
+ *
+ *  Inputs:
+ *  ------
+ * 
+ *  Outputs:
+ *  -------
+ *
+ *  Comments:
+ *  --------
+ *  Useful for cleaning up display after menu popdown
+ * 
+ *************************************<->***********************************/
+void PullExposureEvents (void)
+{
+    /* 
+     * Force the exposure events into the queue
+     */
+    XSync (DISPLAY, False);
+    XSync (DISPLAY1, False);
+
+    PullQueuedExposureEvents ();
 
 } /* END OF FUNCTION PullExposureEvents */
 
