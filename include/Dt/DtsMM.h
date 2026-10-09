@@ -165,8 +165,22 @@ extern	DtDtsMMRecord	*_DtDtsMMGetRecordByName(DtDtsMMDatabase *database,
 
 
 char *	_DtDtsMMExpandValue(const char *value);
+/*
+ * Like _DtDtsMMExpandValue(), but when VALUE (a string from the mapped
+ * database) has nothing to expand, VALUE itself is returned instead of a
+ * copy.  The result is read-only and must be released with
+ * _DtDtsMMSafeFree().
+ */
+char *	_DtDtsMMExpandValueNoCopy(const char *value);
 void	_DtDtsMMSafeFree(char *value);
 int	_DtDtsMMIsMemory(const char *value);
+
+/*
+ * A number that changes whenever the database is mapped or unmapped.
+ * Callers caching bosons or pointers into the mapping compare it with
+ * the value they saw when they filled their cache.
+ */
+unsigned int	_DtDtsMMGeneration(void);
 
 extern	DtShmBoson	_DtDtsMMNameStringToBoson(const char *string);
 

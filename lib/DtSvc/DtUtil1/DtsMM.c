@@ -64,24 +64,50 @@ static	caddr_t		mmaped_db = 0;
 static	size_t		mmaped_size = 0;
 static	int		mmaped_fd = 0;
 static	DtDtsMMHeader	*head = 0;
+static	unsigned int	mm_generation = 1;
 
 int _DtDtsMMUnLoad(void);
 
 extern void _DtDbFillVariables (char **line );
 extern void _DtDtsClear(void);
 
+/*
+ * Returns the base of the mapped database, mapping it first if needed.
+ * Once the database is mapped this is a plain load: the process lock
+ * is only needed to serialise the first mapping.  (Taking it on every
+ * address computation did not protect anything anyway, since the
+ * address is used after the lock is released.)
+ */
+static caddr_t
+mm_base(void)
+{
+	caddr_t	db = __atomic_load_n(&mmaped_db, __ATOMIC_ACQUIRE);
+
+	if(!db)
+	{
+		_DtSvcProcessLock();
+		if(!mmaped_db)
+		{
+			_DtDtsMMInit(0);
+		}
+		db = mmaped_db;
+		_DtSvcProcessUnlock();
+	}
+	return(db);
+}
+
+unsigned int
+_DtDtsMMGeneration(void)
+{
+	return(mm_generation);
+}
+
 void *
 _DtDtsMMGetPtr(int index)
 {
 	DtShmIntList  int_list;
 
-	_DtSvcProcessLock();
-	if(!mmaped_db)
-	{
-		_DtDtsMMInit(0);
-	}
-	int_list = (DtShmIntList)&mmaped_db[sizeof(DtDtsMMHeader)];
-	_DtSvcProcessUnlock();
+	int_list = (DtShmIntList)&mm_base()[sizeof(DtDtsMMHeader)];
 	return((void *)&int_list[index]);
 }
 
@@ -90,13 +116,7 @@ _DtDtsMMGetPtrSize(int index)
 {
 	DtShmIntList  int_list;
 
-	_DtSvcProcessLock();
-	if(!mmaped_db)
-	{
-		_DtDtsMMInit(0);
-	}
-	int_list = (DtShmIntList)&mmaped_db[sizeof(DtDtsMMHeader)];
-	_DtSvcProcessUnlock();
+	int_list = (DtShmIntList)&mm_base()[sizeof(DtDtsMMHeader)];
 	return(int_list[index-1]);
 }
 
@@ -105,6 +125,7 @@ _DtDtsMMGetDCNameIndex(int *size)
 {
         int *result;
 
+	mm_base();
 	_DtSvcProcessLock();
 	*size = _DtDtsMMGetPtrSize(head->name_list_offset);	
 	result = (int*) _DtDtsMMGetPtr(head->name_list_offset);
@@ -124,6 +145,7 @@ _DtDtsMMGetNoNameIndex(int *size)
 {
         int *result;
 
+	mm_base();
 	_DtSvcProcessLock();
 
 	if(head->no_name_offset == -1)
@@ -172,14 +194,8 @@ _DtDtsMMBosonToString(DtShmBoson boson)
 	if (boson == 0)
 		return(0);
 
-	_DtSvcProcessLock();
-	if(!mmaped_db)
-	{
-		_DtDtsMMInit(0);
-	}
-
+	mm_base();
 	str_table = (DtShmStrtab)_DtDtsMMGetPtr(head->str_tbl_offset);
-	_DtSvcProcessUnlock();
 
 	return(_DtShmBosonToString(str_table, boson));
 }
@@ -192,14 +208,8 @@ _DtDtsMMStringToBoson(const char *string)
 	if ((string == (char *)NULL) || (*string == '\0'))
 		return(-1);
 
-	_DtSvcProcessLock();
-	if(!mmaped_db)
-	{
-		_DtDtsMMInit(0);
-	}
-
+	mm_base();
 	str_table = (DtShmStrtab)_DtDtsMMGetPtr(head->str_tbl_offset);
-	_DtSvcProcessUnlock();
 
 	return(_DtShmStringToBoson(str_table, string));
 }
@@ -461,27 +471,33 @@ _DtDtsMMGetFieldByName(DtDtsMMRecord *rec, const char *name)
 DtDtsMMRecord *
 _DtDtsMMGetRecordByName(DtDtsMMDatabase *db, const char *name)
 {
-	int i;
-	DtShmBoson 	name_quark = _DtDtsMMStringToBoson(name);
-	DtDtsMMRecord	*rec_ptr;
+	DtShmBoson 	name_quark;
 	DtDtsMMRecord	*rec_ptr_list;
+	int		*idx;
+
+	if (!db || (name_quark = _DtDtsMMStringToBoson(name)) == -1)
+	{
+		return NULL;
+	}
 
 	/*
-	 * If the fields are not sorted in alphanumeric order
-	 * by name a binary search will fail.  So do the slow but
-	 * sure linear search.
+	 * The cache builder (build_new_db() in MMDb.c) indexes every
+	 * database by record name, pointing at the first record of each
+	 * run of equal names.  The databases this is used for are sorted
+	 * by name, so that is the first record of that name, which is
+	 * what a linear search would find.
 	 */
-	rec_ptr_list = _DtDtsMMGetPtr(db->recordList);
-
-	for (i = 0; i < db->recordCount; i++)
+	idx = _DtDtsMMGetDbName(db, name_quark);
+	if (!idx || *idx < 0 || *idx >= db->recordCount)
 	{
-		rec_ptr = &rec_ptr_list[i];
-		if (rec_ptr->recordName == name_quark)
-		{
-			return (rec_ptr);
-		}
+		return NULL;
 	}
-	return NULL;
+	rec_ptr_list = _DtDtsMMGetPtr(db->recordList);
+	if (rec_ptr_list[*idx].recordName != name_quark)
+	{
+		return NULL;
+	}
+	return (&rec_ptr_list[*idx]);
 }
 int
 _DtDtsMMPathHash(DtDirPaths *dirs)
@@ -593,12 +609,12 @@ _DtDtsMMapDB(const char *CacheFile)
 		_DtDtsMMUnLoad();
 	}
 
-	mmaped_fd  = open(CacheFile, O_RDONLY, 0400);
+	mmaped_fd  = open(CacheFile, O_RDONLY|O_CLOEXEC, 0400);
 	if(mmaped_fd !=  -1)
 	{
 		if(fstat(mmaped_fd, &buf) == 0 && buf.st_uid == getuid())
 		{
-			mmaped_db = (char *)mmap(NULL,
+			caddr_t	db = (char *)mmap(NULL,
 					buf.st_size,
 					PROT_READ,
 #if defined(sun)
@@ -610,12 +626,18 @@ _DtDtsMMapDB(const char *CacheFile)
 #endif
 					mmaped_fd,
 					0);
-			if(mmaped_db != (void *) -1)
+			if(db != (void *) -1)
 			{
+				DtShmIntList	int_list;
+
 				success = TRUE;
 				mmaped_size = buf.st_size;
-				head = (DtDtsMMHeader *)mmaped_db;
-				db_list = (DtDtsMMDatabase *)_DtDtsMMGetPtr(head->db_offset);
+				head = (DtDtsMMHeader *)db;
+				int_list = (DtShmIntList)&db[sizeof(DtDtsMMHeader)];
+				db_list = (DtDtsMMDatabase *)&int_list[head->db_offset];
+				mm_generation++;
+				/* Publish the mapping only once it is usable. */
+				__atomic_store_n(&mmaped_db, db, __ATOMIC_RELEASE);
 			}
 			else
 			{
@@ -658,8 +680,9 @@ MMValidateDb(DtDirPaths *dirs, char *suffix)
 	for(i = 0; i < count; i++)
 	{
 		file = _DtDtsMMBosonToString(boson_list[i]);
-		stat(file, &buf);
-		if(mtime_list[i]  != buf.st_mtime)
+		/* A file that is gone (or unreadable) invalidates the cache. */
+		if(!file || stat(file, &buf) == -1 ||
+		   mtime_list[i] != buf.st_mtime)
 		{
 		        _DtSvcProcessUnlock();
 			return(0);
@@ -671,20 +694,48 @@ MMValidateDb(DtDirPaths *dirs, char *suffix)
 
 }
 
+/*
+ * _DtDbFillVariables() only changes a value that holds a '$' (variable
+ * reference) or a '\\' (escape, removed by clean_line()).  Neither byte
+ * can be the trailing byte of a multibyte character that matters here:
+ * '$' never is, and a '\\' trailing byte (e.g. in IBM-932) is found by the
+ * same byte search, which only makes us take the slow path.
+ */
+#define	NEEDS_EXPANSION(v)	(strpbrk((v), "$\\") != NULL)
+
+/* _DtDbFillVariables() assumes the buffer holds at least this many bytes. */
+#define	FILL_VARIABLES_MIN	1024
+
 char *
 _DtDtsMMExpandValue(const char *value)
 {
-	char *newval;
+	char	*newval;
+	size_t	len;
 
 	if(!value)
 	{
 		return NULL;
 	}
-	newval = (char *)malloc(1024);
-
-	strcpy(newval, value);
+	if(!NEEDS_EXPANSION(value))
+	{
+		return(strdup(value));
+	}
+	len = strlen(value) + 1;
+	newval = (char *)malloc(len < FILL_VARIABLES_MIN ?
+				FILL_VARIABLES_MIN : len);
+	memcpy(newval, value, len);
 	_DtDbFillVariables(&newval);
 	return(newval);
+}
+
+char *
+_DtDtsMMExpandValueNoCopy(const char *value)
+{
+	if(value && !NEEDS_EXPANSION(value) && _DtDtsMMIsMemory(value))
+	{
+		return((char *)value);
+	}
+	return(_DtDtsMMExpandValue(value));
 }
 
 void
@@ -699,17 +750,13 @@ _DtDtsMMSafeFree(char *value)
 int
 _DtDtsMMIsMemory(const char *value)
 {
+	int	result;
+
 	_DtSvcProcessLock();
-	if((caddr_t)value < mmaped_db || (caddr_t)value > mmaped_db+mmaped_size)
-	{
-	        _DtSvcProcessUnlock();
-		return(0);
-	}
-	else
-	{
-	        _DtSvcProcessUnlock();
-		return(1);
-	}
+	result = mmaped_db != 0 && (caddr_t)value >= mmaped_db &&
+		 (caddr_t)value < mmaped_db+mmaped_size;
+	_DtSvcProcessUnlock();
+	return(result);
 }
 
 int
@@ -737,10 +784,11 @@ _DtDtsMMUnLoad(void)
 	}
 
 	db_list = 0;
-	mmaped_db = 0;
+	__atomic_store_n(&mmaped_db, 0, __ATOMIC_RELEASE);
 	mmaped_size = 0;
 	mmaped_fd = 0;
 	head = 0;
+	mm_generation++;
 	_DtSvcProcessUnlock();
 	return(error);
 }
