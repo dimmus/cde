@@ -42,6 +42,7 @@
 #include "ilX.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 #include <X11/Xutil.h>
 #include "ilpipelem.h"
 #include "ilerrors.h"
@@ -873,7 +874,7 @@ int                         scaledX, scaledY;
     scaledHeight = ((nSrcLines + pPriv->linesDone) * ratio + 0.5) 
 	- scaledY;
 
-    _XmPutScaledImage (pXWC->i.display, pPriv->drawable, 
+    _ilXPutScaledImage (pXWC->i.display, pPriv->drawable, 
                        pXWC->i.gc, pXImage, 
 		       0, 0, scaledX, scaledY,
 		       pXImage->width, nSrcLines,
@@ -956,7 +957,7 @@ int scaledX, scaledY ;
     scaledX = pPriv->x * ratio  ;
     scaledY = (pPriv->y + pPriv->linesDone)* ratio  ;
 
-    _XmPutScaledImage (pXWC->i.display, pPriv->drawable, pXWC->i.gc, pXImage, 
+    _ilXPutScaledImage (pXWC->i.display, pPriv->drawable, pXWC->i.gc, pXImage, 
 		       0, 0, scaledX, scaledY,
 		       pXImage->width, nSrcLines,
 	               scaledWidth,scaledHeight);
@@ -964,6 +965,85 @@ int scaledX, scaledY ;
     pPriv->linesDone += nSrcLines;
 
     return IL_OK;
+}
+
+
+        /*  ----------------------- _ilXPutScaledImage --------------------- */
+        /*  Public function; see ilX.h.
+        */
+void _ilXPutScaledImage (
+    Display                *display,
+    Drawable                d,
+    GC                      gc,
+    XImage                 *src_image,
+    int                     src_x,
+    int                     src_y,
+    int                     dest_x,
+    int                     dest_y,
+    unsigned int            src_width,
+    unsigned int            src_height,
+    unsigned int            dest_width,
+    unsigned int            dest_height
+    )
+{
+XImage                     *pDst;
+unsigned int               *xmap;
+unsigned int                x, y, sy, prevSy;
+size_t                      nBytes;
+
+    if (!src_width || !src_height || !dest_width || !dest_height)
+        return;
+
+    if (src_width == dest_width && src_height == dest_height) {
+        XPutImage (display, d, gc, src_image, src_x, src_y, dest_x, dest_y,
+                   src_width, src_height);
+        return;
+        }
+
+        /*  Build a destination image of the same format and depth, and fill
+            it by nearest-neighbour sampling of the source.
+        */
+    pDst = XCreateImage (display, (Visual *)NULL, src_image->depth,
+                         src_image->format, 0, (char *)NULL,
+                         dest_width, dest_height, src_image->bitmap_pad, 0);
+    if (!pDst)
+        return;
+    pDst->red_mask   = src_image->red_mask;
+    pDst->green_mask = src_image->green_mask;
+    pDst->blue_mask  = src_image->blue_mask;
+    nBytes = (size_t)pDst->bytes_per_line * dest_height;
+    if (pDst->format == XYPixmap)
+        nBytes *= pDst->depth;
+    pDst->data = (char *)malloc (nBytes);
+    xmap = (unsigned int *)malloc (dest_width * sizeof (unsigned int));
+    if (!pDst->data || !xmap) {
+        free (xmap);
+        XDestroyImage (pDst);           /* frees pDst->data */
+        return;
+        }
+
+    for (x = 0; x < dest_width; x++)
+        xmap[x] = src_x + (unsigned int)(((unsigned long)x * src_width) / dest_width);
+
+    prevSy = (unsigned int)-1;
+    for (y = 0; y < dest_height; y++) {
+        sy = src_y + (unsigned int)(((unsigned long)y * src_height) / dest_height);
+        if (sy == prevSy && pDst->format != XYPixmap) {
+                /* same source row as the previous line: copy it */
+            memcpy (pDst->data + (size_t)y * pDst->bytes_per_line,
+                    pDst->data + (size_t)(y - 1) * pDst->bytes_per_line,
+                    pDst->bytes_per_line);
+            continue;
+            }
+        prevSy = sy;
+        for (x = 0; x < dest_width; x++)
+            XPutPixel (pDst, x, y, XGetPixel (src_image, xmap[x], sy));
+        }
+
+    XPutImage (display, d, gc, pDst, 0, 0, dest_x, dest_y,
+               dest_width, dest_height);
+    free (xmap);
+    XDestroyImage (pDst);
 }
 
 

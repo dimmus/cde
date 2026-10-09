@@ -1262,7 +1262,7 @@ XwdFileToPixmap (
 
     if (result != GR_ALLOC_ERR)
 
-    _XmPutScaledImage(dpy, pixmap, gc, out_image,
+    _ilXPutScaledImage(dpy, pixmap, gc, out_image,
 		      src_x, src_y, dst_x, dst_y,
 		      in_image.width, in_image.height,
 		      width, height);
@@ -1360,7 +1360,7 @@ static enum _DtGrLoadStatus processBitmap(
 
 	scaled_pixmap = XCreatePixmap (dpy, drawable, (*in_out_width),
 				       (*in_out_height), depth);
-       _XmPutScaledImage(dpy, scaled_pixmap, gc, &ximage,0, 0, 0, 0,
+       _ilXPutScaledImage(dpy, scaled_pixmap, gc, &ximage,0, 0, 0, 0,
 			 width,height,(*in_out_width),(*in_out_height));
        XFree((char *)data);
        *ret_pixmap = scaled_pixmap;
@@ -1747,7 +1747,7 @@ myXpmReadFileToPixmap(
             XSetBackground (display, gc, fg);
             XSetForeground (display, gc, bg);
 	  }
-        _XmPutScaledImage(display, *pixmap_return, gc, image, 
+        _ilXPutScaledImage(display, *pixmap_return, gc, image, 
 			  0, 0, 0, 0,
 			  image->width, image->height,
 			  scaledWidth, scaledHeight);
@@ -2148,7 +2148,7 @@ static enum _DtGrLoadStatus processJPEG(
 		** Copy the XImage into the pixmap and set the other
                 ** return parameters.
                 */
-                _XmPutScaledImage(dpy, *ret_pixmap, gc, out_image, 0, 0, 0, 0, 
+                _ilXPutScaledImage(dpy, *ret_pixmap, gc, out_image, 0, 0, 0, 0, 
 				  out_image->width, out_image->height, 
 		                  scaledWidth, scaledHeight); 
 

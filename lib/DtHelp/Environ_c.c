@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/utsname.h>
 
 char * _DtCliSrvGetDtUserSession(void)
 {
@@ -78,24 +79,21 @@ char * _DtCliSrvGetDtUserSession(void)
 
       if (localDisplayVar == NULL) {
 
-	/* run uname to get the display name */
+	/* use the node name (what "uname -n" prints) as the display
+	 * name; uname(2) avoids forking a shell for it. */
 
-	FILE *pp;
-	display = pipedata;
+	struct utsname un;
+	size_t len;
 
-	pp = popen("uname -n", "r");
-	if (NULL == pp) {
-	  perror("uname -n");
+	if (uname(&un) == -1) {
+	  perror("uname");
 	  return NULL;
 	}
-	*display = 0;
-	if(NULL == fgets(display, BUFSIZ, pp)) {
-	   perror("fgets() failed to read");
-	   return NULL;	
-	}
-	while (isspace(display[strlen(display)-1]))
-	  display[strlen(display)-1] = 0;
-	pclose(pp);
+	display = pipedata;
+	snprintf(display, sizeof(pipedata), "%s", un.nodename);
+	len = strlen(display);
+	while (len > 0 && isspace((unsigned char) display[len - 1]))
+	  display[--len] = 0;
       }
       else {
 	display = malloc(strlen(localDisplayVar) + 1);

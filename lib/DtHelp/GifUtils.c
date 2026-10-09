@@ -73,6 +73,7 @@
 #include <assert.h>
 #include <Xm/XmPrivate.h>
 #include "GifUtilsI.h"
+#include "ilX.h"
 
 #ifndef __STDC__
 #define debug1(s, x)  s <<  "x" << " = " << (x) << "\n"
@@ -1198,7 +1199,7 @@ else
     return None;
   }
 
-  _XmPutScaledImage (g->f_dpy,pm,g->f_gc,g->f_ximage,
+  _ilXPutScaledImage (g->f_dpy,pm,g->f_gc,g->f_ximage,
 		     0,0,0,0,width,height,
 		     scaledWidth,scaledHeight);
 
