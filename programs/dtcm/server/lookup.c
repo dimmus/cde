@@ -81,6 +81,9 @@ static CSA_return_code _GetEntryAttrsByName(_DtCmsCalendar *cal,
 					cms_attribute **attrs_r);
 static CSA_return_code _GetAllEntryAttrs(cms_entry *entry, uint *num_attrs_r,
 					cms_attribute **attrs_r);
+static CSA_return_code _AddRun(cms_entry ***runs, int *nruns, int *maxruns,
+					cms_entry *run);
+static cms_entry *_MergeRuns(cms_entry **runs, int nruns);
 
 /*****************************************************************************
  * extern functions used in the library
@@ -182,6 +185,8 @@ _DtCmsLookupEntries(
 	List_node	*lnode;
 	time_t		endtick;
 	cms_attribute	*aptr;
+	cms_entry	**runs = NULL;
+	int		nruns = 0, maxruns = 0, i;
 
 	/* do lookup on one-time entries first */
 	key.time = start1;
@@ -220,21 +225,44 @@ nextone:
 		key.id = eptr->key.id;
 	}
 
-	/* do lookup on repeating entries */	
+	/*
+	 * Do lookup on repeating entries.  Each sequence yields its
+	 * instances in time order, so collect one sorted run per sequence
+	 * (run 0 holds the one-time entries) and merge the runs at the
+	 * end.  Sorted insertion into one list made this O(K^2) in the
+	 * number of instances returned.
+	 */
+	if (stat == CSA_SUCCESS && head != NULL &&
+	    (stat = _AddRun(&runs, &nruns, &maxruns, head)) == CSA_SUCCESS)
+		head = NULL;
+
 	lnode = cal->list->root;
 	while (lnode != NULL && stat == CSA_SUCCESS) {
+		cms_entry *rhead = NULL, *rtail = NULL;
 
 		stat = _EnumerateSequence(sender, access, lnode, start1, start2,
 			no_end_time_range, end1, end2, num_attrs, attrs,
-			ops, &head, &tail);
+			ops, &rhead, &rtail);
+
+		if (rhead != NULL) {
+			if (stat == CSA_SUCCESS)
+				stat = _AddRun(&runs, &nruns, &maxruns, rhead);
+			if (stat != CSA_SUCCESS)
+				_DtCm_free_cms_entries(rhead);
+		}
 
 		lnode = hc_lookup_next(lnode);
 	}
 
-	if (stat == CSA_SUCCESS)
-		*entries = head;
-	else if (head)
-		_DtCm_free_cms_entries(head);
+	if (stat == CSA_SUCCESS) {
+		*entries = _MergeRuns(runs, nruns);
+	} else {
+		if (head)
+			_DtCm_free_cms_entries(head);
+		for (i = 0; i < nruns; i++)
+			_DtCm_free_cms_entries(runs[i]);
+	}
+	free(runs);
 
 	return (stat);
 }
@@ -553,7 +581,12 @@ _EnumerateSequence(
 				item.date_time_value = ebuf;
 		}
 
-		stat = _AddToLinkedEntries(eptr, head, tail, B_TRUE,B_FALSE);
+		/* instances come in ascending order, so this normally
+		 * appends; sort only if a tick ever goes backwards
+		 */
+		stat = _AddToLinkedEntries(eptr, head, tail,
+			(*tail != NULL && (*tail)->key.time >= tick),
+			B_FALSE);
 
 		eptr->key.time = fsttick;
 		eptr->attrs[CSA_ENTRY_ATTR_START_DATE_I].value->\
@@ -658,4 +691,68 @@ _GetAllEntryAttrs(
 	return (stat);
 }
 
+/*
+ * Append a sorted list of entries to the array of runs to be merged.
+ */
+static CSA_return_code
+_AddRun(cms_entry ***runs, int *nruns, int *maxruns, cms_entry *run)
+{
+	cms_entry	**newruns;
+	int		newmax;
 
+	if (*nruns == *maxruns) {
+		newmax = *maxruns ? *maxruns * 2 : 16;
+		if ((newruns = (cms_entry **)realloc(*runs,
+		    newmax * sizeof(cms_entry *))) == NULL)
+			return (CSA_E_INSUFFICIENT_MEMORY);
+		*runs = newruns;
+		*maxruns = newmax;
+	}
+	(*runs)[(*nruns)++] = run;
+	return (CSA_SUCCESS);
+}
+
+/*
+ * Merge two lists sorted by time.  'b' holds entries found after the
+ * ones in 'a'; on equal times its entries go first, which is where the
+ * old sorted insertion (before the first entry with time >= its own)
+ * put them.
+ */
+static cms_entry *
+_MergeTwo(cms_entry *a, cms_entry *b)
+{
+	cms_entry	head, *tail = &head;
+
+	while (a != NULL && b != NULL) {
+		if (b->key.time <= a->key.time) {
+			tail->next = b;
+			b = b->next;
+		} else {
+			tail->next = a;
+			a = a->next;
+		}
+		tail = tail->next;
+	}
+	tail->next = (a != NULL) ? a : b;
+	return (head.next);
+}
+
+/*
+ * Merge sorted runs pairwise, O(K log R) for K entries in R runs.  The
+ * left group always holds the earlier runs, so the result is the order
+ * the old one-at-a-time sorted insertion produced.
+ */
+static cms_entry *
+_MergeRuns(cms_entry **runs, int nruns)
+{
+	int	width, i;
+
+	if (nruns == 0)
+		return (NULL);
+
+	for (width = 1; width < nruns; width *= 2)
+		for (i = 0; i + width < nruns; i += 2 * width)
+			runs[i] = _MergeTwo(runs[i], runs[i + width]);
+
+	return (runs[0]);
+}

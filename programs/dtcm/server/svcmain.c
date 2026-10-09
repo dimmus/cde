@@ -485,26 +485,87 @@ _GetFirstGarbageCollectionTime(void)
 	return (gtime - n);
 }
 
+/*
+ * SIGALRM/SIGUSR1 (garbage collection) and SIGUSR2 (debug switch) only
+ * set a flag; the work is done by run_service() between requests.
+ * Garbage collection used to run inside the signal handler, i.e. in
+ * the middle of whatever request was being served, while it walked and
+ * rewrote the calendars that request might be changing.
+ */
+static volatile sig_atomic_t gc_requested = 0;
+static volatile sig_atomic_t debug_requested = 0;
+
+static void
+gc_signal(int sig)
+{
+	gc_requested = 1;
+}
+
+static void
+debug_signal(int sig)
+{
+	debug_requested = 1;
+}
+
 static void
 init_alarm(void)
 {
 	int next;
-	extern void garbage_collect();
-	extern void debug_switch();
+	struct sigaction sa;
 
-#if defined(SVR4) && !defined(__linux__)
-	extern void (*sigset(int, void (*)(int)))(int);
-	sigset(SIGUSR1, garbage_collect);
-	sigset(SIGALRM, garbage_collect);
-	sigset(SIGUSR2, debug_switch);
-#else
-	signal(SIGUSR1, garbage_collect);
-	signal(SIGALRM, garbage_collect);
-	signal(SIGUSR2, debug_switch);
-#endif /* SVR4 */
+	memset(&sa, 0, sizeof(sa));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = gc_signal;
+	sigaction(SIGUSR1, &sa, NULL);
+	sigaction(SIGALRM, &sa, NULL);
+	sa.sa_handler = debug_signal;
+	sigaction(SIGUSR2, &sa, NULL);
 
 	next = _GetFirstGarbageCollectionTime();
 	alarm((unsigned) next);
+}
+
+/*
+ * svc_run() with the deferred signal work.  The signals are blocked
+ * except while waiting in pselect(), so a signal is never lost between
+ * the flag test and the wait.
+ */
+static void
+run_service(void)
+{
+	extern void garbage_collect(void);
+	extern void debug_switch(void);
+	sigset_t block, orig;
+	fd_set	readfds;
+	int	n;
+
+	sigemptyset(&block);
+	sigaddset(&block, SIGALRM);
+	sigaddset(&block, SIGUSR1);
+	sigaddset(&block, SIGUSR2);
+	sigprocmask(SIG_BLOCK, &block, &orig);
+
+	for (;;) {
+		if (gc_requested) {
+			gc_requested = 0;
+			garbage_collect();
+		}
+		if (debug_requested) {
+			debug_requested = 0;
+			debug_switch();
+		}
+
+		readfds = svc_fdset;
+		n = pselect(FD_SETSIZE, &readfds, NULL, NULL, NULL, &orig);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			perror("rpc.cmsd: select");
+			return;
+		}
+		if (n > 0)
+			svc_getreqset(&readfds);
+	}
 }
 
 int
@@ -749,7 +810,7 @@ main(int argc, char **argv)
 	init_alarm();
 	_DtCm_init_hash();
 
-	svc_run();
+	run_service();
 
 	(void)fprintf(stderr, "rpc.cmsd: svc_run returned\n");
 	return(1);

@@ -96,6 +96,8 @@ _DtCmsFreeRegistrationInfo(_DtCmsRegistrationInfo *rinfo)
 	if (rinfo==NULL) return;
 	if (rinfo->client != NULL)
 		free(rinfo->client);
+	if (rinfo->cl != NULL)
+		clnt_destroy(rinfo->cl);
 	free(rinfo);
 }
 
@@ -420,6 +422,7 @@ _DtCmsDoUpdateCalAttrsCallback(
 	if (num_attrs > 0 &&
 	    (cdata.names = (char **)calloc(1, sizeof(char *)*num_attrs)))
 	{
+		cdata.num_names = num_attrs;
 		for (i = 0; i < num_attrs; i++)
 			cdata.names[i] = attrs[i].name.name;
 	} else {
@@ -545,6 +548,40 @@ _DtCmsDoUpdateEntryCallback(
 }
 
 /*
+ * Callbacks are one-way notifications: the server must not wait for a
+ * client, which may itself be blocked in a call to the server.  They
+ * used to be sent with a zero timeout, but TI-RPC (libtirpc) does not
+ * even send a datagram when the timeout is zero, so clients never got
+ * any callback.  Wait at most a millisecond for the reply instead.
+ */
+#define CB_TIMEOUT_USEC	1000
+
+/*
+ * Send one callback through the registration's cached handle.  A
+ * successful send normally reports RPC_TIMEDOUT or RPC_SUCCESS.
+ */
+static enum clnt_stat
+_DtCmsCallClient(_DtCmsRegistrationInfo *ptr, int version, void *args)
+{
+	struct timeval timeout_tv;
+
+	timeout_tv.tv_sec = 0;
+	timeout_tv.tv_usec = CB_TIMEOUT_USEC;
+
+	if (version == AGENTVERS) {
+		return (clnt_call(ptr->cl, ptr->procnum,
+			(xdrproc_t)_DtCm_xdr_Table_Res_4, (char *)args,
+			(xdrproc_t)xdr_void, (char *)0, timeout_tv));
+	} else if (version == AGENTVERS_2) {
+		return (clnt_call(ptr->cl, ptr->procnum,
+			(xdrproc_t)xdr_cmcb_update_callback_args,
+			(char *)args, (xdrproc_t)xdr_void, (char *)0,
+			timeout_tv));
+	}
+	return (RPC_TIMEDOUT);
+}
+
+/*
  * this routine takes care of callbacks to clients using either
  * v1 or v2 of the callback protocol.
  */
@@ -562,7 +599,7 @@ _DtCmsDoCallback(
         _DtCmsRegistrationInfo *ptr;
         _DtCmsRegistrationInfo *prev;
 	struct timeval timeout_tv;
-	CLIENT *cl;
+	enum clnt_stat cstat;
 	boolean_t advance = B_TRUE;
         
 	/*
@@ -593,21 +630,53 @@ _DtCmsDoCallback(
 			continue;
 		}
 
-		sourcehost = _DtCmsTarget2Location(ptr->client);
 		if (debug) {
 			fprintf(stderr,
 			  "%s: calling back %s on prog: %ld, vers: %ld, proc: %ld\n",
 			  pgname, ptr->client, ptr->prognum, ptr->versnum,
 			  ptr->procnum);
 		}
-		cl = clnt_create(sourcehost, ptr->prognum, ptr->versnum, "udp");
+
+		/*
+		 * The handle is cached in the registration: creating one
+		 * costs a portmapper query and a socket for every client
+		 * on every change.  If a call through a cached handle
+		 * fails outright (it normally succeeds or just times
+		 * out, see CB_TIMEOUT_USEC), drop it and retry with a
+		 * fresh one, which also re-checks that the client is
+		 * still there.
+		 */
+		if (ptr->cl != NULL) {
+			cstat = _DtCmsCallClient(ptr, version, args);
+			if (cstat != RPC_SUCCESS && cstat != RPC_TIMEDOUT) {
+				clnt_destroy(ptr->cl);
+				ptr->cl = NULL;
+			}
+		}
+
+		if (ptr->cl == NULL) {
+			sourcehost = _DtCmsTarget2Location(ptr->client);
+			ptr->cl = clnt_create(sourcehost, ptr->prognum,
+					ptr->versnum, "udp");
+			if (ptr->cl == NULL && debug)
+				clnt_pcreateerror(sourcehost);
+			free(sourcehost);
+
+			if (ptr->cl != NULL) {
+				/* for non-sun systems, clnt_call won't
+				 * return right away unless the timeout is
+				 * also set using clnt_control(), (rpc bug?)
+				 */
+				timeout_tv.tv_sec = 0;
+				timeout_tv.tv_usec = CB_TIMEOUT_USEC;
+				clnt_control(ptr->cl, CLSET_TIMEOUT,
+						(char *)&timeout_tv);
+				(void) _DtCmsCallClient(ptr, version, args);
+			}
+		}
 
 		/* deregister client if fails to create handle */
-		if (cl == NULL) {
-			if (debug) {
-				clnt_pcreateerror(sourcehost);
-			}
-
+		if (ptr->cl == NULL) {
 			if (ptr == rlist) { /* top of list */
 				rlist = ptr->next;
 				prev = rlist;
@@ -622,38 +691,9 @@ _DtCmsDoCallback(
 			ptr = prev;
 
 		} else {
-			/* Set timeout to zero so that the call
-			 * returns right away.
-			 */
-			timeout_tv.tv_sec = 0;
-			timeout_tv.tv_usec = 0;
-
-#ifndef SunOS
-			/* for non-sun systems, clnt_call won't
-			 * return right away unless timeout is set
-			 * to zero using clnt_control(), (rpc bug?)
-			 */
-			clnt_control(cl, CLSET_TIMEOUT,
-					(char *)&timeout_tv);
-#endif
-			if (version == AGENTVERS) {
-				(void)clnt_call(cl, ptr->procnum,
-					(xdrproc_t)_DtCm_xdr_Table_Res_4, (char *)args,
-					(xdrproc_t)xdr_void, (char *)0, timeout_tv);
-			} else if (version == AGENTVERS_2) {
-				(void)clnt_call(cl, ptr->procnum,
-					(xdrproc_t)xdr_cmcb_update_callback_args,
-					(char *)args, (xdrproc_t)xdr_void, (char *)0,
-					timeout_tv);
-			}
 			ncallbacks++;
 			nclients++;
 		}
-
-		if (cl)
-			clnt_destroy(cl);
-
-		free(sourcehost);
 
 		if (advance) {
 			prev = ptr;
