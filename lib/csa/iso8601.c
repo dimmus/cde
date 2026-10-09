@@ -28,10 +28,6 @@
  *  (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  */
 
-#if defined(__linux__) || defined(CSRG_BASED)
-# define _GNU_SOURCE
-#endif
-
 #include <EUSCompat.h>
 #define XOS_USE_NO_LOCKING
 #define X_INCLUDE_TIME_H
@@ -39,53 +35,48 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <time.h>
 #include <string.h>
 #include "iso8601.h"
 
-static void
-set_timezone(char *tzname)
+/* strlen("CCYYMMDDThhmmssZ") */
+#define ISO8601_LEN	16
+
+/*
+ * Parse exactly 'n' decimal digits at 's'.  Returns -1 if any of them
+ * is not a digit.
+ */
+static int
+get_digits(const char *s, int n)
 {
-        static char tzenv[BUFSIZ];
- 
-        if (tzname==NULL)
-                (void) putenv("TZ");
-        else {
-                snprintf(tzenv, sizeof tzenv, "TZ=%s", tzname);
-                (void) putenv(tzenv);
-        }
-        tzset();
+	int	v = 0;
+
+	while (n-- > 0) {
+		if (*s < '0' || *s > '9')
+			return (-1);
+		v = v * 10 + (*s++ - '0');
+	}
+	return (v);
 }
 
-static int
-validate_iso8601(char *buf)
+/*
+ * Days from 1970-01-01 to the given proleptic Gregorian date.  A day of
+ * the month past the end of the month is carried into the next month,
+ * the way mktime() and timegm() normalise it (February 31 is March 3,
+ * or March 2 in a leap year).
+ */
+static long
+days_from_civil(long y, int m, int d)
 {
-	/* validation rules:
-         *             - sscanf returns # of matches, which must be 6.
-         *             - crude range check on each numerical value scanned.
-         *             - length of input is fixed: strlen("CCYYMMDDThhmmssZ")
-         *             - last char must be Z, indicating UTC time
-         */
-	int	year, month, day, hour, min, sec;
-	int	scan_ret=0;
-static  char	tmp[] = "CCYYMMDDThhmmssZ";
+	long	era, yoe, doy, doe;
 
-	scan_ret=sscanf(buf, "%4d%2d%2dT%2d%2d%2dZ",
-	    &year, &month, &day, &hour, &min, &sec);
-
-	/* the rules:  if any fail, whole test fails so return */
-	if (strlen(buf) != strlen(tmp)) return (-1);
-	if (buf[strlen(buf)-1] != 'Z')	return (-1);
-	if (scan_ret != 6)		return (-1);
-	if ((year<1970) || (year>2038))	return (-1);
-	if ((month<1) || (month>12))	return (-1);
-	if ((day<1) || (day>31))	return (-1);
-	if ((hour<0) || (hour>24))	return (-1);
-	if ((min<0) || (min>59))	return (-1);
-	if ((sec<0) || (sec>59))	return (-1);
-
-	return (0);
+	if (m <= 2)
+		y--;
+	era = (y >= 0 ? y : y - 399) / 400;
+	yoe = y - era * 400;
+	doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+	doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+	return (era * 146097 + doe - 719468);
 }
 
 /*
@@ -110,48 +101,46 @@ static  char	tmp[] = "CCYYMMDDThhmmssZ";
  *        time information is assumed to be pre-converted to UTC.
  *
  *	  dac 19940728T224055Z  :-)
+ *
+ * Note 3:This is called once per date attribute of every entry, on both
+ *	  the client and the server.  It used to switch TZ to GMT and
+ *	  back around mktime() (two tzset() calls, i.e. two zoneinfo
+ *	  loads, per call, and not thread-safe).  It is now a fixed-width
+ *	  parser plus plain UTC arithmetic, equivalent to timegm().
  */ 
 int
 _csa_iso8601_to_tick(char *buf, time_t *tick_out)
 {
-	int		year, month, day, hour, min, sec;
-	struct tm	time_str;
-	char		tz_orig[BUFSIZ];
-	boolean_t	orig_tzset = B_FALSE;
+	int	year, month, day, hour, min, sec;
 
-	sscanf(buf, "%4d%2d%2dT%2d%2d%2dZ",
-	    &year, &month, &day, &hour, &min, &sec);
+	/* validation rules:
+	 *	- length of input is fixed: strlen("CCYYMMDDThhmmssZ")
+	 *	- every field is all digits, 'T' and 'Z' are where they belong
+	 *	  (the last char must be Z, indicating UTC time)
+	 *	- crude range check on each numerical value scanned.
+	 */
+	if (buf == NULL || strlen(buf) != ISO8601_LEN ||
+	    buf[8] != 'T' || buf[15] != 'Z')
+		return (-1);
 
-	if (validate_iso8601(buf) != 0)
-		return(-1);
+	year  = get_digits(buf, 4);
+	month = get_digits(buf + 4, 2);
+	day   = get_digits(buf + 6, 2);
+	hour  = get_digits(buf + 9, 2);
+	min   = get_digits(buf + 11, 2);
+	sec   = get_digits(buf + 13, 2);
 
-	time_str.tm_year	= year - 1900;
-	time_str.tm_mon		= month - 1;
-	time_str.tm_mday	= day;
-	time_str.tm_hour	= hour;
-	time_str.tm_min		= min;
-	time_str.tm_sec		= sec;
-	time_str.tm_isdst	= -1;
+	if ((year<1970) || (year>2038))	return (-1);
+	if ((month<1) || (month>12))	return (-1);
+	if ((day<1) || (day>31))	return (-1);
+	if ((hour<0) || (hour>24))	return (-1);
+	if ((min<0) || (min>59))	return (-1);
+	if ((sec<0) || (sec>59))	return (-1);
 
-	if (getenv("TZ")) {
-		strncpy(tz_orig, getenv("TZ"), sizeof(tz_orig));
-		tz_orig[sizeof(tz_orig)-1] = '\0';
-		orig_tzset = B_TRUE;
-	}
+	*tick_out = (time_t)days_from_civil(year, month, day) * 86400 +
+		    hour * 3600 + min * 60 + sec;
 
-	set_timezone("GMT");
-
-	*tick_out = mktime(&time_str);
-
-	if (orig_tzset == B_TRUE)
-		set_timezone(tz_orig);
-	else
-		set_timezone(NULL);
-
-	if (*tick_out != (long)-1)
-		return(0);
-	else
-		return(-1);
+	return (0);
 }
 
 /*
@@ -167,45 +156,19 @@ _csa_tick_to_iso8601(time_t tick, char *buf_out)
 {
 	struct tm	*time_str;
 	time_t		tk=tick;
-	char 		*s;
-#if !defined(__linux__) && !defined(CSRG_BASED)
-	char 		tz_orig[BUFSIZ];
-	boolean_t	orig_tzset = B_FALSE;
-#else
-        _Xgtimeparams   gmtime_buf;
-#endif
+	_Xgtimeparams	gmtime_buf;
 
 	/* tick must be +ve to be valid */
 	if (tick < 0) {
 	   return(-1);
 	}
 
-	/* JET.  This is horrible. */
-#if !defined(__linux__) && !defined(CSRG_BASED)
-
-	if (getenv("TZ")) {
-		strncpy(tz_orig, getenv("TZ"), sizeof(tz_orig));
-		tz_orig[sizeof(tz_orig)-1] = '\0';
-		orig_tzset = B_TRUE;
-	}
-
-	set_timezone("GMT");
-
-	time_str = localtime(&tk);
-
-	if (orig_tzset == B_TRUE)
-		set_timezone(tz_orig);
-	else
-		set_timezone(NULL);
-
-#else 
-	/* let's use something a little more reasonable */
-        (void) gmtime_buf;	/* unused unless XTHREADS */
-        time_str = _XGmtime(&tk, gmtime_buf);
-#endif /* !linux && !CSGRC_BASED */
+	(void) gmtime_buf;	/* unused unless XTHREADS */
+	if ((time_str = _XGmtime(&tk, gmtime_buf)) == NULL)
+		return (-1);
 
 	/* format string forces fixed width (zero-padded) fields */
-	asprintf(&s, "%04d%02d%02dT%02d%02d%02dZ",
+	sprintf(buf_out, "%04d%02d%02dT%02d%02d%02dZ",
 		time_str->tm_year + 1900,
 		time_str->tm_mon + 1,
 		time_str->tm_mday,
@@ -213,10 +176,7 @@ _csa_tick_to_iso8601(time_t tick, char *buf_out)
 		time_str->tm_min,
 		time_str->tm_sec);
 
-    strcpy(buf_out, s);
-    free(s);
-
-    return (0);
+	return (0);
 }
 
 /*
@@ -231,16 +191,18 @@ _csa_tick_to_iso8601(time_t tick, char *buf_out)
 int
 _csa_iso8601_to_range(char *buf, time_t *start, time_t *end)
 {
-    int nchars;
-    char tmpstr[BUFSIZ];
+    size_t nchars;
+    char tmpstr[ISO8601_LEN + 1];
     char *p;
 
     if ((p = strchr(buf, '/')) == NULL) {
         return (-1);
     }
 
-    nchars=(p-buf);
-    strncpy(tmpstr, buf, (size_t)nchars);
+    nchars = (size_t)(p - buf);
+    if (nchars != ISO8601_LEN)
+        return (-1);
+    memcpy(tmpstr, buf, nchars);
     tmpstr[nchars]='\0';
 
     if (_csa_iso8601_to_tick(tmpstr, start) != 0) {
@@ -252,7 +214,8 @@ _csa_iso8601_to_range(char *buf, time_t *start, time_t *end)
         return (-1);
     }
 
-    if (end < start)
+    /* compare the times, not the pointers to them */
+    if (*end < *start)
 	return (-1);
     else
 	return(0);
@@ -269,7 +232,7 @@ _csa_iso8601_to_range(char *buf, time_t *start, time_t *end)
 int
 _csa_range_to_iso8601(time_t start, time_t end, char *buf)
 {
-    char tmpstr1[BUFSIZ], tmpstr2[BUFSIZ], *s;
+    char tmpstr1[BUFSIZ], tmpstr2[BUFSIZ];
 
     /* validate: ticks must be +ve, and end can't precede start */
     if ((start < 0) || (end < 0) || (end < start)) {
@@ -283,15 +246,8 @@ _csa_range_to_iso8601(time_t start, time_t end, char *buf)
         return (-1);
     }
 
-    if (asprintf(&s, "%s/%s", tmpstr1, tmpstr2) < 0) {
-        free(s);
-        return (-1);
-    }
-    else {
-        strcpy(buf, s);
-        free(s);
-        return(0);
-    }
+    sprintf(buf, "%s/%s", tmpstr1, tmpstr2);
+    return(0);
 }
 
 static int
@@ -355,11 +311,8 @@ _csa_iso8601_to_duration(char *buf, time_t *sec)
 int
 _csa_duration_to_iso8601(time_t sec, char *buf)
 {
-    char *s;
-
-    asprintf(&s, "%cPT%dS", (sec < 0) ? '-': '+', abs(sec));
-    strcpy(buf, s);
-    free(s);
+    sprintf(buf, "%cPT%ldS", (sec < 0) ? '-': '+',
+	    (sec < 0) ? -(long)sec : (long)sec);
 
     return(0);
 }
