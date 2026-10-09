@@ -63,6 +63,9 @@ in this Software without prior written authorization from the X Consortium.
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
 
 #include <X11/Intrinsic.h>
 #include <X11/SM/SMlib.h>
@@ -80,9 +83,18 @@ typedef struct _IceAuthFileEntryList
  * Private data
  */
 #define MAGIC_COOKIE_LEN 16
-#define AUTH_RETRIES 10
-#define AUTH_TIMEOUT 2
-#define AUTH_DEADTIME 600L
+
+/*
+ * .ICEauthority locking.  These used to be passed to IceLockAuthFile()
+ * as 10 retries x 2 s with a 600 s dead time, so a lock left behind by a
+ * session that died less than ten minutes earlier stalled login for 20 s
+ * (40 s when the fallback path was tried as well).  Lock holders keep
+ * the lock for a few milliseconds, so poll every 100 ms and treat a lock
+ * older than 10 s as stale.
+ */
+#define AUTH_POLL_MS 100
+#define AUTH_RETRIES 120	/* x AUTH_POLL_MS = 12 s, > AUTH_DEADTIME */
+#define AUTH_DEADTIME 10L
 
 /*
  * Private functions - forward declarations
@@ -112,6 +124,94 @@ freeEntryList (
 /*
  * Private functions - implemenation.
  */
+
+/*
+ * lockAuthFile - take the lock on an ICE authority file.
+ *
+ * Same protocol as IceLockAuthFile() in libICE (create "<file>-c", then
+ * hard-link it to "<file>-l"; the link is the lock and IceUnlockAuthFile()
+ * removes both), so it interoperates with every other ICE client, but it
+ * polls at AUTH_POLL_MS instead of whole seconds and re-checks for a stale
+ * lock on every attempt.  The "-c" file is opened without O_TRUNC so that
+ * waiting does not refresh the ctime that staleness is judged by.
+ */
+static int
+lockAuthFile (
+	const char	*file_name)
+{
+    char creat_name[MAXPATHLEN], link_name[MAXPATHLEN], dir_name[MAXPATHLEN];
+    struct timespec poll = { 0, AUTH_POLL_MS * 1000000L };
+    struct stat statb;
+    char *slash;
+    int created = 0;
+    int retries = AUTH_RETRIES;
+    int fd;
+
+    if (snprintf(creat_name, sizeof(creat_name), "%s-c", file_name)
+	    >= (int) sizeof(creat_name) ||
+	snprintf(link_name, sizeof(link_name), "%s-l", file_name)
+	    >= (int) sizeof(link_name))
+	return IceAuthLockError;
+
+    /* link() needs a writable directory; without one, waiting is futile. */
+    snprintf(dir_name, sizeof(dir_name), "%s", file_name);
+    if ((slash = strrchr(dir_name, '/')) == NULL)
+	strcpy(dir_name, ".");
+    else if (slash == dir_name)
+	dir_name[1] = '\0';
+    else
+	*slash = '\0';
+    if (access(dir_name, W_OK) != 0)
+	return IceAuthLockError;
+
+    while (retries > 0)
+    {
+	if (stat(creat_name, &statb) == 0 &&
+	    time(NULL) - statb.st_ctime > AUTH_DEADTIME)
+	{
+	    unlink(creat_name);
+	    unlink(link_name);
+	    created = 0;
+	}
+
+	if (!created)
+	{
+	    fd = open(creat_name, O_WRONLY | O_CREAT, 0666);
+	    if (fd == -1)
+	    {
+		if (errno != EACCES)
+		    return IceAuthLockError;
+	    }
+	    else
+	    {
+		close(fd);
+		created = 1;
+	    }
+	}
+
+	if (created)
+	{
+	    if (link(creat_name, link_name) == 0)
+		return IceAuthLockSuccess;
+
+	    if (errno == ENOENT)
+	    {
+		/* The holder unlocked between our open and link. */
+		created = 0;
+		continue;
+	    }
+
+	    if (errno != EEXIST)
+		return IceAuthLockError;
+	}
+
+	nanosleep(&poll, NULL);
+	--retries;
+    }
+
+    return IceAuthLockTimeout;
+}
+
 static void
 freeEntryList (
 	IceAuthFileEntryList	*entryList)
@@ -196,18 +296,15 @@ writeIceauth (
     if ((path = IceAuthFileName()) == (char *)NULL)
 	return 0;
 
-    if (IceLockAuthFile(path, AUTH_RETRIES, AUTH_TIMEOUT, AUTH_DEADTIME)
-	!= IceAuthLockSuccess) {
+    if (lockAuthFile(path) != IceAuthLockSuccess) {
 	/*
 	 * Let's try another PATH, in case IceLockAuthFile's call to
 	 * link() fails.  This workaround code was taken from 
 	 * dtlogin/auth.c.
 	 */
         IceUnlockAuthFile(path);
-	extraPath = XtMalloc (MAXPATHLEN);
-	(void) strcpy (extraPath, CDE_CONFIGURATION_TOP ".ICEauthority");
-	if (IceLockAuthFile(extraPath, AUTH_RETRIES, AUTH_TIMEOUT, AUTH_DEADTIME)
-		!= IceAuthLockSuccess) {
+	extraPath = CDE_CONFIGURATION_TOP ".ICEauthority";
+	if (lockAuthFile(extraPath) != IceAuthLockSuccess) {
 	    IceUnlockAuthFile (extraPath);
 	    return 0;
 	 }
