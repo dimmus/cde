@@ -216,11 +216,19 @@ AttachArea::initialize()
 			xmFormWidgetClass, _parent, 
 			NULL);
 
-    // Get pixel data.
-    XmeGetColorObjData(XtScreen(_parent), &colorUse, pixels, XmCO_NUM_COLORS,
-		       &act, &inact, &prim, &second, &text);
-    _foreground = pixels[text].fg;
-    _background = pixels[text].sc;
+    // Get pixel data. Without a color server (no dtsession) there is
+    // none, and the returned palette index is garbage.
+    if (XmeGetColorObjData(XtScreen(_parent), &colorUse, pixels,
+			   XmCO_NUM_COLORS, &act, &inact, &prim, &second,
+			   &text)) {
+	_foreground = pixels[text].fg;
+	_background = pixels[text].sc;
+    }
+    else
+	XtVaGetValues(_w,
+		      XmNforeground, &_foreground,
+		      XmNbackground, &_background,
+		      NULL);
 
     parWid = _myOwner->textEditor()->get_text_width();
 

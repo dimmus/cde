@@ -1169,6 +1169,11 @@ MsgScrollingList::show_with_attachments(DtMail::Message * msg)
     if (! is_multipart)
       return DTM_FALSE;
 
+    // Answered from the headers and delimiters when possible, so that
+    // building the list does not parse every multipart body.
+    if (msg->flagIsSet(error, DtMailMessageHasMultipleParts))
+      return DTM_TRUE;
+
     num_bodyParts = msg->getBodyCount(error);
     if (num_bodyParts > 1)
       return DTM_TRUE;

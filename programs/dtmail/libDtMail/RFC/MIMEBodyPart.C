@@ -146,13 +146,19 @@ MIMEBodyPart::MIMEBodyPart(DtMailEnv & error,
     // any predefined length fields so we have to use the boundaries.
     //
     int bndry_len = strlen(boundary);
-    for (;body_end <= *end; body_end++) {
-	if (*body_end == '\n' &&
-	    *(body_end + 1) == '-' &&
-	    *(body_end + 2) == '-' &&
-	    strncmp(body_end + 3, boundary, bndry_len) == 0) {
-	    break;
-	}
+    char * delimiter = (char *)malloc(bndry_len + 4);
+    delimiter[0] = '\n';
+    delimiter[1] = '-';
+    delimiter[2] = '-';
+    memcpy(delimiter + 3, boundary, bndry_len + 1);
+    const char * next_delimiter =
+		RFCScanFor(body_end, *end, delimiter, bndry_len + 3);
+    free(delimiter);
+    if (next_delimiter != NULL) {
+	body_end = next_delimiter;
+    }
+    else if (body_end <= *end) {
+	body_end = *end + 1;
     }
 
     if (*(body_end - 1) == '\r') {

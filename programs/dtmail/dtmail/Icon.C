@@ -107,11 +107,19 @@ Icon::Icon (
 					host_prefix,
 					DtMEDIUM);
 
-    // Get pixel data.
-    XmeGetColorObjData(XtScreen(parent), &colorUse, pixels, XmCO_NUM_COLORS,
-		       &act, &inact, &prim, &second, &text);
-    _cur_fg = pixels[text].fg;
-    _cur_bg = pixels[text].sc;
+    // Get pixel data. Without a color server (no dtsession) there is
+    // none, and the returned palette index is garbage.
+    if (XmeGetColorObjData(XtScreen(parent), &colorUse, pixels,
+			   XmCO_NUM_COLORS, &act, &inact, &prim, &second,
+			   &text)) {
+	_cur_fg = pixels[text].fg;
+	_cur_bg = pixels[text].sc;
+    }
+    else
+	XtVaGetValues(parent,
+		      XmNforeground, &_cur_fg,
+		      XmNbackground, &_cur_bg,
+		      NULL);
 
     n = 0;
     XtSetArg (args[n], XmNshadowThickness, 0);          n++;

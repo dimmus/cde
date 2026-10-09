@@ -137,6 +137,10 @@ typedef enum {
     DtMailMessageAnswered	=	3,
     DtMailMessageMultipart	=	4,
     DtMailMessagePartial	=	8,
+    // True only when the message is known, without parsing its bodies,
+    // to have more than one body part (what getBodyCount() would say).
+    // False means "single part, or cannot tell cheaply".
+    DtMailMessageHasMultipleParts =	16,
     DtMailMessageReservedLimit	=	8192
 } DtMailMessageState;
 

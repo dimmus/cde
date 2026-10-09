@@ -346,6 +346,24 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 		       const DtMailBoolean replace,
 		       const char * val)
 {
+    storeHeader(error, name, replace, val, DTM_TRUE);
+}
+
+void
+RFCEnvelope::setDerivedHeader(DtMailEnv & error,
+			      const char * name, 
+			      const char * val)
+{
+    storeHeader(error, name, DTM_TRUE, val, DTM_FALSE);
+}
+
+void
+RFCEnvelope::storeHeader(DtMailEnv & error,
+			 const char * name, 
+			 const DtMailBoolean replace,
+			 const char * val,
+			 const DtMailBoolean mark_dirty)
+{
     MutexLock lock_header(_header_lock);
 
     RFCMessage * msg = (RFCMessage *)_parent;
@@ -357,6 +375,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
     //
     ParsedHeader * hdr;
     const char * real_name;
+    int changed = 0;
 
     // Find the header if it currently exists
     //
@@ -403,7 +422,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 	hdr = new ParsedHeader;
 	slot = _parsed_headers.append(hdr);
 	real_name = mapName(name);
-	_dirty = 1;				// new entry: header dirty
+	changed = 1;				// new entry: header dirty
     }
     else {
 	hdr = _parsed_headers[slot];
@@ -417,7 +436,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 	hdr->name_start = strdup(real_name);
 	hdr->name_len = strlen(real_name);
 	_header_len += hdr->name_len;
-	_dirty = 1;				// new name: header dirty
+	changed = 1;				// new name: header dirty
     }
 
     // Clean up the existing value if need be.
@@ -425,7 +444,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
     if (hdr->value_start) {
       if ( (strlen(val) != (size_t) hdr->value_len)
 	|| (strncmp(hdr->value_start, val, hdr->value_len)!=0) )	// has value changed??
-	  _dirty = 1;				// yes: header dirty
+	  changed = 1;				// yes: header dirty
 	if (hdr->alloc_mask & VALUE_MASK) {
 	    free((char *)hdr->value_start);
 	}
@@ -434,15 +453,21 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 	hdr->value_len = 0;
     }
     else
-      _dirty = 1;				// new value: header dirty
+      changed = 1;				// new value: header dirty
 
     hdr->value_start = strdup(val);
     hdr->value_len = strlen(hdr->value_start);
     _header_len += hdr->value_len + 1;
     hdr->alloc_mask |= VALUE_MASK;
 
-    if (msg) {
-      msg->markDirty(_dirty);
+    // Only a real change dirties the message: setting a header to the
+    // value it already has must not force the mailbox to be rewritten.
+    //
+    if (changed && mark_dirty == DTM_TRUE) {
+      _dirty = 1;
+      if (msg) {
+	msg->markDirty(1);
+      }
     }
 }
 
@@ -456,6 +481,10 @@ RFCEnvelope::removeHeader(DtMailEnv & error, const char * name)
     // Remove all versions of this header.
     //
     int slot = lookupHeader(name);
+    if (slot < 0) {
+	return;		// Nothing to remove: nothing changed.
+    }
+
     while (slot >= 0) {
 	_parsed_headers.remove(slot);
 	slot = lookupHeader(name);
