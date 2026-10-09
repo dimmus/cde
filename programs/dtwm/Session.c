@@ -69,6 +69,24 @@ extern String unpost_monitor_arrow_image;
 #define MAX_PATH        1024
 
 
+/*
+ * The home directory: $HOME, or the password entry's when HOME is unset
+ * or empty.
+ */
+static char *
+SessionHomeDir (void)
+{
+   char * home_dir = getenv ("HOME");
+   struct passwd * pw_info;
+
+   if (home_dir == NULL || home_dir[0] == '\0')
+   {
+      pw_info = getpwuid (getuid());
+      home_dir = (pw_info && pw_info->pw_dir) ? pw_info->pw_dir : "/";
+   }
+   return (home_dir);
+}
+
 /************************************************************************
  *
  *  SessionFileGetName
@@ -82,16 +100,11 @@ SessionFileGetName (void)
 {
    char * home_dir;
    char * file_name;
-   struct passwd * pw_info;
    
 
    /*  Get the home directory used to build the path to the session file.  */
 
-   if ((home_dir = (char *)getenv("HOME")) != NULL || strlen (home_dir) == 0)
-   {
-      pw_info = getpwuid (getuid());
-      home_dir = pw_info->pw_dir;
-   }
+   home_dir = SessionHomeDir ();
 
    file_name = XtMalloc (strlen (home_dir) + strlen (SESSION_FILE) + 1);
    sprintf (file_name, "%s%s", home_dir, SESSION_FILE);
@@ -783,16 +796,11 @@ SessionDeleteAll(void)
    int srclen;
    char * home_dir;
    char * fp_dir;
-   struct passwd * pw_info;
 
 
    /*  Get the home directory used to build the path to the session file.  */
 
-   if ((home_dir = (char *)getenv("HOME")) != NULL || strlen (home_dir) == 0)
-   {
-      pw_info = getpwuid (getuid());
-      home_dir = pw_info->pw_dir;
-   }
+   home_dir = SessionHomeDir ();
 
   /* Add path to fp_dynamic directory */
    fp_dir = XtMalloc (strlen(home_dir) + strlen(TYPES_DIR) + 1);

@@ -854,20 +854,16 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 	    }
 	    else if (propertyEvent->atom == wmGD.xa_MWM_HINTS)
 	    {
-		long suppliedReturn;
-		XSizeHints hintsReturn = {0};
-
-		XGetWMNormalHints (DISPLAY, pCD->client, &hintsReturn,
-				&suppliedReturn);
-
-		hintsReturn.flags |= P_MAX_SIZE;
-		hintsReturn.max_width = -1;
-		hintsReturn.max_height = -1;
-
-		XSetWMNormalHints (DISPLAY, pCD->client, &hintsReturn);
-
 		ProcessMwmHints (pCD);
 		SetClientOffset (pCD);
+
+		/*
+		 * The decorations may have changed: recompute the maximum
+		 * size for them.  (This used to be done by writing a
+		 * maximum size of -1 into the client's WM_NORMAL_HINTS,
+		 * which clobbered the client's own hints.)
+		 */
+		ProcessWmNormalHintsNoMaxSize (pCD);
 	    }
 	    else if (propertyEvent->atom == XA_WM_NAME ||
 		     propertyEvent->atom == wmGD.xa__NET_WM_NAME)

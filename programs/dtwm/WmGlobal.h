@@ -1392,6 +1392,8 @@ typedef struct _WmBackdropData
     String		image;			/* resource */
     Atom		nameAtom;
     Pixmap		imagePixmap;
+    Boolean		imagePixmapOwned;	/* created here, not in the
+						   Xm pixmap cache */
     int			colorSet;		/* resource */
     Pixel 		background;		/* resource */
     Pixel 		foreground;		/* resource */

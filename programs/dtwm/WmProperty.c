@@ -1902,7 +1902,7 @@ HasProperty (
 char *GetUtf8String (Display *display, Window w, Atom property)
 {
     int actualFormat;
-    char *propReturn;
+    char *propReturn = NULL;
     unsigned long nitems, leftover;
     Atom actualType;
     Atom reqType = wmGD.xa_UTF8_STRING;

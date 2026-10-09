@@ -654,14 +654,7 @@ DeleteWorkspace(
 	/*
 	 * Delete the workspace data structures
 	 */
-	if (pWS->backdrop.imagePixmap)
-	{
-	    if (!XmDestroyPixmap (XtScreen(pWS->workspaceTopLevelW),
-			    pWS->backdrop.imagePixmap))
-	    {
-		/* not in Xm pixmap cache */
-	    }
-	}
+	FreeBackdropPixmap (pWS);
 
 	/* free pWS->backdrop.image */
 	if ((pWS->backdrop.flags & BACKDROP_IMAGE_ALLOCED) &&

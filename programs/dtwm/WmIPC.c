@@ -670,6 +670,39 @@ NoticeMsgCB(Tt_message m, Tt_pattern p)
 
 } /* END OF FUNCTION NoticeMsgCB */
 
+
+/*
+ * The screen named by the integer argument n of a request, or NULL if
+ * the argument is missing or is not a screen we manage.
+ */
+static WmScreenData *
+MessageArgScreen (Tt_message m, int n)
+{
+    int screen_num;
+
+    if (tt_message_arg_ival (m, n, &screen_num) != TT_OK ||
+	screen_num < 0 || screen_num >= wmGD.numScreens ||
+	!wmGD.Screens[screen_num].managed)
+    {
+	return NULL;
+    }
+    return &wmGD.Screens[screen_num];
+}
+
+/*
+ * The string argument n of a request, or NULL if it is missing.  The
+ * result is freed with tt_free.
+ */
+static char *
+MessageArgString (Tt_message m, int n)
+{
+    char *pch = tt_message_arg_val (m, n);
+
+    if (tt_ptr_error (pch) != TT_OK)
+	return NULL;
+    return pch;
+}
+
 
 /******************************<->*************************************
  *
@@ -699,7 +732,6 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
     char	*op;
     Tt_status	status;
 
-    int			screen_num;
     WmScreenData	*pSD;
     WmWorkspaceData	*pWS = NULL;
     Atom		aWs;
@@ -729,11 +761,18 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	 */
 
 	/* get the first arg from the message */
-	tt_message_arg_ival(m, 0, &screen_num);
-	pSD = &wmGD.Screens[screen_num];
+	pSD = MessageArgScreen (m, 0);
 
 	/* get the second arg from the message */
-	pch = tt_message_arg_val(m, 1);
+	pch = MessageArgString (m, 1);
+
+	if (!pSD || !pch) {
+	    if (pch) tt_free (pch);
+	    tt_message_fail(m);
+	    tt_message_destroy(m);
+	    tt_free(op);
+	    return TT_CALLBACK_PROCESSED;
+	}
 
 	/* retrieve the selected workspace */
 	aWs = strtoul (pch, (char **) NULL, 0);
@@ -755,11 +794,18 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	 */
 
 	/* get the first arg from the message */
-	tt_message_arg_ival(m, 0, &screen_num);
-	pSD = &wmGD.Screens[screen_num];
+	pSD = MessageArgScreen (m, 0);
 
 	/* get the second arg from the message */
-	pch = tt_message_arg_val(m, 1);
+	pch = MessageArgString (m, 1);
+
+	if (!pSD || !pch) {
+	    if (pch) tt_free (pch);
+	    tt_message_fail(m);
+	    tt_message_destroy(m);
+	    tt_free(op);
+	    return TT_CALLBACK_PROCESSED;
+	}
 
 	/* retrieve the selected workspace */
 	aWs = strtoul (pch, (char **) NULL, 0);
@@ -767,12 +813,12 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	pWS = GetWorkspaceData (pSD, aWs);
 
 	/* get the third arg from the message */
-	pch = tt_message_arg_val(m, 2);
+	pch = MessageArgString (m, 2);
 
-	if (pWS) {
+	if (pWS && pch) {
 	    ChangeWorkspaceTitle (pWS, pch);
 	}
-	tt_free( pch );
+	if (pch) tt_free( pch );
 
 	tt_message_reply(m);
 	tt_message_destroy(m);

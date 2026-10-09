@@ -1350,6 +1350,12 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
  *
  *************************************<->***********************************/
 
+/*
+ * Set by ProcessWmNormalHintsNoMaxSize: process the hints as if their
+ * maximum size were "unlimited" (-1, which means the size of the head).
+ */
+static Boolean normalHintsNoMaxSize = False;
+
 void 
 ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
 {
@@ -1372,6 +1378,13 @@ ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
     pNormalHints = GetNormalHints (pCD);
 
     pCD->icccVersion = pNormalHints->icccVersion;
+
+    if (normalHintsNoMaxSize)
+    {
+	pNormalHints->flags |= P_MAX_SIZE;
+	pNormalHints->max_width = -1;
+	pNormalHints->max_height = -1;
+    }
 
 
     /*
@@ -2020,6 +2033,33 @@ ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
     }
 
 } /* END OF FUNCTION ProcessWmNormalHints */
+
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessWmNormalHintsNoMaxSize (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reprocess WM_NORMAL_HINTS as if they set no maximum size, so that the
+ *  limit becomes the size of the head with the current decorations.
+ *  Used when _MOTIF_WM_HINTS change the decorations (e.g. a client that
+ *  removes them to go full screen).  The client's property is left
+ *  alone; its own maximum size applies again when it next changes
+ *  WM_NORMAL_HINTS.
+ *
+ *************************************<->***********************************/
+
+void 
+ProcessWmNormalHintsNoMaxSize (ClientData *pCD)
+{
+    normalHintsNoMaxSize = True;
+    ProcessWmNormalHints (pCD, FALSE /*not first time*/, 0);
+    normalHintsNoMaxSize = False;
+
+} /* END OF FUNCTION ProcessWmNormalHintsNoMaxSize */
 
 
 /*************************************<->*************************************

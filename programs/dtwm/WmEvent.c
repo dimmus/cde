@@ -63,6 +63,7 @@
 #include "WmResParse.h"
 #include "WmParse.h"
 #include "WmParseP.h"
+#include "WmMultiHead.h"
 #include "Dt/Wsm.h"
 
 #include <Xm/RowColumnP.h> /* for MS_LastManagedMenuTime */
@@ -130,6 +131,9 @@ void InitEventHandling (void)
 
     /* handle entry of root window */
     base_mask |= EnterWindowMask | LeaveWindowMask;
+
+    /* notice root size changes (RandR), which change the heads */
+    base_mask |= StructureNotifyMask;
 
     for (scr=0; scr<wmGD.numScreens; scr++)
     {
@@ -957,6 +961,16 @@ Boolean WmDispatchWsEvent (XEvent *event)
 
 	case FocusOut:
 	{
+	    break;
+	}
+
+	case ConfigureNotify:
+	{
+	    /* the root window changed size: the heads may have changed */
+	    if (event->xconfigure.window == event->xconfigure.event)
+	    {
+		InvalidateHeadInfo ();
+	    }
 	    break;
 	}
 

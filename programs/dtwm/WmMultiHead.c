@@ -33,7 +33,28 @@
 /*
  * Global Variables
  */
-DtXineramaInfo_t *DtXI = NULL;/* Xinerama data is static for life of X server */
+DtXineramaInfo_t *DtXI = NULL;	/* cached Xinerama data, see InvalidateHeadInfo */
+
+
+/*************************************<->*************************************
+ *
+ *  InvalidateHeadInfo ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Forget the cached head layout, so that the next lookup queries the
+ *  server again.  Called when a root window changes size (RandR).
+ *
+ *************************************<->***********************************/
+void InvalidateHeadInfo(void) {
+    if (DtXI) {
+        if (DtXI->ScreenInfo)
+            XFree(DtXI->ScreenInfo);
+        free(DtXI);
+        DtXI = NULL;
+    }
+}
 
 
 /*************************************<->*************************************
@@ -81,7 +102,6 @@ WmHeadInfo_t *GetHeadInfo(const ClientData *pcd) {
         fprintf(stderr, "(dtwm) _GetScreenInfo: malloc failed\n");
 #endif
 
-        free(DtXI);
         return NULL;
     }
 
@@ -159,7 +179,6 @@ WmHeadInfo_t *GetHeadInfoById(int id) {
         fprintf(stderr, "(dtwm) _GetHeadInfoById: malloc failed\n");
 #endif
 
-        free(DtXI);
         return NULL;
     }
 

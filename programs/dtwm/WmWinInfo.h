@@ -56,6 +56,7 @@ extern void ProcessWmHints (ClientData *pCD, Boolean firstTime);
 extern void ProcessWmIconTitle (ClientData *pCD, Boolean firstTime);
 extern void ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, 
 				  long manageFlags);
+extern void ProcessWmNormalHintsNoMaxSize (ClientData *pCD);
 extern void ProcessWmTransientFor (ClientData *pCD);
 extern void ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime);
 extern Boolean SetupClientIconWindow (ClientData *pCD, Window window);

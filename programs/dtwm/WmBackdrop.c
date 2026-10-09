@@ -205,6 +205,10 @@ ProcessBackdropResources(
     }
 
     pWS->backdrop.flags = BACKDROP_NONE;	/* by default */
+    if (!(callFlags & CHANGE_BACKDROP))
+    {
+	pWS->backdrop.imagePixmapOwned = False;
+    }
 
     /*
      *  see if we're using a bitmap 
@@ -280,6 +284,7 @@ ProcessBackdropResources(
 		     * proper depth.
 		     */
 		    tmpPix = pWS->backdrop.imagePixmap;
+		    pWS->backdrop.imagePixmapOwned = False;
 		    if (XmUNSPECIFIED_PIXMAP != tmpPix)
 		    {
 		        display = XtDisplay(pWS->workspaceTopLevelW);
@@ -418,14 +423,36 @@ ProcessBackdropResources(
 			      0, 0, w, h, 0, 0);
 			}
 		        XFreeGC(display, gc);
+
+			if (pWS->backdrop.imagePixmap != tmpPix)
+			{
+			    /*
+			     * We made a new pixmap from tmpPix.  Ours is
+			     * freed with XFreePixmap; give up our
+			     * reference to tmpPix if it came from the Xm
+			     * pixmap cache (a pixmap from a backdrop
+			     * change request is not in it, and is left
+			     * alone).
+			     */
+			    pWS->backdrop.imagePixmapOwned = True;
+			    XmDestroyPixmap (XtScreen(pWS->workspaceTopLevelW),
+					     tmpPix);
+			}
 		    }
 
 		    if (XmUNSPECIFIED_PIXMAP == tmpPix || BadDrawable == status)
+		    {
+		      if (pWS->backdrop.imagePixmapOwned)
+		      {
+			XFreePixmap (DISPLAY, pWS->backdrop.imagePixmap);
+			pWS->backdrop.imagePixmapOwned = False;
+		      }
 		      pWS->backdrop.imagePixmap = 
 			WmXmGetPixmap2 (XtScreen(pWS->workspaceTopLevelW),
 				 (char *)pch,
 				 pWS->backdrop.foreground,
 				 pWS->backdrop.background);
+		    }
 		}
 		else 
 		{
@@ -657,6 +684,38 @@ FullBitmapFilePath(
 
 /******************************<->*************************************
  *
+ *  FreeBackdropPixmap (pWS)
+ *
+ *  Description:
+ *  -----------
+ *  Release the backdrop pixmap of a workspace: free it if dtwm created
+ *  it, else drop the Xm pixmap cache reference (if it is in the cache).
+ *
+ *************************************<->***********************************/
+void 
+FreeBackdropPixmap (WmWorkspaceData *pWS)
+{
+    if (pWS->backdrop.imagePixmap &&
+	pWS->backdrop.imagePixmap != XmUNSPECIFIED_PIXMAP)
+    {
+	if (pWS->backdrop.imagePixmapOwned)
+	{
+	    XFreePixmap (DISPLAY, pWS->backdrop.imagePixmap);
+	}
+	else
+	{
+	    /* returns False if it is not in the Xm pixmap cache */
+	    (void) XmDestroyPixmap (XtScreen(pWS->workspaceTopLevelW), 
+				    pWS->backdrop.imagePixmap);
+	}
+    }
+    pWS->backdrop.imagePixmap = None;
+    pWS->backdrop.imagePixmapOwned = False;
+}
+
+
+/******************************<->*************************************
+ *
  *  SetNewBackdrop (pWS, pixmap, aName, imageType)
  *
  *  Description:
@@ -705,12 +764,7 @@ SetNewBackdrop(
     if ((pWS->backdrop.imagePixmap) &&
 	(pWS->backdrop.imagePixmap != pixmap))
     {
-	if (!XmDestroyPixmap (XtScreen(pWS->workspaceTopLevelW), 
-			pWS->backdrop.imagePixmap))
-	{
-	    /* not in Xm pixmap cache */
-	}
-	pWS->backdrop.imagePixmap = None;
+	FreeBackdropPixmap (pWS);
     }
 
     /* free pWS->backdrop.image */
