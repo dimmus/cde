@@ -727,12 +727,15 @@ islink(type_info_t *info)
 	return(0);
 }
 
+#define	MAXSYMLINKS_FOLLOWED	40
+
 void
 get_link_info(type_info_t *info)
 {
 	char		buff[MAXPATHLEN];
 	const	char	*name = 0;
 	int		n;
+	int		hops = 0;
 
 	if(info->link_path == 0)
 	{
@@ -746,12 +749,22 @@ get_link_info(type_info_t *info)
 		{
 			name = strdup(name);
 		}
-		while((n = readlink(name, buff, MAXPATHLEN)) > 0)
+		/*
+		 * readlink() does not terminate the name; this used to
+		 * overwrite its last character instead, so e.g. a link to
+		 * "x.dti" never matched LINK_NAME *.dti.  A cycle used to
+		 * loop forever.
+		 */
+		while((n = readlink(name, buff, sizeof(buff) - 1)) > 0)
 		{
-	
-			buff[n - 1] = 0;
+			buff[n] = 0;
 			free((void *)name);
 			name = strdup(buff);
+			if(++hops > MAXSYMLINKS_FOLLOWED)
+			{
+				errno = ELOOP;
+				break;
+			}
 		}
 		if(errno == EINVAL || errno == ENOENT)
 		{
