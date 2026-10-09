@@ -241,6 +241,29 @@ extern void		free_range	(CSA_attribute**,
 						   CSA_enum**, int);
 
 /*
+ * Events of a whole range fetched with one csa_list_entries() call and
+ * handed out by sub-range (a day, an hour), for code that used to make
+ * one call per sub-range.  If the fetch fails, CmRangeListGet falls back
+ * to one call per sub-range.
+ */
+typedef struct {
+	CSA_session_handle	cal;
+	int			version;
+	boolean_t		valid;	/* whole-range fetch succeeded */
+	CSA_entry_handle	*list;	/* the whole range */
+	CSA_uint32		total;
+	time_t			*ticks;	/* start time of each entry */
+	CSA_entry_handle	*slice;	/* the last sub-range handed out */
+	CSA_entry_handle	*sub;	/* fallback: per-sub-range result */
+} CmRangeList;
+
+extern void		CmRangeListInit	(CmRangeList*, CSA_session_handle,
+					 int, time_t, time_t);
+extern CSA_uint32	CmRangeListGet	(CmRangeList*, time_t, time_t,
+					 CSA_entry_handle**);
+extern void		CmRangeListFree	(CmRangeList*);
+
+/*
  * Other utilty functions
  */
 extern int blank_buf (char*);
@@ -300,6 +323,8 @@ typedef struct _CmDataList {
 	CmDataItem	*head;
 	CmDataItem	*tail;
 	int		count;
+	CmDataItem	*cursor;	/* last item found by CmDataListGetData */
+	int		cursor_pos;	/* its position, 0 if cursor is unset */
 } CmDataList;
 
 extern CmDataList * CmDataListCreate(void);

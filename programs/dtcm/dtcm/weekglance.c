@@ -141,14 +141,13 @@ format_week_header(Tick date, OrderingType order, char *buf)
 }
  
 static int
-count_week_pages (Calendar *c, int lines_per_page, Tick start_date)
+count_week_pages (Calendar *c, int lines_per_page, Tick start_date,
+		  CmRangeList *rl)
 {
 	time_t start, stop;
         CSA_entry_handle *list;
-        CSA_attribute *range_attrs;
-	CSA_enum *ops;
 	CSA_uint32 a_total;
-        int num_appts, i, j, max = 0, pages;
+        int num_appts, i, max = 0, pages;
 
         /* count the times and text of appts */
         for (i = 1; i <= 7; i++)
@@ -156,17 +155,13 @@ count_week_pages (Calendar *c, int lines_per_page, Tick start_date)
                 /* setup a time limit for appts searched */
                 start = (time_t) lowerbound (start_date);
                 stop = (time_t) next_ndays(start_date, 1) - 1;
-		setup_range(&range_attrs, &ops, &j, start, stop,
-			    CSA_TYPE_EVENT, 0, B_FALSE, c->general->version);
-		csa_list_entries(c->cal_handle, j, range_attrs, ops, &a_total, &list, NULL);
-		free_range(&range_attrs, &ops, j);
+		a_total = CmRangeListGet(rl, start, stop, &list);
 
                 num_appts = count_multi_appts(list, a_total, c);
                 if (num_appts > max)
                         max = num_appts;
  
                 start_date = nextday(start_date);
-                csa_free(list);
         }
  
         pages = max / lines_per_page;
@@ -187,14 +182,13 @@ print_week (Calendar *c,
         Boolean more, done = False, all_done = True;
         int num_appts;
         char    buf[128];
-        int     i, j;
+        int     i;
 	OrderingType ot = get_int_prop(p, CP_DATEORDERING);
 	time_t start, stop;
         CSA_entry_handle *list;
-        CSA_attribute *range_attrs;
-	CSA_enum *ops;
         CSA_uint32 a_total;
 	int lines_per_page;
+	CmRangeList rl;
         static Tick start_date = 0;
 	static int total_pages;
  
@@ -227,9 +221,15 @@ print_week (Calendar *c,
 	  if (!timeok(start_date))
 	    start_date = get_bot();
 	}
-	else
+
+	/* one call for the week instead of one per day (twice) */
+	CmRangeListInit(&rl, c->cal_handle, c->general->version,
+			(time_t)lowerbound(start_date) - daysec,
+			(time_t)next_ndays(start_date, 8));
+
+	if (num_page == 1)
 	  total_pages = (lines_per_page > 0) ?
-	    count_week_pages(c, lines_per_page, start_date) : 1;
+	    count_week_pages(c, lines_per_page, start_date, &rl) : 1;
 
 	format_week_header(start_date, ot, buf);
 
@@ -248,11 +248,7 @@ print_week (Calendar *c,
 	  /* setup a time limit for appts searched */
 	  start = (time_t) lowerbound (start_date);
 	  stop = (time_t) next_ndays(start_date, 1) - 1;
-	  setup_range(&range_attrs, &ops, &j, start, stop,
-		      CSA_TYPE_EVENT, 0, B_FALSE, c->general->version);
-	  csa_list_entries(c->cal_handle, j, range_attrs,
-			   ops, &a_total, &list, NULL);
-	  free_range(&range_attrs, &ops, j);
+	  a_total = CmRangeListGet(&rl, start, stop, &list);
 
 	  num_appts = count_multi_appts(list, a_total, c);
 
@@ -276,8 +272,8 @@ print_week (Calendar *c,
 	  x_week_sched_draw(xp, i);
 
 	  start_date = nextday(start_date);
-	  csa_free(list);
 	}
+	CmRangeListFree(&rl);
 
 	x_finish_printer(xp);
 

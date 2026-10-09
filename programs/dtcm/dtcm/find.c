@@ -28,9 +28,14 @@
  *  (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  */
 
+#if defined(__linux__)
+#define _GNU_SOURCE		/* strcasestr */
+#endif
+
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <csa.h>
 #include <Xm/Xm.h>
 #include <Xm/Form.h>
@@ -559,6 +564,65 @@ fmt_time_what(
         }
 }
 
+/*
+ * Find searches in chunks.  It used to fetch every appointment 4 weeks
+ * at a time (about 880 calls for "all") and match here.  The server now
+ * does the matching (CSA_MATCH_CONTAIN on the summary), so only hits
+ * come back, and a year per call keeps each reply small even for daily
+ * repeating appointments and old servers that sort replies in O(n^2).
+ * Without the server-side match the old 4-week chunks are kept.
+ */
+#define FIND_CHUNK		(52 * wksec)
+#define FIND_CHUNK_UNFILTERED	(4 * wksec)
+
+/*
+ * The server matches case-insensitively in its own locale, normally C;
+ * let it match only ASCII strings, so 8-bit locales keep their own
+ * case folding (done here with strcasestr).
+ */
+static boolean_t
+is_ascii(const char *s)
+{
+	for (; *s; s++)
+		if ((unsigned char)*s >= 0x80)
+			return (B_FALSE);
+	return (B_TRUE);
+}
+
+/*
+ * Add "summary contains str" to the range criteria set up by setup_range.
+ */
+static boolean_t
+add_summary_match(CSA_attribute **attrs, CSA_enum **ops, int *count,
+		  char *str, int version)
+{
+	CSA_attribute	*na;
+	CSA_enum	*no;
+
+	if ((na = (CSA_attribute *)realloc(*attrs,
+	    (*count + 1) * sizeof(CSA_attribute))) == NULL)
+		return (B_FALSE);
+	*attrs = na;
+	if ((no = (CSA_enum *)realloc(*ops,
+	    (*count + 1) * sizeof(CSA_enum))) == NULL)
+		return (B_FALSE);
+	*ops = no;
+
+	memset(&na[*count], 0, sizeof(CSA_attribute));
+	initialize_entry_attr(CSA_ENTRY_ATTR_SUMMARY_I, &na[*count],
+			      appt_write, version);
+	if (na[*count].value == NULL ||
+	    (na[*count].value->item.string_value = strdup(str)) == NULL) {
+		free(na[*count].name);
+		free(na[*count].value);
+		return (B_FALSE);
+	}
+	no[*count] = CSA_MATCH_CONTAIN;
+	(*count)++;
+
+	return (B_TRUE);
+}
+
 void
 find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs)
 {
@@ -566,9 +630,10 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 	Props *p = (Props*)c->properties;
 	DisplayType dt = get_int_prop(p, CP_DEFAULTDISP);
 	Find *f = (Find*)c->find;
-	int i, j, range_count;
+	int i, range_count;
         char what_buf[WHAT_LEN+1], buf[WHAT_LEN+1], buf2[WHAT_LEN+1], message[40], *astr;
-	XmString buf_str;
+	XmString *items = NULL, *nitems;
+	int nitems_used = 0, nitems_max = 0;
         int last_match_total = 0, match_total = 0;
 	Tick end_of_time, start, stop;
 	Tick_list *ptr, *next_ptr, *tail_ptr = NULL, *new_tick;
@@ -578,7 +643,8 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
         CSA_attribute *range_attrs;
 	CSA_uint32 num_entries;
 	Dtcm_appointment *appt;
-	int comparison_length;
+	char *what;
+	boolean_t use_filter, filtered;
 	Tick	real_eot = get_eot();
 	_Xltimeparams localtime_buf;
 	(void) localtime_buf;	/* unused unless XTHREADS */
@@ -588,6 +654,7 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
         if (astr == NULL || *astr == '\0') {
 		sprintf(message, "%s", CATGETS(c->DT_catd, 1, 290, "Specify Appt String to Match."));
 		set_message(f->find_message, message);
+		XtFree(astr);
                 return;
         }
 	XmListDeleteAllItems(f->find_list);
@@ -613,11 +680,13 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 		else if (start == DATE_AEOT) {
                         sprintf(message, "%s", CATGETS(c->DT_catd, 1, 810, "Please enter a start date after 1/1/1970"));
                         set_message(f->find_message, message);
+			XtFree(astr);
                         return;
                 }
 		else if (start <= 0) {
                         sprintf(message, "%s", CATGETS(c->DT_catd, 1, 811, "Malformed start date"));
                         set_message(f->find_message, message);
+			XtFree(astr);
                         return;
                 }
 
@@ -629,17 +698,20 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 		else if (end_of_time == DATE_BBOT) {
                         sprintf(message, "%s", CATGETS(c->DT_catd, 1, 812, "Please enter an end date before 1/1/2038"));
                         set_message(f->find_message, message);
+			XtFree(astr);
                         return;
                 }
 		else if (end_of_time <= 0) {
                         sprintf(message, "%s", CATGETS(c->DT_catd, 1, 813, "Malformed end date"));
                         set_message(f->find_message, message);
+			XtFree(astr);
                         return;
                 }
 
 		if (start >= end_of_time) {
 			sprintf(message, "%s", CATGETS(c->DT_catd, 1, 713, "You must choose a begin date before the end date."));
                 	set_message(f->find_message, message);
+			XtFree(astr);
                 	return;
         	}
 		
@@ -647,12 +719,11 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 			end_of_time = real_eot;
 	}
 
-	stop = start + (4 * wksec);
+	use_filter = is_ascii(astr);
+	stop = start + (use_filter ? FIND_CHUNK : FIND_CHUNK_UNFILTERED);
 
-	if (stop > end_of_time)
+	if ((stop > end_of_time) || (stop < 0))
 		stop = end_of_time;
-
-	comparison_length = cm_strlen(astr);
 
 	appt = allocate_appt_struct(appt_read,
 				    c->general->version,
@@ -665,58 +736,80 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
         for (; stop <= end_of_time;) {
 		setup_range(&range_attrs, &ops, &range_count, start, stop,
 			    CSA_TYPE_EVENT, 0, B_FALSE, c->general->version);
+		filtered = use_filter &&
+			add_summary_match(&range_attrs, &ops, &range_count,
+					  astr, c->general->version);
 	        stat = csa_list_entries(c->cal_handle, range_count, range_attrs, ops, &num_entries, &entries, NULL);
+
+		if (stat != CSA_SUCCESS && filtered) {
+			/* the server cannot match on the summary;
+			 * fetch everything and match here
+			 */
+			use_filter = B_FALSE;
+			free_range(&range_attrs, &ops, range_count);
+			stop = start + FIND_CHUNK_UNFILTERED;
+			if ((stop > end_of_time) || (stop < 0))
+				stop = end_of_time;
+			continue;
+		}
 
         	if (stat != CSA_SUCCESS) {
 			free_range(&range_attrs, &ops, range_count);
-			_DtTurnOffHourGlass(f->frame);
-                	return;
+			break;
         	}
 
 		for (i = 0; i < num_entries; i++) {
 			stat = query_appt_struct(c->cal_handle, entries[i], appt);
-                	if (stat != CSA_SUCCESS) {
-				free_appt_struct(&appt);
-				csa_free(entries);
-				_DtTurnOffHourGlass(f->frame);
-                        	return;
-                	}
+                	if (stat != CSA_SUCCESS)
+				break;
 
-			for (j = 0; appt->what->value->item.string_value[j] != '\0'; j++)
-				if (strncasecmp(astr, &(appt->what->value->item.string_value[j]),
-			     		comparison_length) == 0) {
-					new_tick = (Tick_list *) ckalloc(sizeof(Tick_list));
-					if (new_tick == NULL) {
-						free_appt_struct(&appt);
-						free_range(&range_attrs, &ops, range_count);
-						csa_free(entries);
-						_DtTurnOffHourGlass(f->frame);
-						return;
-					}
-					new_tick->next = NULL;
-					_csa_iso8601_to_tick(appt->time->value->item.date_time_value, &(new_tick->tick));
-					if (f->ticks == NULL)
-						f->ticks = new_tick;
-					else
-						tail_ptr->next = new_tick;
-					tail_ptr = new_tick;
-					match_total++;
-					strcpy(buf, "");
-					strcpy(buf2, "");
-					strcpy(what_buf, "");
-					strftime(buf, WHAT_LEN, "%h %e, %Y", 
-					    _XLocaltime(
-					      (const time_t *)&new_tick->tick,
-					      localtime_buf));
-                                	fmt_time_what(appt, what_buf, dt);
-					snprintf(buf2, sizeof(buf2), "%10s  %s", buf, what_buf);
-					buf_str = XmStringCreateLocalized(buf2);
-					XmListAddItem(f->find_list, buf_str, 0);
-					XmStringFree(buf_str);
+			/* the server matched already, but check anyway:
+			 * this is cheap and the only check when the
+			 * server could not filter
+			 */
+			what = appt->what->value->item.string_value;
+			if (what == NULL || strcasestr(what, astr) == NULL)
+				continue;
 
+			if (nitems_used == nitems_max) {
+				nitems_max = nitems_max ? nitems_max * 2 : 64;
+				if ((nitems = (XmString *)realloc(items,
+				    nitems_max * sizeof(XmString))) == NULL) {
+					stat = CSA_E_INSUFFICIENT_MEMORY;
 					break;
-                        	}  /* end if stmt */
+				}
+				items = nitems;
+			}
+			new_tick = (Tick_list *) ckalloc(sizeof(Tick_list));
+			if (new_tick == NULL) {
+				stat = CSA_E_INSUFFICIENT_MEMORY;
+				break;
+			}
+			new_tick->next = NULL;
+			_csa_iso8601_to_tick(appt->time->value->item.date_time_value, &(new_tick->tick));
+			if (f->ticks == NULL)
+				f->ticks = new_tick;
+			else
+				tail_ptr->next = new_tick;
+			tail_ptr = new_tick;
+			match_total++;
+			strcpy(buf, "");
+			strcpy(buf2, "");
+			strcpy(what_buf, "");
+			strftime(buf, WHAT_LEN, "%h %e, %Y", 
+			    _XLocaltime(
+			      (const time_t *)&new_tick->tick,
+			      localtime_buf));
+			fmt_time_what(appt, what_buf, dt);
+			snprintf(buf2, sizeof(buf2), "%10s  %s", buf, what_buf);
+			items[nitems_used++] = XmStringCreateLocalized(buf2);
 		}  /* end for i = 0 loop */
+
+		csa_free(entries);
+		free_range(&range_attrs, &ops, range_count);
+
+		if (stat != CSA_SUCCESS)
+			break;
 
 		if (match_total != last_match_total) {
 			if (match_total == 1)
@@ -729,10 +822,6 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 
 		last_match_total = match_total;
 
-
-		csa_free(entries);
-		free_range(&range_attrs, &ops, range_count);
-
 		if (stop == real_eot)
 			break;
 
@@ -741,20 +830,28 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 		if (start > end_of_time)
 			break;
 
-		stop = start + (4 * wksec);
+		stop = start + (use_filter ? FIND_CHUNK : FIND_CHUNK_UNFILTERED);
 		if ((stop > end_of_time) || (stop < 0))
 			stop = end_of_time;
-		
-
         }  /* end for range.end loop */
 
-	if (match_total == 0)
-		sprintf(message, "%s", CATGETS(c->DT_catd, 1, 291, "Appointment Not Found."));
-	else if (match_total == 1)
-		sprintf(message, CATGETS(c->DT_catd, 1, 631, "%d match found"), match_total);
-	else
-		sprintf(message, CATGETS(c->DT_catd, 1, 292, "%d matches found"), match_total);
-	set_message(f->find_message, message);
+	/* one list update instead of one per match */
+	if (nitems_used > 0) {
+		XmListAddItems(f->find_list, items, nitems_used, 0);
+		for (i = 0; i < nitems_used; i++)
+			XmStringFree(items[i]);
+	}
+	free(items);
+
+	if (stat == CSA_SUCCESS) {
+		if (match_total == 0)
+			sprintf(message, "%s", CATGETS(c->DT_catd, 1, 291, "Appointment Not Found."));
+		else if (match_total == 1)
+			sprintf(message, CATGETS(c->DT_catd, 1, 631, "%d match found"), match_total);
+		else
+			sprintf(message, CATGETS(c->DT_catd, 1, 292, "%d matches found"), match_total);
+		set_message(f->find_message, message);
+	}
 	free_appt_struct(&appt);
 	_DtTurnOffHourGlass(f->frame);
 
