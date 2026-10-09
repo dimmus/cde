@@ -27,4 +27,5 @@ AM_CPPFLAGS = -I$(SDLPARSERSRC) -I$(SDLUTILSRC) \
 
 # needed by parser/
 noinst_LIBRARIES = libhelptag.a
-libhelptag_a_SOURCES = custom.c sdl.c option.c out.c global.c ../parser/delim.h
+libhelptag_a_SOURCES = custom.c sdl.c option.c out.c global.c lzw.c lzw.h \
+		       ../parser/delim.h
