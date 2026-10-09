@@ -29,3 +29,4 @@ void Circle_Box(Window win, int x1, int y1, int x2, int y2, XRectangle *box);
 void Set_HotBox_Coords(void);
 void Start_HotBox(int flag);
 void Stop_HotBox(void);
+void Refresh_HotBox(void);

@@ -182,6 +182,57 @@ static int box_x1, box_y1, box_x2, box_y2;
 static XtIntervalId selectTimerID;
 static void Do_HotBox();
 
+/*
+ * The flashing border is only animated while the editor window is mapped
+ * and has the keyboard focus; otherwise the timer is not re-armed
+ * (hotboxPaused) and the border is left drawn in its current colour.
+ */
+static Boolean hotboxPaused = False;
+static Boolean shellMapped = True;
+static Boolean shellFocused = True;
+static Boolean shellHandlerInstalled = False;
+
+static void
+HotBox_ShellEvent(
+        Widget w,
+        XtPointer client_data,
+        XEvent *event,
+        Boolean *cont )
+{
+  switch (event->type) {
+    case MapNotify:   shellMapped = True;  break;
+    case UnmapNotify: shellMapped = False; break;
+    case FocusIn:     shellFocused = True; break;
+    case FocusOut:
+      /* focus moving into one of our own subwindows is not a loss */
+      if (event->xfocus.detail != NotifyInferior)
+        shellFocused = False;
+      break;
+    default:
+      return;
+  }
+  if (hotboxPaused && shellMapped && shellFocused) {
+    hotboxPaused = False;
+    selectTimerID = XtAppAddTimeOut(AppContext,
+                                    FLASH_INTERVAL,
+                                    (XtTimerCallbackProc) Do_HotBox,
+                                    NULL);
+  }
+}
+
+/* Called after the tablet is repainted: while the animation is paused
+ * no timer tick will redraw the border, so draw it now. */
+void
+Refresh_HotBox( void )
+{
+  if (!hotboxPaused || !Selected)
+    return;
+  XSetForeground(dpy, scratch_gc, FlashState ? white_pixel : black_pixel);
+  XSetLineAttributes(dpy, scratch_gc, 1, LineSolid, CapButt, JoinMiter);
+  XDrawRectangle(dpy, tablet_win, scratch_gc,
+        flash_x, flash_y, flash_width, flash_height);
+}
+
 void
 Set_HotBox_Coords( void )
 {
@@ -263,6 +314,12 @@ Start_HotBox(
   if (flag == INITIAL)
     Set_HotBox_Coords();
 
+  if (!shellHandlerInstalled) {
+    XtAddEventHandler(dtIconShell, StructureNotifyMask | FocusChangeMask,
+                      False, HotBox_ShellEvent, NULL);
+    shellHandlerInstalled = True;
+  }
+  hotboxPaused = False;
   selectTimerID = XtAppAddTimeOut(AppContext,
                                   FLASH_INTERVAL,
                                   (XtTimerCallbackProc) Do_HotBox,
@@ -322,10 +379,13 @@ Do_HotBox(
     XSetLineAttributes(dpy, scratch_gc, 1, LineSolid, CapButt, JoinMiter);
     XDrawRectangle(dpy, tablet_win, scratch_gc,
         flash_x, flash_y, flash_width, flash_height);
-    selectTimerID=XtAppAddTimeOut(AppContext,
-                                  FLASH_INTERVAL,
-                                  (XtTimerCallbackProc) Do_HotBox,
-                                  NULL);
+    if (shellMapped && shellFocused)
+      selectTimerID=XtAppAddTimeOut(AppContext,
+                                    FLASH_INTERVAL,
+                                    (XtTimerCallbackProc) Do_HotBox,
+                                    NULL);
+    else
+      hotboxPaused = True;    /* HotBox_ShellEvent restarts it */
     }
     else
       Stop_HotBox();
