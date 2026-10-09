@@ -219,7 +219,7 @@ XCOMM ##########################################################################
   [ -z "$MAIL" ] && MAIL=cpp_MAIL
   [ -z "$LANG" ] && LANG="C"
   TERM=dtterm
-  SESSION_SVR=`hostname`
+  SESSION_SVR=`uname -n`
 
   export PATH EDITOR MAIL TERM SESSION_SVR LANG
 
