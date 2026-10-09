@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 	struct	stat	statbuf;
 	char	snf_file[BUFSIZE], buf[BUFSIZE];
 	int	pfd[2], fd, snf_fd, permission;
-	int	exit_stat;
+	int	exit_stat = 0;
 	char	*style ;	/* style */
 	int 	chk_fd;
 	pid_t	chld_pid = 0;
@@ -357,7 +357,10 @@ int main(int argc, char *argv[])
 	}
 	fclose( Head.output );
 	close( pfd[1] );
-	wait( &exit_stat );
+	/* Reap exactly the converter; it has written and closed the file
+	 * once it has exited, so no settle delay is needed afterwards. */
+	while ( waitpid( chld_pid, &exit_stat, 0 ) < 0 && errno == EINTR )
+		;
 #if !defined( SVR4 ) && !defined( SYSV ) && !defined(__FreeBSD__)
 	if ( !WIFEXITED(exit_stat) ) {
 #else
@@ -373,7 +376,6 @@ int main(int argc, char *argv[])
 	signal( SIGQUIT, SIG_IGN );
 	signal( SIGTERM, SIG_IGN );
 
-	sleep(1) ;
 	if ( (stat( Head.out_file,&statbuf ) ) ||
 	    ( statbuf.st_size == 0 ) ) {
 		Unlink_Tmpfile( Head.out_file, argv[0] );
