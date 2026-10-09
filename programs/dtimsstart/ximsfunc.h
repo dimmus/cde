@@ -62,6 +62,7 @@ extern	void	ximsWaitDone(/*  */);
 extern	int	is_waiting(/*  */);
 extern	void	set_sig_chld(/* enable */);
 extern	int	im_mod_available(/* renv */);
+extern	int	next_wait_interval(/* restart */);
 extern	int	mk_ims_option(/* ptr, sel */);
 extern	int	load_resources(/*  */);
 extern	int	restore_resources(/*  */);
