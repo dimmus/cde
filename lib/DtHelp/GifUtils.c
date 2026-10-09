@@ -718,7 +718,8 @@ int allocate_colors(GifObj *g)
       color.blue  = g->GifCMap[i].blue;
     
       /*printf ("Allocating %3d: ", i); */
-      if ( !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
+      if ( !_ilXComputeColor (g->f_dpy, g->f_cmap, g->f_visual, &color) &&
+           !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
 
 	  /*puts ("FAILED!!!"); */
          colors = (unsigned long *) malloc (sizeof(unsigned long)  * i);
@@ -809,7 +810,8 @@ debug1(cerr, GifCMap[i].grey);
          color.blue  = (i*65535)/(g->f_total_greys - 1);
    
          /*fprintf (stderr, "Allocating %3d: ", i);*/
-         if ( !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
+         if ( !_ilXComputeColor (g->f_dpy, g->f_cmap, g->f_visual, &color) &&
+              !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
 
 	     /*fprintf(stderr, "alloc Grey FAILED!!!");*/
             colors = (unsigned long *) malloc (sizeof(unsigned long)  * i);

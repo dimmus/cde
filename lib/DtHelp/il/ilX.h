@@ -189,6 +189,19 @@ extern ilBool ilQueryXWC (
         private _XmPutScaledImage(), whose signature is not stable across
         Motif versions.
     */
+    /*  If the pixel for a read-only colour can be computed without a server
+        round trip (a TrueColor visual), store in *pColor exactly what
+        XAllocColor() would return (pixel and actual RGB) and return true.
+        Otherwise return false; the caller must use XAllocColor().
+        A computed pixel is not allocated: never pass it to XFreeColors().
+    */
+extern ilBool _ilXComputeColor (
+    Display                *display,
+    Colormap                colormap,
+    Visual                 *visual,
+    XColor                 *pColor
+    );
+
 extern void _ilXPutScaledImage (
     Display                *display,
     Drawable                d,
