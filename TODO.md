@@ -742,7 +742,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: `AM_CPPFLAGS`/`AM_CFLAGS` through a common include; `PKG_CHECK_MODULES([TIRPC],[libtirpc])`.
 - [ ] **[verified] P2** `configure.ac:26,74-75,624`: C is strict `-std=c99` with a pile of `_BSD_SOURCE`/`_SVID_SOURCE` defines. C++ has no `-std`, so it silently follows the compiler default (gnu++20 on GCC 16) for 1990s code.
   - Fix: `-std=gnu11`/`gnu17` and `-std=gnu++17`; drop the deprecated feature macros.
-- [x] Warning baseline: `-Wall` for C and C++ (this branch; see Phase 7). The `-Wno-*` probes in `m4/compiler_flag_chk.m4` are no-ops, because GCC accepts any unknown `-Wno-*`; probe the positive form instead.
+- [x] Warning baseline: `-Wall` for C and C++, with the whole tree warning-free (see Phase 7). The `-Wno-*` probes in `m4/compiler_flag_chk.m4` are no-ops, because GCC accepts any unknown `-Wno-*`; probe the positive form instead.
 - [ ] **[verified] P3** `configure.ac:354-355`: `-fno-strict-aliasing` is applied to the whole tree.
   - Fix: limit it to the code that needs it (DtSearch/raima, il) and enable `-Wstrict-aliasing=2` elsewhere.
 - [ ] **[verified] P2** There is no release/debug split and nothing defines `NDEBUG`, so about 380 `assert`s are live (dtinfo 142, dtmail 142, dtappbuilder 57, tt 40). `programs/dticon/constants.h:34` hard-codes `#define DEBUG True`.
@@ -873,9 +873,106 @@ N = entries in the directory, K = files in one operation, T = data types.
 ## Phase 7 — Warnings
 
 - [x] Add `-Wall` to the C and C++ flags (`configure.ac`, `C_FLAG_CHECK`/`CXX_FLAG_CHECK`).
-- [ ] Fix every `-Wall` warning in the default build (`--disable-docs`). Progress and per-directory counts are tracked in the commit series on this branch.
-- [ ] Then remove `-Wno-format-truncation` (part of `-Wall`) and fix what it reports.
-- [ ] Then `-Wextra` (curated), as in motif TODO 2.3, and `-Werror` in CI.
+- [x] Fix every `-Wall` warning in the default build (`--disable-docs`).
+  - The baseline build had 10,343 warning lines: 9,889 distinct diagnostics at 5,478 distinct sites, after collapsing the per-enum-value `-Wswitch` lines (4,748 of them) into 337 switch statements.
+  - No pragmas and no blanket `-Wno-*` flags were used. Generated code was fixed at the generator: the rpcgen post-filter in `lib/csa/Makefile.am`, dtcodegen (`dtappbuilder/src/abmf`), dthelp's `build`/`eltdef` tools, flex `%option nounput`, and bison directives.
+  - X11 `Xos_r.h` thread-safety buffers are kept with `(void) var; /* unused unless XTHREADS */`.
+  - Still reported, all outside `-Wall`:
+    - Motif `-Wdeprecated-declarations`: dtmail 49 sites, dtinfo 9 (`XmListGetSelectedPos`, `Xm*GetChild`, `XmStringGetLtoR`). The replacements are not drop-in.
+    - `-Wfree-nonheap-object` from `lib/DtMmdb/dti_cc/cc_hdict.C:12`, instantiated from `dtinfo/src/OnlineRender/FontCache.C:86`.
+    - `-Wdiscarded-qualifiers` in `programs/dtksh/init.c`, a build-time copy of the vendored ksh93 source.
+    - Linker "dangerous" notices for `tmpnam`/`tempnam`/`mktemp`: dtwm, dtlogin, dtspcd, dticon, dtcalc, dtcm, dtcreate, dtpdmd, dtpad, dtfile, dtfile_copy, dtmail, dtstyle, dtinfo, ttsnoop. Move them to `mkstemp`; that also closes the `/tmp` races.
+- [ ] Remove `-Wno-format-truncation` (part of `-Wall`) and fix what it reports.
+- [ ] Replace the deprecated Motif calls above. Then add a curated `-Wextra`, as in motif TODO 2.3, and `-Werror` in CI.
+
+### 7.1 Bugs the `-Wall` cleanup exposed and fixed (behaviour changes)
+
+| Location | Bug and fix |
+|---|---|
+| `lib/csa/match.c` | `defalut:` label typo; the function fell off the end and returned garbage. |
+| `dtcm/server/cmsfunc.c` | Two use-after-free bugs: `free(appt)` before the reply in `cms_update_entry_5_svc`, and `free(log); unlink(log)`. |
+| `dtcm/server/cmscalendar.c` `_DtCmsRbToCsaStat` | Missing return. |
+| dtmail `DtMailServer`, `RFCFormat` | Destructors were not virtual, so POP3/APOP destructors never ran. |
+| dtmail | `delete` changed to `delete[]`. |
+| dtmail `RFCTransport.C` `concatValue` | 1-byte heap overflow. |
+| dtmail `MenuBar.C` | Pointer `==` on strings meant per-menu help callbacks were never installed; now `strcmp`. |
+| `dtprintinfo/UI/DtApp.C` | A local shadowed the `old_uid` member, so `setuid()` received garbage. |
+| dtprintinfo | `delete[]` mismatches. |
+| dtprintinfo `Icon.c` `QueryGeometry` | Missing return. |
+| `lib/tt/bin/ttauth/process.c` | Uninitialised `status`. |
+| `lib/DtSvc/DtUtil1/ActionTt.c` | Missing return. |
+| `lib/DtSvc/DtUtil2/SvcPam.c` | Uninitialised `status`. |
+| `dtwm/WmBackdrop.c` | Uninitialised `status`. |
+| `dtpad/main.c` `HostCB` | Missing return. |
+| dtfile `Desktop.c` and `Trash.c` | `sprintf(buf, "%s…", buf)`, which is undefined behaviour. |
+| `dthelp/parser/*/parser/scan.c` | Out-of-bounds write. |
+| `canon1/helptag/xref.c` | Writes after `fclose`. |
+| `dthelpprint/PrintTopics.c` | Overlapping `strcpy`. |
+| `dtsr/dtsrkdump.c` | Negative array index. |
+| `dtappbuilder/src/abmf/resource_file.c` | Garbage return. |
+| `dtappbuilder/src/ab/cgen_utils.c` | Double `closedir`. |
+| `dtsearchpath` `Environ.h` | Virtual destructor added. |
+| `fontaliases/test_fonts_alias.c` | `goto` skipped an initialisation. |
+| DtHelp `Graphics.c` and `il/ilpipe.c` | Missing returns. |
+| `dtsession/SmError.c` `ToolkitError` and `dtprintinfo/libUI/MotifUI/Debug.c` `_XtError` | Xt fatal-error handlers could return; they now always exit and are marked `_X_NORETURN`. |
+
+### 7.2 Suspicious code the warnings exposed (semantics kept; decide and fix)
+
+Line numbers are those after the cleanup.
+
+- **DtSvc**
+  - `include/Dt/ActionP.h:314` `IS_DIR_OBJ()` is always 0 (`==` binds tighter than `&`). A dropped directory is never used as the working directory (`Action.c` `__ExtractCWD`).
+  - `lib/DtSvc/DtUtil2/UErrNoBMS.c`: `DtFatalError:`/`DtInternalError:`/`DtInformation:` were goto labels, not `case`s, so information messages are logged as errors.
+  - `WmGWsInfo.c`: `rcode = X(...) >= Success` stores the comparison result, not the status.
+- **DtHelp**
+  - `HelpUtil.c` `_DtHelpSetButtonPositions` compares a variable with itself; probably meant `> minFormWidth`.
+  - `FileListUtils.c` `_DtHelpFileListAddFile` never sets `nameKey`.
+  - `CCDFUtil.c`: `GetCmdData`'s `strip` argument has no effect.
+  - `Layout.c` `BlankTableCell`: border width is 3.
+- **DtTerm**
+  - `TermViewMenu.c`: the cascade buttons are created even for repeat popups (missing braces around the `PULLDOWN_ACCELERATORS` block).
+  - `Term/TermFunction.c` `termFuncErase`: `eraseFromCol0` falls through.
+- **ToolTalk**
+  - `tt_old_db.C`: the `uid == -1` test can never be true.
+  - `ttdbserverd/db_server_svc.C`: `read() < sizeof` never detects `-1`.
+  - `ttdesktop.C`: `TTDT_GET_MAPPED` tests `TTDT_SET_ICONIFIED`.
+  - `ttdt_Get_Locale` passes `handler` instead of `_handler`.
+  - `tt_tracefile_parse.C`: missing `break`.
+  - `mp_s_mp.C` `init_self` drops errors.
+- **dtmail**
+  - `SafeWrite/SafeRead() < size_t` never detects `-1` (`Attachment.C`, `ComposeCmds.C`, `RoamCmds.C`).
+  - `IO.C` `SockOpen` never detects `INADDR_NONE`.
+  - `RFCMailBox.C` `writeToDumpFile` runs without the `_errorLogging` guard.
+  - `RoamCmds.C`: the vacation buffer is never freed.
+- **dtfile**
+  - `FileManip.c`: `else` binding in the move/link path.
+  - `dtcopy/fsrtns.c:465`: `replace && a || b` precedence.
+  - `Desktop.c` `LoadDesktopInfo`: `fgets(NULL)` after the buffer is cleared.
+- **dtprintinfo**
+  - `Button.C`: the arrow switch has no `break`s.
+  - `Icon.c`: dangling `else`.
+  - `IconObj.C`: NULL dereference via `par && A || B`.
+  - `BaseObj.C` `SendAction`: NULL `Action*`.
+- **dtwm and small tools**
+  - dtwm `DataBaseLoad.c` `ResolveDuplicates`: `strcmp(NULL)` for boxes.
+  - dtcalc `ds_popup.c`: a no-op statement that was probably meant to be `space = …`.
+  - dticon `main.c`: fd tested against 0, and a NULL dereference after `strchr`.
+- **dtstyle**
+  - `Mouse.c`: `_DtAddToResource` runs unconditionally.
+  - `ColorMain.c`: a `defaultName_restore` test that is always false.
+- **dthelp parser** (all 3 copies)
+  - `param.c`: the whitespace-collapse block sits outside its loop.
+  - `actutil.c`: `%s` used with `M_WCHAR*`.
+- **dtappbuilder**
+  - `libABil/bil.c`: `AB_BIL_UNDEF` is 259, not 0, so the unknown-value tests are always true.
+  - `gil_loadact.c`: load errors are ignored.
+  - `abobj_set.c`: `a || b && c` precedence.
+  - `pal_panedwin.c`: an unconditional reparent.
+  - `dtb_session_restore`: an inverted test leaks.
+  - `abmf/resource_file.c`: `assert()` has a side effect.
+- **dtcm**
+  - `monthglance.c`: bitwise `&` on booleans.
+  - `x_graphics.c`: a `GR_DEBUG` build does not compile.
 
 ---
 
