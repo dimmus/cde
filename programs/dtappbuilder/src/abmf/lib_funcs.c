@@ -1586,7 +1586,7 @@ dtb_session_restore(
      * CDE Sessioning API states that the path
      * string has to be free'd by the application.
      */
-    if (!session_file_path)
+    if (session_file_path)
         XtFree((char *)session_file_path);
 
 }

@@ -1783,7 +1783,7 @@ bilP_compass_point_to_string(AB_COMPASS_POINT compass_point)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_compass_point_to_token(compass_point)))
+    if ((token = bilP_compass_point_to_token(compass_point)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1796,7 +1796,7 @@ bilP_text_type_to_string(AB_TEXT_TYPE text_type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_text_type_to_token(text_type)))
+    if ((token = bilP_text_type_to_token(text_type)) != AB_BIL_UNDEF)
     {
 	string = bilP_token_to_string(token);
     }
@@ -1809,7 +1809,7 @@ bilP_container_type_to_string(AB_CONTAINER_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_container_type_to_token(type)))
+    if ((token = bilP_container_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = bilP_token_to_string(token);
     }
@@ -1822,7 +1822,7 @@ bilP_packing_to_string(AB_PACKING pack)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_packing_to_token(pack)))
+    if ((token = bilP_packing_to_token(pack)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1835,7 +1835,7 @@ bilP_alignment_to_string(AB_ALIGNMENT align)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_alignment_to_token(align)))
+    if ((token = bilP_alignment_to_token(align)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1863,7 +1863,7 @@ bilP_label_type_to_string(AB_LABEL_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_label_type_to_token(type)))
+    if ((token = bilP_label_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1876,7 +1876,7 @@ bilP_group_type_to_string(AB_GROUP_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_group_type_to_token(type)))
+    if ((token = bilP_group_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1889,7 +1889,7 @@ bilP_button_type_to_string(AB_BUTTON_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_button_type_to_token(type)))
+    if ((token = bilP_button_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1902,7 +1902,7 @@ bilP_orientation_to_string(AB_ORIENTATION type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_orientation_to_token(type)))
+    if ((token = bilP_orientation_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1915,7 +1915,7 @@ bilP_direction_to_string(AB_DIRECTION type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_direction_to_token(type)))
+    if ((token = bilP_direction_to_token(type)) != AB_BIL_UNDEF)
     {
         string = (bilP_token_to_string(token));
     }   
@@ -1928,7 +1928,7 @@ bilP_item_type_to_string(AB_ITEM_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_item_type_to_token(type)))
+    if ((token = bilP_item_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1941,7 +1941,7 @@ bilP_choice_type_to_string(AB_CHOICE_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_choice_type_to_token(type)))
+    if ((token = bilP_choice_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1954,7 +1954,7 @@ bilP_label_style_to_string(AB_LABEL_STYLE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_label_style_to_token(type)))
+    if ((token = bilP_label_style_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1967,7 +1967,7 @@ bilP_func_type_to_string(AB_FUNC_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_func_type_to_token(type)))
+    if ((token = bilP_func_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1980,7 +1980,7 @@ bilP_builtin_action_to_string(AB_BUILTIN_ACTION type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_builtin_action_to_token(type)))
+    if ((token = bilP_builtin_action_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -1993,7 +1993,7 @@ bilP_when_to_string(AB_WHEN type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_when_to_token(type)))
+    if ((token = bilP_when_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = bilP_token_to_string(token);
     }
@@ -2005,7 +2005,7 @@ bilP_arg_class_to_string(AB_ARG_CLASS argClass)
 {
     BIL_TOKEN           token;
     STRING              string = NULL;
-    if ((token = bilP_arg_class_to_token(argClass)))
+    if ((token = bilP_arg_class_to_token(argClass)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -2018,7 +2018,7 @@ bilP_arg_type_to_string(AB_ARG_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_arg_type_to_token(type)))
+    if ((token = bilP_arg_type_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -2031,7 +2031,7 @@ bilP_attachment_to_string(AB_ATTACH_TYPE type)
     BIL_TOKEN           token;
     STRING              string = NULL;
 
-    if ((token = bilP_attachment_to_token(type)))
+    if ((token = bilP_attachment_to_token(type)) != AB_BIL_UNDEF)
     {
 	string = (bilP_token_to_string(token));
     }
@@ -2100,7 +2100,7 @@ bilP_initial_state_to_string(AB_OBJECT_STATE type)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_initial_state_to_token(type)))
+    if ((token = bilP_initial_state_to_token(type)) != AB_BIL_UNDEF)
 	string = bilP_token_to_string(token);
     return (string);
 }
@@ -2155,7 +2155,7 @@ bilP_border_frame_to_string(AB_LINE_TYPE type)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_border_frame_to_token(type)))
+    if ((token = bilP_border_frame_to_token(type)) != AB_BIL_UNDEF)
 	string = bilP_token_to_string(token);
     return (string);
 }
@@ -2227,7 +2227,7 @@ bilP_line_style_to_string(AB_LINE_TYPE line_style)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_line_style_to_token(line_style)))
+    if ((token = bilP_line_style_to_token(line_style)) != AB_BIL_UNDEF)
 	string = bilP_token_to_string(token);
     return (string);
 }
@@ -2282,7 +2282,7 @@ bilP_arrow_style_to_string(AB_ARROW_STYLE arrow_style)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_arrow_style_to_token(arrow_style)))
+    if ((token = bilP_arrow_style_to_token(arrow_style)) != AB_BIL_UNDEF)
 	string = bilP_token_to_string(token);
     return (string);
 }
@@ -2333,7 +2333,7 @@ bilP_selection_mode_to_string(AB_SELECT_TYPE selection_mode)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_selection_mode_to_token(selection_mode)))
+    if ((token = bilP_selection_mode_to_token(selection_mode)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }
@@ -2380,7 +2380,7 @@ bilP_scrollbar_policy_to_string(AB_SCROLLBAR_POLICY sb_policy)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_scrollbar_policy_to_token(sb_policy)))
+    if ((token = bilP_scrollbar_policy_to_token(sb_policy)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }
@@ -2438,7 +2438,7 @@ bilP_msg_type_to_string(AB_MESSAGE_TYPE msg_type)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_msg_type_to_token(msg_type)))
+    if ((token = bilP_msg_type_to_token(msg_type)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }
@@ -2488,7 +2488,7 @@ bilP_file_type_mask_to_string(AB_FILE_TYPE_MASK ftm)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_file_type_mask_to_token(ftm)))
+    if ((token = bilP_file_type_mask_to_token(ftm)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }
@@ -2541,7 +2541,7 @@ bilP_sessioning_method_to_string(AB_SESSIONING_METHOD sessioning_method)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
 
-    if ((token = bilP_sessioning_method_to_token(sessioning_method)))
+    if ((token = bilP_sessioning_method_to_token(sessioning_method)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }
@@ -2590,7 +2590,7 @@ bilP_tt_desktop_level_to_string(AB_TOOLTALK_LEVEL tt_level)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
  
-    if ((token = bilP_tt_desktop_level_to_token(tt_level)))
+    if ((token = bilP_tt_desktop_level_to_token(tt_level)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }
@@ -2647,7 +2647,7 @@ bilP_default_button_to_string(AB_DEFAULT_BUTTON button)
     BIL_TOKEN           token = AB_BIL_UNDEF;
     STRING              string = NULL;
  
-    if ((token = bilP_default_button_to_token(button)))
+    if ((token = bilP_default_button_to_token(button)) != AB_BIL_UNDEF)
         string = bilP_token_to_string(token);
     return (string);
 }

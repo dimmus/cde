@@ -367,23 +367,25 @@ get_action_attribute(
 
     switch (attr)
     {
+    /* a syntax error (< 0) stops the action list; the caller destroys
+       the half-read action instead of reading on from a bad position */
     case AB_GIL_FROM:
-        get_from(inFile, obj, module, action);
+        return_value = get_from(inFile, obj, module, action);
         break;
     case AB_GIL_ACTION:
-        get_operation(inFile, action);
+        return_value = get_operation(inFile, action);
         break;
     case AB_GIL_TO:
-        get_to(inFile, obj, module, action);
+        return_value = get_to(inFile, obj, module, action);
         break;
     case AB_GIL_WHEN:
-        get_when(inFile, obj, action);
+        return_value = get_when(inFile, obj, action);
         break;
     case AB_GIL_FUNCTION_TYPE:
-        get_function_type(inFile, action);
+        return_value = get_function_type(inFile, action);
         break;
     case AB_GIL_ARG_TYPE:
-        get_arg_type(inFile, action);
+        return_value = get_arg_type(inFile, action);
         break;
     default:
         abil_print_load_err(ERR_UNKNOWN);

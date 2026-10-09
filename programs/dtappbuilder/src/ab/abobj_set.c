@@ -2046,9 +2046,10 @@ abobj_set_min_max_values(
 {
     ABObj       subObj;
 
-    if (min != obj_get_min_value(obj) ||
-	(max != obj_get_max_value(obj) &&
-        (obj_is_scale(obj) || obj_is_spin_box(obj))))
+    /* a min or max change, for the object types that have them (the
+       type test used to apply to the max change only) */
+    if ((min != obj_get_min_value(obj) || max != obj_get_max_value(obj)) &&
+        (obj_is_scale(obj) || obj_is_spin_box(obj)))
     {
         /* A change has occurred in the module so set the save flag */
         abobj_set_save_needed( obj_get_module(obj), TRUE);

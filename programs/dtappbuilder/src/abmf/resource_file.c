@@ -150,7 +150,9 @@ abmfP_write_app_res_file(
 {
     int		rc = 0;
     assert(obj_is_project(project));
-    assert(resFile.file = file);
+    /* this used to be done inside assert(), so not at all with NDEBUG */
+    resFile.file = file;
+    assert(resFile.file != NULL);
 
     rc = abmfP_res_file_append_intermediate_files(file, project);
     write_footer(file, resFile.isIntermediate);

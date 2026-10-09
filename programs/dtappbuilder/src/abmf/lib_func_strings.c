@@ -1556,7 +1556,7 @@ static LibFuncRec abmfP_lrc_session_restore =
     "     * CDE Sessioning API states that the path\n"
     "     * string has to be free'd by the application.\n"
     "     */\n"
-    "    if (!session_file_path)\n"
+    "    if (session_file_path)\n"
     "        XtFree((char *)session_file_path);\n"
     "\n"
     "}"
