@@ -638,7 +638,16 @@ bool_t _Tt_db_file::isFileInDatabase ()
 							     directoryFlag);
 
 		if (dbResults != TT_DB_OK) {
-			dbHostnameGlobalMapRef.removeDB(dbFileHostname);
+			// Drop the shared connection only if it failed, not
+			// because the file is simply not in the database yet
+			// (that used to force a reconnect, with its name
+			// lookup and portmapper query, per new file).
+			if ((dbResults == TT_DB_ERR_DB_CONNECTION_FAILED) ||
+			    (dbResults == TT_DB_ERR_RPC_CONNECTION_FAILED) ||
+			    (dbResults == TT_DB_ERR_RPC_FAILED) ||
+			    (dbResults == TT_DB_ERR_DB_OPEN_FAILED)) {
+				dbHostnameGlobalMapRef.removeDB(dbFileHostname);
+			}
 			dbFileDatabase = (_Tt_db_client *)NULL;
 		}
 	}
