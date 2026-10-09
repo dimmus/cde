@@ -498,10 +498,6 @@ void DtDND::AnimateCB(Widget /*widget*/, XtPointer client_data,
    DtDND *obj = (DtDND *)client_data;
    if (obj->dndCB)
     {
-      DtDndDropAnimateCallbackStruct *animateInfo;
-      animateInfo = (DtDndDropAnimateCallbackStruct *) call_data;
-      int i = 0, numItems;
-      numItems = animateInfo->dropData->numItems;
       //for (i = 0; i < numItems; i++)
        {
 	 (*obj->dndCB)(obj->obj, NULL, NULL, ANIMATE);
@@ -563,7 +559,7 @@ void DtDND::TransferCB(Widget /*widget*/, XtPointer client_data,
 	 MotifUI *tmp = (MotifUI *)obj->obj;
 	 DtActionInvoke(tmp->topLevel, value, aap, numItems, NULL, NULL, NULL,
 			1, NULL, NULL);
-	 delete aap;
+	 delete [] aap;
 	 delete value;
        }
       break;

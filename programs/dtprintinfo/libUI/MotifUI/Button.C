@@ -131,6 +131,7 @@ void Button::CreateButton(MotifUI *parent, char *name, char * /*category*/,
 	case DOWN_ARROW_BUTTON: dir = XmARROW_DOWN;
         case LEFT_ARROW_BUTTON: dir = XmARROW_LEFT;
         case RIGHT_ARROW_BUTTON: dir = XmARROW_RIGHT;
+        default: break;
        }
       _w = XtVaCreateManagedWidget("arrow", xmArrowButtonWidgetClass, parentW, 
 				   XmNmultiClick, XmMULTICLICK_DISCARD,

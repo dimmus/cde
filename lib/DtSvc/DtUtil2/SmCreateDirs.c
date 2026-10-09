@@ -315,7 +315,6 @@ static char *
 GetDisplayName (
 	Display		*display)
 {
-    char 		*tmpPath;
     char 		hostName[101], displayName[101];
     char		*pch, *tmpNumber = NULL;
     char		*returnPath;

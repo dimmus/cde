@@ -402,7 +402,6 @@ DeleteControlCB (Widget    w,
 #endif
     Widget dialog;
     String title, del_ctrl, ctrl_name, ctrl_label, del_msg, message;
-    long indx = (long) client_data;
     Arg args[2];
 
     XtSetArg (args[0], XmNuserData, &control_data);
@@ -506,7 +505,6 @@ ToggleControlCB (Widget    w,
 {
     SubpanelData * subpanel_data = (SubpanelData *) client_data;
     ControlData * control_data;
-    long indx = (long) client_data;
     Arg args[1];
 
     XtSetArg (args[0], XmNuserData, &control_data);
@@ -533,7 +531,6 @@ AddSubpanelCB (Widget w,
 
 {
     ControlData * control_data;
-    long indx = (long) client_data;
     Arg args[1];
 
     XtSetArg (args[0], XmNuserData, &control_data);
@@ -1288,11 +1285,9 @@ PopupMenu (Widget    w,
    XmAnyCallbackStruct * callback;
    XEvent * event;
    Widget form, focus_widget;
-   XmManagerWidget mgr;
    SubpanelData * subpanel_data = NULL;
    ControlData * control_data;
    BoxData * box_data = NULL;
-   XmString label_string;
    Arg args[5];
    long control_type, action_count = panel.popup_data->action_count;
 
@@ -1764,8 +1759,6 @@ WSPopupMenu (Widget     w,
 
 
 {
-   XmManagerWidget mgr = (XmManagerWidget) w;
-   int num_children = mgr->composite.num_children;
    XmAnyCallbackStruct * callback;
    XEvent * event;
    Widget form, focus_widget;

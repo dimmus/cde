@@ -65,7 +65,7 @@ extern caddr_t
 make_timezone(Calendar *c)
 {
 	Timezone *t;
-	Widget text, separator, button_form;
+	Widget separator, button_form;
 	XmString xmstr;
 	int ac;
 	Arg args[10];
@@ -378,8 +378,6 @@ tz_set_timezone(Calendar *c, Timezone *t)
 {
     char *tmp_buf, buf[BUFSIZ], gmt[BUFSIZ];
     Widget text;
-    Dtcm_calendar *cal_handle;
-    int time_diff;
 
     t->timezone_type = t->edit_timezone_type;
     if (t->timezone_type == mytime)

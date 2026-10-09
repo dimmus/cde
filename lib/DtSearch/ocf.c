@@ -358,32 +358,6 @@ static void     set_boolbit (long *flagvar, long mask, char *flagname,
 
 /****************************************/
 /*					*/
-/*		set_int			*/
-/*					*/
-/****************************************/
-static void     set_int (int *intvar, char *keyword, _Xstrtokparams *strtok_buf)
-{
-    int             myint;
-
-    if ((token = _XStrtok(NULL, DELIMITERS, *strtok_buf)) == NULL) {
-	token = CATGETS(dtsearch_catd, MS_loadocf, 140, "(missing)");
-ERR_MSG:
-	sprintf (sprintbufp, CATGETS(dtsearch_catd, MS_loadocf, 610,
-	    "%s %s: %s value is '%s'. "
-	    "Should be positive integer. Line ignored."),
-	    PROGNAME"844", cfgfname, keyword, token);
-	DtSearchAddMessage (sprintbufp);
-	return;
-    }
-    if ((myint = atoi (token)) <= 0L)
-	goto ERR_MSG;
-    *intvar = myint;
-    return;
-}  /* set_int() */
-
-
-/****************************************/
-/*					*/
 /*		set_long		*/
 /*					*/
 /****************************************/
@@ -601,22 +575,6 @@ static void     read_path (_Xstrtokparams *strtok_buf)
 
 /****************************************/
 /*					*/
-/*	      obsolete_keyword		*/
-/*					*/
-/****************************************/
-/* append warning msg: passed keyword no longer used */
-static void     obsolete_keyword (char *keyword)
-{
-    sprintf (sprintbufp, CATGETS(dtsearch_catd, MS_loadocf, 1,
-	"%1$s%2$s: %3$s keyword is obsolete."),
-	PROGNAME "001 ", cfgfname, keyword);
-    DtSearchAddMessage (sprintbufp);
-    return;
-}  /* obsolete_keyword() */
-
-
-/****************************************/
-/*					*/
 /*	      read_maxhits		*/
 /*					*/
 /****************************************/
@@ -681,7 +639,7 @@ static int      add_a_keytype (char ktchar)
     }
 
     /* Make sure ktchar is alphanumeric */
-    if ( (ascii_charmap[ktchar] & (CONSONANT | VOWEL | NUMERAL)) == 0) {
+    if ( (ascii_charmap[(unsigned char)ktchar] & (CONSONANT | VOWEL | NUMERAL)) == 0) {
 	if (!isprint (ktchar))
 	    ktchar = '?';
 	sprintf (sprintbufp,
@@ -719,7 +677,7 @@ static int      add_a_keytype (char ktchar)
 	CATGETS(dtsearch_catd, MS_loadocf, 457, "'%c' Records"), ktchar);
 
     /* Warn about inaccessible lowercase ktchars */
-    if ( ((ascii_charmap[ktchar] & 0xff) != ktchar) && OE_uppercase_keys ) {
+    if ( ((ascii_charmap[(unsigned char)ktchar] & 0xff) != ktchar) && OE_uppercase_keys ) {
 	sprintf (sprintbufp,
 	    CATGETS(dtsearch_catd, MS_loadocf, 1011,
 	    "%s %s: Database '%s': Records with lowercase\n"

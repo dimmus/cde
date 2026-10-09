@@ -178,7 +178,7 @@ static void
 build_mainWindow(
         Widget shell )
 {
-  int        count, n, n2;
+  int        count, n;
   Arg        args[MAX_ARGS];
   Widget     WidgList[10];
   Widget     frame;
@@ -189,7 +189,6 @@ build_mainWindow(
   Widget     exitBtn;
   char       *mnemonic;
   char       *tmpStr;
-  Pixmap     pixmap;
   XmString   labelString;
   Pixmap     ditherPix;
   XmPixelSet pixelSet[XmCO_NUM_COLORS];
@@ -440,8 +439,6 @@ ProcessComponentList(
         Widget parent,
         Widget mainRC )
 {
-   int       count=0;
-   int       j=0;
    int       n, n2;
    Arg       args[MAX_ARGS];
    Widget    componentWidget;

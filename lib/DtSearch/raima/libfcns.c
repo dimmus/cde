@@ -414,14 +414,14 @@ int    n   /* Max. String length */
       else {
 	 if ( x1 || x2 ) { /* Only sort_as2 value for one string */
 	    if ( x1 ) {
-               *t++;    /* Compare with next character in string 2 */
+               t++;    /* Compare with next character in string 2 */
 	       if ( db_global.country_tbl.ptr[*t].sort_as1 )
 		  f2 = db_global.country_tbl.ptr[*t].sort_as1;
                else f2 = *t;
 	       if (( x = x1 - f2 )) return(x);
 	    }
 	    if ( x2 ) {
-               *s++;    /* Compare with next character in string 1 */
+               s++;    /* Compare with next character in string 1 */
 	       if ( db_global.country_tbl.ptr[*s].sort_as1 )
 		  f1 = db_global.country_tbl.ptr[*s].sort_as1;
                else f1 = *s;
@@ -435,8 +435,8 @@ int    n   /* Max. String length */
 		db_global.country_tbl.ptr[*t].sub_sort))
             return(x);  
       }
-      *s++;
-      *t++;
+      s++;
+      t++;
    }
    if (n) {
       if (*s) return(1);

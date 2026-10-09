@@ -150,6 +150,7 @@ DoDay(
 		} else {
 			struct tm		*tm;
 			_Xltimeparams		localtime_buf;
+			(void) localtime_buf;	/* unused unless XTHREADS */
 
 			/* There is a later valid time on this day, use it */
                         tm = _XLocaltime(&cur_time, localtime_buf);
@@ -194,6 +195,7 @@ DoWeek(
 	DayTime			*daytime = RE_WEEKLY(re)->wd_daytime;
 	Tick			 next_time;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	cur_tm = *_XLocaltime((const time_t *)&cur_time, localtime_buf);
 	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
@@ -259,12 +261,11 @@ DoMonthDay(
 				 res_day = RES_MSTATE(res).res_day;
 	Duration		 res_duration = res->res_duration;
 	Tick			 _cur_time;
-	struct tm		 start_tm,
-				 cur_tm;
+	struct tm		 cur_tm;
 	int			 next_interval = FALSE;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
-	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
 	cur_tm = *_XLocaltime((const time_t *)&cur_time, localtime_buf);
 
 	/*
@@ -319,23 +320,20 @@ DoMonthPos(
 	RepeatEventState	*res)
 {
 	WeekDayTime             *wdt_list = RE_MONTHLY(re)->md_weektime;
-	struct tm		 start_tm,
-				 cur_tm;
+	struct tm		 cur_tm;
 	Tick			 _cur_time;
 	Duration		 res_duration = res->res_duration;
 	unsigned int		 md_nitems = RE_MONTHLY(re)->md_nitems,
-				 wdt_nday = wdt_list[md_nitems-1].wdt_nday,
-				 wdt_nweek = wdt_list[md_nitems-1].wdt_nweek,
 				 res_weektime = RES_MSTATE(res).res_weektime,
 				 res_wday = RES_MSTATE(res).res_wday,
 				 res_wtime = RES_MSTATE(res).res_wtime,
 				 res_wweek = RES_MSTATE(res).res_wweek;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (res->res_duration == 0)
 		return (Tick)0;
 		
-	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
 	cur_tm = *_XLocaltime((const time_t *)&cur_time, localtime_buf);
 
 	/* XXX: This assumes rules of this form only: MP<n> 1+ WE #4 */
@@ -386,6 +384,7 @@ DoYearByMonth(
 				 nitems = RE_YEARLY(re)->yd_nitems,
 				 res_month = RES_YSTATE(res).res_daymonth;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
 	cur_tm = *_XLocaltime((const time_t *)&cur_time, localtime_buf);
@@ -444,6 +443,7 @@ DoYearByDay(
 				 nitems = RE_YEARLY(re)->yd_nitems,
 				 res_month = RES_YSTATE(res).res_daymonth;
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	start_tm = *_XLocaltime((const time_t *)&start_time, localtime_buf);
 	cur_tm = *_XLocaltime((const time_t *)&cur_time, localtime_buf);
@@ -498,6 +498,7 @@ NextDayTick(
 	struct tm	*tm;
 	struct tm	 start_tm;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	if (res->res_duration == 0) return (Tick)0;
 

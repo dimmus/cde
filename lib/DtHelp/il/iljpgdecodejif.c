@@ -101,6 +101,7 @@ static iljpgError iljpgSkipBytes (
         if (!ILJPG_DECODE_GET_BYTE (stream, byte, error))
             return error;
         }
+    (void) byte;                        /* bytes are discarded */
     return 0;
 }
 

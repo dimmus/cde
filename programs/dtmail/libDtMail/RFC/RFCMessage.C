@@ -634,7 +634,7 @@ RFCMessage::pinMessageDown(char ** msgHeaderStart, long & msgHeaderLen,
 
   // Make sure we did not overflow the allocated area
   //
-  assert(msgHeaderLen < msgNewHeaderSize);
+  assert((size_t) msgHeaderLen < msgNewHeaderSize);
 
   // As of this implementation, body parts can never change, so we do not have to
   // worry about the body part needing reconstruction
@@ -1547,7 +1547,7 @@ RFCMessage::parseV3Bodies(DtMailEnv & error)
 	    if (*body == '\n' && 
 		strncmp(body + 1, "----------", 10) == 0 &&
 		(*(body + 11) == '\n' || 
-		 *(body + 11) == '\r' && *(body + 12) == '\n')) {
+		 (*(body + 11) == '\r' && *(body + 12) == '\n'))) {
 		break;
 	    }
 	}

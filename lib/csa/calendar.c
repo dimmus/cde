@@ -563,7 +563,7 @@ _get_calendar_owner(
 			owner = buf;
 	}
 
-	if (attr->name = strdup(CSA_CAL_ATTR_CALENDAR_OWNER)) {
+	if ((attr->name = strdup(CSA_CAL_ATTR_CALENDAR_OWNER))) {
 		if ((val = (CSA_attribute_value *)calloc(1,
 		    sizeof(CSA_attribute_value))) == NULL) {
 			free(attr->name);
@@ -579,7 +579,7 @@ _get_calendar_owner(
 			return (CSA_E_INSUFFICIENT_MEMORY);
 		}
 
-		if (val->item.calendar_user_value->user_name = strdup(owner)) {
+		if ((val->item.calendar_user_value->user_name = strdup(owner))) {
 			attr->value = val;
 			return (CSA_SUCCESS);
 		} else {
@@ -595,7 +595,7 @@ _get_calendar_owner(
 static CSA_return_code
 _get_calendar_name(Calendar *cal, CSA_attribute *attr)
 {
-	if (attr->name = strdup(CSA_CAL_ATTR_CALENDAR_NAME))
+	if ((attr->name = strdup(CSA_CAL_ATTR_CALENDAR_NAME)))
 		return (_DtCm_set_csa_string_attrval(cal->name, &attr->value,
 			CSA_VALUE_STRING));
 	else
@@ -605,7 +605,7 @@ _get_calendar_name(Calendar *cal, CSA_attribute *attr)
 static CSA_return_code
 _get_product_identifier(Calendar *cal, CSA_attribute *attr)
 {
-	if (attr->name = strdup(CSA_CAL_ATTR_PRODUCT_IDENTIFIER))
+	if ((attr->name = strdup(CSA_CAL_ATTR_PRODUCT_IDENTIFIER)))
 		return (_DtCm_set_csa_string_attrval(_DtCM_PRODUCT_IDENTIFIER,
 			&attr->value, CSA_VALUE_STRING));
 	else
@@ -615,7 +615,7 @@ _get_product_identifier(Calendar *cal, CSA_attribute *attr)
 static CSA_return_code
 _get_version_supported(Calendar *cal, CSA_attribute *attr)
 {
-	if (attr->name = strdup(CSA_CAL_ATTR_VERSION))
+	if ((attr->name = strdup(CSA_CAL_ATTR_VERSION)))
 		return (_DtCm_set_csa_string_attrval(
 			_DtCM_SPEC_VERSION_SUPPORTED, &attr->value,
 			CSA_VALUE_STRING));
@@ -626,7 +626,7 @@ _get_version_supported(Calendar *cal, CSA_attribute *attr)
 static CSA_return_code
 _get_server_version(Calendar *cal, CSA_attribute *attr)
 {
-	if (attr->name = strdup(CSA_X_DT_CAL_ATTR_SERVER_VERSION))
+	if ((attr->name = strdup(CSA_X_DT_CAL_ATTR_SERVER_VERSION)))
 		return (_DtCm_set_csa_uint32_attrval(cal->rpc_version,
 			&attr->value));
 	else
@@ -636,7 +636,7 @@ _get_server_version(Calendar *cal, CSA_attribute *attr)
 static CSA_return_code
 _get_data_version(Calendar *cal, CSA_attribute *attr)
 {
-	if (attr->name = strdup(CSA_X_DT_CAL_ATTR_DATA_VERSION))
+	if ((attr->name = strdup(CSA_X_DT_CAL_ATTR_DATA_VERSION)))
 		return (_DtCm_set_csa_uint32_attrval(cal->file_version,
 			&attr->value));
 	else

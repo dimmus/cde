@@ -288,7 +288,7 @@ void fsa(void)
         pstate->first ? ++arcount : 0) ;
       for (parc = pstate->first ; parc ; parc = parc->next) {
         if (arcount > 1) fputs(",\n", farc) ;
-        fprintf(farc, "  %d, %s, %d, %d, %d, %d",
+        fprintf(farc, "  {%d, %s, %d, %d, %d, %d}",
           parc->label ? parc->label->eltno : 0,
           boolean(parc->optional),
           parc->minim ? parc->id : 0,

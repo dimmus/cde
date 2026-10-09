@@ -408,7 +408,6 @@ GetDtexecPath (
 {
    XrmValue resource_value;
    char *rep_type;
-   char errorMessage [MAX_BUF_SIZE];
    char *name;
    char *class;
    XrmDatabase db = XtDatabase (display);
@@ -572,9 +571,6 @@ _DtCmdCreateTerminalCommand(
         char *procId,
         char *tmpFiles)
 {
-   char *pGeom = NULL;
-   char *pName = NULL;
-   char *pTitle = NULL;
    char options[MAX_BUF_SIZE];
    char *defaultTerminal;
 

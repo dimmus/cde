@@ -89,7 +89,6 @@ void handleAliasSelection(Widget w, XtPointer, XtPointer calldata)
 {
   AliasListUiItem *item;
   XmListCallbackStruct *list_info = (XmListCallbackStruct *)calldata;
-  char *selection_string = NULL;
   DtVirtArray<PropStringPair *> *list_items;
 
   XtVaGetValues(w, 
@@ -121,7 +120,6 @@ void handleAliasSelection(Widget w, XtPointer, XtPointer calldata)
 ///////////////////////////////////////////////////////////////////
 void AliasListUiItem::writeFromUiToSource()
 {
-  Widget w = this->getWidget();
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
@@ -175,11 +173,8 @@ void AliasListUiItem::writeFromSourceToUi()
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
   Widget w = this->getWidget();
-  const char *list_str = NULL;
   DtVirtArray<char *> list_str_list(10);
-  char *buf = NULL;
   int list_len, i;
-  const char *value = NULL;
   PropStringPair **prop_pairs = NULL;
 
   XmListDeleteAllItems(w);
@@ -377,7 +372,7 @@ void AliasListUiItem::handleChangeButtonPress()
 			    pos_list[0],
 			    TRUE);
 	  }
-	props_changed = TRUE;
+      props_changed = TRUE;
     }
 }
 ///////////////////////////////////////////////////////////

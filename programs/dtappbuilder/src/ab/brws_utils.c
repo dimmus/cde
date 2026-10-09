@@ -106,7 +106,6 @@ static void		clipwindowResizeCB(
 			    XtPointer	call_data
 			);
 
-static char		*ab_browser_project_name = "*module_name";
 
 static int
 select_fn(
@@ -386,12 +385,8 @@ brws_select
     AB_OBJ	*obj
 )
 {
-    AB_OBJ	*project;
-    ABBrowser	b_list;
     AB_OBJ	*root_obj = obj;
     VNode	selected_nodes;
-    Widget	draw_area;
-    ViewerMethods	*m;
 
     if (!obj)
 	return;
@@ -436,12 +431,8 @@ brws_deselect
     AB_OBJ	*obj
 )
 {
-    AB_OBJ	*project;
-    ABBrowser	b_list;
     AB_OBJ	*root_obj = obj;
     VNode	selected_nodes;
-    Widget	draw_area;
-    ViewerMethods	*m;
 
     if (!obj)
 	return;
@@ -485,7 +476,6 @@ brws_toggle_select
 {
     AB_OBJ	*root_obj = obj;
     VNode	selected_nodes;
-    Widget	draw_area;
 
     if (!obj)
 	return;
@@ -539,7 +529,6 @@ select_node
 {
     ViewerMethods	*m;
     Viewer		*v;
-    ABObj		obj;
 
     if (!selected_node)
 	return;
@@ -548,8 +537,6 @@ select_node
     m = v->methods;
 
     BRWS_NODE_SET_STATE(selected_node, BRWS_NODE_SELECTED);
-
-    obj = (AB_OBJ *)selected_node->obj_data;
 
     if (!brwsP_node_is_collapsed(selected_node))
         (*m->render_node)(selected_node, TRUE);
@@ -563,7 +550,6 @@ deselect_node
 {
     ViewerMethods	*m;
     Viewer		*v;
-    ABObj		obj;
 
     if (!selected_node)
 	return;
@@ -572,8 +558,6 @@ deselect_node
     m = v->methods;
 
     BRWS_NODE_UNSET_STATE(selected_node, BRWS_NODE_SELECTED);
-
-    obj = (AB_OBJ *)selected_node->obj_data;
 
     if (!brwsP_node_is_collapsed(selected_node))
         (*m->render_node)(selected_node, FALSE);
@@ -601,18 +585,14 @@ toggle_select_node
     VNode selected_node
 )
 {
-    AB_OBJ		*obj;
     Viewer		*b;
     ViewerMethods	*m;
-    Widget		draw_area;
 
     if (!selected_node)  
 	return;
 
     b = selected_node->browser;
     m = b->methods;
-    obj = (AB_OBJ *)selected_node->obj_data;
-    draw_area = brws_draw_area(b);
 
     if (BRWS_NODE_STATE_IS_SET(selected_node, BRWS_NODE_SELECTED))
     {
@@ -637,9 +617,8 @@ r_deselect_all_nodes
 )
 {
     VMethods	m;
-    VNode	child;
     VNode	*selected_nodes = NULL;
-    int		i, num_child, num_selected = 0;
+     int		i, num_selected = 0;
 
     if (!tree)
 	return;
@@ -702,7 +681,7 @@ brws_set_module_name
             /*
              * Check return value of strrchr before adding 1 to it
              */
-	    if (filename = strrchr(fullpath, '/'))
+	    if ((filename = strrchr(fullpath, '/')))
 	        module_name = (STRING)strdup(filename + 1);
 	    else
 	        module_name = (STRING)strdup(fullpath);
@@ -816,7 +795,6 @@ brws_update_node(
 {
     Vwr		v;
     VNode	update_nodes = NULL;
-    VMethods	*m;
 
     if (!obj)
 	return;
@@ -912,7 +890,6 @@ brws_get_browser_shell_for_obj(
 		proj = NULL;
     ABBrowser	cur_b = NULL,
 		b_list = NULL;
-    ABObj	project = proj_get_project();
 
     if (!obj)
 	return NULL;
@@ -1077,12 +1054,10 @@ brwsP_node_is_collapsed
     VNode	parent;
     VMethods	m;
     Vwr		v;
-	    ABObj	obj;
 
     if (!node)
 	return (TRUE);
     
-    obj = (AB_OBJ *)node->obj_data;
     /*
     fprintf(stderr, "brwsP_node_is_collapsed(%s), viewer = %p\n", 
 	obj_get_name(obj),
@@ -1095,13 +1070,10 @@ brwsP_node_is_collapsed
     if (!(m = v->methods))
 	return (TRUE);
 
-    while (parent = (*m->get_parent)(node))
+    while ((parent = (*m->get_parent)(node)))
     {
 	if (!BRWS_NODE_STATE_IS_SET(parent, BRWS_NODE_EXPANDED))
 	{
-
-	    obj = (AB_OBJ *)parent->obj_data;
-
 	    /*
 	    fprintf(stderr, "parent node %s is collapsed\n", obj_get_name(obj));
 	    */
@@ -1128,7 +1100,6 @@ brwsP_node_is_visible
     VNode	parent;
     VMethods	m;
     Vwr		v;
-	    ABObj	obj;
 
     if (!node)
 	return (FALSE);
@@ -1136,7 +1107,6 @@ brwsP_node_is_visible
     if (!BRWS_NODE_STATE_IS_SET(node, BRWS_NODE_VISIBLE))
 	return (FALSE);
 
-    obj = (AB_OBJ *)node->obj_data;
     /*
     fprintf(stderr, "brwsP_node_is_visible(%s), viewer = %p\n", 
 	obj_get_name(obj),
@@ -1149,13 +1119,10 @@ brwsP_node_is_visible
     if (!(m = v->methods))
 	return (TRUE);
 
-    while (parent = (*m->get_parent)(node))
+    while ((parent = (*m->get_parent)(node)))
     {
 	if (!BRWS_NODE_STATE_IS_SET(parent, BRWS_NODE_VISIBLE))
 	{
-
-	    obj = (AB_OBJ *)parent->obj_data;
-
 	    /*
 	    fprintf(stderr, "parent node %s is not visible\n", obj_get_name(obj));
 	    */
@@ -1583,9 +1550,7 @@ brwsP_tear_off_selected(
 )
 {
     ABBrowser		new_browser, b_list;
-    BrowserProps	props, new_props;
-    AB_OBJ		*project, *sel_obj;
-    VNode		selected;
+    AB_OBJ		*project;
     ViewerMethods	*m;
 
     if (!b || !b->module)

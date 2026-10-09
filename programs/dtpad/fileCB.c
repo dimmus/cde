@@ -229,7 +229,6 @@ FileSaveCB(
     DtEditorErrorCode errorCode;
     Boolean addNewlines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
-    Tt_message m;
 
     if (pPad->fileStuff.fileName && *pPad->fileStuff.fileName) { /* filename? */
 	/* -----> if called directly from [Save] menu and word wrap is on,
@@ -256,7 +255,7 @@ FileSaveCB(
 	}
 	if (pPad->ttEditReq.contract) {
 	    /* ZZZ -----> Create and send Saved notice */
-	    m = ttdt_file_notice(
+	    (void) ttdt_file_notice(
 			pPad->ttEditReq.contract,	/* context */
 			TTDT_SAVED,			/* op */
 			TT_SESSION,			/* Tt_scope */
@@ -394,7 +393,6 @@ FilePrintCB(
 {
     Editor *pPad = (Editor *) client_data;
     DtActionArg *actionArgp = (DtActionArg *) XtCalloc(2,sizeof(DtActionArg));
-    DtActionInvocationID actionID;
     char *pr_name = (char *) NULL, *user_name;
     DtEditorErrorCode errorCode;
 
@@ -422,7 +420,7 @@ FilePrintCB(
 			True,		/* overwrite existing file */
 			addNewlines,	/* replace soft line feeds? */
 			False);		/* don't mark contents as saved */
-    if (errorCode != SUCCESS) {		/* this should never occur */
+    if (errorCode != DtEDITOR_NO_ERRORS) {		/* this should never occur */
 	_DtTurnOffHourGlass(pPad->app_shell);
 	PostSaveError(pPad, pr_name, errorCode);
 	return;
@@ -472,7 +470,7 @@ FilePrintCB(
      *       and turn it back on in PrintActionCB() when it receives a
      *       DtACTION_DONE status */ 
     /* ----> Invoke the print action */
-    actionID = DtActionInvoke(pPad->app_shell,
+    DtActionInvoke(pPad->app_shell,
 		"PRINT_DTPAD_TEMPFILE",		/* action */
 		actionArgp, 2,			/* action arguments & count */
 		(char *) NULL,			/* terminal options */
@@ -499,8 +497,6 @@ static void FileDoXpPrint(Editor *pPad, Boolean silent)
 {
     PrintJob *pJob;
 
-    DtActionArg *actionArgp = (DtActionArg *) XtCalloc(2,sizeof(DtActionArg));
-    DtActionInvocationID actionID;
     DtEditorErrorCode errorCode;
 
     char *pr_name = (char *) NULL, *user_name;
@@ -529,7 +525,7 @@ static void FileDoXpPrint(Editor *pPad, Boolean silent)
 			True,		/* overwrite existing file */
 			addNewlines,	/* replace soft line feeds? */
 			False);		/* don't mark contents as saved */
-    if (errorCode != SUCCESS) {		/* this should never occur */
+    if (errorCode != DtEDITOR_NO_ERRORS) {		/* this should never occur */
 	_DtTurnOffHourGlass(pPad->app_shell);
 	PostSaveError(pPad, pr_name, errorCode);
 	return;
@@ -625,7 +621,6 @@ static Boolean
 FileExitWP(XtPointer client_data)
 {
     Editor *pPad = (Editor *)client_data;
-    Tt_status status;
 
     if (pPad->numPendingTasks > 0)
       return FALSE;
@@ -637,8 +632,8 @@ FileExitWP(XtPointer client_data)
     }
 
     if (pPad->ttQuitReq.contract) {  /* reply to ToolTalk Quit request */
-	status = tt_message_reply(pPad->ttQuitReq.contract);
-	status = tttk_message_destroy(pPad->ttQuitReq.contract);
+	tt_message_reply(pPad->ttQuitReq.contract);
+	tttk_message_destroy(pPad->ttQuitReq.contract);
     }
 
     if (pPad->ttEditReq.contract) {
@@ -760,7 +755,6 @@ oldFileExitCB(
         caddr_t call_data)
 {
     Editor *pPad = (Editor *)client_data;
-    Tt_status status;
 
     if (SaveUnsaved(pPad, FileExitCB)) {
 	/*
@@ -780,8 +774,8 @@ oldFileExitCB(
     }
 
     if (pPad->ttQuitReq.contract) {  /* reply to ToolTalk Quit request */
-	status = tt_message_reply(pPad->ttQuitReq.contract);
-	status = tttk_message_destroy(pPad->ttQuitReq.contract);
+	tt_message_reply(pPad->ttQuitReq.contract);
+	tttk_message_destroy(pPad->ttQuitReq.contract);
     }
 
     if (pPad->ttEditReq.contract) {
@@ -1060,7 +1054,6 @@ SaveUnsaved(
 	void (*callingFunc)() )
 {
     Boolean addNewlines;
-    Tt_message m;
 
     /*
      * If there are unsaved changes, ask the user if they wish to
@@ -1094,7 +1087,7 @@ SaveUnsaved(
 			addNewlines,		/* replace soft line feeds? */
 			True);			/* mark contents as saved */
             _DtTurnOffHourGlass(pPad->app_shell);
-	    if (errorCode != SUCCESS) {
+	    if (errorCode != DtEDITOR_NO_ERRORS) {
 	        PostSaveError(pPad, pPad->fileStuff.fileName, errorCode);
 	        if (callingFunc == FileExitCB) {
 		    /* Set saveOnClose to False to force user to explicitly
@@ -1106,7 +1099,7 @@ SaveUnsaved(
 	    } else {
 		if (pPad->ttEditReq.contract) {
 		    /* ZZZ -----> Create and send Saved notice */
-		    m = ttdt_file_notice(
+		    (void) ttdt_file_notice(
 			pPad->ttEditReq.contract,	/* context */
 			TTDT_SAVED,			/* op */
 			TT_SESSION,			/* Tt_scope */
@@ -1170,11 +1163,7 @@ SaveAsOkCB(
     Editor *pPad = (Editor *)client_data;
     SaveAs *pSaveAs = &pPad->fileStuff.fileWidgets.saveAs;
     void (*pFunc)();
-    Widget textField = XmFileSelectionBoxGetChild(
-		    pPad->fileStuff.fileWidgets.saveAs.saveAs_form,
-		    XmDIALOG_TEXT);
     DtEditorErrorCode errorCode;
-    Tt_message m;
     Boolean addNewlines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
     Boolean overWrite, markSaved;
@@ -1232,7 +1221,7 @@ SaveAsOkCB(
 	_DtTurnOffHourGlass(pPad->app_shell);
 	return;
     }
-    if (errorCode != SUCCESS) {
+    if (errorCode != DtEDITOR_NO_ERRORS) {
         PostSaveError(pPad, pPad->fileStuff.savingName, errorCode);
 	XtFree(pPad->fileStuff.savingName);
 	pPad->fileStuff.savingName = (char *)NULL;
@@ -1240,7 +1229,7 @@ SaveAsOkCB(
     } else {
 	if (pPad->ttEditReq.contract) {
 	    /* ZZZ -----> Create and send Saved notice */
-	    m = ttdt_file_notice(
+	    (void) ttdt_file_notice(
 			pPad->ttEditReq.contract,	/* context */
 			TTDT_SAVED,			/* op */
 			TT_SESSION,			/* Tt_scope */
@@ -1294,7 +1283,6 @@ AlrdyExistsOkCB(
     Boolean addNewlines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
     Boolean markSaved;
-    Tt_message m;
 
     _DtTurnOnHourGlass(pPad->app_shell);
     _DtTurnOnHourGlass(w);
@@ -1320,10 +1308,10 @@ AlrdyExistsOkCB(
     _DtTurnOffHourGlass(w);
     _DtTurnOffHourGlass(pPad->app_shell);
 
-    if (errorCode == SUCCESS) {
+    if (errorCode == DtEDITOR_NO_ERRORS) {
 	if (pPad->ttEditReq.contract) {
 	    /* ZZZ -----> Create and send Saved notice */
-	    m = ttdt_file_notice(
+	    (void) ttdt_file_notice(
 			pPad->ttEditReq.contract,	/* context */
 			TTDT_SAVED,			/* op */
 			TT_SESSION,			/* Tt_scope */

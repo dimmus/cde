@@ -154,12 +154,10 @@ static int	replace_string_shorter(
  * Debugging routines
  */
 #ifdef DEBUG
-static int	dump_callbacks(ABObj project);
 static int	debug_verify_tree(ABObj root);
 #endif /* DEBUG */
 
 #ifdef DEBUG	/* performance testing */
-static int	time_traversal(ABObj root);
 static int	get_cur_time(double *realTimeOut, double *cpuTimeOut);
 #endif /* DEBUG */
 
@@ -182,14 +180,11 @@ main(int argc, STRING *argv)
     CmdlineArgsRec      cmdlineRec;
     CmdlineArgs         cmdline = &cmdlineRec;
     ABObj               project = NULL;
-    ABObj               module = NULL;
-    int                 num_modules_processed = 0;
     BOOL		genAllFiles = FALSE;
     BOOL		genMain = FALSE;
     BOOL		genMainOnly = FALSE;
     BOOL		useDefaultProject = FALSE;
     BOOL		showAllWindows = FALSE;
-    STRING		errmsg = NULL;
 
 #ifdef DEBUG	/* performance testing */
     double		progStartSeconds = 0.0;
@@ -837,7 +832,6 @@ mark_modules_to_load_and_write(
 			StringList	fileNames
 )
 {
-    int			return_value = 0;
     AB_TRAVERSAL	fileTrav;
     ABObj		file = NULL;
     ISTRING		fileName = NULL;
@@ -1046,6 +1040,8 @@ mark_modules_to_load_and_write(
 			}
 		}
 	    break;
+	    default:
+	    break;
 	    }
         }
         trav_close(&allTrav);
@@ -1060,7 +1056,6 @@ load_marked_modules(ABObj project)
 {
     ABObj		module = NULL;
     AB_TRAVERSAL	moduleTrav;
-    char	fileName[MAXPATHLEN+1] = "";
 
     for (trav_open(&moduleTrav, project, AB_TRAV_MODULES|AB_TRAV_MOD_SAFE);
 	(module = trav_next(&moduleTrav)) != NULL; )
@@ -1227,7 +1222,6 @@ find_proj_file(CmdlineArgs cmdline)
     numProjectFiles = strlist_get_num_strs(&projFiles);
     if (numProjectFiles > 0)
     {
-	int	num_strings = strlist_get_num_strs(&projFiles);
 	int	i = 0;
 	STRING	fileName = NULL;
 
@@ -1453,7 +1447,7 @@ replace_string_shorter(STRING buf, STRING subStr, STRING replaceStr)
 	memmove(subStrPtr+replaceStrLen, 
 		subStrPtr+subStrLen,
 		((int)(bufEnd - (subStrPtr+subStrLen))) + 1);
-	strncpy(subStrPtr, replaceStr, replaceStrLen);	/* no NULL! */
+	memcpy(subStrPtr, replaceStr, replaceStrLen);	/* no NULL! */
 	bufPtr = subStrPtr+replaceStrLen;
 	bufEnd -= replaceDiffLen;
 	++numReplaced;
@@ -1473,10 +1467,6 @@ examine_tree(ABObj project)
     AB_TRAVERSAL        uiTrav;
     ABObj               module = NULL;
     ABObj               obj = NULL;
-    ABObj		parent = NULL;
-    StringList		proj_callbacks = NULL;
-    ABObj		callbackScopeObj = NULL;
-    STRING		funcName = NULL;
 
     objxm_obj_configure(project, OBJXM_CONFIG_CODEGEN, TRUE);
 
@@ -1731,7 +1721,6 @@ dump_tree(ABObj tree)
 
     print_tree(tree, 0);
 
-epilogue:
     util_set_verbosity(old_verbosity);
     return return_value;
 }
@@ -1788,75 +1777,6 @@ epilogue:
 }
 
 
-#ifdef DEBUG
-static int
-time_traversal(ABObj root)
-{
-	int		return_value = 0;
-	AB_TRAVERSAL	trav;
-	ABObj		obj = NULL;
-	int		i = 0;
-	double		startTime = 0;
-	double		endTime = 0;
-	double		totalTravTime = 0;
-	double		oneTravTime = 0;
-	int		numTravs = 1000;
-	struct tms	timeBuf;
-	long		ticks_per_second = sysconf(_SC_CLK_TCK);
-	int		oldVerbosity = util_get_verbosity();
-
-	if (ticks_per_second <= 0)
-	{
-	    util_dprintf(0, "Couldn't get the value of _SC_CLK_TCK!\n");
-	    return_code(ERR_INTERNAL);
-	}
-	
-	util_set_verbosity(0);		/* no expensive error-checking */
-
-	/*
-	 *  all
-	 */
-	util_printf("Beginning trav test\n");
-	startTime = (times(&timeBuf) *1.0) / ticks_per_second;
-	for (i = 0; i < numTravs; ++i)
-	{
-	    for (trav_open(&trav, root, AB_TRAV_ALL);
-		(obj = trav_next(&trav)) != NULL; )
-	    {
-	    }
-	    trav_close(&trav);
-	}
-	endTime = (times(&timeBuf) *1.0) / ticks_per_second;
-	util_printf("end of trav test\n");
-	totalTravTime = (endTime - startTime);
-	oneTravTime = totalTravTime/numTravs;
-	util_printf("one ALL traversal time: %g\n", oneTravTime);
-
-	/*
-	 * salient
-	 */
-	startTime = (times(&timeBuf) *1.0) / ticks_per_second;
-	for (i = 0; i < numTravs; ++i)
-	{
-	    for (trav_open(&trav, root, AB_TRAV_SALIENT);
-		(obj = trav_next(&trav)) != NULL; )
-	    {
-	    }
-	    trav_close(&trav);
-	}
-	endTime = (times(&timeBuf) *1.0) / ticks_per_second;
-	util_printf("end of trav test\n");
-	totalTravTime = (endTime - startTime);
-	oneTravTime = totalTravTime/numTravs;
-	util_printf("one SALIENT traversal time: %lg\n", oneTravTime);
-
-epilogue:
-    util_set_verbosity(oldVerbosity);
-    return return_value;
-}
-#endif /* DEBUG */
-
-
 /*
  * Actually sets the tree up for code generation.
  */
@@ -1865,7 +1785,6 @@ abmfP_prepare_tree(ABObj project)
 {
     ABObj		module = NULL;
     AB_TRAVERSAL	trav;
-    StringList		proj_callbacks = NULL;
     ABObj		obj = NULL;
     AB_TRAVERSAL	allTrav;
     ABObj		callbackScopeObj;
@@ -1882,8 +1801,6 @@ abmfP_prepare_tree(ABObj project)
 	abmfP_create_obj_data_for_module(module);
     }
     trav_close(&trav);
-
-    proj_callbacks = mfobj_get_proj_data(project)->callbacks;
 
     for (trav_open(&allTrav, project, 
                 AB_TRAV_ALL | AB_TRAV_MOD_PARENTS_FIRST | AB_TRAV_MOD_SAFE);
@@ -2126,14 +2043,11 @@ static int
 ensure_data_for_module_obj(ABObj module)
 {
     CGenModuleData	moduleData = NULL;
-    ABObj		project = NULL;
-    ABObj		newProject = NULL;
 
     if (!obj_is_module(module))
     {
 	return -1;
     }
-    project = obj_get_project(module);
     if (module->cgen_data == NULL)
     {
         module->cgen_data = (CGenData)calloc(sizeof(CGenDataRec), 1);
@@ -2151,35 +2065,6 @@ ensure_data_for_module_obj(ABObj module)
 
 
 #ifdef DEBUG
-
-static int
-dump_callbacks(ABObj project)
-{
-    ABObj		module = NULL;
-    AB_TRAVERSAL	moduleTrav;
-    StringList		callbacks = NULL;
-
-    util_dprintf(0, "\n***** CALLBACKS *****\n");
-    util_dprintf(0, "project callbacks\n");
-    callbacks = mfobj_get_proj_data(project)->callbacks;
-    if (callbacks != NULL)
-    {
-        strlist_dump(callbacks);
-    }
-    for (trav_open(&moduleTrav, project, AB_TRAV_MODULES);
-	(module = trav_next(&moduleTrav)) != NULL; )
-    {
-	util_dprintf(0, "module '%s' callbacks\n", util_strsafe(obj_get_name(module)));
-	callbacks = mfobj_get_module_data(module)->callbacks;
-        if (callbacks != NULL)
-        {
-            strlist_dump(callbacks);
-        }
-    }
-    trav_close(&moduleTrav);
-    util_dprintf(0,"\n");
-    return 0;
-}
 
 /*
  * Checks tree and aborts if an error is found.
@@ -2237,7 +2122,6 @@ debug_verify_tree(ABObj root)
 static int	
 get_cur_time(double *realTimeOut, double *cpuTimeOut)
 {
-	long		ticks_per_second = sysconf(_SC_CLK_TCK);
     struct tms	timeInfo;
     double	realTime = times(&timeInfo);
     double	cpuTime = timeInfo.tms_utime + timeInfo.tms_stime

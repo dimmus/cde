@@ -274,6 +274,8 @@ abmfP_get_connect_includes(StringList includeFiles, ABObj projOrModule)
 	            abmfP_comp_get_widget_specific_includes(
 			includeFiles, obj_get_root(toObj));
 		break;
+		default:
+		break;
 	    }
 	}
     }

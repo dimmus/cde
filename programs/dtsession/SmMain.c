@@ -131,9 +131,7 @@ main (int argc, char **argv)
     int                         n, tmp;
     Arg                         args[10];
     XEvent                      next;
-    String                      tmpString;
     XWindowAttributes           windAtt;
-    XPropertyEvent              *pEvent = (XPropertyEvent *) &next;
     int                         status;
     struct stat                 buf;
     Display                     *srvDisplay;

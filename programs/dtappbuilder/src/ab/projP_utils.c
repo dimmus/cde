@@ -209,7 +209,7 @@ save_as_bil_okCB(
     XmSelectionBoxCallbackStruct *call_data
 )
 {
-    STRING              fullpath = NULL, msg = NULL;
+    STRING              fullpath = NULL;
     char		mod_name[MAXPATHLEN];
     char		mod_dir[MAXPATHLEN];
     ABObj               module_obj = (ABObj) client_data;
@@ -310,7 +310,6 @@ projP_save_export_bil(
     DTB_MODAL_ANSWER    answer = DTB_ANSWER_NONE;
     BOOL		read_OK, write_OK;
     int			iRet = 0;
-    XmString		xm_buf = (XmString) NULL;
 
     *new_filename = 0;
 

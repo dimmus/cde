@@ -280,7 +280,7 @@ serverPause( unsigned t, int serverPid )
 #  endif
 #endif
 	    if (pid == serverPid ||
-		pid == -1 && errno == ECHILD)
+		(pid == -1 && errno == ECHILD))
 	    {
 		Debug ("Server dead\n");
 		serverPauseRet = 1;
@@ -325,7 +325,7 @@ static void
 GetRemoteAddress( struct display *d, int fd )
 {
     char    buf[512];
-    int	    len = sizeof (buf);
+    socklen_t len = sizeof (buf);
 
     if (d->peer)
 	free ((char *) d->peer);

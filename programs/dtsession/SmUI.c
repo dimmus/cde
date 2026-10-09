@@ -133,7 +133,6 @@ static void LockDialogUp( Widget, XtPointer, XtPointer ) ;
 static void SimpleOK( Widget, XtPointer, XtPointer ) ;
 static void ConfirmOKCB ( Widget, XtPointer, XtPointer ) ;
 static void ConfirmCancelCB ( Widget, XtPointer, XtPointer ) ;
-static void ConfirmHelpCB ( Widget, XtPointer, XtPointer ) ;
 static void XSMPFailureOKCB( Widget w, XtPointer client_data, XtPointer call_data );
 static void SaveTimeout( XtPointer , XtIntervalId *) ;
 
@@ -141,7 +140,6 @@ static void SaveTimeout( XtPointer , XtIntervalId *) ;
 /*
  * Local vars
  */
-static Boolean session_confirmed = False;
 static Boolean reasonsDialogOK;
 static Boolean saveTimeout;
 
@@ -1153,7 +1151,6 @@ ImmediateExit(
 	Tt_message msg,
 	Boolean doSave)
 {
-    long old;
     Tt_message notice;
 
     /*
@@ -1161,11 +1158,15 @@ ImmediateExit(
      * down
      */
 #if !defined(SVR4) && !defined(__linux__)
-    old = sigblock(sigmask(SIGTERM));
+    sigblock(sigmask(SIGTERM));
     sigblock(sigmask(SIGHUP));
     sigblock(sigmask(SIGPIPE));
 #else
-    old = sighold(SIGTERM);
+    sigset_t set;
+
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+    sigprocmask(SIG_BLOCK, &set, NULL);
 #endif
     /*
      *
@@ -1187,7 +1188,6 @@ ImmediateExit(
 	XEvent		next;
 	Tt_message	msg;
 	int		sessionType = smGD.sessionType;
-	XtIntervalId	timerId;
 
     	msg = (Tt_message) tttk_message_create( NULL, TT_NOTICE, TT_SESSION, NULL,
 					       "DtActivity_Beginning", NULL );
@@ -1221,8 +1221,8 @@ ImmediateExit(
 	smGD.ExitComplete = False;
 
         saveTimeout = False;
-	timerId = XtAppAddTimeOut (smGD.appCon, smRes.saveYourselfTimeout,
-				   SaveTimeout, NULL);
+	XtAppAddTimeOut (smGD.appCon, smRes.saveYourselfTimeout,
+			 SaveTimeout, NULL);
 
 	while (smXSMP.saveState.saveComplete == False &&
 	       smXSMP.saveState.shutdownCanceled == False) {
@@ -2138,7 +2138,7 @@ PostXSMPFailureDialog (
 	  {
 	    char		*home;
 
-	    if (home = getenv ("HOME"))
+	    if ((home = getenv ("HOME")))
 	      {
 		len = strlen(home) +
 		  strlen(DtPERSONAL_CONFIG_DIRECTORY) +
@@ -2373,8 +2373,6 @@ PostReasonsDialog (
 	XmString		msgString;
 	XmString		okString;
 	XmString		helpString;
-	Arg      		args[20];
-	char			* titleString;
 	char			* str1;
 	char			* str2;
 	char			* str3;

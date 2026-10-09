@@ -717,7 +717,6 @@ static int
 when_table_init(void)
 {
 #define wt when_table
-    int                 i = 0;
 
     when_table_inited = TRUE;
     convert_fill_table(when_table, AB_WHEN_NUM_VALUES,

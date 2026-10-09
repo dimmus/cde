@@ -88,7 +88,6 @@ static int num_exception(Appt_4 *p_appt);
 extern CSA_return_code
 _DtCmsInsertAppt(_DtCmsCalendar *cal, Appt_4 *appt4)
 {
-	CSA_return_code	stat;
 	Rb_Status	rb_stat;
 	time_t		current_time;
 	Attr_4		p_attr;
@@ -253,8 +252,7 @@ _DtCmsDeleteApptInstancesAndLog(
 	CSA_return_code	stat = CSA_SUCCESS;
 	Appt_4		*p_appt, *oldcopy;
 	int		ordinal;
-	int		f, file_size, ntimes, ninstance, status = 0;
-	struct stat	info;
+	int		file_size, ninstance;
 
 	p_lnode = (List_node *)hc_lookup_node (REPT_LIST(cal), (caddr_t)key);
 	if (p_lnode == NULL)
@@ -338,6 +336,9 @@ _DtCmsDeleteApptInstancesAndLog(
 				p_appt->period.enddate = _DtCms_prev_tick_v4(
 								key->tick,
 								p_appt->period);
+				break;
+			default:
+				break;
 			}
 			trunc_exception_list(p_appt, ordinal);
 		}
@@ -537,8 +538,6 @@ _DtCmsChangeSome(
 {
 	CSA_return_code	stat;
 	Appt_4		*olda, *newcopy = NULL;
-	List_node 	*lnode;
-	Exception_4 	*newexcept;
 	int		file_size;
 	int		remain;
 
@@ -706,7 +705,7 @@ _DtCmsLookupRangeV4(
 	caddr_t		ilp = NULL;
 	int		tmp_tick, endtick;
 	Id_4		lo_key;
-	int		n;
+	int		n = 0;
 	List_node	*p_lnode;
 	time_t		hi_tick, lo_tick;
 	int		tick;
@@ -915,7 +914,6 @@ _DtCmsLookupKeyrangeV4(
 	Period_4	period;
 	long		tmp_tick, endtick;
 	Id_4		lo_key;
-	int		n = 0;
 	List_node	*p_lnode;
 	int		tick;
 	int		ordinal;
@@ -1009,8 +1007,6 @@ _DtCmsLookupKeyrangeV4(
 			/* If not cancelled, add to linked list */
 			if (!_DtCms_marked_4_cancellation (p_appt, ordinal))
 			{
-				n++;
-
 				/* Replace the parent key by
 				 * the current tick for the
 				 * repeating event
@@ -1066,7 +1062,6 @@ _AddToLinkedAppts(
 	uint	access,
 	caddr_t	*ilp)
 {
-	Appt_4	*p_prev;
 	Appt_4	*copy;
 
 	switch (_GetAccessLevel(user, access, p_appt)) {

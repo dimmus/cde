@@ -103,7 +103,6 @@ extern Hc_list *
 hc_create(_DtCmsGetKeyProc get, _DtCmsCompareProc compare)
 {
 	Private	*p;
-	List_node	*root = NULL;
 	Hc_list	*list;
 
 	p = (Private *) calloc (1, sizeof (*p));

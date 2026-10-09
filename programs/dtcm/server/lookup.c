@@ -177,7 +177,6 @@ _DtCmsLookupEntries(
 	cms_entry	**entries)
 {
 	CSA_return_code	stat = CSA_SUCCESS;
-	CSA_return_code	stat2 = CSA_SUCCESS;
 	cms_entry	*eptr, *head = NULL, *tail = NULL;
 	cms_key		key;
 	List_node	*lnode;
@@ -497,7 +496,6 @@ _EnumerateSequence(
 	cms_entry	**tail)
 {
 	CSA_return_code	stat = CSA_SUCCESS;
-	CSA_return_code	stat2 = CSA_SUCCESS;
 	cms_entry	*eptr;
 	time_t		fsttick, tick;
 	RepeatEventState *restate = NULL;

@@ -115,11 +115,6 @@ static void	turnoff_changebars(
 /*
  * Xt Callbacks
  */
-static void	size_policyCB(
-		    Widget   	widget,
-                    XtPointer 	clientdata,
-                    XmToggleButtonCallbackStruct *state
-                );
 
 
 /*************************************************************************
@@ -648,26 +643,4 @@ turnoff_changebars(
 
     prop_changebars_cleared(pls->prop_sheet);
 
-}
-
-static void
-size_policyCB(
-    Widget	w,
-    XtPointer	clientdata,
-    XmToggleButtonCallbackStruct *state
-)
-{
-    AB_PROP_TYPE        	type = (AB_PROP_TYPE)clientdata;
-    PropLabelSettingsRec        *pls = &(prop_label_settings_rec[type]);
-    XtArgVal			value;
-
-    /* Width/Height fields should ONLY be editable if Size Policy
-     * is "Fixed"
-     */
-    if (state->set)
-    {
-    	XtVaGetValues(w, XmNuserData, &value, NULL);
-    	ui_field_set_editable(pls->geometry.w_field, value == SIZE_FIXED_KEY);
-    	ui_field_set_editable(pls->geometry.h_field, value == SIZE_FIXED_KEY);
-    }
 }

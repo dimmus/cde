@@ -131,11 +131,11 @@ DtWsmGetWorkspaceInfo(
 			&tp,
 			aProperty))>=Success)
 	{
-	    if (rcode=XmbTextPropertyToTextList (
+	    if ((rcode=XmbTextPropertyToTextList (
 				display,
 				&tp,
 				&ppchList,
-				&count) >= Success)
+				&count) >= Success))
 	    {
 		pWsInfo = (DtWsmWorkspaceInfo *)
 			XtCalloc(1, sizeof(DtWsmWorkspaceInfo));

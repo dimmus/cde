@@ -840,8 +840,10 @@ _GetSmWindow(
     unsigned long leftover;
     PropDtSmWindowInfo *pSmInfo = NULL;
     int rcode;
+#ifdef BAD
     Window wroot, wparent, *pchildren;
     unsigned int nchildren;
+#endif /* BAD */
 
     *pSmWindow = 0;
     if ((rcode=XGetWindowProperty(display,root,

@@ -225,6 +225,8 @@ determine_libs(AbmfLibs libs, ABObj project, AB_OS_TYPE osType)
 	case AB_OS_OBSD:
 		return_value = determine_obsd_libs(libs, project);
 		break;
+	default:
+		break;
     }
 
     return return_value;
@@ -472,6 +474,8 @@ write_os_params(
         case AB_OS_OBSD:
                 return_value = write_obsd_params(makeFile, libs);
                 break;
+	default:
+		break;
     }
 
     return return_value;
@@ -951,7 +955,6 @@ write_targets(
 )
 {
     File	makeFile = genCodeInfo->code_file;
-    STRING	prog = util_get_program_name();
     STRING	projFile = obj_get_file(project);
     STRING	modFile = NULL;
     char	modName[MAXPATHLEN+1];

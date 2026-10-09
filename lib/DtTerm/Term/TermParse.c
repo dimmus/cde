@@ -142,7 +142,6 @@ _DtTermParsePushNum(Widget w)
 void
 _DtTermSaveChar(Widget w)
 {
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   ParserContext context ;
   wchar_t c;
   context = GetParserContext(w) ;
@@ -190,11 +189,8 @@ sendEscSequence(Widget w, char *transmitString)
 void 
 _DtTermDeviceStatus(Widget w)     /* DSR CSI?pn  */
 {
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   DtTermData vtd = ((DtTermWidget)w)->vt.td;
   ParserContext context ;
-  char buf[100] ;
-  int col,cnt ;
   Debug('P', fprintf(stderr,">>In func  _DtTermDeviceStatus\n")) ;
   context = GetParserContext(w) ;
   STORELASTARG(context) ;
@@ -221,7 +217,7 @@ _DtTermDeviceStatusAnsi(Widget w)     /* DSR CSIpn  */
   DtTermData vtd = ((DtTermWidget)w)->vt.td;
   ParserContext context ;
   char buf[100] ;
-  int row,col,cnt ;
+  int row,col;
   Debug('P', fprintf(stderr,">>In func  _DtTermDeviceStatus\n")) ;
   context = GetParserContext(w) ;
   STORELASTARG(context) ;
@@ -245,7 +241,6 @@ void
 _DtTermPModeSet(Widget w)   /*  DECSET CSI?ph */
 {
   ParserContext context ;
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   DtTermWidget vtw = (DtTermWidget)w;
   int i,cnt ;
   Debug('P', fprintf(stderr,">>In func _DtTermPModeSet\n")) ;
@@ -333,7 +328,6 @@ void
 _DtTermPModeReset(Widget w)   /* DECRST CSI?pl */
 {
   ParserContext context ;
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   DtTermWidget vtw = (DtTermWidget)w;
   int i,cnt ;
   Debug ('P', fprintf(stderr,">>In func _DtTermPModeReset\n")) ;
@@ -496,7 +490,6 @@ _DtTermCursorPos(Widget w)   /* CUP CSIp;pH */
 void 
 _DtTermEraseDisplay(Widget w)    /* ED CSIpJ */
 {
-  int cnt ;
   DtTermWidget vtw = (DtTermWidget) w;
   ParserContext context ;
   DtEraseMode   eraseMode;
@@ -803,7 +796,6 @@ void
 _DtTermNextLine(Widget w) /* NEL ESCE */
 {
   DtTermWidget vtw = (DtTermWidget) w;
-  int brow;
   Debug('P', fprintf(stderr,">>In func _DtTermNextLine\n")) ;
   vtw->term.tpd->cursorColumn = FIRSTCOLUMN(vtw) ;
   _DtTermIndex(w) ;  /* use IND */
@@ -878,7 +870,7 @@ void
 _DtTermCharAttributes(Widget w)   /* SGR CSIpm */
 {
   ParserContext context ;
-  int i,cnt ;
+  int cnt ;
   Debug('P', fprintf(stderr,">>In func _DtTermCharAttributes\n")) ;
   context = GetParserContext(w) ;
   STORELASTARG(context) ;
@@ -895,7 +887,6 @@ _DtTermDeviceAttributes(Widget w)    /* DA CSIpc */
 {
   DtTermWidget vtw = (DtTermWidget) w;
   ParserContext context ;
-  int cnt ;
   char buf[50];
   Debug('P', fprintf(stderr,">>In func _DtTermDeviceAttributes\n")) ;
   context = GetParserContext(w) ;
@@ -1025,7 +1016,6 @@ void
 _DtTermSaveCursor(Widget w) /* DECSC ESC7 */
 {
   DtTermWidget vtw = (DtTermWidget) w;
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   DtTermData vtd = vtw->vt.td;
 
   Debug('P', fprintf(stderr,">>In func _DtTermSaveCursor\n")) ;
@@ -1174,7 +1164,7 @@ _DtTermScrollUp(Widget w)    /* SU CSIpS */
 {
     ParserContext context ;
     DtTermWidget vtw = (DtTermWidget) w;
-    int row,col,cnt ;
+    int row,col;
 
     Debug('P', fprintf(stderr,">>In func _DtTermScrollUp\n")) ;
 #define  EXIT_IF_OUTSIDE_SR(w) if((w)->term.tpd->scrollLockTopRow >  \
@@ -1211,7 +1201,7 @@ _DtTermScrollDown(Widget w)  /* SD CSIpT */
 {
     ParserContext context ;
     DtTermWidget vtw = (DtTermWidget) w;
-    int row,col,cnt ;
+    int row,col;
 
     Debug('P', fprintf(stderr,">>In func _DtTermScrollDown\n")) ;
     EXIT_IF_OUTSIDE_SR(vtw)
@@ -1242,7 +1232,6 @@ void
 _DtTermRestoreModeValues(Widget w)  /* xterm - Restore DEC mode values CSI?pr */
 {
   ParserContext context ;
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   DtTermWidget vtw = (DtTermWidget)w;
   DtTermData vtd = vtw->vt.td;
   int i,cnt ;
@@ -1328,7 +1317,6 @@ void
 _DtTermSaveModeValues(Widget w)  /* xterm - Save DEC mode values CSI?ps  */
 {
   ParserContext context ;
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   DtTermWidget vtw = (DtTermWidget)w;
   DtTermData vtd = vtw->vt.td;
   int i,cnt ;
@@ -1520,11 +1508,8 @@ void
 _DtTermSelEraseInDisplay(Widget w) /* DECSED ESC?pJ */
 {
   DtTermWidget vtw = (DtTermWidget) w;
-  DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
   ParserContext context ;
-  enhValues evalues;
   int r,col1,col2,row1,row2,col,row ;
-  int   cnt ;
   Debug('P', fprintf(stderr,">>In func _DtTermSelEraseInDisplay\n")) ;
   KILLWRAP(vtw) ;
   context = GetParserContext(w) ;
@@ -1961,7 +1946,7 @@ _DtTermParseBackspace  /*  Ctrl-H  */
 )
 {
   DtTermWidget vtw = (DtTermWidget) w;
-  int row,col,fcol,cnt ;
+  int row,col,fcol;
   Debug('P', fprintf(stderr,">>In func  _DtTermParseBackspace\n")) ;
   fcol = FIRSTCOLUMN(vtw) ;
   row = vtw->term.tpd->cursorRow;
@@ -2065,11 +2050,9 @@ _DtTermParseSunMisc  /*  Misc sun esc seqs  */
   ParserContext context ;
   DtTermWidget vtw = (DtTermWidget) w;
   Display *display = XtDisplay(w);
-  int i, scr_num = XScreenNumberOfScreen(XtScreen(w));
+  int scr_num = XScreenNumberOfScreen(XtScreen(w));
   Window sh_win;
   Widget sw;
-  XWindowChanges values;
-  Arg arg[5];
   char buf[BUFSIZ];
   Position x,y;
   short   rows,columns;

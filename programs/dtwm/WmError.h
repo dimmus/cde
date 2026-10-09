@@ -36,7 +36,7 @@ extern void PrintFormatted(char *f, char *s0, char *s1, char *s2, char *s3, char
 extern void WmInitErrorHandler (Display *display);
 extern int WmXErrorHandler (Display *display, XErrorEvent *errorEvent);
 extern int WmXIOErrorHandler (Display *display);
-extern void WmXtErrorHandler (char *message);
+extern void WmXtErrorHandler (char *message) _X_NORETURN;
 extern void WmXtWarningHandler (char *message);
 extern void Warning (char *message);
 #ifndef NO_MESSAGE_CATALOG

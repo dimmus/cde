@@ -955,7 +955,7 @@ while (pElement)
     {
     if (pElement->type == e_form)
 	{
-	if (pFdata = pElement->u.u_form.pFdata)
+	if ((pFdata = pElement->u.u_form.pFdata))
 	    RemoveSuperfluousBlocks(&(pFdata->u.u_fdata.pBlockOrForm));
 	}
     else if (!pElement->u.u_block.level    &&
@@ -1345,11 +1345,11 @@ do  {
 
     unlink(compZFileName);
     zFd = OpenFile(compZFileName, O_WRONLY, xxx);
-    while (length = FreadFile(inFile,
+    while ((length = FreadFile(inFile,
 			      inFileName,
 			      (char *) buffer,
 			      MIN(delta, BUFSIZ),
-			      xxx))
+			      xxx)))
 	{
 	WriteFile(zFd, compZFileName, (char *) buffer, length, xxx);
 	delta -= length;
@@ -1369,11 +1369,11 @@ do  {
     CloseFile(zFd, compZFileName, xxx);
     delta = Compress(compFileName, compZFileName, FALSE);
     zFd = OpenFile(compFileName, O_RDONLY, xxx);
-    while (length = ReadFile(zFd,
+    while ((length = ReadFile(zFd,
 			     compFileName,
 			     (char *) buffer,
 			     MIN(delta, BUFSIZ),
-			     xxx))
+			     xxx)))
 	{
 	WriteFile(outFd, tempFileName, (char *) buffer, length, xxx);
 	delta -= length;
@@ -1484,6 +1484,8 @@ while (pThis)
 	    rclass    = pThis->u.u_grphstyle.class;
 	    rssi      = pThis->u.u_grphstyle.ssi;
 	    pBeenUsed = &pThis->u.u_grphstyle.beenUsed;
+	    break;
+	default:
 	    break;
 	}
     if ((!rlevel || (w_strcmp(rlevel, level) == 0)) &&
@@ -4802,7 +4804,7 @@ if (doCompression)
 
     /* copy the compressed virpage to output */
     zFd = OpenFile(compZFileName, O_RDONLY, xxx);
-    while (length = ReadFile(zFd, compZFileName, buffer, BUFSIZ, xxx))
+    while ((length = ReadFile(zFd, compZFileName, buffer, BUFSIZ, xxx)))
 	FwriteFile(outFile, tempFileName, buffer, length, xxx);
     CloseFile(zFd, compZFileName, xxx);
     unlink(compZFileName);
@@ -5277,7 +5279,7 @@ int StringToUpper(char *string)
 char *pc, c;
 
 pc = string;
-while (c = *pc)
+while ((c = *pc))
     {
     if (isalpha(c) && islower(c)) *pc = toupper(c);
     pc++;
@@ -5294,7 +5296,6 @@ void BuildIndex(void)
 char  buffer[BUFSIZ+1], *pFrom, *pTo, *pRestart, thisChar;
 int   length, size;
 int   lineCount;
-char  line[LINEMAX];
 int   status;
 int   remnant;
 int   found;
@@ -5327,7 +5328,7 @@ sprintf(buffer + strlen(buffer),
 	"sort -f %s > %s",
 	idxFileName,
 	sortedIdxFileName);
-if (status = system(buffer))
+if ((status = system(buffer)))
     {
     if (status == -1)
 	{
@@ -5400,7 +5401,7 @@ while (size ||
 	size = 0;
 	pTo = buffer;
 	pFrom = pRestart;
-	while (*pTo++ = *pFrom++);
+	while ((*pTo++ = *pFrom++));
 	remnant = pTo - buffer - 1;
 	pFrom = buffer;
 	continue;
@@ -5427,7 +5428,7 @@ while (size ||
 	size = 0;
 	pTo = buffer;
 	pFrom = pRestart;
-	while (*pTo++ = *pFrom++);
+	while ((*pTo++ = *pFrom++));
 	remnant = pTo - buffer - 1;
 	pFrom = buffer;
 	continue;
@@ -5448,7 +5449,7 @@ while (size ||
 	size = 0;
 	pTo = buffer;
 	pFrom = pRestart;
-	while (*pTo++ = *pFrom++);
+	while ((*pTo++ = *pFrom++));
 	remnant = pTo - buffer - 1;
 	pFrom = buffer;
 	continue;
@@ -5528,7 +5529,7 @@ while (size ||
 	size = 0;
 	pTo = buffer;
 	pFrom = pRestart;
-	while (*pTo++ = *pFrom++);
+	while ((*pTo++ = *pFrom++));
 	remnant = pTo - buffer - 1;
 	pFrom = buffer;
 	continue;
@@ -5555,7 +5556,7 @@ while (size ||
 	size = 0;
 	pTo = buffer;
 	pFrom = pRestart;
-	while (*pTo++ = *pFrom++);
+	while ((*pTo++ = *pFrom++));
 	remnant = pTo - buffer - 1;
 	pFrom = buffer;
 	continue;
@@ -5576,7 +5577,7 @@ while (size ||
 	size = 0;
 	pTo = buffer;
 	pFrom = pRestart;
-	while (*pTo++ = *pFrom++);
+	while ((*pTo++ = *pFrom++));
 	remnant = pTo - buffer - 1;
 	pFrom = buffer;
 	continue;
@@ -5762,7 +5763,7 @@ if (FileExists(snbFileName))
 	WriteFile(outFd, tempFileName, closeSNB, sizeof(closeSNB)-1, xxx);
     FcloseFile(snbFile, snbFileName, xxx);
     }
-while (length = ReadFile(inFd, realInFileName, buffer, BUFSIZ, xxx))
+while ((length = ReadFile(inFd, realInFileName, buffer, BUFSIZ, xxx)))
     WriteFile(outFd, tempFileName, buffer, length, xxx);
 CloseFile(inFd, realInFileName, xxx);
 CloseFile(outFd, tempFileName, xxx);
@@ -6070,6 +6071,8 @@ while (pThis)
 	        size += 7 + 4 + w_strlen(pThis->u.u_grphstyle.justify);
 	    size += 2 /* strlen(">\n") */;
 	    break;
+	default:
+	    break;
 	}
     pThis = pThis->pNext;
     }
@@ -6165,7 +6168,7 @@ char      buffer[BUFSIZ], zTemp[4];
 char     *pc;
 int       length, delta, change, pad;
 int       newZsize, oldZsize;
-int       inFd, idxFd;
+int       inFd;
 LoidsPtr  pLoids;
 static char      padString[COMPRESS_PAD_LENGTH];
 
@@ -6198,11 +6201,11 @@ while (1)
 
     /* copy inFd to outFile up to start of <loids> */
     delta = startOfLOIDS;
-    while (length = ReadFile(inFd,
+    while ((length = ReadFile(inFd,
 			     compFileName,
 			     buffer,
 			     MIN(BUFSIZ,delta),
-			     xxx))
+			     xxx)))
 	{
 	FwriteFile(outFile, compFileName, buffer, length, xxx);
 	delta -= length;
@@ -6241,7 +6244,7 @@ while (1)
     endOfLOIDS = ftell(outFile);
 
     /* copy the remainder of the vstruct and doc head+snb to outFile */
-    while (length = ReadFile(inFd, compFileName, buffer, BUFSIZ, xxx))
+    while ((length = ReadFile(inFd, compFileName, buffer, BUFSIZ, xxx)))
 	FwriteFile(outFile, compFileName, buffer, length, xxx);
     CloseFile(inFd, compFileName, xxx);
     FcloseFile(outFile, compFileName, xxx);
@@ -6281,7 +6284,7 @@ FwriteFile(outFile, outFileName, zTemp, 4, xxx);
 
 /* copy the compressed vstruct, doc head+snb to output */
 inFd = OpenFile(compZFileName, O_RDONLY, xxx);
-while (length = ReadFile(inFd, compZFileName, buffer, BUFSIZ, xxx))
+while ((length = ReadFile(inFd, compZFileName, buffer, BUFSIZ, xxx)))
     FwriteFile(outFile, outFileName, buffer, length, xxx);
 CloseFile(inFd, compZFileName, xxx);
 unlink(compZFileName);
@@ -6332,7 +6335,7 @@ else
 
 /* copy inFd to outFile up to start of <loids> */
 delta = startOfLOIDS;
-while (length = ReadFile(inFd, inFileName, buffer, MIN(BUFSIZ,delta), xxx))
+while ((length = ReadFile(inFd, inFileName, buffer, MIN(BUFSIZ,delta), xxx)))
     {
     FwriteFile(outFile, realOutFileName, buffer, length, xxx);
     delta -= length;
@@ -6376,11 +6379,11 @@ if (!minimalTossFlag) /* use the full <toss> from the document */
     if (delta) /* an old <toss> is in the document, copy it to outFile */
 	{
 	delta -= endOfLOIDS;
-	while (length = ReadFile(inFd,
+	while ((length = ReadFile(inFd,
 				 inFileName,
 				 buffer,
 				 MIN(BUFSIZ,delta),
-				 xxx))
+				 xxx)))
 	    {
 	    FwriteFile(outFile, realOutFileName, buffer, length, xxx);
 	    delta -= length;
@@ -6404,11 +6407,11 @@ else /* emit only those <toss> elements actually used in the document */
 if (endOfLOPhrases)
     {
     delta = endOfLOPhrases - startOfLOPhrases;
-    while (length = ReadFile(inFd,
+    while ((length = ReadFile(inFd,
 			     inFileName,
 			     buffer,
 			     MIN(BUFSIZ,delta),
-			     xxx))
+			     xxx)))
 	{
 	FwriteFile(outFile, realOutFileName, buffer, length, xxx);
 	delta -= length;
@@ -6419,7 +6422,7 @@ if (endOfLOPhrases)
 if (haveIndex)
     {
     idxFd = OpenFile(sortedIdxFileName, O_RDONLY, xxx);
-    while (length = ReadFile(idxFd, sortedIdxFileName, buffer, BUFSIZ, xxx))
+    while ((length = ReadFile(idxFd, sortedIdxFileName, buffer, BUFSIZ, xxx)))
 	FwriteFile(outFile, realOutFileName, buffer, length, xxx);
     unlink(sortedIdxFileName);
     }
@@ -6432,7 +6435,7 @@ if (endOfIndex && haveIndex)
 endOfLOIDS = newEndOfLOIDS;
 
 /* copy the remainder of the vstruct and doc head+snb to outFile */
-while (length = ReadFile(inFd, vstructFileName, buffer, BUFSIZ, xxx))
+while ((length = ReadFile(inFd, vstructFileName, buffer, BUFSIZ, xxx)))
     FwriteFile(outFile, realOutFileName, buffer, length, xxx);
 CloseFile(inFd, vstructFileName, xxx);
 unlink(vstructFileName);
@@ -6442,7 +6445,7 @@ if (compressFlag)
 
 /* then copy the virpages over to outFile */
 inFd = OpenFile(tempFileName, O_RDONLY, xxx);
-while (length = ReadFile(inFd, tempFileName, buffer, BUFSIZ, xxx))
+while ((length = ReadFile(inFd, tempFileName, buffer, BUFSIZ, xxx)))
     FwriteFile(outFile, outFileName, buffer, length, xxx);
 CloseFile(inFd, tempFileName, xxx);
 
@@ -6513,7 +6516,6 @@ unsigned char type;
 unsigned char wheredef;
 M_WCHAR **content;
 M_WCHAR  *name;
-M_WCHAR  *newContent;
 char     *toss_name = "TOSSFILE";
 char     *mb_name;
 
@@ -6529,7 +6531,7 @@ do  {
 	m_free(mb_name, "multi-byte toss file entity name");
 	}
     }
-while (name = CycleEnt(FALSE, &type, &content, &wheredef));
+while ((name = CycleEnt(FALSE, &type, &content, &wheredef)));
 }
 
 
@@ -6542,7 +6544,6 @@ const char  cString[] = "C";
 char        myLocale[256]; /* arbitrarily large */
 char       *mb_lang;
 char       *mb_charset;
-char       *charset;
 
 if (!pLang && !pCharset)
     return;

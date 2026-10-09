@@ -440,7 +440,6 @@ _DtAddToResProp(
     char *xdefs;
     Buffer *oldBuffer, *newBuffer;
     Entries *oldDB;
-    int                 defStatus;
     Atom                actualType;
     int                 actualFormat;
     unsigned long       nitems, leftover;
@@ -459,7 +458,7 @@ _DtAddToResProp(
    /*
     * Get resource database from specified window and property.
     */
-    defStatus = XGetWindowProperty(dpy, win,
+    XGetWindowProperty(dpy, win,
 				   prop, 0L,
 				   100000000L,False,XA_STRING,&actualType,
 				   &actualFormat,&nitems,&leftover,
@@ -511,9 +510,6 @@ _DtGetResString(
         unsigned int id)
 {
     char *xdefs;
-    Buffer *oldBuffer, *newBuffer;
-    Entries *oldDB;
-    int                 defStatus;
     Atom                actualType;
     int                 actualFormat;
     unsigned long       nitems, leftover;
@@ -532,7 +528,7 @@ _DtGetResString(
    /*
     * Get resource database from specified window and property.
     */
-    defStatus = XGetWindowProperty(dpy, win,
+    XGetWindowProperty(dpy, win,
 				   prop, 0L,
 				   100000000L,False,XA_STRING,&actualType,
 				   &actualFormat,&nitems,&leftover,
@@ -555,14 +551,8 @@ _DtAddResString(
         const char *data, 
         unsigned int flags)
 {
-    char *xdefs;
-    int i;
     Buffer *buffer; 
     Entries *newDB;
-    int                 defStatus;
-    Atom                actualType;
-    int                 actualFormat;
-    unsigned long       nitems, leftover;
 
     if((data == NULL) || (*data == '\0'))
     {

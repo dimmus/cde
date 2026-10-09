@@ -86,7 +86,6 @@ void handleIgnoreSelection(Widget w, XtPointer, XtPointer calldata)
 {
   IgnoreListUiItem *item;
   XmListCallbackStruct *list_info = (XmListCallbackStruct *)calldata;
-  char *selection_string = NULL;
   DtVirtArray<PropStringPair *> *list_items;
 
   XtVaGetValues(w, 
@@ -117,7 +116,6 @@ void handleIgnoreSelection(Widget w, XtPointer, XtPointer calldata)
 ///////////////////////////////////////////////////////////////////
 void IgnoreListUiItem::writeFromUiToSource()
 {
-  Widget w = this->getWidget();
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
@@ -303,7 +301,7 @@ void IgnoreListUiItem::handleChangeButtonPress()
 			    pos_list[0],
 			    TRUE);
 	  }
- 	props_changed = TRUE;
+      props_changed = TRUE;
     }
 }
 ///////////////////////////////////////////////////////////

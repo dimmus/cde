@@ -885,13 +885,12 @@ boolean BaseUI::ObjectExists(int unique_id)
    boolean found = false;
    for (i = 0; i < _numChildren; i++)
     {
-      BaseUI *child = _children[i];
       if (unique_id == _children[i]->_id)
        {
          found = true;
          break;
        }
-      else if (found = _children[i]->ObjectExists(unique_id))
+      else if ((found = _children[i]->ObjectExists(unique_id)))
 	 break;
     }
    return found;
@@ -937,6 +936,7 @@ void BaseUI::Dump(boolean verbose, int level)
       case LARGE_ICON: printf("IconStyle : LARGE_ICON\n"); break;
       case SMALL_ICON: printf("IconStyle : SMALL_ICON\n"); break;
       case DETAILS: printf("IconStyle : DETAILS\n"); break;
+      default: break;
       }
       for (i = -1; i <= level; i++) printf("   ");
       printf("Number Children = %d\n",  _numChildren);

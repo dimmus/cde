@@ -437,7 +437,7 @@ merge_from(const _Tt_string &dbpath, _Tt_typedb_ptr &tdb)
 		}
 	}
 
-	if (f = fopen((char *)dbpath, "r")) {
+	if ((f = fopen((char *)dbpath, "r"))) {
 		fcntl(fileno(f), F_SETFD, 1);	/* close on exec */
 		result = merge_from(f, tdb, version);
 		fclose(f);
@@ -1075,6 +1075,9 @@ send_saved(const _Tt_string &savedfile)
 		if (status == TT_OK) {
 			tt_free( procid );
 		}
+		break;
+	    default:
+		break;
 	}
 	if (status != TT_OK) {
 		//

@@ -86,59 +86,14 @@
 /*
  * routines called from Uil file via callbacks
  */
-static void	browser_repaint(
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_resize(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_orientation(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_show_view_glyph(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_show_view_name(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_show_view_type(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_show_view_wclass(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_find_obj(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
-static void	browser_tear_off(	
-		    Widget	widget,
-		    XtPointer	client_data,
-		    XtPointer	call_data
-		);
 
 static void	browser_destroyCB(	/* Browser destroy procedure */
 		    Widget	widget,
@@ -254,7 +209,6 @@ static void		destroy_browser_ui_handles(
                             ABBrowser	b
                         );
 
-static BrowserProps	aob_create_props();
 
 static void		aob_destroy_ui_obj(
 		    	    Vwr		b
@@ -266,21 +220,12 @@ static void             brws_view_cascadeCB(
                             XtPointer   call_data
                         );
 
-static void		aob_destroy_props(
-		    	    Vwr		b
-			);
 
-static Widget		get_main_window(
-			    Widget	widget
-			);
 
 static int		select_rband(
 			    VNode       vnode
 			);
 
-static int		select_fn(
-			    VNode       vnode
-			);
 
 static void		brwsP_drawarea_button_drag(
 			    Widget widget,
@@ -347,7 +292,6 @@ static String proj_btn2_adjust_translations =
 static XtTranslations browser_proj_transtbl = NULL;
 
 
-static char	*browser_mainwindow = "mainwindow";
 
 static char		*sm_font_name = "-*-courier-bold-r-normal--12-120-75-75-m-70-iso8859-1";
 
@@ -931,14 +875,13 @@ browser_select(
     if (selected_node)  
     {
         VMethods	m;
-	unsigned long	elm_selected;
 
         m = b->methods;
 
 	if (!m)
 	    return;
 
-        elm_selected = (*m->locate_elements)(selected_node, 
+        (*m->locate_elements)(selected_node, 
 				event->xbutton.x, event->xbutton.y);
 
 	obj = (AB_OBJ *)selected_node->obj_data;
@@ -1106,18 +1049,13 @@ browser_popup_menu(
     int num_params
 )
 {
-    AB_OBJ	*obj;
     ABBrowser	ab = NULL;
-    Vwr		b;
-    VNode	selected_node;
     ABSelectedRec sel;
 
     XtVaGetValues(widget, XmNuserData, &ab, NULL); 
 
     if (!ab)
 	return;
-
-    b = aob_proj_or_module(ab, widget);
 
     abobj_get_selected(proj_get_project(), FALSE, TRUE, &sel);
 
@@ -1318,8 +1256,7 @@ setup_callbacks(
     ABBrowser	browser
 )
 {
-    BrowserUiObj	proj_ui,
-			mod_ui;
+    BrowserUiObj	proj_ui;
     DtbBrwsMainwindowInfo	instance;
 
     proj_ui = (BrowserUiObj)browser->project->ui_handle;
@@ -1390,17 +1327,6 @@ setup_callbacks(
     brwsP_make_drawarea_snap(browser->module, instance->detailed_drawarea);
 }
 
-static int
-select_fn(
-    VNode       vnode
-)
-{
-    if (BRWS_NODE_STATE_IS_SET(vnode, BRWS_NODE_SELECTED))
-        return (1);
-		 
-    return (0);
-}
-
 void
 brws_add_objects_to_browser
 (
@@ -1409,15 +1335,12 @@ brws_add_objects_to_browser
 )
 {
     ViewerMethods	*m;
-    ABObj		module;
 
     if (!ab)
 	return;
     
     if (obj)
     {
-	VNode	*selected_nodes = NULL;
-	int	num_selected = 0;
 
         m = ab->project->methods;
         (*m->insert_tree)(ab->project, obj);
@@ -1486,7 +1409,7 @@ brws_add_objects
 {
     AB_OBJ	*project, 
 		*module;
-    ABBrowser	new_b, cur_b, b_list = NULL;
+    ABBrowser	cur_b, b_list = NULL;
 
     if (!obj)
 	return;
@@ -1548,7 +1471,6 @@ brws_add_objects
      */
     for (cur_b = b_list; cur_b; cur_b = cur_b->next)
     {
-        ViewerMethods	*m;
 
 #ifdef POPULATE_EMPTY_BROWSER
 	if (!cur_b->project->tree || 
@@ -1667,9 +1589,6 @@ create_browser_ui_handles
     BrowserUiObj	module_ui;
     BrowserUiObj	project_ui;
     Widget		browser_main = NULL;
-    XmString		xmlabel;
-    char		*tmp;
-    char		title[100];
 
     if (!b || !b->module || b->module->ui_handle)
 	return;
@@ -1905,7 +1824,6 @@ aob_free_graphics(
 {
 
     BrowserUiObjects	*ui_handle;
-    XGCValues		gcvalues;
     Display		*dpy;
     Widget		draw_area;
 
@@ -2013,9 +1931,7 @@ recompute_viewer(
 {
     ViewerMethods	*m;
     int			end_y = BRWS_Y_ORIGIN,
-			end_x = BRWS_X_ORIGIN,
-			max_x = BRWS_X_ORIGIN,
-			max_y = BRWS_Y_ORIGIN;
+			end_x = BRWS_X_ORIGIN;
 
     if (!v)
 	return;
@@ -2277,7 +2193,6 @@ void
 draw_viewer(Viewer *v)
 {
     ViewerMethods	*m;
-    ViewerNode	*node;
 
     if (!v->current_tree || !v->tree)
         return;
@@ -2314,27 +2229,6 @@ BrowserUiObj aob_create_ui_obj(void)
 }
 
 /*
- * Create (malloc) structure to hold browser properties
- */
-static BrowserProps   
-aob_create_props(void)
-{
-    BrowserProps	props;
-
-    props = (BrowserProps)malloc(sizeof(BrowserProperties));
-
-    props->elements_shown = 0;
-    props->initial_state = 0;
-    props->min_width = 0;
-    props->min_height = 0;
-    props->orientation = BRWS_VERTICAL;
-    props->show_mult_trees = FALSE;
-    props->active = FALSE;
-
-    return(props);
-}
-
-/*
  * Free structure that holds browser UI objects
  */
 static void            
@@ -2349,21 +2243,6 @@ aob_destroy_ui_obj
     free(v->ui_handle);
 
     v->ui_handle = (void *)NULL;
-}
-
-/*
- * Free structure that holds browser properties
- */
-static void             
-aob_destroy_props
-(
-    Vwr		b
-)
-{
-    if (!b && !b->properties)
-	return;
-
-    free(b->properties);
 }
 
 /*
@@ -2464,10 +2343,9 @@ aob_is_widget_proj_browser
     Widget	w
 )
 {
-    Widget	proj_draw_area, draw_area;
+    Widget	proj_draw_area;
 
     proj_draw_area = brws_draw_area(b->project);
-    draw_area = brws_draw_area(b->module);
 
     if (w == proj_draw_area)
 	return (TRUE);
@@ -2553,7 +2431,7 @@ node_selected
             (i < num_child); 
             child = (*m->get_child)(tree, ++i))
     {
-        if (selected_node = node_selected(child))
+        if ((selected_node = node_selected(child)))
         return selected_node;
     }
 
@@ -2574,7 +2452,7 @@ aob_set_mode
     AB_OBJ	*project
 )
 {
-    ABBrowser	new_b, cur_b, b_list = NULL;
+    ABBrowser	cur_b, b_list = NULL;
 
     if (!project)
 	return;
@@ -2734,25 +2612,6 @@ brws_edit_cascadeCB(
 }
 
 
-static Widget
-get_main_window(
-    Widget	widget
-)
-{
-    Widget	browser_main = NULL,
-		cur_widget = widget;
-
-    while (cur_widget && !browser_main)
-    {
-	if (!strcmp(XtName(cur_widget), browser_mainwindow))
-	    browser_main = cur_widget;
-	else
-	    cur_widget = XtParent(cur_widget);
-    }
-
-    return (browser_main);
-}
-
 static void
 brws_view_cascadeCB(
     Widget      widget, 
@@ -2821,7 +2680,7 @@ brws_build_module_menu(
 ) 
 { 
     ABObj		project = proj_get_project();
-    Widget		menu = NULL, mpb = NULL;
+    Widget		mpb = NULL;
     WidgetList		children = NULL;
     AB_TRAVERSAL	trav;
     ABObj		module = NULL;

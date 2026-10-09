@@ -427,11 +427,6 @@ void WmDtStringHelpCB (Widget theWidget,
 {
     WmScreenData *pSD;
     char * theHelpString = (char *)client_data;
-    Widget theRealWidget = theWidget;
-    if( XmIsGadget(theWidget))
-    {
-	theRealWidget = XtParent(theWidget);
-    }
     pSD = WmScreenDataFromWidget(theWidget);
 
 /*    WmDtDisplayTopic(theRealWidget, NULL, theHelpString, */
@@ -568,7 +563,6 @@ WmScreenDataFromWidget (Widget theWidget)
     WmScreenData *pSD = NULL;
     int scr;
     
-    CacheListStruct *pTemp; 
 
     if (theWidget)
     {
@@ -615,7 +609,6 @@ static void WmDtCloseHelpCB (
     XtPointer callData)
 {
     WmScreenData *pSD = NULL;
-    int scr;
     Widget helpDialog = (Widget) clientData;
     
     CacheListStruct *pTemp; 
@@ -668,7 +661,6 @@ static void WmDtWmCloseHelpCB (
     XtPointer callData)
 {
     WmScreenData *pSD;
-    Widget helpDialog = (Widget) clientData;
     pSD = WmScreenDataFromWidget(w);
     HideHelpDialog (pSD, True); 
 
@@ -1289,15 +1281,11 @@ WmDtDisplayTopic (
 
 {
     Arg	 	setArgs[10]; 
-    Arg	 	smallArgs[2];	
     ArgList  argsNew;
     int         n;
-    int         ac;
     Widget      helpWidget;
     Widget      shellWidget;
-    char *      helpTitle;
     WmPanelistObject  pPanelist;
-    char *      defaultTitle="Help";
     ClientData *pCD = NULL;
     WmScreenData *pSD = NULL;
     CacheListStruct *pCurrentNode = NULL;
@@ -1331,13 +1319,11 @@ WmDtDisplayTopic (
 	    XtSetArg (setArgs[n],DtNhelpVolume,helpVolume);     n++; 
 	}
 	XtSetArg (setArgs[n], DtNlocationId,locationId);        n++;
-	helpTitle=locationId;
 	break;
 	
       case DtHELP_TYPE_DYNAMIC_STRING:
 	XtSetArg (setArgs[n], DtNstringData, locationId);        n++;
 /*	helpTitle=locationId;*/
-	helpTitle=defaultTitle;
 	break;
 	
       case DtHELP_TYPE_MAN_PAGE:
@@ -1624,7 +1610,6 @@ RestoreHelpDialogs(
     XrmValue value;
 
     Position xLoc, yLoc;
-    short columns, rows;
     int helpType = DtHELP_TYPE_TOPIC;
     char geometry[40];
     int wsCnt;    
@@ -1644,12 +1629,8 @@ RestoreHelpDialogs(
     Arg setArgs[20];
     int ac;
 
-    WmPanelistObject  pPanelist = (WmPanelistObject) pSD->wPanelist;
-
     xLoc = 0;
     yLoc = 0;
-    columns = 40;
-    rows = 15;
 
     if (pSD->helpResources)
     {
@@ -1693,7 +1674,6 @@ RestoreHelpDialogs(
 		{
 		    XtSetArg (setArgs[ac], XmNcolumns, 
 			      (short)atoi((char *)value.addr)); ac++;
-		    columns = (short)atoi((char *)value.addr);
 		}
 
 		/* get rows */
@@ -1703,7 +1683,6 @@ RestoreHelpDialogs(
 		{
 		    XtSetArg (setArgs[ac], XmNrows, 
 			      (short)atoi((char *)value.addr)); ac++;
-		    rows = (short)atoi((char *)value.addr);
 		}
 		sprintf (geometry, "=+%d+%d", xLoc, yLoc);
 		
@@ -1887,7 +1866,6 @@ RestoreHelpDialogs(
 		{
 		    XtSetArg (setArgs[ac], XmNcolumns, 
 			      (short)atoi((char *)value.addr)); ac++;
-		    columns = (short)atoi((char *)value.addr);
 		}
 		
 		/* get rows */
@@ -1897,7 +1875,6 @@ RestoreHelpDialogs(
 		{
 		    XtSetArg (setArgs[ac], XmNrows, 
 			      (short)atoi((char *)value.addr)); ac++;
-		    rows = (short)atoi((char *)value.addr);
 		}
 		sprintf (geometry, "=+%d+%d", xLoc, yLoc);
 		
@@ -2067,7 +2044,6 @@ SaveHelpResources(
 
     char screenName[10];
     char dialogName[128];
-    char resString[MAXWMPATH+1];
  
     int  cachedCount=0;
 
@@ -2521,7 +2497,6 @@ wmDtHelpSetPosition(
     Dimension height;
     Window wGroup = None;
     int x, y;
-    ClientData *pCDforHelp;
 
     if (!restorePos)
     {
@@ -2697,12 +2672,6 @@ wmDtErrorDialog(
     Widget wTemp;
     Widget wParent;
     Widget wShell;
-    Window wRoot, wChild; 
-    int rootX, rootY, winX, winY;
-    unsigned int mask;
-    Dimension dWidth, dHeight;
-    Position x, y;
-    WmPanelistObject  pPanelist;
 
     xmsMessage = 
 	    XmStringCreateLocalized (sMessage);
@@ -2728,6 +2697,8 @@ wmDtErrorDialog(
 #if 0
 	if ((wmGD.dtSD == pSD) && pSD->wPanelist)
 	{
+	    WmPanelistObject  pPanelist;
+
 	    pPanelist = (WmPanelistObject) pSD->wPanelist;
 	    wParent = O_Shell (pPanelist);
 	}

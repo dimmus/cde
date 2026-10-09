@@ -36,7 +36,7 @@
 
 #include "WmGlobal.h"
 
-#define MWM_NEED_IIMAGE
+#define MWM_NEED_IIMAGE_SIZE
 #include "WmIBitmap.h"
 
 #include <Xm/XmosP.h> 
@@ -893,16 +893,16 @@ int GetBitmapIndex (WmScreenData *pSD, char *name, Boolean bReportError)
         {
 	  if (bReportError)
             MWarning (((char *)GETMESSAGE(38, 7, "Unable to read bitmap file %s\n")), path);
-	    XtFree ((char *)bitmapc->path);
-	    return (-1);
+	  XtFree ((char *)bitmapc->path);
+	  return (-1);
         }
 
         if (bitmapc->width == 0 || bitmapc->height == 0)
         {
 	  if (bReportError)
             MWarning (((char *)GETMESSAGE(38, 8, "Invalid bitmap file %s\n")), path);
-	    XtFree ((char *)bitmapc->path);
-	    return (-1);
+	  XtFree ((char *)bitmapc->path);
+	  return (-1);
         }
     }
     else

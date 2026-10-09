@@ -499,7 +499,6 @@ cpanel_prop_apply(
     ABObj			chg_root = pcs->current_obj;
     STRING			value;
     BOOL			reset_bg = False;
-    BOOL			size_chg = False;
     int				new_w = -1;
     int				new_h = -1;
 
@@ -535,8 +534,6 @@ cpanel_prop_apply(
     {
 	abobj_set_size_policy(pcs->current_obj,
 		prop_radiobox_get_value(&(pcs->size_policy)) == SIZE_FIXED_KEY);
-
-	size_chg = True;
     }
     if (prop_changed(pcs->geometry.changebar))
     {

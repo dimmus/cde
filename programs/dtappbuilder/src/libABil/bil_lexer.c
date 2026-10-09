@@ -104,7 +104,6 @@ static int	get_comment(FILE *file, int lastChar);
 static int	get_string(FILE *file, int lastChar);
 static int	get_ident(FILE *file, int lastChar);
 static int	get_number(FILE *file, int lastChar);
-static int	get_(FILE *file, int lastChar);
 
 
 int

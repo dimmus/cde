@@ -129,7 +129,6 @@ strlist_get_sort_order(StringList list)
 int
 strlist_set_sort_order(StringList list, STRLIST_SORT_ORDER new_order)
 {
-    int		return_value = 0;
 
     if (list->sort_order != new_order)
     {
@@ -231,7 +230,6 @@ strlist_get_istr_index(StringList list, ISTRING string)
 	}
     }
 
-epilogue:
     return index;
 }
 
@@ -311,7 +309,6 @@ strlist_remove_index(StringList list, int doomedIndex)
 #define num_strings (list->num_strings)
     ISTRING	*strings = list->strings;
     void	**user_datas = list->user_datas;
-    int		index = 0;
     int		numToMove = 0;
 
     if ((doomedIndex < 0) || (doomedIndex >= num_strings))

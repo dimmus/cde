@@ -189,7 +189,7 @@ FormatChooserArgument (
     int		    result_len = 0;
     int		    netfamily;
 
-    if (GetChooserAddr (addr_buf, &addr_len) == -1)
+    if (GetChooserAddr ((char *) addr_buf, &addr_len) == -1)
     {
 	LogError ((unsigned char *)"Cannot get return address for chooser socket\n");
 	Debug ("Cannot get chooser socket address\n");
@@ -365,7 +365,7 @@ ProcessChooserSocket (
 
     Debug ("Process chooser socket\n");
     len = sizeof (buf);
-    client_fd = accept (fd, (struct sockaddr *)buf, &len);
+    client_fd = accept (fd, (struct sockaddr *)buf, (socklen_t *) &len);
     if (client_fd == -1)
     {
 	LogError ((unsigned char *)"Cannot accept chooser connection\n");

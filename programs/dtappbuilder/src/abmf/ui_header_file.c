@@ -269,7 +269,6 @@ abmfP_obj_get_widget_specific_includes(StringList includesList, ABObj obj)
 {
     int                 	return_value = 0;
     int				num_includes = 0;
-    BOOL                	objHasScrollbar = FALSE;
     IncludeForClass	include = class_includes;
 
     /*
@@ -387,11 +386,9 @@ write_struct_def(GenCodeInfo genCodeInfo, ABObj structObj)
     int                 numFields = 0;
     int                 thisFieldNum = 0;
     BOOL                objHasItems = FALSE;
-    BOOL                lastNumFields = 0;
     BOOL                separateObj = TRUE;
     BOOL                lastSeparateObj = FALSE;
     char                commentBuf[1024] = "";
-    int                 fieldsWritten = 0;
 
     /* Don't want the message structure written out to the
      * _ui.h file.  It belongs in the dtb_utils.h file.
@@ -421,7 +418,7 @@ write_struct_def(GenCodeInfo genCodeInfo, ABObj structObj)
     for (trav_open(&salientTrav, 
                 structObj, AB_TRAV_UI|AB_TRAV_MOD_PARENTS_FIRST);
         (salientObj= trav_next(&salientTrav)) != NULL;
-        lastNumFields = numFields, lastSeparateObj = separateObj)
+        lastSeparateObj = separateObj)
     {
         if (! (obj_is_salient(salientObj) || obj_is_menu_ref(salientObj)) )
         {
@@ -460,7 +457,6 @@ write_struct_def(GenCodeInfo genCodeInfo, ABObj structObj)
             if ((typeName != NULL) && (fieldName != NULL))
             {
                 ++thisFieldNum;
-                ++fieldsWritten;
                 obj_set_was_written(fieldObj, TRUE);
                 if (obj_is_menu_ref(fieldObj))
                 {
@@ -500,8 +496,6 @@ write_struct_def(GenCodeInfo genCodeInfo, ABObj structObj)
          */
         if (objHasItems)
         {
-            char        msg[256];
-            ++fieldsWritten;
             abio_printf(codeFile, "%s\t%s;\n", 
                 abmfP_get_c_substruct_type_name(salientObj),
                 abmfP_get_c_substruct_field_name(salientObj));
@@ -759,26 +753,6 @@ write_init_proc_decls(GenCodeInfo genCodeInfo, ABObj module)
 
 
 /*
- * Returns a copy of the input string with dots replaced with underscores.
- */
-static              STRING
-remove_dots(STRING s)
-{
-    static char         name[MAXPATHLEN];
-    STRING              n = (STRING) name;
-
-    for (; *s; ++s, ++n)
-        if (*s == '.')
-            *n = '_';
-        else
-            *n = *s;
-
-    *n = '\0';
-
-    return name;
-}
-
-/*
  * Open the UI header file, write some comments, write the includes, write
  * the decls, and close the header file.
  */
@@ -792,7 +766,6 @@ abmfP_write_ui_header_file(
 {
     File                codeFile = genCodeInfo->code_file;
     char                moduleName[1024];
-    STRING              errmsg = NULL;
     int                 i = 0;
     *moduleName = 0;
 
@@ -880,14 +853,6 @@ int
 abmfP_write_action_func_decl(GenCodeInfo genCodeInfo, ABObj action)
 {
     STRING		funcName = abmfP_get_action_name(action);
-    ABObj		fromObj = NULL;
-    AB_TRAVERSAL        refTrav;
-    ABObj               refObj = NULL;
-    ABObj               actualFromObj = NULL;
-    ABObj		module = NULL;
-
-    fromObj = obj_get_from(action);
-    module = obj_get_module(fromObj);
 
     switch (obj_get_when(action))
     {

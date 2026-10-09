@@ -558,7 +558,7 @@ int exec_proc_local_channel_object(SPC_Channel_Ptr channel)
 	     * last definition must be putenv'ed to assure the 
 	     * multi-byte parsing code is using the correct locale.
 	     */
-	    for (i = 0, ppch = channel->envp; *ppch; *ppch++, i++)
+	    for (i = 0, ppch = channel->envp; *ppch; ppch++, i++)
 	       if (!strncmp (*ppch, "LANG=", 5))
 		  indx = i;
 
@@ -763,14 +763,14 @@ remove_variable(
    /*
     * Scan 'environ' for 'tmp_var'
     */
-   for (ppch = environ; *ppch; *ppch++) {
+   for (ppch = environ; *ppch; ppch++) {
       if (!strncmp (tmp_var, *ppch, tmp_len)) {
 	 /*
 	  * Found the variable so remove it by moving all
 	  * variables after *ppch up.
 	  */
-	 for (ppch2 = ppch; *ppch2; *ppch2++) {
-	    *ppch++;
+	 for (ppch2 = ppch; *ppch2; ppch2++) {
+	    ppch++;
 	    *ppch2 = *ppch;
 	 }
 	 break;

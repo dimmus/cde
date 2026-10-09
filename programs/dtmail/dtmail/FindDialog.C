@@ -236,7 +236,6 @@ Widget
 FindDialog::createWorkArea(Widget dialog)
 {
   // TODO - CHECK ERROR!!!
-  Widget *label = new Widget[_num_text_fields]; 
 
 
   unsigned int		offset;
@@ -302,7 +301,7 @@ FindDialog::createWorkArea(Widget dialog)
 	Widget	*_fd_labels = new Widget [_num_text_fields];
 
 	int	_fd_i = 0;
-	for (_fd_i = 0; _fd_i < _num_text_fields; _fd_i++)
+	for (_fd_i = 0; (unsigned int) _fd_i < _num_text_fields; _fd_i++)
 	{
 		_fd_labels [_fd_i] = XtVaCreateManagedWidget (
 					_text_labels [_fd_i],
@@ -316,7 +315,7 @@ FindDialog::createWorkArea(Widget dialog)
 		// XtAddCallback(_fd_labels [_fd_i], XmNhelpCallback, HelpCB, helpId);
 	}
 
-	for (_fd_i = 0; _fd_i < _num_text_fields; _fd_i++)
+	for (_fd_i = 0; (unsigned int) _fd_i < _num_text_fields; _fd_i++)
 	{
 		_text_fields [_fd_i] = XtVaCreateManagedWidget (
 					_text_names [_fd_i],

@@ -75,9 +75,7 @@
 static BOOL     abmfP_subobj_should_be_written(ABObj obj);
 
 static int write_check_null(GenCodeInfo genCodeInfo, ABObj obj);
-static int write_check_null_and_return(GenCodeInfo genCodeInfo, ABObj obj);
 static int write_assign_obj_var(GenCodeInfo genCodeInfo, ABObj obj);
-static int write_check_null_and_assign(GenCodeInfo genCodeInfo, ABObj obj);
 static int write_end_check_null(GenCodeInfo genCodeInfo, ABObj obj);
 static int          write_parent_name(GenCodeInfo genCodeInfo, ABObj obj);
 static int write_set_items_glyph_labels(GenCodeInfo genCodeInfo, ABObj obj);
@@ -125,16 +123,6 @@ static int write_free_local_xmstring_array(
 
 static int write_comp_file_chooser(GenCodeInfo genCodeInfo, ABObj fchooser);
 
-static int
-write_widget_menu_button(
-                         GenCodeInfo genCodeInfo,
-                         ABObj obj, int index,
-                         int num_submenus,
-                         ABObj parent);
-
-static int      write_comp_except_for_actual_obj_tree(
-                        GenCodeInfo     genCodeInfo,
-                        ABObj           obj);
 
 static int      write_comp_except_for_subtree(
                         GenCodeInfo     genCodeInfo,
@@ -688,20 +676,6 @@ abmfP_subobj_should_be_written(ABObj subobj)
 }
 
 
-static              STRING
-abmfP_strip_item_name(char *item_name)
-{
-    static char         new_name[MAX_NAME_SIZE];
-    char               *p;
-
-    snprintf(new_name, sizeof(new_name), "%s", item_name);
-    p = (char *) strrchr(new_name, '_');
-    if (p != NULL)
-        *p = '\0';
-    return new_name;
-}
-
-
 /*
  * Write callbacks and actions.
  */
@@ -717,7 +691,6 @@ abmfP_write_add_callbacks_and_actions(
     ABObj               module = obj_get_module(srcObj);
     ABObj               action = NULL;
     ABObj               dest = NULL;
-    Arg                *arg = NULL;
     STRING              resource = NULL;
     ABObj               commonSrcObj = obj_get_actual_obj(srcObj);
     ISTRING             istr_resource = NULL;
@@ -729,7 +702,6 @@ abmfP_write_add_callbacks_and_actions(
     ABObj               actualTargetSubobj = NULL;
     int                 actionObjCount = 0;
     ABObj               actionObj = NULL;
-    ABObj               win_parent, help_btn, help_obj;
 
     /* 
      * Look in the module and then the project
@@ -1444,11 +1416,8 @@ write_comp_create_button(GenCodeInfo genCodeInfo, ABObj obj)
 static int
 write_comp_create_choice(GenCodeInfo genCodeInfo, ABObj obj)
 {
-   int          rc = 0;         /* return code */
    ABObj        actualObj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
    ABObj        itemParentObj = objxm_comp_get_subobj(obj, AB_CFG_PARENT_OBJ);
-   int          numItems = obj_get_num_items(obj);
-   ABObj        labelObj = objxm_comp_get_subobj(obj, AB_CFG_LABEL_OBJ);
 
     if (obj_get_choice_type(obj) == AB_CHOICE_OPTION_MENU)
     {
@@ -1590,9 +1559,7 @@ static int
 write_obj_create_base_win(GenCodeInfo genCodeInfo, ABObj obj)
 {
     File        codeFile = genCodeInfo->code_file;
-    ABObj       project = obj_get_project(obj); 
     BOOL	wasAppShell = mfobj_has_flags(obj, CGenFlagTreatAsAppShell);
-    STRING	className = NULL;
 
     /* always treat as non-primary shell, so that any other instances
      * created by the application programmer will pick up the proper
@@ -2030,29 +1997,6 @@ write_create_and_attach_item_menu(GenCodeInfo genCodeInfo, ABObj item)
 #endif /* BOGUS */
 
 
-static BOOL
-ancestor_is_menu(ABObj obj)
-{
-    AB_TRAVERSAL        trav;
-    AB_OBJ             *ancestor;
-    BOOL                isit = FALSE;
-
-    if (!obj_is_choice(obj) || obj_is_group(abmfP_parent(obj)))
-        return FALSE;
-    for (trav_open(&trav, obj, AB_TRAV_PARENTS);
-         (ancestor = trav_next(&trav)) != NULL;)
-    {
-        if (ObjWClassIsMenuShell(ancestor))
-        {
-            isit = TRUE;
-            break;
-        }
-    }
-    trav_close(&trav);
-
-    return isit;
-}
-
 /**********
  * end of MENU STUFF
  *********/
@@ -2102,21 +2046,6 @@ write_comp_parents_of_obj(
 
     return 0;
 #undef MAX_ANCESTORS
-}
-
-
-/*
- * Writes out all the widgets in the composite object, except for
- * the actual control object and it's descendants
- */
-static int
-write_comp_except_for_actual_obj_tree(
-                        GenCodeInfo     genCodeInfo,
-                        ABObj           obj
-)
-{
-    ABObj       actualObj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
-    return write_comp_except_for_subtree(genCodeInfo, obj, actualObj);
 }
 
 
@@ -2388,29 +2317,6 @@ write_create_one_item(
 }
 
 static int
-write_widget_file_chooser_shell(GenCodeInfo genCodeInfo, ABObj obj)
-{
-    File                codeFile = genCodeInfo->code_file;
-
-    obj_set_was_written(obj, TRUE);
-    abio_printf(codeFile, "\t\tXmCreateFileSelectionDialog(");
-    write_parent_name(genCodeInfo, obj);
-    abio_printf(codeFile, "\t\t\t\"%s\",\n", abmfP_get_widget_name(obj));
-    abio_printf(codeFile, "\t\t\tNULL, 0 );\n");
-
-    abio_printf(codeFile, "\tXtVaSetValues(%s,\n", abmfP_get_c_name(genCodeInfo, obj));
-    abmfP_obj_spew_args(genCodeInfo, 
-        obj, ABMF_ARGCLASS_ALL_BUT_WIDGET_REF, ABMF_ARGFMT_VA_LIST);
-    abmfP_xt_va_list_close(genCodeInfo);
-
-    abio_printf(codeFile, "\tif (%s == NULL)\n\t\treturn FALSE;\n\n",
-                abmfP_get_c_name(genCodeInfo, obj));
-
-    return TRUE;
-}
-
-
-static int
 write_parent_name(GenCodeInfo genCodeInfo, ABObj obj)
 {
     abio_printf(genCodeInfo->code_file, "%s,\n",
@@ -2528,14 +2434,6 @@ abmfP_get_widget_parent_name(GenCodeInfo genCodeInfo, ABObj obj)
 
 
 static int
-child_isnumeric(ABObj child)
-{
-    return ((child->type == AB_TYPE_TEXT_FIELD)
-            && (child->info.text.type == AB_TEXT_NUMERIC));
-}
-
-
-static int
 write_check_null(GenCodeInfo genCodeInfo, ABObj obj)
 {
     abio_printf(genCodeInfo->code_file, 
@@ -2551,16 +2449,6 @@ write_assign_obj_var(GenCodeInfo genCodeInfo, ABObj obj)
     abio_printf(genCodeInfo->code_file,
         "%s =\n", abmfP_get_c_name(genCodeInfo, obj));
     abio_indent(genCodeInfo->code_file);
-    return 0;
-}
-
-
-static int
-write_check_null_and_assign(GenCodeInfo genCodeInfo, ABObj obj)
-{
-    write_check_null(genCodeInfo, obj);
-    write_assign_local_vars(genCodeInfo, obj);
-    write_assign_obj_var(genCodeInfo, obj);
     return 0;
 }
 
@@ -2733,12 +2621,9 @@ abmfP_write_create_widgets_for_one_obj(GenCodeInfo genCodeInfo, ABObj obj)
     int                 return_value= 0;
     File                codeFile = genCodeInfo->code_file;
     int                 iRC= 0;         /* int return code */
-    STRING              glyph_file_name = NULL; /* For messages that are
-                                                 * glyphs, */
     ABObj               wholeObj = NULL;
     ABObj               actualObj= NULL;
     ABObj               parentObj = NULL;
-    ABObj               item= NULL;
     BOOL                objIsActualObj = FALSE;
     BOOL                objIsParentObj = FALSE;
     int                 startingIndent = abio_get_indent(codeFile);

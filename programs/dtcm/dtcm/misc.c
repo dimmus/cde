@@ -81,7 +81,6 @@ create_repeat_menu(Widget parent, XtCallbackProc cb_func, XtPointer data) {
 	Arg			args[5];
 	Widget			cb;
 	XmString		xmstr;
-	Repeat_menu_op		i;
 	extern			Calendar *calendar;
 
 	ac = 0;
@@ -145,7 +144,6 @@ create_for_menu(Widget parent) {
 	Arg			args[5];
 	Widget			cb, list, text;
 	XmString		xmstr;
-	For_menu_op		i;
 	extern			Calendar *calendar;
 
 	ac = 0;
@@ -225,7 +223,7 @@ create_for_menu(Widget parent) {
 
 extern Widget
 create_privacy_menu(Widget parent) {
-	int			ac, i;
+	int			ac;
 	Arg			args[5];
 	Widget			cb;
 	XmString		xmstr;
@@ -299,15 +297,15 @@ set_time_submenu(Widget parent,
 	for (i = beg; i < end; i++) {
 		if (dt == HOUR12) {
 			if (i > 12)
-                       		 sprintf(buf, "%2d:", i-12);
+                       		 snprintf(buf, sizeof(buf), "%2d:", i-12);
                 	else
                         	if (i == 0)
                                 	cm_strcpy(buf, "12:");
                 	else
-                       		 sprintf(buf, "%2d:", i);	
+                       		 snprintf(buf, sizeof(buf), "%2d:", i);	
 		}
 		else
-			sprintf(buf, "%02d", i);
+			snprintf(buf, sizeof(buf), "%02d", i);
 
 		for (j = 0; j <= 45; j += 15) {
 			sprintf(buf2, "%s%02d", buf, j);
@@ -462,7 +460,6 @@ create_repeat_scope_menu(Widget parent, XmString label,
 	char			buf[MAXNAMELEN];
 	Widget			menu, option_m, menuitems[3];
 	XmString		xmstr;
-	Repeat_scope_menu_op	i;
 	Calendar		*c = calendar;
 
 	menu = XmCreatePulldownMenu(parent, "pulldown", NULL, 0);
@@ -541,7 +538,7 @@ create_all_pixmaps(Props_pu *p, Widget w)
 {
         Pixel           fg, bg;
         Screen          *s;
-        static XImage   ic, ei, ci, li, ri, eri, ii, pui, qi, wi;
+        static XImage   ei, ci, eri, ii, pui, qi, wi;
 
         s = XtScreen(w);
         XtVaGetValues(w, XmNforeground, &fg, XmNbackground, &bg,
@@ -563,22 +560,22 @@ create_all_pixmaps(Props_pu *p, Widget w)
                 p->postup_pixmap = XmGetPixmap(s, "postup_pixmap", fg, bg);
 
         fill_pixmap(&eri, xm_error_width, xm_error_height,
-                xm_error_bits);
+                (unsigned char *)xm_error_bits);
         if (XmInstallImage(&eri, "err_pixmap"))
                 p->xm_error_pixmap = XmGetPixmap(s, "err_pixmap", fg, bg);
 
         fill_pixmap(&ii, xm_information_width, xm_information_height,
-                xm_information_bits);
+                (unsigned char *)xm_information_bits);
         if (XmInstallImage(&ii, "info_pixmap"))
                 p->xm_info_pixmap = XmGetPixmap(s, "info_pixmap", fg, bg);
 
         fill_pixmap(&qi, xm_question_width, xm_question_height,
-                xm_question_bits);
+                (unsigned char *)xm_question_bits);
         if (XmInstallImage(&qi, "q_pixmap"))
                 p->xm_question_pixmap = XmGetPixmap(s, "q_pixmap", fg, bg);
 
         fill_pixmap(&wi, xm_warning_width, xm_warning_height,
-                xm_warning_bits);
+                (unsigned char *)xm_warning_bits);
         if (XmInstallImage(&wi, "w_pixmap"))
                 p->xm_warning_pixmap = XmGetPixmap(s, "w_pixmap", fg, bg);
 
@@ -854,8 +851,6 @@ dialog_popup(Widget parent, ...) {
 */
 extern void
 get_range(Glance glance, time_t date, time_t *start, time_t *stop) {
-	int day_of_week;
-
 	switch(glance) {
 	case monthGlance:
 		*start = first_dom(date);
@@ -1303,10 +1298,8 @@ Dimension *dim,
     va_list   ap;
     int       i, _high = 0;
     Dimension _max;
-    Widget    _targetW, _highestW;
-    Arg       _args[3];
+    Widget    _targetW;
     XtWidgetGeometry geo;
-    unsigned char type;
 
     *ret = (Widget)NULL;
     *dim = (Dimension)0;
@@ -1337,7 +1330,6 @@ Dimension *dim,
 	if ( _height[i] >= _max ) {
 	    _max = _height[i];
 	    _high = i;
-	    _highestW = _targetW;
 	}
     }
 
@@ -1356,10 +1348,9 @@ Dimension *dim,
 {
     va_list   ap;
     int       i, _wide = 0;
-    Widget    _targetW, _widestW;
+    Widget    _targetW;
     Dimension _max;
     XtWidgetGeometry geo;
-    unsigned char type;
 
     *ret = (Widget)NULL;
     *dim = (Dimension)0;
@@ -1389,7 +1380,6 @@ Dimension *dim,
 	} if ( _width[i] >= _max ) {
 	    _max = _width[i];
 	    _wide = i;
-	    _widestW = _targetW;
 	}
     }
 
@@ -1430,7 +1420,6 @@ Dimension *dim,
     Widget    _targetW, _highestW;
     Arg       _args[3];
     XtWidgetGeometry geo;
-    unsigned char type;
 
     *ret = (Widget)NULL;
     *dim = (Dimension)0;

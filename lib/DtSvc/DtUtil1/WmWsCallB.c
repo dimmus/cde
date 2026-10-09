@@ -194,7 +194,6 @@ DtWsmAddCurrentWorkspaceCallback (
 static Tt_callback_action
 _WsModifiedCB (Tt_message m, Tt_pattern p)
 {
-    struct _DtWsmCBContext *pCbCtx;
     Atom 	aWs;
     DtWsmWsReason	reason;
 

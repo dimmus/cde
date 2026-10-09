@@ -219,13 +219,13 @@ setDebugFlags(char *c1)
 	/* now run through the the char array and or in these flags... */
 	for (c2 = charArray; *c2; c2++) {
 	    if (isalpha(*c2)) {
-		if (!debugLevel[*c2]) {
-		    debugLevel[*c2] =
+		if (!debugLevel[(unsigned char) *c2]) {
+		    debugLevel[(unsigned char) *c2] =
 			    (unsigned char *) malloc(_TERM_DEBUG_NUM_BYTES);
-		    (void) memset(debugLevel[*c2], '\0', _TERM_DEBUG_NUM_BYTES);
+		    (void) memset(debugLevel[(unsigned char) *c2], '\0', _TERM_DEBUG_NUM_BYTES);
 		}
 		for (i1 = 0; i1 < _TERM_DEBUG_NUM_BYTES; i1++) {
-		    debugLevel[*c2][i1] |= theseFlags[i1];
+		    debugLevel[(unsigned char) *c2][i1] |= theseFlags[i1];
 		}
 	    }
 	}

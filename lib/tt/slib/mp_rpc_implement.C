@@ -508,6 +508,8 @@ _tt_update_msg(SVCXPRT *transp, int reply)
 		    case TT_ABSTAINED:
 			proc_list = msg->abstainers();
 			break;
+		    default:
+			break;
 		}
 		if ((! proc_list.is_null()) && (proc_list->count() > 0)) {
 			found = _tt_s_mp->find_proc(proc_list->bot(), proc, 0);

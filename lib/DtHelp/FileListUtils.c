@@ -232,6 +232,8 @@ static int ScanDirForFiles(
     struct dirent *result;
     _Xreaddirparams dirEntryBuf;
 
+    (void) dirEntryBuf;	/* unused unless XTHREADS */
+
     /* open the directory */
     pDir = opendir (dirpath);
     if (pDir == NULL) return 0;                        /* RETURN */
@@ -444,7 +446,6 @@ Boolean _DtHelpFileListAddFile (
    _DtHelpFileRec  addFile;
    char *       actualPath;
    char         empty = 0;
-   int		nameKey = 0;
    typedef int (*_CEStrcollProc)(const char *,const char *);
    extern _CEStrcollProc _DtHelpCeGetStrcollProc();
    _CEStrcollProc strcollfn = _DtHelpCeGetStrcollProc();
@@ -481,10 +482,6 @@ Boolean _DtHelpFileListAddFile (
                        &addFile.fileTitle,&addFile.fileTitleXmStr,
                        &addFile.docId,&addFile.timeStamp,&addFile.nameKey,
                        io_fontList,ret_mod);
-   }
-   else
-   { 
-      nameKey = _DtHelpCeStrHashToKey(fileName);
    }
 
    /* look for prior existence and position */

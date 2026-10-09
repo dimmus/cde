@@ -129,7 +129,9 @@ static char	*fallbacks[] = {
 	/* local functions */
     /* window env */
 static int	ignoreBadWindow(/* dpy, error */);
+#ifdef	unused
 static void	finish_window(/* w, end_window */);
+#endif	/* unused */
 static int	own_main_atom(/* win */);
 static int	disown_main_atom(/* win */);
     /* selection window */
@@ -164,7 +166,9 @@ static void	help_ok(/* w, client_data, call_data */);
 static void	create_help(/*  */);
     /* msg window */
 static void	dialog_resp_cb(/* w, client_data, call_data */);
+#ifdef	unused
 static int	wait_confirmation(/* w */);
+#endif	/* unused */
     /* locate window */
 static int	window_location(/* loc_str */);
 static void	locate_window(/* w */);
@@ -975,7 +979,6 @@ static void	add_cmd_btn(Widget parent_rc, void (*cb_ok)(),
 
 static void	start_host_window(char *cur_host)
 {
-    int	ret;
 
     if (!HostW) {
 	create_host_window(cur_host);
@@ -1613,7 +1616,7 @@ static int	window_location(char *loc_str)
     char	*lower_str, *p;
 
     lower_str = NEWSTR(loc_str);
-    if (p = lower_str) {
+    if ((p = lower_str)) {
 	to_lower_str(p);
 	if (strstr(lower_str, "center"))	locate_type |= LOC_CENTER;
 	if (strstr(lower_str, "top"))		locate_type |= LOC_TOP;

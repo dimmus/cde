@@ -57,7 +57,6 @@ Boolean _DtNl_is_multibyte = False;
 void 
 Dt_nlInit( void )
 {
-   char * bc;
    static Boolean first = True;
 
    _DtSvcProcessLock();
@@ -212,8 +211,7 @@ Dt_strspn(
         char *s2 )
 {
    wchar_t s1char, s2char;
-   int s1len, s2len;
-   int i;
+   int s1len;
    int count;
    char * ptr;
    Boolean match;
@@ -279,8 +277,7 @@ Dt_strcspn(
         char *s2 )
 {
    wchar_t s1char, s2char;
-   int s1len, s2len;
-   int i;
+   int s1len;
    int count;
    char * ptr;
 
@@ -339,7 +336,6 @@ Dt_strchr(
         char c )
 {
    wchar_t schar;
-   int i;
    int slen;
    wchar_t wc;
    char foo[2];
@@ -383,7 +379,6 @@ Dt_strrchr(
         char c )
 {
    wchar_t schar;
-   int i;
    int slen;
    char * last = NULL;
    wchar_t wc;

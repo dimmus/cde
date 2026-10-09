@@ -249,7 +249,9 @@ static int check_content(char *val1, char *val2)
 		int	l2 = atoi(loc2);
 		int	sl1 = strlen(cnt1);
 		int	sl2 = strlen(cnt2);
+#ifdef DEBUG
 		char	sym;
+#endif
 
 		     if (sl1 > sl2) ret = -1;
 		else if (sl1 < sl2) ret =  1;
@@ -285,8 +287,6 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 	int             loc1;
 	int             loc2;
 	char           *value1, *value2;
-	DtDtsDbRecord  *rec;
-	DtDtsDbField   *fld;
 	int		val;
 
 	test1 |= get_value(item1, DtDTS_CONTENT) ? 2 : 0;
@@ -425,7 +425,6 @@ cde_dc_compare(DtDtsDbRecord ** a, DtDtsDbRecord ** b)
 	DtDtsDbRecord **x = (DtDtsDbRecord **) a;
 	DtDtsDbRecord **y = (DtDtsDbRecord **) b;
 	int		results;
-	char		c;
 
 	results = sfe(*x, *y);
 	return(results);

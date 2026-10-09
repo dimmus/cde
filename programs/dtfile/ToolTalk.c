@@ -98,7 +98,6 @@
 #define VENDOR                "CDE"
 #define VERSION               "1.0"
 
-static char* RESTRICTED_HEADER = "-restricted";
 
 static Tt_pattern * FileManagerToolTalkPattern = NULL;
 static Boolean sendStopped = False;
@@ -121,7 +120,6 @@ FileCallback(
   switch (op) {
 	  char *to_file;
 	  DialogData *dialog_data;
-	  int i;
       default:
 	  break;
       case TTDT_MOVED:
@@ -153,7 +151,6 @@ FileCallback(
 void
 FinalizeToolTalkSession(void)
 {
-  Tt_status ttRc;
   int i;
 
   for (i = 0; i < view_count; i++)
@@ -172,13 +169,13 @@ FinalizeToolTalkSession(void)
   if( FileManagerToolTalkPattern &&
       tt_ptr_error( FileManagerToolTalkPattern ) == TT_OK )
   {
-    ttRc = ttdt_session_quit( NULL,
-                              FileManagerToolTalkPattern,
-                              1 );
+    ttdt_session_quit( NULL,
+                       FileManagerToolTalkPattern,
+                       1 );
     if( ProcessToolTalkInputId )
       XtRemoveInput( ProcessToolTalkInputId );
   }
-  ttRc = ttdt_close( NULL, NULL, sendStopped );
+  ttdt_close( NULL, NULL, sendStopped );
 }
 
 void
@@ -206,7 +203,6 @@ SessionCallback( Tt_message msg, void * client_data, Tt_message contract )
   tt_free( opString );
 
   switch (op) {
-	  int i;
       default:
 	  break;
       case TTDT_QUIT:

@@ -53,7 +53,7 @@
 class RFCFormat : public DtCPlusPlusAllocator {
   public:
     RFCFormat(DtMail::Session * session);
-    ~RFCFormat(void);
+    virtual ~RFCFormat(void);
 
     virtual void msgToBuffer(DtMailEnv & error,
 			     DtMail::Message & msg,

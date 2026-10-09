@@ -57,6 +57,7 @@
 
 #include <DtMail/DtMail.hh>
 
+#if defined(SVR4)
 /*
  * Returns: length of second argument if it is a prefix of the
  * first argument, otherwise zero.
@@ -74,6 +75,7 @@ preflen(char * str, char * pref)
     return (len);
   return (0);
 }
+#endif
 
 // DetermineFileLocality -- determine if specified path object is local
 //		or remote to the current system
@@ -186,7 +188,6 @@ DtMail::DetermineFileLocality(const char * path)
     //
   }
 #else
-  int len = (int) strlen(path);
   return(Dtm_FL_UNKNOWN);
 #endif
 }

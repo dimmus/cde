@@ -119,8 +119,6 @@ static int	abstrsz =	-1;
 static char	dbname [12] =	"<dbname>";
 struct or_dbrec dbrec;
 static int	debug_mode =	FALSE;
-static char     default_cant_open_msg[] =
-				"%s: %s: %s.\n";
 static int	fzkeysz =	0;
 static int	flavor =	DTSEARCH_FLAVOR;
 static int	language =	DtSrLaENG;
@@ -282,7 +280,6 @@ static int      change_min_wordsize (char *new_size)
 /************************************************/
 static void	print_usage (void)
 {
-    int		i;
 
     printf (CATGETS(dtsearch_catd, MS_initausd,
 	    3,
@@ -327,7 +324,6 @@ static void	print_usage (void)
 static void     user_args_processor (int argc, char **argv)
 {
     int		i;
-    int		remaining_slot_space;
     char	*ptr;
 
     /* Initialize variables prior to parsing command line */
@@ -618,7 +614,6 @@ static void     create_new_dbd (FILE *f)
 int             main (int argc, char *argv[])
 {
     int		i;
-    char	*ptr;
     FILE	*f;
     struct or_miscrec	miscrec;
     struct or_swordrec	swordrec;

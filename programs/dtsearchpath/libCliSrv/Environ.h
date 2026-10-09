@@ -42,7 +42,7 @@ class Shell  {
  public:
    // class constructor, destructor
    Shell()  {}
-   ~Shell() {}
+   virtual ~Shell() {}
 
    // pure virtual function
    virtual void putToEnv( const CString &, const char * ) = 0;

@@ -169,7 +169,6 @@ void
 merge(int overwrite)
 {
 
-	int				status_ok = 1;
 	int				exists;
 	_Tt_typedb_ptr			db;
 	_Tt_ptype_table_cursor		db_ptypes;
@@ -329,7 +328,6 @@ f_list_types(int otypes)
 {
 	_Tt_typedb_ptr		db;
 	Tt_status		status;
-	int			checkOW = 0;
 
 	if (cedb == TypedbNone) {
 		cedb = TypedbAll;
@@ -582,7 +580,6 @@ process_args(int argc, char **argv)
 {
 	extern char 	*optarg;
 	extern int	optind;
-	extern int	opterr;
 	int		c;
 	int		args_left;
 	cmd_fn		fn;

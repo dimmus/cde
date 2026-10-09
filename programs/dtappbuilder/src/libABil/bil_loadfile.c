@@ -97,15 +97,16 @@ bil_load_file(
 )
 {
 #define compObjsOut (*compObjsOutPtr)
-    ABObj               obj = NULL;
     STRING              errmsg = NULL;
-    AB_FILE_TYPE        file_type = AB_FILE_UNDEF;
     int                 success = OK;
-    int                 i;
     int                 lineNumber = 0;
-    BOOL                unknownObjects = FALSE;
     BOOL		LoadErr = FALSE;
     float		ver = 0.0;
+#ifdef BOGUS
+    ABObj               obj = NULL;
+    int                 i;
+    BOOL                unknownObjects = FALSE;
+#endif /* BOGUS */
 
     if (util_strempty(bil_file) && inFile == NULL)
     {

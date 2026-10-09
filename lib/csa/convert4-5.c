@@ -173,28 +173,28 @@ _DtCm_appt4_to_attrs(
 		(stat = _DtCm_set_string_attrval(buf,
 		&attrs[CSA_ENTRY_ATTR_START_DATE_I].value,CSA_VALUE_DATE_TIME)))
 			;
-	else if (stat = eventtype4_to_attrs(a4->tag->tag, num_attrs, attrs))
+	else if ((stat = eventtype4_to_attrs(a4->tag->tag, num_attrs, attrs)))
 			;
-	else if (stat = _DtCm_set_sint32_attrval(a4->tag->showtime,
-		&attrs[CSA_X_DT_ENTRY_ATTR_SHOWTIME_I].value))
+	else if ((stat = _DtCm_set_sint32_attrval(a4->tag->showtime,
+		&attrs[CSA_X_DT_ENTRY_ATTR_SHOWTIME_I].value)))
 			;
 	else if ((stat = _csa_tick_to_iso8601(a4->appt_id.tick + a4->duration,
 		buf) ? CSA_E_INVALID_DATE_TIME : CSA_SUCCESS) ||
 		(stat = _DtCm_set_string_attrval(buf,
 		&attrs[CSA_ENTRY_ATTR_END_DATE_I].value, CSA_VALUE_DATE_TIME)))
 			;
-	else if (stat = _DtCm_set_string_attrval(a4->what,
-		&attrs[CSA_ENTRY_ATTR_SUMMARY_I].value, CSA_VALUE_STRING))
+	else if ((stat = _DtCm_set_string_attrval(a4->what,
+		&attrs[CSA_ENTRY_ATTR_SUMMARY_I].value, CSA_VALUE_STRING)))
 			;
-	else if (stat = _DtCm_set_user_attrval(a4->author,
-		&attrs[CSA_ENTRY_ATTR_ORGANIZER_I].value))
+	else if ((stat = _DtCm_set_user_attrval(a4->author,
+		&attrs[CSA_ENTRY_ATTR_ORGANIZER_I].value)))
 			;
-	else if (stat = _DtCm_set_uint32_attrval(_DtCm_apptstatus4_to_status(
-		a4->appt_status), &attrs[CSA_ENTRY_ATTR_STATUS_I].value))
+	else if ((stat = _DtCm_set_uint32_attrval(_DtCm_apptstatus4_to_status(
+		a4->appt_status), &attrs[CSA_ENTRY_ATTR_STATUS_I].value)))
 			;
-	else if (stat = _DtCm_set_uint32_attrval(
+	else if ((stat = _DtCm_set_uint32_attrval(
 		_DtCm_privacy4_to_classification(a4->privacy),
-		&attrs[CSA_ENTRY_ATTR_CLASSIFICATION_I].value))
+		&attrs[CSA_ENTRY_ATTR_CLASSIFICATION_I].value)))
 			;
 	else if (rerule && (stat = _RepeatInfoToRule(a4,
 		&attrs[CSA_ENTRY_ATTR_RECURRENCE_RULE_I].value)))
@@ -495,6 +495,8 @@ _RepeatInfoToRule(Appt_4 *a4, cms_attribute_value **attrval)
 		if (a4->period.nth & 0x10) strcat(buf, "TH ");
 		if (a4->period.nth & 0x20) strcat(buf, "FR ");
 		if (a4->period.nth & 0x40) strcat(buf, "SA ");
+		break;
+	default:
 		break;
 	}
 

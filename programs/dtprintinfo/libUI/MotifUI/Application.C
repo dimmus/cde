@@ -133,7 +133,7 @@ Application::Application(char *name,
    n_attrs = 0;
    session_path = NULL;
    fp = NULL;
-   if (session_file = application_args.session_file)
+   if ((session_file = application_args.session_file))
     {
       if (*session_file == '/')
 	 session_path = strdup(session_file);
@@ -346,7 +346,7 @@ char *Application::Restore(char *attribute)
       if (stat(session_path, &statbuff) != -1)
        {
 	 FILE *fp1;
-	 if (fp1 = fopen(session_path, "r"))
+	 if ((fp1 = fopen(session_path, "r")))
 	  {
 	    session_info = new char[statbuff.st_size + 1];
 	    fread(session_info, (unsigned int)statbuff.st_size, 1, fp1);

@@ -135,11 +135,9 @@ build_file_list(DtShmProtoIntList int_handle, DtDirPaths *dirs,
 		DtDtsMMHeader *header, const char *suffix)
 {
 	DIR 			*dirp;
-	struct dirent		*dp = NULL;
 	struct stat		buf;
 	char			cur_path[MAXPATHLEN+1];
 	void			*data;
-	int			size = sizeof(buf.st_mtime);
 	int			i;
 	int			isnew;
 	DtShmBoson		*boson_list = 0;
@@ -147,6 +145,7 @@ build_file_list(DtShmProtoIntList int_handle, DtDirPaths *dirs,
 	int			count = 0;
 	_Xreaddirparams		dirEntryBuf;
 	struct dirent		*result;
+	(void) dirEntryBuf; /* unused unless XTHREADS */
 
 	/* Theses here to make sure it gets into the string tables
 	   because actions uses it in its "types" field. */
@@ -197,30 +196,6 @@ build_file_list(DtShmProtoIntList int_handle, DtDirPaths *dirs,
 	return;
 }
 
-static int
-db_table_size(int num_db, DtDtsDbDatabase **db_list)
-{
-	int			db;
-	DtDtsDbDatabase		*db_ptr;
-	int			rec;
-	DtDtsDbRecord		*rec_ptr;
-	int			fld;
-	DtDtsDbField		*fld_ptr;
-	int			size = 0;
-
-	size += num_db*sizeof(DtDtsMMDatabase);
-	for(db = 0; db < num_db; db++)
-	{
-		db_ptr = db_list[db];
-		size += db_ptr->recordCount * sizeof(DtDtsMMRecord);
-		for(rec = 0; rec < db_ptr->recordCount; rec++)
-		{
-			rec_ptr = db_ptr->recordList[rec];
-			size += rec_ptr->fieldCount * sizeof(DtDtsMMField);
-		}
-	}
-	return(size/sizeof(int));
-}
 static void
 _DtMMSortDataTypes(DtShmProtoStrtab str_handle)
 {
@@ -292,20 +267,12 @@ _DtMMAddActionsToDataAttribute(DtDtsDbDatabase *db_ptr)
 {
 	int		rec;
 	DtDtsDbRecord	*rec_ptr;
-	int		action_flag = 0;
-	int		sort_flag = 0;
-	int		found_flag = 0;
-	int		n;
-	const	char	*tmp;
 	XrmQuark	desc_qrk = XrmStringToQuark(DtDTS_DA_DESCRIPTION);
 	XrmQuark	icon_qrk = XrmStringToQuark(DtDTS_DA_ICON);
 	XrmQuark	label_qrk = XrmStringToQuark(DtDTS_DA_LABEL);
 
 	for(rec = 0; rec < db_ptr->recordCount; rec++)
 	{
-		int	found_des = 0;
-		int	found_icon = 0;
-		int	found_label = 0;
 		char	*obj_type;
 
 		rec_ptr = db_ptr->recordList[rec];
@@ -350,7 +317,6 @@ build_new_db(DtShmProtoStrtab shm_handle, DtShmProtoIntList int_handle, int num_
 	for(db = 0; db < num_db; db++)
 	{
 		int	last_boson = -1;
-		int	list_count = 0;
 		DtShmProtoInttab	nameIndex;
 		int		size;
 		int		*idx;
@@ -431,35 +397,6 @@ srch(const void *a, const void *b)
 	return(results);
 }
 
-static void
-showtable(
-	DtDtsDbDatabase *db,
-	struct list *name_index, 
-	struct list *other, 
-	DtDtsMMHeader *head,
-	int other_break)
-{
-	int	i;
-
-	printf("============== names =====================\n");
-	for(i = 0; name_index[i].boson; i++)
-	{
-		printf("%20s -> %s\n",
-			XrmQuarkToString(db->recordList[name_index[i].rec]->recordName),
-			_DtShmProtoLookUpStrtab(shm_handle, 
-					name_index[i].boson));
-	}
-	printf("%d entries\n", i);
-	
-	printf("============= other ======================\n");
-	for(i = 0; i < other_break; i++)
-	{
-		printf("%s\n",
-			XrmQuarkToString(db->recordList[other[i].rec]->recordName));
-	}
-	printf("%d entries\n", i);			
-}
-
 static int
 build_name_list(DtDtsDbDatabase *db,
 		DtShmProtoIntList int_handle,
@@ -488,9 +425,7 @@ build_name_list(DtDtsDbDatabase *db,
 	/* step through all records */
 	for(i = 0; i < db->recordCount; i++)
 	{
-		DtShmBoson	boson;
 		char	*attr;
-		char	*t;
 
 		/* see if a name pattern exist */
 		attr = _DtDtsDbGetFieldByName(db->recordList[i],

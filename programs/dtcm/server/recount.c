@@ -133,6 +133,7 @@ CountEvents(
 		int		 ndays = RE_MONTHLY(re)->md_nitems;
 		struct tm	*start_tm;
 		_Xltimeparams	 localtime_buf;
+		(void) localtime_buf;	/* unused unless XTHREADS */
 
 		start_tm = _XLocaltime((const time_t *)&start_time, localtime_buf);
 		/* 
@@ -195,6 +196,7 @@ InitialEventsToExclude(
 {
 	struct tm	*start_tm;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	start_tm = _XLocaltime((const time_t *)&start_time, localtime_buf);
 
@@ -211,7 +213,6 @@ InitialEventsToExclude(
 		}
 		return (nevent_days);
 	} else if (re->re_type == RT_MONTHLY_POSITION) {
-		WeekDayTime *wdt = (WeekDayTime *)RE_MONTHLY(re)->md_weektime;
 		int	     i,
 			     ndays = 0;
 

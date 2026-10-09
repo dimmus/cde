@@ -353,7 +353,7 @@ toolkit_initialize(
         char *argv[] )
 {
 	int i;
-	char name[8], *var;
+	char *var;
 	wtab_t *w;
 	int newargc;
 	char **newargv;
@@ -650,10 +650,9 @@ _xmcreatefunc(
 	Widget widget, realparent;
 	classtab_t *class;
 	char *arg0 = argv[0];
-	wtab_t *w, *pw, *wtab, *parenttab;
+	wtab_t *pw, *wtab, *parenttab;
 	char *wname, *parentid, *var;
 	Arg	args[MAXARGS];
-	int	i;
 	int n;
         char * errmsg;
 	int pargc;
@@ -1277,12 +1276,10 @@ do_DtHelpReturnSelectedWidgetId(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * results = argv[1]; 
    char * variable = argv[3]; 
    XrmValue f, t;
    int res;
-   classtab_t *ctab;
    Widget retWidget;
    char * errmsg;
 
@@ -1330,7 +1327,6 @@ do_DtHelpSetCatalogName(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    char * errmsg;
 
    if (argc != 2) 
@@ -1355,12 +1351,10 @@ do_DtHelpQuickDialogGetChild(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * variable = argv[1]; 
    int childType;
    XrmValue f, t;
    Widget child;
-   classtab_t *ctab;
    char * errmsg;
 
    if (argc != 4) 
@@ -1781,7 +1775,6 @@ do_XmListDeleteItemsPos(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    int position = 0;
    int count = 0;
@@ -1811,7 +1804,6 @@ do_XmListDeleteItems(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    XmString *items = NULL;
    int itemCount = 0;
@@ -1857,7 +1849,6 @@ do_XmListDeletePositions(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    int positionCount = 0;
    int * positionList = NULL;
@@ -1904,7 +1895,6 @@ GetSelectedPosList(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    int i;
    char * buf;
@@ -1997,10 +1987,8 @@ do_XmListGetKbdItemPos(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    int position;
-   int i;
    char buf[24];
    char * errmsg;
 
@@ -2032,7 +2020,6 @@ do_XmListItemExists(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    XmString string;
    Boolean res;
@@ -2062,10 +2049,8 @@ do_XmListItemPos(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    int position;
-   int i;
    char buf[24];
    XmString item;
    char * errmsg;
@@ -2099,7 +2084,6 @@ do_XmListPosSelected(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    Boolean res;
    int position;
@@ -2128,7 +2112,6 @@ do_XmListPosToBounds(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    Boolean res;
    int position;
@@ -2191,7 +2174,6 @@ ListSelectItem(
 {
    char *arg0 = argv[0];
    wtab_t *w;
-   int i;
    XmString item;
    XrmValue fval, tval;
    int position = 0;
@@ -2266,7 +2248,6 @@ do_XmListSetAddMode(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    XrmValue fval, tval;
    Boolean state;
@@ -2301,7 +2282,6 @@ do_XmListSetKbdItemPos(
         int argc,
         char *argv[] )
 {
-   char *arg0 = argv[0];
    wtab_t *w;
    Boolean res;
    int position;
@@ -2391,10 +2371,8 @@ GetMainWindowSeparator(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * variable = argv[1]; 
    Widget child;
-   classtab_t *ctab;
    char * errmsg;
 
    if (argc != 3) 
@@ -2570,6 +2548,7 @@ CatchAndIgnoreXError(
         Display *display,
         XEvent *event )
 {
+   return(0);
 }
 
 
@@ -2704,7 +2683,6 @@ do_XmUpdateDisplay(
         char *argv[] )
 {
    wtab_t *w;
-   char * p;
    char * errmsg;
 
    if (argc != 2)
@@ -2988,12 +2966,10 @@ do_XmCommandGetChild(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * variable = argv[1]; 
    int childType;
    XrmValue f, t;
    Widget child;
-   classtab_t *ctab;
    char * errmsg;
 
    if (argc != 4) 
@@ -3059,12 +3035,10 @@ do_XmMessageBoxGetChild(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * variable = argv[1]; 
    int childType;
    XrmValue f, t;
    Widget child;
-   classtab_t *ctab;
    char * errmsg;
 
    if (argc != 4) 
@@ -3131,12 +3105,10 @@ do_XmFileSelectionBoxGetChild(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * variable = argv[1]; 
    int childType;
    XrmValue f, t;
    Widget child;
-   classtab_t *ctab;
    char * errmsg;
 
    if (argc != 4) 
@@ -3203,12 +3175,10 @@ do_XmSelectionBoxGetChild(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   XmString string;
    char * variable = argv[1]; 
    int childType;
    XrmValue f, t;
    Widget child;
-   classtab_t *ctab;
    char * errmsg;
 
    if (argc != 4) 
@@ -3327,7 +3297,6 @@ do_XmScaleSetValue(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   char buf[25];
    int scaleValue;
    char * p;
    char * errmsg;
@@ -3379,7 +3348,6 @@ do_XmScrollBarGetValues(
    int sliderSize;
    int increment;
    int pageIncrement;
-   Boolean notify;
    char * errmsg;
 
    if (argc != 6) 
@@ -3432,7 +3400,6 @@ do_XmScrollBarSetValues(
 {
    char *arg0 = argv[0];
    wtab_t * w;
-   char buf[25];
    int value;
    int sliderSize;
    int increment;
@@ -3527,7 +3494,6 @@ do_XmScrollVisible(
    char *arg0 = argv[0];
    wtab_t * w;
    wtab_t * w2;
-   char buf[25];
    Dimension lrMargin;
    Dimension tbMargin;
    char * p;
@@ -3723,7 +3689,6 @@ do_catopen(
         char **argv )
 {
    int * lockedFds;
-   char * arg0 = argv[0];
    char * var = argv[1];
    char * catName = argv[2];
    char buf[10];
@@ -3789,7 +3754,6 @@ do_catclose(
         int argc,
         char **argv )
 {
-   char * arg0 = argv[0];
    char * catId = argv[1];
    nl_catd id;
    long long_id;
@@ -3814,7 +3778,6 @@ do_catgets(
         int argc,
         char **argv )
 {
-   char * arg0 = argv[0];
    char * variable = argv[1];
    char * catId = argv[2];
    char * setNum = argv[3];
@@ -4071,7 +4034,6 @@ Text_WidgetAndBoolean(
 {
    char *arg0 = argv[0];
    wtab_t *w;
-   char buf[10];
    Boolean boolean;
    XrmValue fval, tval;
    char * errmsg;
@@ -4131,8 +4093,6 @@ Text_WidgetAndOneParam(
    char *arg0 = argv[0];
    wtab_t *w;
    Boolean result;
-   int string;
-   char buf[10];
    char * p;
    int param;
    char * errmsg;
@@ -4976,10 +4936,8 @@ _CreatePDMJobSetup(
 	Widget widget, realparent;
 	classtab_t *class;
 	char *arg0 = argv[0];
-	wtab_t *w, *pw, *wtab, *parenttab;
+	wtab_t *pw, *parenttab;
 	char *parentid, *var;
-	int	i;
-	int n;
 	char * errmsg;
 	WidgetClass wclass;
 
@@ -5021,7 +4979,7 @@ _CreatePDMJobSetup(
 			parenttab = (wtab_t *)widget_to_wtab(realparent);
 		} else
 			parenttab = pw;
-		wtab = set_up_w(widget, parenttab, var, XtName(widget), class);
+		set_up_w(widget, parenttab, var, XtName(widget), class);
 
 	} else {
                 errmsg = strdup(GetSharedMsg(DT_WIDGET_CREATE_FAILED));

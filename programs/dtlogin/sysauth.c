@@ -137,38 +137,6 @@
 
 /***************************************************************************
  *
- *  Procedure declarations (SUN)
- *
- ***************************************************************************/
-
-static void Audit( struct passwd *p, char *msg, int errnum) ;
-
-
-
-/***************************************************************************
- *
- *  Audit (SUN)
- *
- ***************************************************************************/
-
-static void 
-Audit( struct passwd *p, char *msg, int errnum )
-{
-
-    /*
-     * make sure program is back to super-user...
-     */
-
-    seteuid(0);
-
-    Debug("Audit: %s\n", msg);
-
-    return;
-}
-
-
-/***************************************************************************
- *
  *  Authenticate (SUN)
  *
  *  verify the user
@@ -182,7 +150,9 @@ Authenticate( struct display *d, char *name, char *passwd, char **msg )
    extern char *progName;
 
    int	status;
+#if defined(PAM) || !defined(HAS_PAM_LIBRARY)
    char* ttyLine = d->gettyLine;
+#endif
 
    /*
     * Nothing to do if no name provided.
@@ -194,7 +164,7 @@ Authenticate( struct display *d, char *name, char *passwd, char **msg )
    /*
     * Construct device line
     */
-#ifdef DEF_NETWORK_DEV
+#if defined(DEF_NETWORK_DEV) && (defined(PAM) || !defined(HAS_PAM_LIBRARY))
             /*
              * If location is not local (remote XDMCP dtlogin) and
              * remote accouting is enabled (networkDev start with /dev/...)

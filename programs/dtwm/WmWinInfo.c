@@ -3484,7 +3484,7 @@ FindClientPlacement (ClientData *pCD)
     frameWidth = pCD->clientWidth + (2 * pCD->clientOffset.x);
     frameHeight = pCD->clientHeight + pCD->clientOffset.y + pCD->clientOffset.x;
 
-    if (WmHI = GetHeadInfo(wmGD.keyboardFocus)) {
+    if ((WmHI = GetHeadInfo(wmGD.keyboardFocus))) {
         /* Use Head metrics for placeable area */
         screenX = WmHI->x_org;
         screenY = WmHI->y_org;
@@ -4015,7 +4015,7 @@ void GetMaxInfo (ClientData *pCD, int *pX, int *pY, int *pWidth, int *pHeight)
 	width  = pCD->fullscreenWidth;
 	height = pCD->fullscreenHeight;
     }
-    else if (WmHI = GetHeadInfo (pCD))
+    else if ((WmHI = GetHeadInfo (pCD)))
     {
 	x      = WmHI->x_org;
 	y      = WmHI->y_org;
@@ -4032,7 +4032,8 @@ void GetMaxInfo (ClientData *pCD, int *pX, int *pY, int *pWidth, int *pHeight)
 	height = DisplayHeight (DISPLAY, SCREEN_FOR_CLIENT (pCD));
     }
 
-    FrameToClient (pCD, &x, &y, &width, &height);
+    FrameToClient (pCD, &x, &y, (unsigned int *) &width,
+		   (unsigned int *) &height);
 
     if (pX)      *pX      = x;
     if (pY)      *pY      = y;

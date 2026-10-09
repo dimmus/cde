@@ -207,8 +207,6 @@ ApplyTerminalOptionsDialogCallback
     Arg			  al[20];
     int			  ac;
     Arg			  al2;
-    char		 *c1;
-    int			  i1;
 
     ac = 0;
     (void) XtSetArg(al2, XmNmenuHistory, &menuHistory);
@@ -320,14 +318,10 @@ _DtTermViewCreateTerminalOptionsDialog
     Widget		  KbdControlForm;
     Widget		  ScreenControlFrame;
     Widget		  ScreenControlForm;
-    Widget		  LoggingFrame;
-    Widget		  LoggingForm;
     Widget		  label;
     Widget		  pulldown;
     Widget		  tmp;
-    Widget		  separator;
     Widget		  button;
-    Widget		  cancel;
     Widget		  reset;
     XmString		  string;
     XmString		  resetString;

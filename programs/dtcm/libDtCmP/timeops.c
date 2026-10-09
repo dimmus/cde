@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static char sccsid[] = "@(#)timeops.c 1.13 95/05/02 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #ifdef HAVE_CONFIG_H
 #include <cde_config.h>
 #endif
@@ -183,6 +179,7 @@ magic_time(Tick t)
         boolean_t magic=B_FALSE;
         struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm = _XLocaltime(&t, localtime_buf);
 
@@ -220,6 +217,7 @@ dst_changed(Tick old, Tick new)
 	struct tm oldtm;
 	struct tm newtm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	oldtm	= *_XLocaltime(&old, localtime_buf);
 	newtm	= *_XLocaltime(&new, localtime_buf);
@@ -252,6 +250,7 @@ year(Tick t)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 	return(tm->tm_year + 1900);
@@ -262,6 +261,7 @@ month(Tick t)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 	return(tm->tm_mon+1);
@@ -272,6 +272,7 @@ hour(Tick t)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 	return(tm->tm_hour);
@@ -282,6 +283,7 @@ minute(Tick t)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 	return(tm->tm_min);
@@ -291,7 +293,7 @@ int
 leapyr(int y)
 {
 	return
-	 (y % 4 == 0 && y % 100 !=0 || y % 400 == 0);
+	 ((y % 4 == 0 && y % 100 !=0) || y % 400 == 0);
 }
 
 int
@@ -300,6 +302,7 @@ monthlength(Tick t)
 	int mon;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	mon = tm.tm_mon;
@@ -312,6 +315,7 @@ monthseconds(Tick t)
 	int mon;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 	
 	tm = *_XLocaltime(&t, localtime_buf);
 	mon = tm.tm_mon;
@@ -323,6 +327,7 @@ dom(Tick t)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 	return(tm->tm_mday);
@@ -333,6 +338,7 @@ wom(Tick t)
 {
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = _XLocaltime(&t, localtime_buf);
 	return((12 + tm->tm_mday - tm->tm_wday)/7);
@@ -347,6 +353,7 @@ next_nmonth(Tick t, int n)
 	struct tm tm;
 	int	n12;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	n12 = n/12;
 	n = n%12;
@@ -380,6 +387,7 @@ weekofmonth(Tick t, int *wk)
 	struct tm tm, tm1, tm2;
 	Tick	firstday;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	tm.tm_hour = 0;
@@ -411,6 +419,7 @@ dow(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	return(tm.tm_wday);
@@ -421,6 +430,7 @@ fdom(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_mday	= 1;
@@ -435,6 +445,7 @@ ldom(Tick t /* find dow(0-6) that last dom falls on */ )
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_mday	= monthlength(t);
@@ -517,6 +528,7 @@ next_nhours(Tick t, int n)
 	Tick next;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm              = *_XLocaltime(&t, localtime_buf);
         tm.tm_sec       = 0;
@@ -534,6 +546,7 @@ last_ndays(Tick t, int n)
 	Tick last;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_sec	= 0;
@@ -552,6 +565,7 @@ next_ndays(Tick t, int n)
 	Tick next;
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_sec	= 0;
@@ -636,6 +650,7 @@ prevmonth_exactday(Tick t)
 	struct tm tm;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	sdelta = tm.tm_hour * hrsec + tm.tm_min * minsec + tm.tm_sec; 
@@ -670,6 +685,7 @@ nextmonth_exactday(Tick t)
 	struct tm tm;
 	int sdelta;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	sdelta = tm.tm_hour * hrsec + tm.tm_min * minsec + tm.tm_sec; 
@@ -700,6 +716,7 @@ nextnyear(Tick t, int n)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm	= *_XLocaltime(&t, localtime_buf);
 	tm.tm_year += n;
@@ -731,6 +748,7 @@ prevnyear(Tick t, int n)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	tm.tm_year -= n;
@@ -752,6 +770,7 @@ previousmonth(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&t, localtime_buf);
 	tm.tm_hour=0;
@@ -780,6 +799,7 @@ prev_nmonth(Tick t, int n)
 	struct tm tm;
 	int	n12;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	n12 = n/12;
 	n = n%12;
@@ -809,6 +829,7 @@ jan1(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_mon	= 0;
@@ -826,6 +847,7 @@ nextjan1(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_mon	= 0;
@@ -844,6 +866,7 @@ lastjan1(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		= *_XLocaltime(&t, localtime_buf);
 	tm.tm_mon	= 0;
@@ -862,6 +885,7 @@ lowerbound(Tick t)
 {
 	struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm		=  *_XLocaltime(&t, localtime_buf);
 	tm.tm_sec	=  0;
@@ -879,6 +903,7 @@ lower_bound(int i, Tick t)
 {
         struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm              =  *_XLocaltime(&t, localtime_buf);
         tm.tm_sec       =  0;
@@ -896,6 +921,7 @@ upperbound(Tick t)
 {
         struct tm tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm              =  *_XLocaltime(&t, localtime_buf);
         tm.tm_sec       =  59;
@@ -919,11 +945,11 @@ Tick
 xytoclock(int x, int y, Tick t)
 {
 	int dd, mn, yr, ly, leaps;
-	char buf[10];
 	struct tm tm;
 	struct tm timestruct;
 	Tick tick;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	memset(&timestruct, 0, sizeof(struct tm));
 
@@ -976,8 +1002,6 @@ set_timezone(char *tzname)
 long
 gmt_off(void)
 {
-        struct tm tm;
-        Tick t;
         static Tick gmt;
  
 #ifdef SVR4
@@ -985,6 +1009,8 @@ gmt_off(void)
 
         gmt             = timezone;
 #else
+        struct tm tm;
+        Tick t;
 	_Xltimeparams localtime_buf;
 
         t       = now();
@@ -1009,6 +1035,8 @@ init_time(void)
 	Tick	t;
 	_Xltimeparams localtime_buf;
 	_Xgtimeparams gmtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
+	(void) gmtime_buf;	/* unused unless XTHREADS */
 
 #if defined(SVR4)
 	/* Fix for QAR 31607 */
@@ -1091,8 +1119,7 @@ seconds_to_weeks(int)
 Tick
 monthdayyear(int m, int d, int y)
 {
-        int t, t1;
-        char buf[10];
+        int t;
 
 	struct tm timestruct;
 

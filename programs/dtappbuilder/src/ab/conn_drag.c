@@ -205,7 +205,6 @@ conn_drag_chord(
     while (!done)
     {
 	XEvent		extra;
-	Window		new_win;
 
 	XNextEvent(display, &new_event);
 
@@ -262,7 +261,6 @@ process_chord_extend(
 {
     ABObj		project = proj_get_project();
     Display	        *display = XtDisplay(widget);
-    Window	        window = XtWindow(widget);
     Window	        root_win = RootWindow(display, DefaultScreen(display));
 
     DRAG_DIR		new_dir;
@@ -387,7 +385,6 @@ setup_drag(
 )
 {
     Display	*display	= XtDisplay(widget);
-    Window	window		= XtWindow(widget);
     Window	root_win	= RootWindow(display, DefaultScreen(display));
     Cursor	cur_cursor;
 
@@ -615,7 +612,6 @@ is_win_decor(
     Window	window
 )
 {
-    Boolean	ret_val;
     Window	query_win	= XtWindow(win_wid);
     Display	*display	= XtDisplay(win_wid);
 

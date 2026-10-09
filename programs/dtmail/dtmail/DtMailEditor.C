@@ -396,7 +396,6 @@ DtMailEditor::attachConvertCallback(
     int			numIcons = editor->attachArea()->getIconCount();
     Attachment		**list = editor->attachArea()->getList();
     int 		ii, current = 0;
-    char		*name = NULL;
     XmString		str;
     DtMailEnv	    	mail_error;
 
@@ -454,7 +453,7 @@ DtMailEditor::attachDragFinishCallback(
     if (editor->editable())
 	editor->attachDropEnable();
 
-    for (ii = 0; ii < dragData->numItems; ii++) {
+    for (ii = 0; (Cardinal) ii < dragData->numItems; ii++) {
 	XtFree((char *)dragData->data.buffers[ii].name);
     }
 }

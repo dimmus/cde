@@ -976,7 +976,7 @@ update_cur_src(
 	return;
     }
 
-    if (name = objxm_xmstr_to_str(list_cl->item))
+    if ((name = objxm_xmstr_to_str(list_cl->item)))
     {
         abobj_moduled_name_extract(name, &module, &selected_obj);
  	if (selected_obj == NULL)
@@ -1080,7 +1080,7 @@ update_cur_target(
     if (list_cl->reason != XmCR_BROWSE_SELECT)
 	return;
 
-    if (name = objxm_xmstr_to_str(list_cl->item))
+    if ((name = objxm_xmstr_to_str(list_cl->item)))
     {
         abobj_moduled_name_extract(name, &module, &selected_obj);
         util_free(name);
@@ -1244,6 +1244,8 @@ select_connection(
 		XtVaSetValues(arg_field, XmNvalue, str_val, NULL);
 	    }
 	    break;
+	    default:
+	    break;
 	}
 	break;
 
@@ -1340,6 +1342,8 @@ select_connection(
                 XmTextFieldSetString(volume_field, help_vol);
 	break;
       }
+      default:
+	    break;
     }
 }
 
@@ -1455,9 +1459,6 @@ connP_ui_source_type_update(
 {
     Widget	*w_list = NULL;
     int		i;
-    AB_WHEN             g_when = AB_WHEN_UNDEF;
-    AB_FUNC_TYPE        g_func = AB_FUNC_UNDEF;
-    AB_BUILTIN_ACTION   g_act = AB_STDACT_UNDEF;
 
     if (when_pulldown == NULL)
     {
@@ -1789,7 +1790,6 @@ connP_update_on_obj_rename(
 {
     ABObj		obj = info->obj;
     AB_OBJECT_TYPE	ab_type = AB_TYPE_UNDEF;
-    ABObj       	module = obj_get_module(obj);
     int			iRet = 0;
 
     if ((obj != NULL) && (AB_conn_dialog != (Widget)NULL))
@@ -1860,7 +1860,7 @@ connP_update_on_show_status(
 		    set_ctrls_for_target(TRUE);
 	    }
 
-	    if (conn = connP_get_connection())
+	    if ((conn = connP_get_connection()))
 	    {
 		cur_conn_src_mod = obj_get_module(obj_get_from(conn));
 	    	cur_conn_target_mod = obj_get_module(obj_get_to(conn));
@@ -2056,7 +2056,6 @@ conn_cancelCB(
 )
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
-    DtbConnConnDialogInfo dtbSource = (DtbConnConnDialogInfo)clientData;
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
@@ -2090,7 +2089,6 @@ connP_make_connection(
     BOOL	is_cross_module = (BOOL)FALSE;
     STRING	vol_value = NULL,
 		loc_value = NULL;
-    BOOL        valid     = False;
 
     if ((c_source = connP_get_source()) == NULL ||
         connP_get_source_type() != obj_get_type(c_source))
@@ -2209,6 +2207,8 @@ connP_make_connection(
         /* Set SaveNeeded flag */
         abobj_set_save_needed(obj_get_module(c_source), TRUE);
 	break;
+      default:
+		break;
     }
 
     if (ab_action != (ABObj)NULL)
@@ -2367,6 +2367,8 @@ connP_change_connection(
 	    XmTextFieldSetString(location_field, "");
 	    XmTextFieldSetString(volume_field, "");
             break;
+	  default:
+	    break;
 	}
 	if (is_changed == TRUE)
 	{
@@ -2465,6 +2467,8 @@ connP_change_connection(
 	    XmTextFieldSetString(location_field, "");
 	    XmTextFieldSetString(volume_field, "");
             break;
+	  default:
+	    break;
 	}
 
 	XtFree(str_value);
@@ -2550,6 +2554,8 @@ connP_change_connection(
 	    XmTextFieldSetString(location_field, "");
 	    XmTextFieldSetString(volume_field, "");
             break;
+	  default:
+	    break;
 	}
 
 	XtFree(str_value);
@@ -2628,6 +2634,8 @@ connP_change_connection(
 		c_source : obj_get_module(c_source), TRUE);
 	    XmTextFieldSetString(location_field, "");
 	    XmTextFieldSetString(volume_field, "");
+            break;
+          default:
             break;
         }
         break;
@@ -2713,10 +2721,14 @@ connP_change_connection(
                     c_source : obj_get_module(c_source), TRUE);
 	    }
             break;
+          default:
+            break;
 	}
 	XtFree(loc_value);
 	XtFree(vol_value);
 	break;
+      default:
+	    break;
     }
     if (is_changed == TRUE)
     {
@@ -2793,6 +2805,7 @@ connP_register_connect_button(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -2810,6 +2823,7 @@ connP_register_change_button(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     /* Make Change button initially inactive */
@@ -2832,6 +2846,7 @@ connP_register_cancel_button(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     cancel_button = dtbSource->cancel_button;
@@ -2857,6 +2872,7 @@ connP_register_delete_button(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -2884,6 +2900,7 @@ connP_register_source_choices(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -2911,6 +2928,7 @@ connP_register_target_choices(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -2941,6 +2959,7 @@ connP_register_when_choices(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -2972,6 +2991,7 @@ connP_register_predef_act_choices(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -2999,6 +3019,7 @@ connP_register_view_choices(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3021,6 +3042,7 @@ connP_register_source_list(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3043,6 +3065,7 @@ connP_register_target_list(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3065,6 +3088,7 @@ connP_register_conn_list(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3087,6 +3111,7 @@ connP_register_arg_field(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3107,6 +3132,7 @@ connP_register_action_Predefined_item(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3128,6 +3154,7 @@ connP_register_action_Call_Function_item(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3149,6 +3176,7 @@ connP_register_action_Execute_Code_item(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -3194,6 +3222,7 @@ connP_register_action_on_item_help_item(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     on_item_help_item = widget;
@@ -3214,6 +3243,7 @@ connP_register_action_help_vol_item(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     
     help_volume_item = widget;
@@ -3234,6 +3264,7 @@ connP_register_loc_textf(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     location_rowcol = dtbSource->loc_textf_rowcolumn;
@@ -3255,6 +3286,7 @@ connP_register_vol_textf(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     volume_rowcol = dtbSource->vol_textf_rowcolumn;
@@ -3276,10 +3308,10 @@ connP_register_action_type_opmenu(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     
     XmString	xmstr = NULL;
-    STRING	label = NULL;
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     action_type_opmenu = widget;
@@ -3400,8 +3432,6 @@ connP_exec_code_okCB(
     STRING	code_frag = NULL;
     STRING      first_line = NULL;
     char        *newline = NULL;
-    DtbConnExecCodeDialogInfo	dtbSource =
-			(DtbConnExecCodeDialogInfo) clientData;
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
@@ -3509,7 +3539,6 @@ exec_code_cancelCB(
 )
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
-    DtbConnExecCodeDialogInfo   dtbSource = (DtbConnExecCodeDialogInfo)clientData;
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
@@ -3683,7 +3712,6 @@ connP_update_action_menu(
     XtPointer callData
 )
 {
-    ABObj		src_obj = connP_get_source();
     ABObj       	target_obj = connP_get_target();
     AB_OBJECT_TYPE      target_type = connP_get_target_type();
     Widget      	*w_list = NULL;
@@ -3827,9 +3855,6 @@ update_on_target_type_change(
 static void
 update_conn_ed_controls(void)
 {
-    AB_WHEN             g_when = AB_WHEN_UNDEF;
-    AB_FUNC_TYPE        g_func = AB_FUNC_UNDEF;
-    AB_BUILTIN_ACTION   g_act = AB_STDACT_UNDEF;
     AB_OBJECT_TYPE      source_type = AB_TYPE_UNDEF; 
     int			source_subtype = -1;
     AB_OBJECT_TYPE      target_type = AB_TYPE_UNDEF; 

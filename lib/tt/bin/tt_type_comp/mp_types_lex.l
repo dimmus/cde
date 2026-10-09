@@ -12,8 +12,6 @@ int input(void);
 void output(int);
 void unput(int);
 }
-static void skip_c_comments(void);
-static void skip_cplusplus_comments(void);
 %}
 
 %%

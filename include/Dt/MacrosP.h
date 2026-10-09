@@ -77,9 +77,15 @@
 
 /*	XmGadget Class Macros
 */
+#ifndef XmInheritBorderHighlight
 #define XmInheritBorderHighlight	((XtWidgetProc) _XtInherit)
+#endif
+#ifndef XmInheritBorderUnhighlight
 #define XmInheritBorderUnhighlight	((XtWidgetProc) _XtInherit)
+#endif
+#ifndef XmInheritVisualChange
 #define XmInheritVisualChange		((XmVisualChangeProc) _XtInherit)
+#endif
 
 
 

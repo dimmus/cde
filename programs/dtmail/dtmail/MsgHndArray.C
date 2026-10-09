@@ -111,11 +111,8 @@ void
 MsgHndArray::remove_entry(int position)
 {
     int i;
-    FORCE_SEGV_DECL(MsgStruct, tmpMS);
 
     if ((position < 0) || (position >= _length)) return;
-
-    tmpMS = _contents[position];
 
     for (i=position; i<(_length-1); i++)
       _contents[i] = _contents[i+1];

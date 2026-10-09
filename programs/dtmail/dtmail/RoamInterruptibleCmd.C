@@ -85,10 +85,6 @@ RoamInterruptibleCmd::execute (
 void 
 RoamInterruptibleCmd::execute()
 {
-    char *name_str;
-    
-    name_str = (char *) name();
-
     _done  = FALSE;  // Initialize flag
 
     // Let the derived class post the dialog.

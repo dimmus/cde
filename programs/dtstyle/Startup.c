@@ -510,9 +510,6 @@ SetConfirmCB(
         XtPointer client_data,
         XmToggleButtonCallbackStruct *call_data )
 {
-   int n;
-   Arg   args[2];
-   Boolean mode;
 
     if (call_data->set)
         style.smState.smConfirmMode = DtSM_VERBOSE_MODE;

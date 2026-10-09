@@ -193,8 +193,7 @@ projP_save_mod_proc(
     Vwr		v = NULL;
     VNode	*selected_nodes = NULL;
     VMethods	m;
-    int		num_selected = 0,
-		i;
+    int		num_selected = 0;
     AB_OBJ	*obj;
     STRING	file = NULL;
     BOOL	read_OK = FALSE, write_OK = FALSE;
@@ -315,8 +314,7 @@ projP_save_as_mod_proc(
     Vwr         v = NULL;
     VNode       *selected_nodes = NULL;
     VMethods    m;
-    int         num_selected = 0,
-                i;
+    int         num_selected = 0;
     AB_OBJ      *obj;
 
     XtVaGetValues(widget, XmNuserData, &v, NULL);
@@ -743,6 +741,7 @@ projP_set_userdata(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }

@@ -165,15 +165,6 @@ static void	jump_backslash_ungets(
 		    char	*buf
 		);
 
-/* These are obsolete functions and should go away eventually */
-static char *	nl_dup(
-		    char	*string
-		);
-static void	nl_puts(
-		    char	*string,
-		    FILE	*fp
-		);
-
 /* MsgSet Methods */
 
 MsgSet
@@ -633,7 +624,8 @@ msgFile_load(
     /* Read comment till first set */
     if (msgFile_read_top_comment(that) == FALSE)
     {
-        fclose(that->fp);
+        if (that->fp != (FILE *)NULL)
+            fclose(that->fp);
         that->fp = NULL;
         goto cret;
     }
@@ -1217,97 +1209,6 @@ out_str_puts(
 }
 
 
-/* 
-** NOTE: OBSOLETE FUNCTION -- do not use (for reference only)!
-**
-** Go through a string transforming the to character sequence '\' + 'n' into 
-** the single character '\n'.  All other character combinations will be
-** unaltered.
-*/
-static char *
-nl_dup(
-    char	*string
-)
-{
-    char	*ret_val = (char *)NULL;
-    char	*trav;
-    char	*start;
-    char	*end;
-    char	*dup_str = (char *)NULL;
-    int		cur_len = 0;
-    BOOL	done = (BOOL)FALSE;
-
-    if (string == (char *)NULL)
-	goto cret;
-
-    start = trav = string;
-
-    while (!done)
-    {
-	int	len;
-	int	offs = 1;
-
-	if ((end = strchr(trav, '\\')) == NULL)
-	    done = TRUE;
-	else
-	{
-	    if (*(end+1) != 'n')
-	    {
-		trav = end + 1;
-		continue;
-	    }
-	    else
-	    {
-		*end = '\0';
-		offs = 2;
-	    }
-	}
-
-	len = strlen(trav);
-	cur_len += len+offs;
-
-	if ((dup_str = (char *)realloc(dup_str, cur_len)) == NULL)
-	    goto cret;
-
-	if (cur_len == len+offs)
-	    strcpy(dup_str, start);
-	else
-	    strcat(dup_str, trav);
-	if (offs == 2)
-	    strcat(dup_str, "\n");
-	start = trav = end + offs;
-	offs = 1;
-    }
-
-    ret_val = dup_str;
-
-cret:
-    return(ret_val);
-}
-
-/*
-** NOTE: OBSOLETE FUNCTION -- do not use (for reference only)!
-*/
-static void
-nl_puts(
-    char	*string,
-    FILE	*fp
-)
-{
-    char	*trav = string;
-    char	*end;
-
-    while ((end = strchr(trav, '\n')) != NULL)
-    {
-	*end = '\0';
-	fputs(trav, fp);
-	fputs("\\n", fp);
-	*end = '\n';
-	trav = end+1;
-    }
-    fputs(trav, fp);
-}
-
 static BOOL
 get_set_number_and_name(
     FILE	*fp,
@@ -1319,7 +1220,6 @@ get_set_number_and_name(
     char	*buf;
     char	*trav;
     char	*sn;
-    char	comment[BUFSIZ];
     int		num;
 
     if ((buf = jump_backslash_gets(fp)) == NULL)

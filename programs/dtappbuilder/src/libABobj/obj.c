@@ -620,7 +620,6 @@ obj_set_name_from_label(ABObj obj, STRING parent_name_in)
 {
     STRING              parent_name = NULL;
     STRING		item_label = NULL;
-    STRING              new_name = NULL;
 
     parent_name =
 	(parent_name_in == NULL ?
@@ -656,7 +655,6 @@ int
 obj_set_name_from_parent(ABObj obj, STRING suffix)
 {
     STRING              parent_name;
-    STRING              new_name = NULL;
 
     parent_name = (obj->parent == NULL ?
 		   NULL

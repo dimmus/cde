@@ -266,6 +266,7 @@ connP_set_insensitive(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     /* widget is either the abort button or the abort menu item */
@@ -308,6 +309,7 @@ connP_set_termp_inactive(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     /* widget is the output term pane */
@@ -335,6 +337,7 @@ connP_init_termp(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     /* Make the cursor stop blinking. */

@@ -122,7 +122,6 @@ ShowHelpDialog(
 {
    HelpRec * helpRec;
    HelpData * helpData;
-   int count;
    char *helpName;
    char *tmpStr;
    DialogData * fmDialogData;
@@ -226,8 +225,6 @@ MainWindowHelpClose(
    FileMgrRec  * fileMgrRec = (FileMgrRec *) client_data;
    FileMgrData * fileMgrData;
    DialogData  * dialog_data;
-   int count;
-   int i, j;
 
    dialog_data = _DtGetInstanceData((XtPointer)fileMgrRec);
    fileMgrData = (FileMgrData *)dialog_data->data;
@@ -299,7 +296,6 @@ ShowTrashHelpDialog(
 {
    HelpRec * helpRec;
    HelpData * helpData;
-   int count;
    Arg args[3];
 
    /* Get the default values */
@@ -355,8 +351,6 @@ TrashHelpClose(
         DialogData *new_dialog_data )
 
 {
-   int count;
-   int i, j;
 
    /*  Remove the dialog data from the trash window's list  */
    if (old_dialog_data == primaryTrashHelpDialog)
@@ -425,7 +419,6 @@ ShowDTHelpDialog(
 {
    HelpRec * helpRec;
    HelpData * helpData;
-   int count;
    Arg args[3];
 
    /* 
@@ -495,8 +488,6 @@ DTHelpClose(
 
 {
    int  workspaceNum = (int)(XtArgVal) client_data;
-   int count;
-   int i, j;
    WorkspaceRec * wsInfo;
 
    wsInfo = desktop_data->workspaceData[workspaceNum];

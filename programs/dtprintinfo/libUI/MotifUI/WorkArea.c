@@ -88,7 +88,6 @@ static void NewLayout(WorkAreaWidget);
 static void ComputePositions(WorkAreaWidget, Widget, Dimension *, Dimension *,
                             Dimension, Dimension, int *, int *, int, int *);
 static void SetPositions(WorkAreaWidget, Widget);
-static int OpenedSubnodes(Widget);
 static void Resize(WorkAreaWidget);
 static void MakeChildVisible(Widget, XtPointer, XtPointer);
 static void ResizeTimeOut(Widget w, XtIntervalId *id);
@@ -456,7 +455,6 @@ Initialize(
    WorkAreaWidget new)
 {
    Arg             wargs[3];
-   WorkAreaConstraints workArea_const;
 
    /* Make sure the widget's width and height are greater than zero.  */
    if (request->core.width <= 0)
@@ -759,7 +757,6 @@ DeleteNode(
    Widget super_node,
    Widget node)
 {
-   WorkAreaConstraints node_const = WORKAREA_CONSTRAINT(node);
    WorkAreaConstraints super_const;
    int pos, i;
 
@@ -975,7 +972,7 @@ NewLayout(
    int cur_x, cur_y;
    Dimension new_width, new_height;
    Dimension replyWidth, replyHeight;
-   int i, j;
+   int i;
    int seen_one = 0;
    XtGeometryResult result;
 
@@ -1057,7 +1054,6 @@ ComputePositions(
 {
    int i;
    WorkAreaConstraints node_const = WORKAREA_CONSTRAINT(w);
-   Widget node, super_node;
    Dimension offset;
    Dimension line_offset = workArea->workArea.line_offset;
    Dimension node_line_length = workArea->workArea.node_line_length;
@@ -1270,30 +1266,6 @@ SetPositions(
    /* Set the positions of all sub_nodes. */
    for (i=0; i< node_const->workArea.n_sub_nodes;i++)
       SetPositions(workArea, node_const->workArea.sub_nodes[i]);
-}
-
-/*
- *   NAME:    OpenedSubnodes
- *   FUNCTION: 
- *   RETURNS:  
- */
-static int
-OpenedSubnodes(
-   Widget w)
-{
-   int i, n_subnodes = 0;
-   WorkAreaConstraints node_const;
-   WorkAreaConstraints workArea_const;
-
-   workArea_const = WORKAREA_CONSTRAINT(w);
-
-   for (i=0; i< workArea_const->workArea.n_sub_nodes;i++)
-    {
-      node_const = WORKAREA_CONSTRAINT(workArea_const->workArea.sub_nodes[i]);
-      if (node_const->workArea.is_opened == TRUE)
-         n_subnodes++;
-    }
-   return n_subnodes;
 }
 
 /*

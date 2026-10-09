@@ -95,7 +95,7 @@ int open_cgm_buffer(_DtGrStream *stream)
 static int get_b_bytes(unsigned char *out_ptr,
 		       int bytes_wanted, _DtGrStream *stream)
 {
-  int bytes_got, i;
+  int bytes_got;
   if (!begin_ptr) {
     burp(stderr, "haven't opened file yet !\n");
     return 0;
@@ -109,7 +109,7 @@ static int get_b_bytes(unsigned char *out_ptr,
   if (bytes_wanted % 2) burp(stderr, "odd %d bytes ?\n", bytes_wanted);
   
   /* move over bytes from input buffer */
-  for (i=0; (bytes_wanted > 0) && (in_ptr < endin_ptr); ++i) {
+  while ((bytes_wanted > 0) && (in_ptr < endin_ptr)) {
     *out_ptr++ = *in_ptr++;
     --bytes_wanted;
   }
@@ -134,7 +134,7 @@ static int get_b_bytes(unsigned char *out_ptr,
     endin_ptr = begin_ptr + bytes_got;
     in_ptr = begin_ptr;
     /* move over bytes from input buffer */
-    for (i=0; (bytes_wanted > 0) && (in_ptr < endin_ptr); ++i) {
+    while ((bytes_wanted > 0) && (in_ptr < endin_ptr)) {
       *out_ptr++ = *in_ptr++;
       --bytes_wanted;
     }

@@ -149,7 +149,6 @@ FileWindowExposeCallback(
    DialogData  * dialog_data;
    FileMgrData * file_mgr_data;
    XmDrawingAreaCallbackStruct * da_cbs;
-   int i;
 
    file_mgr_rec = (FileMgrRec *) client_data;
    dialog_data = _DtGetInstanceData ((XtPointer)file_mgr_rec);
@@ -1026,7 +1025,7 @@ GetSelectionRectangle(
    int x4, y4;
    int old_x, old_y;
    int temp, j, i;
-   int pixmap_x, pixmap_y, pixmap_x1, pixmap_y1;
+   int pixmap_x, pixmap_y;
    int directory_count;
     
    Window root, sub_win;
@@ -1054,11 +1053,9 @@ GetSelectionRectangle(
    FileViewData *file_view_data;
    
    Position x,y;
-   Dimension highlightThickness, shadowThickness;
-   Dimension width, height;
-   Dimension marginWidth, marginHeight;
+   Dimension highlightThickness;
    Dimension pixmapWidth, pixmapHeight;
-   Dimension stringWidth, stringHeight;
+   Dimension stringWidth;
    unsigned char pixmapPosition;
    unsigned char alignment;
 
@@ -1439,20 +1436,16 @@ GetSelectionRectangle(
                g = (DtIconGadget) file_view_data->widget;
 
                highlightThickness = g->gadget.highlight_thickness;
-               shadowThickness = g->gadget.shadow_thickness;
 
                x = g->rectangle.x;
                y = g->rectangle.y;
       
-               marginWidth = g->icon.cache->margin_width;
-               marginHeight = g->icon.cache->margin_height;
                pixmapPosition = g->icon.cache->pixmap_position;
                alignment = g->icon.cache->alignment;
 
                pixmapWidth = g->icon.pixmap_width;
                pixmapHeight = g->icon.pixmap_height;
                stringWidth = g->icon.string_width;
-               stringHeight = g->icon.cache->string_height;
 
                switch ((int) pixmapPosition)
                {
@@ -1899,7 +1892,6 @@ DrawHighlight (
    int n, num_rectangles;
    Position x,y;
    Dimension highlightThickness, shadowThickness;
-   Dimension half_shadowThickness;
    Dimension marginWidth, marginHeight;
    Dimension pixmapWidth, pixmapHeight;
    Dimension stringWidth, stringHeight;
@@ -1985,11 +1977,6 @@ DrawHighlight (
 
    adj_x = shadowThickness + highlightThickness + marginWidth;
    adj_y = shadowThickness + highlightThickness + marginHeight;
-   
-   if(shadowThickness != 0)
-     half_shadowThickness = shadowThickness/2;
-   else
-     half_shadowThickness = 0;
 
    num_rectangles = 0;
    switch ((int) pixmapPosition)

@@ -54,11 +54,6 @@
  * ________________________________________________________________________
  */
 
-#ifndef lint
-static char *RCSid =
-  "$XConsortium: info.c /main/3 1996/06/19 17:13:13 drk $";
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>

@@ -453,10 +453,9 @@ create_copydir_dialog(
 	char *target)
 {
   Arg args[10];
-  int n;
   XmString xm_string;
   Widget form, form1, action_area, summary_label, separator2;
-  Widget source_label, source_text_field, target_label, target_text_field;
+  Widget source_label, target_label;
   char   target_folder[MAX_PATH], target_object[MAX_PATH];
 
   Pixel background;
@@ -587,8 +586,7 @@ create_copydir_dialog(
 
   xm_string = XmStringCreateLocalized(tsource);
 
-  source_text_field =
-    XtVaCreateManagedWidget("source_text_field",
+  XtVaCreateManagedWidget("source_text_field",
 			    xmLabelWidgetClass,
 			    form1,
 			    XmNlabelString,     xm_string,
@@ -642,8 +640,7 @@ create_copydir_dialog(
   }
 
   xm_string = XmStringCreateLocalized(target_folder);
-  target_text_field =
-    XtVaCreateManagedWidget("target_text_field",
+  XtVaCreateManagedWidget("target_text_field",
 			    xmLabelWidgetClass,
 			    form1,
 			    XmNlabelString,     xm_string,

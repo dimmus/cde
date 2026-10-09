@@ -497,7 +497,7 @@ ReadDisplayEntry(
     	}
     }
     prev = &d->hosts;
-    while (h = ReadHostEntry (file))
+    while ((h = ReadHostEntry (file)))
     {
 	if (h->type == HOST_CHOOSER)
 	{
@@ -525,7 +525,7 @@ ReadAccessDatabase(
     DisplayEntry    *d, **prev;
 
     prev = &database;
-    while (d = ReadDisplayEntry (file))
+    while ((d = ReadDisplayEntry (file)))
     {
 	*prev = d;
 	prev = &d->next;

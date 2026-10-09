@@ -266,9 +266,6 @@ static String GrowBuffer(
                         String buf,
                         int *size,
                         int extra) ;
-static String MakeAbsolute(
-                        String current_directory,
-                        String path) ;
 static Boolean FindProcessStarted(
                         FindRec *find_rec,
                         FindData *find_data) ;
@@ -361,11 +358,12 @@ Create(
         XtPointer *dialog )
 {
    FindRec * find_rec;
-   Widget shell, form, form1, form2;
+   Widget shell, form, form2;
    Widget newFM, outputSeparator;
    Widget headLabel, contentLabel, contentText;
    Widget filterText, filterLabel, listLabel, scrolledList, dirName, dirLabel;
 #if defined(sun)
+   Widget form1;
    Widget followLink, followLinkPD;
 #endif
    Widget putOnDT, separator;
@@ -375,7 +373,6 @@ Create(
    Arg args[12];
    int n;
    XtTranslations trans_table;
-   char * tmpStr;
 
    /* Initialize some global varibles */
    buffer = NULL;
@@ -999,7 +996,6 @@ GetResourceValues(
 {
    FindData * find_data;
    Dummy dummy;
-   static Boolean convertersAdded = False;
 
 
    /*  Allocate and get the resources for find file dialog data.  */
@@ -1148,7 +1144,6 @@ WriteResourceValues(
 {
    FindData * find_data = (FindData *) values->data;
    FindRec  * find_rec;
-   Arg args[2];
    Dummy dummy;
 
 
@@ -1656,31 +1651,6 @@ GrowBuffer(
 
 /************************************************************************
  *
- *  MakeAbsolute()
- *	Change relative path to absolute one.
- *
- ************************************************************************/
-
-static String
-MakeAbsolute(
-        String current_directory,
-        String path )
-{
-   String absPath;
-
-   absPath = XtMalloc (strlen (path) + strlen (current_directory) + 2);
-   (void) strcpy (absPath, current_directory);
-   (void) strcat (absPath, "/");
-   (void) strcat (absPath, path);
-
-   return (absPath);
-}
-
-
-
-
-/************************************************************************
- *
  *  FindProcessStarted()
  *      Determine whether to do a 'find' or a 'grep'.
  *
@@ -1720,7 +1690,10 @@ ExecuteFind(
    String findptr;
    String host;
    String path;
+#if defined (SVR4) || defined(_AIX) || \
+    !(defined(__linux__) || defined(CSRG_BASED) || defined(BLS))
    int access_priv;
+#endif
    XmString label_string;
    char *tmpStr;
    Arg args[1];
@@ -1731,8 +1704,6 @@ ExecuteFind(
 #endif /* SVR4 */
    char *link_path;
    void (*oldSig)();
-   Tt_status tt_status;
-   int rv;
 
    if(strcmp(find_data->content, "") == 0)
    {
@@ -1795,23 +1766,23 @@ ExecuteFind(
 /* needed for getaccess () call */
    save_ruid = getuid();
 #if !defined(SVR4)
-   rv = setreuid(geteuid(),-1);
+   setreuid(geteuid(),-1);
 #else
-   rv = setuid(geteuid());
+   setuid(geteuid());
 #endif
    save_rgid = getgid();
 #if !defined(SVR4)
-   rv = setregid(getegid(),-1);
+   setregid(getegid(),-1);
 #else
-   rv = setgid(getegid());
+   setgid(getegid());
 #endif
    access_priv = access (path, R_OK);
 #if !defined(SVR4)
-   rv = setreuid(save_ruid,-1);
-   rv = setregid(save_rgid,-1);
+   setreuid(save_ruid,-1);
+   setregid(save_rgid,-1);
 #else
-   rv = setuid(save_ruid);
-   rv = setgid(save_rgid);
+   setuid(save_ruid);
+   setgid(save_rgid);
 #endif
 
 
@@ -1819,12 +1790,12 @@ ExecuteFind(
    {
 #else
 #  if defined(__linux__) || defined(CSRG_BASED)
-   rv = setreuid(geteuid(),-1);
+   setreuid(geteuid(),-1);
    if (access ((char *) path, R_OK) == -1)
    {
 #  else
 #    ifdef BLS
-   rv =setresuid(geteuid(),-1,-1);
+   setresuid(geteuid(),-1,-1);
    if (access ((char *) path, R_OK) == -1)
    {
 #    else
@@ -2039,7 +2010,7 @@ ExecuteGrep( FindRec * find_rec)
       (void) strcat (command, ptr);
       (void) strcat (command, " ");
       *ptr2 = ',';
-      *ptr2++;
+      ptr2++;
       ptr = ptr2;
    }
 
@@ -2107,7 +2078,6 @@ AlternateInputHandler(
    int count = 0;
    Arg args[1];
    char * findptr;
-   char * end;
    struct stat stat_data;
    int item_count;
    char * title;
@@ -2608,7 +2578,7 @@ ExtractDirectory(
       return (True);
    }
 
-   if(findptr = strrchr (path, '/'))
+   if((findptr = strrchr (path, '/')))
    {
      *findptr = '\0';
      findptr++;
@@ -2863,7 +2833,9 @@ SetFocus(
 FILE *
 findpopen(char *cmd, char *mode, int *childpid)
 {
+#ifdef DEBUG
    static char *pname = "findpopen";
+#endif
    int     fd[2];
    int parentside, childside;
 

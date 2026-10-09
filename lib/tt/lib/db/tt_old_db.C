@@ -1169,7 +1169,7 @@ _Tt_old_db::verifyAccess (const _Tt_string        &key,
 
       // If the user in the DB is -1, all users match
       bool_t user_flag = FALSE;
-      if (user == -1) {
+      if (user == (uid_t)-1) {
         user_flag = TRUE;
       }
       else {
@@ -1180,7 +1180,7 @@ _Tt_old_db::verifyAccess (const _Tt_string        &key,
 
       // If the group in the DB is -1, all groups match
       bool_t group_flag = FALSE;
-      if (group == -1) {
+      if (group == (gid_t)-1) {
         group_flag = TRUE;
       }
       else {

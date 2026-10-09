@@ -442,7 +442,6 @@ separator_prop_apply(
     PropSepSettingsRec 	*pss = &(prop_sep_settings_rec[type]);
     STRING		value;
     AB_ORIENTATION	orient;
-    BOOL		size_chg = False;
     BOOL		orient_chg = False;
     BOOL		style_chg = False;
     BOOL		reset_bg = False;
@@ -480,7 +479,6 @@ separator_prop_apply(
             abobj_set_xy(pss->current_obj,
                 prop_geomfield_get_value(&(pss->geometry), GEOM_X),
                 prop_geomfield_get_value(&(pss->geometry), GEOM_Y));
-        size_chg = True;
     }
     if (prop_changed(pss->init_state.changebar))
     {

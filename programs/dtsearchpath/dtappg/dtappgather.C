@@ -104,8 +104,8 @@ AppManagerDirectory::AppManagerDirectory
 	CDEEnvironment * user,
 	const CString &  app
 	) : user_(user),
-	    langVersionFound(0),
-	    appsp_(app)
+	    appsp_(app),
+	    langVersionFound(0)
 {
     // Set the users Application Manager subdirectory
 
@@ -286,7 +286,7 @@ void AppManagerDirectory::GatherAppsFromASearchElement
 
 	user_->OS()->setUserId();
 
-	while (direntry = iter()) {
+	while ((direntry = iter())) {
 	    CString dname(direntry->d_name);
 	    if (user_->OS()->isDirectory(source + "/" + dname)
 	     || user_->OS()->isFile(source + "/" + dname))

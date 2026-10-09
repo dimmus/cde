@@ -51,23 +51,6 @@ clearEnhancements
 );
 
 static void
-insertEnhancements
-(
-    TermBuffer tb,
-    short      row,
-    short      col,
-    short      insertCount
-);
-
-static void
-deleteEnhancement
-(
-    TermBuffer tb, 
-    short      row,
-    short      col
-);
-
-static void
 _DtTermClearEnhancements
 (
     TermBuffer tb,
@@ -95,14 +78,6 @@ _DtTermGetEnhancement
     enhValue            **enhancements,
     short                *count,
     const countSpec       countWhich
-);
-
-static termChar *
-_DtTermGetCharacterPointer
-(
-    TermBuffer  tb,
-    short       row,
-    short       col
 );
 
 static void
@@ -140,32 +115,12 @@ _DtTermDeleteEnhancement
     short       width
 );
 
-static short
-_DtTermInsert
-(
-    TermBuffer  tb,
-    short       row,
-    short       col,
-    termChar   *newChars,
-    short       numChars,
-    Boolean     insertFlag,   /* if TRUE, insert, else overwrite        */
-    termChar  **returnChars,  /* pointer to overflow buffer             */
-    short      *returnCount   /* count of characters in overflow buffer */
-);
-
 static Boolean
 _DtTermSetLineLength
 (
     TermBuffer      tb,
     short           row,
     short           newLength
-);
-
-static short
-_DtTermGetLineLength
-(
-    TermBuffer      tb,
-    short           row
 );
 
 static Boolean
@@ -207,7 +162,6 @@ _DtTermBufferCreateBuffer
     const short   sizeOfEnh
 )
 {
-    int             i;
     TermBuffer      newTB;
     DtLine    *lines;
 
@@ -608,7 +562,6 @@ _DtTermDeleteEnhancement
 )
 {
     DtEnh           enh;
-    DtTermEnhPart   fillEnh;
     DtLine          line;
     int             copyCount;
     
@@ -720,7 +673,6 @@ _DtTermSetEnhancement
     enhValue        value
 )
 {
-    int     i;
     DtEnh   enhState;
     
     enhState = (DtEnh) &(DT_ENH_STATE(tb));

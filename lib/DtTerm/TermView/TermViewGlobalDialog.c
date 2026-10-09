@@ -479,7 +479,6 @@ ApplyGlobalOptionsDialogCallback
     int			  ac;
     Arg			  al2;
     char		 *c1;
-    int			  i1;
     int			  blinkRate;
 
     ac = 0;
@@ -623,9 +622,7 @@ _DtTermViewCreateGlobalOptionsDialog
     Widget		  label;
     Widget		  pulldown;
     Widget		  tmp;
-    Widget		  separator;
     Widget		  button;
-    Widget		  cancel;
     Widget		  reset;
     XmString		  string;
     XmString		  helpString;

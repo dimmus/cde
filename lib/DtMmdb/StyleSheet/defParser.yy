@@ -64,7 +64,6 @@ extern int yylex();
 
 %type<valueListPtrData>
 	ValueList
- 	ValueListOpt
 
 %type<typeValuesPtrData>
 	TypeValues

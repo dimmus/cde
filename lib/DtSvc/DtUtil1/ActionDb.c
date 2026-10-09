@@ -280,31 +280,6 @@ _DtActFieldBitLookup(char *name)
 
 /******************************************************************************
  *
- * _DtActFieldNameLookup
- *	Lookup the name string associated with the given mask bit in the array
- *	of names and field bits.  If the mask bit is not recognized return the
- *      default value associated with the NULL field name  (i.e. 0 ).
- *
- ******************************************************************************/
- 
-static char *
-_DtActFieldNameLookup(long bitmask)
-{
-	int j;
-
-	if ( !bitmask )
-		return NULL;
-
-	for ( j = 0; j < NUM_FIELD_NAMES; j++ )
-		if ( _DtActNamesAndBits[j].bit == bitmask )
-			break;	/* found matching field name */
-
-	return _DtActNamesAndBits[j].name;
-}
-
-
-/******************************************************************************
- *
  * _DtActDupFieldNameCheck
  *	return True if "name" duplicates an existing fieldName.
  *

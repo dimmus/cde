@@ -568,7 +568,7 @@ highlight_search_hit(_DtCvSegment* seg, unsigned int vcc, unsigned int vlen)
 	else {
 	    unsigned char *seg_str = (unsigned char*)seg->handle.string.string;
 
-	    for (int i = 0; i < rel_vcc; ++i) {
+	    for (unsigned int i = 0; i < rel_vcc; ++i) {
 		if (ISSPACE_C(*seg_str)) {
 		    ++seg_str;
 		    continue;
@@ -580,7 +580,7 @@ highlight_search_hit(_DtCvSegment* seg, unsigned int vcc, unsigned int vlen)
 		else seg_str += mbl;
 	    }
 
-	    for (int i = 0; i < vlen; ++i) {
+	    for (unsigned int i = 0; i < vlen; ++i) {
 		if (ISSPACE_C(*seg_str)) {
 		    ++seg_str;
 		    ++len;

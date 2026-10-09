@@ -221,7 +221,7 @@ static unsigned int proximity2relevance(int prox)
     else
 	inv_prox = 1 / (float)prox; // 0 to 1;
 
-    return (unsigned int)(inv_prox * DtSR_SearchResultsEntry::Utmost_Relevance);
+    return (unsigned int)(inv_prox * (int)DtSR_SearchResultsEntry::Utmost_Relevance);
 }
 
 unsigned int

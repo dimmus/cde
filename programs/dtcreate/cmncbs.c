@@ -71,11 +71,9 @@ int     (*sigchildRoutine)();
 void activateCB_open_FindSet (Widget find_set_button, XtPointer cdata,
                               XmFileSelectionBoxCallbackStruct *cbstruct)
 {
-  Widget filter;
   XtArgVal /* Boolean */ use_bm = False;
   static char *use_bm_filter = "*.m.bm";
   static char *use_pm_filter = "*.m.pm";
-  char *search_path;
   char *filter_field_title = NULL;
   int use_filter_field = False;
   char *file_filter;
@@ -199,16 +197,13 @@ void activateCB_edit_icon (Widget wid, XtPointer client_data,
                            XmPushButtonCallbackStruct *cbs)
 {
   char    *pszIconToEdit;
-  Boolean IsActionIcons;
 
   if (bIconEditorDisplayed) return;
 
   if ((int)(XtArgVal)client_data == CA_ACTION_ICONS) {
-     IsActionIcons = True;
      widSelectedIcon = get_selected_action_icon();
      widEditSource = CreateActionAppShell;
   } else {
-     IsActionIcons = False;
      widSelectedIcon = (Widget)get_selected_filetype_icon();
      widEditSource = AddFiletype;
   }

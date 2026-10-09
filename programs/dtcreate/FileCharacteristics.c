@@ -173,6 +173,7 @@ ushort GetContentsType(void)
     return((ushort)CA_FT_CNTLONG);
   }
   /* NOTREACHED */
+  return((ushort)0);
 }
 
 /******************************************************************************/
@@ -188,7 +189,6 @@ void Save_FileChar_Info(void)
 {
   FiletypeData *pFtD;
   char         *ptr = (char *)NULL;
-  short        sContentsType;
 
   /**************************************************************************/
   /* Clear file characteristics text widget on the AddFiletype dialog.      */
@@ -351,8 +351,7 @@ void ParseAndUpdateID(FiletypeData *pFtD)
 /*****************************************************************************/
 void CalculateAND(void)
 {
-  XtArgVal /* Boolean */ set1, set2, set3, set4;
-  int     cnt;
+  XtArgVal /* Boolean */ set1, set2, set3;
 
   XtVaGetValues(FC_NameOrPathToggle, XmNset, &set1, NULL);
   XtVaGetValues(FC_PermissionToggle, XmNset, &set2, NULL);
@@ -360,7 +359,6 @@ void CalculateAND(void)
   XtSetSensitive(FC_AndLabel1, False);
   XtSetSensitive(FC_AndLabel2, False);
 
-  cnt = (int)set1 + (int)set2 + (int)set3;
     if (set1 && (set2 || set3))
           XtSetSensitive(FC_AndLabel1, True);
     if (set2 && set3)

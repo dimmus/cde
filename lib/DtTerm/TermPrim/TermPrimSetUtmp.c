@@ -216,8 +216,9 @@ _pututline(struct utmp *ut)
 void
 _DtTermPrimUtmpInit(Widget w)
 {
-    char buffer[BUFSIZ];
+#if defined(XTHREADS) && defined(XUSE_MTSAFE_API) && defined(AIXV3)
     char *c;
+#endif
     struct passwd * pw_ret;
     _Xgetpwparams pw_buf;
 
@@ -225,9 +226,13 @@ _DtTermPrimUtmpInit(Widget w)
     _Xgetloginparams login_buf;
 
 #ifdef UT_ADDR
+    char buffer[BUFSIZ];
     struct hostent *		name_ret;
     _Xgethostbynameparams	name_buf;
 #endif
+
+    (void) pw_buf;	/* unused unless XTHREADS */
+    (void) login_buf;	/* unused unless XTHREADS */
 
     _DtTermProcessLock();
 
@@ -280,7 +285,6 @@ _DtTermPrimUtmpInit(Widget w)
 char *
 _DtTermPrimUtmpGetUtLine(int pty, char *ptyName)
 {
-    Boolean closePty = False;
     char *c;
 
 #ifdef	DKS
@@ -288,6 +292,7 @@ _DtTermPrimUtmpGetUtLine(int pty, char *ptyName)
      * returned by ttyname())...
      */
     _Xttynameparams tty_buf;
+    Boolean closePty = False;
 
     /* if we weren't passed a pty, let's try opening ptyName.  By using
      * O_NOCTTY we are able to open the pty without accidentally becoming
@@ -323,14 +328,12 @@ static char *
 UtmpEntryCreate(Widget w, pid_t pid, char *utmpLine)
 {
 #if !defined(CSRG_BASED) /* XXX */
-    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct utmp ut;
     struct utmp *utPtr;
     char *c;
-    char *displayName;
     time_t now;
-    Boolean closePty = False;
 #ifdef	UT_HOST
+    char *displayName;
     char *seat;
 #endif	/* UT_HOST */
 #ifdef	UT_ADDR
@@ -358,7 +361,7 @@ UtmpEntryCreate(Widget w, pid_t pid, char *utmpLine)
 	(void) strncpy(utPtr->ut_id, utmpLine,
 		sizeof(utPtr->ut_id));
 #elif defined(__linux__) || defined(sun)
-	if (c = strchr(utmpLine, '/')) {
+	if ((c = strchr(utmpLine, '/'))) {
 	    c++;
 	} else {
 	    c = utmpLine;
@@ -496,7 +499,7 @@ UtmpEntryDestroy(Widget w, char *utmpLine)
     ut.ut_type = USER_PROCESS;
     snprintf(ut.ut_line, sizeof(ut.ut_line), "%s", utmpLine);
     (void) setutent();
-    if (utPtr = getutline(&ut)) {
+    if ((utPtr = getutline(&ut))) {
 	utPtr->ut_type = DEAD_PROCESS;
 #if !defined(__linux__)
 	utPtr->ut_exit.e_termination = 0;

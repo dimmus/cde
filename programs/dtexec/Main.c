@@ -531,7 +531,6 @@ SigCld(void)
 static void
 InitializeSignalHandling( void )
 {
-   long                    oldMask;
    struct sigaction        svec;
 
    /*
@@ -634,7 +633,6 @@ ExecuteCommand (
 	char **commandArray)
 {
    int i, index1;
-   int exitStatus;
    struct sigaction svec;
 
    for (index1 = 0; (index1 < 10) && ((childPidG = fork()) < 0); index1++) {
@@ -1002,7 +1000,6 @@ Tt_callback_action IdSelfToCallerReplyCB(
 {
     Tt_state state;
     Tt_status status;
-    char *errorMsg;
 
 
     status = tt_message_status(msg);
@@ -1014,9 +1011,9 @@ Tt_callback_action IdSelfToCallerReplyCB(
 	 * message into a log file.  May have to wrap long messages.
 	 */
 	if (status < TT_ERR_LAST)
-	    errorMsg = tt_status_message(status);
+	    (void) tt_status_message(status);
 	else
-	    errorMsg = tt_message_status_string(msg);
+	    (void) tt_message_status_string(msg);
 
 	dtexec_tttk_message_destroy(msg);
 	DetachFromTooltalk(NULL);
@@ -1083,7 +1080,6 @@ Tt_callback_action DoneRequestReplyCB(
     Tt_pattern pattern)
 {
     Tt_state state;
-    Tt_status replyStatus;
 
 
     state = tt_message_state(msg);

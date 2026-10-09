@@ -100,7 +100,7 @@ ge_add_to_gappt_list(Access_data *ad, int idx, GEditor *ge, Boolean reset) {
 	char			buf[DEFAULT_GAPPT_LEN], *name1, *name2 = NULL;
 	Props			*p = (Props *)ge->cal->properties;
 	XmString		str;
-	List_data		*step = NULL, *last = NULL;
+	List_data		*step = NULL;
 	CSA_return_code		stat;
 	DisplayType		dt = get_int_prop(p, CP_DEFAULTDISP);
 	Dtcm_appointment	*appt;
@@ -236,11 +236,10 @@ ge_list_select_proc(Widget w, XtPointer client_data, XtPointer data) {
 	int			cnt;
 	GEditor			*ge = (GEditor *)client_data;
 	CSA_entry_handle	a;
-	List_data		*ld;
 	Access_data		*ad, *step_ad;
 	XmListCallbackStruct	*cbs = (XmListCallbackStruct *)data;
 
-	if (a = geditor_nth_appt(ge, cbs->item_position, &ad))
+	if ((a = geditor_nth_appt(ge, cbs->item_position, &ad)))
 		appt_to_form(ge, a, (ad && ad->name) ? ad->name : "\0", ad->version);
 	XmListDeselectAllItems(ge->access_list);
 	if (!ad || !ad->name)
@@ -261,7 +260,6 @@ ge_list_select_proc(Widget w, XtPointer client_data, XtPointer data) {
 static void
 ge_set_modify_buttons(GEditor *ge, int cnt) {
 	char	buf[MAXNAMELEN];
-	Boolean	val;
 
 	if (cnt == 1)
 		sprintf(buf, "%d %s.", cnt,
@@ -336,7 +334,6 @@ static void
 ge_mail_proc(Widget w, XtPointer client_data, XtPointer data) {
 	GEditor		*ge = (GEditor *)client_data;
 	Calendar	*c = ge->cal;
-	Props_pu	*p = (Props_pu *)ge->cal->properties_pu;
         Tt_message      msg;
         Tt_status       status;
         char            *appointment_buf;
@@ -385,7 +382,6 @@ nt */
 */
 static void
 ge_build_expand(GEditor *ge) {
-	Props		*p = (Props *)ge->cal->properties;
 	XmString	xmstr;
 	Calendar	*c = ge->cal;
 	Widget		widgets[20];
@@ -701,7 +697,6 @@ ge_insert_proc(Widget w, XtPointer client_data, XtPointer data) {
 	CSA_return_code		stat;
 	Access_data		*ad;
 	Dtcm_appointment	*appt;
-	XmListCallbackStruct	*lcb = (XmListCallbackStruct *)data;
 
 	_DtTurnOnHourGlass(ge->frame);
 	XmListGetSelectedPos(ge->access_list, &c_list, &c_cnt);
@@ -799,7 +794,7 @@ ge_insert_proc(Widget w, XtPointer client_data, XtPointer data) {
 
 static void
 ge_delete_proc(Widget w, XtPointer client_data, XtPointer data) {
-	int			*item_list = NULL, item_cnt = 0, c_cnt, i;
+	int			*item_list = NULL, item_cnt = 0, c_cnt;
 	GEditor			*ge = (GEditor *)client_data;
 	Calendar		*c = ge->cal;
 	Props_pu		*p = (Props_pu *)ge->cal->properties_pu;
@@ -968,7 +963,7 @@ ge_delete_proc(Widget w, XtPointer client_data, XtPointer data) {
 
 static void
 ge_change_proc(Widget w, XtPointer client_data, XtPointer data) {
-	int			*item_list = NULL, item_cnt = 0, c_cnt, i;
+	int			*item_list = NULL, item_cnt = 0, c_cnt;
 	GEditor			*ge = (GEditor *)client_data;
 	Calendar		*c = ge->cal;
 	Props_pu		*p = (Props_pu *)c->properties_pu;
@@ -1251,7 +1246,6 @@ static void
 ge_make_editor(Calendar *c) {
 	int		cnt;
 	Arg		args[15];
-	char		*buf;
         GEditor		*ge = (GEditor *)c->geditor;
 	Props_pu	*p = (Props_pu *)c->properties_pu;
 	XmString	xmstr;
@@ -1259,7 +1253,6 @@ ge_make_editor(Calendar *c) {
         XtTranslations  new_translations;
 	Boolean		btn1_transfer;
 	Widget		second_list_label;
-	Widget		second_access_label;
 	XFontSetExtents listfontextents;
         static char     translations[] = "\
                 ~c ~s ~m ~a <Btn1Down>:\
@@ -1589,7 +1582,7 @@ ge_make_editor(Calendar *c) {
 	XtSetArg(args[cnt], XmNleftAttachment, XmATTACH_OPPOSITE_WIDGET); ++cnt;
 	XtSetArg(args[cnt], XmNleftWidget, ge->access_list_sw); ++cnt;
 	XtSetArg(args[cnt], XmNleftOffset, 23 * listfontextents.max_logical_extent.width); ++cnt;
-	second_access_label = XmCreateLabelGadget(ge->base_form_mgr,
+	XmCreateLabelGadget(ge->base_form_mgr,
 		"second_access_label", args, cnt);
 	XmStringFree(xmstr);
 
@@ -1684,14 +1677,12 @@ add_to_gaccess_list(
 	char		access, *buf;
 	XmString	xmstr;
 	Calendar	*c;
-	Props_pu	*p;
 	Access_data	*new_data = NULL;
 
 	if (!ge)
 		return;
 
 	c = ge->cal;
-	p = (Props_pu *)c->properties_pu;
 
 	while (ge->access_data && cnt <= ge->access_data->count) {
 		new_data = (Access_data *)

@@ -241,8 +241,7 @@ ConvertDaily(
 {
 	char	 	tmp_buf[32];
 	unsigned int	size = 0,
-		 	num_time,
-		 	i;
+		 	num_time;
 
 	num_time = RE_DAILY(re)->dd_ntime;
 
@@ -398,11 +397,7 @@ ConvertYearly(
 	unsigned int	 subcommand_size)
 {
 	char	 tmp_buf[32];
-	int	 size = 0,
-		 num_items,
-		 i;
-
-	num_items = RE_YEARLY(re)->yd_nitems;
+	int	 size = 0;
 
 	if (re->re_type == RT_YEARLY_MONTH)
 		sprintf(subcommand, "YM%d", re->re_interval);

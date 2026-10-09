@@ -80,7 +80,7 @@ make_find(Calendar *c)
 							CP_DATEORDERING);
 	SeparatorType 	 sep = get_int_prop((Props *)c->properties, 
 							CP_DATESEPARATOR);
-	Tick		 cursor, begin_range, end_range;
+	Tick		 cursor;
 	char		 buffer[50];
 	int		 i;
 	void 		 find_appts(), show_appt(), f_cancel_cb(), 
@@ -530,6 +530,7 @@ fmt_time_what(
         struct tm 		*tm;
 	char			 tmp[16];
 	_Xltimeparams		 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
         if(!appt || !buf) return;
         _csa_iso8601_to_tick(appt->time->value->item.string_value, &tick);
@@ -563,20 +564,14 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 {
 	Calendar *c = calendar;
 	Props *p = (Props*)c->properties;
-	OrderingType ot = get_int_prop(p, CP_DATEORDERING);
 	DisplayType dt = get_int_prop(p, CP_DEFAULTDISP);
-	SeparatorType sep = get_int_prop(p, CP_DATESEPARATOR);
 	Find *f = (Find*)c->find;
-	int mos, i, j, range_count;
-	char *location;
-	Dimension w, h;
+	int i, j, range_count;
         char what_buf[WHAT_LEN+1], buf[WHAT_LEN+1], buf2[WHAT_LEN+1], message[40], *astr;
 	XmString buf_str;
-        int num_items, mo, last_match_total = 0, match_total = 0;
-        pr_pos xy;
+        int last_match_total = 0, match_total = 0;
 	Tick end_of_time, start, stop;
 	Tick_list *ptr, *next_ptr, *tail_ptr = NULL, *new_tick;
-	CSA_session_handle cal = 0;
 	CSA_return_code stat;
         CSA_entry_handle *entries = NULL;
 	CSA_enum *ops;
@@ -586,6 +581,7 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 	int comparison_length;
 	Tick	real_eot = get_eot();
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	astr = XmTextGetString(f->apptstr);
 
@@ -771,7 +767,6 @@ show_appt(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs)
 {
 	Calendar *c = calendar;
 
-	Props *p = (Props*)c->properties;
 	Find *f = (Find*)c->find;
 	int *pos_list;
 	int pos_cnt;

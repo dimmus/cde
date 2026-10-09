@@ -57,9 +57,7 @@ gil_load_file(
     int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     STRING              errmsg = NULL;
-    ABObj               obj = NULL;
     ABObj               interface = NULL;
-    AB_FILE_TYPE        file_type = AB_FILE_UNDEF;
     FILE               *gilInFile = NULL;
 
     /* printf("gil_load_file(%s)\n", gil_file); */
@@ -278,7 +276,6 @@ gil_load_project_file_and_resolve_all(
     int                 return_value = 0;
     int                 rc = 0;
     ABObj		project = NULL;
-    int			i = 0;
     ABObj		interface = NULL;
     AB_TRAVERSAL	trav;
 

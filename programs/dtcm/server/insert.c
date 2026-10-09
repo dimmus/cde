@@ -84,7 +84,6 @@ _DtCmsInsertEntry(_DtCmsCalendar *cal, cms_entry *entry)
 	Rb_Status	rb_stat;
 	List_node	*lnode = NULL;
 	cms_entry	*newptr;
-	time_t		current_time;
 	time_t		key, tick, endtime;
 	char		*date, buf[80];
 	CSA_opaque_data	opq;
@@ -93,7 +92,6 @@ _DtCmsInsertEntry(_DtCmsCalendar *cal, cms_entry *entry)
 	RepeatEventState *res = NULL;
 	extern		void _DtCm_rule_parser();
 	uint		count;
-	int		i;
 
 	if (cal == NULL || entry == NULL)
 		return (CSA_E_INVALID_PARAMETER);
@@ -228,8 +226,6 @@ _DtCmsInsertEntryAndLog(_DtCmsCalendar *cal, cms_entry *entry)
 static boolean_t
 _IsOnetimeEntry(cms_entry *entry)
 {
-	cms_attribute	*attr;
-
 	if (entry->attrs[CSA_ENTRY_ATTR_RECURRENCE_RULE_I].value == NULL)
 		return (B_TRUE);
 	else
@@ -339,7 +335,7 @@ _DailyRuleToRepeatType(RepeatEvent *re)
 static int
 _WeeklyRuleToRepeatType(RepeatEvent *re)
 {
-	int	i, mask, temp;
+	int	i, mask;
 
 	if (re->re_data.re_weekly->wd_ndaytime == 1 ||
 	    re->re_data.re_weekly->wd_ndaytime == 0) {
@@ -354,8 +350,6 @@ _WeeklyRuleToRepeatType(RepeatEvent *re)
 
 	/* check for MWF, M-F, TuTh */
 	for (i = 0, mask = 0; i < re->re_data.re_weekly->wd_ndaytime; i++) {
-		temp = re->re_data.re_weekly->wd_daytime[i].dt_day;
-		temp = 0x1 << re->re_data.re_weekly->wd_daytime[i].dt_day;
 		mask |= (0x1 << re->re_data.re_weekly->wd_daytime[i].dt_day);
 	}
 

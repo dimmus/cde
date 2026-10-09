@@ -71,7 +71,7 @@ int main(int argc, char **argv)
       dtprintinfo_cat = CATOPEN("dtprintinfo", 0);
 #endif
 
-      if ((nl_catd) errno)
+      if (errno)
          dtprintinfo_cat = (nl_catd) -1;
     }
 

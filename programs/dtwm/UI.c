@@ -121,8 +121,6 @@ void DeleteSubpanelControl (SubpanelData *, ControlData *);
 
 
 
-static char DTFP_CLASS_NAME[] = "Frontpanel";
-static char DTFP_APP_NAME[] = "frontpanel";
 
 static XtCallbackRec dropCB[] = { {DropCB, NULL}, {NULL, NULL} };
 static XtCallbackRec transferDropCB[] = { {TransferDropCB, NULL},{NULL, NULL} };
@@ -391,8 +389,6 @@ Initialize (DtPanelShellWidget panel_shell)
    Screen  * screen = XtScreen (panel_shell);
    Display * display = XtDisplay (panel_shell);
 
-   Pixmap busy_pixmap;
-   Pixmap busy_pixmap_mask;
 
    Pixel black_pixel = BlackPixelOfScreen (screen);
    Pixel white_pixel = WhitePixelOfScreen (screen);
@@ -1307,7 +1303,6 @@ MainControlCreate (int switch_position)
    int i;
    BoxData * box_data;
    Boolean   first_box;
-   Arg al[1];
 
 
    /*  Set up a loop to go through each box and create the set of controls  */
@@ -1775,8 +1770,6 @@ ControlSetBehavior (ControlData * control_data,
 
       case CONTROL_DATE:
       {
-         int size;
-	 
          XtSetArg (al[*ac], XmNcontrolType, XmCONTROL_DATE);         (*ac)++;
          XtSetArg (al[*ac], XmNshadowThickness, shadow_thickness);   (*ac)++;
          XtSetArg (al[*ac], XmNsensitive, sensitive);                (*ac)++;
@@ -1841,7 +1834,7 @@ ControlCreateAndRegister (Widget        parent,
 {
    Widget icon;
    unsigned char operations = 0;
-   char *format, * next_seg;
+   char *format;
    Arg al2[4];
 
 
@@ -1983,11 +1976,8 @@ SwitchCreate (BoxData * box_data)
    Atom    current_workspace_atom;
    int     current_workspace = 0;
 
-   Widget switch_button;
 
-   XmString label_string;
    
-   XmPixelSet * pixel_set;
 
    Pixmap pixmap;
 
@@ -2514,7 +2504,6 @@ ArrowCreate (Widget         parent,
    Widget prev_separator = NULL;
    Arg al[40];
    Arg al2[30];
-   Arg al3[1];
    int ac;
    int ac2;
    int ac_save;
@@ -2695,7 +2684,6 @@ SubpanelCreate (ControlData  * main_control_data,
 
 
 {
-   DtPanelShellWidget subpanel_shell;
    char * subpanel_name = (char *) subpanel_data->element_values[SUBPANEL_TITLE].parsed_value;
    XmString icon_label;
 
@@ -3279,7 +3267,6 @@ DeleteControl (ControlData * control_data)
 
 
 {
-   int i;
 
 
    /*  Remove the control from the push recall and embedded client list.  */
@@ -3847,7 +3834,6 @@ ToggleDefaultControl (ControlData  * main_control_data,
    Widget prev_icon = NULL;
    Widget next_icon = NULL;
    Widget old_main_icon = main_control_data->icon;
-   Widget main_subpanel_icon;
    Widget parent = XtParent (old_main_icon);
    Widget control_icon;
 
@@ -4064,7 +4050,6 @@ ToggleDefaultControl (ControlData  * main_control_data,
    if (new_width < width)
    {
       Dimension normal_size;
-      Dimension margin_width;
       
       if (panel.resolution == HIGH)
          normal_size = ICON_HIGH_WIDTH;

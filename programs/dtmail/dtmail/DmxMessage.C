@@ -131,8 +131,7 @@ DmxMsg::setInfo (char *info)
 char *
 DmxMsg::getMessageHeader (DmxHeaders which)
 {
-	int		i = 0, length = 0;
-	int		buflength = 0;
+	int		length = 0;
 	char		*rtn;
 	const char	*str;
 
@@ -285,7 +284,6 @@ DmxMsg::display (
 		XtPointer stream)
 {
     DtMailEnv		env;
-    DtMailBoolean	FirstIsText = DTM_FALSE;
     DtMail::BodyPart	*firstPart = NULL, *nextpart = NULL;
     char		*buf = NULL,
     			*description = NULL,
@@ -550,9 +548,8 @@ DmxMsg::parse (void)
 	// store the body parts for later reference
 
 	DtMailEnv			env;
-	DtMailBoolean		FirstIsText = DTM_FALSE;
 	DtMail::BodyPart	*part = NULL, *nextpart = NULL;
-	char			*type = NULL, *attr = NULL;
+	char			*type = NULL;
 
 	int	bc = message->getBodyCount (env);
 	if (handleError (env, "getBodyCount") == DTM_TRUE)
@@ -576,16 +573,10 @@ DmxMsg::parse (void)
 
 	if (type != NULL)
 	{
-		attr = DtDtsDataTypeToAttributeValue (type,
+		DtDtsDataTypeToAttributeValue (type,
 						DtDTS_DA_IS_TEXT,
 						NULL);
-		if (attr != NULL)
-		{
-			FirstIsText = DTM_TRUE;
-		}
 		//free (type);	// it's allocating some data for us
-	} else {
-		FirstIsText = DTM_FALSE;
 	}
 
 	// No attachments?  We're done.

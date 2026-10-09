@@ -562,13 +562,11 @@ custdlg_prop_apply(
 )
 {
     PropCustdlgSettingsRec 	*pcs = &(prop_custdlg_settings_rec[type]);
-    ABObj			module;
     ABObj			area;
     STRING			value;
     BOOL			area_set;
     BOOL			reset_bg = False;
     BOOL			reset_fg = False;
-    BOOL			size_chg = False;
     int				new_w, new_h;
 
     if (!verify_props(type))
@@ -600,8 +598,6 @@ custdlg_prop_apply(
     }
     if (prop_changed(pcs->areas.changebar))
     {
-	module = obj_get_module(pcs->current_obj);
-
 	/* Button Panel */
 	area = objxm_comp_custdlg_get_area(pcs->current_obj, AB_CONT_BUTTON_PANEL);
 	area_set = prop_checkbox_get_value(&(pcs->areas), AB_CONT_BUTTON_PANEL);
@@ -638,8 +634,6 @@ custdlg_prop_apply(
     {
 	abobj_set_size_policy(pcs->current_obj,
 		prop_radiobox_get_value(&(pcs->size_policy)) == SIZE_FIXED_KEY);
-
-	size_chg = True;
     }
     if (prop_changed(pcs->geometry.changebar))
     {

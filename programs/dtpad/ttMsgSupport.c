@@ -167,7 +167,6 @@ TTdt_message_acceptCB(
 {
     Editor *pPad;
     int silent, force;
-    Tt_status status;
     char *operation2Quit;
     int mark = tt_mark();
 
@@ -179,13 +178,13 @@ TTdt_message_acceptCB(
 	/* Search the list of Editor instances for one with a TT media
 	 * msg id matching the originating media msg id supplied as the
 	 * 'operation2Quit' (3rd) argument of the TTDT_QUIT msg */
-	if (operation2Quit = tt_message_arg_val(m, 2)) {
+	if ((operation2Quit = tt_message_arg_val(m, 2))) {
 	    for (pPad = pPadList; pPad != (Editor *)NULL; pPad = pPad->pNextPad) {
 		if (pPad->inUse == True && pPad->ttEditReq.msg_id &&
 		  strcmp(pPad->ttEditReq.msg_id, operation2Quit) == 0) {
 		    pPad->ttQuitReq.contract = m;	/* process Quit msg */
-		    status = tt_message_arg_ival(m, 0, &silent);
-		    status = tt_message_arg_ival(m, 1, &force);
+		    tt_message_arg_ival(m, 0, &silent);
+		    tt_message_arg_ival(m, 1, &force);
 		    pPad->ttQuitReq.silent = (Boolean) silent;
 		    pPad->ttQuitReq.force = (Boolean) force;
 		    pPad->ttQuitReq.operation2Quit = strdup(operation2Quit);
@@ -248,8 +247,7 @@ TTmedia_ptype_declareCB(
 	char *		docname)
 {
     Editor *pPad;
-    char *filename;
-    Tt_message TTdt_message_acceptCB(), incoming;
+    Tt_message TTdt_message_acceptCB();
     Tt_pattern *ttrc;
     DtEditorContentRec  contentRec;
     DtEditorErrorCode   errorCode;
@@ -331,63 +329,63 @@ TTmedia_ptype_declareCB(
          }
    
          /* -----> basic options */
-         if (context = tt_message_context_val(m, "STATUSLINE")) {
+         if ((context = tt_message_context_val(m, "STATUSLINE"))) {
 	   if (*context == 't')
 	     pPad->xrdb.statusLine = True;
 	   else
 	     pPad->xrdb.statusLine = False;
          }
    
-         if (context = tt_message_context_val(m, "WINDOWWORDWRAP")) {
+         if ((context = tt_message_context_val(m, "WINDOWWORDWRAP"))) {
 	   if (*context == 't')
 	     pPad->xrdb.wordWrap = True;
 	   else
 	     pPad->xrdb.wordWrap = False;
          }
    
-         if (context = tt_message_context_val(m, "OVERSTRIKE")) {
+         if ((context = tt_message_context_val(m, "OVERSTRIKE"))) {
 	   if (*context == 't')
 	     pPad->xrdb.overstrike = True;
 	   else
 	     pPad->xrdb.overstrike = False;
          }
    
-         if (context = tt_message_context_val(m, "SAVEONCLOSE")) {
+         if ((context = tt_message_context_val(m, "SAVEONCLOSE"))) {
 	   if (*context == 't')
 	     pPad->xrdb.saveOnClose = True;
 	   else
 	     pPad->xrdb.saveOnClose = False;
          }
    
-         if (context = tt_message_context_val(m, "MISSINGFILEWARNING")) {
+         if ((context = tt_message_context_val(m, "MISSINGFILEWARNING"))) {
 	   if (*context == 't')
 	     pPad->xrdb.missingFileWarning = True;
 	   else
 	     pPad->xrdb.missingFileWarning = False;
          }
    
-         if (context = tt_message_context_val(m, "NOREADONLYWARNING")) {
+         if ((context = tt_message_context_val(m, "NOREADONLYWARNING"))) {
 	   if (*context == 't')
 	     pPad->xrdb.readOnlyWarning = True;
 	   else
 	     pPad->xrdb.readOnlyWarning = False;
          }
    
-         if (context = tt_message_context_val(m, "NONAMECHANGE")) {
+         if ((context = tt_message_context_val(m, "NONAMECHANGE"))) {
 	   if (*context == 't')
 	     pPad->xrdb.nameChange = True;
 	   else
 	     pPad->xrdb.nameChange = False;
          }
    
-         if (context = tt_message_context_val(m, "VIEWONLY")) {
+         if ((context = tt_message_context_val(m, "VIEWONLY"))) {
 	   if (*context == 't')
 	     pPad->xrdb.viewOnly = True;
 	   else
 	     pPad->xrdb.viewOnly = False;
          }
    
-         if  (context = tt_message_context_val(m, "WORKSPACELIST")) {
+         if  ((context = tt_message_context_val(m, "WORKSPACELIST"))) {
 	   pPad->xrdb.workspaceList = strdup(context);
          }
    
@@ -545,9 +543,9 @@ TTstartDesktopMediaExchange(
     int		 my_ttfd = 0;
     Tt_pattern	*tt_pat = NULL;
     Tt_status	 status = TT_OK;
-    int		 mark = tt_mark();
     char	*sess = NULL;
 
+    (void) tt_mark();
 
     /*
      * Open a connection to the ToolTalk service

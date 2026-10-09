@@ -187,10 +187,10 @@ void ProcessNetWmState (ClientData *pCD, long action,
 {
     if (pCD->clientState & UNSEEN_STATE) return;
 
-    if (firstProperty  == wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT &&
-	secondProperty == wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ ||
-	firstProperty  == wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ &&
-	secondProperty == wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT)
+    if ((firstProperty  == wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT &&
+	 secondProperty == wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ) ||
+	(firstProperty  == wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ &&
+	 secondProperty == wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT))
 	ProcessNetWmStateMaximized (pCD, action);
     else if (firstProperty  == wmGD.xa__NET_WM_STATE_FULLSCREEN ||
 	     secondProperty == wmGD.xa__NET_WM_STATE_FULLSCREEN)

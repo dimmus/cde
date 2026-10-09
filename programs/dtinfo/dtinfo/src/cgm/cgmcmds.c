@@ -1257,11 +1257,14 @@ case 24: out = (((UINT)ptr[0]) << 16)\
 case 16: out = (((UINT)ptr[0]) << 8) + ptr[1]; ptr += 2; break;\
 case 8: out = *ptr++; break;\
 case 4: if(!(temp=(((done + 1) * prec) % 8))) out = *ptr++ & 15; \
-else out = (*ptr >> temp) & 15; break;\
+else out = (*ptr >> temp) & 15;\
+break;\
 case 2: if(!(temp=(((done + 1) * prec) % 8))) out = *ptr++ & 3; \
-else out = (*ptr >> (8 - temp)) & 3; break;\
+else out = (*ptr >> (8 - temp)) & 3;\
+break;\
 case 1: if(!(temp=(((done + 1) * prec) % 8))) out = *ptr++ & 1; \
-else out = (*ptr >> (8 - temp)) & 1; break;}
+else out = (*ptr >> (8 - temp)) & 1;\
+break;}
 /* get a packed list */
 static void getListPixels(unsigned char *datPtr, cgm_s_type *cgm_s,
 			  int nx, int ny, int prec, Pixel *retPtr)

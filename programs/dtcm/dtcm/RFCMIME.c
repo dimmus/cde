@@ -20,7 +20,6 @@
  * to the Free Software Foundation, Inc., 51 Franklin Street, Fifth
  * Floor, Boston, MA 02110-1301 USA
  */
-static char sccsid[] = "$TOG: RFCMIME.c /main/11 1999/06/30 12:08:55 mgreess $";
 /*
  *   COMPONENT_NAME: desktop
  *
@@ -320,7 +319,6 @@ static void _converter_( iconv_t CD,
     size_t        InBytesLeft;
     char          *OutBuf = NULL;
     size_t        OutBytesLeft = 0;
-    size_t        _OutBytesLeft = 0;
     size_t        iconv_ret;
     size_t        converted_num = 0;
 
@@ -459,7 +457,6 @@ CvtStr( char *charSet, void *from, unsigned long from_len,
     char	*to_codeset = NULL;
     char	*CuStdCodeSet = NULL;
     char	*InterChCodeSet = NULL;
-    char	*StdCodeSet = NULL;
     iconv_t	CD;
     int		isASCII=~0;
     int		isStopASCII = ~0;
@@ -1180,7 +1177,7 @@ writeBase64(char * buf, const char * bp, const unsigned long len)
 	line[lf++] = base64_chars[enc_char];
 
 	if (lf == 72) {
-	    strncat(buf,line,lf);
+	    sprintf(buf + strlen(buf), "%.*s", lf, line);
 	    crlf(buf);
 	    lf = 0;
 	}
@@ -1202,7 +1199,7 @@ writeBase64(char * buf, const char * bp, const unsigned long len)
 	enc_char = ((ubp[block] & 0x3) << 4);
 	strncat(buf, &base64_chars[enc_char], 1);
 
-	strncat(buf,"==", 2);
+	strcat(buf,"==");
 	break;
 
       case 2:
@@ -1215,7 +1212,7 @@ writeBase64(char * buf, const char * bp, const unsigned long len)
 	enc_char = ((ubp[block + 1] & 0xf) << 2);
 	strncat(buf,&base64_chars[enc_char], 1);
 
-	strncat(buf,"=", 1);
+	strcat(buf,"=");
     }
 
 /*    crlf(buf); */
@@ -1272,7 +1269,7 @@ writeQPrint(char *buf, const char * bp, const unsigned long bp_len,
 	*/
 	if (off > 72) {
 	    line_buf[off++] = '=';
-	    strncat(buf,line_buf, off);
+	    sprintf(buf + strlen(buf), "%.*s", off, line_buf);
 	    crlf(buf);
 	    last_nl = 0;
 	    off = 0;
@@ -1359,7 +1356,7 @@ writeQPrint(char *buf, const char * bp, const unsigned long bp_len,
 		    line_buf[off++] = *cp_w;
 		    if (off > 72) {
 			line_buf[off++] = '=';
-			strncat(buf,line_buf, off);
+			sprintf(buf + strlen(buf), "%.*s", off, line_buf);
 			crlf(buf);
 			off = 0;
 			last_nl = 0;
@@ -1419,7 +1416,7 @@ writeQPrint(char *buf, const char * bp, const unsigned long bp_len,
 		    off += 3;
 		}
 
-		strncat(buf,line_buf, off);
+		sprintf(buf + strlen(buf), "%.*s", off, line_buf);
 		last_nl = 0;
 		off = 0;
 
@@ -1446,7 +1443,7 @@ writeQPrint(char *buf, const char * bp, const unsigned long bp_len,
     }
 
     if (off > 0) {
-	strncat(buf,line_buf, off);
+	sprintf(buf + strlen(buf), "%.*s", off, line_buf);
     }
 /*
     if (*(cur - 1) != '\n') {
@@ -1533,9 +1530,9 @@ rfc1522cpy(char * buf, const char * value)
 				_tmp1_,
 				NULL,
 				&_tmp2_ );
-		strncat(buf,"=?", 2);
-		strncat(buf,_tmp2_, strlen(_tmp2_));
-		strncat(buf,"?q?", 3);
+		strcat(buf,"=?");
+		strcat(buf,_tmp2_);
+		strcat(buf,"?q?");
 
 		free(_tmp1_);
 		free(_tmp2_);
@@ -1544,13 +1541,13 @@ rfc1522cpy(char * buf, const char * value)
 	     * According to RFC1468, in the Header Field, we should use
 	     * B-encoding
 	     */
-		strncat(buf,"=?", 2);
-		strncat(buf,charset, strlen(charset));
-		strncat(buf,"?b?", 3);
+		strcat(buf,"=?");
+		strcat(buf,charset);
+		strcat(buf,"?b?");
 	    } else {
-		strncat(buf,"=?", 2);
-		strncat(buf,charset, strlen(charset));
-		strncat(buf,"?q?", 3);
+		strcat(buf,"=?");
+		strcat(buf,charset);
+		strcat(buf,"?q?");
 	    }
 
 	    /*
@@ -1580,7 +1577,7 @@ rfc1522cpy(char * buf, const char * value)
 	    } else
 		writeQPrint( tmp, cur, scan_c - cur, 0 );
 
-	    strncat(buf,tmp,strlen(tmp));
+	    strcat(buf,tmp);
 	    strcat(buf,"?=");
 	    cur = scan_c - 1;
 	}

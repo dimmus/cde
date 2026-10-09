@@ -138,12 +138,11 @@ static Widget
 build_audioDlg(
         Widget shell )
 {
-    int     i, n;
+    int n;
     Arg              args[MAX_ARGS];
     XmString         button_string[NUM_LABELS]; 
     XmString         string; 
     Widget           form;
-    Pixmap           audioPixmap;
     int              count = 0;
     Widget           widget_list[12];
 
@@ -501,8 +500,6 @@ valueChangedCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int                 n, value;
-    Arg                 args[1];
     XKeyboardControl    kbdControl;
     int                 kbdControlMask;
 
@@ -528,7 +525,7 @@ systemDefaultCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    int                 n, value;
+    int                 n;
     Arg                 args[1];
     XKeyboardControl    kbdControl;
     int                 kbdControlMask;

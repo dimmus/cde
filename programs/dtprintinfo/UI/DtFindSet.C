@@ -183,7 +183,7 @@ void DtFindSet::Apply()
     {
       FindSetIcon *icon = (FindSetIcon *)items[0];
       char *iconfile;
-      if (iconfile = strrchr(icon->IconFile(), '/'))
+      if ((iconfile = strrchr(icon->IconFile(), '/')))
 	 iconfile++;
       else
          iconfile = icon->IconFile();

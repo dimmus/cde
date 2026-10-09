@@ -285,7 +285,6 @@ do_tar( _Tt_string tttardir, bool_t do_tttarfile )
 bool_t archiver::
 do_tttar( char *tttarfile_name, bool_t silent )
 {
-	char		       *process_id;
 	int		        first_ttmalloc;
 	XDR			xdrs;
 	bool_t			val2return = TRUE;
@@ -319,7 +318,6 @@ do_tttar( char *tttarfile_name, bool_t silent )
 	if (IS_TT_ERR(err_noted)) {
 		return FALSE;
 	}
-	process_id = ptr_returned;
 
 	switch (_mode) {
 	    case CREATE:

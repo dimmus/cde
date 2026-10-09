@@ -522,7 +522,7 @@ updateFileSystemEntries ()
 	int rc;     
         while (! (rc = getmntent(mount_table, &entry)))
 #else		    
-	while (entry = getmntent(mount_table))
+	while ((entry = getmntent(mount_table)))
 #endif
 #if !defined(CSRG_BASED)
 	{

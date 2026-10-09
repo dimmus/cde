@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)dssw.c 1.58 95/08/07 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdlib.h>
 #include <Xm/Xm.h>
@@ -686,7 +682,7 @@ dssw_form_flags_to_appt(DSSW *dssw, Dtcm_appointment *a, char *name, Tick t, int
 extern Boolean
 dssw_form_to_todo(DSSW *dssw, Dtcm_appointment *a, char *name, Tick t)
 {
-	time_t		start_tick, stop_tick;
+	time_t		start_tick;
 	char		ampm_buf[BUFSIZ], buf[BUFSIZ];
 	Props		*p = (Props *)dssw->cal->properties;
 	Props_pu	*pu = (Props_pu *)dssw->cal->properties_pu;
@@ -932,7 +928,7 @@ load_dssw_times(DSSW *dssw, Tick start, Tick stop, Boolean set_no_time) {
 	if (start > 0) {
 		format_time(start, dt, buf);
 		if (dt == HOUR12) {
-			strncpy(dssw->start_val.val, buf, 5);
+			snprintf(dssw->start_val.val, 6, "%.5s", buf);
 			dssw->start_val.val[5] = '\0';
 			dssw->start_val.block = (buf[5] == 'a') ?
 				TIME_AM : TIME_PM;
@@ -966,7 +962,6 @@ set_dssw_defaults(DSSW *dssw, Tick t, Boolean set_times) {
 	int			appt_beg, appt_end, beg_hr, end_hr;
 	Props			*p = (Props *)dssw->cal->properties;
 	DisplayType		dt;
-	Time_scope_menu_op	dur_scope;
 
 	if (set_times) {
 		dt = get_int_prop(p, CP_DEFAULTDISP);

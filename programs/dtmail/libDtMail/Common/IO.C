@@ -249,7 +249,7 @@ SafeWritev(int fd, struct iovec *iov, int iovcnt)
     // indicated by the number of bytes written by writev() - any leftover
     // in status indicates a partial write of a vector
     //
-    while ((status > 0) && (curIov < iovcnt) && (iov[curIov].iov_len <= status)) {
+    while ((status > 0) && (curIov < iovcnt) && (iov[curIov].iov_len <= (size_t) status)) {
       status -= iov[curIov++].iov_len;
     }
 
@@ -275,7 +275,7 @@ SafeWritev(int fd, struct iovec *iov, int iovcnt)
     // a vector - adjust the vector and and feed it back to writev() again
     // OTHERWISE writev() ended with the current vector so move on to the next
     //
-    if (iov[curIov].iov_len == status)	// full write of this vector?
+    if (iov[curIov].iov_len == (size_t) status)	// full write of this vector?
       curIov++;				// yes: move on to the next vector
     else if (status != 0) {		// no: adjust this vector and retry
       iov[curIov].iov_len -= status;
@@ -297,11 +297,11 @@ SafeWriteStrip(int fd, const void * buf, size_t bytes)
     // make a finite size buffer for writing
     writebuf = (char*) malloc(bytes < SWS_BUFFERSIZE ? bytes : SWS_BUFFERSIZE); 
 
-    for (i = 0, j = 0; i < bytes; i++, ptr++) {
+    for (i = 0, j = 0; (size_t) i < bytes; i++, ptr++) {
 	if (*ptr == '\r' && *(ptr+1) == '\n')
 		continue;
 	writebuf[j++] = *ptr;
-	if (j == SWS_BUFFERSIZE || i == (bytes-1)) {
+	if (j == SWS_BUFFERSIZE || (size_t) i == (bytes-1)) {
     		do {
 			status = write(fd, writebuf, j);
     		} while(status < 0 && errno == EINTR);
@@ -625,7 +625,7 @@ void *SockOpen(char *host, int clientPort, char **errorstring)
     ad.sin_family = AF_INET;
 
     inaddr = inet_addr(host);
-    if (inaddr != -1)
+    if (inaddr != (unsigned long) -1)
       memcpy(&ad.sin_addr, &inaddr, sizeof(inaddr));
     else
     {
@@ -979,9 +979,9 @@ int FileSystemSpace(const char *file_path, size_t bytes, char **fsname)
 {
     int			fserror=FALSE;
     struct stat		stat_buf;
-    size_t		req_space = 0;
 #if !defined(__linux__)
     struct statvfs	statvfs_buf;
+    size_t		req_space = 0;
 #endif
 
     if (stat(file_path,&stat_buf) < 0) return 0;
@@ -1019,10 +1019,10 @@ int FileSystemSpace(const char *file_path, size_t bytes, char **fsname)
 
         if (! fserror)
         {
+#if !defined(__linux__)
             req_space = (size_t) ((bytes > stat_buf.st_size) ?
 				  (bytes-stat_buf.st_size) :
 				  0);
-#if !defined(__linux__)
             if ( (statvfs_buf.f_bfree*statvfs_buf.f_bsize) >
 	         (req_space + statvfs_buf.f_bsize) )
 	      return 1;

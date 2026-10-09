@@ -47,7 +47,7 @@ Process::Process()
    pprocs = (char **)malloc(sizeof(char *));
    NumProcs = 0;
    strtok(procs, "\n");
-   while(pprocs[NumProcs] = strtok(NULL, "\n"))
+   while((pprocs[NumProcs] = strtok(NULL, "\n")))
     {
       NumProcs++;
       pprocs = (char **)realloc(pprocs, sizeof(char *) * (NumProcs + 1));

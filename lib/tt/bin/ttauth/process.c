@@ -888,7 +888,7 @@ search_and_do(char *inputfilename, int lineno, int start,
               int argc, char *argv[], int (*do_func)(), char *data)
 {
     int i;
-    int status;
+    int status = 0;
     int errors = 0;
     _tt_AuthFileEntryList *l, *next;
     char *protoname, *protodata, *netid, *authname;
@@ -1092,7 +1092,6 @@ static int
 do_merge(char *inputfilename, int lineno, int argc, char *argv[])
 {
     int i;
-    int errors = 0;
     _tt_AuthFileEntryList *head, *tail, *listhead, *listtail;
     int nentries, nnew, nrepl, ndup;
 
@@ -1113,7 +1112,6 @@ do_merge(char *inputfilename, int lineno, int argc, char *argv[])
 			&used_stdin, inputfilename, lineno,
 			argv[0]);
 	if (!fp) {
-	    errors++;
 	    continue;
 	}
 
@@ -1123,7 +1121,6 @@ do_merge(char *inputfilename, int lineno, int argc, char *argv[])
 	    prefix (inputfilename, lineno);
 	    fprintf (stderr, "unable to read any entries from file \"%s\"\n",
 		     filename);
-	    errors++;
 	} else {			/* link it in */
 	    add_to_list (listhead, listtail, head);
  	}

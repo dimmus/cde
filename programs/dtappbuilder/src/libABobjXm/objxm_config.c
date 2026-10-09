@@ -267,7 +267,6 @@ objxm_tree_unconfigure(
     ABObj root
 )
 {
-    int                 iRetVal= 0;
     AB_TRAVERSAL        trav;
     ABObj               obj= NULL;
  

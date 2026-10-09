@@ -76,7 +76,6 @@
 static Tt_callback_action
 _WsSelectionCB (Tt_message m, Tt_pattern p)
 {
-    struct _DtWsmCBContext	*pCbCtx;
     int				type, val;
     Position			x, y;
     Dimension			width, height;

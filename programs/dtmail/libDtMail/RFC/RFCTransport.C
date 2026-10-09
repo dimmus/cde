@@ -950,7 +950,7 @@ RFCTransport::childHandler(void)
         // until we do the wait.  wait for the child and get its
         // pid and return status.  write these to the transfds pipe.
 	// Be sure to reap all processes so that none get lost.
-        while (d.pid = (int) waitpid ((pid_t) -1, &d.status, WNOHANG))
+        while ((d.pid = (int) waitpid ((pid_t) -1, &d.status, WNOHANG)))
         {
             if (d.pid > 0)
                 SafeWrite(_transfds[1], &d, sizeof(d));
@@ -1115,7 +1115,7 @@ RFCTransport::concatValue(DtMailValueSeq & value)
 	tot_size += 5; // Fudge for null, commas, and space.
     }
 
-    char * str = new char[tot_size];
+    char * str = new char[tot_size + 1];
 
     *str = 0;
     for (int cp = 0; cp < valueLength; cp++) {

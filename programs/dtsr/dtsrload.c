@@ -313,7 +313,6 @@ PRINT_USAGE:
 		break;
 
 	    default:
-UNKNOWN_ARG:
 		printf (CATGETS(dtsearch_catd, MS_cravel, 14,
 		    "\n%s Unknown command line argument '%s'.\n"),
 		    PROGNAME, argptr);
@@ -482,7 +481,6 @@ static void     read_dbrec (void)
 /* Write the database's updated reccount and maxdba fields */
 static void     write_dbrec (void)
 {
-    int             i;
     DtSrINT32	int32;
 
     RECFRST (PROGNAME "355", OR_DBREC, 0);	/* seqtl retrieval */
@@ -752,7 +750,6 @@ static void     create_object (char *key)
  */
 static void     update_object (char *key)
 {
-    int		i;
     int		first_fzkabstr = TRUE;
     DtSrINT16	misctype;
     DtSrINT32	int32;
@@ -871,7 +868,7 @@ int             main (int argc, char *argv[])
     DBLK	dblk;
     int		i, linelen;
     DtSrINT32	int32;
-    char	*cptr, *targ, *src;
+    char	*cptr, *src;
     char	*db_key;
     char	uniqkey [DtSrMAX_DB_KEYSIZE + 4];
     char	linebuf [2048];
@@ -1231,7 +1228,7 @@ int             main (int argc, char *argv[])
 	    continue;
 	}
 	linelen = 1;
-	while (linebuf [linelen] = readchar_ftext (NULL)) {
+	while ((linebuf [linelen] = readchar_ftext (NULL))) {
 	    if (++linelen >= 80) {
 		call_encoder ((UCHAR *)linebuf, linelen);
 		linelen = 0;

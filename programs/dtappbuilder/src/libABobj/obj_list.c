@@ -153,7 +153,6 @@ objlist_get_sort_order(ABObjList list)
 int
 objlist_set_sort_order(ABObjList list, OBJLIST_SORT_ORDER new_order)
 {
-    int		return_value = 0;
 
     if (list->sort_order != new_order)
     {
@@ -316,7 +315,6 @@ objlist_remove_index(ABObjList list, int doomedIndex)
 #define num_objs (list->num_objs)
     ABObj	*objs = list->objs;
     void	**user_datas = list->user_datas;
-    int		index = 0;
     int		numToMove = 0;
 
     if ((doomedIndex < 0) || (doomedIndex >= num_objs))

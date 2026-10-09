@@ -75,6 +75,7 @@ static struct hostent *my_gethost(XeString hostname)
   struct hostent *host_def, *copy;
   int alias_count, i, addr_count, addrlen;
   _Xgethostbynameparams	host_buf;
+  (void) host_buf; /* unused unless XTHREADS */
 
   host_def = _XGethostbyname(hostname, host_buf);
   if (host_def == NULL)
@@ -388,7 +389,7 @@ SPC_Connection_Ptr SPC_Init_Child(SPC_Connection_Ptr conn,
 SPC_Connection_Ptr SPC_Standalone_Daemon(SPC_Connection_Ptr conn)
 {
   struct sockaddr_in saddr, client_saddr;
-  int len=sizeof(client_saddr);
+  socklen_t len=sizeof(client_saddr);
   int server_bind_attempts      = MAX_SERVER_BIND_ATTEMPTS;
   int server_bind_pause         = SERVER_PAUSE_INTERVAL;
   int pid, from;
@@ -442,6 +443,7 @@ SPC_Connection_Ptr SPC_Standalone_Daemon(SPC_Connection_Ptr conn)
   for(;;) {
     struct hostent		*addr_ret;
     _Xgethostbynameparams	addr_buf;
+    (void) addr_buf; /* unused unless XTHREADS */
 
     /* Attempt to accept a connection with a client */
     

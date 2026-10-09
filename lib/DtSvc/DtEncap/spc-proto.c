@@ -512,7 +512,6 @@ protocol_request_ptr  SPC_Filter_Connection(SPC_Connection_Ptr connection,
 					    int deletep)
 /*----------------------------------------------------------------------+*/
 {
-  SPC_Connection_Ptr connptr=NULL;
   SPC_Channel_Ptr conn_channel;
   XeQueue   tmpqueue;
   protocol_request_ptr retval;
@@ -1151,7 +1150,6 @@ int SPC_Send_Multi_Packet(SPC_Connection_Ptr connection,
   XeString buf;
   int reply_seqno;
   int this_seqno;
-  int valid_ep = 0;
   char *this_str;
 
   _DtSvcProcessLock();
@@ -1723,6 +1721,7 @@ SPC_Validate_User(XeString hostname,
   XeString connection_hostname=CONNECTION_HOSTNAME(connection);
   _Xgetpwparams	pwd_buf;
   struct passwd * pwd_ret;
+  (void) pwd_buf; /* unused unless XTHREADS */
 
   hostinfo = SPC_LocalHostinfo();
 

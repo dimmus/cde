@@ -2198,7 +2198,9 @@ void
 TGDefn::build()
 {
   unsigned i, len, slen, lent, leng;
+#ifdef TABLE_DEBUG
   unsigned num_cells   = 0; // # of virtual cells
+#endif
   unsigned num_rows    = 0; // # of physical rows
   unsigned num_columns = 0; // # of physical columns
 
@@ -2245,8 +2247,10 @@ TGDefn::build()
 
   for (current_row = 0; ++row_cursor; current_row++)
     {
+#ifdef TABLE_DEBUG
       unsigned entries = row_cursor.key()->columns().entries() ;
       num_cells += entries ;
+#endif
 
       // now find out how many columns we span
       CC_TPtrSlistIterator<ColDefn> col_cursor (row_cursor.key()->columns());

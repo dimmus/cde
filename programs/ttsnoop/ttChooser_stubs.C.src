@@ -63,7 +63,7 @@ _DtTtChooserSet(
     char *okString    = NULL;
     char *title       = NULL;
     char *valueLabel  = NULL;
-    char *valuesLabel;
+    char *valuesLabel = NULL;
     switch (choice) {
 	case _DtTtChooserNone:
 	    return;
@@ -339,7 +339,7 @@ choiceOkayed(
     _DtTtChooserAction choice = (_DtTtChooserAction)ival;
     Widget label = dtb_ttsnoop_ttsnoop_win.ttsnoopWin_label;
     Tt_status status = TT_OK;
-    char *func = NULL, *procid;
+    char *func = NULL;
     switch (choice) {
 	    void *pval;
 	    int ival, fd;
@@ -517,6 +517,8 @@ choiceOkayed(
 		    if (status == TT_OK) {
 			    DtTtDestroyed( DTTT_DTFILE, pats );
 		    }
+		    break;
+		default:
 		    break;
 	    }
 	    DtTtSetLabel( label, func, status );

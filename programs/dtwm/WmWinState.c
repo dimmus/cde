@@ -894,6 +894,9 @@ SlideOutTimerProc ( XtPointer client_data, XtIntervalId *id)
 		    }
 		}
 		break;
+
+	    default:
+		break;
 	}
 
 	/*
@@ -1050,6 +1053,9 @@ SlideWindowOut (ClientData *pCD)
 		pSOR->currHeight = pSOR->incHeight;
 		pSOR->currX = pCD->frameInfo.x;
 		pSOR->currY = pCD->frameInfo.y;
+		break;
+
+	    default:
 		break;
 	}
 
@@ -1208,6 +1214,9 @@ SlideSubpanelBackIn (ClientData *pCD, Widget wSubpanel)
 
 	    case SLIDE_SOUTH:
 		pSOR->currHeight -= pSOR->incHeight;
+		break;
+
+	    default:
 		break;
 	}
 

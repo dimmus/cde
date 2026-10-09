@@ -62,7 +62,7 @@ CString Usage ("Usage: dtsearchpath [ -v | -T | -o | -a | -csh | -ksh ] "
 	       "[ -u <login-name> ]");
 
     if (argc > 1) {
-	for (int i = 1; i < argc; i++) {
+	for (int i = 1; i < (int)argc; i++) {
 	    if (strcmp(argv[i],"-v") == 0)
 		flags |= 1;
 	    else if (strcmp(argv[i],"-T") == 0)
@@ -79,7 +79,7 @@ CString Usage ("Usage: dtsearchpath [ -v | -T | -o | -a | -csh | -ksh ] "
 		flags |= 64;
 	    else if (strcmp(argv[i],"-u") == 0) {
 		flags |= 2;
-		if (++i < argc && argv[i][0] != '-') {
+		if (++i < (int)argc && argv[i][0] != '-') {
 		    user_id = new CString(argv[i]);
 		    struct passwd * pwd = getpwnam(user_id->data());
 		    home_dir = new CString(pwd->pw_dir);

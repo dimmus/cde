@@ -148,7 +148,6 @@ FileShare::mt_lock_cb(Tt_message m, Tt_pattern p)
   } else if (!strcmp(op, "rulock")) {
     // handle rulock notice
     if (state == TT_SENT) {
-      DtMailBoolean answer = DTM_FALSE;		// default is to not give up the lock
       FileShare *f = (FileShare *)tt_pattern_user(p, 1);
       if (f->_cb_func)
       {
@@ -156,7 +155,7 @@ FileShare::mt_lock_cb(Tt_message m, Tt_pattern p)
 	  DtMailEnv::getMessageText(
 		FileShareMsgSet, 5,
 		"Another user would like your lock.");
-	answer = f->_cb_func(DTMC_UNLOCK, f->_path, msg, f->_cb_data);
+	f->_cb_func(DTMC_UNLOCK, f->_path, msg, f->_cb_data);
       }
       tt_message_destroy(m);
     }
@@ -172,7 +171,7 @@ FileShare::FileShare(DtMailEnv & error,
 		     DtMailCallback cb,
 		     void * clientData)
 {
-  DtMail::MailRc *mailrc = session->mailRc(error);
+  session->mailRc(error);
 
     _key = session->newObjectKey();
     _session = session;

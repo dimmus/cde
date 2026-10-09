@@ -80,7 +80,7 @@ void IconObj::CreateIconObj(MotifUI *parent, char *name, char * /*category*/,
    int isOpened;
    GuiIconFields gui_fields;
 
-   if (fields = _fields)
+   if ((fields = _fields))
     {
       int i;
       gui_fields = new GuiIconFieldsStruct;
@@ -146,7 +146,7 @@ void IconObj::CreateIconObj(MotifUI *parent, char *name, char * /*category*/,
    s = name;
 
    BaseUI *par = Parent();
-   if (par && par->UISubClass() == ICON_LIST ||
+   if ((par && par->UISubClass() == ICON_LIST) ||
        par->UISubClass() == SCROLLED_ICON_LIST)
       isOpened = true;
    else
@@ -188,6 +188,8 @@ void IconObj::CreateIconObj(MotifUI *parent, char *name, char * /*category*/,
         pixmapPlacement = GuiPIXMAP_LEFT;
 	pixmap = _smallPixmap;
 	mask = _smallMask;
+	break;
+     default:
 	break;
     }
    // Get Parent and colors
@@ -377,6 +379,8 @@ void IconObj::IconFile(char *iconFile)
       XtVaSetValues(_w, XmNlabelPixmap, _smallPixmap, GuiNiconMask, _smallMask,
 		    NULL);
       break;
+   default:
+      break;
    }
    strcpy(_iconFile, iconFile);
 }
@@ -417,7 +421,7 @@ boolean IconObj::SetOpen(boolean flag)
    BaseUI *parent = Parent();
    if (ContainerView() == TREE)
       isOpened = flag;
-   else if (parent && parent->UISubClass() == ICON_LIST ||
+   else if ((parent && parent->UISubClass() == ICON_LIST) ||
             parent->UISubClass() == SCROLLED_ICON_LIST)
       isOpened = true;
    else
@@ -461,7 +465,7 @@ boolean IconObj::SetIcon(IconStyle style)
    BaseUI *parent = Parent();
    if (ContainerView() == TREE)
       isOpened = true;
-   else if (parent && parent->UISubClass() == ICON_LIST ||
+   else if ((parent && parent->UISubClass() == ICON_LIST) ||
             parent->UISubClass() == SCROLLED_ICON_LIST)
       isOpened = true;
    else

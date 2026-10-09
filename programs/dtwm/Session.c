@@ -478,7 +478,6 @@ WmFrontPanelSessionSaveData (void)
    FILE * fd;
 
    char * session_file;
-   Boolean written = False;
    
    BoxData * box_data;
    ControlData * control_data;
@@ -492,7 +491,6 @@ WmFrontPanelSessionSaveData (void)
 
    XWindowAttributes window_attributes;
 
-   Arg al[2];
 
    int i,j;
 
@@ -786,7 +784,6 @@ SessionDeleteAll(void)
    char * home_dir;
    char * fp_dir;
    struct passwd * pw_info;
-   int i;
 
 
    /*  Get the home directory used to build the path to the session file.  */

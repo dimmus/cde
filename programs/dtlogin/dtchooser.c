@@ -110,15 +110,11 @@ extern void DoPing (Widget w, XtPointer client_data, XtPointer call_data);
  *
  ***************************************************************************/
 
-static SIGVAL syncTimeout( int arg ) ;
-static Widget InitToolKit( int argc, char **argv) ;
 void MakeRootCursor( void ) ;
 void MakeBackground( void ) ;
 void MakeButtons( void ) ;
 void MakeLogin( void ) ;
 void MakeOptionsProc( XtPointer data, XtIntervalId *id) ;
-static int  ErrorHandler( Display *dpy, XErrorEvent *event) ;
-static SIGVAL Terminate( int arg ) ;
 extern void DoCancel (Widget w, XtPointer client_data, XtPointer call_data);
 
 
@@ -431,13 +427,8 @@ MakeButtons( void )
 {
     int i;
 
-    Dimension	width;
-
     Dimension	max_width;	/* maximum width  of a set of widgets	   */
     Dimension	max_height;	/* maximum height of a set of widgets	   */
-
-    int		origin;		/* horizontal origin for button placement  */
-    int		spacing;	/* spacing between buttons (width/32)      */
 
      
     /* 
@@ -856,6 +847,8 @@ MakeDialog( DialogType dtype )
         XtAddCallback(w, XmNokCallback,     RespondDialogCB, NULL);
         XtAddCallback(w, XmNcancelCallback, RespondDialogCB, NULL);
         break;
+      default:
+        break;
     }
 
 
@@ -1018,22 +1011,6 @@ MakeOptionsMenu( void )
 
 /***************************************************************************
  *
- *  ErrorHandler
- *
- *  X protocol error handler to override the default
- ***************************************************************************/
-
-static int 
-ErrorHandler( Display *dpy, XErrorEvent *event )
-{
-    return 0;
-}
-
-
-
-
-/***************************************************************************
- *
  *  MakeOptionsProc
  *
  *  Timeout routine to build options menu
@@ -1049,23 +1026,6 @@ MakeOptionsProc( XtPointer data, XtIntervalId *id )
     return;
 }
 
-
-
-
-/***************************************************************************
- *
- *  Terminate
- *
- *  Catch a SIGTERM and unmanage display
- ***************************************************************************/
-
-static SIGVAL
-Terminate( int arg )
-
-{
-    write(1, "terminate", 9);
-    CleanupAndExit(NULL, NOTIFY_ABORT);
-}
 
 #ifdef SIA
 /*

@@ -510,7 +510,6 @@ _DtProcessTtRequest(
         char * relPathDir)
 
 {
-   ActionPtr action = request->clonedAction;
 
    if (ResolveTtRequestMessagePieces(w, request, relPathHost, relPathDir))
    {
@@ -636,9 +635,7 @@ Ttmedia_to_Dt_StatusUpdateCB(
     DtActionInvocationID id;
     DtActionArg *newArgp = NULL;	/* hanger for returned data if any */
     int  newArgc = 0;
-    unsigned long evalStatus;
-    DtActionStatus userStatus;
-    int i, j, upIdx;
+    int i, upIdx;
     char *upVType;
 
 
@@ -856,6 +853,8 @@ static int _DtAct_tt_message_arg_reptype( Tt_message message, int arg )
 	return( DtACT_TT_REP_INT);
     else if (status == TT_ERR_NUM)
 	return( DtACT_TT_REP_BUFFER );
+
+    return( DtACT_TT_REP_UNDEFINED );
 }
 
 /******************************************************************************
@@ -877,15 +876,13 @@ TtRequestCallbackHandler(
     _DtActChildRecT *childRec;
     _DtActInvRecT *invRec;
     DtActionInvocationID id;
-    unsigned long evalStatus;
-    DtActionStatus userStatus;
     DtActionArg *newArgp = NULL;	/* hanger for returned data if any */
-    int  newArgc = 0, totalArgs, i, j, upIdx;
+    int  newArgc = 0, totalArgs, i, upIdx;
     int upArgClass;
     int argRepType;
     char *upttbuf;
     int upttbuflen, ivalue;
-    char *upVType = NULL, *upVType2 = NULL;
+    char *upVType = NULL;
 
 
     status = (Tt_status) tt_message_status(message);
@@ -1195,9 +1192,6 @@ InitiateTtRequest(
     Tt_pattern *subcon_patterns;
     _DtActInvRecT *actInvRecP;
     _DtActChildRecT *actChildRecP;
-    unsigned long evalStatus;
-    DtActionStatus userStatus;
-    int j;
     char *bufFilename = NULL;
     int ttmedia_test;
 
@@ -1789,9 +1783,7 @@ Tt_status
 _DtInitializeToolTalk(Widget w)
 {
    static int RegisteredPatterns = 0;
-   char * procid;
    Tt_status status;
-   int fd;
    Tt_pattern pat;	/* pattern to register for exec*  messages */
    char *session_id;
    extern Widget _DtInitTtContextWidget;

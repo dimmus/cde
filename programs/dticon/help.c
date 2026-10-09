@@ -450,8 +450,7 @@ static Widget
 GetHelpDialog( void )
 {
   HelpStruct *pHelp;
-  Arg args[5];
-  int i, done;
+  int done;
 
 #ifdef DEBUG
   if (debug)

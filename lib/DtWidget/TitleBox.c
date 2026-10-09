@@ -111,10 +111,6 @@ static Boolean SetValues(
                         DtTitleBoxWidget current,
                         DtTitleBoxWidget request,
                         DtTitleBoxWidget new) ;
-static XtGeometryResult QueryGeometry( 
-                        DtTitleBoxWidget manager,
-                        XtWidgetGeometry *request,
-                        XtWidgetGeometry *reply) ;
 static XtGeometryResult GeometryManager( 
                         Widget kid,
                         XtWidgetGeometry *request,
@@ -911,48 +907,6 @@ SetValues(
 	}
 
 	return (redisplay_flag);
-}
-
-
-
-/*-------------------------------------------------------------
-**	QueryGeometry
-**		Handle query geometry request.
-*/
-static XtGeometryResult 
-QueryGeometry(
-        DtTitleBoxWidget manager,
-        XtWidgetGeometry *request,
-        XtWidgetGeometry *reply )
-{
-	Dimension	w = M_Width (manager),
-			h = M_Height (manager),
-			new_w = 0,
-			new_h = 0;
-	Boolean		width_req = request->request_mode & CWWidth,
-			height_req = request->request_mode & CWHeight;
-
-/*	Compute preferred size if preferred width or height requested.
-*/
-	if (width_req || height_req)
-		GetSize (manager, 0, 0, 0, 0, &new_w, &new_h);
-
-/*	Load reply.
-*/
-	reply->request_mode = request->request_mode;
-	reply->x = request->x;
-	reply->y = request->y;
-	reply->width = (width_req) ? new_w : request->width;
-	reply->height = (height_req) ? new_h : request->height;
-	reply->border_width = request->border_width;
-
-/*	If no change return no; otherwise yes.
-*/
-	if ((!width_req || (width_req && w == new_w)) &&
-	    (!height_req || (height_req && h == new_h)))
-		return (XtGeometryNo);
-	else
-		return (XtGeometryYes);		
 }
 
 

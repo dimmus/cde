@@ -34,81 +34,81 @@
 
 struct rpcgen_table tableprog_2_table[] = {
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_ping_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_ping_2_svc),
 	(xdrproc_t)xdr_void,			0,
-	(xdrproc_t)xdr_void,			0,
+	(xdrproc_t)xdr_void,			0 },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_next_larger_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_next_larger_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_next_smaller_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_next_smaller_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_range_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_range_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_abbreviated_lookup_range_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_abbreviated_lookup_range_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_insert_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_insert_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_delete_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_delete_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_delete_instance_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_delete_instance_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_change_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_change_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_change_instance_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_change_instance_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_next_reminder_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_lookup_next_reminder_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Res_2,		sizeof ( Table_Res_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_check_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_check_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Status_2,		sizeof ( Table_Status_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Status_2,		sizeof ( Table_Status_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_flush_table_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_flush_table_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Table_Status_2,		sizeof ( Table_Status_2 ),
+	(xdrproc_t)_DtCm_xdr_Table_Status_2,		sizeof ( Table_Status_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_size_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_size_2_svc),
 	(xdrproc_t)_DtCm_xdr_Table_Args_2,		sizeof ( Table_Args_2 ),
-	(xdrproc_t)xdr_int,			sizeof ( int ),
+	(xdrproc_t)xdr_int,			sizeof ( int ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_register_callback_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_register_callback_2_svc),
 	(xdrproc_t)_DtCm_xdr_Registration_2,		sizeof ( Registration_2 ),
-	(xdrproc_t)_DtCm_xdr_Registration_Status_2,	sizeof ( Registration_Status_2 ),
+	(xdrproc_t)_DtCm_xdr_Registration_Status_2,	sizeof ( Registration_Status_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_deregister_callback_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_deregister_callback_2_svc),
 	(xdrproc_t)_DtCm_xdr_Registration_2,		sizeof ( Registration_2 ),
-	(xdrproc_t)_DtCm_xdr_Registration_Status_2,	sizeof ( Registration_Status_2 ),
+	(xdrproc_t)_DtCm_xdr_Registration_Status_2,	sizeof ( Registration_Status_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_set_access_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_set_access_2_svc),
 	(xdrproc_t)_DtCm_xdr_Access_Args_2,		sizeof ( Access_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Access_Status_2,		sizeof ( Access_Status_2 ),
+	(xdrproc_t)_DtCm_xdr_Access_Status_2,		sizeof ( Access_Status_2 ) },
 
-	(char *(*)())RPCGEN_ACTION(_DtCm_rtable_get_access_2_svc),
+	{ (char *(*)())RPCGEN_ACTION(_DtCm_rtable_get_access_2_svc),
 	(xdrproc_t)_DtCm_xdr_Access_Args_2,		sizeof ( Access_Args_2 ),
-	(xdrproc_t)_DtCm_xdr_Access_Args_2,		sizeof ( Access_Args_2 ),
+	(xdrproc_t)_DtCm_xdr_Access_Args_2,		sizeof ( Access_Args_2 ) },
 };
 int tableprog_2_nproc =
 	sizeof(tableprog_2_table)/sizeof(tableprog_2_table[0]);

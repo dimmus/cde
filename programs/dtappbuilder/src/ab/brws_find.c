@@ -232,7 +232,6 @@ find_callback(
     ABObj		root_obj;
     ABObj		found_obj;
     char		*obj_name_str = NULL;
-    char		*obj_type_str = NULL;
 
     XtVaGetValues(widget, XmNuserData, &b, NULL); 
 

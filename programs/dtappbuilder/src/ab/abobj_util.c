@@ -896,7 +896,6 @@ ABObj
 abobj_dup(ABObj obj)
 {
     ABObj	newObj= obj_dup(obj);
-    STRING	name;
 
     if (newObj == NULL)
     {
@@ -1228,7 +1227,6 @@ abobj_project_name_extract(
 )
 {
     STRING	appobjname = XtNewString(app_name);
-    STRING	appname = NULL;
     STRING	objname = NULL;
     int		iRet = 0;
 
@@ -1240,7 +1238,7 @@ abobj_project_name_extract(
     }
     else
     {
-    	appname = strtok(appobjname, " ::");
+    	strtok(appobjname, " ::");
 	strtok(NULL, " ");
     	objname = strtok(NULL, "");
 

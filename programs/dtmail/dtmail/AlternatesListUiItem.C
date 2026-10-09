@@ -82,7 +82,6 @@ void handleAlternateSelection(Widget w, XtPointer clientdata, XtPointer calldata
 {
   AlternatesListUiItem *item;
   XmListCallbackStruct *list_info = (XmListCallbackStruct *)calldata;
-  char *selection_string = NULL;
   DtVirtArray<PropStringPair *> *list_items;
   clientdata = clientdata;
 
@@ -115,7 +114,6 @@ void handleAlternateSelection(Widget w, XtPointer clientdata, XtPointer calldata
 ///////////////////////////////////////////////////////////////////
 void AlternatesListUiItem::writeFromUiToSource()
 {
-  Widget w = this->getWidget();
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
@@ -197,7 +195,7 @@ void AlternatesListUiItem::writeFromSourceToUi()
 
       char_list->append(strdup(token));
  
-      while(token = (char *)strtok(NULL, " "))
+      while((token = (char *)strtok(NULL, " ")))
 	{
 	  new_pair = new PropStringPair;
 	  new_pair->label = strdup(token);
@@ -322,7 +320,7 @@ void AlternatesListUiItem::handleChangeButtonPress()
 			    pos_list[0],
 			    TRUE);
 	  }
-	props_changed = TRUE;
+      props_changed = TRUE;
     }
 }
 ///////////////////////////////////////////////////////////

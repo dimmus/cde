@@ -299,11 +299,13 @@ createSizeMenu
 {
     DtTermViewWidget	  tw = (DtTermViewWidget) w;
     Widget		  submenu;
+#ifndef	WINDOW_SIZE_TOGGLES
     Widget		  button;
+#endif	/* WINDOW_SIZE_TOGGLES */
     long		  i1;
+#ifdef	NOTDEF
     char		 *c1;
     char		 *c2;
-#ifdef	NOTDEF
     char		  mnemonics[BUFSIZ];
 #endif	/* NOTDEF */
     char		  buffer[BUFSIZ];
@@ -410,7 +412,6 @@ createFontMenu
 {
     DtTermViewWidget	  tw = (DtTermViewWidget) w;
     Widget		  submenu;
-    Widget		  button;
     long		  i1;
     int			  i2;
     char		 *c1;
@@ -593,7 +594,9 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     static Widget pulldown[numPulldowns];
     static Widget popupMenu = (Widget) 0;
     int pc;
+#if defined(NOTDEF) || defined(HPVUE)
     Widget button;
+#endif	/* NOTDEF || HPVUE */
     Widget submenu;
     Arg arglist[20];
     Arg *newArglist;
@@ -670,7 +673,7 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     if (menuBar || (!menuBar && firstPopup))
 #ifdef	PULLDOWN_ACCELERATORS
 	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,21, "W"));
-	(void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+    (void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	          (GETMESSAGE(NL_SETN_ViewMenu,20, "Window")),
 		  ks,
 		  NULL, NULL, NULL, NULL);
@@ -713,7 +716,7 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     if (menuBar || (!menuBar && firstPopup))
 #ifdef	PULLDOWN_ACCELERATORS
 	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,31, "E"));
-	(void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+    (void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	          (GETMESSAGE(NL_SETN_ViewMenu,30, "Edit")),
 		  ks,
 		  NULL, NULL, NULL, NULL);
@@ -780,7 +783,7 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     if (menuBar || (!menuBar && firstPopup))
 #ifdef	PULLDOWN_ACCELERATORS
         ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,47, "O"));
-	(void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+    (void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	          (GETMESSAGE(NL_SETN_ViewMenu,46, "Options")),
 		   ks,
 		   NULL, NULL, NULL, NULL);
@@ -844,7 +847,7 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     if (menuBar || (!menuBar && firstPopup))
 #ifdef	PULLDOWN_ACCELERATORS
 	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,61,"H"));
-	cascade = _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+    cascade = _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	         (GETMESSAGE(NL_SETN_ViewMenu,60, "Help")),
 		ks,
 		NULL, NULL, NULL, NULL);
@@ -908,7 +911,7 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     if (menuBar || (!menuBar && firstPopup))
 #ifdef	PULLDOWN_ACCELERATORS
 	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,81,"H"));
-	cascade = _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+    cascade = _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	         (GETMESSAGE(NL_SETN_ViewMenu,80, "Help")),
 		ks,
 		NULL, NULL, NULL, NULL);
@@ -1591,7 +1594,6 @@ _DtTermViewSetUserFontListIndex
     long		  i1
 )
 {
-    DtTermViewWidget	  tw = (DtTermViewWidget) w;
     _DtTermWidgetToAppContext(w);
 
     _DtTermAppLock(app);

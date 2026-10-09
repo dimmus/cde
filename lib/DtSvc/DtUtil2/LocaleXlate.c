@@ -322,6 +322,7 @@ void GetHomeDirPath(
     char * ptr = NULL;
     _Xgetpwparams pwd_buf;
     struct passwd * pwd_ret;
+    (void) pwd_buf; /* unused unless XTHREADS */
 
     if((ptr = (char *)getenv("HOME")) == NULL) 
     {

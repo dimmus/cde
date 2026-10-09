@@ -76,9 +76,8 @@ void SPCD_RemoveException(SbInputId id)
 void SPCD_MainLoopUntil(Boolean *flag)
 {
   
-  int fd_vec_size = howmany(SPCD_max_fd, NFDBITS);
   fd_set input_mask, except_mask;
-  int n, fd;
+  int fd;
   int result;
 
   do {

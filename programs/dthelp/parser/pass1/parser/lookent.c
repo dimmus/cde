@@ -43,7 +43,7 @@ LOGICAL m_lookent(M_WCHAR *name, unsigned char *type, M_WCHAR **content,
   {
     M_ENTITY *entity ;
 
-    if (entity = (M_ENTITY *) m_lookfortrie(name, m_enttrie)) {
+    if ((entity = (M_ENTITY *) m_lookfortrie(name, m_enttrie))) {
       *type = entity->type ;
       *content = entity->content ;
       *wheredef = entity->wheredef ; 

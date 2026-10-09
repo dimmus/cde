@@ -344,7 +344,7 @@ Do_HotBox(
 void
 Stop_HotBox( void )
 {
-  int min_x, min_y, max_x, max_y, tmp_x, tmp_y;
+  int min_x, min_y, max_x, max_y;
   static int tmp_ix, tmp_iy;
   static Boolean Rotate_Move=False;
 

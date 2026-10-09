@@ -113,7 +113,6 @@ static void Redisplay(Widget, XEvent *, Region);
 static void DoLayout(XmMonthPanelWidget) ;
 static void Resize(Widget) ;
 static Boolean SetValues(Widget, Widget, Widget, ArgList, Cardinal *) ;
-static XtGeometryResult QueryProc(Widget, XtWidgetGeometry*, XtWidgetGeometry*);
 static XtGeometryResult GeometryManager( Widget, XtWidgetGeometry *, XtWidgetGeometry *);
 static void DayCallback(Widget, XtPointer, XtPointer);
 static void MonthCallback(Widget, XtPointer, XtPointer);
@@ -286,17 +285,12 @@ Initialize( Widget rw, Widget nw, ArgList args, Cardinal *num_args )
 {
 	int i=0;
 	Arg wargs[5];
-	Widget header;
-	XmString str;
 	struct tm *tm_ret;
 	time_t timer;
-	Tick tmptick;
 	_Xltimeparams localtime_buf;
 	
-        XmMonthPanelWidget request = (XmMonthPanelWidget) rw ;
         XmMonthPanelWidget new_w = (XmMonthPanelWidget) nw ;
-
-        char buf[BUFSIZ];
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	new_w->month_panel.display_rows = 6;  /* minimum to show all days */
 
@@ -412,8 +406,6 @@ Initialize( Widget rw, Widget nw, ArgList args, Cardinal *num_args )
 static void
 Redisplay(Widget w, XEvent *ev, Region region)
 {
-	XmMonthPanelWidget panel = (XmMonthPanelWidget) w;
-
 	XmeRedisplayGadgets( w, ev, region) ;
 }
 
@@ -736,18 +728,6 @@ GeometryManager( Widget w, XtWidgetGeometry *request, XtWidgetGeometry *reply )
         return (XtGeometryYes);
 }
 
-/***************************************************************************
- *									   *
- *  QueryProc (stub for now)						   *
- *									   *
- ***************************************************************************/
-static XtGeometryResult 
-QueryProc( Widget w, XtWidgetGeometry *request, XtWidgetGeometry *reply )
-{
-/*    XmMonthPanelWidget mw = (XmMonthPanelWidget) w;*/
-    return(XtGeometryYes);
-}
-
 
 #if 0
 /***************************************************************************
@@ -881,6 +861,7 @@ set_header_string(XmMonthPanelWidget mw)
 	Arg wargs[3];
 	char buf[BUFSIZ];
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tmptick =
 	   monthdayyear(mw->month_panel.month, 1 ,mw->month_panel.year);

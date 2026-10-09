@@ -135,11 +135,9 @@ int input(void);
 void output(int);
 void unput(int);
 }
-static void skip_c_comments(void);
-static void skip_cplusplus_comments(void);
 # define YYNEWLINE 10
 int _Tt_types_table::yylex(){
-int nstr; extern int yyprevious;
+int nstr;
 #ifdef __cplusplus
 /* to avoid CC and lint complaining yyfussy not being used ...*/
 static int __lex_hack = 0;

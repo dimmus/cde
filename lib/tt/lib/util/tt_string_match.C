@@ -89,7 +89,7 @@ _tt_csh_match(const char *string, const char *pattern)
 		switch (pattern_ch = *pattern) {
 		case '[':
 			k= 0;
-			while (pattern_ch = *++pattern) {
+			while ((pattern_ch = *++pattern)) {
 				switch (pattern_ch) {
 				case ']':
 					if (!k) {

@@ -268,7 +268,6 @@ GetUserFileName(
 {
     int                status, ret = NoError;
     char               *path, *tmp_path;
-    int                len = 0;
     struct stat        buf;
 
     /* The user IMS Selection File should be of the following form:
@@ -312,7 +311,7 @@ ReadImSelectionFile(
 )
 {
     int         ret = NoError;
-    char	*lp, *valp, *vp, *p;
+    char	*lp, *valp, *vp;
     int         select_mode = 0;
     char        *imsname, *hostname;
     int         line_num, i;
@@ -408,7 +407,7 @@ GetImsList(
     sprintf(pipe_command, "/usr/dt/bin/dtimsstart -listname -hostname %s", 
 	    hostname);
 
-    if (fp = popen(pipe_command, "r")) {
+    if ((fp = popen(pipe_command, "r"))) {
 
 	/* Set the sensitivity of the InputMethod Title Box to False until we
 	 * are done reading the new information. */
@@ -461,7 +460,7 @@ ReadPipe (
 
 {
     char      buf[512];
-    int       i, nbytes;
+    int nbytes;
     int       status = NoError;
     static    char * savebuf = NULL; 
     static    int savebuf_bytes = 0 ;
@@ -503,7 +502,7 @@ ProcessBuf(
      char    *savebuf, 
      I18nEnv *env )
 {
-    int    i, n = 0;
+    int n = 0;
     int    ret = NoError;
     ImsEnt *ims_ent;
     char * filename, * label ;

@@ -392,7 +392,7 @@ static char	*find_session_resfile(int res_type)
     }
 
     if (!res)	return NULL;
-    if (ls = parse_strlist(res, ':')) {
+    if ((ls = parse_strlist(res, ':'))) {
 	for (pp = ls; *pp; pp++) {
 	    expand_string(*pp, path, MAXPATHLEN, (ImsConf *)0);
 	    if (access(path, R_OK) == 0) {
@@ -405,7 +405,7 @@ static char	*find_session_resfile(int res_type)
     /* DPR2(("find_session_resfile(): '%s'\n", path)); */
 
     if (found)
-	return NEWSTR(path);
+	return NEWSTR(&path[0]);
     return NULL;
 }
 
@@ -451,15 +451,15 @@ static int	build_run_env(UserSelection *sel)
 
 	/* proto, im_mod  & atom */
     proto = renv->proto = default_protocol(ims);
-    if (p = Conf.xmod[proto]) {
+    if ((p = Conf.xmod[proto])) {
 	char	buf[BUFSIZ];
 	expand_string(p, buf, BUFSIZ, ims);
-	renv->im_mod = NEWSTR(buf);
+	renv->im_mod = NEWSTR(&buf[0]);
     }
-    if (p = Conf.atom[proto]) {
+    if ((p = Conf.atom[proto])) {
 	char	buf[BUFSIZ];
 	expand_string(p, buf, BUFSIZ, ims);
-	renv->atom_name = NEWSTR(buf);
+	renv->atom_name = NEWSTR(&buf[0]);
     } else {		/* copy im_mod, instead */
 	renv->atom_name = NEWSTR(renv->im_mod);
     }
@@ -659,7 +659,7 @@ static bool	is_ims_running(RunEnv *renv, ImsConf *ims)
     Window	owner;
     Atom	*atomp;
 
-    if (prop_str = ims->property) {
+    if ((prop_str = ims->property)) {
 	atomp = (Atom *)0;
     } else {
 	if (!(prop_str = renv->atom_name))
@@ -703,7 +703,7 @@ static int	settle_ims(UserSelection *sel)
 	ImsConf	*ims = sel->ent->ims;
 
 	owner = None;
-	if (prop_str = ims->property) {
+	if ((prop_str = ims->property)) {
 	    atomp = (Atom *)0;
 	    owner = property_owner(atomp, prop_str);
 	}

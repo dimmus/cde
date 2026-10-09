@@ -65,7 +65,7 @@ _DtCmsTarget2Location(char *target)
 	if (target == NULL)
 		return (NULL);
 
-	if (ptr = strchr(target, '@')) {
+	if ((ptr = strchr(target, '@'))) {
 		return (strdup(++ptr));
 	} else
 		return (NULL);
@@ -96,7 +96,7 @@ _DtCmsTarget2Domain(char *target)
         char *location, *domain, *ptr;
  
         if ((location = _DtCmsTarget2Location(target)) != NULL) {
-		if (ptr = strchr(location, '.'))
+		if ((ptr = strchr(location, '.')))
 			domain = strdup(++ptr);
 		else
 			domain = NULL;

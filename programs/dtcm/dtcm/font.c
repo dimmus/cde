@@ -262,7 +262,6 @@ load_app_font(
 					    &font_name_list))) {
 			pixel_size = 12;
 		} else {
-			int i;
 			if (!XGetFontProperty(font_struct_list[0],
 					      pixel_atom, 
 					      &pixel_size))

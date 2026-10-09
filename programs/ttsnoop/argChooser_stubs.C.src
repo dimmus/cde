@@ -430,7 +430,6 @@ argOkayed(
     }
 
     switch (choice) {
-	    Tt_status status;
 	case _DtArgChooseMessageArgAdd:
 	case _DtArgChooseMessageIArgAdd:
 	case _DtArgChooseMessageArgSet:

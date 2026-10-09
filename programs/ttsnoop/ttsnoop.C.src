@@ -719,7 +719,7 @@ main(int argc, char **argv)
 		    tt_pattern_category_set( pat, TT_OBSERVE );
 		    if (scopeFilesCount > 0) {
 			    tt_pattern_scope_add( pat, TT_BOTH );
-			    for (int i = 0; i < scopeFilesCount; i++) {
+			    for (int i = 0; (unsigned int)i < scopeFilesCount; i++) {
 				    tt_pattern_file_add( pat, scopeFiles[i] );
 			    }
 		    } else {
@@ -728,10 +728,10 @@ main(int argc, char **argv)
 		    char *sess = tt_default_session();
 		    tt_pattern_session_add( pat, sess );
 		    tt_free( sess );
-		    for (int i = 0; i < opsCount; i++) {
+		    for (int i = 0; (unsigned int)i < opsCount; i++) {
 			    tt_pattern_op_add( pat, ops[i] );
 		    }
-		    for (int i = 0; i < sendersCount; i++) {
+		    for (int i = 0; (unsigned int)i < sendersCount; i++) {
 			    tt_pattern_sender_add( pat, senders[i] );
 		    }
 		    if (vtype != 0) {

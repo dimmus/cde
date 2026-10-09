@@ -116,7 +116,7 @@ static int IOErrorHandler(
                         Display *disp ) ;
 
 static void ToolkitErrorHandler(
-                        char *message) ;
+                        char *message) _X_NORETURN;
 static void errParentMap( 
                         Widget w,
                         XtPointer client_data,
@@ -455,8 +455,6 @@ main(
 {
     int             n;
     Arg             args[MAX_ARGS];
-    XEvent          event;
-    XPropertyEvent *pEvent=(XPropertyEvent *)&event;
     long            mwmFunc;
     Boolean         useMaskRtn, useIconFileCacheRtn;    
     char           *dirs = NULL;
@@ -509,7 +507,7 @@ malloc_trace(0);
 	visual = XDefaultVisual(style.display,style.screenNum);
 	style.visualClass = visual->class;
     
-    if (progName = DtStrrchr(argv[0], '/')) progName++;
+    if ((progName = DtStrrchr(argv[0], '/'))) progName++;
     else progName = argv[0];
 
     /* Get the lock established to ensure only one dtstyle process
@@ -1076,9 +1074,8 @@ void
 WaitChildDeath( void )
 {
   int   stat_loc;
-  pid_t pid;
   
-  pid = wait(&stat_loc);
+  wait(&stat_loc);
   signal(SIGCHLD,(void (*)())WaitChildDeath);
 
 }

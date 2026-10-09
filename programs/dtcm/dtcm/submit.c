@@ -76,7 +76,6 @@ arpaPhrase(const char * name)
     int distance;
     char ** addrs;
     const char * comma;
-    const char * start;
     
     if (name == (char *) 0) {
 	return(NULL);
@@ -105,7 +104,6 @@ arpaPhrase(const char * name)
 
     gotlt = 0;
     lastsp = 0;
-    start = name;
     for (cp = name; (c = *cp++) != 0;) {
 	switch (c) {
 	  case '(':
@@ -324,7 +322,7 @@ formatMessage(char ** addrs, const char * subject, const char * body)
                 	enc = MIME_7BIT;
 
 		memset(digest,0,sizeof(digest));
-		md5PlainText(body,body_len,digest);
+		md5PlainText(body,body_len,(unsigned char *)digest);
 		writeContentHeaders(hdr_buf,mime_type,enc,(char *)digest,isAllASCII);
 		strcat(hdr_buf,"\n");
 		strcat(hdr_buf,"Content-Length: ");

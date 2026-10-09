@@ -124,6 +124,7 @@ main(int argc, char **argv)
 
 	/* back up buffer... */
 	(void) strncpy(orig, buffer, BUFSIZ - 1);
+	orig[BUFSIZ - 1] = '\0';
 
 	bufPtr = buffer;
 

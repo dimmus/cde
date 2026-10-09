@@ -124,7 +124,6 @@ gilP_load_att_done_handler(FILE * inFile, ABObj obj, ABObj module)
     int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     ISTRING             handler = NULL;
-    ABObj               action = NULL;
 
     if ((rc = gilP_load_handler(inFile, &handler)) < 0)
     {
@@ -360,7 +359,6 @@ get_action_attribute(
 )
 {
     int                 return_value = 0;
-    int                 rc = 0; /* r turn code */
 
     if (abio_get_eof(inFile))
     {
@@ -370,22 +368,22 @@ get_action_attribute(
     switch (attr)
     {
     case AB_GIL_FROM:
-        rc = get_from(inFile, obj, module, action);
+        get_from(inFile, obj, module, action);
         break;
     case AB_GIL_ACTION:
-        rc = get_operation(inFile, action);
+        get_operation(inFile, action);
         break;
     case AB_GIL_TO:
-        rc = get_to(inFile, obj, module, action);
+        get_to(inFile, obj, module, action);
         break;
     case AB_GIL_WHEN:
-        rc = get_when(inFile, obj, action);
+        get_when(inFile, obj, action);
         break;
     case AB_GIL_FUNCTION_TYPE:
-        rc = get_function_type(inFile, action);
+        get_function_type(inFile, action);
         break;
     case AB_GIL_ARG_TYPE:
-        rc = get_arg_type(inFile, action);
+        get_arg_type(inFile, action);
         break;
     default:
         abil_print_load_err(ERR_UNKNOWN);
@@ -401,7 +399,6 @@ static int
 get_from(FILE * inFile, ABObj obj, ABObj module, ABObj action)
 {
     int                 return_value = 0;
-    int                 rc = 0; /* r turn code */
     ISTRING             interface_name = NULL;
     ISTRING             parent_name = NULL;
     ISTRING		name = NULL;
@@ -422,7 +419,7 @@ get_from(FILE * inFile, ABObj obj, ABObj module, ABObj action)
 
     if (from == NULL)
     {
-        rc = abil_print_load_err(ERR_UNKNOWN_OBJECT);
+        abil_print_load_err(ERR_UNKNOWN_OBJECT);
         goto abort;
     }
 
@@ -443,7 +440,6 @@ static int
 get_to(FILE * inFile, ABObj obj, ABObj module, ABObj action)
 {
     int                 return_value = 0;
-    int                 rc = 0; /* r turn code */
     ISTRING             interface_name = NULL;
     ISTRING             parent_name = NULL;
     ISTRING             name = NULL;
@@ -464,7 +460,7 @@ get_to(FILE * inFile, ABObj obj, ABObj module, ABObj action)
 
     if (to == NULL)
     {
-        rc = abil_print_load_err(ERR_UNKNOWN_OBJECT);
+        abil_print_load_err(ERR_UNKNOWN_OBJECT);
         goto abort;
     }
 
@@ -690,15 +686,12 @@ static int
 add_user_handler(ABObj obj, ABObj module,
                  ISTRING handler, AB_WHEN when)
 {
-    int                 retval = 0;
-    ABObj               project = NULL;
     ABObj               action = NULL;
 
     if (handler == NULL)
     {
         return 0;
     }
-    project = obj_get_project(module);
 
     /*
      * With "callbacks," the to field is irrelevant.  The target is generally

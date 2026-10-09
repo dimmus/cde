@@ -781,7 +781,6 @@ _tt_update_modtime(int			  isfd,
 		last_mod_time++;
 	}
 
-	char mod_string[16];
 	sprintf(&_tt_record[OID_KEY_LENGTH + MAX_PROP_LENGTH],
 		"%ld", (long)last_mod_time);
 	res.result = isrewcurr(isfd, _tt_record);

@@ -125,12 +125,6 @@ CreateInstance(Widget topLevelWidget, char *name, Arg *arglist,
 
 
 /* forward declarations... */
-static void activateCallback(
-    Widget		  w,
-    XtPointer		  client_data,
-    XtPointer		  call_data
-);
-
 static void ToggleMenuBar(
     Widget		  w,
     XtPointer		  client_data,
@@ -846,9 +840,6 @@ CreateInstance
 void
 AtExitProc(void)
 {
-    static int i = 0;
-
-    i++;
 #ifdef	BBA
     _bA_dump();
 #endif	/* BBA */
@@ -1126,7 +1117,6 @@ main(int argc, char **argv)
     int			  i;
     char		 *c;
     char		 *c2;
-    char		 *saved_arg0;
     char		**commandToExecute = (char **) 0;
     int			  ptyMasterFd = -1;
     struct sigaction	  sa;
@@ -1136,7 +1126,7 @@ main(int argc, char **argv)
     
     (void) atexit(AtExitProc);
 
-    if (c = getenv("dttermDebugFlags")) {
+    if ((c = getenv("dttermDebugFlags"))) {
 	(void) setDebugFlags(c);
     }
     if (isDebugSet('T')) {
@@ -1146,7 +1136,7 @@ main(int argc, char **argv)
 	(void) timeStamp("starting");
     }
 
-    if (c = getenv("dttermDelayFlags"))
+    if ((c = getenv("dttermDelayFlags")))
     {
 	if (NULL != c)
 	{
@@ -1291,7 +1281,7 @@ main(int argc, char **argv)
 	     */
 	    /* skip past the '-S'... */
 	    c = argv[i] + 2;
-	    if (c2 = strchr(c, '.')) {
+	    if ((c2 = strchr(c, '.'))) {
 		/* skip past the '.'... */
 		(void) c2++;
 	    } else {
@@ -1791,12 +1781,11 @@ RestoreSession(
     char *fileName = attrs.session;
     char *path;
     XrmDatabase db;
-    char *tmpStr;
     XrmName xrm_name[5];
     XrmRepresentation rep_type;
     XrmValue value;
     Widget ShellWidget;
-    int numToRestore, i, j;
+    int numToRestore, j;
     Arg			  al[30];
     int			  ac;
     
@@ -1869,24 +1858,8 @@ RestoreTerm(
     DtTermWidget dtw = (DtTermWidget )dtvw->termview.term;
     Position x,y;
     Dimension width, height;
-    char                  *ws_list;
-    unsigned char	  charCursorStyle;
     int			  blinkRate;
-    Boolean		  jumpScroll;
-    Boolean		  marginBell;
     int			  nMarginBell;
-    Boolean		  visualBell;
-    Boolean		  reverseVideo;
-    Boolean		  cursorMode;
-    Boolean		  keypadMode;
-    Boolean		  autoWrap;
-    Boolean		  reverseWrap;
-    Boolean		  c132;
-    Boolean		  lockState;
-    Boolean		  autoLineFeed;
-    Boolean		  menuBar;
-    Boolean		  scrollBar;
-    char		 *cwd;
     Arg			  al[30];
     int			  ac;
     int			  rows = 0;

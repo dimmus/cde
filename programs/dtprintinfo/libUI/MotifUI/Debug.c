@@ -39,7 +39,7 @@ static  const char *SysErrorMsg(int n);
 /* Error Handlers */
 static  int XIOError(Display *dpy);
 static  int XError(Display *dpy, XErrorEvent *event);
-static  void _XtError(String);
+static  void _XtError(String) _X_NORETURN;
 
 static Boolean G_DumpCore;
 
@@ -71,6 +71,7 @@ XError(
         kill(getpid(), SIGQUIT);
     else
         exit(1);
+    return 0;
 }
 
 /*
@@ -94,6 +95,7 @@ XIOError(
         kill(getpid(), SIGQUIT);
     else
         exit(1);
+    return 0;
 }
 
 /*
@@ -253,6 +255,6 @@ _XtError(
     (void)fprintf(stderr, "XtToolkit Error: %s\n", string);
     if (G_DumpCore)
         kill(getpid(), SIGQUIT);
-    else
-        exit(1);
+    /* Xt requires that this handler never returns (SIGQUIT may be caught). */
+    exit(1);
 }

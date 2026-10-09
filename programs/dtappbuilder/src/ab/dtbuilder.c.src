@@ -255,7 +255,6 @@ init_ab(ABInitProcInfo init_info)
     char	*type = NULL;
     XrmValue	value;
     struct sigaction    exit_action;
-    BOOL	reopenFailed = FALSE;
 
 
     /*
@@ -376,6 +375,8 @@ init_ab(ABInitProcInfo init_info)
                     case DTB_ANSWER_CANCEL:
 			ret = -1;
                     break;
+                    default:
+		    break;
 		}
                 if ((ret < 0) && (answer != DTB_ANSWER_CANCEL))
                 {
@@ -425,11 +426,15 @@ init_ab(ABInitProcInfo init_info)
 			    case DTB_ANSWER_CANCEL:
 				ret = -1;
 				break;
+			    default:
+				break;
 			}
                     break;
 
                     case DTB_ANSWER_CANCEL:
 		        ret = -1;
+                    break;
+                    default:
                     break;
 		}
 	    }
@@ -714,101 +719,6 @@ output_handler(STRING msg)
 
 
 
-static Boolean
-ab_save_sessionCB
-(
-    Widget	widget,
-    char	*session_file,
-    char	***argv,
-    int		*argc
-)
-{
-    FILE		*fp;
-    AB_TRAVERSAL	trav;
-    ABObj		proj,
-			module;
-    char		*proj_name;
-    Boolean		first = True,
-			curProjWritten = False,
-			shownModulesWritten = False;
-
-    if (!(fp = util_fopen_locked(session_file, "w+")))
-    {
-	fprintf(stderr, "fopen of session file %s failed.\n", session_file);
-        return False;
-    }
-
-    chmod(session_file, S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP);
-
-    /*
-     * Current Project
-     */
-    proj = proj_get_project();
-    if (proj)
-    {
-	if (proj_name = obj_get_file(proj))
-	{
-	    fprintf(fp, "%s:%s",
-		AB_XRM_CUR_PROJECT, proj_name);
-	    curProjWritten = True;
-	}
-    }
-
-    if (curProjWritten)
-    {
-	fprintf(fp, "\n");
-
-        /*
-         * Shown modules
-         */
-        for (trav_open(&trav, proj, AB_TRAV_MODULES);
-	        (module = trav_next(&trav)) != NULL; )
-        {
-	    if (obj_has_flag(module, MappedFlag))
-	    {
-	        if (first)
-	        {
-	            fprintf(fp, "%s: %s",
-			    AB_XRM_SHOWN_MODULES, obj_get_name(module));
-		    first = False;
-	        }
-	        else
-	        {
-	            fprintf(fp," %s", obj_get_name(module));
-	        }
-		shownModulesWritten = True;
-	    }
-        }
-    }
-
-    fclose(fp);
-
-    if (curProjWritten | shownModulesWritten)
-	return (True);
-
-    return(False);
-}
-
-static Boolean
-ab_restore_sessionCB
-(
-    Widget	widget,
-    char	*session_file
-)
-{
-    XrmDatabase db;
-
-    /***  Open the resource database file ***/
-
-    if ((db = XrmGetFileDatabase (session_file)) == NULL)
-        return (False);
-
-    AB_db = db;
-
-    return (True);
-}
-
-
 #ifdef DEBUG	/* performance testing */
 
 static int
@@ -891,7 +801,6 @@ create_import_rbox(
 		format_rbox = NULL,
 		method_rbox = NULL,
 		rbox = NULL,
-		rbox_label = NULL,
 		BIL_item = NULL,
 		UIL_item = NULL,
 		Copy_item = NULL,
@@ -934,7 +843,7 @@ create_import_rbox(
 
     label_xmstring = XmStringCreateLocalized(
 			CATGETS(Dtb_project_catd, 100, 46,"Import Format:"));
-    rbox_label = XtVaCreateManagedWidget("rbox_label",
+    XtVaCreateManagedWidget("rbox_label",
                 xmLabelWidgetClass,
                 format_rbox,
                 XmNlabelType, XmSTRING,
@@ -1011,7 +920,7 @@ create_import_rbox(
 
     label_xmstring = XmStringCreateLocalized(
                         CATGETS(Dtb_project_catd, 100, 49,"Import By:"));
-    rbox_label = XtVaCreateManagedWidget("rbox_label",
+    XtVaCreateManagedWidget("rbox_label",
                 xmLabelWidgetClass,
                 method_rbox,
                 XmNlabelType, XmSTRING,
@@ -1789,7 +1698,7 @@ Session_saveCB(Widget widget, String session_file, char ***argv, int *argc)
     proj = proj_get_project();
     if (proj)
     {
-	if (proj_name = obj_get_file(proj))
+	if ((proj_name = obj_get_file(proj)))
 	{
 	    fprintf(fp, "%s:%s",
 		AB_XRM_CUR_PROJECT, proj_name);
@@ -1922,6 +1831,8 @@ proj_show_new_proj_dlgCB(
             case DTB_ANSWER_NONE:
             case DTB_ANSWER_CANCEL:
                 break;
+            default:
+                break;
         }
     }                   /* End check unsaved edits */
     else
@@ -1997,6 +1908,8 @@ proj_show_open_chooserCB(
 
 	    case DTB_ANSWER_CANCEL:
 		return;
+	    default:
+		break;
 	}
     }
 
@@ -2157,6 +2070,8 @@ proj_close_projCB(
 
             case DTB_ANSWER_NONE:
             case DTB_ANSWER_CANCEL:
+                break;
+            default:
                 break;
         }
     }

@@ -127,8 +127,6 @@ static  void    activateCB_AF_OkButton( Widget  UxWidget,
                                        XtPointer UxCallbackArg)
 {
   FiletypeData  *pFtD;
-  FiletypeData  **papArray;
-  int           i;
 
   /**************************************************************************/
   /* Check if fields are valid.                                             */
@@ -249,8 +247,6 @@ static  void    activateCB_AF_CancelButton( Widget UxWidget,
 static Widget   _Uxbuild_AddFiletype(void)
 {
         Widget                _UxParent;
-        char                  *UxTmp0;
-        Widget                AF_CharacteristicsWindow;
         Widget                ActionAreaForm;
         int                   ntotalbuttons = 4;
         int                   nbutton = 0;

@@ -134,9 +134,6 @@ static void	_DtActMMGetCmdInfo(
 static void	_DtActMMGetTtMsgInfo(
 			DtDtsMMRecord *actRecp,
 			ActionPtr actp);
-static int	_DtActInputSeqCheck(
-			DtDtsDbRecord *r1,
-			DtDtsDbRecord *r2);
 static char *	_DtActDbChooseLabel(
 			DtDtsDbRecord *rec);
 static char *	_DtActMMChooseLabel(
@@ -432,7 +429,6 @@ _DtActionDbLabel (  char *s )
 {
 	int		n;
 	XrmQuark 	tmpq;
-	char		*label;
 	DtDtsDbRecord	**act_rec;
 	DtDtsDbRecord	**last_rec_found = NULL;
 	DtDtsDbDatabase	*act_db;
@@ -486,7 +482,6 @@ _DtActionMMLabel (  char *s )
 {
 	int		n;
 	DtShmBoson 	tmpq;
-	char		*label;
 	DtDtsMMRecord	*act_rec;
 	DtDtsMMRecord	*act_rec_list;
 	DtDtsMMRecord	*last_rec_found = NULL;
@@ -1397,7 +1392,6 @@ _DtActMMGetTtMsgInfo(DtDtsMMRecord *actRecp, ActionPtr actp)
 		+ sizeof(_DtACTION_TTN_REP_TYPE)]; /* space for longest suffix */
 	int  i;
 	char *s;
-	char *tmp = NULL;
 
 	/* Get the (required) tt_class field */
 	s = _DtActGetDtsMMField(actRecp,_DtACTION_TT_CLASS);
@@ -1850,7 +1844,6 @@ _DtActionLocateRecord(
 	int		n;
 	DtDtsMMRecord	*act_rec;
 	DtDtsMMRecord	*act_rec_list;
-	DtDtsMMRecord	*last_rec_found = NULL;
 	char		*tmp = 0;
 	int		*start;
 	
@@ -1951,7 +1944,6 @@ ValidKeyword(
    char *stop;
    char *lastCh;
    int lastChLen;
-   char savedChar;
    Boolean FoundQualifier=False;
 
 
@@ -2094,7 +2086,6 @@ ValidKeyword(
     * must also be a '"'; otherwise, the keyword was invalid.  If the next
     * character is not a '"', then the keyword is invalid.
     */
-   savedChar = *DtNextChar(end);
    lastCh = DtPrevChar(start, end+1);
    lastChLen = mblen(lastCh, MB_LEN_MAX);
 

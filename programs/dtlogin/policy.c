@@ -109,7 +109,7 @@ CheckAuthentication( struct protoDisplay *pdpy, ARRAY8Ptr displayID,
         	     ARRAY8Ptr name, ARRAY8Ptr data )
 {
 #ifdef HASXDMAUTH
-    if (name->length && !strncmp (name->data, "XDM-AUTHENTICATION-1", 20))
+    if (name->length && !strncmp ((char *)name->data, "XDM-AUTHENTICATION-1", 20))
 	return XdmCheckAuthentication (pdpy, displayID, name, data);
 #endif
     return TRUE;

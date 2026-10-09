@@ -124,18 +124,12 @@ static void	clear_editor_fields(void);
 static BOOL	dnd_editable_obj_test(
     			PalEditableObjInfo  *ed_obj_info
 		);
-static int      dnd_ed_editor_load(
-                    ABObj   project
-                );
 static int      dnd_ed_editor_apply(void);
 
 static void     dnd_turnoff_changebars(void);
 
 static int	check_active(void);
 
-static int	dnd_ed_update_objecttype_menu(
-    			Widget	menu_pane
-		);
 
 static BOOL	dnd_list_test(
 			ABObj test_obj
@@ -370,15 +364,6 @@ dnd_ed_editor_init(
 }
 
 
-static int
-dnd_ed_update_objecttype_menu(
-    Widget	menu_pane
-)
-{
-return 0;
-}
-
-
 static void
 dnd_change_objecttype_palCB(
     Widget	widget,
@@ -498,36 +483,13 @@ dnd_editable_obj_test(
 	case AB_TYPE_CONTAINER:
 	    needed = (ed_obj_info->subtype == (int)AB_CONT_RELATIVE);
 	break;
+	default:
+	break;
     }
 
     return needed;
 }
 
-
-static int
-dnd_ed_editor_load(
-    ABObj       obj
-)
-{
-    DndEditorSettings	dds = &dndEdInfo;
- 
-    if (obj == NULL)
-    {
-        if (dds->curObj != NULL)
-            obj = dds->curObj;
-        else
-            return ERROR;
-    }
-    else
-        dds->curObj = obj;
-
-    /* REMIND: LOAD ALL EDITOR SETTINGS WITH OBJ VALUES HERE */
-
-    dnd_turnoff_changebars();
-
-    return OK;
-
-}
 
 static int
 dnd_ed_editor_apply(void)
@@ -706,6 +668,8 @@ do_auto_apply(
 			old_name);
 		    ui_list_select_item(list,old_name,FALSE);
 		}
+		break;
+	default:
 		break;
     }
 

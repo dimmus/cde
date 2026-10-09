@@ -414,6 +414,8 @@ change_state(const _Tt_procid_ptr &changer, Tt_state s,
 	      case TT_STARTED:
 		status = started( trace );
 		break;
+	      default:
+		break;
 	}
 	if (! changer.is_null()) {
 		add_voter( changer, s, trace );
@@ -759,7 +761,6 @@ object_oriented_dispatch(const _Tt_msg_trace &trace)
 Tt_status _Tt_s_message::
 procedural_dispatch(const _Tt_msg_trace &trace)
 {
-	int				matched_handler = 0;
 	
 	
 	// if handler_ptype is filled in then verify it is a valid
@@ -870,6 +871,8 @@ match_signatures(_Tt_signature_list_ptr &siglist, const _Tt_msg_trace &trace)
 								  sr,
 								  sc));
 			}
+			break;
+		    default:
 			break;
 		}
 	}
@@ -1046,7 +1049,6 @@ deliver(const _Tt_msg_trace &trace, int deliver_to_observers)
 	_Tt_procid_ptr			handler_procid;
 	_Tt_s_procid_ptr		dummy;
 	int				found_observer = 0;
-	int				best_match = 0;
 
 	_Tt_patlist_ptr opful_pats = _tt_s_mp->opful_pats->lookup(_op);
 	if (opful_pats.is_null()) {
@@ -1243,6 +1245,9 @@ _tt_excludes(Tt_category best_category, Tt_category curr_category)
 		if (best_category == TT_HANDLE_PUSH) {
 			return 1;
 		}
+		break;
+	    default:
+		break;
 	}
 	return 0;
 }
@@ -1260,7 +1265,7 @@ _tt_excludes(Tt_category best_category, int best_match,
 				return 0;
 			}
 			if (   (best_match == score)
-			    && (best_timestamp >= timestamp))
+			    && (best_timestamp >= (unsigned int)timestamp))
 			{
 				// Newest PUSH pattern wins
 				return 1;
@@ -1284,7 +1289,7 @@ _tt_excludes(Tt_category best_category, int best_match,
 			}
 			if (   (best_match == score)
 			    && (best_category == TT_HANDLE_ROTATE)
-			    && (best_timestamp < timestamp))
+			    && (best_timestamp < (unsigned int)timestamp))
 			{
 				// Coldest ROTATE pattern wins
 				return 1;
@@ -1296,6 +1301,8 @@ _tt_excludes(Tt_category best_category, int best_match,
 				return 1;
 			}
 			break;
+		    default:
+			break;
 		}
 		break;
 	    case TT_HANDLE:
@@ -1303,6 +1310,9 @@ _tt_excludes(Tt_category best_category, int best_match,
 		if (best_match >= score) {
 			return 1;
 		}
+		break;
+	    default:
+		break;
 	}
 	return 0;
 }

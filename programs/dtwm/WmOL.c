@@ -158,7 +158,6 @@ OLWinAttr *
 GetOLWinAttr(
         ClientData *pCD )
 {
-    Boolean rval = False;
     OLWinAttr *property = NULL;
     OLWinAttr *prop_new;
     Atom actual_type;

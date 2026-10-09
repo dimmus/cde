@@ -327,7 +327,7 @@ static	const	_DtCvSegmentI	BlankTableCell =
   {
 	_DtCvCONTAINER,		/* type         */
 	-1,			/* link_idx     */
-	  {			/* container info */
+	  { {			/* container info */
 	    NULL,		  /* id           */
 	    NULL,		  /* justify_char */
 	    _DtCvDYNAMIC,	  /* type         */
@@ -344,9 +344,9 @@ static	const	_DtCvSegmentI	BlankTableCell =
 	    0,			  /* rmargin      */
 	    0,			  /* tmargin      */
 	    0,			  /* bmargin      */
-	    _DtCvBORDER_NONE,  /* bdr_info     */
+	    { _DtCvBORDER_NONE, NULL },  /* bdr_info     */
 	    NULL 		  /* seg_list     */
-	  },
+	  } },
 	NULL,			/* next_seg     */
 	NULL,			/* next_disp    */
 	NULL,			/* client_use   */
@@ -1638,28 +1638,6 @@ FormatCell(
 }
 
 /******************************************************************************
- * Function: AdjustFrmtTxtOption
- *
- *****************************************************************************/
-static void
-AdjustFrmtTxtOption(
-    _DtCvSegmentI	*p_seg,
-    _DtCvFrmtOption	 option)
-{
-    if (p_seg != NULL && _DtCvIsSegContainer(p_seg))
-      {
-	TxtHorizJustify(p_seg) = option;
-
-	p_seg = _DtCvContainerListOfSeg(p_seg);
-	while (p_seg != NULL)
-	  {
-	    AdjustFrmtTxtOption(p_seg, option);
-	    p_seg = p_seg->next_seg;
-	  }
-      }
-}
-
-/******************************************************************************
  * Function: ResolveCell
  *
  *****************************************************************************/
@@ -2758,6 +2736,8 @@ UpdateDimensionArrays(
 		    (*top_bot)[i][j][DIMS_HEIGHT] += height;
 		break;
 
+	default:
+		break;
       }
 
     /*
@@ -2804,6 +2784,8 @@ UpdateDimensionArrays(
 		    if ((*flow)[j][DIMS_WIDTH] < width)
 			(*flow)[j][DIMS_WIDTH] = width;
 		  }
+		break;
+	default:
 		break;
       }
 }
@@ -3110,6 +3092,8 @@ AdjustHeadPosition(
 		    newY = (*side)[i][j];
 		    (*side)[i][j] += info->height;
 		  }
+		break;
+	default:
 		break;
       }
 
@@ -3492,6 +3476,9 @@ DrawBorders(
 			SaveLine(canvas, layout, _DtCvLINE_HORZ,
 						data, line_width,
 						left_x, top_y, width);
+			break;
+	    default:
+			break;
 	  }
     
 	/*
@@ -3533,6 +3520,9 @@ DrawBorders(
 			SaveLine(canvas, layout, _DtCvLINE_VERT,
 						data, line_width,
 				right_x - line_width, top_y, bot_y - top_y);
+			break;
+	    default:
+			break;
 	  }
       }
 

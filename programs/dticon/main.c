@@ -187,20 +187,18 @@ main(
         /*-----------------------------------------------------------*/
         /* Declarations.                                             */
         /*-----------------------------------------------------------*/
-        Widget  w, d;
+        Widget  w;
         int n;
         Arg args[20];
         Atom xa_WM_DELETE_WINDOW, xa_WM_SAVE_YOURSELF;
         char *tmpPtr=NULL;
         static char *untitledStr = NULL;
         char *p=NULL;
-        char *tmpp=NULL;
 
 #ifdef __TOOLTALK
     int ttFd;
     char * procId;
     Tt_status ttRc;
-    char * sessionString;
 #endif
 
         /*-----------------------------------------------------------*/
@@ -222,7 +220,7 @@ main(
         XtSetLanguageProc(NULL, NULL, NULL);
 
         execName = argv[0];
-        if (progName=strrchr(argv[0], '/'))
+        if ((progName=strrchr(argv[0], '/')))
             progName++;
         else
             progName = argv[0];
@@ -250,10 +248,10 @@ main(
         /*------------------------------------------------------------------*/
         w = create_dtIconShell();
 	dticonShell = w;
-        d = create_fileIODialog();
-        d = create_newIconDialog();
-        d = create_queryDialog();
-        d = create_stdErrDialog();
+        create_fileIODialog();
+        create_newIconDialog();
+        create_queryDialog();
+        create_stdErrDialog();
         Create_Gfx_Labels(Foreground, Background);
         AssignHelpCallbacks();
 
@@ -381,7 +379,7 @@ DieFromToolTalkError(Widget parent, char *errfmt, Tt_status status)
 {
     Arg		 args[10];
     Widget	 dialog, dialogShell;
-    char	*errmsg, *statmsg, *title;
+    char	*errmsg, *statmsg;
     XmString	 xms_errmsg, xms_ok, xms_title;
     int		 n;
 
@@ -598,6 +596,8 @@ if (tt_message_status(msg) == TT_WRN_START_MESSAGE) tt_message_reply(msg);
            }
         }
     break;
+    default:
+    break;
   }
 
   tt_release(mark);
@@ -679,7 +679,6 @@ send_tt_saved(void)
         char* Fbuffer=NULL;
         char* Mbuffer=NULL;
         struct stat statbuf;        /* Information on a file. */
-        Tt_status ttstat;
         Tt_message msg;
 
         mark = tt_mark();
@@ -743,7 +742,7 @@ send_tt_saved(void)
                             (void *) buffer, Mlen+len+1);
         tt_message_arg_add(msg, TT_IN, "string", msgID);
 
-        ttstat = tt_message_send(msg);
+        tt_message_send(msg);
         tt_message_destroy(msg);
 	tt_release(mark);
 

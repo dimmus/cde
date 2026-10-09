@@ -44,7 +44,6 @@ int main(int argc, char **argv)
   GC myGC;
   Pixmap myPixmap = 0;
   char *fileName;
-  int i;
   _DtGrStream stream ;
   int status ;
   _DtGrContext gr_context ;

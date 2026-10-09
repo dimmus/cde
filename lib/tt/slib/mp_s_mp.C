@@ -195,8 +195,6 @@ _Tt_s_mp::init_self()
 	// Use the lame do-loop hack to avoid repeating the drop_mutex
 	// code after every possible failure...
 	
-	Tt_status status = TT_OK;;
-
 	do {
 		//
 		// tt_open(), tt_fd()

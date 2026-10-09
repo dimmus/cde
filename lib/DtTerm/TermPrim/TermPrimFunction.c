@@ -388,7 +388,6 @@ _DtTermPrimFuncMarginClear(Widget w, int count, FunctionSource functionSource)
 void
 _DtTermPrimFuncRedrawDisplay(Widget w, int count, FunctionSource functionSource)
 {
-    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
 
     (void) XClearArea(XtDisplay(w), XtWindow(w), 0, 0, 0, 0, True);
     return;

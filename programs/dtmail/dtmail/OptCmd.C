@@ -505,8 +505,6 @@ void OptCmd::update_source()
   if (mail_rc->getParseError() != DTME_NoError)
   {
     char* helpId;
-    int answer = 0;
-
     genDialog()->setToErrorDialog(CATGETS(DT_catd, 2, 1, "Mailer"),
       CATGETS(DT_catd, 2, 25, "There were unrecoverable syntax errors found in the ~/.mailrc file.\nMail options settings can be applied in the current session but can\nnot be saved to file."));
     helpId = DTMAILHELPERROR;
@@ -662,7 +660,6 @@ Boolean OptCmd::optionsAreValid()
 {
     char	*errMsg = NULL;
     PropUiItem	*propui_ptr = NULL;
-    int		answer;
 
     for (propui_ptr = _PrintingOptions->getFirstProp();
 	 propui_ptr != (PropUiItem *) NULL;
@@ -675,7 +672,7 @@ Boolean OptCmd::optionsAreValid()
 			CATGETS(DT_catd, 5, 2, "Mailer"),
 			errMsg);
  
-            answer = this->genDialog()->post_and_return(
+            this->genDialog()->post_and_return(
 			CATGETS(DT_catd, 26, 5, "Continue"),
                         DTMAILHELPERROR);
  
@@ -695,7 +692,7 @@ Boolean OptCmd::optionsAreValid()
 			CATGETS(DT_catd, 5, 2, "Mailer"),
 			errMsg);
  
-            answer = this->genDialog()->post_and_return(
+            this->genDialog()->post_and_return(
 			CATGETS(DT_catd, 26, 5, "Continue"),
                         DTMAILHELPERROR);
  
@@ -807,7 +804,7 @@ void OptCmd::init_msg_view_pane()
 {
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
-  DtMail::MailRc * mail_rc = d_session->mailRc(error);
+  d_session->mailRc(error);
   PropUiItem *propui_ptr = NULL;
   ListUiItem *list_ptr = NULL;
 
@@ -853,7 +850,7 @@ void OptCmd::init_compose_pane()
   PropUiItem *propui_ptr = NULL;
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
-  DtMail::MailRc * mail_rc = d_session->mailRc(error);
+  d_session->mailRc(error);
 
   DtVirtArray<char *> fields_list(10);
   ListUiItem *list_ptr = NULL;
@@ -917,8 +914,7 @@ void OptCmd::init_msg_filing_pane()
 {
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
-  DtMail::MailRc * mail_rc = d_session->mailRc(error);
-  const char *list_str = NULL;
+  d_session->mailRc(error);
   DtVirtArray<char *> move_menu_list(10);
   PropUiItem *propui_ptr = NULL;
 

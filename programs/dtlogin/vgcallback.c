@@ -103,7 +103,6 @@ extern  LogoInfo	logoInfo; /* information about the logo		   */
  *
  ***************************************************************************/
 
-static void CenterForm( Widget w1, Widget w2);
 static void PingLost( void ) ;
 static SIGVAL PingBlocked( int arg ) ;
 static void ProcessTraversal( Widget w, int direction) ;
@@ -197,36 +196,6 @@ XmString multiline_xmstring(char *text)
 }
 
 #endif /* SIA */
-
-
-/***************************************************************************
- *
- *  CenterForm
- *
- *  Utility function to center one form horizontally within another.
- ***************************************************************************/
-
-static void 
-CenterForm( Widget w1, Widget w2 )
-{
-
-    Dimension	width;
-    int		i, width1, width2;
-   
-    XtSetArg(argt[0], XmNwidth,  &width);
-    XtGetValues(w1, argt, 1);
-    width1 = (int)width;    
-
-    XtSetArg(argt[0], XmNwidth,  &width);
-    XtGetValues(w2, argt, 1);
-    width2 = (int)width;
-    
-    i = 0;
-    XtSetArg(argt[i], XmNleftAttachment,	XmATTACH_FORM		); i++;
-    XtSetArg(argt[i], XmNleftOffset,		(width1 - width2) / 2	); i++;
-    XtSetValues(w2,  argt, i);
-}
-
 
 
  
@@ -545,7 +514,7 @@ FakeFocusIn( Widget focus_widget, XtPointer client_data, XEvent *eventprm,
 void
 LayoutCB( Widget w, XtPointer client_data, XtPointer call_data )
 {
-    int	i, j;
+    int	i;
     Dimension	width, height;	/* size values returned by XtGetValues	   */
     Dimension	shadowThickness;/* size values returned by XtGetValues	   */
     Position	x, y;		/* position values returned by XtGetValues */
@@ -557,23 +526,16 @@ LayoutCB( Widget w, XtPointer client_data, XtPointer call_data )
     int x, y;
     int	width;
     int height;
-    }		mw, pw; /* matte, logo, drop shadow, login matte
+    }		mw; /* matte, logo, drop shadow, login matte
     				       and greeting widgets		   */
 
-    int		width1, width2; /* general width variable		   */
-    int		height1;	/* general height variable		   */
+    int		width1; /* general width variable		   */
     Position	x1, y1;		/* general position variables		   */
-    int		offsety;	/* general offset variable		   */
-    int		shadow_offsetx; /* offset for drop shadow (pixels)	   */
-    int		shadow_offsety; /* offset for drop shadow (pixels)	   */
     int		spacing;	/* spacing between login & matte bottoms   */
     
-    Widget	buttons[4];	/* pushbutton widgets			   */
-
     XtWidgetGeometry  geometry;	/* geometry of a widget			   */
     
     int		max_width;	/* maximum width  of a set of widgets	   */
-    int		origin;		/* horizontal origin for button placement  */
     int		space;		/* total available space left between buttons */
     int         overlap;        /* possible widget overlap                 */
 
@@ -585,7 +547,8 @@ LayoutCB( Widget w, XtPointer client_data, XtPointer call_data )
 				/* get info on the prefered screen */
     if (!_DtXineramaGetScreen(dpyinfo.DtXineramaInfo, 
                               appInfo.xineramaPreferredScreen,
-			      &dpwidth, &dpheight, &xorg, &yorg))
+			      (unsigned int *) &dpwidth, (unsigned int *) &dpheight,
+			      (unsigned int *) &xorg, (unsigned int *) &yorg))
       {				/* no joy here either - setup for normal */
 	dpwidth = dpyinfo.width;
 	dpheight = dpyinfo.height;
@@ -779,7 +742,6 @@ MenuItemCB( Widget w, XtPointer client_data, XtPointer call_data )
     	char     *logoFile;
     	char     *logoName;
 	char 	*temp_p;
-	char 	temp[MAXPATHLEN];
 
 #ifdef VG_TRACE
     vg_TRACE_EXECUTION("main:  entered MenuItemCB ...");
@@ -1079,13 +1041,11 @@ PostMenuCB( Widget w, XtPointer client_data, XtPointer call_data )
 static void 
 ProcessTraversal( Widget w, int direction )
 {
-    int i;
-
 #ifdef VG_TRACE
     vg_TRACE_EXECUTION("main:  entered ProcessTraversal ...");
 #endif /* VG_TRACE */
 
-    i = XmProcessTraversal(w, direction);
+    XmProcessTraversal(w, direction);
 
     /*
      * Versions of Motif other than HP do not support the XmfocusCallback

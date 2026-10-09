@@ -121,7 +121,6 @@ static char     Buf[MAXBSIZE];	/* work buffer */
  */
 static int	    debug_unbuffer_file(FILE *);	/*use on output files*/
 static int          gil_version(FILE *);
-static void         skip_comments(FILE *);
 static STRING       get_token(FILE *);
 static int	abioP_build_indent_string(
 			FILE *out_file,
@@ -137,7 +136,6 @@ static STRING			help_volume = NULL;
 static STRING			help_locID = NULL;
 static STRING	gilVersionPrefix = ";GIL-";
 static int	gilMajorVersion	= 4;
-static int	gilMinorVersion	= 0;
 
 /*
  * Return the string representation of a boolean.
@@ -1156,7 +1154,6 @@ abio_open_bil_output(
 )
 {
 #define outFile (*pOutFile)
-    int                 version_written = FALSE;
     char                backup[MAXPATHLEN];
     FILE               *bakp = NULL;
     STRING              file_begin = abio_file_begin_string();
@@ -1289,13 +1286,12 @@ abio_open_gil_input(STRING name, FILE ** pInFile)
 #define inFile (*pInFile)
     int                 v = 0;
     STRING              errmsg = NULL;
-    int			ch = -1;
 
     /*
      * If the input file exists and is the correct version, open it and skip
      * leading comments.
      */
-    if (inFile = util_fopen_locked(name, "r"))
+    if ((inFile = util_fopen_locked(name, "r")))
     {
 	v = gil_version(inFile);
 	if (v < 1)
@@ -1348,7 +1344,7 @@ abio_open_gil_output(STRING outfile, FILE ** pOutFile)
 	/*
 	 * outFileut file does not exits.  Open a new one.
 	 */
-	if (outFile = util_fopen_locked(outfile, "w"))
+	if ((outFile = util_fopen_locked(outfile, "w")))
 	{
 	    debug_unbuffer_file(outFile);
 
@@ -1366,7 +1362,7 @@ abio_open_gil_output(STRING outfile, FILE ** pOutFile)
      * The output file exists.  Make sure we can successfully open it before
      * backing it up.
      */
-    if (outFile = util_fopen_locked(outfile, "a"))
+    if ((outFile = util_fopen_locked(outfile, "a")))
     {
 	char                backup[MAXPATHLEN];
 	FILE               *bakp = NULL;
@@ -2131,24 +2127,6 @@ gil_version(FILE * fp)
 }
 
 /*
- * Skip leading comments in a GIL file.
- */
-static void
-skip_comments(FILE * inFile)
-{
-    long                pos;
-
-    for (;;)
-    {
-	pos = ftell(inFile);
-	if (!fgets(Buf, sizeof(Buf), inFile) ||
-	    Buf[0] != *abio_comment_string())
-	    break;
-    }
-    fseek(inFile, pos, 0);
-}
-
-/*
  *  If the file is not NULL, and verbosity >= 3, then util_unbuffer_file
  *  is called on the file. This keeps files flushed during debugging, so
  *  it is easier to see what's going on while the file is being written.
@@ -2292,8 +2270,6 @@ int
 util_dprintf(int debug_level, STRING fmt, ...)
 {
     va_list	args;
-    BOOL	do_debug = debugging();
-    int		the_level = debug_level();
 
     va_start(args, fmt);
     if ((debugging()) && (debug_level() >= debug_level))

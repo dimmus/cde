@@ -98,7 +98,8 @@ WmHeadInfo_t *GetHeadInfo(const ClientData *pcd) {
      */
     int idx = 0;
     while (_DtXineramaGetScreen(DtXI, idx++,
-            &WmHI->width, &WmHI->height, &WmHI->x_org, &WmHI->y_org)) {
+            &WmHI->width, &WmHI->height,
+            (unsigned int *) &WmHI->x_org, (unsigned int *) &WmHI->y_org)) {
 
         if (pcd->clientX >= WmHI->x_org &&
             pcd->clientY >= WmHI->y_org &&
@@ -163,7 +164,8 @@ WmHeadInfo_t *GetHeadInfoById(int id) {
     }
 
     if (_DtXineramaGetScreen(DtXI, id,
-            &WmHI->width, &WmHI->height, &WmHI->x_org, &WmHI->y_org))
+            &WmHI->width, &WmHI->height,
+            (unsigned int *) &WmHI->x_org, (unsigned int *) &WmHI->y_org))
         return WmHI;
 
     free(WmHI);

@@ -484,7 +484,7 @@ abmfP_get_c_struct_or_ptr_name(
         name = abmfP_get_c_struct_global_name(structObj);
 	if (wantPtr)
 	{
-	    sprintf(nameBuf, "&(%s)", name);
+	    snprintf(nameBuf, sizeof(nameBuf), "&(%s)", name);
 	    name = nameBuf;
 	}
     }
@@ -660,7 +660,7 @@ abmfP_get_c_substruct_global_name(ABObj obj)
     {
 	return NULL;
     }
-    sprintf(name, "%s.%s", structVar, structField);
+    snprintf(name, sizeof(name), "%s.%s", structVar, structField);
     return name;
 }
 
@@ -794,7 +794,6 @@ abmfP_get_widget_name(ABObj obj)
 {
     static char	nameBuf[MAX_NAME_SIZE];
     char	*name = nameBuf;
-    ABObj	project = NULL;
     *nameBuf = 0;
     assert(abmfP_parent(obj) != NULL);
     assert(obj_get_name(obj_get_module(obj)) != NULL);
@@ -883,7 +882,6 @@ abmfP_get_widget_name_for_res_file(ABObj obj)
 	/* name = Class*topmostcontainer*widget.item */
 
 	ABObj	parent = abmfP_parent(obj);
-	STRING	parentName = NULL;
 
 	*name = 0;
 	abmfP_get_widget_name_for_res_file(parent);
@@ -1067,7 +1065,7 @@ abmfP_get_c_app_root_win_name(ABObj obj)
 {
     static char	root_widget_name[256];
     ABObj	project= obj_get_project(obj);
-    ABObj	root_window= abmfP_get_root_window(project);
+    abmfP_get_root_window(project);	/* caches the root window */
     *root_widget_name = 0;
 
     snprintf(root_widget_name, sizeof(root_widget_name), "%s()", abmfP_lib_get_toplevel_widget->name);

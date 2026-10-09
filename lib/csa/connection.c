@@ -77,7 +77,6 @@ static CSA_return_code get_client_handle(const char *host, const u_long prognum,
 			u_long *vers_outp, const u_long vers_low,
 			const u_long vers_high, char *nettype,
 			CLIENT **clnt);
-static CSA_return_code regstat4_to_dtcmstatus(Registration_Status_4 stat4);
 
 extern CSA_return_code
 _DtCm_create_udp_client(
@@ -245,8 +244,8 @@ _DtCm_clnt_call(
 	caddr_t out,
 	struct timeval tout)
 {
-	_DtCm_Client_Info	*ci;
-	_DtCm_Transport_Type	ttype;
+	_DtCm_Client_Info	*ci = NULL;
+	_DtCm_Transport_Type	ttype = udp_transport;
 	enum clnt_stat status = RPC_FAILED;
 	int retry = conn->retry;
 
@@ -624,11 +623,16 @@ static void
 cleanup_some_connection(_DtCm_Client_Info *dontclose)
 {
 	_DtCm_Client_Info *ci, *oldci;
-	int total = 0, deleted = 0, done = 0;
+	int done = 0;
+#ifdef CM_DEBUG
+	int total = 0, deleted = 0;
+#endif
 
 	for (ci = client_cache_head; ci != NULL; )
 	{
+#ifdef CM_DEBUG
 		total++;
+#endif
 
 		if (ci != dontclose && ci->nregistered == 0 &&
 		    (ci->tcpcl || (!done && ci->tcpcl == NULL) ||
@@ -636,7 +640,9 @@ cleanup_some_connection(_DtCm_Client_Info *dontclose)
 		{
 			if (!done) done = 1;
 
+#ifdef CM_DEBUG
 			deleted++;
+#endif
 			oldci = ci;
 			ci = ci->next;
 			delete_client_info(oldci);
@@ -845,24 +851,5 @@ get_client_handle(
 	/* cannot find a server that supports a version in the given range */
 	/* Probably will never get here */
 	return (CSA_E_SERVICE_UNAVAILABLE);
-}
-
-static CSA_return_code
-regstat4_to_dtcmstatus(Registration_Status_4 stat4)
-{
-	switch (stat4) {
-	case registered_4:
-		return (CSA_SUCCESS);
-
-	case deregistered_4:
-		return (CSA_SUCCESS);
-
-	case reg_notable_4:
-		return (CSA_E_CALENDAR_NOT_EXIST);
-
-	case failed_4:
-	case confused_4:
-		return (CSA_E_FAILURE);
-	}
 }
 

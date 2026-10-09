@@ -277,9 +277,7 @@ _primBufferInsertWc
           short      *returnLength  /* count of characters in overflow buffer */
 )
 {
-    short             charWidth;
     short             lengthInsert;
-    short             insertOverflow; /* # of newChars that would overflow */
     short             overflowLength;
     short             overflowWidth;
     short             localCol;
@@ -423,8 +421,6 @@ _primBufferOverwriteWc
           short      *returnLength  /* count of characters in overflow buffer */
 )
 {
-           short        charWidth;
-           short        insertOverflow; /* # of newChars that would overflow */
            short        lengthInsert;
            short        localCol;
            TermLine     line;
@@ -950,7 +946,6 @@ _DtTermPrimBufferEraseWc
     TermCharInfoRec       startCharInfo;
     TermCharInfoRec       stopCharInfo;
     short                 localCol;
-    TermLine              line;
     wchar_t              *pwchar;
     short                 lengthErase;
     short                 lengthInc;

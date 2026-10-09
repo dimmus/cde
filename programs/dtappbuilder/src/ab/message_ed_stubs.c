@@ -600,7 +600,7 @@ msg_editor_load(
     ABObj    obj
 )
 {
-    STRING                      name, msg;
+    STRING                      msg;
     AB_MESSAGE_TYPE         	mtype = AB_MSG_UNDEF;
     AB_DEFAULT_BUTTON		button = AB_DEFAULT_BTN_UNDEF;
     MsgEditorSettingsRec    	*mes = &msg_editor_settings_rec;
@@ -712,12 +712,6 @@ msg_editor_load(
     return OK;
 }
 
-
-static BOOL
-msg_editor_pending(void)
-{
-    return(prop_changebars_pending(msg_editor_settings_rec.prop_sheet));
-}
 
 static BOOL
 verify_name(void)
@@ -1081,6 +1075,8 @@ typeCB(
                                 (XtPointer)AB_DEFAULT_BTN_ACTION1, True);
 	    }
             break;
+        default:
+            break;
     }
     /* Set the Message textpane label to the correct string */ 
     set_msg_textp_label((AB_MESSAGE_TYPE) value);
@@ -1149,6 +1145,8 @@ setup_button_fields(
             ui_set_active(mes->action2_label.field, True);
             ui_set_active(mes->cancel_button.label, False);
             ui_set_active(mes->cancel_button.checkbox, False);
+            break;
+        default:
             break;
     }
 }
@@ -1400,7 +1398,7 @@ obj_renamedOCB(
     ObjEvAttChangeInfo    info
 )
 {
-    Widget      list = NULL, item = NULL; 
+    Widget      item = NULL; 
     int		iRet = 0, numModItems = 0;
     STRING	mod_name = NULL;
  
@@ -1452,7 +1450,6 @@ msgEdP_msgpane_init(
    DtbMessageEdDialogInfo      cgen
 )
 {
-    MsgEditorSettingsRec	*mes = &msg_editor_settings_rec;
     int				numModItems = 0;
 
     /* Build module optionmenu */
@@ -1573,12 +1570,11 @@ objlist_load(
 )
 {
     ABObj           proj = proj_get_project();
-    int             num_items = 0;
  
     if (proj == NULL || list == NULL)
         return;
  
-    num_items = abobj_list_load(list, proj, objlist_test_func);
+    abobj_list_load(list, proj, objlist_test_func);
 }
 
 /*
@@ -1667,6 +1663,8 @@ verify_default_btn(void)
 	    break;
 
 	case AB_DEFAULT_BTN_NONE:
+	    break;
+	default:
 	    break;
     }
 
@@ -1876,7 +1874,6 @@ msgEdP_del_msgCB(
     ABObj               	selected_obj = NULL;
     STRING              	name = NULL;
     XmStringTable		selected_items = NULL;
-    int				ret = 0;
     MsgEditorSettingsRec        *mes = &msg_editor_settings_rec;
 
     cgen = (DtbMessageEdDialogInfo) clientData;
@@ -1917,7 +1914,6 @@ msgEdP_show_msgCB(
 
     DtbMessageDataRec		mbr;
     MsgEditorSettingsRec        *mes = &msg_editor_settings_rec;
-    ABObj			project = obj_get_project(mes->current_obj);
     STRING			str = (STRING) NULL;
     DTB_BUTTON			default_btn = DTB_NONE;
     unsigned char		dialogType = 0;
@@ -2436,6 +2432,8 @@ msgEdP_do_auto_apply(
                         old_name);
                 ui_list_select_item(list, old_name, FALSE);
             }
+            break;
+        default:
             break;
     }        
 

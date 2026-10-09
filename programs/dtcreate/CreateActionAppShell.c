@@ -248,7 +248,6 @@ void  activateCB_CA_MB_FileSave(Widget UxWidget,
                                 XtPointer UxCallbackArg)
 
 {
-  ushort   usRc = 0;
   char     *pszActionFile = NULL;
   char     *msgPtr, *bufPtr;
   Boolean  bHaveError = FALSE;
@@ -374,7 +373,7 @@ static  void    activateCB_CA_FiletypesDelete( Widget UxWidget,
      /* structure.                                                          */
      /***********************************************************************/
      if ((AD.cFiletypes - poscnt) > 0) {
-        if ( papArray = (FiletypeData **) XtMalloc(sizeof(FiletypeData *) * (AD.cFiletypes - poscnt)) ) {
+        if (( papArray = (FiletypeData **) XtMalloc(sizeof(FiletypeData *) * (AD.cFiletypes - poscnt)) )) {
            cnt = 0;
            for (i = 0; i < AD.cFiletypes; i++) {
               bFound = FALSE;
@@ -514,10 +513,7 @@ static Widget   _Uxbuild_CreateActionAppShell(void)
         Widget               _UxParent;
         Widget               CA_MB_FileOption_shell;
         Widget               CA_MB_HelpOption_shell;
-        Widget               CA_MB_Help_Sep1;
-        Widget               CA_MB_Help_Sep2;
         Widget               CA_MB_OptionsOption_shell;
-        char                 *UxTmp0;
 
         Widget               CA_WindowType_OptionMenuShell;
         Widget               CA_WindowType_Pane;
@@ -777,7 +773,7 @@ static Widget   _Uxbuild_CreateActionAppShell(void)
         /*
          * Creation of CA_MB_Help_Sep1
          */
-        CA_MB_Help_Sep1 = XtVaCreateManagedWidget( "CA_MB_Help_Sep1",
+        XtVaCreateManagedWidget( "CA_MB_Help_Sep1",
                         xmSeparatorWidgetClass,
                         CA_MB_HelpOption,
                         NULL );
@@ -800,7 +796,7 @@ static Widget   _Uxbuild_CreateActionAppShell(void)
         /*
          * Creation of CA_MB_Help_Sep2
          */
-        CA_MB_Help_Sep2 = XtVaCreateManagedWidget( "CA_MB_Help_Sep2",
+        XtVaCreateManagedWidget( "CA_MB_Help_Sep2",
                         xmSeparatorWidgetClass,
                         CA_MB_HelpOption,
                         NULL );

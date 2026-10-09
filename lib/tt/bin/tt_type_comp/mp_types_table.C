@@ -53,7 +53,6 @@
 #define  TT_TYPE_TABLE_BUCKETS  19
 
 static int use_cpp;
-static int cppline(const char *line);
 static void docppline(const char *line, int &lineno, _Tt_string &fname);
 
 /*
@@ -634,7 +633,7 @@ input()
 			char buf[MAXPATHLEN+100];
 			// Apparently fgets can't be used because ungetc is
 			int i;
-			for (i=0;i<sizeof(buf)-1;i++){
+			for (i=0;i<(int)sizeof(buf)-1;i++){
 				buf[i] = getc(yyin);
 				if (buf[i] == '\n') break;
 			}

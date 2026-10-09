@@ -193,6 +193,7 @@ static char * check_possible_files (
 	char		* env;
 	_Xgetpwparams	pwd_buf;
 	struct passwd	* pwd_ret;
+	(void) pwd_buf; /* unused unless XTHREADS */
 
 	if ((file = get_file_name (type,
 				   fp,
@@ -266,11 +267,13 @@ void DtMsgLogMessage (
 	char 			buf[MAX_DATE_TIME_STRING];
 #ifdef NLS16
 	char			* tmp_format;
-#endif
+#else
 	_Xctimeparams		ctime_buf;
 	char			* result;
+#endif
 	_Xltimeparams		localtime_buf;
 	struct tm		* current_time;
+	(void) localtime_buf; /* unused unless XTHREADS */
 
 	Va_start (args, format);
 
@@ -361,6 +364,7 @@ void DtMsgLogMessage (
 #endif /* MSGLOG_CLIENT_ONLY */
 			getpid(), buf);
 #else
+	(void) ctime_buf; /* unused unless XTHREADS */
 	result = _XCtime(&now, ctime_buf);
 	num_bytes = fprintf (fp, "*** %s(%d): %s: PID %ld: %s", 
 			msg_string, msg_type, 

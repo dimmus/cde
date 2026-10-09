@@ -45,12 +45,12 @@ SearchPath::SearchPath
 	CDEEnvironment *       user_,
 	const char *           envvar,
 	const char *           sep
-	) : user(user_),
-	    environment_var(envvar),
-	    separator(sep),
-	    parse_state(0),
+	) : norm_search_path(""),
 	    final_search_path(""),
-	    norm_search_path("")
+	    user(user_),
+	    environment_var(envvar),
+	    parse_state(0),
+	    separator(sep)
 {
 }
 

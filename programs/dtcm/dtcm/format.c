@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static char sccsid[] = "@(#)format.c 1.27 95/01/19 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -85,6 +81,7 @@ format_date(Tick t, OrderingType order, char *buf, int day_and_date,
 	int m, d, y, wd;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	buf[0] = '\0';
 	tm = _XLocaltime(&t, localtime_buf);
@@ -157,6 +154,7 @@ format_date3(Tick t, OrderingType order, SeparatorType sep, char *buf)
 	struct tm *tm;  
 	char *str = (char *) separator_str(sep);
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	buf[0] = '\0';
 	tm = _XLocaltime(&t, localtime_buf); 
@@ -193,6 +191,7 @@ format_line(Tick tick,
 	struct tm *tm;
 	Boolean	pad = FALSE;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         if (buf==NULL) return pad;
         buf[0] = '\0';
@@ -258,6 +257,7 @@ format_maxchars(Dtcm_appointment *appt, char *buf1, int maxchars,
         char    *s1, *s2;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
 	_csa_iso8601_to_tick(appt->time->value->item.string_value, &tick);
 	if (appt->end_time)
@@ -281,7 +281,7 @@ format_maxchars(Dtcm_appointment *appt, char *buf1, int maxchars,
 			min2 = minute(end_tick);
 		}
 
-		if (end_tick == 0 || hour1 == hour2 && min1 == min2) {
+		if (end_tick == 0 || (hour1 == hour2 && min1 == min2)) {
 			if (display == HOUR24) 
 				sprintf(buf1, "%02d%02d  ", hour1, min1);
 			else
@@ -327,6 +327,7 @@ format_line2(Dtcm_appointment *appt, char *buf1, char *buf2,
         char    *s1, *s2;
         struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	_csa_iso8601_to_tick(appt->time->value->item.string_value, &tick);	
 	if (appt->end_time)
@@ -400,6 +401,7 @@ format_abbrev_appt(Dtcm_appointment *appt, char *b, Boolean show_am,
         Boolean am = True;
 	struct tm *tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
         if(appt==NULL || b==NULL) return;
 	_csa_iso8601_to_tick(appt->time->value->item.string_value, &tick);
@@ -436,11 +438,12 @@ format_abbrev_appt(Dtcm_appointment *appt, char *b, Boolean show_am,
  */
 extern void
 format_appt(Dtcm_appointment *appt, char *b, DisplayType display, int max) {
-        int		hr, mn, len, i = 0, j = 0;
+        int		hr, mn, len, i = 0;
 	Tick		tick;
 	struct tm	*tm;
 	char		*what_ptr;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
 	if (!appt || !b)
 		return;
@@ -484,6 +487,7 @@ format_gappt(Dtcm_appointment *appt, char *name, char *b, DisplayType display,
 	char		*what_ptr;
 	struct tm	*tm;
 	_Xltimeparams localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
 	if (!appt || !b)
 		return;

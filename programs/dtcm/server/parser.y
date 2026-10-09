@@ -823,8 +823,6 @@ convert_2_tick(char *datestr)
 static void
 add_hashed_attr_to_array(_attr_array *attrs, int num, char *value)
 {
-	int		type;
-
 	if (num > currentCalendar->entry_tbl->size)
 		return;
 
@@ -883,7 +881,6 @@ get_tag_from_string(char *tagstr)
 static CSA_return_code
 get_attr_value(int type, char *valstr, cms_attribute_value **attrval)
 {
-	char 		buf1[BUFSIZ], buf2[BUFSIZ];
 	char		*ptr1, *ptr2, *ptr3, *ptr4;
 	uint		unum;
 	CSA_reminder	remval;
@@ -910,9 +907,9 @@ get_attr_value(int type, char *valstr, cms_attribute_value **attrval)
 		break;
 	case CSA_VALUE_REMINDER:
 		memset((void *)&remval, 0, sizeof (CSA_reminder));
-		if (ptr1 = strchr(valstr, ':')) {
+		if ((ptr1 = strchr(valstr, ':'))) {
 			*ptr1++ = '\0';
-			if (ptr2 = strchr(ptr1, ':')) {
+			if ((ptr2 = strchr(ptr1, ':'))) {
 				*ptr2++ = '\0';
 				ptr3 = strchr(ptr2, ':');
 			}
@@ -932,7 +929,7 @@ get_attr_value(int type, char *valstr, cms_attribute_value **attrval)
 		} else {
 			/* format = "string:string:number:number:string" */
 			*ptr3++ = '\0';
-			if (ptr4 = strchr(ptr3, ':')) {
+			if ((ptr4 = strchr(ptr3, ':'))) {
 				*ptr4++ = '\0';
 				remval.lead_time = valstr;
 				remval.snooze_time = ptr1;
@@ -954,7 +951,7 @@ get_attr_value(int type, char *valstr, cms_attribute_value **attrval)
 		stat = get_date_time_list_value(valstr, attrval);
 		break;
 	case CSA_VALUE_OPAQUE_DATA:
-		if (ptr1 = strchr(valstr, ':')) {
+		if ((ptr1 = strchr(valstr, ':'))) {
 			*ptr1++ = '\0';
 			opqval.size = atoi(valstr);
 			opqval.data = (unsigned char *)ptr1;
@@ -991,7 +988,7 @@ get_access_list_value(char *valstr, cms_attribute_value **attrval)
 	}
 
 	head = NULL;
-	while (ptr = strchr(valstr, ' ')) {
+	while ((ptr = strchr(valstr, ' '))) {
 
 		*ptr = 0;
 		stat = get_user_access_entry(valstr, &a);
@@ -1096,7 +1093,7 @@ get_date_time_list_value(char *valstr, cms_attribute_value **attrval)
 	val->type = CSA_VALUE_DATE_TIME_LIST;
 
 	head = NULL;
-	while (ptr = strchr(valstr, ' ')) {
+	while ((ptr = strchr(valstr, ' '))) {
 
 		*ptr = 0;
 		if (!(a = calloc(1, sizeof(CSA_date_time_entry))) ||

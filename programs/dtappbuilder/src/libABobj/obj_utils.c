@@ -113,6 +113,8 @@ ab_get_proper_subobj_type(AB_OBJECT_TYPE type)
     case AB_TYPE_MENU:
 	subtype = AB_TYPE_ITEM;
 	break;
+    default:
+	break;
     }
 
     return subtype;
@@ -140,6 +142,8 @@ ab_get_proper_item_type(AB_OBJECT_TYPE type)
 
     case AB_TYPE_LIST:
 	item_type = AB_ITEM_FOR_LIST;
+	break;
+    default:
 	break;
     }
 
@@ -714,12 +718,12 @@ ab_ident_from_file_name(STRING filename)
 
     if (filename != NULL)
     {
-	if (p = (char *) strrchr(filename, '/'))
+	if ((p = (char *) strrchr(filename, '/')))
 	    snprintf(buf, sizeof(buf), "%s", p + 1);
 	else
 	    snprintf(buf, sizeof(buf), "%s", filename);
 
-	if (p = (char *) strrchr(buf, '.'))
+	if ((p = (char *) strrchr(buf, '.')))
 	    *p = '\0';
     }
     return buf;
@@ -911,6 +915,8 @@ obj_print_indented(ABObj obj, int spaces, int verbosity)
 	    sprintf(namebuf, "builtin:%s",
 		    util_builtin_action_to_string(
 				      obj->info.action.func_value.builtin));
+	    break;
+	default:
 	    break;
 	}
     }
@@ -1359,12 +1365,16 @@ obj_verify(ABObj obj)
 	        case AB_FUNC_USER_DEF:
 		    check_str(obj,info.action.func_value.func_name);
 	        break;
+	        default:
+	            break;
 	    }
 	    switch (obj->info.action.arg_type)
 	    {
 	        case AB_ARG_STRING:
 		    check_str(obj,info.action.arg_value.sval);
 	        break;
+	        default:
+	            break;
 	    }
 	    check_str(obj,info.action.func_name_suffix);
 	break;
@@ -1394,6 +1404,9 @@ obj_verify(ABObj obj)
         {
 	    check_str(obj,info.text.initial_value_string);
         }
+	break;
+
+        default:
 	break;
     } /* switch obj->type */
     if (obj->type == AB_TYPE_MODULE)
@@ -1442,6 +1455,8 @@ obj_verify(ABObj obj)
 	        case AB_TYPE_PROJECT: 
 		    namesList = parent->info.project.obj_names_list;
 	        break;
+	        default:
+	            break;
 	    }
 
 	    if (namesList == NULL)
@@ -1511,7 +1526,6 @@ objP_is_accessible(ABObj obj)
     volatile BOOL		isIt = TRUE;
     volatile unsigned char	*volatile objData = (unsigned char *)obj;
     volatile int		i;
-    volatile unsigned char	oneByte = 0;
 
     mem_fault_occurred = FALSE;
     if (sigsetjmp(sigjmp_env, TRUE) != 0)
@@ -1522,7 +1536,7 @@ objP_is_accessible(ABObj obj)
 
     for (i = 0 ; i < sizeof(*obj); ++i)
     {
-	oneByte = objData[i];
+	(void) objData[i];
     }
 
 epilogue:
@@ -1699,7 +1713,6 @@ verify_the_silly_index(
     int		nameCount = 0;
     int		objCount = 0;
     ABObj	namedObj = NULL;
-    ABObj	namesObj = NULL;
     ISTRING	curName = NULL;
     ABObj	curObj = NULL;
     ABObj	curScopeObj = NULL;

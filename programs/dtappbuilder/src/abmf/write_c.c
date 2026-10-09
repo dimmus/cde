@@ -151,7 +151,6 @@ abmfP_write_c_func_decl(
 #define va_start_params() (va_start(params, func_name))
     va_list	params;
     File	file= genCodeInfo->code_file;
-    int		i= 0;
     int		num_params = 0;
     int		num_params_written= 0;
     BOOL	list_params= TRUE;	/* use multiline format for params */
@@ -357,12 +356,11 @@ write_func_def_params(
 #else
 #define va_start_params() (params = va_params)
 #endif
-#define va_end_params() (0)
+#define va_end_params() ((void)0)
     va_list	params;
     int		num_params_written= 0;
     int		num_params= 0;
     BOOL	list_params= FALSE;
-    int		i= 0;
     STRING	curParamType = NULL;
     STRING	curParamName = NULL;
     BOOL	paramsDone = FALSE;
@@ -617,7 +615,6 @@ abmfP_write_create_proc_begin_or_decl(
     int		num_widgets = 0;
     int		first_widget_return_param = -1;
     int		num_submenu_params = 0;
-    int		first_submenu_param = -1;
 
     for (num_params = 0; num_params < MAX_CREATE_PARAMS; ++num_params)
     {
@@ -943,6 +940,8 @@ abmfP_write_file_header(
 " *  ** EDIT ONLY WITHIN SECTIONS MARKED WITH DTB_USER_CODE COMMENTS.  **\n"
 " *  ** ALL OTHER MODIFICATIONS WILL BE OVERWRITTEN. DO NOT MODIFY OR  **\n"
 " *  ** DELETE THE GENERATED COMMENTS!                                 **\n";
+	break;
+	default:
 	break;
     }
 

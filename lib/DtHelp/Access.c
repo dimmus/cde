@@ -761,7 +761,7 @@ _DtHelpCeExpandPathname (
 
 		default:
 			i = 0;
-			while (i < MY_NUM && mySubs && mySubs[i].match != *spec)
+			while (i < MY_NUM && mySubs[i].match != *spec)
 			    i++;
 
 			if (i < MY_NUM)

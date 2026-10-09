@@ -101,7 +101,6 @@ Status GetStandardProperties(
 	Boolean 		*xsmpClient)		/* RETURNED */
 {
   int 				cc;
-  long				suppliedRet;
   XTextProperty			sessProp;
   Atom				actType;
   int				actFormat;

@@ -327,6 +327,8 @@ match(Tt_scope theScope, Tt_class theClass, const _Tt_string &op,
 		    case TT_OBSERVE:
 			*trace << "observe";
 			break;
+		    default:
+			break;
 		}
 		*trace << ": ";
 		trace->print( _Tt_signature::pretty_print_, this );
@@ -586,7 +588,7 @@ print(const _Tt_ostream &os) const
 	fprintf(fs,"\t\t(%s,string,<%s>)\n",
 		_tt_ce_attr_string(_TT_CLASS),
 		_tt_enumname(_message_class));
-	switch (_reliability) {
+	switch ((int)_reliability) {
 	    case TT_START+TT_QUEUE:
 #ifdef NOT_BACKWARD_COMPATIBLE
 		fprintf(fs,"\t\t(%s,string,<TT_START+TT_QUEUE>)\n",
@@ -648,6 +650,7 @@ pretty_print(const _Tt_ostream &os) const
 		    case TT_FILE:		os << "file";		break;
 		    case TT_SESSION:		os << "session";	break;
 		    case TT_FILE_IN_SESSION:	os << "file_in_session";break;
+		    default:			break;
 		}
 	}
 	os << " " << _op << "(";
@@ -658,6 +661,7 @@ pretty_print(const _Tt_ostream &os) const
 		    case TT_IN:		os << "in";	break;
 		    case TT_OUT:	os << "out";	break;
 		    case TT_INOUT:	os << "inout";	break;
+		    default:		break;
 		}
 		os << " " << argc->type() << " " << argc->name();
 		if (--argn) {
@@ -681,6 +685,7 @@ pretty_print(const _Tt_ostream &os) const
 		    case TT_FILE:		os << "file";		break;
 		    case TT_SESSION:		os << "session";	break;
 		    case TT_FILE_IN_SESSION:	os << "file_in_session";break;
+		    default:			break;
 		}
 	} else {
 		if (   (_reliability&TT_START) || (_reliability&TT_QUEUE)
@@ -737,6 +742,8 @@ pretty_print_(const _Tt_ostream &os, const _Tt_signature_list_ptr &sigs,
 				    case TT_OBSERVE:
 					os << "observe:\n";
 					break;
+				    default:
+					break;
 				}
 			}
 			os << "\t";
@@ -762,6 +769,8 @@ xdr_version_required() const
 			version = TT_PUSH_ROTATE_XDR_VERSION;
 		}
 //		version = max(version, TT_PUSH_ROTATE_XDR_VERSION);
+		break;
+	    default:
 		break;
 	}
 	return version;

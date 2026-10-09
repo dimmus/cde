@@ -495,10 +495,10 @@ ilFileTag                  *tag [AI_NTAGS];
 ilBool                      present;
 ilError                     error;
 ilPtr                       pTagAlloc;
-unsigned long      value;
-int                         i, tagIndex, nBits, resolutionUnit, fillOrder = 0;
-unsigned long               group3CompData;
-unsigned long               group4CompData;
+unsigned long      value = 0;
+int                         i, tagIndex, nBits, resolutionUnit = 2, fillOrder = 0;
+unsigned long               group3CompData = 0;
+unsigned long               group4CompData = 0;
 ilFileTag         *pTag;
 ilYCbCrInfo                *pYCbCr = NULL;     /* null if not YCbCr ; else -> des...YCbCr */
 

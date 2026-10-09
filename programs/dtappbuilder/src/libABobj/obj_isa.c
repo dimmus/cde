@@ -104,6 +104,8 @@ obj_is_virtual(ABObj obj)
 	case AB_TYPE_ITEM:
 	    if (obj->info.item.type == AB_ITEM_FOR_MENU)
 		return TRUE;
+	default:
+	    break;
     }
     return FALSE;
 }
@@ -278,6 +280,8 @@ obj_is_intra_module(ABObj obj)
 	    }
 	}
     }
+    default:
+        break;
     }
 
     return isIt;
@@ -462,6 +466,8 @@ obj_is_pane(ABObj obj)
     case AB_TYPE_TERM_PANE:
     case AB_TYPE_DRAWING_AREA:
 	return TRUE;
+    default:
+        break;
     }
     return FALSE;
 }
@@ -479,6 +485,8 @@ obj_is_popup(ABObj obj)
     case AB_TYPE_MENU:
 	is_popup = obj_is_pane(obj->parent) || 
 		   obj_is_list(obj->parent);
+	break;
+    default:
 	break;
     }
     return is_popup;
@@ -511,6 +519,8 @@ obj_is_control(ABObj obj)
     case AB_TYPE_SPIN_BOX:
     case AB_TYPE_TEXT_FIELD:
 	return TRUE;
+    default:
+        break;
     }
     return FALSE;
 }
@@ -562,6 +572,8 @@ obj_is_window(ABObj obj)
 	case AB_TYPE_DIALOG:
 	case AB_TYPE_FILE_CHOOSER:
 	    return TRUE;
+	default:
+	    break;
     }
     return FALSE;
 }
@@ -636,6 +648,8 @@ obj_is_ui(ABObj obj)
 	case AB_TYPE_TEXT_PANE:
 	    isUI = TRUE;
 	    break;
+	default:
+	    break;
     }
 
     return isUI;
@@ -655,7 +669,7 @@ obj_is_descendant_of(ABObj obj, ABObj ancestor)
     if (!obj || !ancestor)
 	return (FALSE);
 
-    while (obj = obj_get_parent(obj))
+    while ((obj = obj_get_parent(obj)))
     {
 	if (obj == ancestor)
 	    return (TRUE);

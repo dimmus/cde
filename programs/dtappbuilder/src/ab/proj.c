@@ -107,9 +107,6 @@ static void	enable_proj_actions(
 		    Widget widget
 		);
 
-static void	disable_proj_actions(
-		    Widget widget
-		);
 
 static void	no_module_selected(
 		    DtbProjProjMainInfo	proj_d
@@ -252,7 +249,6 @@ void
 proj_show_dialog(void)
 {
     ABObj		proj = proj_get_project();
-    BrowserUiObj 	ui;
     ChooserInfo		info = NULL;
  
     if (AB_proj_window == NULL)
@@ -298,7 +294,6 @@ projP_store_viewer(
     XtPointer   call_data
 )
 {
-    char	*tmp_str = (char *)client_data;
 
     /*
     widget_str = strtok(tmp_str, "+");
@@ -406,7 +401,6 @@ proj_add_objects
     AB_OBJ	*obj
 )
 {
-    AB_OBJ		*project;
     Vwr			viewer;
     ViewerMethods	*m;
 
@@ -415,11 +409,6 @@ proj_add_objects
 /*
         Proj_viewer = create_proj_struct();
 */
-
-    /*
-     * Get project object
-     */
-    project = obj_get_project(obj);
 
     viewer = Proj_viewer;
 
@@ -446,17 +435,11 @@ proj_delete_objects
     AB_OBJ	*obj
 )
 {
-    AB_OBJ		*project;
     Vwr			viewer;
     ViewerMethods	*m;
 
     if (!Proj_viewer)
 	return;
-
-    /*
-     * Get project object
-     */
-    project = obj_get_project(obj);
 
     viewer = Proj_viewer;
 
@@ -519,16 +502,6 @@ enable_proj_actions(
     XtVaSetValues(widget, 
 		XtNtranslations, proj_transtbl,
         	NULL);
-}
-
-/*
- * Disable project window actions
- */
-static void
-disable_proj_actions(
-    Widget widget
-)
-{
 }
 
 /*
@@ -1267,7 +1240,6 @@ projP_obj_renameOCB(
 )
 {
     ABObj	obj = info->obj;
-    char	*name;
 
     /*
      * We only care about modules and projects here
@@ -1427,8 +1399,6 @@ project_rband(
     Vwr		v = NULL;
     VNode	*selected_nodes = NULL;
     VMethods	m;
-    ABSelectedRec	old_sel, 
-			new_sel;
     XRectangle	tmp_rect;
     int		num_selected = 0,
 		num_cur_selected = 0,
@@ -1532,7 +1502,6 @@ project_rband(
     for (i=0; i < num_selected; ++i)
     {
 	ABObj	obj;
-	int	j;
 
 	/*
 	 * Get ABObj

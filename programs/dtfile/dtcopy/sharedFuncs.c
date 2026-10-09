@@ -366,7 +366,7 @@ CopyCheckDeletePermissionRecur(
 
   first_file = True;
 
-  while (dp = readdir (dirp))
+  while ((dp = readdir (dirp)))
   {
     if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
     {
@@ -651,7 +651,6 @@ _DtCopyChangeTildeToHome (input_string)
     char *input_string)
 #endif
 {
-    char *path;
     char *full_path;
     struct passwd * pwInfo;
     char * homedir = (char *) XtNewString(getenv("HOME"));

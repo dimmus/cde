@@ -212,14 +212,14 @@ Dialog::Dialog(MotifUI *parent, char *title, char *message,
    if (_dialog_type == QUESTION || _dialog_type == WARNING)
       XtAddCallback(_w, XmNcancelCallback, &Dialog::DialogCB, (XtPointer) this);
    else
-      XtUnmanageChild(XmMessageBoxGetChild(_w, XmDIALOG_CANCEL_BUTTON));
+      XtUnmanageChild(XtNameToWidget(_w, "Cancel"));
    if (help)
       XtAddCallback(_w, XmNhelpCallback, &Dialog::DialogCB, (XtPointer) this);
    else
-      XtUnmanageChild(XmMessageBoxGetChild(_w, XmDIALOG_HELP_BUTTON));
+      XtUnmanageChild(XtNameToWidget(_w, "Help"));
    if (_dialog_type == WORK_IN_PROGRESS ||
        _dialog_type == MODAL_WORK_IN_PROGRESS)
-      XtUnmanageChild(XmMessageBoxGetChild(_w, XmDIALOG_OK_BUTTON));
+      XtUnmanageChild(XtNameToWidget(_w, "OK"));
    else
       XtAddCallback(_w, XmNokCallback, &Dialog::DialogCB, (XtPointer) this);
    XmAddWMProtocolCallback(XtParent(_w), 
@@ -248,7 +248,6 @@ Dialog::Dialog(MotifUI *parent, char *title, char *caption, boolean editable,
    int      n;
    XmString xm_string = StringCreate(title);
    XmString xm_message = NULL;
-   Pixmap   pixmap;
 
    _dialog_type = PROMPT_DIALOG;
    _validation_callback = validation_callback;
@@ -272,7 +271,6 @@ Dialog::Dialog(MotifUI *parent, char *title, char *caption, boolean editable,
       XtSetArg(args[n], XmNmessageString, xm_message); n++;
       if (icon && *icon)
        {
-	 pixmap = 0;
          // XtSetArg(args[n], XmNsymbolPixmap, pixmap); n++;
        }
     }
@@ -287,7 +285,7 @@ Dialog::Dialog(MotifUI *parent, char *title, char *caption, boolean editable,
     }
    else
     {
-      XtUnmanageChild(XmMessageBoxGetChild(_w, XmDIALOG_HELP_BUTTON));
+      XtUnmanageChild(XtNameToWidget(_w, "Help"));
     }
    _prompt = new Prompt(this, caption, editable, prompt_type, default_value,
 		        validation_callback, validation_callback_data,
@@ -347,7 +345,7 @@ Dialog::Dialog(MotifUI *parent, char *title, char *base_directory,
     }
    else
     {
-      XtUnmanageChild(XmMessageBoxGetChild(_w, XmDIALOG_HELP_BUTTON));
+      XtUnmanageChild(XtNameToWidget(_w, "Help"));
     }
    XmAddWMProtocolCallback(XtParent(_w), 
       XmInternAtom(display, "WM_DELETE_WINDOW", False), 

@@ -154,20 +154,15 @@ _DtTermPrimRefreshText(Widget w, short startColumn, short startRow,
     TermBuffer tBuffer = tpd->termBuffer;
     int lineWidth;
     unsigned char *linePtr;
-    TermFont termFont;
-    int currentColorPair = 0;
-    int currentVideo = 0;
     short chunkStartColumn;
     short chunkWidth;
     enhValues enhancements;
-    int i;
     int lineNum;
     unsigned long valueMask;
     GC gc;
     XGCValues values;
     TermEnhInfoRec enhInfo;
     Boolean checkSelection = False;
-    int selectionEnd;
     Pixel tmpPixel;
     XmTextPosition  begin, end;
     
@@ -210,7 +205,6 @@ _DtTermPrimRefreshText(Widget w, short startColumn, short startRow,
 
     if (!tpd->renderGC.gc) {
 	/* get a drawImageString GC... */
-	int i;
 	XGCValues values;
 
 	/***********************************************************
@@ -1334,7 +1328,6 @@ _DtTermPrimParseInput
     short returnLen;
     Boolean turnCursorOn = False;
     unsigned char *tmpBuffer = (unsigned char *) 0;
-    unsigned char mbChar[MB_LEN_MAX];
     int mbCharLen = 1;
     static Boolean *preParseTable = (Boolean *) 0;
 

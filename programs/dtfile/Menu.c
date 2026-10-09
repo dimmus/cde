@@ -120,10 +120,12 @@ static void RereadDirectoryMenu(
                         Widget w,
                         XtPointer client_data,
                         XtPointer call_data) ;
+#if defined(ADD_SHOW_TRASH)
 static void ShowTrash(
                         Widget w,
                         XtPointer client_data,
                         XtPointer call_data) ;
+#endif
 static void NewView(
                         Widget w,
                         XtPointer client_data,
@@ -770,7 +772,7 @@ static void
 UnmanageAllActionItems(
         FileMgrRec *file_mgr_rec )
 {
-  int i, children;
+  int i;
   XmManagerWidget action_pane;
 
   action_pane = (XmManagerWidget) file_mgr_rec->action_pane;

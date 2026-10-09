@@ -222,7 +222,7 @@ BAD_DBA:
 	    fprintf (aa_stderr,
 		PROGNAME"434 Invalid dba %ld.  "
 		"recno=%ld bitvec[%ld]=%02x  db_status=%d.\n",
-		objrecdba, recno, recno>>3, 1<<(recno%8), db_status);
+		(long)objrecdba, recno, recno>>3, 1<<(recno%8), db_status);
 	    fflush (aa_stderr);
 	}
 	return FALSE;
@@ -632,7 +632,7 @@ static void	weights_filter_WK (void)
     int		i;
     double	scalefac;
     long	recno;
-    int		smallest, biggest;
+    int		smallest;
     float	biggestwt;
     long	byteno, smallest_byteno;
     int		bitmask, smallest_bitmask;
@@ -711,7 +711,6 @@ static void	weights_filter_WK (void)
          */
 	if (biggestwt < wtvec[recno]) {
 	    biggestwt = wtvec[recno];
-	    biggest = smallest;
 	}
 
 	/* Find the next smallest */

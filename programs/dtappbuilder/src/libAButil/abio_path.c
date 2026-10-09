@@ -292,10 +292,10 @@ expand_path(char *nm, char *buf)
 	q = nm[0] == '\\' && nm[1] == '~';
 
 	/* Expand inline environment variables */
-	while (*d++ = *s)
+	while ((*d++ = *s))
 	{
 		if (*s == '\\') {
-			if (*(d - 1) = *++s)
+			if ((*(d - 1) = *++s))
 			{
 				s++;
 				continue;
@@ -306,7 +306,7 @@ expand_path(char *nm, char *buf)
 			char  *start = d;
 			char  braces = *s == '{';
 			char  *value;
-			while (*d++ = *s)
+			while ((*d++ = *s))
 				if (braces ? *s == '}' : !isalnum(*s))
 					break;
 				else
@@ -314,7 +314,7 @@ expand_path(char *nm, char *buf)
 			*--d = 0;
 			value = getenv(braces ? start + 1 : start);
 			if (value) {
-				for (d = start - 1; *d++ = *value++;);
+				for (d = start - 1; (*d++ = *value++););
 				d--;
 				if (braces && *s)
 					s++;
@@ -328,7 +328,7 @@ expand_path(char *nm, char *buf)
 	if (nm[0] == '~' && !q) { /* prefix ~ */
 		if (nm[1] == '/' || nm[1] == 0)
 		{ /* ~/filename */
-			if (s = getenv("HOME"))
+			if ((s = getenv("HOME")))
 			{
 				if (*++nm)
 					nm++;
@@ -353,11 +353,11 @@ expand_path(char *nm, char *buf)
 	}
 	d = buf;
 	if (*s) {
-		while (*d++ = *s++);
+		while ((*d++ = *s++));
 		*(d - 1) = '/';
 	}
 	s = nm;
-	while (*d++ = *s++);
+	while ((*d++ = *s++));
 }
 
 

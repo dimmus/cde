@@ -165,8 +165,8 @@ init(_Tt_string dt_handle, _Tt_dt_type /* t */)
 
 		// now connect to the indicated X11 server
 		while (retries--) {
-			if (priv->xd = (Display *)
-			       CALLX11(XOpenDisplay)((char *)display)) {
+			if ((priv->xd = (Display *)
+			       CALLX11(XOpenDisplay)((char *)display))) {
 				// Xlib has already emitted diagnostic
 				break;
 			}

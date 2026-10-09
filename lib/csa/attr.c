@@ -1915,8 +1915,8 @@ _CheckNameAtHost(char *owner, char *value)
 			return (CSA_E_FAILURE);
 	}
 
-	if (optr = strchr(owner, '@')) *optr = '\0';
-	if (ptr = strchr(value, '@')) *ptr = '\0';
+	if ((optr = strchr(owner, '@'))) *optr = '\0';
+	if ((ptr = strchr(value, '@'))) *ptr = '\0';
 	res = strcmp(value, owner);
 	if (optr) *optr = '@';
 	if (ptr) *ptr = '@';
@@ -1972,7 +1972,7 @@ _CheckCalendarName(char *owner, char *cname, cms_attribute_value *val)
 	/* now make sure if cal name is a user name, it's
 	 * the same as that of the calling user
 	 */
-	if (ptr = strchr(val->item.string_value, '@')) *ptr = '\0';
+	if ((ptr = strchr(val->item.string_value, '@'))) *ptr = '\0';
 	isuser = _DtCmIsUserName(val->item.string_value);
 	if (ptr) *ptr = '@';
 

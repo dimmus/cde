@@ -99,10 +99,8 @@ void InterruptibleCmd::execute ( TaskDoneCallback callback, void *clientData )
 
 void InterruptibleCmd::execute()
 {
-    char *name_str;
     char *label_str;
     
-    name_str = (char *) name();
     label_str = (char *) getLabel();
 
     _done  = FALSE;  // Initialize flag

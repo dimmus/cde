@@ -140,7 +140,7 @@ void done(void)
       for (actp = firstact ; actp ; actp = actp->nextact) {
         if (first) first = FALSE;
         else fprintf(ifh, ",\n");
-        fprintf(ifh, "  %d, %d, %d, %d",
+        fprintf(ifh, "  {%d, %d, %d, %d}",
                 actp->data, actp->element,
                 actp->son ? actp->son->count : M_NULLVAL,
                 actp->next ? actp->next->count : M_NULLVAL);

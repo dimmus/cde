@@ -1077,7 +1077,6 @@ void            write_new_word_2_dtbs (void)
 {
     FREE_SPACE_STR *free_slot;
     DtSrINT32	num_writes;
-    int             ret_fseek;
     DtSrINT32	int32;
 
     if (debugging & (DEBUG_n  | DEBUG_N))
@@ -1087,14 +1086,14 @@ void            write_new_word_2_dtbs (void)
     free_slot = find_free_space (num_addrs_for_word, &fl_hdr);
     if (free_slot == NULL) {
 	/* append addrs to end of d99 file */
-	ret_fseek = fseek (dtbs_addr_fp, 0L, SEEK_END);
+	fseek (dtbs_addr_fp, 0L, SEEK_END);
 	got_word.or_hwoffset = ftell (dtbs_addr_fp);
 	got_word.or_hwfree = 0;
 	if (debugging & (DEBUG_n  | DEBUG_N))
 	    printf ("APPEND ofs=%ld, fre=0\n", (long int) got_word.or_hwoffset);
     }
     else {
-	ret_fseek = fseek (dtbs_addr_fp,
+	fseek (dtbs_addr_fp,
 		(long)free_slot->offset, SEEK_SET);
 	got_word.or_hwoffset = free_slot->offset;
 	got_word.or_hwfree = free_slot->hole_size -
@@ -1243,7 +1242,6 @@ static void	load_into_bintree (
 			DB_ADDR	dba)
 {
     static DtSrINT16	or_maxwordsz;
-    static char		*cptr;
     static int		i;
     static TREENODE	**this_link;
     static TREENODE	*newnode;
@@ -1368,17 +1366,13 @@ main (int argc, char **argv)
     long		word_offset;	/* <-- PARG.offsetp */
     long		bytes_in;	/* ftell() */
     DtSrINT32		dba_offset;
-    int			got_ETX;
     char		*cptr, *src;
-    char		temp_buf[40];
     char		db_key [DtSrMAX_DB_KEYSIZE + 2];
-    int			oops = FALSE;
     DtSrINT32	cur_byte;
     struct tm		*tmptr;
     DB_ADDR		dba, temp_dba;
     time_t		elapsed;
     size_t		mallocsz;
-    char		*parsebufp, *stembufp;
 
     /******************* INITIALIZE ******************/
     setlocale (LC_ALL, "");

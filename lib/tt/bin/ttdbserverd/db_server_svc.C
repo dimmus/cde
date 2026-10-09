@@ -415,7 +415,7 @@ main(int argc, char** argv, char **envp)
 	}
 	
 	/* setup database file creation mask */
-	mode_t pmask = umask(_TT_UMASK);
+	(void)umask(_TT_UMASK);
 	
 	/* initialize access control cache */
 	_tt_oa_cache = new _Tt_oid_access_queue();
@@ -599,7 +599,7 @@ _tt_process_transaction()
 	}
 	/* Check the transaction flag */
 	int nbytes = read(log_fd, _tt_log_buf, sizeof(int));
-	if (nbytes < sizeof(int)) {
+	if ((size_t)nbytes < sizeof(int)) {
 		_tt_syslog(errstr, LOG_ERR, "read(): %m");
 		_tt_dbserver_prog_cleanup(log_fd);
 		UNLOCK_RPC();
@@ -648,7 +648,7 @@ _tt_process_transaction()
 	_Tt_trans_record trec;
 	nbytes = read(log_fd, _tt_log_buf, _TT_TREC_INFO);
 	while (nbytes) {
-		if (nbytes < _TT_TREC_INFO) {
+		if ((size_t)nbytes < _TT_TREC_INFO) {
 			_tt_syslog(errstr, LOG_ERR, "read(): %m");
 			_tt_dbserver_prog_cleanup(log_fd, isfd);
 			UNLOCK_RPC();
@@ -664,7 +664,7 @@ _tt_process_transaction()
 		buf_rec += sizeof(u_int);
 		/* read the record as a whole */
 		nbytes = read(log_fd, _tt_log_buf, trec.rec.rec_len);
-		if (nbytes < trec.rec.rec_len) {
+		if ((u_int)nbytes < trec.rec.rec_len) {
 			_tt_syslog(errstr, LOG_ERR, "read(): %m");
 			_tt_dbserver_prog_cleanup(log_fd, isfd);
 			UNLOCK_RPC();

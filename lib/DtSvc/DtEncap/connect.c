@@ -56,7 +56,6 @@
 static XeString context_host = NULL;
 
 static XeString FindDomainHost (XeString host_spec);
-static void UnParseFileString (XeString host, XeString path);
 static int GetDomainName (XeString buffer, unsigned int bufsize);
 
 #define strequal(xxx_str1, xxx_str2) (!strcmp(xxx_str1, xxx_str2))
@@ -200,17 +199,6 @@ FindDomainHost(XeString host_spec)
 ******/
 
 /*------------------------------------------------------------------------+*/
-static void
-UnParseFileString(XeString host, XeString path)
-/*------------------------------------------------------------------------+*/
-{
-   if (host) { /* there was a host in the original string */
-      *--path = (XeChar) ':';
-   }
-}
-
-
-/*------------------------------------------------------------------------+*/
 int
 XeParseFileString(XeString line,
 		  XeString *host_addr,
@@ -263,6 +251,7 @@ GetDomainName(XeString buffer, unsigned int bufsize)
    _Xgethostbynameparams host_buf; 
    static Boolean firstPass = TRUE;
    int status;
+   (void) host_buf; /* unused unless XTHREADS */
    
    /* try to get domain name from hostname */
    if ((status = gethostname(tmpbuf, bufsize))) {
@@ -430,7 +419,6 @@ Xechdir (const char *path)
 /*------------------------------------------------------------------------+*/
 {
    int status;
-   char *simple_path = NULL;
    char *env;
    char buf[MAXPATHLEN+10];
    if ((status = chdir(path))==0) {

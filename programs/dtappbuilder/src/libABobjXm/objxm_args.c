@@ -760,6 +760,8 @@ objxm_comp_set_label_args(
 	    objxm_obj_set_line_style_arg(subObj, ctype);
 	    break;
 
+        default:
+	    break;
     }
     obj_set_flag(subObj, AttrChangedFlag);
     return 0;
@@ -975,7 +977,6 @@ objxm_comp_set_msgbox_button_arg(
 )
 {
     ABObj       msgbox_obj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
-    BOOL        cgen_args;
     Widget	msgbox, button;
     BOOL     	(*func)(ABObj obj)= NULL;
 
@@ -993,7 +994,6 @@ objxm_comp_set_msgbox_button_arg(
 	    break;
     }
     button = XmMessageBoxGetChild(msgbox, which_btn);
-    cgen_args = (ctype == OBJXM_CONFIG_CODEGEN? TRUE : FALSE);
 
     if (func(obj))
     {
@@ -1250,6 +1250,8 @@ objxm_obj_get_default_motif_class(
             case AB_ITEM_FOR_LIST:
                 /* no class for list items (strings) */
             break;
+            default:
+                break;
             }
             break;
         case AB_TYPE_LABEL:

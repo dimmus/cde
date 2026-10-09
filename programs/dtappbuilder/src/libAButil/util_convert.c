@@ -319,7 +319,6 @@ static int
 when_table_init(void)
 {
 #define wt when_table
-	int	i= 0;
 
 	when_table_inited= TRUE;
 	convert_fill_table(when_table, AB_WHEN_NUM_VALUES, 
@@ -857,6 +856,8 @@ util_os_type_to_ident(AB_OS_TYPE osType)
         case AB_OS_FBSD: typeString = "freebsd"; break;
         case AB_OS_NBSD: typeString = "netbsd"; break;
         case AB_OS_OBSD: typeString = "openbsd"; break;
+	default:
+	    break;
     }
 
     return typeString;
@@ -879,6 +880,8 @@ util_os_type_to_string(AB_OS_TYPE osType)
         case AB_OS_FBSD: nameString = "FreeBSD"; break;
         case AB_OS_NBSD: nameString = "NetBSD"; break;
         case AB_OS_OBSD: nameString = "OpenBSD"; break;
+	default:
+	    break;
     }
 
     return nameString;

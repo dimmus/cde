@@ -170,8 +170,6 @@ CreateFontDlg(
     int     n;
     int              i;
     Arg              args[MAX_ARGS];
-    Widget           appTBox;
-    Widget           sizeMenuPlDn;
     XmString         button_string[NUM_LABELS];
     XmString         string;
     int              count = 0;
@@ -179,7 +177,6 @@ CreateFontDlg(
     XmString         *sizeItems;
     XmStringTable    selectedSize;
     char             sizeStr[111];
-    Dimension        fontheight;
 
 
     font.selectedFontStr = style.xrdb.systemFontStr;
@@ -459,7 +456,6 @@ ButtonCB(
   int      n, len;
   XtArgVal items;
   char	   *str, *fntstr, *fntsetstr;
-  Arg      args[MAX_ARGS];
   char     fontres[8192];
 
   switch (cb->button_position)
@@ -652,7 +648,8 @@ changeSampleFontCB(
      */
     n = 0;
     if (!font.userTextChanged) 
-      XtSetArg (args[n], XmNvalue, USER_MSG);  n++;
+      XtSetArg (args[n], XmNvalue, USER_MSG);
+    n++;
     XtSetArg(args[n], XmNfontList, style.xrdb.fontChoice[pos].userFont); n++;
     XtSetValues (font.userText, args, n);
     XmTextShowPosition(font.userText, 0);

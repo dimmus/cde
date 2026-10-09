@@ -125,6 +125,5 @@ void clearErrorHelpWidget(void);
 extern void DisplayErrorHelp(Widget, char *, char *);
 void HelpErrorCB(Widget, XtPointer, XtPointer);
 extern void DisplayVersion(Widget, char *, char *);
-static void CloseMainCB(Widget, XtPointer, XtPointer);
 
 #endif

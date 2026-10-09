@@ -61,10 +61,12 @@ _SHXbuf::append(int const ch, char flag)
 
     if (flag == NOQUOTE)
 	if (ch == '*' || ch == '?' || ch == '[')
+	{
 	    if (glob)
 		is_pattern = TRUE;
 	    else
 		flag |= SINGLEQUOTE;
+	}
 
     if (ch <= 0xFF)
     {
@@ -77,7 +79,7 @@ _SHXbuf::append(int const ch, char flag)
 	// multibyte char
 	long sz = buf.size();
 
-	for (int i=0; i<MB_CUR_MAX; i++) flags[sz+i] = flag;
+	for (int i=0; i<(int)MB_CUR_MAX; i++) flags[sz+i] = flag;
 	buf.reset(sz + MB_CUR_MAX);
 	char *cp = &buf.elt(sz);
 	WCHAR(ch, cp);

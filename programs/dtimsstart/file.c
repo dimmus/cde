@@ -112,7 +112,7 @@ int	init_log_file(char *org_path, int check_size)
 	(void) close(fd);
     }
 
-    Opt.LogPath = NEWSTR(path);
+    Opt.LogPath = NEWSTR(&path[0]);
     return NoError;
 
 _err:
@@ -149,7 +149,7 @@ int	read_cmd_conf(void)
     CmdConf	*conf = &Conf;
     char	*conf_dir, *path;
     char	*p, *lp, *valp;
-    int		line_num, num_alias;
+    int		line_num;
     DtEnv	*dt = NULL;
     RemoteEnv	*remote;
     FILE	*fp;
@@ -179,7 +179,6 @@ int	read_cmd_conf(void)
     remote->timeout = REMOTE_TIMEOUT;
     remote->passEnv = NULL;
 
-    num_alias = 0;
     start_tag_line(path);
     while ((line_num = read_tag_line(fp, &lp, &valp)) > 0) {
 	if (!valp) {
@@ -277,7 +276,9 @@ int	read_cmd_conf(void)
 
     /* if (remote->disabled)	FREE(remote->passEnv); */
 
+#ifdef	DEBUG2
 _default:
+#endif
 	/* set default value unless set */
     if (!conf->imsConfDir)	conf->imsConfDir = NEWSTR(conf_dir);
     if (!conf->imsAppDir)	conf->imsAppDir = NEWSTR(DTIMS_APPDIR);
@@ -345,7 +346,7 @@ int	expand_cmd_conf(void)
 	if (strcmp(p, buf))	j++;
 #endif
 	FREE(p);
-	*(pp[i]) = NEWSTR(buf);
+	*(pp[i]) = NEWSTR(&buf[0]);
     }
 
     DPR(("expand_cmd_conf(): %d / %d entries modified\n", j, n));
@@ -386,7 +387,7 @@ int	read_imsconf(ImsConf *conf, char *ims_name, char *ims_fname)
 	if (strcmp(lp, "name") == 0)
 	    ;	/* conf->name = NEWSTR(valp); */
 	else if (strcmp(lp, "server_name") == 0) {
-	    if (p = strchr(valp, ',')) {	/* contain secondary names */
+	    if ((p = strchr(valp, ','))) {	/* contain secondary names */
 		conf->servername2 = NEWSTR(valp);	/* save full name */
 		*p = 0;
 	    }
@@ -538,7 +539,7 @@ int	read_localeconf(ImsList *list, char *locale_name)
 		break;
 	    }
 	    ent = ALLOC(1, ImsEnt);
-	    if (pp = strchr(lp, STR_PREFIX_CHAR)) {
+	    if ((pp = strchr(lp, STR_PREFIX_CHAR))) {
 		*pp++ = 0;
 		if (*pp)
 		    ent->fname = NEWSTR(pp);
@@ -582,7 +583,6 @@ int	read_localeconf(ImsList *list, char *locale_name)
 int	read_user_selection(FileSel **fselp, char *locale_name)
 {
     char	path[MAXPATHLEN];
-    int		ret;
     int		dpy_specific;
     FILE	*fp;
     FileSel	*fsel;
@@ -600,7 +600,7 @@ int	read_user_selection(FileSel **fselp, char *locale_name)
     fsel = ALLOC(1, FileSel);
 
     start_tag_line(path);
-    ret = read_selection_file(fsel, fp);
+    read_selection_file(fsel, fp);
     fclose(fp);
 
     fsel->dpy_specific = dpy_specific;
@@ -648,7 +648,7 @@ int	read_selection_file(FileSel *fsel, FILE *fp)
 	    if (*valp)
 		iconic = str_to_bool(valp, False);
 	} else if (strncmp(lp + 1, STR_IMSOPTION, 4) == 0) {
-	    if (p = strchr(lp + 1, STR_PREFIX_CHAR)) {	/* indiv. opt */
+	    if ((p = strchr(lp + 1, STR_PREFIX_CHAR))) {	/* indiv. opt */
 		if (nopts >= MAXIMSENT) {
 		    DPR(("\t[line=%d] too many options - '%s' ignored\n",
 								line_num, lp));
@@ -698,11 +698,10 @@ int	read_selection_file(FileSel *fsel, FILE *fp)
 int	save_user_selection(UserSelection *sel, char *locale_name)
 {
     char	path[MAXPATHLEN];
-    int		dpy_specific;
     FILE	*fp;
     FileSel	*fsel = sel->fsel;
 
-    dpy_specific = user_selection_fname(path, MAXPATHLEN, -1);
+    user_selection_fname(path, MAXPATHLEN, -1);
 
     if ((fp = fopen(path, "w")) == NULL) {
 	DPR(("\tcannot create '%s'\n", path));
@@ -827,6 +826,7 @@ int	get_select_mode(void)
 
     select_mode = SEL_MODE_NONE;
     dpy_specific = user_selection_fname(path, MAXPATHLEN, -1);
+    (void) dpy_specific;	/* used only #ifdef DEBUG */
 
     DPR3(("get_select_mode(): path=%s\n", path));
 
@@ -868,6 +868,7 @@ int	set_select_mode(int cur_mode, int new_mode)
     }
 
     dpy_specific = user_selection_fname(path, MAXPATHLEN, -1);
+    (void) dpy_specific;	/* used only #ifdef DEBUG */
 
     DPR3(("set_selection_mode(): path=%s\n", path));
 
@@ -913,7 +914,7 @@ int	set_select_mode(int cur_mode, int new_mode)
 	    if (*lp == STR_PREFIX_CHAR) {
 		if (strncmp(lp + 1, STR_SELECTMODE, 3) == 0) {
 		    if (mode_line)	continue;	/* ignore this line */
-		    if (valp = strchr(lp, TAG_END_CHAR)) {
+		    if ((valp = strchr(lp, TAG_END_CHAR))) {
 			valp++;
 			skip_white(valp);
 			if (str_to_int(valp, &n) && n == new_mode)

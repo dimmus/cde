@@ -132,7 +132,6 @@ DtkshCvtStringToPixel(
     status = XAllocNamedColor(DisplayOfScreen(screen), colormap,
 			      (char*)str, &screenColor, &exactColor);
     if (status == 0) {
-	String type;
 	/* Server returns a specific error code but Xlib discards it.  Ugh */
 	if (XLookupColor(DisplayOfScreen(screen), colormap, (char*)str,
 			 &exactColor, &screenColor)) {

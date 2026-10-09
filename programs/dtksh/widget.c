@@ -114,7 +114,7 @@ static void pr_widheader( void ) ;
 void
 init_widgets( void )
 {
-	int i, n = 0;
+	int i;
 	char *nam;
 	wtab_t *wentries;
         char * errmsg;
@@ -164,8 +164,7 @@ str_to_class(
         char *arg0,
         char *s )
 {
-   int i, j, n;
-   Widget w;
+   int i, j;
    char *nam;
    classtab_t *ret;
    char * errhdr;
@@ -315,8 +314,6 @@ Widget
 DtkshNameToWidget(
         String s )
 {
-	Widget w;
-	char *p;
 	int len;
         char * errhdr;
         char * errmsg;
@@ -547,7 +544,6 @@ fixupresources(
 {
 	XtResource *resource;
 	int i;
-	char *nam;
 
 	if (fixups == NULL)
 		return;
@@ -852,8 +848,7 @@ do_DtWidgetInfo(
         int argc,
         char *argv[] )
 {
-	int i, j;
-	char buf[1024];
+	int i;
 	wtab_t *w;
 	classtab_t *c;
 	int errs = 0;

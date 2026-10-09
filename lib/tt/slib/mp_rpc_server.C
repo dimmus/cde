@@ -415,8 +415,8 @@ gettransient(int proto, int vers, int *sockp)
 		return(0);
 	}
 
-	int optval = 0;
 #if !defined(__linux__)
+	int optval = 0;
 	if (setsockopt(s, SOL_SOCKET, SO_USELOOPBACK,
 		       (char *)&optval, sizeof(optval)) == -1) {
 	}

@@ -51,11 +51,6 @@
  * ________________________________________________________________________
  */
 
-#ifndef lint
-static char *RCSid =
-  "$XConsortium: translate.c /main/10 1996/10/29 11:47:36 cde-hp $";
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -373,7 +368,6 @@ ProcesOutputSpec(
     char	obuf[LINESIZE];
     char	vbuf[LINESIZE];
     char	*dest, vname[LINESIZE], *cp;
-    int		esc;
 
     obuf[0] = EOS;			/* start with empty output buffer */
 
@@ -381,7 +375,6 @@ ProcesOutputSpec(
     ib = vbuf;
     dest = obuf;
 
-    esc = 0;
     while (*ib) {
 	/* Is esc-$ next?  If so, just copy the '$'. */
 	if (*ib == '\\' && ib[1] == VDELIM) {

@@ -421,7 +421,7 @@ PRINT_USAGE:
 	KEYFRST (PROGNAME"111", OR_OBJKEY, 0);
 	while (db_status == S_OKAY) {
 	    KEYREAD (PROGNAME"288", buf);
-	    (counters[buf[0]])++;
+	    (counters[(unsigned char)buf[0]])++;
 
 	    CRGET (PROGNAME"251", &dba, 0);
 	    if (maxdba < (dba & 0xffffff))
@@ -432,7 +432,7 @@ PRINT_USAGE:
 		i = 0;
 		putchar ('\"');
 		for (ptr = buf; *ptr != 0; ptr++) {
-		    if (*ptr < 32 | *ptr >= 127) {
+		    if ((*ptr < 32) | (*ptr >= 127)) {
 			putchar ('.');
 			i++;
 		    }

@@ -46,6 +46,7 @@
 #include <sys/stat.h>
 #include "calctool.h"
 #include <X11/Xlib.h>
+#include <X11/XKBlib.h>
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <Xm/XmP.h>
@@ -2105,7 +2106,7 @@ key_init(void)
       X->kparray[i - X->kcmin] = 0 ;
       for (j = 0; j < X->keysyms_per_key; ++j)
         {
-          ks = XKeycodeToKeysym(X->dpy, i, j) ;
+          ks = XkbKeycodeToKeysym(X->dpy, i, j >> 1, j & 1) ;
           if (IsKeypadKey(ks))
             {
               X->kparray[i - X->kcmin] = 1 ;
@@ -2125,7 +2126,7 @@ keypad_keysym(XEvent *xevent)
 
   for (i = 0; i < X->keysyms_per_key; ++i)
     {
-      ks = XKeycodeToKeysym(X->dpy, keycode, i) ;
+      ks = XkbKeycodeToKeysym(X->dpy, keycode, i >> 1, i & 1) ;
       if (IsKeypadKey(ks))
       {
 #ifdef sun

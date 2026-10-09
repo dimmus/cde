@@ -276,10 +276,6 @@ static const char * TZNames[] = {
 "EST", "CST", "MST", "PST"
 };
 
-static const char * TZNamesDST[] = {
-"EDT", "CDT", "MDT", "PDT"
-};
-
 static time_t
 parseTZ(const char * start, const char * end)
 {
@@ -684,7 +680,6 @@ stripAngleAddr(const char * value)
 static char *
 stripQuotesWhiteSpace(const char * value)
 {
-    int   found_alphanum = 0;
     char *name = NULL;
     char *out = NULL;
 
@@ -811,7 +806,7 @@ RFCValue::decodeValue(void)
 
 	    if (in_c > in_c_sav) {
 	        size_t bufLen = strlen(buf);
-	        if (bufLen > outleft) {
+	        if (bufLen > (size_t) outleft) {
 		    output =
 			(char*) realloc((char*)output, _valueLen + bufLen + 2);
 		    outleft += bufLen;

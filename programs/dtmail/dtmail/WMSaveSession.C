@@ -280,7 +280,6 @@ RoamApp::smpSaveSessionLocal(void)
     char **save_argv = NULL;
     int save_argc = 0;
     char **argv = NULL;
-    int argc = 0;
     
     if (! DtSessionSavePath(_w, &pathname, &filename))
       return;
@@ -496,7 +495,7 @@ RoamMenuWindow::smpSaveSessionLocal(void)
     Atom	*ws_presence = NULL;
     char	*workspace_name=NULL;
     unsigned long num_workspaces = 0;
-    char	*all_workspace_names;
+    char	*all_workspace_names = NULL;
     char	*mailboxname;
     
     if (fp == NULL)
@@ -517,7 +516,7 @@ RoamMenuWindow::smpSaveSessionLocal(void)
 				display, XtWindow(_w),
                                 &ws_presence, &num_workspaces) == Success)
     {
-         for (int j = 0; j < num_workspaces; j++)
+         for (int j = 0; (unsigned long) j < num_workspaces; j++)
          {
             workspace_name = XGetAtomName (display, ws_presence[j]);
 	    if (j == 0)
@@ -696,7 +695,7 @@ SendMsgDialog::smpSaveSessionLocal(void)
     Atom	*ws_presence = NULL;
     char	*workspace_name = NULL;
     unsigned long num_workspaces = 0;
-    char	*all_workspace_names;
+    char	*all_workspace_names = NULL;
     char	*save_filename;
     int j;
 
@@ -734,7 +733,7 @@ SendMsgDialog::smpSaveSessionLocal(void)
 				display, XtWindow (_w),
                                 &ws_presence, &num_workspaces) == Success)
     {
-        for (j = 0; j < num_workspaces; j++)
+        for (j = 0; (unsigned long) j < num_workspaces; j++)
         {
             workspace_name = XGetAtomName (display, ws_presence[j]);
 	    if (j == 0)

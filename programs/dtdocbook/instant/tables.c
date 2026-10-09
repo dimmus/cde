@@ -198,7 +198,6 @@ static int	tblBOFTCount = 0;	/* count of bofts that we've created
 int	BOFTTextThresh = BOFTTHRESHOLD;
 					/* length of text before we
 					 * call it a BOFT */
-static bool	tblboft = false;	/* within a block of filled text? */
 static bool	tblinBOFT = false;	/* within a boft now? */
 
 static struct tblformat * formP = 0;	/* THead/TBody format lines */
@@ -225,8 +224,7 @@ typedef struct {
 
 /* some flags, set when the table tag is processed, used later */
 static int	rowsep, siderules;
-static int	frametop, framebot, frameall;
-static char	basemodel[128];	/* model for table (in formatting language) */
+static int	frametop, framebot;
 static int	spaninfo[MAXCOLS];	/* 100 columns, max */
 static TableInfo	TheTab;
 
@@ -455,7 +453,6 @@ SetTabAtts(
 )
 {
     char	*at;
-    Element_t	* ep;
 
     /* remember values of attributes */
     if ((at = FindAttValByName(e, "ALIGN")))	  t->align      = at;
@@ -535,9 +532,11 @@ CheckTable(
 )
 {
     int		pr_loc=0;	/* flag to say if we printed location */
-    int		i, r, c;
+    int		i;
+#if false
+    int		r, c;
     Element_t	*ep, *ep2;
-    float	wt;
+#endif
     char	*tpref = "Table Check";		/* prefix for err messages */
     char	*ncolchk =
 	"Table Check: %s ('%s') has wrong number of tokens.  Expecting %d.\n";
@@ -650,9 +649,12 @@ check_for_spans(
     Element_t	*e
 )
 {
+    int		i;
+#if false
     char	*at;
     char	**spans;
-    int		n, i, inspan;
+    int		n, inspan;
+#endif
 
 #if false	/* NOT IMPLEMENTED RIGHT NOW */
 
@@ -709,9 +711,8 @@ TexTable(
     FILE	*fp
 )
 {
-    int		i, n;
-    float	tot;
-    char	*cp, wbuf[1500], **widths=0, **widths_v=0;
+    int		i;
+    char	**widths=0, **widths_v=0;
 
     FreeTabAtts(&TheTab);	/* free storage, if allocated earlier */
     SetTabAtts(e, &TheTab, 1);	/* look at attributes */
@@ -770,7 +771,10 @@ TexTableCellStart(
 )
 {
     int		n, i;
-    char	buf[50], *at;
+    char	buf[50];
+#ifdef New
+    char	*at;
+#endif
 
     if (spaninfo[e->my_eorder] == SPAN_START) {
 	for (i=e->my_eorder+1,n=1; ; i++) {
@@ -898,7 +902,6 @@ TblTStart(Element_t * ep,
 	  FILE * fP)
 {
 	char * cp;
-	struct Element_t * ep2;
 
 
 
@@ -972,8 +975,8 @@ TblTGroup(Element_t * ep,
 	  FILE * fP)
 {
 	int i, j, k;
-	char * cp, * cp2;
-	Element_t * ep2, ep3;
+	char * cp;
+	Element_t * ep2;
 	struct tblcolspec * tcsp, * tcsp2;
 	struct tblspanspec * tssp, * tssp2;
 
@@ -1303,6 +1306,7 @@ TblGetAlign(short col,			/* column number */
 	case Char:	return 'd';
 	case Span:	return 's';
 	}
+	return 'l';
 }
 
 /*	TblGetWidth()  --  get width spec, if any, for a entry
@@ -1317,7 +1321,6 @@ TblGetWidth(short col,			/* column number */
 	    tblsource	source)		/* context */
 {
 	struct tblcolspec * tcsp;
-	struct tblspanspec * tssp;
 	static char colWidth[10];
 
 
@@ -1350,8 +1353,6 @@ TblGetFont(short col,			/* column number */
 	   Element_t * entry,		/* the entry */
 	   tblsource source)		/* context */
 {
-	struct tblcolspec * tcsp;
-	struct tblspanspec * tssp;
 
 
 	return "";
@@ -1426,7 +1427,7 @@ TblGetMoreRows(short col,		/* column number */
 	char * cp;
 
 
-	if ( cp = FindAttValByName(entry, "MOREROWS") )
+	if ( (cp = FindAttValByName(entry, "MOREROWS") ))
 		return atoi(cp);
 	else
 		return 0;
@@ -1449,7 +1450,7 @@ TblColAdv(short col,		/* the current column */
 
 	bump = true;
 
-	if ( tssp = TblEntrySpanSpec(col, ep, source) )	{
+	if ( (tssp = TblEntrySpanSpec(col, ep, source) ))	{
 		bump = tssp->align != Span;
 		free(tssp);
 	}
@@ -1467,7 +1468,6 @@ TblEntryColSpec(short num,		/* column number */
 		Element_t * ep,		/* entry */
 		tblsource source)	/* context */
 {
-	int i;
 	bool throwAway;
 	char * cp;
 	struct tblcolspec * tcsp, * tcsp2;
@@ -1482,7 +1482,7 @@ TblEntryColSpec(short num,		/* column number */
 		}
 	}
 
-	if ( tcsp2 = TblFindColNum(num, source) )	{
+	if ( (tcsp2 = TblFindColNum(num, source) ))	{
 		tcsp = TblDoColSpec(num, ep, tcsp2, source);
 		throwAway = true;
 	}
@@ -1505,7 +1505,7 @@ TblEntrySpanSpec(short num,		/* column number */
 		 Element_t * ep,	/* entry */
 		 tblsource source)	/* context */
 {
-	char * cp, * cp2;
+	char * cp;
 	struct tblspanspec * tssp, * tssp2;
 
 
@@ -1707,7 +1707,6 @@ TblTCellStart(Element_t * ep,
 	      FILE * fP)
 {
 	int i;
-	Element_t * ep2;
 	bool sawPIorPara;
 
 
@@ -1810,13 +1809,13 @@ TblDoColSpec(short number,		/* this column number */
 
 	Calloc(1, tcsp, struct tblcolspec);
 
-	if ( cp = FindAttValByName(ep, "COLNAME") )
+	if ( (cp = FindAttValByName(ep, "COLNAME") ))
 		strcpy(tcsp->name, cp);
 
 	tcsp->num = number;
 	tcsp->source = source;
 
-	if ( cp = FindAttValByName(ep, "ALIGN") )	{
+	if ( (cp = FindAttValByName(ep, "ALIGN") ))	{
 		if      ( !strcmp(cp, "LEFT") )		tcsp->align = Left;
 		else if ( !strcmp(cp, "RIGHT") )	tcsp->align = Right;
 		else if ( !strcmp(cp, "CENTER") )	tcsp->align = Center;
@@ -1825,27 +1824,27 @@ TblDoColSpec(short number,		/* this column number */
 	} else
 		tcsp->align = ( pcsp ) ? pcsp->align : Left;
 
-	if ( cp = FindAttValByName(ep, "CHAR") )
+	if ( (cp = FindAttValByName(ep, "CHAR") ))
 		tcsp->alignchar = cp[0];
 	else
 		tcsp->alignchar = ( pcsp ) ? pcsp->alignchar : 0;
 
-	if ( cp = FindAttValByName(ep, "CHAROFF") )
+	if ( (cp = FindAttValByName(ep, "CHAROFF") ))
 		tcsp->aligncharoff = atoi(cp);
 	else
 		tcsp->aligncharoff = ( pcsp ) ? pcsp->aligncharoff : 0;
 
-	if ( cp = FindAttValByName(ep, "COLWIDTH") )
+	if ( (cp = FindAttValByName(ep, "COLWIDTH") ))
 		snprintf(tcsp->colwidth, sizeof(tcsp->colwidth), "%s", cp);
 	else
 		snprintf(tcsp->colwidth, sizeof(tcsp->colwidth), "%s", ( pcsp ) ? pcsp->colwidth : "");
 
-	if ( cp = FindAttValByName(ep, "COLSEP") )
+	if ( (cp = FindAttValByName(ep, "COLSEP") ))
 		tcsp->colsep = !strcmp(cp, "1");
 	else
 		tcsp->colsep = ( pcsp ) ? pcsp->colsep : false;
 
-	if ( cp = FindAttValByName(ep, "ROWSEP") )
+	if ( (cp = FindAttValByName(ep, "ROWSEP") ))
 		tcsp->rowsep = !strcmp(cp, "1");
 	else
 		tcsp->rowsep = ( pcsp ) ? pcsp->rowsep : false;
@@ -1874,12 +1873,12 @@ TblDoSpanSpec(Element_t * ep,		/* element containing spanspec stuff */
 
 	Calloc(1, tssp, struct tblspanspec);
 
-	if ( cp = FindAttValByName(ep, "SPANNAME") ) {
+	if ( (cp = FindAttValByName(ep, "SPANNAME") )) {
 		snprintf(tssp->name, sizeof(tssp->name), "%s", cp);
 	}
 	tssp->source = source;
 
-	if ( cp = FindAttValByName(ep, "NAMEST") )	{
+	if ( (cp = FindAttValByName(ep, "NAMEST") ))	{
 		if ( (tcsp = TblFindColSpec(cp, source)) ||
 		     (tcsp = TblFindColNum(atoi(cp), source)) )	{
 		     	tssp->start = tcsp;
@@ -1893,7 +1892,7 @@ TblDoSpanSpec(Element_t * ep,		/* element containing spanspec stuff */
 		}
 	}
 
-	if ( cp = FindAttValByName(ep, "NAMEEND") )	{
+	if ( (cp = FindAttValByName(ep, "NAMEEND") ))	{
 		if ( (tcsp = TblFindColSpec(cp, source)) ||
 		     (tcsp = TblFindColNum(atoi(cp), source)) )	{
 		     	tssp->end = tcsp;
@@ -1907,7 +1906,7 @@ TblDoSpanSpec(Element_t * ep,		/* element containing spanspec stuff */
 		}
 	}
 
-	if ( cp = FindAttValByName(ep, "ALIGN") )	{
+	if ( (cp = FindAttValByName(ep, "ALIGN") ))	{
 		if      ( !strcmp(cp, "LEFT") )		tssp->align = Left;
 		else if ( !strcmp(cp, "RIGHT") )	tssp->align = Right;
 		else if ( !strcmp(cp, "CENTER") )	tssp->align = Center;
@@ -1918,26 +1917,26 @@ TblDoSpanSpec(Element_t * ep,		/* element containing spanspec stuff */
 			tssp->align = pssp->align;
 	}
 
-	if ( cp = FindAttValByName(ep, "CHAR") )
+	if ( (cp = FindAttValByName(ep, "CHAR") ))
 		tssp->alignchar = cp[0];
 	else	{
 		if ( pssp )
 			tssp->alignchar = pssp->alignchar;
 	}
-	if ( cp = FindAttValByName(ep, "CHAROFF") )
+	if ( (cp = FindAttValByName(ep, "CHAROFF") ))
 		tssp->aligncharoff = atoi(cp);
 	else	{
 		if ( pssp )
 			tssp->alignchar = pssp->alignchar;
 	}
 
-	if ( cp = FindAttValByName(ep, "COLSEP") )
+	if ( (cp = FindAttValByName(ep, "COLSEP") ))
 		tssp->colsep = !strcmp(cp, "1");
 	else	{
 		if ( pssp )
 			tssp->colsep = pssp->colsep;
 	}
-	if ( cp = FindAttValByName(ep, "ROWSEP") )
+	if ( (cp = FindAttValByName(ep, "ROWSEP") ))
 		tssp->rowsep = !strcmp(cp, "1");
 	else	{
 		if ( pssp )

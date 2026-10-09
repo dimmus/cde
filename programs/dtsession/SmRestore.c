@@ -507,7 +507,6 @@ RestoreState( void )
 {
     SmStateInfo	state;
     SmSaverInfo saver;
-    char convertCommand[MAXPATHSM+1];
     int status;
     Boolean fixedBuffer = False;
     struct stat                 buf;
@@ -1816,13 +1815,13 @@ RestoreClients( void )
 {
     unsigned char *lineP, *string;
     char *pch, *dispPtr = NULL;
-    char *dispEnv, *dispSav, *dispEnvHelpview, *dispSavHelpview;
+    char *dispEnv, *dispSav;
     unsigned char *hostPtr=NULL, *cmdPtr=NULL, *hintPtr = NULL;
     unsigned char *remoteDisplay;
     char *displayName;
     char *envVal;
     unsigned char  tmpChar[35];
-    int     screenNum = 0, i, j, chlen, numClientsExec;
+    int     screenNum = 0, i, numClientsExec;
     int	    numRemoteDone = 0;
     Window	dtwmWin = 0;
     Boolean	clientsDone = False, wmHandshake = False, cmdInvInit = False;
@@ -3413,10 +3412,10 @@ SetTemporaryDisplay (
 		strcpy (tmpDisplay, savedDisplay);
 	}
 
-	if (pch = strrchr (tmpDisplay, ':')) {
+	if ((pch = strrchr (tmpDisplay, ':'))) {
 		char		*pch2, *pch3;
 
-		if (pch2 = strchr (pch, '.'))
+		if ((pch2 = strchr (pch, '.')))
 			*pch2 = '\000';
 		pch3 = XtMalloc (strlen (tmpDisplay) + 4);
 		if (!pch3)
@@ -3488,7 +3487,6 @@ StartClient(
 	int			screen)
 {
 	static char		* defaultCwd = NULL;
-	Boolean			cwdNull = False;
 	Boolean			startStatus;
 
 	SetTemporaryDisplay (screen);
@@ -3515,7 +3513,6 @@ StartClient(
           }
 
 	if (!cwd) {
-		cwdNull = True;
 		cwd = defaultCwd;
 	}
 
@@ -3555,7 +3552,7 @@ StartLocalClient (
 	Boolean 		useIgnoreEnvironmentResource)
 {
     pid_t  clientFork;
-    int	   execStatus, i;
+    int	   execStatus;
     char   clientMessage[MAXPATHLEN + 30];
     char   **tmpEnv, **ppchar;
 	   
@@ -3760,7 +3757,7 @@ static void
 ForkWM( void )
 {
     pid_t  clientFork;
-    int	   execStatus, i;
+    int	   execStatus;
 
      strcpy(tmpExecWmFile,CDE_INSTALLATION_TOP "/bin/dtwm");
 
@@ -3918,7 +3915,6 @@ KillParent( void )
 static void 
 WaitForWM( void )
 {
-    XEvent              event;
     XtIntervalId	wmTimerId;
     
     XtAddEventHandler(smGD.topLevelWid,

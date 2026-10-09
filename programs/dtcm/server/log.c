@@ -691,6 +691,8 @@ _DtCmsWriteVersionString(char *file, int version)
 	CSA_return_code stat = CSA_SUCCESS;
 	_Xltimeparams	localtime_buf;
 	_Xatimeparams	asctime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
+	(void) asctime_buf;	/* unused unless XTHREADS */
 
 	tmval = time((time_t *) 0);
 	tm = _XLocaltime(&tmval, localtime_buf);

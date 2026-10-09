@@ -651,7 +651,6 @@ LoadXloginResources( struct display *d )
     char	*authority="";
     char	*auth_key="";
     char        *resources = NULL;
-    char	*p;
     char	tmpname[32];
 
     if (d->resources && d->resources[0]) { 
@@ -726,12 +725,9 @@ LoadAltDtsResources(struct display *d)
     char        res_file[MAXPATHLEN];
     char        *rmtype;        /* for XrmGetResource()                    */
     XrmValue    rmvalue;        /* for XrmGetResource()                    */
-    char        buf[MAXPATHLEN];
     char        tempbuf[MAXPATHLEN];
-    XrmDatabase defDb;
     XrmDatabase userDb;
     char        altdtres[MAXPATHLEN];
-    char        Altdtres[MAXPATHLEN];
     int         i = 0;
     int		j = 0;
     char        *resources = NULL;
@@ -1166,10 +1162,15 @@ static int
 StartClient( struct verify_info *verify, struct display *d, int *pidp )
 {
     char	**f, *home;
+#ifdef SIA
     char        currentdir[PATH_MAX+1];
+#endif
     char	*failsafeArgv[20];
     char	*user;			/* users name 			   */
-    char 	*lang, *font;		/* failsafe LANG and font	   */
+#ifdef _AIX
+    char 	*lang;			/* failsafe LANG		   */
+#endif
+    char 	*font;			/* failsafe font		   */
 
     int	pid;
     int		failsafe = FALSE;	/* do we run the failsafe session? */
@@ -1535,7 +1536,9 @@ StartClient( struct verify_info *verify, struct display *d, int *pidp )
 	 */
 	    
 	font = NULL;
+#ifdef _AIX
 	lang = getEnv (verify->userEnviron, "LANG");
+#endif
 
 
 
@@ -1768,7 +1771,7 @@ execute(char **argv, char **environ )
 	*av++ = p;
 	if (optarg)
 	    *av++ = optarg;
-	while (*av++ = *argv++)
+	while ((*av++ = *argv++))
 	    ;
 	session_execve (newargv[0], newargv, environ);
     }
@@ -1822,9 +1825,7 @@ RunGreeter( struct display *d, struct greet_info *greet,
     int       pid;
     waitType	status;
     
-    int		rbytes;
     static char	msg[MSGSIZE];
-    char	*p;
     char	**env;
     char	*path;
     struct greet_state state;
@@ -1887,7 +1888,6 @@ RunGreeter( struct display *d, struct greet_info *greet,
 	if(-1 == pipe(request)) {
             perror(strerror(errno));
         }
-	rbytes = 0;
 
 
 	switch (greeterPid = fork ()) {

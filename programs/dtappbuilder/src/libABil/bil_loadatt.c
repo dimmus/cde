@@ -84,8 +84,6 @@ bilP_get_string(void)
     ISTRING             value1;
     /* ISTRING	value2; */
     int                 valueToken = AB_BIL_UNDEF;
-    int                 length;
-    STRING              tmp = NULL;
 
     valueToken = bilP_load_get_value_type();
     if (valueToken == AB_BIL_VALUE_STRING)
@@ -103,7 +101,6 @@ bilP_get_string(void)
     }
 
     value1 = istr_create(tmp_str);
-    length = istr_len(value1);
 
 #ifdef BOGUS
     /**** REMIND: strip off quotes, sometimes heap overwrite violation*/
@@ -365,8 +362,6 @@ bilP_load_att_decimal_points(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_default(BIL_TOKEN valueToken)
 {
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                is_default = FALSE;
     ABObj               obj = bilP_load.obj;
 
@@ -574,12 +569,11 @@ bilP_load_att_item_type(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_menu(BIL_TOKEN valueToken)
 {
-    ABObj               newObj = NULL;
     STRING              stringValue = bilP_load_get_value();
 
     if (valueToken == AB_BIL_VALUE_IDENT)
     {
-	newObj = obj_scoped_find_or_create_undef(bilP_load.module, 
+	obj_scoped_find_or_create_undef(bilP_load.module, 
 			stringValue, AB_TYPE_MENU);
 	obj_set_menu_name(bilP_load.obj, stringValue);
     }
@@ -611,7 +605,6 @@ bilP_load_att_menu_title(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_menu_type(BIL_TOKEN valueToken)
 {
-    AB_MENU_TYPE        menuType;
 
 /*
     nset_att(AB_BIL_MENU_TYPE);
@@ -751,7 +744,6 @@ bilP_load_att_bg_color(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
     ISTRING             bg_color = NULL;
-    int                 type;
 
     nset_att(AB_BIL_BG_COLOR);
     bg_color = bilP_get_string();
@@ -820,7 +812,6 @@ STRING
 bilP_load_att_fg_color(BIL_TOKEN valueToken)
 {
     ISTRING             fg_color = NULL;
-    int                 type;
     ABObj               obj = bilP_load.obj;
 
     nset_att(AB_BIL_FG_COLOR);
@@ -917,8 +908,6 @@ STRING
 bilP_load_att_height_resizable(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                resizable;
 
     set_att(":height-resizable");
@@ -946,8 +935,6 @@ STRING
 bilP_load_att_hscrollbar(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL		sb_flag = FALSE;
     AB_SCROLLBAR_POLICY	hscrollbar;
 
@@ -1088,7 +1075,6 @@ STRING
 bilP_load_att_label_emphasis(BIL_TOKEN valueToken)
 {
     int                 label_emphasis = AB_BIL_UNDEF;
-    AB_LABEL_TYPE       obj_type;
 
     set_att(":label-emphasis");
     if ((label_emphasis = bilP_load_get_token()) == AB_BIL_UNDEF)
@@ -1223,10 +1209,6 @@ bilP_load_att_module_files(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_multiple_selections(BIL_TOKEN valueToken)
 {
-    ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
-    BOOL                selection;
 
     /* for exclusive and non-exclusive in scrolling-list */
 /*
@@ -1309,8 +1291,6 @@ bilP_load_att_name(BIL_TOKEN valueToken)
 	     * the name, so we can just add the additional attributes
 	     * into the forward reference.
 	     */
-	    AB_OBJECT_TYPE      obj_type = AB_TYPE_UNKNOWN;
-	    ABObj		doomed_obj = NULL;
 
 	    /* 
 	     * Set the "current" object to be the "forward" reference
@@ -1394,6 +1374,9 @@ bilP_load_att_name(BIL_TOKEN valueToken)
 	        /* leave type unknown - ignore it */
 	    }
 	    break;
+
+	    default:
+	    break;
 	} /* switch obj_get_type() */
 
         if (obj_is_module(load_obj) || obj_is_project(load_obj))
@@ -1425,7 +1408,6 @@ bilP_load_att_num_columns(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
     int                 num_columns = 0;
-    int                 type;
 
     set_att(bilP_token_to_string(valueToken));
     if (valueToken == AB_BIL_VALUE_INT)
@@ -1514,10 +1496,6 @@ bilP_load_att_reference_point(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_resource(BIL_TOKEN valueToken)
 {
-    int                 type = AB_BIL_UNDEF;
-    STRING              value1 = NULL;
-    STRING              value2 = NULL;
-    BOOL                resource;
 
     return NULL;
 }
@@ -1530,8 +1508,6 @@ STRING
 bilP_load_att_read_only(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                read_only;
 
     set_att(":read-only");
@@ -1577,8 +1553,6 @@ STRING
 bilP_load_att_selection_required(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                selection_required;
 
     /* for choices & scrolling-list */
@@ -1661,9 +1635,6 @@ bilP_load_att_border_frame(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_has_footer(BIL_TOKEN valueToken)
 {
-    ABObj               obj = bilP_load.obj;
-    BOOL                has_footer;
-
     util_dprintf(3, "bilP_load_att_has_footer %d/%s\n",
 	       valueToken,
 	       str_safe(bilP_token_to_string(valueToken)));
@@ -1673,7 +1644,6 @@ bilP_load_att_has_footer(BIL_TOKEN valueToken)
     {
 	abil_print_load_err(ERR_WANT_BOOLEAN);
     }
-    has_footer = bilP_token_to_bool(valueToken);
 /*
     REMIND: has-footer attribute is now obsolete
     obj_set_has_footer(obj, has_footer);
@@ -1708,8 +1678,6 @@ STRING
 bilP_load_att_tear_off(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                tear_off = FALSE;
 
     set_att(":tear-off");
@@ -1836,8 +1804,6 @@ bilP_load_att_version(BIL_TOKEN valueToken)
 STRING
 bilP_load_att_visible(BIL_TOKEN valueToken)
 {
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                visible;
 
     set_att(":visible");
@@ -1875,8 +1841,6 @@ STRING
 bilP_load_att_vscrollbar(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL		sb_flag = FALSE;
     AB_SCROLLBAR_POLICY vscrollbar;
 
@@ -1952,8 +1916,6 @@ STRING
 bilP_load_att_selected(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
 
     set_att(":selected");
     if (!bilP_token_is_bool(valueToken))
@@ -2055,8 +2017,6 @@ STRING
 bilP_load_att_width_resizable(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                resizable;
 
     set_att(":width-resizable");
@@ -2197,13 +2157,7 @@ bilP_load_list_value(BIL_TOKEN token)
 int
 bilP_load_set_current_att(BIL_TOKEN att)
 {
-    STRING              attName = bilP_token_to_string(att);
-
     bilP_load.att = att;
-    if (att == AB_BIL_UNDEF)
-    {
-	attName = NULL;
-    }
     abil_loadmsg_set_att(bilP_token_to_string(att));
     return 0;
 }
@@ -2332,8 +2286,6 @@ STRING
 bilP_load_att_is_help_item(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
     BOOL                is_help_item;
 
     set_att(":is-help-item");
@@ -2455,6 +2407,8 @@ bilP_load_attachment_value(BIL_TOKEN valueToken)
 	case AB_ATTACH_CENTER_GRIDLINE:
 	    value = atoi(bilP_load_get_value());
 	    obj_set_attach_value(bilP_load.obj, cp, (void *) value);
+	    break;
+	default:
 	    break;
     }
 
@@ -2678,8 +2632,6 @@ STRING
 bilP_load_att_active(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
 
     set_att(":active");
     if (!bilP_token_is_bool(valueToken))
@@ -2693,8 +2645,6 @@ STRING
 bilP_load_att_iconic(BIL_TOKEN valueToken)
 {
     ABObj               obj = bilP_load.obj;
-    int                 type = AB_BIL_UNDEF;
-    STRING              value = NULL;
 
     set_att(":iconic");
     if (!bilP_token_is_bool(valueToken))

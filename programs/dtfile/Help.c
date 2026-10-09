@@ -186,7 +186,6 @@ Create(
    HelpRec * helpRec;
    Arg args[2];
    Widget helpDialog;
-   int mwmDecs;
 
    /*  Allocate the audio annotation dialog instance record.  */
 
@@ -354,9 +353,6 @@ SetValues(
    Arg args[10];
    int n;
    String helpString = NULL;
-   DtHelpDialogWidget diaShell;
-
-   diaShell = (DtHelpDialogWidget)helpRec->helpDialog;
 
    n = 0;
    XtSetArg(args[n], DtNhelpVolume, helpData->volString); n++;
@@ -374,7 +370,6 @@ SetValues(
    }
    XtSetValues(helpRec->helpDialog, args, n);
    XtFree(helpString);
-   diaShell = (DtHelpDialogWidget)helpRec->helpDialog;
 }
 
 

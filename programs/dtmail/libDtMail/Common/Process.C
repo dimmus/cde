@@ -226,14 +226,14 @@ RunProg(const char * program,
 	    }
 
 	    if ((fds[0].revents & POLLOUT) &&
-		stdin_data && stdin_written < stdin_size) {
+		stdin_data && (unsigned long) stdin_written < stdin_size) {
 		int status = SafeWrite(stdin_fd[1], stdin_data + stdin_written,
 				       (size_t) stdin_size - stdin_written);
 		if (status > 0) {
 		    stdin_written += status;
 		}
 
-		if (stdin_written >= stdin_size) {
+		if ((unsigned long) stdin_written >= stdin_size) {
 		    // we're done with the input
 		    close(stdin_fd[1]);
 		    fds[0].fd = -1;

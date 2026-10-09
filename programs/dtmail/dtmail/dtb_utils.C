@@ -1970,6 +1970,9 @@ dtb_children_align(
 	    num_cols = 0;
 	break;
 
+	default:
+	break;
+
     }
 
 #ifdef DTB_GROUP_USERDATA
@@ -2125,12 +2128,9 @@ align_handler(
 
     if (event->type == ConfigureNotify) {
         XConfigureEvent	*xcon = &event->xconfigure;
-	Widget		resized_child;
 
 	if (xcon->window != xcon->event)
 	{
-            resized_child = XtWindowToWidget(XtDisplay(widget), xcon->window);
-
             switch(group_info->group_type)
             {
                 case DTB_GROUP_NONE:
@@ -2177,12 +2177,6 @@ align_handler(
     */
 
     if (event->type == DestroyNotify) {
-        XDestroyWindowEvent	*xdestroy = &event->xdestroywindow;
-	Widget			destroyed_child;
-
-        destroyed_child = XtWindowToWidget(XtDisplay(widget), 
-			xdestroy->window);
-
 	relayout_all = True;
     }
 
@@ -2493,11 +2487,9 @@ align_labels(
 {
     WidgetList	children_list = NULL,
 		one_col = NULL;
-    Widget	previous_child = NULL,
-		child,
+    Widget	child,
 		previous_ref_widget = NULL;
-    Dimension	ref_lbl_width = 0,
-		max_label_width = 0,
+    Dimension	max_label_width = 0,
 		max_value_width = 0;
     int		num_children = 0,
 		num_rows,

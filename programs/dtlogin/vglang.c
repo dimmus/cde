@@ -287,7 +287,6 @@ struct _enumObject
 static void *
 _enumLangStart(void)
 {
-  char *p;
   struct _enumObject *state = malloc(sizeof(struct _enumObject));
  
   if (state)

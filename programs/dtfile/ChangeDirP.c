@@ -98,10 +98,6 @@ static void CheckCurrentDirectorySelect(
 static void TimerEvent(
                         XtPointer client_data,
                         XtIntervalId *id );
-static void ResizeFastText(
-                        FileMgrRec *file_mgr_rec,
-                        FileMgrData *file_mgr_data,
-                        short columns) ;
 static int get_textwidth(
 			FileMgrData *fmd,
 			char *str,
@@ -233,7 +229,6 @@ get_text_pieces(
         long to display
       */
      int len = path_len;
-     char saved_char;
 
      while( 0 != len )
      {
@@ -453,7 +448,7 @@ CurrentDirSelected(
       new_select = NULL;
    }
    else if (event->x < begin_x + host_pixels ||
-            event->x < begin_x + host_pixels + prefix_pixels && !chopped)
+            (event->x < begin_x + host_pixels + prefix_pixels && !chopped))
    {
       /* click on host name or "/..." prefix: root selected */
       if (file_mgr_data->restricted_directory)
@@ -515,7 +510,7 @@ CurrentDirSelected(
       /* check if new_select is the same as or a subdirectory of $HOME */
       len = strlen(users_home_dir);
       if (strncmp(new_select, users_home_dir, len) != 0
-           || new_select[len] != '\0' && new_select[len] != '/')
+           || (new_select[len] != '\0' && new_select[len] != '/'))
       {
          /* change new_select to $HOME */
          XtFree(new_select);
@@ -698,12 +693,8 @@ CurrentDirectoryIconMotion(
    FileMgrRec  * file_mgr_rec = (FileMgrRec *) client_data;
    DialogData  * dialog_data;
    FileMgrData * file_mgr_data;
-   Pixmap drag_pixmap;
-   char * type_set;
-   char * file_set;
    int diffX, diffY;
    Widget dirIcon;
-   DtIconGadget iconG;
 
 
    if ((B1DragPossible && (event->xmotion.state & Button1Mask)) ||
@@ -905,7 +896,6 @@ DrawCurrentDirectory(
    int draw_y;
    int dir_width;
    int msg_width = 0;
-   short columns;
    Boolean msg_drawn;
 
    /* Get layout values */
@@ -1066,9 +1056,6 @@ CurrentDirChange(
    FileMgrData * file_mgr_data;
    ChangeDirData * new_change_dir_data;
    ChangeDirData * old_change_dir_data;
-   char path[MAX_PATH];
-   char host_name[MAX_PATH];
-   char * ptr;
 
 
    /*  Get a pointer file manager's data structure, free up the   */
@@ -1193,7 +1180,7 @@ ShowFastChangeDir(
 {
    char *textString;
    Arg args[16];
-   Dimension width, height;
+   Dimension width;
    Dimension shadow, highlight, margin;
    char buf[2*MAX_PATH];
    Boolean chopped;
@@ -1308,40 +1295,6 @@ TimerEvent(
 
    ShowFastChangeDir(file_mgr_rec, file_mgr_data);
 }
-
-/************************************************************************
- *
- *  ResizeFastText - resizes the fast change text widget due to changes
- *       in the size of the FileManager window.
- *
- *************************************************************************/
-static void
-ResizeFastText(
-        FileMgrRec *file_mgr_rec,
-        FileMgrData *file_mgr_data,
-        short columns)
-{
-   Arg args[2];
-   Dimension width;
-   int left_offset;
-
-   /* nothing to do if not managed */
-   if (!XtIsManaged(file_mgr_rec->current_directory_text))
-      return;
-
-   /* get width of current directory line */
-   XtSetArg (args[0], XmNwidth, &width);
-   XtGetValues (file_mgr_rec->current_directory, args, 1);
-
-   /* get offset of the text widget */
-   XtSetArg(args[0], XmNleftOffset, &left_offset);
-   XtGetValues(file_mgr_rec->current_directory_text, args, 1);
-
-   /* set text widget width = current_directory width minus left offset */
-   XtSetArg (args[0], XmNwidth, width - left_offset);
-   XtSetValues (file_mgr_rec->current_directory_text, args, 1);
-}
-
 
 /*--------------------------------------------------------------------
  * get_textwidth

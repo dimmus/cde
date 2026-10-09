@@ -81,7 +81,6 @@ obj_scoped_find_by_name(ABObj searchFirstObj, STRING objName)
     char	*objNamePtr= objName;
     char	*moduleNameEndPtr = NULL;
     int		moduleNameEndChar = -1;
-    char	nameBuf[1024];
     /* printf("obj_scoped_find_by_name(%s[%s])\n",
 	obj_get_safe_name(searchFirstObj, nameBuf, 1024), 
 	util_strsafe(objName)); */
@@ -160,7 +159,6 @@ obj_scoped_find_by_name(ABObj searchFirstObj, STRING objName)
 	}
     }
 
-epilogue:
     /* replace the 0 we inserted with the char that was there */
     if (moduleNameEndPtr != NULL)
     {

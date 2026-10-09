@@ -47,17 +47,6 @@
  */
 void mbox_initialize( XEvent *report, XpPdmServiceRec *rec )
 {
-    Display *testdpy;
-    char    buf[1024];
-
-    Display *selection_display;
-    Window   requestor;
-    Atom     prop_atom;
-    unsigned long tafter;
-
-    XTextProperty  text_prop;
-    char           **list;
-    int            list_cnt;
 
     rec->selection_display  = report->xselectionrequest.display;
     rec->requestor          = report->xselectionrequest.requestor;
@@ -102,11 +91,7 @@ void mbox_build( XpPdmServiceRec *rec )
 void mbox_reply( XpPdmServiceRec *rec )
 {
     XEvent reply;
-    Status status;
-    FILE   *errlog;
-    long   now;
 
-    Atom    tmpa;
 
 
     XChangeProperty( rec->selection_display, rec->requestor,
@@ -126,7 +111,7 @@ void mbox_reply( XpPdmServiceRec *rec )
     reply.xselection.property  = rec->prop_atom;
     reply.xselection.time      = rec->time;
 
-    status = XSendEvent( rec->selection_display, rec->requestor, True, 0, &reply );
+    XSendEvent( rec->selection_display, rec->requestor, True, 0, &reply );
 }
 
 

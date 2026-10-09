@@ -126,8 +126,6 @@ create_stdErrDialog( void )
 
         {
           Widget w0, w1, w2;
-          Arg arg[10];
-          int i;
           w0 = rtrn;
           w1 = XmMessageBoxGetChild(w0, XmDIALOG_CANCEL_BUTTON);
           w2 = XmMessageBoxGetChild(w0, XmDIALOG_HELP_BUTTON);

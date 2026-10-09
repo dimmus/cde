@@ -109,12 +109,6 @@ static void ExecuteQueuedRequest (
 
 static void FreeRequest (Cmd_RequestQueue *pNode);
 			
-static void DtexecTerminator (
-                        SPC_Channel_Ptr cmdChannel,
-                        int pid,
-                        int type,
-                        int cause,
-                        unsigned long ind) ;
 static void CheckCommandTerminator (
                         SPC_Channel_Ptr cmdChannel,
                         int pid,
@@ -254,6 +248,7 @@ _DtSPCOpen(
 	SPC_Channel_Ptr	chan;
 	_Xgetpwparams	pwd_buf;
 	struct passwd *	pwd_ret;
+	(void) pwd_buf; /* unused unless XTHREADS */
 
 	/*
 	 * Restore the original environment
@@ -653,7 +648,6 @@ _DtCmdCommandInvokerExecute (
    Boolean terminalRequest = False;
    char *commandArray2[MAX_EXEC_ARGS];
    Boolean localExecution = True;
-   Boolean xhostError;
    static unsigned long requestNum = 0;
    char *toolRequest = NULL;	/* backward compatibility kludge */
 
@@ -1071,7 +1065,6 @@ CheckCommandTerminator(
         int cause,			/* Exit value of the remote process. */
         unsigned long requestNum)	/* Specifies the request number. */
 {
-   Boolean xhostError;
    char errorMessage[MAX_BUF_SIZE];
    Cmd_RequestQueue *prev  = NULL;
    Cmd_RequestQueue *pNode = requestQueue;

@@ -335,6 +335,8 @@ _ttMediaLoadMsgCB(
 			return msg;
 		}
 		break;
+	    default:
+		break;
 	}
 	Tt_pattern depositPat = 0;
 	if (final) {

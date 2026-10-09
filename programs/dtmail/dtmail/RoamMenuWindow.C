@@ -770,7 +770,6 @@ RoamMenuWindow::createWorkArea(Widget parent)
     DtMail::Session *d_session = theRoamApp.session()->session();
     DtMail::MailRc  *mailrc = d_session->mailRc(error);
     const char      *value = NULL;
-    int		    msgnums = False;
 
     this->addToRowOfLabels(_list);
 
@@ -1181,7 +1180,6 @@ RoamMenuWindow::msgListDragFinishCallback(
 		(DtDndDragFinishCallbackStruct *) callData;
     DtDndContext 	*dragData = finishInfo->dragData;
     RoamMenuWindow 	*rmw = (RoamMenuWindow *) clientData;
-    MsgScrollingList	*msgList = rmw->list();
     DtMailEnv 		mail_error;
     int			ii;
 
@@ -1198,7 +1196,7 @@ RoamMenuWindow::msgListDragFinishCallback(
 	XtDestroyWidget(finishInfo->sourceIcon);
 
     // Free any memory allocated for the drag.
-    for (ii = 0; ii < dragData->numItems; ii++) {
+    for (ii = 0; (Cardinal) ii < dragData->numItems; ii++) {
 	XtFree((char *)dragData->data.buffers[ii].bp);
     }
 
@@ -1471,7 +1469,6 @@ RoamMenuWindow::open(
     DtMailBoolean lock_flag
 )
 {
-    FORCE_SEGV_DECL(char, tmp);
     Dimension win_x, win_y, win_wid, win_ht, win_bwid;
     MailSession *ses = theRoamApp.session();
     int answer = 0;
@@ -1581,8 +1578,8 @@ RoamMenuWindow::open(
 	{
 	    // See if they want to take the lock.
 // 	    sprintf(buf, 
-// 		    CATGETS(DT_catd, 3, 6, "The mailbox %s is locked.\n\
-// You can manually unlock the mailbox and try again\n\
+// 		    CATGETS(DT_catd, 3, 6, "The mailbox %s is locked.\n
+// You can manually unlock the mailbox and try again\n
 // or contact your System Administrator."),
 // 		   _mailbox_fullpath);
 
@@ -2028,6 +2025,7 @@ RoamMenuWindow::structurenotify(
    else if ((event->type == MapNotify) || ( event->type == UnmapNotify))
    {
        if (rmw->_mailbox)
+       {
          if (event->type == UnmapNotify)
 	 {
 	     rmw->_mailbox->save();
@@ -2046,6 +2044,7 @@ RoamMenuWindow::structurenotify(
     		 mailrc->getValue(error, "retrievemailonmapnotify", &value);
     		 if (error.isNotSet()) rmw->checkForMail(error);
              }
+       }
          }
 
        rmw->mapnotify();
@@ -2276,7 +2275,6 @@ RoamMenuWindow::message_summary(
 {
     char *buf, *str; 
     XmString labelStr;
-    int num_live_msgs = num_msgs - num_deleted;  // Undeleted msgs
     DtMail::MailRc * mailrc = get_mail_rc();
     DtMailEnv error;
     const char * value = NULL;
@@ -2356,7 +2354,6 @@ RoamMenuWindow::quitWorkproc(XtPointer client_data)
 {
     RoamMenuWindow	*rmw = (RoamMenuWindow *) client_data;
     MailSession		*ses = theRoamApp.session();
-    static int called = 0;
 
     if (rmw->_numPendingTasks > 0)
     {
@@ -2389,9 +2386,7 @@ RoamMenuWindow::quitWorkproc(XtPointer client_data)
 int 
 RoamMenuWindow::queryExpunge()
 {
-    int answer = 0;
     DtMailEnv error;
-    int i = 0;
 
     if (NULL != _mailbox && _mailbox->mailBoxWritable(error) == DTM_TRUE)
     {
@@ -3261,7 +3256,7 @@ RoamMenuWindow::createContainerList()
 						this,
 						DTM_NONE);
 	    _user_containerlist->append(null_container);
-	    while (token = (char *) strtok(NULL, " "))
+	    while ((token = (char *) strtok(NULL, " ")))
 	    {
 	        null_container= new ContainerMenuCmd(
 						strdup(token),
@@ -3778,7 +3773,6 @@ RoamMenuWindow::construct_text_popup(void)
 void RoamMenuWindow::construct_view_menu()
 {
     FORCE_SEGV_DECL(CmdList, cmdList);
-    FORCE_SEGV_DECL(CmdList, subCmdList);
 
     _view_separator= new SeparatorCmd("Separator","Separator",TRUE);
     
@@ -3845,7 +3839,6 @@ void
 RoamMenuWindow::construct_compose_menu()
 {
     FORCE_SEGV_DECL(CmdList, cmdList);
-    FORCE_SEGV_DECL(CmdList, subCmdList);
 
     // Separator for menu items
     
@@ -4724,7 +4717,7 @@ RoamMenuWindow::postErrorDialog(
 				 (char *)text_str);
     
     helpId = DTMAILHELPERROR;
-    int i = _genDialog->post_and_return(CATGETS(DT_catd, 3, 31, "OK"), helpId);
+    _genDialog->post_and_return(CATGETS(DT_catd, 3, 31, "OK"), helpId);
 
     // Clear the Error
     mail_error.clear();
@@ -4966,7 +4959,6 @@ RoamMenuWindow::save_selected_attachment(
    // Get selected attachment, if none selected, then return.
    if ( attachment == NULL ) {
 	  // Let User know that no attachment has been selected???
-	  int answer = 0;
 	  char *helpId = NULL;
 
 
@@ -4974,7 +4966,7 @@ RoamMenuWindow::save_selected_attachment(
 		    CATGETS(DT_catd, 1, 80, "Mailer"),
 		    CATGETS(DT_catd, 2, 14, "An attachment needs to be selected before issuing the\n\"Save As\" command to save to a file.") );
 	  helpId = DTMAILHELPSELECTATTACH;
-	  answer = _genDialog->post_and_return(
+	  _genDialog->post_and_return(
 			CATGETS(DT_catd, 3, 33, "OK"), helpId );
 	  return;
       }
@@ -5329,7 +5321,7 @@ RoamMenuWindow::MenuButtonHandler(
 
 	XButtonEvent *be = (XButtonEvent *)event;
 
-	if(be->button == theApplication->bMenuButton())
+	if(be->button == (unsigned int) theApplication->bMenuButton())
 		obj->postMsgsPopup(event);
 }
 
@@ -5462,7 +5454,7 @@ Widget parent=NULL;
   }
     if(!parent)
             parent = theApplication->baseWidget();
-    	    DtMailGenDialog *genDialog = new DtMailGenDialog("Dialog",parent,XmDIALOG_FULL_APPLICATION_MODAL);
+    DtMailGenDialog *genDialog = new DtMailGenDialog("Dialog",parent,XmDIALOG_FULL_APPLICATION_MODAL);
 
             char *errMsg = (char *) XtCalloc(1,10240+strlen(fsname));
 

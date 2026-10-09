@@ -467,7 +467,7 @@ _DtEnvControl(
 			    }
 
 			}
-			else if (ptr = strstr(tempString, "/usr/bin"))
+			else if ((ptr = strstr(tempString, "/usr/bin")))
 			{
 			     /* 
 			      * Shorten the string in tempString
@@ -898,8 +898,10 @@ _DtEnvRemove(
         int length )
 {
 	char **pEnviron, **pEnviron2 = environ;
-	char *p, *freeMe;
-	int temp;
+	char *p;
+#if !(defined(__linux__) || defined(CSRG_BASED))
+	char *freeMe;
+#endif
 			 
 	int count  = 0;  /* count is the number of items in the */
 			 /* environ                             */

@@ -125,7 +125,6 @@ void handleCustSelection(Widget w, XtPointer, XtPointer calldata)
 {
   CustomListUiItem *item;
   XmListCallbackStruct *list_info = (XmListCallbackStruct *)calldata;
-  char *selection_string = NULL;
   DtVirtArray<PropStringPair *> *list_items;
 
 
@@ -157,7 +156,6 @@ void handleCustSelection(Widget w, XtPointer, XtPointer calldata)
 ///////////////////////////////////////////////////////////////////
 void CustomListUiItem::writeFromUiToSource()
 {
-  Widget w = this->getWidget();
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
@@ -196,9 +194,9 @@ void CustomListUiItem::writeFromUiToSource()
                 if (strchr((char*)(*list_items)[i]->value, ' ')) {
                         char *token, *tmpbuf;
                         tmpbuf = strdup((*list_items)[i]->value);
-                        if (token = (char *)strtok(tmpbuf, " ")) {
+                        if ((token = (char *)strtok(tmpbuf, " "))) {
                                 strcat(cf_str, token);
-                                while(token = (char *)strtok(NULL, " ")) {
+                                while((token = (char *)strtok(NULL, " "))) {
                                         strcat(cf_str, "\\ ");
                                         strcat(cf_str, token);
                                 }
@@ -229,9 +227,7 @@ void CustomListUiItem::writeFromSourceToUi()
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
   Widget w = this->getWidget();
-  const char *list_str = NULL;
   DtVirtArray<char *> list_str_list(10);
-  char *buf = NULL;
   int list_len, i;
   const char *value = NULL;
 

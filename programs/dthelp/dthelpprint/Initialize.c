@@ -805,7 +805,6 @@ static float dphm = 300.*2540.;
    char *str_type[20];
    XrmValue value;
    int papersize = -1;
-   char buf[20];
    int width,height;
    int lmargin,rmargin,tmargin,bmargin;
    int adjLmargin,adjRmargin,adjTmargin,adjBmargin;
@@ -1148,7 +1147,6 @@ void _DtHPrBuildResourceDb(
    XrmDatabase appClassDB = NULL;
    XrmDatabase appUserDB = NULL;
    XrmDatabase dispDB = NULL;
-   XrmDatabase homeDB = NULL;
    XrmDatabase scrnDB = NULL;
    XrmDatabase envDB = NULL;
    XrmDatabase commandLineDB = NULL;
@@ -1503,8 +1501,6 @@ char * _DtHPrCreateTmpFile(
    char   dirname[MAXPATHLEN+1];
    char * tmppath;
    char * newtmpfile;
-   int    len;
-   char * tmp;
 
    if (NULL == prefix) prefix = EMPTY_STR;
    if (NULL == suffix) suffix = EMPTY_STR;

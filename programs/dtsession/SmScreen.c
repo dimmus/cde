@@ -76,11 +76,6 @@ static int savernum;             /* current screen saver number */
 static void *saverstate = NULL;  /* current running screen saver state */
 static int firsttime = 1;        /* first call to StartScreenSaver */
 
-/*
- * Local Function declarations
- */
-static void ParseSaverList(char *, int *, int *, SmSaverParseStruct *);
-
 
 
 /*************************************<->*************************************
@@ -107,7 +102,6 @@ static void ParseSaverList(char *, int *, int *, SmSaverParseStruct *);
 void
 StartScreenSaver( void )
 {
-  int i;
   SmSaverParseStruct *parse;
 
   if (!smGD.saverListParse)

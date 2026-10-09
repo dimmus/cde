@@ -303,7 +303,6 @@ doActualScroll(Widget w, int lines)
     struct termData *tpd = tw->term.tpd;
     int exposeY;
     int exposeHeight;
-    int i;
 
     /* make sure the cursor is off... */
     (void) _DtTermPrimCursorOff(w);
@@ -701,7 +700,6 @@ _DtTermPrimScrollTextTo(Widget w, short topRow)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    int oldTopRow;
 
     if (topRow == tpd->topRow) {
 	/* already there...  */
@@ -718,9 +716,6 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    int oldTopRow;
-    int exposeY;
-    int exposeHeight;
     int i;
 
 #ifdef	NOTDEF
@@ -922,7 +917,7 @@ _DtTermPrimScrollCompleteIfNecessary(Widget w, short scrollTopRow,
 	if ((lines + tpd->scroll.jump.scrollLines > maxJumpScrollLines) ||
 		(lines + tpd->scroll.jump.scrollLines < -maxJumpScrollLines))
 	    (void) _DtTermPrimScrollComplete(w, True);
-	    return;
+	return;
     } else {
 	if (!tw->term.jumpScroll && tpd->scroll.nojump.pendingScroll) {
 	    (void) _DtTermPrimScrollComplete(w, True);

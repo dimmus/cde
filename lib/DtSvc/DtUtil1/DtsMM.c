@@ -420,7 +420,6 @@ DtDtsMMField *
 _DtDtsMMGetField(DtDtsMMRecord *rec, const char *name)
 {
 	int i;
-	int		fld;
 	DtDtsMMField	*fld_ptr;
 	DtDtsMMField	*fld_ptr_list;
 
@@ -462,9 +461,6 @@ _DtDtsMMGetFieldByName(DtDtsMMRecord *rec, const char *name)
 DtDtsMMRecord *
 _DtDtsMMGetRecordByName(DtDtsMMDatabase *db, const char *name)
 {
-	DtDtsMMRecord	srch;
-	DtDtsMMRecord	*result;
-	DtDtsMMRecord	*s = &srch;
 	int i;
 	DtShmBoson 	name_quark = _DtDtsMMStringToBoson(name);
 	DtDtsMMRecord	*rec_ptr;
@@ -492,11 +488,9 @@ _DtDtsMMPathHash(DtDirPaths *dirs)
 {
 	int	pathhash = 0;
 	DIR	*dirp;
-	struct	dirent	*dp = NULL;
 	int	suffixLen;
 	int	nameLen;
 	char	*file_suffix;
-	char	*next_path;
 	char	*suffix = ".dt";
 	int	i;
 	char	*cur_dir = getcwd(0,MAXPATHLEN);
@@ -504,6 +498,7 @@ _DtDtsMMPathHash(DtDirPaths *dirs)
 
 	_Xreaddirparams dirEntryBuf;
 	struct dirent *result;
+	(void) dirEntryBuf; /* unused unless XTHREADS */
 
 	for(i = 0; dirs->paths[i] ; i++)
 	{
@@ -641,11 +636,7 @@ _DtDtsMMapDB(const char *CacheFile)
 static int
 MMValidateDb(DtDirPaths *dirs, char *suffix)
 {
-	DIR 			*dirp;
-	struct dirent		*direntp;
 	struct stat		buf;
-	struct stat		new_buf;
-	int			size = sizeof(buf.st_mtime);
 	DtShmBoson		*boson_list = 0;
 	time_t			*mtime_list;
 	int			count = 0;

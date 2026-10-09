@@ -166,6 +166,7 @@ _gif_error( char *format, ... )
 #endif
 }
 
+#ifdef DEBUG
 /*********************/
 static void
 _gif_message( char *format, ... )
@@ -179,6 +180,7 @@ _gif_message( char *format, ... )
     fputc( '\n', stderr );
     va_end( args );
 }
+#endif
 
 /*********************/
 static pixel **
@@ -277,6 +279,8 @@ DoExtension(byte **inbuf, int label, GifState *g)
 
 #ifdef DEBUG
     _gif_message("got a '%s' extension", str );
+#else
+    (void) str;
 #endif
 
     while (GetDataBlock(inbuf, (unsigned char*) buf, g) != 0)
@@ -917,9 +921,9 @@ create_raw_image( byte *inbuf, unsigned int buflen, int *width, int *height, int
     }
 
     if (g.GifScreen.AspectRatio != 0 && g.GifScreen.AspectRatio != 49) {
+#ifdef DEBUG
         float    r;
         r = ( (float) g.GifScreen.AspectRatio + 15.0 ) / 64.0;
-#ifdef DEBUG
         _gif_message("warning - non-square pixels; to fix do a 'pnmscale -%cscale %g'",
             r < 1.0 ? 'x' : 'y',
             r < 1.0 ? 1.0 / r : r );

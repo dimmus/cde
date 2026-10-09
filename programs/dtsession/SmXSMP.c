@@ -1303,7 +1303,6 @@ static
 void CancelShutdown (void)
 {
 	ClientRecPtr		pClientRec;
-	char			*pch;
 
 	for (pClientRec = connectedList; pClientRec != NULL; 
 		pClientRec = pClientRec->next) {
@@ -1468,12 +1467,12 @@ void XSMPExit (void)
 	 *    local/<host_name>:/<socket_file_name>,<other_stuff>
 	 */
 	if (!strncmp (networkIds, "local/", 6)) {
-		if (pchar = strchr (networkIds, ':')) {
+		if ((pchar = strchr (networkIds, ':'))) {
 			pchar++;
 			if (pchar && *pchar != '\000') {
 				char		* pchar2;
 
-				if (pchar2 = strchr (pchar, ',')) {
+				if ((pchar2 = strchr (pchar, ','))) {
 					struct		stat buf;
 					/*
 					 * This modifies networkIds but

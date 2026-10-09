@@ -30,9 +30,6 @@
  * (c) Copyright 1996 Hitachi.						*
  */
 
-extern char _DtTermPullInTermWhatString[];
-static char *termWhatString = _DtTermPullInTermWhatString;
-
 #include "TermHeader.h"
 #include "TermPrimDebug.h"
 #include "TermP.h"
@@ -51,20 +48,19 @@ static char *termWhatString = _DtTermPullInTermWhatString;
 
 
 static int TextInsertProc(Widget w, unsigned char *buffer, int length);
-static void Resize(Widget w);
 static void ClassInitialize(void);
 static void ClassPartInitialize(WidgetClass wc);
 static void Initialize(Widget rw, Widget nw, Arg *args, Cardinal *num_args);
 static Boolean SetValues(Widget cw, Widget rw, Widget nw, ArgList args,
 	Cardinal *num_args);
-static void Realize(Widget w, XtValueMask *p_valueMask,
-	XSetWindowAttributes *attributes);
 static void Destroy(Widget w);
+#ifdef	DKS
 static void InitializeVerticalScrollBar(Widget w, Boolean initCallbacks);
 static void VerticalScrollBarCallback(Widget w, XtPointer client_data,
 	XtPointer call_data);
 static void StatusChangeNotify(Widget w, unsigned long mask);
 static void PositionUpdate(Widget w, short row, short column);
+#endif	/* DKS */
 static void GetAutoWrap( 
                         Widget wid,
                         int offset,
@@ -694,20 +690,6 @@ InitializeVerticalScrollBar(Widget w, Boolean initCallbacks)
     }
 }
 #endif	/* DKS */
-
-static void
-Resize(Widget w)
-{
-    DtTermWidget tw = (DtTermWidget) w;
-
-    /* let our superclass (the Term Widget) perform the resize... */
-    tw->core.widget_class->core_class.superclass->core_class.resize(w);
-
-#ifdef	DKS
-    /* and update the scrollbar... */
-    (void) InitializeVerticalScrollBar(w, False);
-#endif	/* DKS */
-}
 /***************************************************************************
  *									   *
  * Import and Export functions for those resources that can't really be	   *
@@ -833,9 +815,6 @@ SetValues(Widget cur_w, Widget ref_w, Widget w, ArgList args,
 
     if (tw->term.fontList != cur_tw->term.fontList) {
 	/* the font has been changed... */
-	XmFontList fontList;
-	XFontSet fontSet;
-	XFontStruct *font;
 
 	/* replace the base font...
 	 */

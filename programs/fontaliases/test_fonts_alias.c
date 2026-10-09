@@ -34,6 +34,7 @@ int main(void) {
   int ret = 0;
   int line_num = 0;
   int npaths;
+  Display *display = NULL;
   char cwd[BUF_SIZE];
   char *font_path_list[BUF_SIZE];
   char **font_path_list_orig = NULL;
@@ -49,7 +50,7 @@ int main(void) {
 
   font_path_list[0] = cwd;
 
-  Display *display = XOpenDisplay(NULL);
+  display = XOpenDisplay(NULL);
 
   if (display == NULL) {
     fprintf(stderr, "Cannot open display.\n");

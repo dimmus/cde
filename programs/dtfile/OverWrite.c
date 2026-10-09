@@ -143,10 +143,6 @@ static void      multiReplaceError_ok_callback(
 	                            Widget w,
                                     XtPointer client_data,
                                     XtPointer call_data);
-static void      multiRenameError_ok_callback(
-	                            Widget w,
-                                    XtPointer client_data,
-                                    XtPointer call_data);
 static char *    getVariableMessage(
                                     VariableMessage message,
                                     int             mode);
@@ -485,10 +481,6 @@ replace_merge_ok_callback(
         XtPointer call_data)
 {
    int          rc;
-   String       newFile=NULL, renameNewName, renameOldName;
-   struct stat  buf;
-   int          saveError = 0;
-   char         msg[128];
    String       title;
    char         *destinationPath =  build_path(G_directory,G_file);
 
@@ -585,8 +577,6 @@ multicollide_ok_callback(
    int          saveError;
    String       destinationPath;
    String       title;
-   static char  msg[1024];
-   struct stat  buf;
 
 
    Boolean      same = (Boolean)(XtArgVal)client_data;
@@ -641,7 +631,6 @@ multicollide_ok_callback(
           if ( names )
           {
               char *buf;
-              int bufsize;
               buf = XtMalloc(strlen(GETMESSAGE(9,138, "Failed to rename the following object(s)\n\n%s\n\nThe most likely cause is that you do not have\npermission to rename these objects(s)"))+strlen(names)+10);
               sprintf(buf,GETMESSAGE(9,138, "Failed to rename the following object(s)\n\n%s\n\nThe most likely cause is that you do not have\npermission to rename these object(s)"),names);
               _DtMessage(toplevel, title, buf, NULL, HelpRequestCB);
@@ -700,7 +689,6 @@ multicollide_ok_callback(
       if ( names )
       {
         char *buf;
-	int bufsize;
         buf = XtMalloc(strlen(GETMESSAGE(9,139, "Failed to replace the following object(s)\n\n%s\n\nThe most likely cause is that you do not have\npermission to replace these object(s)"))+strlen(names)+10);
         sprintf(buf,GETMESSAGE(9,139, "Failed to replace the following object(s)\n\n%s\n\nThe most likely cause is that you do not have\npermission to replace these object(s)"),names);
         _DtMessage(toplevel, title, buf, NULL, HelpRequestCB);
@@ -869,19 +857,6 @@ multiReplaceError_ok_callback(
 
 
 
-static void
-multiRenameError_ok_callback(
-	Widget w,
-	XtPointer client_data,
-	XtPointer call_data)
-{
-  XtDestroyWidget((Widget)client_data);
-
-  return;
-}  /* end multiRenameError_ok_callback */
-
-
-
 /*--------------------------------------------------------------------
  * create replace/rename dialog
  *------------------------------------------------------------------*/
@@ -904,7 +879,6 @@ create_replace_rename_dialog(Widget         parent_widget,
   Widget radio;
   Widget radioButton1;
   Widget actionArea;
-  Widget separator;
   Pixmap px;
   Pixel background, foreground;
   char     path[MAX_PATH], newDir[MAX_PATH], newFile[MAX_PATH];
@@ -1132,15 +1106,15 @@ create_replace_rename_dialog(Widget         parent_widget,
 
   /* create the action area  */
   actionArea = Create_Action_Area(form, actions,  NULL);
-  separator  =  XtVaCreateManagedWidget("separator",
-                                        xmSeparatorWidgetClass, form,
-                                        XmNtopAttachment,     XmATTACH_WIDGET,
-                                        XmNtopWidget,         radio,
-                                        XmNbottomAttachment,  XmATTACH_WIDGET,
-                                        XmNbottomWidget,      actionArea,
-                                        XmNleftAttachment,    XmATTACH_FORM,
-                                        XmNrightAttachment,   XmATTACH_FORM,
-                                        NULL);
+  XtVaCreateManagedWidget("separator",
+                          xmSeparatorWidgetClass, form,
+                          XmNtopAttachment,     XmATTACH_WIDGET,
+                          XmNtopWidget,         radio,
+                          XmNbottomAttachment,  XmATTACH_WIDGET,
+                          XmNbottomWidget,      actionArea,
+                          XmNleftAttachment,    XmATTACH_FORM,
+                          XmNrightAttachment,   XmATTACH_FORM,
+                          NULL);
 
 
   /* set initial keyborad focus to the action button area */
@@ -1186,12 +1160,9 @@ create_replace_merge_dialog(Widget parent_widget,
   Widget action_label;
   Widget msg_label;
   Widget radio;
-  Widget radioButton1;
   Widget actionArea;
-  Widget separator;
   Pixmap px;
   Pixel background, foreground;
-  char     path[MAX_PATH], newDir[MAX_PATH], newFile[MAX_PATH];
   String   s;
   XmString xs;
   char *title;
@@ -1334,12 +1305,12 @@ create_replace_merge_dialog(Widget parent_widget,
 
   /* create the radio buttons ... default button is replace */
   xs = XmStringCreateLocalized(GETMESSAGE(9, 25, "Replace existing folder"));
-  radioButton1 = XtVaCreateManagedWidget("radio_toggle1",
-                                         xmToggleButtonWidgetClass, radio,
-                                         XmNalignment,   XmALIGNMENT_BEGINNING,
-                                         XmNlabelString, xs,
-                                         XmNset,         TRUE,
-                                         NULL);
+  XtVaCreateManagedWidget("radio_toggle1",
+                          xmToggleButtonWidgetClass, radio,
+                          XmNalignment,   XmALIGNMENT_BEGINNING,
+                          XmNlabelString, xs,
+                          XmNset,         TRUE,
+                          NULL);
   XmStringFree(xs);
 
   xs = XmStringCreateLocalized(GETMESSAGE(9, 24, "Merge contents of the two folders"));
@@ -1355,15 +1326,15 @@ create_replace_merge_dialog(Widget parent_widget,
 
   /* create the action area  */
   actionArea = Create_Action_Area(form, actions, NULL);
-  separator  =  XtVaCreateManagedWidget("separator",
-                                        xmSeparatorWidgetClass, form,
-                                        XmNtopAttachment,     XmATTACH_WIDGET,
-                                        XmNtopWidget,         radio,
-                                        XmNbottomAttachment,  XmATTACH_WIDGET,
-                                        XmNbottomWidget,      actionArea,
-                                        XmNleftAttachment,    XmATTACH_FORM,
-                                        XmNrightAttachment,   XmATTACH_FORM,
-                                        NULL);
+  XtVaCreateManagedWidget("separator",
+                          xmSeparatorWidgetClass, form,
+                          XmNtopAttachment,     XmATTACH_WIDGET,
+                          XmNtopWidget,         radio,
+                          XmNbottomAttachment,  XmATTACH_WIDGET,
+                          XmNbottomWidget,      actionArea,
+                          XmNleftAttachment,    XmATTACH_FORM,
+                          XmNrightAttachment,   XmATTACH_FORM,
+                          NULL);
 
 
   /* set initial keyborad focus to the action button area */
@@ -1410,7 +1381,6 @@ create_multicollide_dialog(Widget           parent_widget,
   Widget radio;
   Widget radioButton1;
   Widget actionArea;
-  Widget separator;
   Pixmap px;
   Pixel background, foreground;
   String   s, s1, eMsgOne, eMsgMany;
@@ -1668,15 +1638,15 @@ create_multicollide_dialog(Widget           parent_widget,
 
   /* create the action area  */
   actionArea = Create_Action_Area(form, actions, NULL);
-  separator  =  XtVaCreateManagedWidget("separator",
-                                        xmSeparatorWidgetClass, form,
-                                        XmNtopAttachment,     XmATTACH_WIDGET,
-                                        XmNtopWidget,         radio,
-                                        XmNbottomAttachment,  XmATTACH_WIDGET,
-                                        XmNbottomWidget,      actionArea,
-                                        XmNleftAttachment,    XmATTACH_FORM,
-                                        XmNrightAttachment,   XmATTACH_FORM,
-                                        NULL);
+  XtVaCreateManagedWidget("separator",
+                          xmSeparatorWidgetClass, form,
+                          XmNtopAttachment,     XmATTACH_WIDGET,
+                          XmNtopWidget,         radio,
+                          XmNbottomAttachment,  XmATTACH_WIDGET,
+                          XmNbottomWidget,      actionArea,
+                          XmNleftAttachment,    XmATTACH_FORM,
+                          XmNrightAttachment,   XmATTACH_FORM,
+                          NULL);
 
 
   /* set initial keyborad focus to the action button area */
@@ -2160,6 +2130,7 @@ rename the file you are changing so it no longer has the same name.");
 
    }  /* end switch (message) */
 
+   return NULL;
 }  /* end getVariableMessage */
 
 static Boolean

@@ -116,6 +116,7 @@ char           *nowstring (time_t * now)
     struct tm *	    time_ptr;
     _Xltimeparams   localtime_buf;
 
+    (void) localtime_buf;	/* unused unless XTHREADS */
     if (now == NULL) {
 	now = &mynow;
 	time (now);
@@ -394,7 +395,7 @@ int             clean_wrap (char *string, int wraplen)
 
 	/* Otherwise back up to the first whitespace before last word */
 	for (nlptr = breakptr - 1;  nlptr > string;  nlptr--)
-	    if (ascii_charmap[*nlptr] & WHITESPACE) {
+	    if (ascii_charmap[(unsigned char)*nlptr] & WHITESPACE) {
 		*nlptr = '\n';
 		string = ++nlptr;
 		goto LINE_DONE;

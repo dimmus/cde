@@ -79,7 +79,6 @@ _DtGetMessage(
         char *s )
 {
         char *msg;
-	char *lang;
 	static int first = 1;
 	static nl_catd nlmsg_fd;
 

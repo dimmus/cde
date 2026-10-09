@@ -156,6 +156,8 @@ gilP_obj_set_initial_state(ABObj obj, AB_OBJECT_STATE initial_state)
 	case AB_STATE_VISIBLE:
 	    obj_set_is_initially_visible(obj, TRUE);
 	break;
+	default:
+	    break;
     }
 
     return 0;
@@ -739,15 +741,6 @@ gilP_load_strings(FILE * inFile, ISTRING_ARRAY * strings)
 **      load_attribute calls these functions.                           **
 **************************************************************************
 **************************************************************************/
-
-/*
- * */
-static int
-load_att_(ABObj obj, ABObj root_obj)
-{
-
-    return 0;
-}
 
 static int
 load_att_anchor_object(FILE * inFile, ABObj obj, ABObj root_obj)
@@ -1531,7 +1524,6 @@ load_att_layout_type(FILE * inFile, ABObj obj, ABObj root_obj)
         obj->info.container.col_align = AB_ALIGN_LEFT;
         break;
 
-    case ERROR:
     default:
         return (abil_print_load_err(ERR_UNKNOWN), -1);
     }
@@ -1642,7 +1634,6 @@ load_att_members(FILE * inFile, ABObj obj, ABObj root_obj)
 static int
 load_att_menu_item_accelerators(FILE * inFile, ABObj obj, ABObj root_obj)
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     ISTRING_ARRAY       accels;
 
@@ -1666,7 +1657,6 @@ load_att_menu_item_colors(FILE * inFile, ABObj obj, ABObj root_obj)
 static int
 load_att_menu_item_defaults(FILE * inFile, ABObj obj, ABObj root_obj)
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     BOOL_ARRAY          bools;
     int                 i;
@@ -1699,7 +1689,6 @@ load_att_menu_item_labels(FILE * inFile, ABObj obj, ABObj root_obj)
 static int
 load_att_menu_item_label_types(FILE * inFile, ABObj obj, ABObj root_obj)
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     LABEL_TYPE_ARRAY    ltypes;
     int                 i;
@@ -1724,7 +1713,6 @@ load_att_menu_item_label_types(FILE * inFile, ABObj obj, ABObj root_obj)
 static int
 load_att_menu_item_states(FILE * inFile, ABObj obj, ABObj root_obj)
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     INITIAL_STATE_ARRAY states;
     int                 i;
@@ -1769,7 +1757,6 @@ load_att_menu_item_menus(FILE * inFile, ABObj obj, ABObj root_obj)
 static int
 load_att_menu(FILE * inFile, ABObj obj, ABObj root_obj)
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     ISTRING             menu_name = NULL;
 
@@ -1883,7 +1870,6 @@ static int
 load_att_name(FILE * inFile, ABObj *pobj, ABObj root_obj)
 {
 #define obj (*pobj)
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     ISTRING             name = NULL;
     ABObj               old_obj = NULL;
@@ -1967,11 +1953,9 @@ load_att_orientation(FILE * inFile, ABObj obj, ABObj root_obj)
 static int
 load_att_owner(FILE * inFile, ABObj obj, ABObj root_obj)
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     ISTRING             owner_name = NULL;
     ABObj               parent_obj = NULL;
-    char                real_name[256];
 
     if ((rc = gilP_load_name(inFile, &owner_name)) < 0)
     {
@@ -2122,6 +2106,8 @@ load_att_rows(FILE * inFile, ABObj obj, ABObj root_obj)
     case AB_TYPE_CHOICE:
     case AB_TYPE_LAYERS:        /* special */
         obj_set_num_rows(obj, rows);
+        break;
+    default:
         break;
     }
     if (obj_is_text(obj))
@@ -2399,6 +2385,8 @@ load_att_type(FILE * inFile, ABObj obj, ABObj root_obj)
 		obj_set_read_only(obj, TRUE);
 	    }
 	break;
+	default:
+	    break;
     }
 
     istr_destroy(tmp_str);
@@ -2574,7 +2562,6 @@ gilP_load_attribute_value(
                           ABObj root_obj
 )
 {
-    int                 return_value = 0;
     int                 rc = 0; /* r turn code */
     LOADATT_FUNC       *func = NULL;
 

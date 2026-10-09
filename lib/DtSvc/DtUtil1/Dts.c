@@ -141,7 +141,6 @@ static	DtDtsMMRecord *	name_list(type_info_t *linfo,
 		DtDtsMMRecord *rec_ptr);
 static	const struct stat *get_stat();
 
-static int      csh_match(const char *, const char *);
 static int      csh_match_star(const char *, const char *);
 
 /* filetype comparison function for sorting */
@@ -315,7 +314,6 @@ set_vals(const char		*fn,
 	const struct stat	*ls,
 	const char		*on)
 {
-	char		*tmp;
 	type_info_t	*linfo = (type_info_t *)calloc(1, sizeof(type_info_t));
 
 	linfo->buff_size = -1;
@@ -588,7 +586,6 @@ static const struct stat *
 get_stat(type_info_t *info)
 {
 	struct	stat	buf;
-	int		fd;
 
 	if (!info->file_stat)
 	{
@@ -828,7 +825,7 @@ type_content(char *attr, type_info_t *info)
 	char		*p;
 	_Xstrtokparams	strtok_buf;
 
-	if(buf = get_stat(info))
+	if((buf = get_stat(info)))
 	{
 		if((buf->st_mode&S_IFMT) == S_IFDIR && 
 			(c = strstr(attr, "filename")))
@@ -927,7 +924,7 @@ type_content(char *attr, type_info_t *info)
 			int	i = 0;
 
 			match = 0;
-			while(c = _XStrtok(NULL, "\t \n", strtok_buf))
+			while((c = _XStrtok(NULL, "\t \n", strtok_buf)))
 			{
 				if(s+i*sizeof(lv)+sizeof(lv) > get_buff_size(info))
 				{
@@ -1092,8 +1089,6 @@ type_mode(char *attr, type_info_t *info)
 		case	'd':
 			if((buf->st_mode&S_IFMT) == S_IFDIR)
 			{
-				int	n;
-				int	fd;
 
 				match = 1;
 				if(!info->set_datatype)
@@ -1115,7 +1110,7 @@ type_mode(char *attr, type_info_t *info)
 			{
 				match = 1;
 			}
-			else if(lbuf = get_lstat(info))
+			else if((lbuf = get_lstat(info)))
 			{
 				match = (lbuf->st_mode&S_IFMT) == S_IFLNK;
 			}
@@ -1191,7 +1186,6 @@ type_name(const char *name, char *attr)
 static int
 type_path(const char *path, char *attr)
 {
-	char	*c;
 	int	match = 0;
 
 	if(path && (intptr_t)path != -1)
@@ -1240,21 +1234,15 @@ DtDtsDataToDataType(const char *fp,
 {
 	DtDtsMMDatabase	*db;
 	DtDtsMMRecord	*rec_ptr = 0;
-	DtDtsMMRecord	*rec_ptr_list;
-	DtDtsMMField	*fld_ptr;
 	DtDtsMMField	*fld_ptr_list;
 	type_info_t	*info = 0;
-	int	i;
 	int	j;
 	int	rec_m = 0;
 	int	fld_m = 0;
 	int	atr_m = 0;
 	int	p_atr_m = 1;
 	int	c_atr_m = 1;
-	char	*ot = NULL;
-	char	*file;
 	char	*attr;
-	char	op;
 
 	_DtSvcAppLockDefault();
 	_DtSvcProcessLock();
@@ -1283,7 +1271,7 @@ DtDtsDataToDataType(const char *fp,
 		dtdts_da_label = _DtDtsMMStringToBoson(DtDTS_DA_LABEL);
 	}
 
-	for(i = 0; !rec_m && (rec_ptr = name_list(info, db, rec_ptr)); i++)
+	while(!rec_m && (rec_ptr = name_list(info, db, rec_ptr)))
 	{
 		fld_ptr_list = _DtDtsMMGetPtr(rec_ptr->fieldList);
 		fld_m = 1;
@@ -1637,7 +1625,7 @@ expand_shell(const char *attr)
 		}
 
 		memset(buff, '\0', sizeof(buff));
-		while(size = fread(buff, 1, sizeof(buff)-1, fd))
+		while((size = fread(buff, 1, sizeof(buff)-1, fd)))
 		{
 			buff[sizeof(buff)-1] = '\0';
 			results = append(results, buff);
@@ -1695,7 +1683,6 @@ DtDtsDataTypeToAttributeValue(const char *obj_type, const char *attr, const char
 
 		if(entry)
 		{
-			char	*name = 0;
 			DtDtsMMField *fld = _DtDtsMMGetField(entry,(char *)attr);
 
 
@@ -1720,10 +1707,6 @@ DtDtsDataTypeToAttributeList(const char *obj_type, const char *filename)
 	DtDtsMMField	*fld_ptr;
 	DtDtsAttribute	**list = NULL;
 	int		i;
-	int		action_flag = 0;
-	int		sort_flag = 0;
-	int		found_flag = 0;
-	DtDtsMMField	*fld;
 
 	_DtSvcAppLockDefault();
 	_DtSvcProcessLock();    
@@ -1742,7 +1725,6 @@ DtDtsDataTypeToAttributeList(const char *obj_type, const char *filename)
 	fld_ptr_list = _DtDtsMMGetPtr(entry->fieldList);
 	for(i = 0; i < entry->fieldCount; i++)
 	{
-		char	*tmp;
 		fld_ptr = &fld_ptr_list[i];
 
 		list[i] = (DtDtsAttribute *)malloc(sizeof(DtDtsAttribute));
@@ -1762,7 +1744,6 @@ DtDtsDataTypeToAttributeList(const char *obj_type, const char *filename)
 void
 DtDtsFreeAttributeList(DtDtsAttribute **list)
 {
-	DtDtsAttribute **item = list;
 	int i = 0;
 
 	if(list)
@@ -1834,7 +1815,7 @@ int
 DtDtsDataTypeIsAction(const char *datatype)
 {
 	char	*val;
-	if(val = DtDtsDataTypeToAttributeValue(datatype, "IS_ACTION", NULL))
+	if((val = DtDtsDataTypeToAttributeValue(datatype, "IS_ACTION", NULL)))
 	{
 		DtDtsFreeAttributeValue(val);
 		return(1);
@@ -2054,18 +2035,6 @@ DtDtsSetDataType(const char *filename, const char *datatype_in, const int overid
 	return(datatype);
 }
 
-static int
-srch(const void *a, const void *b)
-{
-	int results = ((struct list *)a)->boson - ((struct list *)b)->boson;
-
-	if(results == 0)
-	{
-		results = ((struct list *)a)->rec - ((struct list *)b)->rec;
-	}
-	return(results);
-}
-
 int *
 get_name_list(char *name, int *count)
 {
@@ -2100,11 +2069,7 @@ get_name_list(char *name, int *count)
 static DtDtsMMRecord *
 name_list(type_info_t *linfo, DtDtsMMDatabase	*db, DtDtsMMRecord *rec_ptr)
 {
-	int			i;
-	char			*src_str;
 	char			*name;
-	int			size;
-	int			isnew;
 	DtDtsMMRecord		*record_list;
 	char			*suffix = 0;
 

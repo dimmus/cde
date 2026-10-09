@@ -234,7 +234,6 @@ pal_get_type_item_info(
 {
     int    	    i;
     PalItemInfo*    palitem = NULL;
-    ABObj     	    vobj;
 
     for (i=0; i < palette_item_cnt; i++)
         if ((palette_item[i]->type == type) && 
@@ -308,7 +307,6 @@ pal_get_item_subname(
 )
 {
     PalItemInfo*   palitem;
-    PalSubtypeInfo *sub = NULL;
     int            i;
 
     palitem = pal_get_item_info(obj);

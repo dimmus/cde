@@ -118,17 +118,7 @@ MakeLogo( void )
     Pixmap	logoPixmap;		/* logo pixmap			   */
     char	*logoName;		/* logo name			   */
 
-    int		logoWidth, logoHeight;	/* width, height of logo	   */
     Pixel	fg, bg;			/* foreground, background colors   */
-
-    Pixmap	dsPixmap;		/* drop shadow pixmap		   */
-    int		dsWidth, dsHeight;	/* width, height of drop shadow    */
-
-    Pixmap		pixmap;			/* scratch pixmap	   */
-    GC		gc;			/* scratch GC		   */
-    XGCValues	gcval;			/* GC values		   */
-    unsigned int	width, height;		/* width, height of bitmap */
-    int		x_hot, y_hot;		/* bitmap hot spot (if any)*/
 
     
     /*
@@ -225,9 +215,6 @@ MakeLogo( void )
                                 fg,			/* foreground	   */
                                 bg,			/* background	   */
                                 dpyinfo.depth);		/* depth	   */
-
-        logoWidth  = dt_logo_width;
-        logoHeight = dt_logo_height;
 
         XtSetArg(argt[i], XmNpixmap, logoPixmap); i++;
     }

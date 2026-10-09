@@ -77,7 +77,7 @@ FILE * f;
 
     /* see if it is there by opening it for reading */
 
-    if (f = fopen(chance,"r")) {
+    if ((f = fopen(chance,"r"))) {
 
       /* it's there so close it, .... */
 

@@ -46,7 +46,7 @@ void m_attval(M_WCHAR *string)
   {
     const M_WCHAR *p ;
 
-    if (p = m_partype(m_ppsave, string)) {
+    if ((p = m_partype(m_ppsave, string))) {
       if (m_parameter[m_ppsave - 1].type == M_KEYWORD)
         m_poccur[m_psave] = (M_WCHAR *) p ;
       else {
@@ -78,7 +78,7 @@ LOGICAL m_attvonly(M_WCHAR *string)
          i < m_element[m_scanel - 1].parcount ;
          par++, i++)
         if (m_parameter[par - 1].type == M_KEYWORD)
-          if (p = m_partype(par, string)) {
+          if ((p = m_partype(par, string))) {
             if (m_poccur[i])
               m_err2(
                 "Redefinition of parameter %s. Discarding old value '%s'.",
@@ -196,11 +196,11 @@ void m_parupper(int par, M_WCHAR *string)
         w_strcpy(string, p) ;
         for (p = string, i = 0 ; *p ; p++, i++)
           *p = m_ctupper(*p) ;
-          if (m_whitespace(*p)) {
-            *p = M_SPACE ;
-            for (q = p + 1 ; m_whitespace(*q); q++) ;
-            w_strcpy(p + 1, q) ;
-            }
+        if (m_whitespace(*p)) {
+          *p = M_SPACE ;
+          for (q = p + 1 ; m_whitespace(*q); q++) ;
+          w_strcpy(p + 1, q) ;
+          }
         if (i && m_whitespace(string[i - 1])) string[i - 1] = M_EOS ;
         return ;
       default:

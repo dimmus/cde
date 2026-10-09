@@ -217,7 +217,7 @@ static void
 CreateColorEditor(
         Widget parent )
 {
-	int     n,i;
+	int     n;
 	Arg              args[MAX_ARGS];
         Widget           sampleTB;
         Widget           sampleForm;
@@ -231,7 +231,6 @@ CreateColorEditor(
         int              widget_count3 = 0;
         XmString         button_string[NUM_LABELS]; 
         Pixel            foreground, background;
-        int              height;
         WidgetList       children;
         Dimension        w, width_old, width_new;
 
@@ -864,7 +863,7 @@ InitializeNewButton( void )
 static void 
 InitializeOldButton( void )
 {
-    int     i,n, numOfPixels;
+    int n, numOfPixels;
     unsigned long    *pixels;
     unsigned long    plane_mask;
     int              hue, val, sat, status;
@@ -1411,6 +1410,8 @@ max(
 
    if(z >= y && z >= x)
       return(z);
+
+   return(z);
 }
 
 /************************************************************************
@@ -1431,6 +1432,8 @@ min(
 
    if(z <= y && z <= x)
       return(z);
+
+   return(z);
 }
 
 /************************************************************************
@@ -1449,7 +1452,6 @@ grabcolorCB(
         XEvent event;
         Pixel pixel;
         XColor colorStruct;
-        char           color_string[MAX_STR_LEN];
         int status, offset;
         Boolean notDone=True;
         KeySym keySym;
@@ -1562,7 +1564,6 @@ dialogBoxCB(
         XtPointer client_data,
         XtPointer call_data )
 {
-    palette *tmp_palette;
     DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;
 
     switch (cb->button_position)
@@ -1612,7 +1613,6 @@ _DtmapCB(
     Dimension	 width,height;
     Arg          args[6];
     int          n;
-    XtWidgetGeometry reply;
     Widget       parent = (Widget) client_data;
 
 

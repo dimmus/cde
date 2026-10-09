@@ -94,10 +94,6 @@ static void wspOkCB(
                         Widget buttonW,
                         WmScreenData *pSD,
                         XtPointer call_data) ;
-static void wspHelpCB( 
-                        Widget buttonW,
-                        XtPointer client_data,
-                        XtPointer call_data) ;
 static void wspAllWsCB( 
                         Widget buttonW,
                         WmScreenData *pSD,
@@ -110,8 +106,6 @@ static void wspExtendedSelectCB(
 			Widget w,
 			XtPointer client_data,
 			XmListCallbackStruct *cb );
-static Dimension wspCharWidth (
-			XmFontList xmfl);
 
 /********    End Static Function Declarations    ********/
 
@@ -1165,76 +1159,6 @@ wspSetPosition(
     XtSetValues (pPres->shellW, args, n);
 
 } /* END OF FUNCTION wspSetPosition */
-
-
-/*************************************<->*************************************
- *
- *  wspCharWidth (xmfl)
- *
- *
- *  Description:
- *  -----------
- *  Returns the max logical character width for this fontList
- *
- *
- *  Inputs:
- *  ------
- *  xmfl  -  XmFontList
- * 
- *  Returns:
- *  -------
- *  max logical character width
- *
- *  Comments:
- *  ---------
- ******************************<->***********************************/
-static Dimension
-wspCharWidth(
-        XmFontList xmfl )
-{
-    XmFontContext 	fc;
-    XmFontListEntry 	entry;
-    Dimension 		dWidth, dTmpWidth;
-    XtPointer 		pFont;
-    XmFontType 		type;
-    XFontSetExtents	*pExtents;
-
-    XmFontListInitFontContext ( &fc, xmfl);
-
-    dWidth = 0;
-
-    entry = XmFontListNextEntry (fc);
-    while (entry)
-    {
-	pFont = XmFontListEntryGetFont (entry, &type);
-
-	switch (type)
-	{
-	    case XmFONT_IS_FONT:
-		dTmpWidth = ((XFontStruct *)pFont)->max_bounds.rbearing -
-			    ((XFontStruct *)pFont)->min_bounds.lbearing;
-		break;
-
-            case XmFONT_IS_FONTSET:
-		pExtents = XExtentsOfFontSet ((XFontSet) pFont);
-		dTmpWidth = pExtents->max_logical_extent.width;
-		break;
-
-	    default:
-		dTmpWidth = 0;
-		break;
-	}
-
-	if (dTmpWidth > dWidth)
-	    dWidth = dTmpWidth;
-
-	entry = XmFontListNextEntry (fc);
-    }
-
-    XmFontListFreeFontContext (fc);
-
-    return (dWidth);
-}
 
 
 /*************************************<->*************************************

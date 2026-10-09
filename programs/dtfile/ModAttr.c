@@ -289,7 +289,6 @@ Create(
    XmString empty_label_string;
    Arg args[15];
    int n;
-   char * tmpStr;
    Dimension len[2];
    int flag=FLAG_RESET;
 
@@ -1172,7 +1171,6 @@ GetResourceValues(
 
 
    ModAttrData * modAttr_data;
-   String host, directory, name;
   
 
    /*  Allocate and get the resources for modify file attrs dialog data.  */
@@ -1257,7 +1255,7 @@ SetValues(
    effective_user = geteuid();
 
 
-   if (user_data && user_data->pw_uid == getuid()
+   if ((user_data && user_data->pw_uid == getuid())
        || effective_user == root_user)
    {
       /* Check for root user */
@@ -1565,9 +1563,9 @@ SetValues(
    {
       char *ptr;
 
-      if (ptr = (char *)DtDtsDataTypeToAttributeValue(modAttr_data->filetype,
+      if ((ptr = (char *)DtDtsDataTypeToAttributeValue(modAttr_data->filetype,
                                                       FM_TYPE_LABEL,
-                                                      NULL))
+                                                      NULL)))
       {
          string = XmStringCreateLocalized(ptr);
          DtDtsFreeAttributeValue(ptr);
@@ -1793,8 +1791,6 @@ WriteResourceValues(
 
 
    ModAttrData * modAttr_data = (ModAttrData *) values->data;
-   ModAttrRec  * modAttr_rec;
-   Arg args[4];
    
 
    /*  If the dialog is currently displayed, update the geometry  */
@@ -1803,7 +1799,6 @@ WriteResourceValues(
    if (modAttr_data->displayed == True)
    {
       _DtGenericUpdateWindowPosition(values);
-      modAttr_rec = (ModAttrRec *) _DtGetDialogInstance(values);
    }
 
    _DtDialogPutResources (fd, name_list, MODIFY_ATTR, values->data, 
@@ -2142,7 +2137,6 @@ _LoadFileAttributes(
         ModAttrData *modAttr_data,
         unsigned long mask )
 {
-   String filetype;
    FileData *file_data=NULL;
    struct group * group_data;
    struct passwd * user_data;
@@ -2334,7 +2328,9 @@ displayFSDialog (Widget                      w,
                  XmPushButtonCallbackStruct  *cbs)
 
 { 
+#ifdef DEBUG
    static char *pname = "displayFSDialog";
+#endif
    pid_t     pid;
    int       n;  
    Arg       args[20];

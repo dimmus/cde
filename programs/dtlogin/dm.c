@@ -165,7 +165,7 @@ main( int argc, char **argv )
 
     progPath = strdup(argv[0]);
 
-    if (str = strrchr(progPath, '/'))
+    if ((str = strrchr(progPath, '/')))
     {
 	if (strlen(str) < 2)
 	{
@@ -541,7 +541,9 @@ WaitForChild( void )
 {
     int		pid;
     waitType	status;
+#if !defined(SYSV) && !defined(SVR4) && !defined(__linux__)
     int		mask;
+#endif
 
 #if defined(SYSV) || defined(SVR4) || defined(__linux__)
     if (AnyWellKnownSockets()) {
@@ -773,7 +775,7 @@ CheckDisplayStatus( struct display *d )
 	case OldEntry:
             Debug("Check %s: status=%d wakeupTime=%d\n", d->name,
                   d->status, wakeupTime);
-	    if (d->status == suspended && wakeupTime >= 0)
+	    if (d->status == suspended && wakeupTime >= 0) {
               if ( GettyRunning(d) || (d->gettyLine && (strcmp(d->gettyLine,"??") == 0)) )
 		    if ( wakeupTime == 0 ) {
 			Debug("Polling of suspended server %s started.\n",
@@ -796,6 +798,7 @@ CheckDisplayStatus( struct display *d )
 			   d->name);
 		    wakeupTime = wakeupInterval;	/* continue polling*/
 		}
+	    }
 
 	    if (d->status == notRunning)
 		StartDisplay (d);
@@ -817,8 +820,10 @@ StartDisplay(
     waitType  status;
     int	pid;
     char* authFile_str;
+#ifdef sun
     char start_fbconsole[1024];
     char buff[128];
+#endif
 
     Debug ("StartDisplay(): %s\n", d->name);
 
@@ -1123,12 +1128,13 @@ StopDisplay( struct display *d )
     Debug("StopDisplay(): %s, server pid = %d, manager pid = %d, dt_shutdown = %d\n",
 	  d->name, d->serverPid, d->pid, dt_shutdown);
 	   
-    if (d->serverPid != -1)
+    if (d->serverPid != -1) {
 	/* don't remove the console */
 	if ((d->displayType.location == Local) && !dt_shutdown ) 
 	    d->status = suspended;
 	else
 	    d->status = zombie;	/* be careful about race conditions */
+    }
 
     if (d->pid != -1)
 	TerminateProcess (d->pid, SIGTERM);
@@ -1363,8 +1369,10 @@ SetTitle( char *name, char *ptr )
 static int 
 StartGetty( struct display *d )
 {
+#if defined(GETTYPATH)
     int		pid;
     char tynm[20];
+#endif
     waitType  status;
 
     Debug ("StartGetty(): %s\n", d->name);

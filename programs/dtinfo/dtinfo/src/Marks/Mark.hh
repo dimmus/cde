@@ -90,7 +90,7 @@ public:
   virtual const char *notes() = 0;
   virtual void set_notes (const char *notes) = 0;
 
-  virtual bool operator== (const Mark &);
+  virtual bool operator== (const Mark &) const;
 
   void view();
   void edit();

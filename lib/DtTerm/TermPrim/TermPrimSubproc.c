@@ -297,6 +297,9 @@ _DtTermPrimSubprocExec(Widget		  w,
     _Xgetpwparams pw_buf;
     _Xgetloginparams login_buf;
 
+    (void) pw_buf;	/* unused unless XTHREADS */
+    (void) login_buf;	/* unused unless XTHREADS */
+
     /* build a default exec command and argv list if one wasn't supplied...
      */
     /* cmd... */

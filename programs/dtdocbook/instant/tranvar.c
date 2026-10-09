@@ -48,11 +48,6 @@
  * ________________________________________________________________________
  */
 
-#ifndef lint
-static char *RCSid =
-  "$XConsortium: tranvar.c /main/7 1996/08/08 14:42:09 cde-hp $";
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>

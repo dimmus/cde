@@ -85,7 +85,6 @@ void handleMMSelection(Widget w, XtPointer, XtPointer calldata)
 {
   MoveMenuListUiItem *item;
   XmListCallbackStruct *list_info = (XmListCallbackStruct *)calldata;
-  char *selection_string = NULL;
   DtVirtArray<PropStringPair *> *list_items;
 
   XtVaGetValues(w, 
@@ -116,7 +115,6 @@ void handleMMSelection(Widget w, XtPointer, XtPointer calldata)
 ///////////////////////////////////////////////////////////////////
 void MoveMenuListUiItem::writeFromUiToSource()
 {
-  Widget w = this->getWidget();
   DtMailEnv error;
   DtMail::Session * d_session = theRoamApp.session()->session();
   DtMail::MailRc * mail_rc = d_session->mailRc(error);
@@ -213,7 +211,7 @@ void MoveMenuListUiItem::writeFromSourceToUi()
 
       char_list->append(strdup(token));
       
-      while(token = (char *)strtok(NULL, " "))
+      while((token = (char *)strtok(NULL, " ")))
 	{
 	  new_pair = new PropStringPair;
 	  new_pair->label = strdup(token);

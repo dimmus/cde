@@ -175,6 +175,7 @@ static char * get_tmp_dir (
    char			*dir;
    _Xgetpwparams	pwd_buf;
    struct passwd *	pwd_ret;
+   (void) pwd_buf; /* unused unless XTHREADS */
 
    if ((pwd_ret = _XGetpwuid(getuid(), pwd_buf)) == NULL)
       return (NULL);
@@ -356,7 +357,6 @@ int reset_noio_channel_object(SPC_Channel_Ptr channel)
 /*----------------------------------------------------------------------+*/
 {
   int result;
-  int iomode=channel->IOMode;
   
   call_parent_method(channel, reset, (channel), result);
 

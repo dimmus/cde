@@ -90,8 +90,6 @@ TTSaveContractCB(
 	Tt_message	contract)
 {
     Editor *pPad;
-    int silent, force;
-    Tt_status status;
     char *messageID;
     int mark = tt_mark();
 
@@ -103,7 +101,7 @@ TTSaveContractCB(
 	/* Search the list of Editor instances for one with a TT media
 	 * msg id matching the originating media msg id supplied as the
 	 * 'messageID' (1st) argument of the TTDT_SAVE msg */
-	if (messageID = tt_message_arg_val(m, 0)) {
+	if ((messageID = tt_message_arg_val(m, 0))) {
 	    for (pPad = pPadList; pPad != (Editor *)NULL; pPad = pPad->pNextPad) {
 		if (pPad->inUse == True && pPad->ttEditReq.msg_id &&
 		  strcmp(pPad->ttEditReq.msg_id, messageID) == 0) {
@@ -355,8 +353,6 @@ TTCreateSavePattern(
 	void *			clientData,
 	int			register_it)
 {
-    char *msgID;
-
     /* -----> Create pattern */
     Tt_pattern pat = _TTCreatePattern(
 			TT_HANDLE,	/* catagory */

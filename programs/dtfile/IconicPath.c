@@ -445,7 +445,6 @@ Update(
    char *fileLabel;
    Widget *manage;
    int nmanage;
-   Dimension iwidth, iheight;
    int twidth;
    Pixel foreground, background;
    Arg args[35];
@@ -634,8 +633,8 @@ Update(
          forbidden = restrictMode
              && strncmp(path, users_home_dir, path_len) == 0
              && (path_len == 1 ||
-                 users_home_dir[path_len] == '/' &&
-                 users_home_dir[path_len + 1] != '\0');
+                 (users_home_dir[path_len] == '/' &&
+                 users_home_dir[path_len + 1] != '\0'));
 
          /* check if we need to add or update the path component */
          if (i >= ip->iconic_path.num_components)
@@ -703,10 +702,10 @@ Update(
             XtAddCallback (ip->iconic_path.components[i].icon, XmNcallback,
                            ButtonCallback, ip);
 
-            if (fileLabel = DtDtsDataTypeToAttributeValue(
+            if ((fileLabel = DtDtsDataTypeToAttributeValue(
                             GetDirectoryLogicalType(file_mgr_data, path),
                             DtDTS_DA_LABEL,
-                            NULL))
+                            NULL)))
             {
                xm_string = XmStringCreateLocalized(fileLabel);
                DtDtsFreeAttributeValue(fileLabel);
@@ -754,10 +753,10 @@ Update(
                ip->iconic_path.components[i].path = XtNewString(path);
             }
 
-            if (fileLabel = DtDtsDataTypeToAttributeValue(
+            if ((fileLabel = DtDtsDataTypeToAttributeValue(
                             GetDirectoryLogicalType(file_mgr_data, path),
                             DtDTS_DA_LABEL,
-                            NULL))
+                            NULL)))
             {
                xm_string = XmStringCreateLocalized(fileLabel);
                DtDtsFreeAttributeValue(fileLabel);
@@ -781,9 +780,9 @@ Update(
             {
                if ((pixmapData->iconFileName == NULL) !=
                           (ip->iconic_path.components[i].icon_name == NULL) ||
-                   pixmapData->iconFileName != NULL &&
+                   (pixmapData->iconFileName != NULL &&
                    strcmp(pixmapData->iconFileName,
-                          ip->iconic_path.components[i].icon_name) != 0)
+                          ip->iconic_path.components[i].icon_name) != 0))
                {
                   INC_N_CHANGES();
 
@@ -1047,13 +1046,11 @@ IconicPathRedraw(
 {
    FileMgrRec *file_mgr_rec = (FileMgrRec *)ip->iconic_path.file_mgr_rec;
    DialogData  * dialog_data;
-   FileMgrData *file_mgr_data;
    int i;
    int x, y, l;
 
    if ((dialog_data = _DtGetInstanceData ((XtPointer)file_mgr_rec)) == NULL)
       return;
-   file_mgr_data = (FileMgrData *) dialog_data->data;
 
    if (ip->iconic_path.gc == None)
    {
@@ -1243,10 +1240,6 @@ GeometryManager(
         XtWidgetGeometry *request,
         XtWidgetGeometry *reply )
 {
-    DtIconicPathWidget ip;
-
-    ip = (DtIconicPathWidget) w->core.parent;
-
     if (IsQueryOnly(request)) return XtGeometryYes;
 
     if (IsWidth(request)) w->core.width = request->width;
@@ -1268,7 +1261,6 @@ ChangeManaged(
         Widget wid )
 {
     DtIconicPathWidget ip = (DtIconicPathWidget) wid ;
-    XtWidgetProc manager ;
 
     XmeNavigChangeManaged((Widget) ip) ;
 
@@ -1288,7 +1280,6 @@ SetValues(
         ArgList args,
         Cardinal *num_args )
 {
-    DtIconicPathWidget current = (DtIconicPathWidget) cw ;
     DtIconicPathWidget ip = (DtIconicPathWidget) nw ;
     FileMgrRec *file_mgr_rec = (FileMgrRec *)ip->iconic_path.file_mgr_rec;
     DialogData *dialog_data;

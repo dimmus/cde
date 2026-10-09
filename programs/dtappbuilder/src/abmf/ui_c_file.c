@@ -47,8 +47,10 @@
  * 
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <ab_private/AB.h>
 #include <ab/util_types.h>
 #include <ab_private/abio.h>
@@ -67,8 +69,6 @@
 #include "lib_func_stringsP.h"
 #include "msg_cvt.h"
 
-static int	write_all_obj_clear_procs(
-			GenCodeInfo genCodeInfo, ABObj rootObj);
 static int	write_all_obj_create_procs(GenCodeInfo genCodeInfo, ABObj rootObj);
 static int	write_call_create_proc(
 				GenCodeInfo genCodeInfo, 
@@ -107,10 +107,6 @@ static int 	write_msg_init_proc(
 		    GenCodeInfo	genCodeInfo, 
 		    ABObj 	parent
 		);
-static int 	write_msg_clear_proc(
-		    GenCodeInfo genCodeInfo,
-		    ABObj       module
-		);
 
 static int 	abmfP_obj_get_num_conns_by_when(
 		    ABObj	obj,
@@ -126,24 +122,11 @@ static ABObj	abmfP_obj_get_conn_by_when(
 static StringList abmfP_get_msg_action_list(
 		    ABObj   msg_obj
 		);
-
-
-static STRING
-strip_spaces_and_dots(char *mname)
-{
-    static char         new_name[MAXPATHLEN];
-    char               *p;
-
-    snprintf(new_name, sizeof(new_name), "%s", mname);
-    p = (char *) strrchr(new_name, '.');
-    if (p)
-	p = (char *) strrchr(p, '.');
-    if (p)
-	p = (char *) strrchr(p, '.');
-    if (p)
-	p = (char *) strrchr(p, ' ');
-    return new_name;
-}
+static int	write_used_decls_and_body(
+		    File	codeFile,
+		    File	declsFile,
+		    File	bodyFile
+		);
 
 
 /*
@@ -188,7 +171,6 @@ write_call_create_proc(GenCodeInfo genCodeInfo, ABObj obj)
     File codeFile= genCodeInfo->code_file;
     char	createProc[1024];
     ABObj	structObj = NULL;
-    ABObj	item = NULL;
 
     strcpy(createProc, abmfP_get_create_proc_name(obj));
 
@@ -545,12 +527,11 @@ write_set_fixed_pane(GenCodeInfo genCodeInfo, ABObj pane)
 static int
 write_out_dialog_set_pane_height(GenCodeInfo genCodeInfo, ABObj obj)
 {
-    ABObj       dialog, panedwin, button_panel, footer;
+    ABObj       button_panel, footer;
  
     if (!obj_is_popup_win(obj))
         return 0;
 
-    panedwin = objxm_comp_get_subobj(obj, AB_CFG_WINDOW_PW_OBJ);
     button_panel = objxm_comp_custdlg_get_area(obj, AB_CONT_BUTTON_PANEL);
     footer  = objxm_comp_custdlg_get_area(obj, AB_CONT_FOOTER);
 
@@ -693,10 +674,11 @@ write_obj_init_proc(GenCodeInfo genCodeInfo, ABObj parent)
 {
     int			return_value= 0;
     File                codeFile = genCodeInfo->code_file;
+    File		realCodeFile = codeFile;
     ABObj               obj;
-    ABObj               whole_obj = NULL;
-    int                 inst = FALSE;
     AB_TRAVERSAL        trav;
+    File		declsFile = NULL;
+    File		bodyFile = NULL;
 
     abmfP_gencode_enter_func(genCodeInfo);
     genCodeInfo->cur_func.ip_obj= abmfP_obj_get_struct_obj(parent);
@@ -706,8 +688,18 @@ write_obj_init_proc(GenCodeInfo genCodeInfo, ABObj parent)
 
     abmfP_write_init_proc_begin(genCodeInfo, parent);
 
+    /* write decls and body separately, to omit unused variables */
+    if (   ((declsFile = tmpfile()) != NULL)
+	&& ((bodyFile = tmpfile()) != NULL) )
+    {
+	codeFile = genCodeInfo->code_file = declsFile;
+    }
     abio_printf(codeFile, "WidgetList\tchildren = NULL;\n");
     abio_printf(codeFile, "int\t\tnumChildren = 0;\n");
+    if (bodyFile != NULL)
+    {
+	codeFile = genCodeInfo->code_file = bodyFile;
+    }
     abio_printf(codeFile, "if (%s->initialized)\n", 
 	abmfP_instance_ptr_var_name);
     abmfP_write_c_block_begin(genCodeInfo);
@@ -716,7 +708,7 @@ write_obj_init_proc(GenCodeInfo genCodeInfo, ABObj parent)
     abio_printf(codeFile, "%s->initialized = True;\n\n",
 	abmfP_instance_ptr_var_name);
 
-    inst= write_all_call_create_procs(genCodeInfo, parent);
+    write_all_call_create_procs(genCodeInfo, parent);
     write_add_widget_ref_resources(genCodeInfo, parent);
 
     /*
@@ -795,6 +787,15 @@ write_obj_init_proc(GenCodeInfo genCodeInfo, ABObj parent)
     abmfP_write_c_func_end(genCodeInfo, "0");
 
 epilogue:
+    if (bodyFile != NULL)
+    {
+	genCodeInfo->code_file = realCodeFile;
+	write_used_decls_and_body(realCodeFile, declsFile, bodyFile);
+    }
+    else if (declsFile != NULL)
+    {
+	fclose(declsFile);
+    }
     abmfP_gencode_exit_func(genCodeInfo);
     return return_value;
 }
@@ -805,7 +806,6 @@ write_all_obj_init_procs(GenCodeInfo genCodeInfo, ABObj module)
 {
     ABObj               obj;
     AB_TRAVERSAL        trav;
-    BOOL		MsgClearWritten = FALSE;
 
     abmfP_tree_set_written(module, FALSE);
     for (trav_open(&trav, module, AB_TRAV_SALIENT_UI);
@@ -844,7 +844,6 @@ write_create_proc_decls(GenCodeInfo genCodeInfo, ABObj module)
     File                codeFile = genCodeInfo->code_file;
     AB_TRAVERSAL        trav;
     ABObj               obj;
-    char               *parent = NULL;
 
     abmfP_tree_set_written(module, FALSE);
     abio_puts(codeFile, "\n");
@@ -923,15 +922,451 @@ assign_parent_to_submenus(ABObj project)
 }
 
 
+/*
+ * Local variable definitions are written before the body of a create
+ * or init proc, so the definitions are written to a temporary file and
+ * the body to another one. When the function is complete, only the
+ * definitions (and the assignments to them made in the definition
+ * section) of variables that are actually referenced are copied to the
+ * real output file, followed by the body. This keeps the generated code
+ * free of unused local variables.
+ */
+typedef enum
+{
+    DECL_CHUNK_OTHER = 0,	/* always kept */
+    DECL_CHUNK_BLANK,		/* blank line */
+    DECL_CHUNK_DECL,		/* definition of a variable */
+    DECL_CHUNK_ASSIGN		/* assignment to a variable */
+} DECL_CHUNK_TYPE;
+
+typedef struct
+{
+    STRING		text;
+    int			len;
+    DECL_CHUNK_TYPE	type;
+    char		var[256];
+    BOOL		keep;
+} DeclChunkRec, *DeclChunk;
+
+static BOOL
+decl_char_is_ident(int c, BOOL first)
+{
+    return (isalpha(c) || (c == '_') || ((!first) && isdigit(c)));
+}
+
+/*
+ * Skips a comment or string/char constant starting at text[i], if there
+ * is one. Returns the index after it, or i.
+ */
+static int
+decl_skip_non_code(STRING text, int len, int i)
+{
+    if ((text[i] == '/') && (i+1 < len) && (text[i+1] == '*'))
+    {
+	for (i += 2; (i+1 < len) && !((text[i] == '*') && (text[i+1] == '/'));
+	     ++i)
+	{
+	}
+	return (i+2 > len? len:i+2);
+    }
+    if ((text[i] == '"') || (text[i] == '\''))
+    {
+	int	quote = text[i];
+	for (++i; (i < len) && (text[i] != quote); ++i)
+	{
+	    if ((text[i] == '\\') && (i+1 < len))
+	    {
+		++i;
+	    }
+	}
+	return (i+1 > len? len:i+1);
+    }
+    return i;
+}
+
+/*
+ * Returns the number of times the identifier appears in the code
+ * (outside of comments and string constants, and not as a structure
+ * member name).
+ */
+static int
+decl_count_ident(STRING text, int len, STRING ident)
+{
+    int		count = 0;
+    int		identLen = strlen(ident);
+    int		i = 0;
+    int		next = 0;
+    int		prev = 0;
+
+    while (i < len)
+    {
+	if ((next = decl_skip_non_code(text, len, i)) != i)
+	{
+	    i = next;
+	}
+	else if (decl_char_is_ident((unsigned char)text[i], TRUE))
+	{
+	    int		start = i;
+	    BOOL	isMember = FALSE;
+
+	    for (prev = start-1; 
+		 (prev >= 0) && isspace((unsigned char)text[prev]); --prev)
+	    {
+	    }
+	    isMember = (   (prev >= 0)
+			&& (   (text[prev] == '.')
+			    || ((text[prev] == '>') && (prev >= 1) 
+				&& (text[prev-1] == '-')) ) );
+	    while ((i < len) && decl_char_is_ident((unsigned char)text[i], FALSE))
+	    {
+		++i;
+	    }
+	    if (   (!isMember)
+		&& ((i - start) == identLen)
+		&& (strncmp(text + start, ident, identLen) == 0))
+	    {
+		++count;
+	    }
+	}
+	else
+	{
+	    ++i;
+	}
+    }
+    return count;
+}
+
+/*
+ * Determines whether the chunk is a definition of, or an assignment to,
+ * a single variable.
+ */
+static void
+decl_classify_chunk(DeclChunk chunk)
+{
+    STRING	text = chunk->text;
+    int		len = chunk->len;
+    int		i = 0;
+    int		next = 0;
+    int		numIdents = 0;
+    int		lastIdentStart = 0;
+    int		lastIdentLen = 0;
+    int		delim = 0;
+
+    chunk->type = DECL_CHUNK_OTHER;
+    for (i = 0; (i < len) && isspace((unsigned char)text[i]); ++i)
+    {
+    }
+    if (i >= len)
+    {
+	chunk->type = DECL_CHUNK_BLANK;
+	return;
+    }
+
+    while ((i < len) && (delim == 0))
+    {
+	if ((next = decl_skip_non_code(text, len, i)) != i)
+	{
+	    i = next;
+	}
+	else if (decl_char_is_ident((unsigned char)text[i], TRUE))
+	{
+	    lastIdentStart = i;
+	    while ((i < len) && decl_char_is_ident((unsigned char)text[i], FALSE))
+	    {
+		++i;
+	    }
+	    lastIdentLen = i - lastIdentStart;
+	    ++numIdents;
+	}
+	else if (   (text[i] == '=') || (text[i] == '[') || (text[i] == ';')
+		 || (text[i] == '(') || (text[i] == ',') || (text[i] == '{'))
+	{
+	    delim = text[i];
+	}
+	else if (isspace((unsigned char)text[i]) || (text[i] == '*'))
+	{
+	    ++i;
+	}
+	else
+	{
+	    return;	/* something we don't understand */
+	}
+    }
+
+    if (   (numIdents < 1) 
+	|| (lastIdentLen >= (int)sizeof(chunk->var))
+	|| ((delim != '=') && (delim != '[') && (delim != ';')) )
+    {
+	return;
+    }
+    if ((delim == '=') && (i+1 < len) && (text[i+1] == '='))
+    {
+	return;
+    }
+    if (numIdents == 1)
+    {
+	if (delim != '=')
+	{
+	    return;
+	}
+	chunk->type = DECL_CHUNK_ASSIGN;
+    }
+    else
+    {
+	/* must define exactly one variable */
+	int	depth = 0;
+	for (; i < len; ++i)
+	{
+	    if ((next = decl_skip_non_code(text, len, i)) != i)
+	    {
+		i = next - 1;
+		continue;
+	    }
+	    if ((text[i] == '(') || (text[i] == '[') || (text[i] == '{'))
+	    {
+		++depth;
+	    }
+	    else if ((text[i] == ')') || (text[i] == ']') || (text[i] == '}'))
+	    {
+		--depth;
+	    }
+	    else if ((text[i] == ',') && (depth == 0))
+	    {
+		return;
+	    }
+	    else if ((text[i] == ';') && (depth == 0))
+	    {
+		break;
+	    }
+	}
+	chunk->type = DECL_CHUNK_DECL;
+    }
+    strncpy(chunk->var, text + lastIdentStart, lastIdentLen);
+    chunk->var[lastIdentLen] = 0;
+}
+
+/*
+ * Splits the definitions into chunks (statements or blank lines)
+ */
+static int
+decl_split_chunks(STRING text, int len, DeclChunk chunks, int maxChunks)
+{
+    int		numChunks = 0;
+    int		i = 0;
+    int		start = 0;
+    int		depth = 0;
+    int		next = 0;
+    BOOL	lineIsBlank = TRUE;
+
+    while ((i < len) && (numChunks < maxChunks))
+    {
+	if ((next = decl_skip_non_code(text, len, i)) != i)
+	{
+	    i = next;
+	    lineIsBlank = FALSE;
+	    continue;
+	}
+	if (text[i] == '\n')
+	{
+	    for (next = start; (next < i) && isspace((unsigned char)text[next]);
+		 ++next)
+	    {
+	    }
+	    if (lineIsBlank && (next == i))
+	    {
+		/* blank line */
+		chunks[numChunks].text = text + start;
+		chunks[numChunks].len = i + 1 - start;
+		++numChunks;
+		start = i + 1;
+	    }
+	    lineIsBlank = TRUE;
+	}
+	else if (!isspace((unsigned char)text[i]))
+	{
+	    lineIsBlank = FALSE;
+	}
+	if ((text[i] == '(') || (text[i] == '[') || (text[i] == '{'))
+	{
+	    ++depth;
+	}
+	else if ((text[i] == ')') || (text[i] == ']') || (text[i] == '}'))
+	{
+	    --depth;
+	}
+	else if ((text[i] == ';') && (depth == 0))
+	{
+	    /* statement ends at the end of the line (incl. comments) */
+	    for (++i; (i < len) && (text[i] != '\n'); )
+	    {
+		if ((next = decl_skip_non_code(text, len, i)) != i)
+		{
+		    i = next;
+		}
+		else
+		{
+		    ++i;
+		}
+	    }
+	    chunks[numChunks].text = text + start;
+	    chunks[numChunks].len = (i < len? i + 1:len) - start;
+	    ++numChunks;
+	    start = i + 1;
+	    lineIsBlank = TRUE;
+	}
+	++i;
+    }
+    if ((start < len) && (numChunks < maxChunks))
+    {
+	chunks[numChunks].text = text + start;
+	chunks[numChunks].len = len - start;
+	++numChunks;
+    }
+    return numChunks;
+}
+
+static STRING
+decl_read_tmp_file(File file, int *lenOut)
+{
+    STRING	buf = NULL;
+    long	size = 0;
+
+    fflush(file);
+    size = ftell(file);
+    *lenOut = 0;
+    if (   (size < 0)
+	|| ((buf = (STRING)malloc(size + 1)) == NULL)
+	|| (fseek(file, 0, SEEK_SET) != 0)
+	|| (fread(buf, 1, size, file) != (size_t)size) )
+    {
+	free(buf);
+	return NULL;
+    }
+    buf[size] = 0;
+    *lenOut = (int)size;
+    return buf;
+}
+
+/*
+ * Writes the definitions of the variables that are referenced,
+ * followed by the function body.
+ */
+static int
+write_used_decls_and_body(File codeFile, File declsFile, File bodyFile)
+{
+    int		declsLen = 0;
+    int		bodyLen = 0;
+    STRING	decls = decl_read_tmp_file(declsFile, &declsLen);
+    STRING	body = decl_read_tmp_file(bodyFile, &bodyLen);
+    int		maxChunks = declsLen + 1;
+    DeclChunk	chunks = NULL;
+    int		numChunks = 0;
+    int		i = 0;
+    int		j = 0;
+    int		uses = 0;
+    BOOL	changed = TRUE;
+    BOOL	lastWasBlank = FALSE;
+
+    fclose(declsFile);
+    fclose(bodyFile);
+    if ((decls == NULL) || (body == NULL))
+    {
+	free(decls);
+	free(body);
+	return -1;
+    }
+
+    chunks = (DeclChunk)calloc(maxChunks, sizeof(DeclChunkRec));
+    if (chunks != NULL)
+    {
+	numChunks = decl_split_chunks(decls, declsLen, chunks, maxChunks);
+    }
+    for (i = 0; i < numChunks; ++i)
+    {
+	chunks[i].keep = TRUE;
+	decl_classify_chunk(&(chunks[i]));
+    }
+
+    /*
+     * Remove definitions of unreferenced variables, until nothing changes
+     */
+    while (changed)
+    {
+	changed = FALSE;
+	for (i = 0; i < numChunks; ++i)
+	{
+	    if ((!chunks[i].keep) || (chunks[i].type != DECL_CHUNK_DECL))
+	    {
+		continue;
+	    }
+	    uses = decl_count_ident(body, bodyLen, chunks[i].var);
+	    for (j = 0; (uses == 0) && (j < numChunks); ++j)
+	    {
+		if (   (j == i) || (!chunks[j].keep)
+		    || (   (chunks[j].type == DECL_CHUNK_ASSIGN)
+			&& util_streq(chunks[j].var, chunks[i].var)) )
+		{
+		    continue;
+		}
+		uses += decl_count_ident(
+				chunks[j].text, chunks[j].len, chunks[i].var);
+	    }
+	    if (uses == 0)
+	    {
+		chunks[i].keep = FALSE;
+		for (j = 0; j < numChunks; ++j)
+		{
+		    if (   (chunks[j].type == DECL_CHUNK_ASSIGN)
+			&& util_streq(chunks[j].var, chunks[i].var))
+		    {
+			chunks[j].keep = FALSE;
+		    }
+		}
+		changed = TRUE;
+	    }
+	}
+    }
+
+    if (chunks == NULL)
+    {
+	fwrite(decls, 1, declsLen, codeFile);
+    }
+    for (i = 0; i < numChunks; ++i)
+    {
+	if (!chunks[i].keep)
+	{
+	    continue;
+	}
+	if (chunks[i].type == DECL_CHUNK_BLANK)
+	{
+	    if (lastWasBlank)
+	    {
+		continue;
+	    }
+	    lastWasBlank = TRUE;
+	}
+	else
+	{
+	    lastWasBlank = FALSE;
+	}
+	fwrite(chunks[i].text, 1, chunks[i].len, codeFile);
+    }
+    fwrite(body, 1, bodyLen, codeFile);
+
+    free(chunks);
+    free(decls);
+    free(body);
+    return 0;
+}
+
+
 int
 write_obj_create_proc(GenCodeInfo genCodeInfo, ABObj obj)
 {
-    File                codeFile = genCodeInfo->code_file;
-    ABObj               top_obj = NULL;
     ABObj		ip_obj = abmfP_obj_get_struct_obj(obj);
-    ABObj               help_obj = NULL;
-    int			num_post_create_procs = 0;
-    STRING 		help_volume, help_location, help_text;
+    File		realCodeFile = genCodeInfo->code_file;
+    File		declsFile = NULL;
+    File		bodyFile = NULL;
 
     abmfP_gencode_enter_func(genCodeInfo);
     abmfP_create_obj(genCodeInfo) = obj;
@@ -944,13 +1379,24 @@ write_obj_create_proc(GenCodeInfo genCodeInfo, ABObj obj)
     }
 
     abmfP_write_create_proc_begin(genCodeInfo, obj);
+
+    /* write decls and body separately, to omit unused variables */
+    if (   ((declsFile = tmpfile()) != NULL)
+	&& ((bodyFile = tmpfile()) != NULL) )
+    {
+	genCodeInfo->code_file = declsFile;
+    }
     abmfP_write_create_proc_decls(genCodeInfo);
+    if (bodyFile != NULL)
+    {
+	genCodeInfo->code_file = bodyFile;
+    }
     abmfP_write_create_widgets_for_comp_obj(genCodeInfo, obj);
     write_call_all_user_post_create_procs(genCodeInfo, obj);
 
     if (abmfP_obj_needs_centering_handler(obj))
     {
-        abio_printf(genCodeInfo->code_file, "\t%s(%s, %s);\n",
+        abio_printf(genCodeInfo->code_file, "%s(%s, %s);\n",
 		abmfP_lib_center->name,
 		abmfP_get_c_name(genCodeInfo, obj),
 		abmfP_obj_get_centering_type(obj));
@@ -962,7 +1408,15 @@ write_obj_create_proc(GenCodeInfo genCodeInfo, ABObj obj)
     abmfP_obj_set_subobjs_written(obj, TRUE);
     abmfP_obj_set_items_written(obj, TRUE);
 
-epilogue:
+    if (bodyFile != NULL)
+    {
+	genCodeInfo->code_file = realCodeFile;
+	write_used_decls_and_body(realCodeFile, declsFile, bodyFile);
+    }
+    else if (declsFile != NULL)
+    {
+	fclose(declsFile);
+    }
     abmfP_gencode_exit_func(genCodeInfo);
     return (OK);
 }
@@ -1220,8 +1674,6 @@ abmfP_write_ui_c_file(
 {
     File                codeFile = genCodeInfo->code_file;
     char		moduleName[1024];
-    ABObj               obj = NULL;
-    char               *errmsg = NULL;
     *moduleName = 0;
 
     /*
@@ -1497,6 +1949,8 @@ write_msg_init_proc(GenCodeInfo genCodeInfo, ABObj parent)
                 case AB_WHEN_CANCEL:
                     cancelCB = callback_func;
                     break;
+                default:
+                    break;
             }
         }
     }
@@ -1699,38 +2153,6 @@ write_msg_init_proc(GenCodeInfo genCodeInfo, ABObj parent)
     
     abmfP_write_c_func_end(genCodeInfo, "0");
 
-epilogue:
     abmfP_gencode_exit_func(genCodeInfo);
     return return_value;
-}
-
-/* 
- * Write out the generic message clear proc 
- */
-static int
-write_msg_clear_proc(
-    GenCodeInfo	genCodeInfo, 
-    ABObj	module
-)
-{
-    File        file = genCodeInfo->code_file;
-    int		iRet = 0;
-
-    iRet = abmfP_write_c_func_begin(
-            genCodeInfo,
-            FALSE,                                 /* Is static */
-            abmfP_str_int,                         /* return type */
-            abmfP_get_msg_clear_proc_name(module), /* function name */
-            "DtbMessageData",                     /* Argument type */
-            abmfP_instance_ptr_var_name,           /* Argument name */
-            NULL);
-
-    abio_printf(file,
-        "memset((void *)(%s), 0, sizeof(*%s));\n",
-        abmfP_instance_ptr_var_name,
-        abmfP_instance_ptr_var_name);
-
-    abmfP_write_c_func_end(genCodeInfo, "0");
-
-    return iRet;
 }

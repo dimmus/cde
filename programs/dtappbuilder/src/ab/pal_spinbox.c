@@ -914,6 +914,8 @@ setup_content_settings(
 	    ui_set_active(pss->item_label.label, True);
 	    ui_set_active(pss->item_state.checkbox, True);
 	    break;
+	default:
+	    break;
     }
 }
 

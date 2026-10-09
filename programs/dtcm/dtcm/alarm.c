@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)alarm.c 1.50 95/07/27 Copyr 1991 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -165,7 +161,6 @@ view_flasher(XtPointer client_data, XtIntervalId *interval_id) {
 
 extern void 
 flash_it(XtPointer client_data, XtIntervalId *interval_id) {
-    int		i, j;
     Calendar	*c = (Calendar *)client_data;
 
     if (c->view->flashes == 0) {
@@ -264,7 +259,7 @@ mail_it(XtPointer client_data, XtIntervalId *interval_id, CSA_reminder_reference
 	} else
 		stopbuf[0] = '\0';
 
-	if (l = lines) {
+	if ((l = lines)) {
 		sprintf(whatbuf, "%s\n", l->s);
 		l = l->next;
 	} else
@@ -393,7 +388,7 @@ postup_show_proc(Calendar *c, CSA_reminder_reference *r) {
 	Lines			*lines, *l = NULL;
 	Props			*p = (Props *)c->properties;
 	Widget			pu_frame, pu_base_form, 
-				pu_text_form, separator, 
+				pu_text_form, 
 				pu_form, button_form, pu_date,
 				pu_range, pu_image, pu_close, line, last_line;
 	Boolean			start_am, stop_am;
@@ -470,7 +465,7 @@ postup_show_proc(Calendar *c, CSA_reminder_reference *r) {
                 NULL);
 	XmStringFree(xmstr);
 
-	separator = XtVaCreateWidget("separator",
+	XtVaCreateWidget("separator",
                 xmSeparatorGadgetClass,
                 pu_base_form,
                 XmNleftAttachment,      XmATTACH_FORM,

@@ -875,7 +875,7 @@ EMPTY_QUERY:
 	return FALSE;
     }
     for  (cptr = usrblk.query;  *cptr;  cptr++) {
-	if ((ascii_charmap[*cptr] & WHITESPACE) == 0)
+	if ((ascii_charmap[(unsigned char)*cptr] & WHITESPACE) == 0)
 	    break;
     }
     if (*cptr == 0)

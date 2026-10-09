@@ -44,7 +44,7 @@ void m_ckmap(M_WCHAR *name, LOGICAL useoradd)
 {
     int mapid ;
 
-    if (mapid = m_packedlook(m_maptree, name))
+    if ((mapid = m_packedlook(m_maptree, name)))
       m_setmap(mapid + 1, useoradd) ;
     else m_err1("Undefined short reference map %s", name) ;
     }
@@ -77,7 +77,7 @@ void m_ntrent(M_WCHAR *p)
     M_ENTITY *new ;
 
     new = (M_ENTITY *) m_malloc(sizeof(M_ENTITY), "entity") ;
-    if (m_entity = (M_ENTITY *) m_ntrtrie(p, m_enttrie, (M_TRIE *) new)) {
+    if ((m_entity = (M_ENTITY *) m_ntrtrie(p, m_enttrie, (M_TRIE *) new))) {
       m_free(new, "entity") ;
       if (m_entity->wheredef == M_DPARSER) {
         if (m_entdupchk) {

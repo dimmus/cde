@@ -602,7 +602,6 @@ PdmMainWinCreateWindow(PdmMainWin* me,
 {
     Widget manager;
     Widget row;
-    Widget w;
     XmString label;
 
     /*
@@ -649,7 +648,7 @@ PdmMainWinCreateWindow(PdmMainWin* me,
 	/*
 	 * create the printer description label
 	 */
-	w = XtVaCreateManagedWidget("PrinterDescriptionLabel",
+	XtVaCreateManagedWidget("PrinterDescriptionLabel",
 				    xmLabelGadgetClass,
 				    row,
 				    NULL);
@@ -662,7 +661,7 @@ PdmMainWinCreateWindow(PdmMainWin* me,
 	    *ptr = '\0';
 	label = XmStringCreateLocalized(desc);
 	XtFree(desc);
-	w = XtVaCreateManagedWidget("PrinterDescription",
+	XtVaCreateManagedWidget("PrinterDescription",
 				    xmLabelGadgetClass,
 				    row,
 				    XmNlabelString, label,
@@ -686,7 +685,7 @@ PdmMainWinCreateWindow(PdmMainWin* me,
 	/*
 	 * create the printer name label
 	 */
-	w = XtVaCreateManagedWidget("PrinterNameLabel",
+	XtVaCreateManagedWidget("PrinterNameLabel",
 				    xmLabelGadgetClass,
 				    row,
 				    NULL);
@@ -708,7 +707,7 @@ PdmMainWinCreateWindow(PdmMainWin* me,
 	 */
 	label = XmStringCreateLocalized(printer_spec);
 	XtFree(printer_spec);
-	w = XtVaCreateManagedWidget("PrinterName",
+	XtVaCreateManagedWidget("PrinterName",
 				    xmLabelGadgetClass,
 				    row,
 				    XmNlabelString, label,
@@ -718,7 +717,7 @@ PdmMainWinCreateWindow(PdmMainWin* me,
     /*
      * top separator
      */
-    w = XtVaCreateManagedWidget("TopSeparator",
+    XtVaCreateManagedWidget("TopSeparator",
 				xmSeparatorGadgetClass,
 				manager,
 				NULL);
@@ -731,7 +730,7 @@ PdmMainWinCreateWindow(PdmMainWin* me,
 				  manager,
 				  XmNorientation, XmHORIZONTAL,
 				  NULL);
-    w = XtVaCreateManagedWidget("NotebookLabel",
+    XtVaCreateManagedWidget("NotebookLabel",
 				xmLabelGadgetClass,
 				row,
 				NULL);

@@ -249,7 +249,7 @@ void DtMainW::DtAddAction(char *name, char *category, char *actionName,
 			  char *accelerator)
 {
    BaseUI *action1;
-   if (action1 = actionsMenu->FindByName(name))
+   if ((action1 = actionsMenu->FindByName(name)))
       action1->Category(NULL);
    else
       actionsMenu->AddAction(name, category, actionName, callback, 

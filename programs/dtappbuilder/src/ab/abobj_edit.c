@@ -141,17 +141,12 @@ static void	init_undo_rec(
 		    ABUndoRec		*undo_rec_ptr
 		);
 
-static void	init_undo(
-		);
 
 static void	verify_undo_rec_space(
 		    ABUndoRec	*undo_rec_ptr,
 		    int		count
 		);
 
-static void	verify_undo_space(
-		    int		count
-		);
 
 static void	remove_clipboard_descendants(
 		    ABSelectedRec	*sel
@@ -211,9 +206,6 @@ static DTB_MODAL_ANSWER show_modal_msg_relative_initiator(
 **************************************************************************/
 static ABClipboardRec	ABClipboard = NULL;
 static ABUndoRec	ABUndo = NULL;
-static ABUndoRec	ABUndo_backup = NULL;
-
-static void		(*Undo_func)();
 
 BOOL			in_undo = FALSE;
 
@@ -238,7 +230,6 @@ edit_destroyOCB(
 )
 {
     ABObj	obj, 
-		parent_obj, 
 		project;
     int		i;
 
@@ -577,9 +568,7 @@ resolve_clipboard_connections(
 {
     AB_TRAVERSAL	trav;
     ABClipbInfo	info;
-    ABObj	newObj,
-		origObj,
-		action_obj;
+    ABObj	action_obj;
     int		i,
 		j;
 
@@ -595,9 +584,6 @@ resolve_clipboard_connections(
 
         if (!info->action_list)
 	    continue;
-
-        newObj = info->dup_obj;
-        origObj = clipboard->list[i];
 
 	/*
 	 * For all the connections that were copied to the clipboard
@@ -703,10 +689,8 @@ resolve_clipboard_attachments(
     ABObj	*new_list = NULL;
     ABObj	newObj,
 		origObj,
-		childObj,
-		action_obj;
-    int		i,
-		j;
+		childObj;
+    int		i;
 
     if (!obj || (count <= 0) || !clipboard)
 	return;
@@ -1082,6 +1066,8 @@ resolve_attach_one_attachment(
 	(void)obj_set_attachment(obj, dir, attachType, (void *)attachObj, offset);
 
 	break;
+	default:
+	break;
     }
 }
 
@@ -1119,14 +1105,12 @@ resolve_attach_parent_dir(
     ABObj		new_parent
 )
 {
-    ABAttachment	*one_attachment;
     AB_ATTACH_TYPE	attachType;
     ABObj		attachObj = NULL;
 
     if (!obj || !new_parent)
 	return;
 
-    one_attachment = obj_get_attachment(obj, dir);
     attachType = obj_get_attach_type(obj, dir);
     attachObj = (void *)obj_get_attach_value(obj, dir);
 
@@ -1154,8 +1138,7 @@ resolve_undo_rec_connections(
 {
     AB_TRAVERSAL	trav;
     ABUndoInfo		undo_info;
-    ABObj		origObj,
-			from_action_list,
+    ABObj		from_action_list,
 			to_action_list,
 			action_obj;
     int			i,
@@ -1178,16 +1161,12 @@ resolve_undo_rec_connections(
             for (trav_open(&trav, from_action_list, AB_TRAV_ACTIONS);
                 (action_obj = trav_next(&trav)) != NULL; )
             {
-                ABUndoInfo	to_info,
-				from_info;
-	        BOOL	to_obj_copied = FALSE,
-			from_obj_copied = FALSE;
+                ABUndoInfo	to_info;
+	        BOOL	to_obj_copied = FALSE;
 	        ABObj	orig_to_obj,
 			new_to_obj,
-			orig_from_obj,
-			new_from_obj;
-	        int	from_save_index,
-			to_save_index;
+			orig_from_obj;
+	        int	to_save_index;
 
 	        /*
 	         * Check if the 'to' object was copied into the
@@ -1240,16 +1219,12 @@ resolve_undo_rec_connections(
             for (trav_open(&trav, to_action_list, AB_TRAV_ACTIONS);
                 (action_obj = trav_next(&trav)) != NULL; )
             {
-                ABUndoInfo	to_info,
-			from_info;
-	        BOOL	to_obj_copied = FALSE,
-			from_obj_copied = FALSE;
+                ABUndoInfo	from_info;
+	        BOOL	from_obj_copied = FALSE;
 	        ABObj	orig_to_obj,
-			new_to_obj,
 			orig_from_obj,
 			new_from_obj;
-	        int	from_save_index,
-			to_save_index;
+	        int	from_save_index;
 
 	        /*
 	         * Check if the 'from' object was copied into the
@@ -1316,15 +1291,12 @@ resolve_undo_rec_attachments(
 )
 {
     AB_TRAVERSAL	trav;
-    ABClipbInfo	info;
     ABUndoInfo		undo_info;
     ABObj	*new_list = NULL;
     ABObj	newObj,
 		origObj,
-		childObj,
-		action_obj;
-    int		i,
-		j;
+		childObj;
+    int		i;
 
     if (!obj || (count <= 0) || !undo_rec)
 	return;
@@ -1448,15 +1420,6 @@ init_undo_rec(
 }
 
 /*
- * Initializes undo buffer
- */
-static void
-init_undo(void)
-{
-    init_undo_rec(&ABUndo);
-}
-
-/*
  * verify_undo_rec_space()
  * Makes sure the undo buffer has enough nodes for 'count' more 
  * objects.
@@ -1512,14 +1475,6 @@ verify_undo_rec_space(
 	 */
         undo_rec->size = num_nodes;
     }
-}
-
-static void
-verify_undo_space(
-    int		count
-)
-{
-    verify_undo_rec_space(&ABUndo, count);
 }
 
 /*
@@ -2073,9 +2028,6 @@ clear_undo_rec(
 
 	case AB_UNDO_UNGROUP:
 	{
-	    int		member_count, member_index;
-	    ABObj	*member_list;
-	    ABObj	member;
 
 	    /*
 	     * Dup group object.
@@ -2125,11 +2077,8 @@ int
 abobj_cut(void)
 {
     ABObj	project = proj_get_project();
-    ABObj	newObj = NULL;
-    ABObj	*clipb_list = NULL;
     ABSelectedRec sel;
     int		i;
-    int		clipb_count = 0;
     int		iRet = 0;
 
     if (!project)
@@ -2170,10 +2119,8 @@ abobj_cut(void)
 int
 abobj_copy(void)
 {
-    ABObj	project = proj_get_project(),
-    		newObj;
+    ABObj	project = proj_get_project();
     ABSelectedRec sel;
-    int		  i;
     int		iRet = 0;
 
     if (!project)
@@ -2204,12 +2151,10 @@ abobj_paste(
 			newroot = NULL,
 			parent;
     ABSelectedRec 	sel;
-    STRING		name = (STRING) NULL;
     int		  	i = 0, j = 0;
     int			iRet = 0;
     STRING		errmsg = (STRING) NULL;
     STRING		i18n_msg = (STRING) NULL;
-    char		Buf[MAXPATHLEN] = "";
     BOOL		Err = False;
     BOOL		CancelPaste = False;
     DTB_MODAL_ANSWER	answer = DTB_ANSWER_NONE;
@@ -2360,6 +2305,8 @@ abobj_paste(
                                 case DTB_ANSWER_CANCEL: 
 				    CancelPaste = TRUE;
 				    break;
+				default:
+				    break;
 			    }
 			}
 			else
@@ -2395,6 +2342,8 @@ abobj_paste(
  
                         	case DTB_ANSWER_CANCEL: /* Cancel */
 				    CancelPaste = TRUE;
+                            	    break;
+                        	default:
                             	    break;
                     	    }
                 	}
@@ -2434,6 +2383,8 @@ abobj_paste(
                                 case DTB_ANSWER_CANCEL:
 				CancelPaste = TRUE;
 			        break;
+                                default:
+                                break;
                             }
 		        }
 	            }
@@ -2897,11 +2848,6 @@ abobj_set_undo(
     AB_UNDO_TYPE	undo_type
 )
 {
-    int		i;
-    Position	x = 0, 
-		y = 0;
-    Dimension	width = 0, 
-		height = 0;
 
     if (!obj || (count <= 0))
 	return (0);
@@ -2932,7 +2878,6 @@ abobj_cancel_undo(void)
 BOOL
 abobj_undo_active(void)
 {
-    BOOL		i;
 
     return (ABUndo && (ABUndo->undo_func != NULL));
 }
@@ -3069,7 +3014,7 @@ abobj_clipboard_add(
 	    if ((action_obj->info.action.from == obj[j]) || 
 		(obj_is_descendant_of(action_obj->info.action.from, obj[j])))
 	    {
-                ABObj	new_action, new_from_obj, new_to_obj;
+                ABObj	new_action, new_from_obj;
 
 		/*
 		 * Create the ACTION_LIST that will hold all the connections
@@ -3144,8 +3089,6 @@ abobj_clipboard_set(
     int		count
 )
 {
-    int		i,
-		j;
 
     /*
      * Clear clipboard first
@@ -3701,15 +3644,8 @@ undo_paste(
     ABUndoRec	undo_rec
 )
 {
-    int		x,
-		y,
-		width, 
-    		height,
-		i = 0;
-    ABObj       obj,
-		dup_obj,
-		parent_obj,
-		newObj;
+    int		i = 0;
+    ABObj       obj;
 
     if (!undo_rec)
 	return;

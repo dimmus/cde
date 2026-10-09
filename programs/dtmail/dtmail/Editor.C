@@ -103,8 +103,6 @@ Editor::set_message(DtMail::Message * msg,
 
     disable_redisplay();
 
-    int indent = 0;
-
     if (format == IF_BRACKETED) {
 	char * ins_bracket;
 	switch (brackets) {

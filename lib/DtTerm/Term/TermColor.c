@@ -67,7 +67,6 @@ _DtTermColorInit(Widget w)
 {
     DtTermWidget tw = (DtTermWidget) w;
     DtTermData td = tw->vt.td;
-    int i;
 
     if (isDebugFSet('C', 0)) {
 #ifdef	BBA

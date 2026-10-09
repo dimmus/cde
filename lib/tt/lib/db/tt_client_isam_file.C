@@ -74,7 +74,7 @@ _Tt_client_isam_file
   // Because a old TT client may be talking with the old DB, make sure
   // files are opened with a manual lock, not an exclusive lock.
   if ((fileDescriptor =
-       dbConnection->isopen(file, mode&(~ISEXCLLOCK)|ISMANULOCK)) == -1) {
+       dbConnection->isopen(file, (mode&(~ISEXCLLOCK))|ISMANULOCK)) == -1) {
     newFlag = TRUE;
     dbConnection->isreclen = min_record_length;
     fileDescriptor = dbConnection->isbuild(file,

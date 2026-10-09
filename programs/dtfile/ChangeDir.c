@@ -632,7 +632,6 @@ WriteResourceValues(
         char **name_list )
 {
    ChangeDirData * change_dir_data = (ChangeDirData *) values->data;
-   ChangeDirRec * change_dir_rec;
 
    /*  If the dialog is currently displayed, update the geometry  */
    /*  fields to their current values.                            */
@@ -640,7 +639,6 @@ WriteResourceValues(
    if (change_dir_data->displayed == True)
    {
       _DtGenericUpdateWindowPosition(values);
-      change_dir_rec = (ChangeDirRec *) _DtGetDialogInstance (values);
    }
 
    _DtDialogPutResources (fd, name_list, CHANGEDIRECTORY, values->data,
@@ -1034,7 +1032,7 @@ CheckRestrictedDir (
    /* check if value is inside the restricted subdir */
    len = strlen(directory);
    if (strncmp(*value, directory, len) != 0 ||
-       (*value)[len] != '/' && (*value)[len] != '\0')
+       ((*value)[len] != '/' && (*value)[len] != '\0'))
    {
        tmpBuffer = GetSharedMessage(CHANGE_DIR_ERROR_TITLE);
        title = XtNewString(tmpBuffer);
@@ -1077,8 +1075,6 @@ ChangeToNewDir (
    FileMgrData * file_mgr_data;
    char * value;
    Widget selection_box;
-   Arg args[1];
-   char * tmpStr;
    int rc;
 
    /*  Get the change dir data record  */
@@ -1353,7 +1349,6 @@ ChangeDirectoryToParent(
    ChangeDirRec * change_dir_rec;
    FileMgrData * file_mgr_data;
    Widget selection_box;
-   char * tmpStr;
    int rc;
 
    /*  Get the change dir data record  */

@@ -253,7 +253,6 @@ typedef struct {
 void GetSessionInfo( void )
 {
     XrmDatabase        db;
-    char               *tmpStr, *tmpStr2;
     char               *path;
     XrmName            xrm_name[5];
     XrmRepresentation  rep_type;
@@ -406,7 +405,6 @@ void SaveSession( void )
     char                    *path, *name;
     int                     fd, n;
     char                    *xa_CommandStr[3];
-    char                    *tmpStr, *tmpStr2;
     Position                x,y;
     Dimension               width, height;
     char                    *msgPtr, *fmtPtr, *errPtr;
@@ -553,10 +551,10 @@ SaveSessionCB (
         XtPointer clientData,
         XtPointer callbackArg )
 {
+#if 0
   char      *xa_CommandStr[3];
   int       i;
 
-#if 0
   i = 0;
   xa_CommandStr[i] = pszExecName; i++;
   XSetCommand(XtDisplay(CreateActionAppShell), XtWindow(CreateActionAppShell), xa_CommandStr, i);
@@ -574,7 +572,6 @@ SaveSessionCB (
 IconData *GetIconDataFromWid( Widget wid )
 {
   int       i;
-  IconData  *pIconData;
 
   for (i=0; i < ICON_NUMBER; i++) {
      if ((IconDataList[i]) && (IconDataList[i]->wid == wid)) {
@@ -593,7 +590,6 @@ IconData *GetIconDataFromWid( Widget wid )
 IconData *GetIconDataFromMsgID( char *msgID )
 {
   int       i;
-  IconData  *pIconData;
 
   for (i=0; i < ICON_NUMBER; i++) {
      if (IconDataList[i]->pmMsgID) {
@@ -629,7 +625,6 @@ IconData *GetIconDataFromMsgID( char *msgID )
 void RemoveTmpIconFiles( void )
 {
   int       i;
-  IconData  *pIconData;
   char      maskFile[MAXFILENAME];
 
   for (i=0; i < ICON_NUMBER; i++) {
@@ -686,7 +681,7 @@ DieFromToolTalkError(Widget parent, char *errfmt, Tt_status status)
 {
     Arg		 args[10];
     Widget	 dialog, dialogShell;
-    char	*errmsg, *statmsg, *title;
+    char	*errmsg, *statmsg;
     XmString	 xms_errmsg, xms_ok, xms_title;
     int		 n;
 
@@ -1109,7 +1104,6 @@ void UxDoEditPixmap(Widget wid, char *fname)
   int            lenFile1 = 0, rlenFile1 = 0;
   int            lenFile2 = 0, rlenFile2 = 0;
 
-  int            mark;
   char           *msgID;
   char           **ppMsgID;
   IconData       *pIconData;
@@ -1121,14 +1115,13 @@ void UxDoEditPixmap(Widget wid, char *fname)
   char           *msgPtr;
   char           *fmtPtr;
   char           *mname = (char *)NULL;
-  char           *type_name, *size_name;
 
 
 #ifdef DEBUG
   if (fname) printf("Edit filename: '%s'\n", fname);  /* debug */
 #endif
 
-  mark = tt_mark();
+  tt_mark();
 
   /*********************************************************************/
   /* Create request                                                    */
@@ -1273,8 +1266,10 @@ void UxDoEditPixmap(Widget wid, char *fname)
                  return;
               }
            }
-           if (fd1 > -1) close(fd1); fd1 = -1;
-           if (fd2 > -1) close(fd2); fd2 = -1;
+           if (fd1 > -1) close(fd1);
+           fd1 = -1;
+           if (fd2 > -1) close(fd2);
+           fd2 = -1;
 
 #ifdef DEBUG
            printf("final buffer = '%s'\n", buffer); /* debug */
@@ -1356,9 +1351,7 @@ main(int argc, char *argv[])
         extern swidget  create_OpenFile();
         extern swidget  create_Confirmed();
         extern Widget   create_ErrorDialog();
-        int             rc;
         Atom            xa_WM_SAVE_YOURSELF;
-        char            *ptr;
 
         /*---------------------------------
          * Interface function declaration

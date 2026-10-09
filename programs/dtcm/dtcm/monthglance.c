@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)monthglance.c 1.82 95/07/27 Copyr 1994 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,7 +107,6 @@ static void 	paint_day_entries(Tick, int, int, int, int,
 				  Paint_cache *, CSA_uint32, XRectangle *);
 static Boolean	allocated(Calendar *);
 static void	allocator(Calendar *);
-static void	deallocator(Calendar *);
 extern void	layout_children(Calendar *);
 static void	display_header(Calendar *);
 static void	quick_button_cb(Widget, XtPointer, XtPointer);
@@ -275,7 +270,6 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
         int 		firstdom, boxw, boxh, dayname_height, margin, default_height;
         Tick 		day;
         struct tm 	tm;
-        new_XContext 	*xc;
 	Dimension 	btn_ht=0, btn_w=0;
 	time_t 		start, stop;
 	CSA_enum 	*ops;
@@ -283,6 +277,7 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
 	CSA_entry_handle *list = NULL;
 	XFontSetExtents fontextents;
 	_Xltimeparams	localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
  
         tm              = *_XLocaltime(&key, localtime_buf);
         tm.tm_mday      = 1;
@@ -300,7 +295,6 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
         boxh            = calendar->view->boxh;
         margin          = calendar->view->outside_margin;
 	dayname_height  = ((Month *) calendar->view->month_info)->dayname_height;
-        xc              = calendar->xcontext;
  
 
 	if (c->paint_cache == NULL) {
@@ -340,7 +334,7 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
 
                 day = nextday(day);
                 x++;
-                if (x > 6 & i != m->ndays) {
+                if ((x > 6) & (i != m->ndays)) {
                         x = 0;
                         y++;
                 }
@@ -360,6 +354,7 @@ display_header(Calendar *c)
 	struct tm 	*tm_ret;
 	Tick 		tmptick = c->view->date;
 	_Xltimeparams	localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 /* label */
 	tm_ret = _XLocaltime(&tmptick, localtime_buf);
@@ -463,6 +458,7 @@ layout_month(
 	struct	tm	 tm;
 	Tick		 day;
 	_Xltimeparams	 localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	tm = *_XLocaltime(&date, localtime_buf);
 	tm.tm_mday = 1;
@@ -490,7 +486,7 @@ layout_month(
 		m->button_loc[i-1].y = box_origin_y + 3;
 
 		x++;
-		if (x > 6 & i != m->ndays) {
+		if ((x > 6) & (i != m->ndays)) {
 			x = 0;
 			y++;
 		}
@@ -570,6 +566,7 @@ get_time_str (Dtcm_appointment *appt, char *buf)
         int 		hr, mn;
 	Tick 		start_tick;
 	_Xltimeparams	localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
 	_csa_iso8601_to_tick(appt->time->value->item.date_time_value, &start_tick);
 	buf[0] = '\0';
@@ -700,6 +697,7 @@ count_month_pages(Calendar *c, Tick start_date, int lines_per_box)
 	CSA_attribute 		*range_attrs;
 	CSA_enum 		*ops;
 	_Xltimeparams		localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
 
         tm    = *_XLocaltime(&start_date, localtime_buf);
         tm.tm_mday = 1;
@@ -973,7 +971,6 @@ layout_children(Calendar *c)
 static void
 manage_children(Calendar *c)
 {
-	int 	i;
 	Month 	*m = (Month *)c->view->month_info;
  
         /* manage the header widget */
@@ -984,7 +981,6 @@ manage_children(Calendar *c)
 static void
 unmanage_children(Calendar *c)
 {
-	int 	i;
 	Month 	*m = (Month *)c->view->month_info;
  
         /* unmanage the header widget */
@@ -1065,30 +1061,3 @@ allocator(Calendar *c)
 	}
 }
 
-/*
- * (Not in service)
- * allocate storage & subwidgets used by month view
- */
-static void 
-deallocator(Calendar *c)
-{
-        Month 	*m = (Month *)c->view->month_info;
-	int 	n;
-
-	/* free cache of points for buttons positions */
-	free(m->button_loc);
-
-	/* destroy widgets used for header */
-	XtDestroyWidget(m->month_label);
-
-	/* hot buttons */
-	for (n=0; n<31; n++)
-		XtDestroyWidget(m->hot_button[n]);
-
-	/* array that held navigation buttons */
-	free(m->hot_button);
-
-	/* structure holding month information */
-	free(m);
-	c->view->month_info = NULL;
-}

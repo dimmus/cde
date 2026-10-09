@@ -64,7 +64,6 @@ _DtTermPrimBufferCreateBuffer
     TermLine       *newTL;
     TermBuffer      newTB;
     Boolean        *tabs;
-    int             sizeOfChar;
     
     /*
     ** malloc new a TermBuffer and an array of TermLine pointers
@@ -1680,7 +1679,6 @@ _DtTermPrimBufferInsertLine
     TermLine *holdLines = lineCache;
     TermLine *destPtr;
     TermLine *srcPtr;
-    short distance;
     int i;
     int refLineCount;
     TermLine *refLines;
@@ -1775,8 +1773,8 @@ _DtTermPrimBufferInsertLine
 	    *destPtr = *srcPtr;
 	    /* clear the line... */
             _DtTermPrimBufferClearLine(tb, dest - length + 1 + i, 0);
-	    *destPtr++;
-            *srcPtr++;
+	    destPtr++;
+            srcPtr++;
 	}
 
 #ifdef	DONT_DO_THIS_ANY_MORE
@@ -1807,8 +1805,8 @@ _DtTermPrimBufferInsertLine
 	    *destPtr = *srcPtr;
 	    /* clear the line... */
             _DtTermPrimBufferClearLine(tb, dest + i, 0);
-	    *destPtr++;
-            *srcPtr++;
+	    destPtr++;
+            srcPtr++;
 	}
     }
 
@@ -1886,8 +1884,10 @@ _DtTermPrimBufferDeleteLine
 {
     TermLine lineCache[10];
     TermLine *holdLines = lineCache;
+#ifndef	USE_MEMCPY
     TermLine *destPtr;
     TermLine *srcPtr;
+#endif	/* USE_MEMCPY */
     short copyLength;
     int i;
     int refLineCount;

@@ -111,8 +111,6 @@ ProcessEvents (
     pid_t			 child_pid,
     Boolean			 child_flag)
 {
-    int    result;
-
     int   rMask;
     int   myFd;
     pid_t pid;
@@ -142,9 +140,9 @@ ProcessEvents (
 	if (!XPending(dpy))
 	  {
 #if	0
-	    result = select(myFd+1, &rMask, 0, 0, topPtr);
+	    select(myFd+1, &rMask, 0, 0, topPtr);
 #else
-	    result = select(myFd+1, ((fd_set *)&rMask), 0, 0, topPtr);
+	    select(myFd+1, ((fd_set *)&rMask), 0, 0, topPtr);
 #endif
 
 	    /*

@@ -243,6 +243,8 @@ void load_icons (Widget wid, XtPointer client_data,
   } else {
      size_name = (char *)NULL;
   }
+  (void) type_name;	/* used only #ifdef DEBUG */
+  (void) size_name;
 
 #ifdef DEBUG
     printf("path&base = %s\n", path_and_base_name); /* debug */
@@ -477,7 +479,7 @@ char **GetIconSearchPathList(void)
        /* If %L in path, then add size of lang variable to it when          */
        /* allocating array for path.                                        */
        /*********************************************************************/
-       if (strip = strstr(tmpptr, "%L")) {
+       if ((strip = strstr(tmpptr, "%L"))) {
          path = malloc(strlen(tmpptr) + langsize + 1);
        } else {
          path = malloc(strlen(tmpptr) + 1);
@@ -487,14 +489,14 @@ char **GetIconSearchPathList(void)
        /*********************************************************************/
        /* Strip off the /%B... stuff off of the path if there is some.      */
        /*********************************************************************/
-       if (strip = strstr(path, "%B")) {
+       if ((strip = strstr(path, "%B"))) {
           *strip = '\0';
        }
 
        /*********************************************************************/
        /* Now replace %L with lang variable.                                */
        /*********************************************************************/
-       if (strip = strstr(path, "%L")) {
+       if ((strip = strstr(path, "%L"))) {
           *strip = '\0';
           if (langsize) {
              strcat(path, lang);
@@ -570,7 +572,6 @@ char **GetIconSearchPathList(void)
 /******************************************************************************/
 void FreeIconSearchPathList(char **pplist)
 {
-  char *ptr;
   int  i;
 
   /**************************************************************************/
@@ -668,7 +669,9 @@ void SetIconData(Widget wid, char *pszIconFile, enum icon_size_range enumIconSiz
 {
   char      pmFileName[MAXBUFSIZE];
   char      bmFileName[MAXBUFSIZE];
+#if 0
   char      pszSize[MAX_EXT_SIZE];
+#endif
   IconData  *pIconData;
   char      *pszName;
 

@@ -88,7 +88,7 @@ DtWsmGetWorkspaceList(
 {
     Atom actualType;
     int actualFormat;
-    unsigned long leftover, items, length, oldlength;
+    unsigned long leftover, items, length;
     int rcode;
     Atom property;
     Window wmWindow;

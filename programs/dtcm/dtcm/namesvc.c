@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)namesvc.c 1.5 94/11/07 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #if 0
 
 #include <rpcsvc/nis.h>

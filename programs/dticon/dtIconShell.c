@@ -891,7 +891,7 @@ build_dtIconShell( void )
         Widget        formatMenu_shell;
         Widget        magnificationMenu_shell;
         Widget        helpMenu_shell;
-        XmString      tmpXmStr, tmpXmStr2, tmpXmStr3, tmpXmStr4;
+        XmString      tmpXmStr;
         char         *tmpStr, *tmpStr2;
         static char   geometry[40];
 

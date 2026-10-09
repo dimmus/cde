@@ -40,7 +40,6 @@
  */
 static void free_excpt3(Except_3 *e);
 static Abb_Appt_3 * abb4_to_abb3(Abb_Appt_4 *a4);
-static void apptid4_to_apptid3(Apptid_4 *from, Apptid_3 *to);
 static Reminder_3 * reminder4_to_reminder3(Reminder_4 *r4);
 static Table_Res_Type_3 tablerestype4_to_tablerestype3(Table_Res_Type_4 t);
 static void tablereslist4_to_tablereslist3(Table_Res_List_4 *from,
@@ -53,10 +52,6 @@ static Buffer_3 buffer4_to_buffer3(Buffer_4 b);
 static Tag_3 * tag4_to_tag3(Tag_4 *t4);
 static Attribute_3 * attr4_to_attr3(Attribute_4 *a4);
 static Except_3 * except4_to_except3(Except_4 *e4);
-static Table_Args_Type_3 argstag4_to_argstag3(Table_Args_Type_4 t);
-static void args4_to_args3(Args_4 *from, Args_3 *to);
-static Table_Args_3 * tableargs4_to_tableargs3(Table_Args_4 *a4);
-static Registration_3 * reg4_to_reg3(Registration_4 *r4);
 static void free_tag3(Tag_3 *t);
 
 /**************** DATA TYPE (4->3) CONVERSION ROUTINES **************/
@@ -213,14 +208,6 @@ abb4_to_abb3(Abb_Appt_4 *a4)
 		a4 = a4->next;
 	}
 	return(head);
-}
-
-static void
-apptid4_to_apptid3(Apptid_4 *from, Apptid_3 *to)
-{
-        if (from==NULL || to==NULL) return;
-        _DtCm_id4_to_id3(from->oid, to->oid);
-        to->new_appt = _DtCm_appt4_to_appt3(from->new_appt);
 }
 
 static Reminder_3 *
@@ -662,98 +649,6 @@ except4_to_except3(Except_4 *e4)
 	return(head);
 }
  
-static Table_Args_Type_3
-argstag4_to_argstag3(Table_Args_Type_4 t)
-{
-        switch(t) {
-        case TICK_4:
-                return(TICK_3);
-        case APPTID_4:
-                return(APPTID_3);
-        case UID_4:
-                return(UID_3);
-        case APPT_4:
-                return(APPT_3);
-        case RANGE_4:
-                return(RANGE_3);
-	case KEYRANGE_4:
-		return(KEYRANGE_3);
-        default:
-                return(TICK_3);
-        }
-}
-
-static void
-args4_to_args3(Args_4 *from, Args_3 *to)
-{
-	if (from==NULL || to==NULL) return;
-	to->tag = argstag4_to_argstag3(from->tag);
-	switch(from->tag) {
-	case TICK_4:
-		to->Args_3_u.tick = from->Args_4_u.tick;
-		break;
-	case APPTID_4:
-		to->Args_3_u.apptid.oid = (Id_3 *)calloc(1, sizeof(Id_3));
-		apptid4_to_apptid3(
-			&(from->Args_4_u.apptid),
-			&(to->Args_3_u.apptid));
-		break;
-	case UID_4:
-		to->Args_3_u.key = _DtCm_uid4_to_uid3(from->Args_4_u.key);
-		break;
-	case APPT_4:
-		to->Args_3_u.appt = _DtCm_appt4_to_appt3(from->Args_4_u.appt);
-		break;
-	case RANGE_4:
-		to->Args_3_u.range = _DtCm_range4_to_range3(from->Args_4_u.range);
-		break;
-	case KEYRANGE_4:
-		to->Args_3_u.keyrange = _DtCm_keyrange4_to_keyrange3(
-			from->Args_4_u.keyrange);
-	default:
-		break;
-	}
-}
-
-static Table_Args_3 *
-tableargs4_to_tableargs3(Table_Args_4 *a4)
-{
-	Table_Args_3 *a3;
-	
-	if (a4==NULL) return((Table_Args_3 *)NULL);
-	a3 = (Table_Args_3 *)calloc(1, sizeof(Table_Args_3));
-	a3->target = buffer4_to_buffer3(a4->target);
-	args4_to_args3(&(a4->args), &(a3->args));
-	a3->pid = a4->pid;
-	return(a3);
-}
-
-static Registration_3 *
-reg4_to_reg3(Registration_4 *r4)
-{
-        Registration_3 *r3, *head, *prev;
-
-	prev = head = NULL;
-	while (r4 != NULL) {
-		r3 = (Registration_3 *)calloc(1, sizeof(Registration_3));
-		r3->target = buffer4_to_buffer3(r4->target);
-		r3->prognum = r4->prognum;
-		r3->versnum = r4->versnum;
-		r3->procnum = r4->procnum;
-		r3->next = NULL;
-		r3->pid = r4->pid;
-
-		if (head == NULL)
-			head = r3;
-		else
-			prev->next = r3;
-		prev = r3;
-
-		r4 = r4->next;
-	}
-	return(head);
-}
-
 static void
 free_tag3(Tag_3 *t)
 {

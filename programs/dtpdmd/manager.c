@@ -515,8 +515,9 @@ void mgr_fetch_pdm( XpPdmServiceRec *rec )
 {
     char tstr[1024], *tptr1 = NULL, *tptr2, *tptr3;
     int  firstTime;
-    long now;
+#if 0 && defined(PRINTING_SUPPORTED)
     Display *tdpy;
+#endif
     int lxerrno;
 
     if ( g.override_pdm ) {
@@ -646,12 +647,10 @@ void mgr_fetch_pdm( XpPdmServiceRec *rec )
 void mgr_launch_reply( XpPdmServiceRec *rec )
 {
     XEvent reply;
-    Status status;
     FILE   *errlog;
     time_t now;
     char   *eec;
 
-    Atom    tmpa;
 
 
     XChangeProperty( rec->selection_display, rec->requestor,
@@ -705,7 +704,7 @@ void mgr_launch_reply( XpPdmServiceRec *rec )
     reply.xselection.property  = rec->prop_atom;
     reply.xselection.time      = rec->time;
 
-    status = XSendEvent( rec->selection_display, rec->requestor, True, 0, &reply );
+    XSendEvent( rec->selection_display, rec->requestor, True, 0, &reply );
 }
 
 /********************************************************************
@@ -717,7 +716,6 @@ void mgr_shutdown_reply( XpPdmServiceRec *rec )
     XEvent cme;
     Display *pdpy;
     char *mess;
-    int inc;
     char buf[2048];
     int lxerrno;
 
@@ -838,19 +836,19 @@ Bool has_exec_token( XpPdmServiceRec *rec )
 	 * required, and eliminate the token from the
 	 * output.
 	 */
-	if ( s2 = strstr( s1, "PDM_START_OK") ) {
+	if (( s2 = strstr( s1, "PDM_START_OK") )) {
 	    rec->pdm_exec_errorcode = g.pdm_start_ok;
 	    i1 = 12;
 	}
-	else if ( s2 = strstr( s1, "PDM_START_VXAUTH") ) {
+	else if (( s2 = strstr( s1, "PDM_START_VXAUTH") )) {
 	    rec->pdm_exec_errorcode = g.pdm_start_vxauth;
 	    i1 = 16;
 	}
-	else if ( s2 = strstr( s1, "PDM_START_PXAUTH") ) {
+	else if (( s2 = strstr( s1, "PDM_START_PXAUTH") )) {
 	    rec->pdm_exec_errorcode = g.pdm_start_pxauth;
 	    i1 = 16;
 	}
-	else if ( s2 = strstr( s1, "PDM_START_ERROR") ) {
+	else if (( s2 = strstr( s1, "PDM_START_ERROR") )) {
 	    rec->pdm_exec_errorcode = g.pdm_start_error;
 	    i1 = 15;
 	}
@@ -860,7 +858,7 @@ Bool has_exec_token( XpPdmServiceRec *rec )
 	     * Compress out the token.
 	     */
 	    s3 = s2 + i1;
-	    while ( *s2++ = *s3++ );
+	    while (( *s2++ = *s3++ ));
 
 	    if ( strlen(s1) == 0 ) {
 		/*
@@ -900,11 +898,8 @@ void mgr_shutdown_scan(void)
     time_t     now;
     FILE       *errlog;
     static int errlog_problem_notice = 0;
-    Bool       shutdown_time;
 
     for ( i = 0; i < g.serviceRecNum; i++ ) {
-
-	shutdown_time = False;
 
 	if ( (g.serviceRecs[i]->do_launch_reply) &&
 	     (has_exec_token(g.serviceRecs[i]) )    ) {

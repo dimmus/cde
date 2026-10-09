@@ -20,7 +20,6 @@
  * to the Free Software Foundation, Inc., 51 Franklin Street, Fifth
  * Floor, Boston, MA 02110-1301 USA
  */
-static char sccsid[] = "@(#)96  1.4  com/config/UxXt.c, aic, aic324, 9317324f 5/12/93 15:40:01";
 /*
  *  COMPONENT_NAME: AIC           AIXwindows Interface Composer
  *
@@ -280,7 +279,6 @@ CREATION:       Visual Edge Software            April 6 1991
 void    UxDeleteContextCB( Widget wgt, XtPointer client_data,
                                                 XtPointer _call_data )
 {
-        XtPointer       call_data = _call_data;
 
         (void) XDeleteContext( XtDisplay( UxTopLevel ),
                                (Window) wgt,
@@ -375,7 +373,6 @@ CREATION:       Visual Edge Software            April 30 1993
 -----------------------------------------------------------------------------*/
 static  void    DelayedFreeData( XtPointer client_data, XtIntervalId *_id)
 {
-        XtIntervalId    *id = _id;
 
         if (client_data != NULL) {
                 XtFree((char *) client_data);
@@ -400,8 +397,6 @@ CREATION:       Visual Edge Software            April 6 1991
 void    UxDestroyContextCB( Widget _wgt, XtPointer client_data,
                                 XtPointer _call_data )
 {
-        Widget          wgt = _wgt;
-        XtPointer       call_data = _call_data;
 
         if (client_data != NULL) {
                 XtAppAddTimeOut(UxAppContext, 0,
@@ -428,7 +423,6 @@ XmFontList    UxConvertFontList( char *fontlist_str )
 {
         XrmValue        from, to;
         XmFontList      fontlist = NULL;
-        Boolean         status;
 
         from.size = strlen( fontlist_str ) + 1;
         from.addr = fontlist_str;
@@ -436,9 +430,9 @@ XmFontList    UxConvertFontList( char *fontlist_str )
         to.size = sizeof(XmFontList);
         to.addr = (caddr_t) &fontlist;
 
-        status = XtConvertAndStore( UxTopLevel,
-                                    XmRString, &from,
-                                    XmRFontList, &to );
+        XtConvertAndStore( UxTopLevel,
+                           XmRString, &from,
+                           XmRFontList, &to );
 
         return ( fontlist );
 }

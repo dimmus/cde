@@ -2916,6 +2916,7 @@ size_t _DtGrRead(
                 return (num_items);
         }
     }
+    return(0);
 }
 
 /******************************************************************************
@@ -2969,6 +2970,7 @@ int _DtGrSeek(
         else
             return(-1); /* Failure */
     }
+    return(-1); /* Failure */
 }
 
 /******************************************************************************
@@ -2997,6 +2999,7 @@ int _DtGrGetChar(
         else
 	    return ((unsigned char) *(stream->source.buffer.current++));
     }
+    return(EOF);
 }
 
 /******************************************************************************
@@ -3058,4 +3061,5 @@ char *_DtGrGetString(
         *buffer = '\0';
         return (save);
     }
+    return(NULL); /* Failure */
 }

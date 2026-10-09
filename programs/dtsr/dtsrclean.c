@@ -969,7 +969,7 @@ static void     copy_new_d99 (long keyfield)
 int             main (int argc, char *argv[])
 {
     FILE_HEADER     fl_hdr;
-    int             a, i, j;
+    int             a, j;
     unsigned char  *bvptr;
     DB_ADDR         dba, dba1, dbaorig;
     char            dbfpath[1024];
@@ -991,7 +991,6 @@ int             main (int argc, char *argv[])
     int             oops;
     char           *ptr;
     char            readbuf[1024 + 32];
-    unsigned long   reads_per_dot;
     char            recidbuf[DtSrMAX_DB_KEYSIZE + 4];
     time_t          starttime;
     DtSrINT32	    x;

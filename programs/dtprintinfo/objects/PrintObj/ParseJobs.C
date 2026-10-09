@@ -277,7 +277,7 @@ JobOutputType DetermineOutput(char *output)
 #endif
 
    s = output;
-   if (s1 = strchr(s, '\n'))
+   if ((s1 = strchr(s, '\n')))
       s1++;
    i = 0;
    while (i < 10 && s && *s)
@@ -304,7 +304,7 @@ JobOutputType DetermineOutput(char *output)
 	 return AIX_V2_OUTPUT;
 #endif
       s = s1;
-      if (s1 = strchr(s, '\n'))
+      if ((s1 = strchr(s, '\n')))
          s1++;
       i++;
     }
@@ -704,16 +704,13 @@ do \
 void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
 {
    char *buf = new char[1000];
-   char *s, *s1, *c;
+   char *s, *s1;
    char *qname = NULL;
    char *jname;
    char *jnumber;
    char *owner;
    char *month;
-   char *day;
    char *date;
-   char *year;
-   char *network;
    char *output;
    char *stime;
    char *jsize;
@@ -731,7 +728,7 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    snprintf(buf, 1000, "LANG=C /usr/local/bin/lpq -P%s", printer);
 #endif
 
-   Invoke *_thread = new Invoke(buf, &output);
+   new Invoke(buf, &output);
 
    if (prev_buf_size == 0)
    {
@@ -754,8 +751,8 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
        char *opt_requests_on_line = "Requests on ";
        if (0 == strncmp(s, opt_requests_on_line, strlen(opt_requests_on_line)))
        {
-           char *requests	= strtok(s, " ");
-           char *on		= strtok(NULL, " ");
+           strtok(s, " ");
+           strtok(NULL, " ");
 
            qname = strtok(NULL, " :\n");
            if (0 != strncmp(qname, printer, strlen(qname)))
@@ -774,11 +771,11 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    //
    {
        hostname = strtok(s, ":");
-       day = strtok(NULL, " ");
+       strtok(NULL, " ");
        month = strtok(NULL, " ");
        date = strtok(NULL, " ");
        stime = strtok(NULL, " ");
-       year = strtok(NULL, " \n");
+       strtok(NULL, " \n");
    }
 
    NEXT_OUTPUT_LINE(s,s1);
@@ -814,7 +811,7 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
            strtok(NULL, " ");
            strtok(NULL, " ");
            strtok(NULL, " ");
-           network = strtok(s, " \n");
+           strtok(s, " \n");
 
            NEXT_OUTPUT_LINE(s,s1);
        }
@@ -1008,7 +1005,7 @@ int ParseBSDPrintJobs(char *printer, char *jobs,
 	 for (s1 = s; *s1 == ' '; s1++)
 	    ;
 	 hostname = s1;
-	 if (s = strchr(hostname, '.'))
+	 if ((s = strchr(hostname, '.')))
 	    *s = '\0';
 	 else
 	    *(strchr(hostname, ']')) = '\0';
@@ -1103,7 +1100,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
    static int prev_buf_size = 0;
 
    snprintf(printer, sizeof(printer), "%s", _printer);
-   if (s = strchr(printer, ':'))
+   if ((s = strchr(printer, ':')))
       *s = '\0';
 	
    if (prev_buf_size == 0)
@@ -1123,7 +1120,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
    s = s1 + 1;
    s1 = strchr(s, '\n');
    s = s1 + 1;
-   if (s1 = strchr(s, '\n'))
+   if ((s1 = strchr(s, '\n')))
       *s1++ = '\0';
    if (strstr(s, "DOWN"))
       rc = 0;
@@ -1139,7 +1136,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
       if (!(jnumber && *jnumber))
        {
          s = s1;
-         if (s1 = strchr(s, '\n'))
+         if ((s1 = strchr(s, '\n')))
             *s1++ = '\0';
 	 continue;
        }
@@ -1147,7 +1144,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
       if (!(jname && *jname))
        {
          s = s1;
-         if (s1 = strchr(s, '\n'))
+         if ((s1 = strchr(s, '\n')))
             *s1++ = '\0';
 	 continue;
        }
@@ -1168,7 +1165,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
 	 ;
       jname = c;
       s = s1;
-      if (s1 = strchr(s, '\n'))
+      if ((s1 = strchr(s, '\n')))
          *s1++ = '\0';
       sdate = strtok(s, " ");
       stime = strtok(NULL, " ");
@@ -1176,7 +1173,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
       strtok(NULL, " ");
       jsize = strtok(NULL, " ");
       s = s1;
-      if (s1 = strchr(s, '\n'))
+      if ((s1 = strchr(s, '\n')))
          *s1++ = '\0';
       c = strtok(s, " \n");
       if (strstr(c, jname))
@@ -1196,7 +1193,7 @@ int ParseAIXv3PrintJobs(char *_printer, char *jobs,
       current_size += len;
       (*return_n_jobs)++;
       s = s1;
-      if (s1 = strchr(s, '\n'))
+      if ((s1 = strchr(s, '\n')))
          *s1++ = '\0';
     }
    *(job_list + current_size) = '\0';
@@ -1263,7 +1260,7 @@ int ParseAIXv2PrintJobs(char *printer, char *jobs,
    s = s1 + 1;
    s1 = strchr(s, '\n');
    s = s1 + 1;
-   if (s1 = strchr(s, '\n'))
+   if ((s1 = strchr(s, '\n')))
       *s1++ = '\0';
    while (s)
     {
@@ -1277,11 +1274,11 @@ int ParseAIXv2PrintJobs(char *printer, char *jobs,
 	 break;
        }
       s = s1;
-      if (s1 = strchr(s, '\n'))
+      if ((s1 = strchr(s, '\n')))
          *s1++ = '\0';
     }
    s = s1;
-   if (s1 = strchr(s, '\n'))
+   if ((s1 = strchr(s, '\n')))
       *s1++ = '\0';
    while (s)
     {
@@ -1290,7 +1287,7 @@ int ParseAIXv2PrintJobs(char *printer, char *jobs,
        {
          s = s1;
          if (s1)
-	    if (s1 = strchr(s, '\n'))
+	    if ((s1 = strchr(s, '\n')))
                *s1++ = '\0';
 	 continue;
        }
@@ -1300,7 +1297,7 @@ int ParseAIXv2PrintJobs(char *printer, char *jobs,
       strtok(NULL, " ");
       strtok(NULL, " ");
       stime = strtok(NULL, " ");
-      if (c = strchr(owner, '.'))
+      if ((c = strchr(owner, '.')))
          *c = '\0';
       sprintf(buf, "%s|%s|%s|%s|%s|%s|%d\n", printer, jname, jnumber,
 	      owner, sdate, stime, atoi(jsize) * 512);
@@ -1312,7 +1309,7 @@ int ParseAIXv2PrintJobs(char *printer, char *jobs,
       current_size += len;
       (*return_n_jobs)++;
       s = s1;
-      if (s1 = strchr(s, '\n'))
+      if ((s1 = strchr(s, '\n')))
          *s1++ = '\0';
     }
    *(job_list + current_size) = '\0';

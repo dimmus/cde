@@ -203,7 +203,6 @@ GetCmdData(
     char     *tmpPtr;
     int   skipString = False;
     int   endToken;
-    int   stripCmd;
 
     if (!ret_string)
 	skipString = True;
@@ -230,7 +229,6 @@ GetCmdData(
                          */
                         myBufPtr++;
 			endToken = True;
-			stripCmd = False;
 
 			/*
 			 * end token
@@ -277,9 +275,6 @@ GetCmdData(
 					    errno = CMD_NOT_ALLOWED;
 					    return -1;
 				          }
-					else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_ABBREV_CMD))
-					    stripCmd = True;
 				      }
 				    else
 				      {
@@ -300,9 +295,6 @@ GetCmdData(
 					errno = CMD_NOT_ALLOWED;
 					return -1;
 				      }
-				    else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_FIGURE_CMD))
-				        stripCmd = True;
 
 				    break;
 					
@@ -334,9 +326,6 @@ GetCmdData(
 					errno = CMD_NOT_ALLOWED;
 					return -1;
 				      }
-				    else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_ID_CMD))
-				        stripCmd = True;
 				    break;
 
 				/*
@@ -353,9 +342,6 @@ GetCmdData(
 					    errno = CMD_NOT_ALLOWED;
 					    return -1;
 				          }
-					else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_LABEL_CMD))
-					    stripCmd = True;
 				      }
 				    else if (_DtCvToLower (*myBufPtr) == 'i')
 				      {
@@ -365,9 +351,6 @@ GetCmdData(
 					    errno = CMD_NOT_ALLOWED;
 					    return -1;
 				          }
-					else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_LINK_CMD))
-					    stripCmd = True;
 				      }
 				    else
 				      {
@@ -405,9 +388,6 @@ GetCmdData(
 					errno = CMD_NOT_ALLOWED;
 					return -1;
 				      }
-				    else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_PARAGRAPH_CMD))
-				        stripCmd = True;
 				    break;
 
 				/*
@@ -424,9 +404,6 @@ GetCmdData(
 					    errno = CMD_NOT_ALLOWED;
 					    return -1;
 				          }
-				        else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_TOPIC_CMD))
-				            stripCmd = True;
 				      }
 				    else if (_DtCvToLower (*myBufPtr) == 'i')
 				      {
@@ -436,9 +413,6 @@ GetCmdData(
 					    errno = CMD_NOT_ALLOWED;
 					    return -1;
 				          }
-				        else if (CCDF_NOT_ALLOW_CMD (strip,
-							CCDF_TITLE_CMD))
-				            stripCmd = True;
 				      }
 				    else
 				      {
@@ -458,8 +432,6 @@ GetCmdData(
 			    errno = CMD_NOT_ALLOWED;
 			    return -1;
 			  }
-			else if (CCDF_NOT_ALLOW_CMD (strip, CCDF_FONT_CMD))
-			    stripCmd = True;
 
 			if (endToken)
 			  {

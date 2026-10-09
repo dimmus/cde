@@ -184,7 +184,7 @@ DtMailServer::ptrans_retrieve_readandappend(
     {
         size_t	nbytes;
 
-	if (nread < len)
+	if (nread < (size_t) len)
 	{
 	    if (DTMAS_MSGBUFSIZE - 1 > len - nread)
 	      nbytes = (size_t) len - nread;
@@ -238,7 +238,7 @@ DtMailServer::ptrans_retrieve_readandappend(
 	        done = TRUE;
 	    }
 	}
-	else if (nread >= len)
+	else if (nread >= (size_t) len)
 	  done = TRUE;
     
 	if (0 < (nbytes = strlen(_msgbuf)))
@@ -285,7 +285,6 @@ DtMailServer::ptrans_retrieve_readandappend(
 DTMailError_t
 DtMailServer::do_send(char *fmt, ... )
 {
-    static char	*pname = "DtMailServer::do_send";
     char	*buf = new char[DTMAS_POPBUFSIZE+1];
     int		nbytes;
     va_list	ap;
@@ -308,7 +307,7 @@ DtMailServer::do_send(char *fmt, ... )
 
     strcat(buf, "\r\n");
     nbytes = SockWrite(buf, 1, strlen(buf), _sockfp);
-    if (nbytes != strlen(buf))
+    if ((size_t) nbytes != strlen(buf))
     {
 	_logger.logError(DTM_FALSE, "Socket Error:  writing '%s'", buf);
 	delete [] buf;
@@ -335,7 +334,6 @@ DtMailServer::do_send(char *fmt, ... )
 DTMailError_t
 DtMailServer::do_transaction(char *fmt, ... )
 {
-    static char		*pname = "DtMailServer::do_transaction";
     DTMailError_t	ok;
     char		*buf = new char[DTMAS_POPBUFSIZE+1];
     int			nbytes;
@@ -358,7 +356,7 @@ DtMailServer::do_transaction(char *fmt, ... )
 
     strcat(buf, DTMAS_COMMAND_TERMINATOR);
     nbytes = SockWrite(buf, 1, strlen(buf), _sockfp);
-    if (nbytes != strlen(buf))
+    if ((size_t) nbytes != strlen(buf))
     {
 	_logger.logError(DTM_FALSE, "Socket Error:  writing '%s'", buf);
 	delete [] buf;
@@ -544,7 +542,6 @@ DtMailServer::retrieve_messages(DtMailEnv &error)
 	char	buf[DTMAS_POPBUFSIZE+1];
 	int	len, num, count, numnew;
 	int	deletions = 0;
-	int	sockfd = -1;
 
         if (proto_requires_password() && NULL == _password)
         {
@@ -783,11 +780,13 @@ DtMailServer::retrieve_messages(DtMailEnv &error)
     closeServer:
 	vtalarm_setitimer(_timeout);
 	if (ok != DTME_MailServerAccess_SocketIOError)
+	{
 	  if (ok == DTME_NoError)
 	    ok = ptrans_quit();
 	  else {
 	    (void) ptrans_quit();
           }
+	}
 	vtalarm_setitimer(0);
 	SockClose(_sockfp);
 	_sockfp = NULL;

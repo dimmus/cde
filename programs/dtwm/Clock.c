@@ -129,11 +129,6 @@ extern Widget DtCreateClock(
 static void ClockTick( 
                         XtPointer client_data,
                         XtIntervalId *id) ;
-static void DrawLine( 
-                        DtClockGadget w,
-                        Dimension blank_length,
-                        Dimension length,
-                        double fraction_of_a_circle) ;
 static void DrawHand( 
                         DtClockGadget w,
                         Dimension length,
@@ -147,8 +142,6 @@ static void SetSegment(
                         int y2) ;
 static int wmround( 
                         double x) ;
-static void DrawClockFace( 
-                        DtClockGadget g) ;
 static void Initialize( 
                         Widget request_w,
                         Widget new_w) ;
@@ -324,7 +317,6 @@ ClockTick(
 	struct tm *	localtime ();
 	struct tm 	tm; 
 	time_t		time_value;
-	char *		time_ptr;
 	Display *	dpy = XtDisplay (w);
 	Window		win = XtWindow (w);
 
@@ -413,10 +405,8 @@ EraseHands (
 	DtClockGadget	w,
 	struct tm *	tm )
 {
-	XmManagerWidget	mgr =	(XmManagerWidget) XtParent (w);
 	Display	*	dpy =		XtDisplay (w);
 	Window		win =		XtWindow (w);
-	unsigned char	behavior =	G_Behavior (w);
 	GC		gc;
 
 	if (! XtIsManaged ((Widget)w) || w->clock.numseg <= 0)
@@ -438,55 +428,6 @@ EraseHands (
 		XFillPolygon (dpy, win, gc, w->clock.hour,
 				VERTICES_IN_HANDS, Convex, CoordModeOrigin);
 	}
-}
-
-
-
-/*-------------------------------------------------------------
-**	DrawLine
-**		Draw a line.
- * blank_length is the distance from the center which the line begins.
- * length is the maximum length of the hand.
- * Fraction_of_a_circle is a fraction between 0 and 1 (inclusive) indicating
- * how far around the circle (clockwise) from high noon.
- *
- * The blank_length feature is because I wanted to draw tick-marks around the
- * circle (for seconds).  The obvious means of drawing lines from the center
- * to the perimeter, then erasing all but the outside most pixels doesn't
- * work because of round-off error (sigh).
- */
-static void
-DrawLine (
-	DtClockGadget w,
-	Dimension blank_length,
-	Dimension length,
-	double fraction_of_a_circle )
-{
-	double dblank_length = (double)blank_length, dlength = (double)length;
-	double angle, cosangle, sinangle;
-	double cos ();
-	double sin ();
-	int cx = w->clock.centerX, cy = w->clock.centerY, x1, y1, x2, y2;
-
-	/*
-	 *  A full circle is 2 PI radians.
-	 *  Angles are measured from 12 o'clock, clockwise increasing.
-	 *  Since in X, +x is to the right and +y is downward:
-	 *
-	 *	x = x0 + r * sin (theta)
-	 *	y = y0 - r * cos (theta)
-	 *
-	 */
-	angle = TWOPI * fraction_of_a_circle;
-	cosangle = cos (angle);
-	sinangle = sin (angle);
-
-	/* break this out so that stupid compilers can cope */
-	x1 = cx + (int) (dblank_length * sinangle);
-	y1 = cy - (int) (dblank_length * cosangle);
-	x2 = cx + (int) (dlength * sinangle);
-	y2 = cy - (int) (dlength * cosangle);
-	SetSegment (w, x1, y1, x2, y2);
 }
 
 
@@ -581,60 +522,6 @@ wmround(
 
 
 /*-------------------------------------------------------------
-**	DrawClockFace
- *
- *	Draw the clock face (every fifth tick-mark is longer
- *	than the others).
- */
-static void 
-DrawClockFace(
-        DtClockGadget g )
-{
-	Boolean	draw_minute_ticks =
-			 ((G_ClockWidth (g) > (Dimension) (2 * SIZE_DEFAULT)) &&
-			  (G_ClockHeight (g) > (Dimension) (2 * SIZE_DEFAULT)));
-	int i;
-	int delta =
-			(int)(g->clock.radius - g->clock.tick_spacing) / 3;
-
-	if (! XtIsManaged ((Widget)g))
-		return;
-
-	g->clock.segbuffptr = g->clock.segbuff;
-	g->clock.numseg = 0;
-
-/*	Set segments.
-*/
-	for (i = 0; i < 60; i++)
-	{
-		if (draw_minute_ticks)
-		{
-			if ((i % 5) == 0)
-				DrawLine (g, g->clock.tick_spacing,
-					 g->clock.radius, ((double) i)/60.);
-			else
-				DrawLine (g, g->clock.radius - delta,
-					 g->clock.radius, ((double) i)/60.);
-		}
-		else
-			if ((i % 15) == 0)
-				DrawLine (g, g->clock.radius - 1,
-					 g->clock.radius, ((double) i)/60.);
-	}
-
-/*	Draw clock face.
-*/
-	XDrawSegments (XtDisplay (g), XtWindow (g), G_ClockHandGC (g),
-			(XSegment *) & (g->clock.segbuff[0]),
-			g->clock.numseg/2);
-	
-	g->clock.segbuffptr = g->clock.segbuff;
-	g->clock.numseg = 0;
-}
-
-
-
-/*-------------------------------------------------------------
 **	Action Procs
 **-------------------------------------------------------------
 */
@@ -657,12 +544,7 @@ Initialize(
 {
 	DtClockGadget	request =	 (DtClockGadget) request_w,
 			new =		 (DtClockGadget) new_w;
-	Dimension	w, h,
-			h_t =		G_HighlightThickness (new),
-			s_t =		G_ShadowThickness (new);
-	XmManagerWidget	mw = (XmManagerWidget) XtParent (new);
-	EventMask	mask;
-	String		name = NULL;
+	Dimension	w, h;
 
 /*	Set width and height.
 */
@@ -720,13 +602,6 @@ Resize(
 			h_t = G_HighlightThickness (g),
 			p_w = G_PixmapWidth (g),
 			p_h = G_PixmapHeight (g),
-			m_w = G_MarginWidth (g),
-			m_h = G_MarginHeight (g),
-			s_w = G_StringWidth (g),
-			s_h = G_StringHeight (g),
-			v_pad = 2 * (s_t + h_t + m_h),
-			h_pad = 2 * (s_t + h_t + m_w),
-			spacing = G_Spacing (g),
 			w = G_Width (g),
 			h = G_Height (g);
 	int		radius;
@@ -866,10 +741,6 @@ Draw(
    XRectangle clip;
    Position p_x, p_y, s_x, s_y;
    unsigned char behavior =	G_Behavior (g);
-   Dimension m_w = G_MarginWidth (g);
-   Dimension m_h = G_MarginHeight (g);
-   Dimension h_pad = h_t + s_t + m_w;
-   Dimension v_pad = h_t + s_t + m_h;
    Dimension width, height;
    Pixmap pix;
    Pixmap mask;
@@ -1005,7 +876,6 @@ XGCValues	values;
 XtGCMask	value_mask;
 XmManagerWidget	mw = (XmManagerWidget) XtParent(g);
 XFontStruct *	font;
-Boolean		font_rtn;
 DtIconGadgetClass
 		super = (DtIconGadgetClass) XtSuperclass (g);
 static Boolean	first = True;

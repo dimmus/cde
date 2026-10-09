@@ -230,9 +230,9 @@ void DtPrtProps::Apply()
    FILE *fp_src, *fp_dest;
    char *filename = printer->CreateActionFile();
    sprintf(buf, "%s.%ld", filename, (long)getpid());
-   if (fp_dest = fopen(buf, "w"))
+   if ((fp_dest = fopen(buf, "w")))
     {
-      if (fp_src = fopen(filename, "r"))
+      if ((fp_src = fopen(filename, "r")))
        {
          while (fgets(buf, buf_len, fp_src))
           {

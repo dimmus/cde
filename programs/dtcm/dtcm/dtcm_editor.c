@@ -242,7 +242,6 @@ GetIcon(DTCM_editor *de)
  
         Display        *display = XtDisplay(calendar->frame);
         Window          window = XtWindow(calendar->frame);
-        unsigned char  *bitmapData, *bitmapMask;
  
         if (de->drag_bitmap == 0) {
                 de->drag_bitmap = XCreateBitmapFromData(display,
@@ -309,9 +308,9 @@ ApptConvertCB(
         DtDndBuffer 	*data		= &(convertInfo->dragData->data.buffers[0]);
         DragContext     *context        = (DragContext *)clientData;
         Display         *display        = XtDisplay(dragContext);
-        Atom            CMAPPOINTMENT 	
-			= XmInternAtom(display, "CalendarAppointment", False);
 	Calendar	*c = context->calendar;
+
+	(void) XmInternAtom(display, "CalendarAppointment", False);
 
 	if (convertInfo->reason != DtCR_DND_CONVERT_DATA)
 		return;
@@ -335,8 +334,6 @@ StandaloneApptDragStart(
         static XtCallbackRec dragFinishCBRec[] =  { {DragFinishCB, NULL},
                                                     {NULL, NULL} };
  
-        Display        *display 	= XtDisplay(widget);
-        int             itemCount, selectedPos;
         DragContext     *context = calloc(sizeof(DragContext), 1);
 	Calendar	*c = de->c;
 	Dtcm_appointment        *appt;
@@ -414,7 +411,6 @@ EditApptDragMotionHandler(
 {
         int             diffX, diffY;
         DTCM_editor     *de = (DTCM_editor *) clientData;
-	Calendar	*c = de->c;
         Dimension       source_height, source_width;
         Position        source_x, source_y;
  
@@ -528,13 +524,13 @@ load_from_file(DTCM_editor *de) {
 	list = CmDataListCreate();
 	parse_appt_from_file(de->c->DT_catd, de->file, list, de->p, 
 			     query_user, de->c, DATAVER_ARCHIVE);
-	if (appt = (Dtcm_appointment *)CmDataListGetData(list, 1)) {
+	if ((appt = (Dtcm_appointment *)CmDataListGetData(list, 1))) {
 		dssw_attrs_to_form(de->dssw, appt);
 		rfp_attrs_to_form(de->rfp, appt);
 	}
 	for (i = 1; i <= list->count; i++)
-		if (appt = (Dtcm_appointment *)
-		    CmDataListGetData(list, i)) {
+		if ((appt = (Dtcm_appointment *)
+		    CmDataListGetData(list, i))) {
 			if (de->orig_appt)
 				free_appt_struct(&de->orig_appt);
 
@@ -708,7 +704,7 @@ DieFromToolTalkError(DTCM_editor *de, char *errfmt, Tt_status status)
 {
     Arg		 args[10];
     Widget	 dialog, dialogShell;
-    char	*errmsg, *statmsg, *title;
+    char	*errmsg, *statmsg;
     XmString	 xms_errmsg, xms_ok, xms_title;
     int		 n;
 
@@ -775,7 +771,6 @@ cmtt_init(
 	Widget		 shell)
 
 {
-	static int	initialized = 0;
 	int		ttfd;
 	Tt_status	status;
 	char            *ttenv;
@@ -881,7 +876,6 @@ load_cb(
 
 {
 	Tt_status status;
-	char	*p;
 	DTCM_editor	*de;
 	FILE		*fp;
 	char		filename[20];
@@ -969,13 +963,13 @@ load_cb(
 				de->init = file_tt;
 			}
 
-			if (appt = (Dtcm_appointment *)CmDataListGetData(list, 1)) {
+			if ((appt = (Dtcm_appointment *)CmDataListGetData(list, 1))) {
 				dssw_attrs_to_form(de->dssw, appt);
 				rfp_attrs_to_form(de->rfp, appt);
 			}
 			for (i = 1; i <= list->count; i++)
-				if (appt = (Dtcm_appointment *)
-			    	CmDataListGetData(list, i)) {
+				if ((appt = (Dtcm_appointment *)
+			    	CmDataListGetData(list, i))) {
 					if (de->orig_appt)
 						free_appt_struct(&de->orig_appt);
 
@@ -983,6 +977,8 @@ load_cb(
 				}
 			CmDataListDestroy(list, B_FALSE);
 
+			break;
+	default:
 			break;
 	}
 
@@ -1003,7 +999,6 @@ handle_drop_cb(
 	XtPointer	client_data,
 	XtPointer	call_data)
 {
-	Display		*display = XtDisplay(w);
 	DtDndDropCallbackStruct *transfer_info = (DtDndDropCallbackStruct *)call_data;
 	DTCM_editor	*de;
 	char		filename[20];
@@ -1066,7 +1061,6 @@ de_register_drop_site(
 {
 	XtCallbackRec	transfer_cb_rec[] = { {handle_drop_cb, NULL},
 					      {NULL, NULL} };
-	Display		*display = XtDisplayOfObject(w);
 
 	transfer_cb_rec[0].closure = (XtPointer)de;
 
@@ -1083,12 +1077,10 @@ de_register_drop_site(
 */
 int 
 main(int argc, char **argv) {
-	int		dssw_loffset, rfp_loffset, start, stop;
-	Dimension	dssw_x, rfp_x;
+	int		start, stop;
 	DTCM_editor	*de;
 	XmString	xmstr;
 	Boolean		btn1_transfer;
-	Dimension	width, longest_dssw_label, longest_rfp_label;
 	WidgetList	children;
 	Widget		widgets[20];
 	int		i = 0;

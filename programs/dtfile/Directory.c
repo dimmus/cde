@@ -784,7 +784,6 @@ ReadFileData(
    char ** link_list;
    int link_len;
    char * end;
-   char * ptr;
    Boolean recursive_link_found;
    struct stat stat_buf;
    struct stat stat_buf2;
@@ -896,7 +895,7 @@ ReadFileData(
       {
          file_data->physical_type = DtDIRECTORY;
          if (file_name == NULL ||
-             strcmp(file_name, ".") != 0 && strcmp(file_name, "..") != 0)
+             (strcmp(file_name, ".") != 0 && strcmp(file_name, "..") != 0))
          {
             file_data->is_subdir = True;
          }
@@ -1031,7 +1030,6 @@ ReadFileData2(
    char ** link_list;
    int link_len;
    char * end;
-   char * ptr;
    Boolean recursive_link_found;
    struct stat stat_buf;
    int stat_result;
@@ -1145,7 +1143,7 @@ ReadFileData2(
       {
          file_data2->physical_type = DtDIRECTORY;
          if (file_name == NULL ||
-             strcmp(file_name, ".") != 0 && strcmp(file_name, "..") != 0)
+             (strcmp(file_name, ".") != 0 && strcmp(file_name, "..") != 0))
          {
             file_data2->is_subdir = True;
          }
@@ -1315,10 +1313,9 @@ GetTTPath(char *path)
 {
    Tt_message dummy_msg;
    char *tmp, *tt_path;
-   Tt_status tt_status;
 
    dummy_msg = tt_message_create();
-   tt_status = tt_message_file_set(dummy_msg, path);
+   tt_message_file_set(dummy_msg, path);
    tmp = tt_message_file(dummy_msg);
 
    tt_path = XtNewString(tmp);
@@ -1351,8 +1348,6 @@ ReadDirectoryProcess(
    DIR *dirp;
    struct dirent * dp;
    Boolean inDtDir;
-   FileData *file_data;
-   FileData2 file_data2;
    Boolean done;
    Boolean update_due;
    short file_data_count = 0;
@@ -1367,7 +1362,6 @@ ReadDirectoryProcess(
    int rc;
    char file_data_buffer[FILEDATABUF * sizeof(FileData2)];
    char *file_data_buf_ptr = file_data_buffer;
-   char *file_data_count_ptr;
    struct timeval time1, time2;
    long diff;
    char *ptrOrig;
@@ -1592,7 +1586,7 @@ ReadDirectoryProcess(
 
      /* check if we need to send the buffered data now */
      if (file_data_count == FILEDATABUF ||
-         file_data_count > 0 && (done || update_due))
+         (file_data_count > 0 && (done || update_due)))
      {
        if (update_due)
          file_data_count |= 0x8000;
@@ -1922,7 +1916,7 @@ UpdateAllProcess(
    }
 
    /*  Loop through the directory entries and update the file list  */
-   while (dp = readdir (dirp))
+   while ((dp = readdir (dirp)))
    {
       /* if Desktop skip */
       if (inDtDir && (strcmp(dp->d_name, "Desktop") == 0))
@@ -2040,7 +2034,6 @@ UpdateSomeProcess(
    char *full_directory_name;
    struct stat stat_buf;
    long modify_time;
-   FileData *file_data;
    FileData2 file_data2;
    short pipe_msg;
    int i;
@@ -2144,8 +2137,6 @@ ReaddirPipeCallback(
    Boolean update_due;
    FileData *new_data = NULL, **new_nextp;
    FileData *old_data, **old_nextp;
-   char *ptr;
-   char *err_msg;
    int i, n;
    int rc;
    long modify_time = 0;
@@ -2817,7 +2808,7 @@ _ReadDir(
   char subdir_name[MAX_PATH];
   FileData *fp, *file_data;
   FileViewData **lp = NULL, *ip;
-  int i, j, n, rc;
+  int i, n, rc;
   TreeShow ts;
   Boolean busy_reading;
 
@@ -3170,11 +3161,12 @@ DirectoryModifyTime(
         char *directory_name,
         long modify_time)
 {
-   Directory *directory;
 
    DPRINTF(("DirectoryModifyTime(%s, %s)\n", host_name, directory_name));
 
 #ifdef SMART_DIR_UPDATE
+   Directory *directory;
+
    /*  Find the directory set entry.  */
    directory = FindDirectory(host_name, directory_name);
 
@@ -3619,7 +3611,6 @@ GetLongName(
        int len = strlen( file_data->file_name );
        if( len > NAME_PRECISION )
        {
-	 int i;
 	 char name[NAME_PRECISION];
 	 sprintf( name, "%-20.20s%s", file_data->file_name, ELLIPSIS);
 
@@ -3736,13 +3727,13 @@ DirectoryBusy(
       /* check if this directory is equal to 'path' or a subdir of 'path' */
       if (directory_set[i]->viewed &&
           (strcmp (directory_set[i]->path_name, path) == 0 ||
-           strncmp (directory_set[i]->path_name, path,len) == 0 &&
-             directory_set[i]->path_name[len] == '/'
+           (strncmp (directory_set[i]->path_name, path,len) == 0 &&
+             directory_set[i]->path_name[len] == '/')
            ||
-           directory_set[i]->tt_path_name != NULL &&
+           (directory_set[i]->tt_path_name != NULL &&
            (strcmp (directory_set[i]->tt_path_name, path) == 0 ||
-            strncmp (directory_set[i]->tt_path_name, path,len) == 0 &&
-              directory_set[i]->tt_path_name[len] == '/')))
+            (strncmp (directory_set[i]->tt_path_name, path,len) == 0 &&
+              directory_set[i]->tt_path_name[len] == '/')))))
       {
          /* check the views in the view list */
          for (j = 0; j < directory_set[i]->numOfViews; j++)
@@ -3773,9 +3764,9 @@ DirectoryBusy(
              * partially expanded */
             sub_root = file_mgr_data->directory_set[k]->sub_root;
             if (sub_root->displayed &&
-                (sub_root->ts == tsDirs && sub_root->ndir > 0  ||
-                 sub_root->ts == tsAll &&
-                   sub_root->ndir + sub_root->nfile > 0))
+                ((sub_root->ts == tsDirs && sub_root->ndir > 0)  ||
+                 (sub_root->ts == tsAll &&
+                   sub_root->ndir + sub_root->nfile > 0)))
             {
               return True;
             }
@@ -3969,7 +3960,6 @@ WritePosInfoPipeCallback(
    PipeCallbackData *pipe_data = (PipeCallbackData *)client_data;
    Directory *directory = pipe_data->directory;
    int rc;
-   int i;
 
    /* get return code from the pipe */
    rc = -1;
@@ -4143,11 +4133,9 @@ TimerEventProcess(
    struct stat stat_buf;
    long modify_time;
    Boolean link_changed;
-   Boolean was_broken;
    FileData *file_data;
    char full_name[MAX_PATH];
    char *namep;
-   short pipe_msg;
    int prev_link_kind;
    int cur_link_kind;
    int link_rc;
@@ -4259,7 +4247,7 @@ StickyProcIdle(
    int max_procs)
 {
    StickyProcDesc *p, **lp;
-   int i, n;
+   int n;
 
    /* mark the process as idle */
    sticky_proc->idle = True;
@@ -4306,7 +4294,6 @@ TimerPipeCallback(
    int rc;
    long modify_time;
    Boolean link_changed;
-   int i;
 
    /* get return code from the pipe */
    rc = -1;
@@ -4492,11 +4479,11 @@ CheckDesktopPipeCallback(
    FileData *new_data, *old_data;
    Boolean found;
    DesktopRec *desktopWindow;
-   int i, n;
+   int i;
 
    /* read the next msg from the pipe */
    msg = -1;
-   n = PipeRead(*fd, &msg, sizeof(short));
+   PipeRead(*fd, &msg, sizeof(short));
 
    if (msg == PIPEMSG_DESKTOP_REMOVED ||
        msg == PIPEMSG_DESKTOP_CHANGED)
@@ -4735,7 +4722,6 @@ TimerEventBrokenLinks(
         XtPointer client_data,
         XtIntervalId *id )
 {
-   int i;
 
    DPRINTF2(("Directory::TimerEventBrokenLinks\n"));
 

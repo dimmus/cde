@@ -127,7 +127,7 @@ public:
 
     DtMailServer(char*, DtMail::Session*, DtMail::MailBox*,
 		 DtMailAppendCallback, void*);
-    ~DtMailServer();
+    virtual ~DtMailServer();
 
     static int		 get_mailrc_value(
     					DtMail::Session*,

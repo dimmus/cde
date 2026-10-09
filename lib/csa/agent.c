@@ -303,7 +303,7 @@ _DtCm_update_callback_1(Table_Res_4 *t, _DtCm_Connection *conn)
 	 * calendar info
 	 * so we just invoke all registered callback with no data
 	 */
-	if (cbi = (_CallbackInfo *)calloc(1, sizeof(_CallbackInfo))) {
+	if ((cbi = (_CallbackInfo *)calloc(1, sizeof(_CallbackInfo)))) {
 		cbi->vers = AGENTVERS;
 
 		if (cb_tail == NULL)

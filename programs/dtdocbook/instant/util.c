@@ -65,11 +65,6 @@
  * ________________________________________________________________________
  */
 
-#ifndef lint
-static char *RCSid =
-  "$TOG: util.c /main/13 1997/10/09 16:09:50 bill $";
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -736,7 +731,8 @@ int Putc(
 	    case '\\':
 		*pc++ = '\\';
 	}
-	for (j = 0; j < i; ++j) *pc++ = argBuf[j]; i = 0;
+	for (j = 0; j < i; ++j) *pc++ = argBuf[j];
+	i = 0;
 	*pc++ = '"';
 	*pc++ = 0;
 	tcl_enc = Tcl_GetEncoding(NULL, NULL);
@@ -831,7 +827,7 @@ int FPuts(
     if ((CheckOutputBuffer(sLength)) == 0)
 	return EOF; /* out of space and can't grow the buffer */
 
-    strncpy(outputBuffer.current, s, sLength);
+    memcpy(outputBuffer.current, s, sLength);
     outputBuffer.current += sLength;
 
     return sLength; /* arbitrary non-negative number */

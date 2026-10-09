@@ -52,21 +52,19 @@
 static void block_SIGCLD( void )
 {
     sigset_t newset;
-    int      rtn;
 
     sigemptyset( &newset );
     sigaddset( &newset, SIGCHLD );
-    rtn = sigprocmask( SIG_BLOCK, &newset, (sigset_t *) NULL );
+    sigprocmask( SIG_BLOCK, &newset, (sigset_t *) NULL );
 }
 
 static void unblock_SIGCLD( void )
 {
     sigset_t newset;
-    int      rtn;
 
     sigemptyset( &newset );
     sigaddset( &newset, SIGCHLD );
-    rtn = sigprocmask( SIG_UNBLOCK, &newset, (sigset_t *) NULL );
+    sigprocmask( SIG_UNBLOCK, &newset, (sigset_t *) NULL );
 }
 
 /********************************************************************
@@ -141,7 +139,6 @@ XpPdmServiceRec *find_rec( Window requestor )
 XpPdmServiceRec *find_rec_by_mbox_win( Window window )
 {
     int i;
-    XpPdmServiceRec *r;
 
 
     if (!window)

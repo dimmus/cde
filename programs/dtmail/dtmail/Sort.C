@@ -122,7 +122,7 @@ Sort::sortMessages(MsgScrollingList	*displayList,
       //
       // Get the messages from the list.
       //
-      for(msgno=0 ; msgno<numberMessages; msgno++)
+      for(msgno=0 ; msgno<(unsigned int) numberMessages; msgno++)
       {
 	offset = msgno + 1;
 
@@ -339,7 +339,7 @@ Sort::sortMessages(MsgScrollingList	*displayList,
       int i;
       
       i = messages[0].link;
-      for (offset = 0; offset < numberMessages ; offset++)
+      for (offset = 0; offset < (unsigned int) numberMessages ; offset++)
       {
 	msgHandles->replace(offset, messages[i].msg_struct);
         if (messages[i].primary_key_str != NULL)
@@ -348,7 +348,7 @@ Sort::sortMessages(MsgScrollingList	*displayList,
       }
 
       // Renumber the session numbers.
-      for(msgno=0 ; msgno<numberMessages; msgno++)
+      for(msgno=0 ; msgno<(unsigned int) numberMessages; msgno++)
       {
 	MsgStruct *ms = msgHandles->at(msgno);
 	ms->sessionNumber = msgno;
@@ -438,9 +438,7 @@ Sort::_msort (char	* base,
       return (0);
     }
 
-	int	loopCount = 0;
     while (1) {
-	loopCount++;	
       /* Compare Kp: Kq */
       k1 = Record(p);
       k2 = Record(q);

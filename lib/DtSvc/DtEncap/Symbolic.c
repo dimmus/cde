@@ -157,43 +157,6 @@ Xe_default_symtab(void)
     return(D_sym_table);
 }
 /*------------------------------------------------------------------------+*/
-static XeSymtabList
-NukeOneItem(XeSymTable t, XeSymtabList l)
-/*------------------------------------------------------------------------+*/
-{
-    XeSymtabList next;
-    
-    /* For standard XeSymbols: 			*/
-    /* 1) Free the name         		*/
-    /* 2) Call free function if configured      */
-    /* 3) Free the XeSymbol entry               */
-    /* ---------------------------------------- */
-    if (l->data_is_XeSymbol)
-    {
-	XeFree( ((XeSymbol)l->data)->name );
-	if (t->clean_fn)
-	    t->clean_fn( ((XeSymbol)l->data)->value );
-	XeFree( l->data );
-    }
-    /* For "anysym" symbols:			*/
-    /* 1) Call free function if configured      */
-    /* 2) If we malloced the data, free it      */
-    /* ---------------------------------------- */
-    else 
-    {
-	if (t->clean_fn)
-	    t->clean_fn( l->data );
-	
-	if (l->data_is_malloc_mem)
-	    XeFree(l->data);
-    }
-    
-    next = l->rest;
-    XeFree(l);
-    return next;
-}
-
-/*------------------------------------------------------------------------+*/
 XeSymTable
 Xe_set_sym_fns(XeSymTable 	t,
 	       XeSymFn_cmp	cmp_fn, 

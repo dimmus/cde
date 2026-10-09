@@ -699,7 +699,7 @@ get_stdact_label(
 	(stdact_type <= AB_BUILTIN_ACTION_NUM_VALUES))
 	ret_val = stdact_labels[stdact_type];
     else
-	ret_val = stdact_labels[stdact_type];
+	ret_val = NULL;
 
     /*
      * This returns the "invalid" string
@@ -926,7 +926,6 @@ connP_make_conn_string(
     int	i;
     long		si;
     static char		conn_string[BUFSIZ];
-    char		buf[BUFSIZ];
     AB_ACTION_INFO	*action_info;
     ABObj		src_obj;
     STRING		modname;
@@ -1034,6 +1033,8 @@ connP_make_conn_string(
 		obj_get_func_help_location(action_obj):"");
 	strcat(conn_string, "\"");
 	break;
+      default:
+		break;
     }
 
     return(conn_string);
@@ -1076,6 +1077,8 @@ connP_action_needs_arg(
 	    return(AB_ARG_STRING);
 	case AB_STDACT_SET_VALUE:
 	    return(AB_ARG_INT);
+	default:
+	    break;
     }
     return(AB_ARG_UNDEF);
 }
@@ -1125,6 +1128,8 @@ connP_guess_when_action(
 	  case AB_TYPE_DIALOG:
 	    if (is_descendant(connP_get_target(), connP_get_source()))
 		*act_ret = AB_STDACT_HIDE;
+	  default:
+	      break;
 	}
 	break;
 
@@ -1135,6 +1140,8 @@ connP_guess_when_action(
 	  case AB_TYPE_DIALOG:
 	    if (is_descendant(connP_get_target(), connP_get_source()))
 		*act_ret = AB_STDACT_HIDE;
+	  default:
+	      break;
 	}
 	break;
 
@@ -1156,6 +1163,8 @@ connP_guess_when_action(
                     *when_ret = ConnP_conn_objs[i].when_list[3];
 	    }
 	    break;
+      default:
+	break;
     }
 }
 
@@ -1381,6 +1390,8 @@ connP_builtin_remove_arg(
 	    istr_destroy(ACT(arg_value.sval));
 	    ACT(arg_value.sval) = (ISTRING)NULL;
 	}
+      default:
+          break;
     }
 }
 
@@ -1446,6 +1457,8 @@ connP_change_in_builtin(
 		    CSETQ(ACT(arg_value.ival), atoi(arg_str));
 		    connP_set_conn_arg(ab_action, cur_arg_type, arg_str);
 		}
+	    break;
+	    default:
 	    break;
 	}
     }

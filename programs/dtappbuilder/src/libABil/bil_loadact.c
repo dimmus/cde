@@ -59,7 +59,6 @@
 				ISTRING handler, AB_WHEN when);
 static int	install_action(ABObj obj, ABObj module, ABObj action);*/
 
-static int	install_action(ABObj obj, ABObj module, ABObj action);
 #ifdef BOGUS
 static ABObj    find_or_create_target(ABObj obj, ABObj module,
                         ISTRING parent_name, ISTRING name);
@@ -83,7 +82,6 @@ STRING
 bilP_load_att_from(BIL_TOKEN valueToken)
 {
     ABObj       newObj = NULL;
-    ABObj       src_module = NULL;
     STRING      stringValue = bilP_load_get_value();
  
 #ifdef DEBUG
@@ -110,7 +108,6 @@ bilP_load_att_from(BIL_TOKEN valueToken)
 	 */
 	newObj = obj_scoped_find_or_create_undef(bilP_load.module, 
 			stringValue, AB_TYPE_UNKNOWN);
-	src_module = obj_get_module(newObj);
 
 	/* bilP_load.obj is the action created in bilP_load_att_class().
 	 * If the connection is a cross-module one, it is stored off of
@@ -294,50 +291,6 @@ bilP_load_att_arg_type(BIL_TOKEN valueToken)
     return NULL;
 }
 
-
-static int
-install_action(ABObj obj, ABObj module, ABObj action)
-{
-	ABObj	oldaction= NULL;
-	ABObj	project= obj_get_project(module);
-
-	/*
-	 * For efficiency, we check this module first to avoid searching
-	 * the entire project unless necessary.
-	 */
-
-	oldaction= obj_find_action(module, action);
-	if (oldaction == NULL)
-	{
-		oldaction= obj_find_action(project, action);
-	}
-
-	if (oldaction != NULL)
-	{
-		/* we've seen this action, before */
-		obj_destroy(action);
-		action= oldaction;
-		if (obj_get_module(action) != module)
-		{
-			/*
-			 *  The action is in another module.  Move
-			 *  it to the project
-			 */
-			if (!obj_is_project(action->parent))
-			{
-				obj_unparent(action);
-				obj_add_action(project, action);
-			}
-		}
-	}
-	else
-	{
-		/* insert it into the current module */
-		obj_add_action(module, action);
-	}
-
-	return 0;
-}
 
 
 #ifdef BOGUS

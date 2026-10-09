@@ -154,7 +154,6 @@ void HelpMenuCB(Widget, XtPointer, XtPointer);
 void HelpCB(Widget, XtPointer, XtPointer);
 extern void DisplayMain(Widget, char *, char *);
 extern void DisplayVersion(Widget, char *, char *);
-static void CloseMainCB(Widget, XtPointer, XtPointer);
  
 #endif
 

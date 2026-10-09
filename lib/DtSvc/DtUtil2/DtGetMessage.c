@@ -72,7 +72,6 @@ Dt11GetMessage(
 	char *s)
 {
         char *msg;
-        static int first = 1;
         static nl_catd nlmsg_fd;
 	static char *nlmsg_filename = NULL;
 

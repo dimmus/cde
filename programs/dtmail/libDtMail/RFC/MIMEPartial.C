@@ -88,7 +88,7 @@ getNamedValueInt(const char *string, const char *name)
   int		  	results = 0;
   unsigned int	offset;
 
-  for (offset = 0; offset < stringLen - nameLen; offset++) {
+  for (offset = 0; offset < (unsigned int) (stringLen - nameLen); offset++) {
     if (strncasecmp(&string[offset], name, nameLen) == 0) {
       if (string[offset + nameLen] == '=') {
 	results = atoi(&string[offset + nameLen + 1]);
@@ -112,7 +112,7 @@ getNamedValueString(const char *string, const char *name)
   char			* stringEnd;
   unsigned int	  offset;
 
-  for (offset = 0; offset < stringLen - nameLen; offset++) {
+  for (offset = 0; offset < (unsigned int) (stringLen - nameLen); offset++) {
     if (strncasecmp(&string[offset], name, nameLen) == 0) {
       if (string[offset + nameLen] == '=') {
 
@@ -140,7 +140,6 @@ RFCMailBox::_isPartial(DtMailEnv	& error,
 		       RFCMessage	* message)
 {
   DtMailBoolean		  results = DTM_FALSE;
-  RFCMessage		* messageArray = NULL;
 
   char		* type;
 

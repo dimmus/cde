@@ -276,8 +276,7 @@ abobj_list_obj_reparented(
 )
 {
     static char full_name[BUFSIZ];
-    STRING      moduled_name = NULL,
-		module = NULL,
+    STRING      module = NULL,
 		name = NULL;
     ABObj	obj = NULL;
     int		ret = 0;

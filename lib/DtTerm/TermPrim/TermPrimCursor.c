@@ -209,7 +209,6 @@ _DtTermPrimCursorOn(Widget w)
     unsigned long valueMask = 0L;
     XGCValues values;
     TermEnhInfoRec enhInfo;
-    int cursorRow;
 
     /* if we are being called cyclically (by _DtTermPrimScrollWait ->
      * _DtTermPrimExposeText -> _DtTermPrimCursorOn), just return...

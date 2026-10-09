@@ -115,7 +115,7 @@ _tt_base64_decode(const char *s)
 	unsigned long r;
 
 	r = 0;
-	while (c = *s++) {
+	while ((c = *s++)) {
 		v = base64_values[c];
 		if (v==64) {	// illegal char, quit early
 			return r;

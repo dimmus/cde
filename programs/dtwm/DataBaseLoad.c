@@ -80,7 +80,6 @@ static Boolean control_element_value_found = False;
 static char * TYPES_DIR = "/.dt/types/fp_dynamic/";
 static char * TYPES_DIR_NO_SLASH = "/.dt/types/fp_dynamic";
 static char * HOME_DIR = NULL;
-static char * RM = "/bin/rm";
 
 
 typedef Boolean (*FieldParse)(char *, void **);
@@ -527,8 +526,6 @@ FrontPanelReadDatabases (void)
    int fd;   
 
    int    i;
-   char * fp_database;
-   int    num_entries;
    char ** name_list;
    DtDirPaths * dir_paths;
 
@@ -1109,8 +1106,6 @@ AnimationParseCB (DtDtsDbField  * fields,
 
 {
    unsigned char *string, *source, *head_ptr;
-   char * field1;
-   char * field2;
    int count = panel.animation_count;
    int field_count = 0;
    void * val_rtn;
@@ -1331,7 +1326,6 @@ OrderRecord (RecordData  * record_data,
 	     int           value_define)
 
 {
-   int i;
    int new_loc;
 
    char         * position_value;
@@ -1751,7 +1745,7 @@ EliminateEntries (RecordData * record_data,
                   int          record_type)
 
 {
-   int j, k;
+   int j;
 
    if (start > end) return;
 
@@ -1795,7 +1789,7 @@ ResolveDuplicates (RecordData * record_data,
 {
    int i, start_index, lock_index, last_index;
    ElementValue * element_values;
-   int cont_type;
+   int cont_type = 0;
    char *cont_name = NULL, *record_name;
    int count = *record_count;
    Boolean locked;
@@ -2056,7 +2050,7 @@ EliminateDeleted (RecordData    * record_data,
 		 int		 lock_type)
 
 {
-   int i, j, start, dummy = 0;
+   int i, j, dummy = 0;
    int count;
    ElementValue * element_values, * other_element_values;
    char * container_name, * rec_name;
@@ -2067,7 +2061,6 @@ EliminateDeleted (RecordData    * record_data,
 
    while (i < count)
    {
-       start = i;
        element_values = record_data[i].element_values;
        if ((intptr_t)element_values[delete_type].parsed_value)
        {
@@ -2172,45 +2165,6 @@ InitializeField (ElementValue  * element_values,
 
 /************************************************************************
  *
- *  CountElements
- *      Given a record_data array, a container name and container type
- *      count how many records match and return the value.
- *
- ************************************************************************/
-
-static int
-CountElements (RecordData * record_data,
-               int          record_count,
-               char       * container_name,
-               int          name_type,
-	       int          container_type,
-               int          container)
-
-
-{
-   int i;
-   static int found_count = 0;
-
-   for (i = 0; i < record_count; i++)
-   {
-      if (ANY_CONTAINER_TYPE == container_type ||
-          (intptr_t)(record_data[i].element_values[container_type].parsed_value) == 
-          container)
-      {
-         if (strcmp (container_name, 
-                     record_data[i].element_values[name_type].parsed_value) ==0)
-            found_count++;
-      }
-   }
-
-   return (found_count);
-}
-
-
-
-
-/************************************************************************
- *
  *  DeleteControlActionList
  *
  ************************************************************************/
@@ -2262,13 +2216,10 @@ AddControlActionList (ControlData * control_data)
    char * data_type = NULL;
    char * act_list = NULL;
    char * file_name = NULL;
-   char * file_str;
    char ** action_list = NULL;
    int num_actions = 0;
    int i = 0;
-   int result;
    Boolean is_file_control = False;
-   PanelActionData * drop_action;
    char * label;
    int j = 0;
 
@@ -3204,7 +3155,6 @@ InitializeFileControlFields (ElementValue * element_values,
       char * description;
       char * file_str;
       char * label = NULL;
-      int i, j, result;
 
       struct stat stat_info;
       Boolean valid_file = True;

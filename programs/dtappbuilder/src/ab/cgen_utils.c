@@ -171,7 +171,6 @@ static int	print_failure_message(CG_SUBCOMMAND cmd_code, int exit_code);
 static int	print_internal_err_message(void);
 static int	print_success_message(void);
 static int	print_cmd_not_found_message(STRING cmd);
-static int	print_death_message(void);
 static int	print_exit_message(int exit_code);
 static int	print_abort_message(void);
 static int	create_status_pipe(void);
@@ -612,9 +611,7 @@ term_execute_command(CG_SUBCOMMAND cmd_code, STRING cmd, STRING argv[])
     CG_STATUS		status_code = CG_STATUS_UNDEF;
     int                 exit_code = 0;
     int                 rc = 0;
-    pid_t		rc_pid = INVALID_PID;
     pid_t		watchdog_pid = INVALID_PID;
-    int                 child_status = 0;
     STRING		msg = NULL;
     int			i= 0, msg_size = 0;
 
@@ -665,7 +662,6 @@ term_execute_command(CG_SUBCOMMAND cmd_code, STRING cmd, STRING argv[])
     else if (watchdog_pid == 0)
     {
         /* child - "watchdog" process */
-        int            	rc = 0;
 	pid_t		actual_process_pid = INVALID_PID;
 
 	/*
@@ -841,7 +837,7 @@ term_execute_command(CG_SUBCOMMAND cmd_code, STRING cmd, STRING argv[])
 	} /* child (watchdog) */
 
 	/* This block should never execute */
-	assert(("Bad block executed",TRUE));
+	assert(((void)"Bad block executed",TRUE));
 	subprocess_exit(1);
     }
     else
@@ -936,7 +932,6 @@ exec_generate_main(void)
     STRING      project_name= NULL;
     STRING      argv[MAX_CGEN_FIXED_ARGS];
     int         i = 0;
-    STRING	cmd = NULL;
 
     if (project == NULL)
     {
@@ -974,7 +969,6 @@ exec_generate_proj(void)
     STRING      project_name= NULL;
     STRING      argv[MAX_CGEN_FIXED_ARGS];
     int         i = 0;
-    STRING	cmd = NULL;
  
     if (project == NULL)
     {
@@ -1156,6 +1150,8 @@ build_dtcodegen_arg_list(STRING *argList, int *iInOut)
             argList[i++] = "-v";
 	    ++numArgsAdded;
         break;
+        default:
+        break;
     }
 
     argList[i] = NULL;
@@ -1279,13 +1275,12 @@ exec_next_command(CG_SUBCOMMAND cmd_code, int exit_code)
 static int
 exec_next_command_for_gen_code(CG_SUBCOMMAND cmd_code, int exit_code)
 {
-    int		rc= 0;	/* return code */
     exit_code = exit_code;	/* avoid warning */
 
     switch (cmd_code)
     {
         case CG_CMD_UNDEF:
-            rc= exec_generate_code();
+            exec_generate_code();
         break;
 
         case CG_CMD_GEN_CODE:
@@ -1521,18 +1516,6 @@ print_cmd_not_found_message(STRING cmd)
 
 
 static int
-print_death_message(void)
-{
-    char msg[256];
-    sprintf(msg, 
-"****> Program died a horrible, unnatural death, due to an uncaught signal\n");
-    print_to_term(msg);
-    user_goal = CG_GOAL_UNDEF;
-    return goto_ready_state();
-}
-
-
-static int
 print_exit_message(int exitCode)
 {
     char msg[256];
@@ -1565,11 +1548,7 @@ pipe_data_ready_proc(
     CG_SUBCOMMAND	cmd_code = CG_CMD_UNDEF;
     CG_STATUS		status_code = CG_STATUS_UNDEF;
     void		*status_data = NULL;
-    int			int_status_code = 0;
-    int			int_cmd_code = 0;
     int			exit_code = 0;
-    int			kill_signal = 0;
-    pid_t		rc_pid = INVALID_PID;
     id = id;	/* avoid warning */
 
     /*util_dprintf(3, "rcv - data ready on pipe...\n");*/
@@ -1608,7 +1587,6 @@ pipe_data_ready_proc(
 	break;
 
 	case CG_STATUS_SIGNALLED:
-	    kill_signal = (int)(intptr_t) status_data;
 	    /*util_dprintf(2,"rcv signalled(%d)\n", kill_signal);*/
 	    actual_process_pgid = INVALID_PID;
 	    goto_ready_state();
@@ -1839,9 +1817,6 @@ static int
 careful_kill_group(pid_t pgid)
 {
     Bool	killed = False;
-    int		rc = 0;
-    pid_t	leader_pid = pgid;
-    int		child_status = 0;
     /* pid_t	pid_done = INVALID_PID; */
     int		waitcount = 0;
     long	kill_pgrp_id = (long)(-1 * pgid); /* negative pid = group id */
@@ -1948,7 +1923,6 @@ static int
 cgen_obj_name_changed_cb(ObjEvAttChangeInfo evInfo)
 {
     ABObj	project= evInfo->obj;
-    char	newTitle[256];
 
     if (   (obj_is_project(project))
 	&& ((evInfo->atts & OBJEV_ATT_NAME) != 0) 
@@ -2437,6 +2411,8 @@ check_path_to_cmd(STRING *cmdList, BOOL *allowWarnUserInOut)
 		    case DTB_ANSWER_CANCEL:
 			userCancelled = TRUE;
 		    break;
+		    default:
+		    break;
 		}
 	    }
         }
@@ -2624,6 +2600,8 @@ check_makefile(BOOL *continueOutPtr)
 		doGenMakefile = FALSE;
 		*continueOutPtr = FALSE;
 	    break;
+	    default:
+	    break;
 	}
     }
     else if ((!makefileIsOK) && (allowDestroyMakefile))
@@ -2652,6 +2630,8 @@ check_makefile(BOOL *continueOutPtr)
 	    case DTB_ANSWER_CANCEL:
 		doGenMakefile = FALSE;
 		*continueOutPtr = FALSE;
+	    break;
+	    default:
 	    break;
 	}
     }
@@ -2736,7 +2716,7 @@ destroy_links_to_file(STRING fileName)
 	}
     }
 
-    closedir(dir);
+    closedir(dir); dir = NULL;
 
     /*
      * We've built a list of all filenames in the current directory that
@@ -2782,8 +2762,6 @@ cgenP_makefile_is_for_project(STRING fileName, ABObj project)
     FILE		*makeFile = NULL;
     StringList		genFileNames = strlist_create();
     ABObj		module = NULL;
-    int			i = 0;
-    int			numFiles = 0;
     AB_TRAVERSAL	trav;
     assert((project == NULL) || obj_is_project(project));
 
@@ -2858,7 +2836,6 @@ strings_exist_in_file(StringList strings, FILE *file)
     int		*stringsLenArray = NULL;
     int		maxFileNameLen = 0;
     int		curFileNameLen = 0;
-    STRING	curFileName = NULL;
     char	buf[8193];
     int		numStrings = 0;
     int		numStringsFound = 0;
@@ -2897,7 +2874,6 @@ strings_exist_in_file(StringList strings, FILE *file)
      */
     for (i = 0; i < numStrings; ++i)
     {
-	curFileName = stringsArray[i];
 	curFileNameLen = stringsLenArray[i];
 	maxFileNameLen = util_max(maxFileNameLen, curFileNameLen);
     }

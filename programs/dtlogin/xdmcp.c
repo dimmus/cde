@@ -382,7 +382,7 @@ void WaitForSomething (void)
     extern int Rescan, ChildReady, wakeupTime;
 
     Debug ("WaitForSomething\n");
-    if (AnyWellKnownSockets () && !ChildReady || wakeupTime > 0 ) {
+    if ((AnyWellKnownSockets () && !ChildReady) || wakeupTime > 0 ) {
 	reads = WellKnownSocketsMask;
 
 	if (wakeupTime >= 0 ) {
@@ -1182,89 +1182,5 @@ NetworkAddressToHostname (CARD16 connectionType, ARRAY8Ptr connectionAddress)
 	break;
     }
     return name;
-}
-
-static int
-HostnameToNetworkAddress (char *name, CARD16 connectionType, ARRAY8Ptr connectionAddress)
-{
-    switch (connectionType)
-    {
-    case FamilyInternet:
-	{
-	    struct hostent	*hostent;
-
-	    hostent = gethostbyname (name);
-	    if (!hostent)
-		return FALSE;
-	    if (!XdmcpAllocARRAY8 (connectionAddress, hostent->h_length))
-		return FALSE;
-	    memmove( connectionAddress->data, hostent->h_addr, hostent->h_length);
-	    return TRUE;
-	}
-#ifdef DNET
-    case FamilyDECnet:
-	return FALSE;
-#endif
-    }
-    return FALSE;
-}
-
-/*
- * converts a display name into a network address, using
- * the same rules as XOpenDisplay (algorithm cribbed from there)
- */
-
-static int
-NameToNetworkAddress(char *name, CARD16Ptr connectionTypep, ARRAY8Ptr connectionAddress, CARD16Ptr displayNumber)
-{
-    char    *colon, *display_number;
-    char    hostname[1024];
-    int	    dnet = FALSE;
-    CARD16  number;
-    CARD16  connectionType;
-
-    colon = strchr(name, ':');
-    if (!colon)
-	return FALSE;
-    if (colon != name)
-    {
-	if (colon - name > sizeof (hostname))
-	    return FALSE;
-	strncpy (hostname, name, colon - name);
-	hostname[colon - name] = '\0';
-    }
-    else
-    {
-	strcpy (hostname, localHostname ());
-    }
-    if (colon[1] == ':')
-    {
-	dnet = TRUE;
-	colon++;
-    }
-#ifndef DNETCONN
-    if (dnet)
-	return FALSE;
-#endif
-    display_number = colon + 1;
-    while (*display_number && *display_number != '.')
-    {
-	if (!isascii (*display_number) || !isdigit(*display_number))
-	    return FALSE;
-    }
-    if (display_number == colon + 1)
-	return FALSE;
-    number = atoi (colon + 1);
-#ifdef DNETCONN
-    if (dnet)
-	connectionType = FamilyDECnet;
-    else
-#endif
-	connectionType = FamilyInternet;
-    if (!HostnameToNetworkAddress (hostname, connectionType, connectionAddress))
-	return FALSE;
-    *displayNumber = number;
-    *connectionTypep = connectionType;
-    return TRUE;
 }
 

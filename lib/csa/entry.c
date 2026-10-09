@@ -223,8 +223,8 @@ _DtCm_get_entry_attrs_by_name(
 				entry->cal->entry_tbl, names[i]);
 
 			if (index >= 0 && entry->e->attrs[index].value) {
-				if (attrs_r[j].name =
-				    strdup(entry->e->attrs[index].name.name))
+				if ((attrs_r[j].name =
+				    strdup(entry->e->attrs[index].name.name)))
 				{
 					stat = _DtCm_cms2csa_attrval(
 						entry->e->attrs[index].value,

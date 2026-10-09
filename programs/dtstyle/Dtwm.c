@@ -150,28 +150,6 @@ static saveRestore save = {FALSE, 0, };
 
 static char dtwmRes[150]="";
 
-static char *icon[] = {
-    "iconTL",
-    "iconTR",
-    "iconBL",
-    "iconBR",
-    "iconLT",
-    "iconLB",
-    "iconRT",
-    "iconRB"
-};
-
-static char *placementStr[] = {
-    "top left",
-    "top right",
-    "bottom left",
-    "bottom right",
-    "left top",
-    "left bottom",
-    "right top",
-    "right bottom"
-};
-
 /*+++++++++++++++++++++++++++++++++++++++*/
 /* popup_dtwmBB                         */
 /*+++++++++++++++++++++++++++++++++++++++*/
@@ -204,7 +182,6 @@ getDtwmValues(void)
 {
     char *str_type_return;
     XrmValue value_return;
-    XrmValue    cvt_value;
     XrmDatabase db;
     Boolean status;
     char *string;
@@ -212,9 +189,9 @@ getDtwmValues(void)
     db = XtDatabase(style.display);
 
     /* Get KeyboardFocusPolicy value */
-    if (status = XrmGetResource (db, "dtwm.keyboardFocusPolicy",
+    if ((status = XrmGetResource (db, "dtwm.keyboardFocusPolicy",
                                  "Dtwm.KeyboardFocusPolicy",
-                                 &str_type_return, &value_return))
+                                 &str_type_return, &value_return)))
     {
         /* make local copy of string */
         string = (char *) XtMalloc( value_return.size );
@@ -243,9 +220,9 @@ getDtwmValues(void)
     } 
 
     /* Get FocusAutoRaise value */
-    if (status = XrmGetResource (db, "dtwm.focusAutoRaise",
+    if ((status = XrmGetResource (db, "dtwm.focusAutoRaise",
                                      "Dtwm.FocusAutoRaise",
-                                     &str_type_return, &value_return))
+                                     &str_type_return, &value_return)))
     {
         /* make local copy of string */
         string = (char *) XtMalloc( value_return.size );
@@ -274,9 +251,9 @@ getDtwmValues(void)
     }
 
     /* Get SecStack value from secondaries OnTop resource*/
-    if (status = XrmGetResource (db, "dtwm.secondariesOnTop",
+    if ((status = XrmGetResource (db, "dtwm.secondariesOnTop",
                                      "Dtwm.secondariesOnTop",
-                                     &str_type_return, &value_return))
+                                     &str_type_return, &value_return)))
     {
         /* make local copy of string */
         string = (char *) XtMalloc( value_return.size );
@@ -305,9 +282,9 @@ getDtwmValues(void)
 #endif
       }
     /* Get UseIconBox value */
-    if (status = XrmGetResource (db, "dtwm.useIconBox",
+    if ((status = XrmGetResource (db, "dtwm.useIconBox",
                                  "Dtwm.UseIconBox",
-                                 &str_type_return, &value_return))
+                                 &str_type_return, &value_return)))
     {
         /* make local copy of string */
         string = (char *) XtMalloc( value_return.size );
@@ -333,9 +310,9 @@ getDtwmValues(void)
     }
 
     /* Get MoveOpaque value */
-    if (status = XrmGetResource (db, "dtwm.moveOpaque",
+    if ((status = XrmGetResource (db, "dtwm.moveOpaque",
                                      "Dtwm.MoveOpaque",
-                                     &str_type_return, &value_return))
+                                     &str_type_return, &value_return)))
     {
         /* make local copy of string */
         string = (char *) XtMalloc( value_return.size );
@@ -369,7 +346,7 @@ static Widget
 build_dtwmDlg(
         Widget shell )
 {
-    int     i, n;
+    int n;
     Arg              args[MAX_ARGS];
     XmString         button_string[NUM_LABELS]; 
     XmString         string; 
@@ -713,9 +690,6 @@ _DtmapCB_dtwmDlg(
         XtPointer call_data )
 {
 
-    static int  first_time = 1;
-    int         n;
-    Arg         args[MAX_ARGS];
 
 
     DtWsmRemoveWorkspaceFunctions(style.display, XtWindow(XtParent(w)));
@@ -772,7 +746,6 @@ ButtonCB(
 {
   int         n;
   Arg         args[MAX_ARGS];
-  char        *resPtr;
   Boolean     state;
   Boolean     changeFlag = 0;
   DtDialogBoxCallbackStruct *cb = (DtDialogBoxCallbackStruct *) call_data;

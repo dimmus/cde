@@ -69,10 +69,6 @@
  * Some internal functions.
 static ViewerNode	*r_locate_node();
  */
-static void		erase_node();
-static int		child_of_selected_node();
-static void		draw_icon();
-static void		draw_arrow();
 
 /*************************************
 	ADT of the browser structure
@@ -143,7 +139,6 @@ vwr_destroy_tree
     Viewer		*b;
     ViewerMethods	*m;
     ViewerNode	*child;
-    ViewerNode	*next_child;
     int			i, num_child;
 
     if (!tree)
@@ -280,7 +275,7 @@ vwr_traverse_tree
             (i < num_child); 
             child = (*m->get_child)(tree, ++i))
     {
-        if (tmp_node = vwr_traverse_tree(child, fn))
+        if ((tmp_node = vwr_traverse_tree(child, fn)))
             rtn_node = tmp_node;
     }
 

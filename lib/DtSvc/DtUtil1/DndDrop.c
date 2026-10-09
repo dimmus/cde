@@ -597,7 +597,6 @@ dndTransferStart(
 	XmDropTransferEntryRec * transferEntries;
 	Cardinal	numTransferEntries;
 	int		posOffsetX, posOffsetY;
-	Boolean		status;
 	Arg		args[10];
 	Cardinal	ii, nn;
 

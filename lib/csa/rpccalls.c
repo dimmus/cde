@@ -225,7 +225,7 @@ _DtCm_rpc_create_calendar(
 		/* check to make sure user is not creating a calendar
 		 * using another user's name
 		 */
-		if (ptr = strchr(cal->name, '@')) *ptr = '\0';
+		if ((ptr = strchr(cal->name, '@'))) *ptr = '\0';
 		if (_DtCmIsUserName(cal->name) == B_TRUE) {
 
 			if ((owner = _DtCmGetUserName()) == NULL)
@@ -1019,8 +1019,8 @@ _DtCm_rpc_list_calendar_attributes(
 		if (res != NULL) {
 			if ((stat = res->stat) == CSA_SUCCESS && res->num_names)
 			{
-				if (names = _DtCm_alloc_character_pointers(
-				    res->num_names)) {
+				if ((names = _DtCm_alloc_character_pointers(
+				    res->num_names))) {
 					for (i = 0; i < res->num_names; i++) {
 						if ((names[i] = strdup(
 						    res->names[i].name))
@@ -1079,8 +1079,8 @@ _DtCm_rpc_list_calendars(
 		if (res != NULL) {
 			if ((stat = res->stat) == CSA_SUCCESS && res->num_names)
 			{
-				if (names = _DtCm_alloc_calendar_users(
-				    res->num_names)) {
+				if ((names = _DtCm_alloc_calendar_users(
+				    res->num_names))) {
 					for (i = 0; i < res->num_names; i++) {
 						if ((names[i].calendar_address =
 						    strdup(res->names[i]))
@@ -1406,14 +1406,14 @@ _GetV4UserAccess(Calendar *cal, cms_access_entry *alist)
 	boolean_t isowner = B_FALSE;
 
 	/* first check if user is owner */
-	if (ptr = strchr(cal->name, '@')) *ptr = '\0';
+	if ((ptr = strchr(cal->name, '@'))) *ptr = '\0';
 
 	if (_DtCmIsUserName(cal->name) == B_TRUE) {
 		if (strcmp(user, cal->name) == 0) {
 			/* check whether calendar location is in
 			 * the same domain
 			 */
-			if (dom = strchr(cal->location, '.')) dom++;
+			if ((dom = strchr(cal->location, '.'))) dom++;
 			if (dom == NULL || _DtCmIsSamePath(
 			    _DtCmGetLocalDomain(NULL), dom) == B_TRUE)
 				isowner = B_TRUE;

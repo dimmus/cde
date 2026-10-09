@@ -102,8 +102,6 @@ static void _GetStartEndIndex(
 
 static void _AdjustExceptionDates(cms_entry *entry, time_t delta);
 
-static int _NumberExceptionDates(cms_entry *entry);
-
 /*****************************************************************************
  * extern functions used in the library
  *****************************************************************************/
@@ -351,7 +349,7 @@ _cleanup:
 		_DtCmsInsertEntry(cal, olde);
 	else {
 		_DtCm_free_cms_entry(updatedold);
-		if (lnode = hc_lookup_node(cal->list, (caddr_t)key)) {
+		if ((lnode = hc_lookup_node(cal->list, (caddr_t)key))) {
 			updatedold = (cms_entry *)lnode->data;
 			lnode->data = (caddr_t)olde;
 			olde = updatedold;
@@ -390,7 +388,7 @@ _AdjustStartEndTimeForUpdateInst(
 {
 	CSA_return_code	stat;
 	time_t		oldbod, newbod, endtime, delta;
-	int		i, starti, endi;
+	int		starti, endi;
 
 	/* update start date */
 	_GetStartEndIndex(num_attrs, attrs, &starti, &endi);

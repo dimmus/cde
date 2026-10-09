@@ -472,7 +472,6 @@ ConvertContainerCmd::doit()
 {
     assert(_menuWindow != NULL);
     
-    MailSession *ses = theRoamApp.session();
     DtMailEnv mail_error;
     
     // Initialize the mail_error.
@@ -738,7 +737,6 @@ UnifiedSelectFileCmd::UnifiedSelectFileCmd (
        const char	*dirname = NULL;
        const char	*expanded_dirname = NULL;
        const char	*value = NULL;
-       char		*full_dirname = NULL;
 
        _unified_directory = NULL;
        _unified_file = NULL;
@@ -909,7 +907,6 @@ UnifiedSelectMailboxCmd::UnifiedSelectMailboxCmd (
        const char	*dirname = NULL;
        const char	*expanded_dirname = NULL;
        const char	*value = NULL;
-       char		*full_dirname = NULL;
 
        _unified_directory = NULL;
        _unified_file = NULL;
@@ -1007,13 +1004,10 @@ UnifiedSelectMailboxCmd::unifiedMailboxSearchProc(
 					Widget w,
 					XtPointer sd)
 {   
-    XmFileSelectionBoxWidget fs =
-				(XmFileSelectionBoxWidget) w;
     XmFileSelectionBoxCallbackStruct * searchData =
 				(XmFileSelectionBoxCallbackStruct *) sd;
     String          dir;
     String          pattern;
-    Arg             args[3];
     int             Index;
     String *        fileList;
     unsigned int    numFiles;
@@ -1057,7 +1051,7 @@ UnifiedSelectMailboxCmd::unifiedMailboxSearchProc(
         Index = 0;
 	dirLen = strlen(dir);
 
-	while (Index < numFiles)
+	while ((unsigned int) Index < numFiles)
 	{
 	    Boolean	isMailBox = 0;
 	    char	*dataType = NULL;
@@ -1414,7 +1408,6 @@ UndeleteCmd::~UndeleteCmd()
 void
 UndeleteCmd::doit()
 {
-    FORCE_SEGV_DECL(MsgStruct, tmpMS);
     MsgScrollingList *list = _menuwindow->list();
     MsgHndArray *deleted_messages;
     DtMailEnv mail_error;
@@ -1531,9 +1524,6 @@ void
 MoveCopyCmd::doit()
 {
     XmString move;
-    Widget filter_button;
-    Widget unused_button;
-    Widget action_area;
     DtMailEnv error;
     
     if (!_fileBrowser) {
@@ -1541,10 +1531,8 @@ MoveCopyCmd::doit()
 	// Customize buttons for MoveCopy dialog
 	move = XmStringCreateLocalized(CATGETS(DT_catd, 1, 90, "Move"));
 	
-	filter_button = XtNameToWidget(_fileBrowser, "*Apply");
 	_move_button = XtNameToWidget(_fileBrowser, "*OK");
-	action_area = XtParent(_move_button);
-	unused_button = XtVaCreateWidget(
+	XtVaCreateWidget(
 			"Unused Button",
 			xmPushButtonWidgetClass, _fileBrowser,
 			NULL);
@@ -1619,13 +1607,8 @@ MoveCopyCmd::fileSelectedCallback2 (
 				     )
 {
     MoveCopyCmd	*obj = (MoveCopyCmd *) clientData;
-    XmFileSelectionBoxCallbackStruct *cb =
-        	(XmFileSelectionBoxCallbackStruct *) callData;
-    char	*name = NULL;
-    char	*dir_str = NULL;
     char	*fname = NULL;
     char	*dname = NULL;
-    int		status = 0;
     XmString	xmstr;
     
     static char	selected[MAXPATHLEN+1];
@@ -1844,7 +1827,6 @@ void
 PrintCmd::printit( int silent )
 {
     char *p;
-    char *silent_str = "DTPRINTSILENT";
     char *tmpdir = new char[MAXPATHLEN+1];
     DtMailEnv	mail_error;
     MsgScrollingList	*list;
@@ -3008,7 +2990,7 @@ EditCutCmd::EditCutCmd(
     editor = w->get_editor()->textEditor();
 
     // className() is a virtual method
-    if (w->className() == "SendMsgDialog") {
+    if (strcmp(w->className(), "SendMsgDialog") == 0) {
 	_compose_dialog = (SendMsgDialog *)w;
     }
     else {
@@ -3039,7 +3021,7 @@ EditCopyCmd::EditCopyCmd(
     editor = w->get_editor()->textEditor();
     
     // className() is a virtual method
-    if (w->className() == "SendMsgDialog") {
+    if (strcmp(w->className(), "SendMsgDialog") == 0) {
 	_compose_dialog = (SendMsgDialog *)w;
     }
     else {
@@ -3300,7 +3282,6 @@ LogMsgCmd::LogMsgCmd(
   // But for now, just look in .mailrc to see if "record" is set.
 
   DtMailEnv error;
-  const char *logfile = NULL;
 
   _send = send;
 
@@ -3364,7 +3345,6 @@ static unsigned long
 writeToFileDesc(const char * buf, int len, va_list args)
 {
     int fd = va_arg(args, int);
-    int cnt = va_arg(args, int);
     int status = 0;
 
     do {
@@ -3669,7 +3649,7 @@ VacationCmd::handleForwardFile()
 	if (lastchar != '\n') {
 	    lseek(fwd_fd, 0, SEEK_END);
 	    char *txt = "\n";
-	    if (SafeWrite(fwd_fd, txt, strlen(txt)) < strlen(txt)) {
+	    if ((size_t) SafeWrite(fwd_fd, txt, strlen(txt)) < strlen(txt)) {
 		// error
 	        delete [] buf;
     	        delete [] messagefile;
@@ -3686,7 +3666,7 @@ VacationCmd::handleForwardFile()
 	char *append_buf1 = new char[1024*2];
 	sprintf(append_buf1, "|\" /usr/bin/vacation %s\"\n", pw.pw_name);
 
-	if (SafeWrite(fwd_fd, append_buf1, strlen(append_buf1)) < 
+	if ((size_t) SafeWrite(fwd_fd, append_buf1, strlen(append_buf1)) < 
 	    strlen(append_buf1)) {
 	    // error
 	    delete [] buf;
@@ -3725,7 +3705,7 @@ VacationCmd::handleForwardFile()
 
 	char *end_text = "User not using forward file\n";
 
-	if (SafeWrite(bkup_fd, end_text, strlen(end_text)) < 
+	if ((size_t) SafeWrite(bkup_fd, end_text, strlen(end_text)) < 
 	    strlen(end_text)) {
 	    // error
 	    delete [] buf;
@@ -3751,7 +3731,7 @@ VacationCmd::handleForwardFile()
 
 	sprintf(append_buf2, "\\%s, |\" /usr/bin/vacation %s\"\n", 
 	        pw.pw_name, pw.pw_name);
-	if (SafeWrite(fwd_fd, append_buf2, strlen(append_buf2)) <
+	if ((size_t) SafeWrite(fwd_fd, append_buf2, strlen(append_buf2)) <
 	    strlen(append_buf2)) {
 	    // error
 	    SafeClose(bkup_fd);
@@ -3878,7 +3858,6 @@ VacationCmd::parseVacationMessage()
 
     DtMailGenDialog	*dialog;
     char * helpId;
-    int answer;
     char dialog_text[1024*4];
     DtMailEnv error;
     DtMail::Session * d_session = theRoamApp.session()->session();
@@ -3924,7 +3903,7 @@ VacationCmd::parseVacationMessage()
 		CATGETS(DT_catd, 1, 105, "Cannot open .vacation.msg file -- No write permission."));
 	dialog->setToQuestionDialog("Mailer", dialog_text);
 	helpId = DTMAILHELPNOWRITEVACATION;
-	answer = dialog->post_and_return(helpId);
+	dialog->post_and_return(helpId);
 	    
 	_subject = NULL;
 	_body = NULL;
@@ -3942,17 +3921,15 @@ VacationCmd::parseVacationMessage()
       return;
    }
 
-    int free_buf = 0;
     mbuf.size = buf.st_size;
     mbuf.buffer = mmap(0, map_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (mbuf.buffer == (char *)-1) {
-	free_buf = 1;
 	mbuf.buffer = new char[mbuf.size];
 	if (mbuf.buffer == NULL) {
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 3, 59, "No Memory"),
 				     CATGETS(DT_catd, 3, 60, "There is not enough memory to load the existing .vacation.msg file."));
 	    helpId = DTMAILHELPNOLOADVACATION;
-	    answer = dialog->post_and_return(helpId);
+	    dialog->post_and_return(helpId);
 	    SafeClose(fd);
 
 	    _subject = NULL;
@@ -3961,11 +3938,11 @@ VacationCmd::parseVacationMessage()
 	    return;
 	}
 
-	if (SafeRead(fd, mbuf.buffer, (unsigned int)mbuf.size) < mbuf.size) {
+	if ((unsigned long) SafeRead(fd, mbuf.buffer, (unsigned int)mbuf.size) < mbuf.size) {
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 3, 61, "Mailer"),
 				     CATGETS(DT_catd, 3, 62, "The existing .vacation.msg file appears to be corrupt."));
 	    helpId = DTMAILHELPCORRUPTVACATION;
-	    answer = dialog->post_and_return(helpId);
+	    dialog->post_and_return(helpId);
 	    SafeClose(fd);
 	    delete (char*) mbuf.buffer;
 	    _subject = NULL;
@@ -3996,7 +3973,6 @@ VacationCmd::parseVacationMessage()
 	DtMail::Envelope * env = msg->getEnvelope(error);
 	DtMailHeaderHandle hnd;
 
-	int hcount = 0;
 	char * name;
 	DtMailValueSeq value;
 

@@ -236,7 +236,7 @@ DtMailGenDialog::okCallback(Widget w, XtPointer clientData, XtPointer cbs)
 	obj->setToAboutDialog();
 	// char * helpId = "About";
 	char * helpId = NULL;
-	int answer = obj->post_and_return(CATGETS(DT_catd, 1, 180, "OK"),
+	obj->post_and_return(CATGETS(DT_catd, 1, 180, "OK"),
 					  helpId);
     }
 }
@@ -290,7 +290,6 @@ void DtMailGenDialog::otherCallback(Widget w, XtPointer clientData, XtPointer)
 void DtMailGenDialog::helpCallback(Widget, XtPointer clientData, XtPointer)
 {
     DtMailDialogCallbackData *dcd = (DtMailDialogCallbackData *) clientData;
-    DtMailGenDialog      *obj = (DtMailGenDialog *) dcd->dialog();
     DialogCallback      callback;
 
     if ((callback=dcd->help()) != NULL) (*callback)(dcd->clientData());
@@ -329,14 +328,14 @@ void DtMailGenDialog::verify(XmTextVerifyPtr cbs)
     else
       *s = '\0';
 
-    if (strlen(_clearText) >= cbs->endPos)
+    if (strlen(_clearText) >= (size_t) cbs->endPos)
     {
         t = _clearText+cbs->endPos;
         if (strlen(t))
           strcpy(s, t);
     }
 
-    if (strlen(buffer) >= _maxTextlen)
+    if (strlen(buffer) >= (size_t) _maxTextlen)
     {
 	_maxTextlen *= 2;
 	_clearText = (char*) realloc((void*) _clearText, (size_t) _maxTextlen);
@@ -383,7 +382,7 @@ void
 DtMailGenDialog::forceUpdate( Widget w )
 {
     Widget diashell, topshell;
-    Window diawindow, topwindow;
+    Window diawindow;
 
     Display		*dpy;
     XWindowAttributes	xwa;
@@ -398,7 +397,6 @@ DtMailGenDialog::forceUpdate( Widget w )
 
     dpy=XtDisplay(diashell);
     diawindow=XtWindow(diashell);
-    topwindow=XtWindow(topshell);
     while (XGetWindowAttributes(dpy,diawindow,&xwa) && 
 	   xwa.map_state != IsViewable && XEventsQueued(dpy,QueuedAlready))
     {

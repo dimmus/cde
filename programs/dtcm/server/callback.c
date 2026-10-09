@@ -284,13 +284,6 @@ _DtCmsDoV1Callback(
 {
 	Uid_4 *k, *ids = NULL;
 	Table_Res_4 res;
-        int nclients=0, ncallbacks=0;
-	char *sourcehost=NULL;
-        _DtCmsRegistrationInfo *ptr;
-        _DtCmsRegistrationInfo *prev;
-	struct timeval timeout_tv;
-	CLIENT *cl;
-	boolean_t advance = B_TRUE;
 
 	if (rlist == NULL)
 		return (rlist);
@@ -415,7 +408,6 @@ _DtCmsDoUpdateCalAttrsCallback(
 	cmcb_update_callback_args	args;
 	cmcb_cal_attr_data		cdata; 
 	_DtCmsRegistrationInfo		*res;
-	char buf[80];
 	char calendar[BUFSIZ];
 	int i;
 

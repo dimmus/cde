@@ -122,7 +122,7 @@ _DtDtsDCConverter(DtDtsDbField * fields,
 	{
 		if (i == 0)
 		{
-			if(rec=_DtDtsDbGetRecordByName(db,fields[i].fieldValue))
+			if((rec=_DtDtsDbGetRecordByName(db,fields[i].fieldValue)))
 			{
 				char *value = _DtDtsDbGetFieldByName(rec,DtDTS_DA_IS_SYNTHETIC);
 				/*
@@ -175,7 +175,7 @@ _DtDtsDAConverter(DtDtsDbField * fields,
 	{
 		if (i == 0)
 		{
-			if(rec = _DtDtsDbGetRecordByName(db, fields[i].fieldValue))
+			if((rec = _DtDtsDbGetRecordByName(db, fields[i].fieldValue)))
 			{
 				char *value = _DtDtsDbGetFieldByName(rec,DtDTS_DA_IS_SYNTHETIC);
 				/*

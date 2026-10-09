@@ -765,12 +765,9 @@ abobjP_track_external_resizes(
 )
 {
     ABObj     	obj = (ABObj)client_data;
-    Widget    	parent = XtParent(widget);
-    int	      	new_value;
     int	      	new_h = -1; 
     int	      	new_w = -1;
     int		old_w, old_h;	
-    BOOL      	resized = False;
 
     if (event->type == ConfigureNotify)
     {
@@ -861,6 +858,8 @@ make_rect (
             new_r->width = max(0, r->x + r->width - x);
             new_r->height = max(0, y - r->y);
 	    break;
+        default:
+            break;
 	}
 }
 
@@ -923,7 +922,6 @@ undo_resize(
      */
     for (i = 0; i < undo_rec->count; ++i)
     {
-	BOOL	w_resizable, h_resizable;
 	/*
 	 * If undo record is not the right type, something is WRONG !!
 	 */
@@ -931,8 +929,6 @@ undo_resize(
 	    continue;
 
         obj = undo_rec->list[i];
-	w_resizable = abobj_width_resizable(obj);
-	h_resizable = abobj_height_resizable(obj);
 
 	/*
 	 * Get current x,y position

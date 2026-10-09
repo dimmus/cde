@@ -335,7 +335,7 @@ GetAtomWindow(Display *dpy, Window win, Atom atom)
 	    (nchildren == 0))
 	  return 0;
 	for (i = nchildren - 1; i >= 0; i--) {
-	    if (inf = GetAtomWindow(dpy, children[i], atom))
+	    if ((inf = GetAtomWindow(dpy, children[i], atom)))
 	      return inf;
 	}
     }
@@ -578,6 +578,7 @@ GetOlitDropSite(Display *dpy, Window top_level_win, INT16 drop_x, INT16 drop_y,
     NEXTWORD(nsites);
     for (i=0; i<nsites && !done; ++i) {
 	NEXTWORD(event_win);	NEXTWORD(site_id);	NEXTWORD(flags);
+	(void) flags;
 	NEXTWORD(areatype);
 	switch (areatype) {
 	case INTEREST_RECT:
@@ -958,8 +959,6 @@ GetTargetsIndex(Display *dpy, unsigned char *in_data, unsigned long atom_cnt, CA
     int 		i, old_size, new_size;
     CARD16 		*target_cnt;
     CARD32		*target_data, tmp_data;
-    int			malloc_length;
-    motif_initiator_t	initiator_info;
     char 		byte_order;
     CARD16		num_target_lists;
 
@@ -1202,10 +1201,6 @@ int ForwardConversion(XSelectionEvent *event, drop_info_t *drop_info)
 void
 ForwardMultpleSelectionRequest(XSelectionRequestEvent *event, drop_info_t *drop_info)
 {
-    int format, status;
-    unsigned long length, bytes_after;
-    unsigned char *data;
-
     drop_info->source_win = event->requestor;
 
     if (CopyProperty(event->display, event->property, 

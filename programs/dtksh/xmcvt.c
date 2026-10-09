@@ -162,7 +162,6 @@ _CvtXmStringTableToString(
    XmStringDirection dir;
    char *text;
    Boolean separator = FALSE;
-   XmString string;
    int i;
    char * ptr;
    char * nextComma;
@@ -260,12 +259,10 @@ DtkshCvtNamedValueToString(
 	/*
 	 * same buffer will get used each time
 	 */
-	static char *ret = NULL;
 	struct named_integer *table;
 	int numtable;
 	long value;
 	int i;
-        char * errmsg;
 
         switch(fval->size)
         {
@@ -331,7 +328,6 @@ DtkshCvtStringToNamedValue(
 	/*
 	 * same buffer will get used each time
 	 */
-	static int ret;
 	struct named_integer *table;
 	int numtable;
 	char *value;

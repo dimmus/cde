@@ -74,7 +74,7 @@ char keywordDB[][30] = { "ACTION"         ,
                           "WINDOW_TYPE"   ,
                           "ARG_TYPE"      ,
                           "LABEL"         ,
-                          '\0'            ,
+                          ""              ,
                      };
 
 /* Max Number of fields in Action Keyword Table */
@@ -98,7 +98,7 @@ char FiletypekeywordDB[][30] = { "DATA_ATTRIBUTES"       ,
                                   "MAP_ACTION"           ,
                                   "TYPE"                 ,
                                   "LABEL"                ,
-                                   '\0'                  ,
+                                   ""                    ,
                      };
 
 /* Max Number of fields in Filetype Keyword Table */
@@ -132,7 +132,7 @@ static int state = 0;
 int
 GetActionData(FILE *fp, ActionData *ActionDataptr)
 {
-int         rc,manflds=0,len,first=TRUE,lastfld=0,fldid=-1;
+int         manflds=0,len,first=TRUE,fldid=-1;
 char        linebuf[1024],**wordPairs,**execstr;
 
 
@@ -320,7 +320,7 @@ char        linebuf[1024],**wordPairs,**execstr;
 FiletypeData **
 GetFiletypeData(FILE  *fp, char *pszOpenCmd, short *nftypes)
 {
-int         manflds=0,len,nfiletypes,previous=0,lastfld=0,fldid;
+int         manflds=0,len,nfiletypes,previous=0,fldid;
 char        linebuf[1024],**wordPairs,**execstr;
 FiletypeData  **ppFiletypeData,**ppnewFiletypeData;
 
@@ -875,7 +875,7 @@ int  done=FALSE, argfound=FALSE,promptfound=FALSE;
                                strncmp(argbuf,"%Args%",6) &&
                                strncmp(argbuf,"%Args\"",6)   )
                       {
-                           strncat(exec_args[0],argbuf,strlen(argbuf)-1);
+                           strncat(exec_args[0],argbuf,(s2-s1));
                            exec_args[0][strlen(exec_args[0])] = '\0';
                            s1=s2;
                            continue;

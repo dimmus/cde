@@ -92,7 +92,6 @@ abobj_align(
 {
     ABSelectedRec sel;
     extern int  AB_grid_size;
-    int	x = MAXINT;
 
     if (!align_mask)
 	return;

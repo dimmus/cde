@@ -166,7 +166,6 @@ int
 abmfP_args_init(void)
 {
     static BOOL         inited = FALSE;
-    ISTRING            *istr_entry = NULL;
     if (inited)
     {
 	return 0;
@@ -755,6 +754,8 @@ abmfP_write_arg_val_line(
 	    break;
 	    case ABMF_ARGFMT_VA_LIST:
 	    break;
+	    default:
+	    break;
         }
     }
 
@@ -770,6 +771,8 @@ abmfP_write_arg_val_line(
 	    break;
 	    case ABMF_ARGFMT_VA_LIST:
 		abio_puts(codeFile, ",\n");
+	    break;
+	    default:
 	    break;
         }
     }
@@ -849,6 +852,8 @@ abmfP_obj_spew_args(
 	case AB_TYPE_SPIN_BOX:
             spew_extra_spinbox_args(genCodeInfo, obj, argClasses);
 	break;
+	default:
+	break;
     }
 
 epilogue:
@@ -875,8 +880,6 @@ abmfP_obj_spew_one_class_args(
     ABObj		actualObj = obj_get_actual_obj(obj);
     ArgList             argList = NULL;
     Arg                *arg = NULL;
-    ABObj               project = obj_get_project(obj);
-    ABObj               menu = NULL;
 
 
     for (objCount = 0; objCount < 2; ++objCount)
@@ -976,6 +979,8 @@ abmfP_obj_spew_one_class_args(
 	                abmfP_write_resource(genCodeInfo, FALSE, arg, obj);
 		        abio_printf(codeFile, ");  ++%s;\n",
 		            istr_string(abmfP_arg_counter_var(genCodeInfo)));
+		    break;
+		    default:
 		    break;
 	        }
 	    }
@@ -1081,7 +1086,6 @@ spew_extra_list_args(
 		ABMF_ARG_CLASS	argClasses
 )
 {
-    FILE	*codeFile = genCodeInfo->code_file;
     int		num_items= obj_get_num_items(obj);
     ABObj	first_item= obj_get_item(obj, 0);
     ABObj	parent= abmfP_parent(obj);
@@ -1112,7 +1116,6 @@ spew_extra_spinbox_args(
                 ABMF_ARG_CLASS  argClasses
 )
 {
-    FILE        *codeFile = genCodeInfo->code_file;
     int         num_items= obj_get_num_items(obj);
     ABObj       first_item= obj_get_item(obj, 0);
 
@@ -1305,6 +1308,8 @@ abmfP_arg_is_typed(STRING argName)
         case AB_ARG_FONT:
 	    isIt = TRUE;
 	    break;
+        default:
+	    break;
     }
 
     return isIt;
@@ -1415,6 +1420,8 @@ abmfP_get_res_type(STRING res_xmname, ABObj obj)
 	    case AB_TYPE_TEXT_FIELD:
 	    case AB_TYPE_TEXT_PANE:
 	        arg_type = AB_ARG_STRING;
+	    break;
+	    default:
 	    break;
         }
     }

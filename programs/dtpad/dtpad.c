@@ -266,7 +266,7 @@ SetSaveAsLabelAndDialog(
 {
     char buf[256];
     Arg al[10];
-    int ac, count = 0;
+    int ac;
     char      *mnemonic;
     XmString tmpStr;
 
@@ -968,8 +968,6 @@ CreateEditorWidget(
     Widget parent = pPad->mainWindow;
     Arg al[10];		/* arg list */
     int ac;	/* arg count */
-    Pixel background, foreground, top_shadow, bottom_shadow, selectColor;
-    Colormap colormap;
     XmString dialogTitleStr = XmStringCreateLocalized(DialogTitle(pPad));
 
     /* create the DtEditor widget */
@@ -1137,7 +1135,6 @@ SetWorkSpaceHints(
      Atom     pCurrent;
      Screen   *currentScreen;
      int      screen;
-     char     *workspace_name;
 
      screen = XDefaultScreen(XtDisplay(shell));
      currentScreen = XScreenOfDisplay(XtDisplay(shell), screen);

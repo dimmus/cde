@@ -141,7 +141,6 @@ static void 	register_palette_info(
 **                                                                      **
 **************************************************************************/
 
-static Widget 	HelpDialog;
 
 
 static void
@@ -387,6 +386,8 @@ register_palette_info(
         case AB_TYPE_FILE_CHOOSER: 
                 pal_register_item_info(palitem_w, ab_fchooser_palitem,
                         (int)AB_NO_SUBTYPE, NULL, 0);
+                break;
+        default:
                 break;
     }
 }
@@ -831,6 +832,7 @@ palP_set_menubar_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_CONTAINER, "AB_CONT_MENU_BAR");
@@ -851,6 +853,7 @@ palP_set_button_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_BUTTON, "AB_BUT_PUSH");
@@ -871,6 +874,7 @@ palP_set_menubutton_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_BUTTON, "AB_BUT_MENU");
@@ -891,6 +895,7 @@ palP_set_mainwin_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_BASE_WINDOW, NULL);
@@ -911,6 +916,7 @@ palP_set_dialog_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_DIALOG, NULL);
@@ -931,6 +937,7 @@ palP_set_file_chooser_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_FILE_CHOOSER, NULL);
@@ -951,6 +958,7 @@ palP_set_text_pane_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_TEXT_PANE, NULL);
@@ -971,6 +979,7 @@ palP_set_draw_area_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_DRAWING_AREA, NULL);
@@ -991,6 +1000,7 @@ palP_set_term_pane_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_TERM_PANE, NULL);
@@ -1011,6 +1021,7 @@ palP_set_optionmenu_palette_info(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_CHOICE, "AB_CHOICE_OPTION_MENU");
@@ -1048,6 +1059,7 @@ palP_set_radiobox_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1069,6 +1081,7 @@ palP_set_checkbox_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
 
     register_palette_info(widget, AB_TYPE_CHOICE, "AB_CHOICE_NONEXCLUSIVE");
@@ -1103,6 +1116,7 @@ palP_set_gauge_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1123,6 +1137,7 @@ palP_set_slider_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1159,6 +1174,7 @@ palP_set_list_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1179,6 +1195,7 @@ palP_set_label_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1216,6 +1233,7 @@ palP_set_textfield_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1236,6 +1254,7 @@ palP_set_container_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1326,6 +1345,7 @@ palP_set_build_udata(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1346,6 +1366,7 @@ palP_set_test_udata(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1366,6 +1387,7 @@ palP_set_separator_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1386,6 +1408,7 @@ palP_set_combobox_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1406,6 +1429,7 @@ palP_set_spinbox_palette_info(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1427,6 +1451,7 @@ palP_set_spinbox_width(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1524,6 +1549,7 @@ palP_set_test_proj_udata(
 
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
 }
@@ -1736,6 +1762,7 @@ palP_create_next_layer_itemCB(
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
     /*** DTB_USER_CODE_END   ^^^ Add C variables and code above ^^^ ***/
     
+    (void)dtbSource;
     /*** DTB_USER_CODE_START vvv Add C code below vvv ***/
     XtVaSetValues(widget, XmNuserData, (XtArgVal)ABMenuNextLayer, NULL);
     /*** DTB_USER_CODE_END   ^^^ Add C code above ^^^ ***/
@@ -1816,6 +1843,8 @@ pal_set_File_menu(
             XtSetSensitive(save_proj_as_item, active);
             XtSetSensitive(save_proj_item, active);
             XtSetSensitive(import_item, active);
+            break;
+        default:
             break;
     }
 }

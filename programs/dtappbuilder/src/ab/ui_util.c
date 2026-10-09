@@ -255,7 +255,6 @@ ui_win_show(
 )
 {
     Widget 	shell;
-    Widget	dialog;
 
     shell = ui_get_ancestor_shell(widget);
 
@@ -919,7 +918,6 @@ ui_get_obj_pixmap
     int			i;
     AB_OBJECT_TYPE	type;
     int			subtype;
-    Pixmap		p = 0;
     BOOL		found = FALSE;
 
     if (!obj || !pixmap || !width || !height)
@@ -1090,7 +1088,6 @@ sync_timeout_proc(
 )
 {
     SyncData		syncData = (SyncData)clientData;
-    time_t		cur_time = time(NULL);
     BOOL		done = FALSE;
 
     if (syncData->synced)
@@ -1396,7 +1393,6 @@ ui_optionmenu_add_item(
     Widget	cascade_btn = NULL;
     Widget	menu = NULL;
     Widget	mpb = NULL;
-    int		ret = 0;
  
     if ((cascade_btn = XmOptionButtonGadget(opmenu)) != NULL)
     {
@@ -1644,7 +1640,6 @@ ui_obj_set_label_string(
 		    {
 			ABObj        p_obj = obj_get_parent(obj);
 			Widget       parent = objxm_get_widget(p_obj);
-			AB_ITEM_TYPE itype = (AB_ITEM_TYPE)obj_get_subtype(obj);
 			int          pos;
 			int          num_items = 0;
 			XmString     xmitem;

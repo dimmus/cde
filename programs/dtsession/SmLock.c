@@ -149,101 +149,6 @@ static void RequirePassword( XtPointer, XtIntervalId *) ;
 static void CycleSaver( XtPointer, XtIntervalId *) ;
 static void BlinkCaret( XtPointer, XtIntervalId *) ;
 
-#if defined(__linux__)
-/* #define JET_AUTHDEBUG */
-
-/* Test for re-auth ability - see if we can re-authenticate via pwd,
- * shadow, or NIS
- */
-static Boolean CanReAuthenticate(char *name, uid_t uid, char *passwd,
-				 struct passwd **pwent, struct spwd **spent)
-{
-  if (!pwent)
-      return False;
-
-  *pwent = (name == NULL) ? getpwuid(uid) : getpwnam(name);
-  if (!*pwent)
-      return False;
-
-  *spent = getspnam((*pwent)->pw_name);
-
-#ifdef JET_AUTHDEBUG
-  fprintf(stderr, "CanReAuthenticate(): uid: %d name: '%s' errno %d %s %s %s\n",
-          uid,
-          (name) ? name : "NULL",
-          errno,
-	  (*pwent) ? "PWENT" : "NULL",
-	  (*spent) ? "SPENT" : "NULL",
-	  (name) ? name : "NULL");
-#endif
-
-  /* some checking for aging stuff on RedPhat */
-
-  if (*pwent && (*pwent)->pw_passwd)
-    {
-      char *loc;
-
-      if ((loc = strchr((*pwent)->pw_passwd, ',')) != NULL)
-	*loc = '\0';
-#ifdef JET_AUTHDEBUG
-      fprintf(stderr, "CanReAuthenticate(): pw: '%s'\n",
-	      (*pwent)->pw_passwd);
-#endif
-
-    }
-
-  if (*spent && (*spent)->sp_pwdp)
-    {
-      char *loc;
-
-      if ((loc = strchr((*spent)->sp_pwdp, ',')) != NULL)
-	*loc = '\0';
-    }
-
-  if (*pwent == NULL)
-    {				/* if we can't get this, we're screwed. */
-#ifdef JET_AUTHDEBUG
-      fprintf(stderr, "CanReAuthenticate(): PWENT == NULL - FALSE\n");
-#endif
-      return False;
-    }
-
-  if ((*pwent)->pw_passwd == NULL)
-    {
-#ifdef JET_AUTHDEBUG
-      fprintf(stderr, "CanReAuthenticate(): (*pwent)->pw_passwd == NULL - FALSE\n");
-#endif
-
-      return False;
-    }
-
-  /* ok, now we have the prequisite data, look first to see if the
-   * passwd field is larger than 1 char - implying NIS, or a shadowed
-   * system.  if not look for *spent being non-NULL
-   */
-  if (*spent == NULL)
-    {				/* if it's null, lets check for the NIS case */
-      if (strlen((*pwent)->pw_passwd) <= 1)
-	{
-#ifdef JET_AUTHDEBUG
-	  fprintf(stderr, "strlen((*pwent)->pw_passwd) <= 1\n");
-#endif
-
-	  return False;		/* not NIS */
-	}
-    }
-
-				/* supposedly we have valid data */
-#ifdef JET_AUTHDEBUG
-      fprintf(stderr, "CanReAuthenticate(): TRUE\n");
-#endif
-
-  return True;
-}
-
-#endif /* linux */
-
-
 
 
 /*************************************<->*************************************
@@ -281,10 +186,7 @@ LockDisplay(
     int	     screenNum;
     Widget   parent = NULL, lockDlg;
     XColor   xcolors[2];
-    struct passwd *pw;
-    Boolean  secure;
     int lockDelay;
-    int rc;
 
     timerId = lockTimeId = lockDelayId = cycleId = flash_id = (XtIntervalId)0;
 
@@ -932,10 +834,10 @@ EventDetected(
      * pressing the shift key or an arrow key), process it.
      */
 #ifdef USE_HP_SPECIFIC_XLIB
-    if (len = XHPConvertLookup(event, str, sizeof(str), NULL, NULL,
-			       XHPGetEurasianCvt(smGD.display)))
+    if ((len = XHPConvertLookup(event, str, sizeof(str), NULL, NULL,
+			        XHPGetEurasianCvt(smGD.display))))
 #else /* USE_HP_SPECIFIC_XLIB */
-    if (len = XLookupString (event, str, sizeof(str), NULL, NULL))
+    if ((len = XLookupString (event, str, sizeof(str), NULL, NULL)))
 #endif /* USE_HP_SPECIFIC_XLIB */
     {
 	if (smGD.lockedState == LOCKED)
@@ -1165,7 +1067,6 @@ UnlockDisplay(
         Boolean kbdGrabbed)
 {
     int i;
-    Tt_message msg;
 
 #ifdef LOCK_SERVER_ACCESS
     /*

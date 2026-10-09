@@ -337,7 +337,7 @@ _DtCm_match_appts(
 {
 	Appt_4	*head = NULL;
 	Appt_4	*freelist = NULL;
-	Appt_4	*last, *nptr;
+	Appt_4	*last = NULL, *nptr;
 	time_t	endtick;
 
 	if (id == 0 && num_attrs == 0 && no_end_time_range)
@@ -1046,7 +1046,7 @@ match_this_attribute(Appt_4 *appt, cms_attribute attr, CSA_enum op)
 
 		return (_DtCm_match_sint32_attribute(&oldattr,
 			(attr.value ? &matchattr : NULL), op));
-	defalut:
+	default:
 		return (B_FALSE);
 	}
 }

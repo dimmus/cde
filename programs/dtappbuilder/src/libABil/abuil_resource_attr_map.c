@@ -3258,6 +3258,8 @@ abuilP_store_attr_in_abobj(
 			    memmove((char *)ctx_addr + maps[i].attr_offset,
 				    &res_value, maps[i].attr_size);
 			    break;
+			  default:
+			    break;
 			}
 		    }
 

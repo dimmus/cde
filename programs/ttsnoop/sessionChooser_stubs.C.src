@@ -57,7 +57,6 @@ _DtSessionChooserSet(
 {
 	char *okString;
 	char *title;
-	char *valueLabel;
 	switch (choice) {
 	    case _DtSessionChoosePattern:
 		okString = "Add";

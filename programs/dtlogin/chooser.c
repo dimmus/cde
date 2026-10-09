@@ -121,7 +121,7 @@ extern XtPointer _XmStringUngenerate (
 #define BROADCAST_HOSTNAME  "BROADCAST"
 
 #ifndef ishexdigit
-#define ishexdigit(c)	(isdigit(c) || 'a' <= (c) && (c) <= 'f')
+#define ishexdigit(c)	(isdigit(c) || ('a' <= (c) && (c) <= 'f'))
 #endif
 
 #ifdef __convex__
@@ -168,9 +168,9 @@ static XtResource  resources[] = {
 #undef offset
 
 static XrmOptionDescRec options[] = {
-    "-xdmaddress",	"*xdmAddress",	    XrmoptionSepArg,	NULL,
-    "-clientaddress",	"*clientAddress",   XrmoptionSepArg,	NULL,
-    "-connectionType",	"*connectionType",  XrmoptionSepArg,	NULL,
+    { "-xdmaddress",	"*xdmAddress",	    XrmoptionSepArg,	NULL },
+    { "-clientaddress",	"*clientAddress",   XrmoptionSepArg,	NULL },
+    { "-connectionType",	"*connectionType",  XrmoptionSepArg,	NULL },
 };
 
 typedef struct _hostAddr {
@@ -447,28 +447,6 @@ DisposeHostname (HostName *host)
     free ((char *) host);
 }
 
-static int
-RemoveHostname (HostName *host)
-{
-    HostName	**prev, *hosts;
-
-    prev = &hostNamedb;;
-    for (hosts = hostNamedb; hosts; hosts = hosts->next)
-    {
-	if (hosts == host)
-	    break;
-	prev = &hosts->next;
-    }
-    if (!hosts)
-	return 0;
-    *prev = host->next;
-    DisposeHostname (host);
-    NameTableSize--;
-    RebuildTable (NameTableSize);
-
-    return 1;
-}
-
 static void
 EmptyHostnames (void)
 {
@@ -670,28 +648,12 @@ RegisterHostname (char *name)
 
 static ARRAYofARRAY8	AuthenticationNames;
 
-static int
-RegisterAuthenticationName (char *name, int namelen)
-{
-    ARRAY8Ptr	authName;
-    if (!XdmcpReallocARRAYofARRAY8 (&AuthenticationNames,
-				    AuthenticationNames.length + 1))
-	return 0;
-    authName = &AuthenticationNames.data[AuthenticationNames.length-1];
-    if (!XdmcpAllocARRAY8 (authName, namelen))
-	return 0;
-    memmove( authName->data, name, namelen);
-
-    return 1;
-}
-
 int
 InitXDMCP (char **argv)
 {
     int	soopts = 1;
     XdmcpHeader	header;
     int	i;
-    int optlen;
 
     header.version = XDM_PROTOCOL_VERSION;
     header.opcode = (CARD16) BROADCAST_QUERY;
@@ -834,45 +796,6 @@ DoAccept (Widget w, XEvent *event, String *params, Cardinal *num_params)
 }
 
 /* ARGSUSED */
-static void
-DoCheckWilling (Widget w, XEvent *event, String *params, Cardinal *num_params)
-{
-    HostName		*h;
-    XmStringTable       selectedItem;
-    int                 selectedCount;
-    int                 i;
-    char                *text;
-
-    /*********************************/
-    /** see if anything is selected **/
-    /*********************************/
-    i = 0;
-    XtSetArg(chooserArgs[i], XmNselectedItemCount, &selectedCount); i++;
-    XtGetValues(chooser_list, chooserArgs, i);
-    if (selectedCount != 1) {
-        return;
-    }
-
-    /**********************************************/
-    /** retrieve the selected item from the list **/
-    /**********************************************/
-    i = 0;
-    XtSetArg(chooserArgs[i], XmNselectedItems, &selectedItem); i++;
-    XtGetValues(chooser_list, chooserArgs, i);
-    text = (char*) _XmStringUngenerate(
-			selectedItem[0], NULL,
-			XmMULTIBYTE_TEXT, XmMULTIBYTE_TEXT);
-    if (NULL == text) return;
-    
-    for (h = hostNamedb; h; h = h->next)
-	if (!strcmp (text, h->fullname))
-	    if (!h->willing)
-		XmListDeselectAllItems (chooser_list);
-
-    if (NULL != text) XtFree(text);
-}
-
-/* ARGSUSED */
 void
 DoCancel (Widget w, XEvent *event, String *params, Cardinal *num_params)
 {
@@ -888,19 +811,14 @@ DoPing (Widget w, XEvent *event, String *params, Cardinal *num_params)
     PingHosts ((XtPointer)NULL, (XtIntervalId *)NULL);
 }
 
-static XtActionsRec app_actions[] = {
-    "Accept",	    DoAccept,
-    "Cancel",	    DoCancel,
-    "CheckWilling", DoCheckWilling,
-    "Ping",	    DoPing,
-};
-
 int
 main (int argc, char **argv)
 {
+#if 0
     Arg		position[3];
     Dimension   width, height;
     Position	x, y;
+#endif
     int		i;
     char	*xsetup;
 

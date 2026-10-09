@@ -199,9 +199,6 @@ static BOOL	attch_objlist_test_func(
 		    ABObj	test_obj
 		);
 
-static BOOL	attch_childrenlist_test_func(
-		    ABObj	test_obj
-		);
 
 static void	attch_objlist_selectCB(
 		    Widget      widget,
@@ -299,9 +296,6 @@ static void	attach_obj_changed(
 		    XtPointer   calldata
 		);
 
-static void	print_attach_type(
-		    ATTCH_ED_ATTACH_TYPE	attach_type
-		);
 
 static BOOL	attch_ed_obj_is_target_type(
 		    ABObj obj
@@ -353,9 +347,6 @@ static BOOL		verify_one_attach(
 			    PropFieldSetting		position_setting
 			);
 
-static ABObj		attch_cur_parent = NULL;
-static AB_OBJECT_TYPE	cur_type = AB_TYPE_UNDEF;
-static int		cur_subtype;
 
 
 AttchEditorSettingsRec attch_editor_settings_rec;
@@ -422,7 +413,7 @@ attch_ed_show_dialog(
 	 */
 	if (cur_obj)
 	{
-	    if (ed_obj_info = pal_get_editable_obj_info(cur_obj))
+	    if ((ed_obj_info = pal_get_editable_obj_info(cur_obj)))
 	    {
 		if (!editable_obj_test(ed_obj_info))
 		    cur_obj = NULL; /* can't edit current obj */
@@ -478,6 +469,8 @@ editable_obj_test(
 	case AB_TYPE_CONTAINER:
 	    if (ed_obj_info->subtype == AB_CONT_MENU_BAR)
 		needed = False;
+	    break;
+	default:
 	    break;
     }
 
@@ -725,7 +718,6 @@ attch_editor_load(
     ABObjPtr 	object
 )
 {
-    AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
 
     load_attch_obj(object, TRUE);
 
@@ -761,15 +753,11 @@ load_attch_obj(
 				left_offset = 0,
 				left_position = 0,
 				right_offset = 0,
-				right_position = 0,
-				cur_position = 1,
-				child_count = 0,
-				n = 0;
+				right_position = 0;
     ABObj			top_obj = NULL,
 				bottom_obj = NULL,
 				left_obj = NULL,
-				right_obj = NULL,
-				*child_list = NULL;
+				right_obj = NULL;
  
     if (object == NULL)
         return;
@@ -900,7 +888,6 @@ create_children_list(
 {
     DtbAttchEdAttchEdDialogInfo	attch_ed_cgen 
 			= &dtb_attch_ed_attch_ed_dialog;
-    AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
     ABObj			parent,
 				*child_list,
 				cur_child;
@@ -1005,7 +992,6 @@ update_attch_obj_parent(
 {
     DtbAttchEdAttchEdDialogInfo	attch_ed_cgen 
 			= &dtb_attch_ed_attch_ed_dialog;
-    AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
     ABObj			parent;
 
     if (!obj)
@@ -1054,12 +1040,11 @@ update_objlist(
 {
     DtbAttchEdAttchEdDialogInfo attch_ed_cgen = &dtb_attch_ed_attch_ed_dialog;
     ABObj                       proj = proj_get_project();
-    int                         num_items;
     
     if (!obj)
 	return;
 
-    num_items = abobj_list_load(attch_ed_cgen->objlist, 
+    abobj_list_load(attch_ed_cgen->objlist, 
 				proj, 
 				attch_objlist_test_func);
 }
@@ -1370,7 +1355,6 @@ attch_ed_select_itemCB(
     XtPointer   call_data
 )
 {
-    XmListCallbackStruct 	*listdata = (XmListCallbackStruct *)call_data;
     AttchEditorSettingsRec 	*ats = &attch_editor_settings_rec;
     ABObj			*child_list = NULL,
 				new_obj = NULL;
@@ -1565,13 +1549,11 @@ create_obj_menu_dir(
     DtbAttchEdAttchEdDialogInfo	attch_ed_cgen = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
     PropOptionsSetting		option_setting = NULL;
-    Widget			label = NULL,
-    				optionbox = NULL,
+    Widget			optionbox = NULL,
     				menu = NULL,
     				changebar = NULL,
     				*item = NULL;
-    int				item_values = 0,
-    				*item_val = NULL, 
+    int				*item_val = NULL, 
 				n = 0;
 
     /*
@@ -1613,6 +1595,8 @@ create_obj_menu_dir(
 	    menu = attch_ed_cgen->right_attach_objmenu_menu;
 	    /* right/left menus share changebars */
 	    changebar = attch_ed_cgen->left_attach_cb;
+	break;
+	default:
 	break;
     }
 
@@ -1929,20 +1913,6 @@ attch_ed_obj_is_target_type(
     /* Should never get here - every test above returns True or False */
 }
 
-static BOOL
-attch_childrenlist_test_func(
-    ABObj	test_obj
-)
-{
-    if (!test_obj || !attch_cur_parent)
-	return (False);
-
-    if (attch_ed_get_parent(test_obj) == attch_cur_parent)
-	return (True);
-
-    return(False);
-}
-
 /*
  * Callback: a new object type has been selected off object type menu
  * This is for 'regular' palette objects
@@ -1970,7 +1940,6 @@ attch_ed_change_objecttype(
     AttchEditorSettingsRec 	*ats = &attch_editor_settings_rec;
     ABObj			proj = proj_get_project();
     int				num_items;
-    char			*modname = NULL;
     DTB_MODAL_ANSWER            answer = DTB_ANSWER_ACTION1;
 
     if (!proj || !attch_ed_cgen->objlist)
@@ -2036,9 +2005,6 @@ attch_objlist_selectCB(
         {
     	    AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
 	    DTB_MODAL_ANSWER		answer = DTB_ANSWER_ACTION1;
-	    ABObj	parent;
-	    Widget	parent_widget;
-	    char	*name = obj_get_name(selected_obj);
 
 	    if (attch_edP_pending()) 
 	    {
@@ -2201,13 +2167,8 @@ handle_actual_obj_destroy(
 			project;
     void		*voidRefType = NULL;
     AB_OBJ_REF_TYPE	refType = AB_REF_UNDEF;
-    ABAttachment	*attachment;
-    ATTCH_ED_ATTACH_TYPE	attach_type;
-    AB_COMPASS_POINT	dir;
     int			i,
-			numRefs,
-			offset,
-			position;
+			numRefs;
     
     if (!info)
 	return;
@@ -2282,12 +2243,9 @@ handle_prop_sheet_obj_reparent(
     ObjEvReparentInfo info
 )
 {
-    DtbAttchEdAttchEdDialogInfo	attch_ed_cgen 
-			= &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec 		*ats 
 			= &attch_editor_settings_rec;
     ABObj	obj = info->obj;
-    int		num_items, first_viz, last_viz;
 
     if (!AB_attch_ed_dialog ||
 	!obj_is_salient(obj) || obj_is_item(obj) || !ats->cur_object)
@@ -2363,17 +2321,11 @@ handle_actual_obj_reparent(
 {
     ABObjList		refList;
     ABObj		obj,
-			refObj,
-			parent;
+			refObj;
     void		*voidRefType = NULL;
     AB_OBJ_REF_TYPE	refType = AB_REF_UNDEF;
-    ABAttachment	*attachment;
-    ATTCH_ED_ATTACH_TYPE	attach_type;
-    AB_COMPASS_POINT	dir;
     int			i,
-			numRefs,
-			offset,
-			position;
+			numRefs;
     
     if (!info)
 	return;
@@ -2587,8 +2539,6 @@ enable_attach_types(
 {
     DtbAttchEdAttchEdDialogInfo	attch_ed_cgen 
 			= &dtb_attch_ed_attch_ed_dialog;
-    AttchEditorSettingsRec 	*ats 
-			= &attch_editor_settings_rec;
     ABObj			parent;
     BOOL			state = FALSE;
     int				child_count;
@@ -2938,6 +2888,8 @@ convert_offset_position(
 	        break;
             }
 	    break;
+        default:
+	        break;
     }
 
     /*
@@ -2968,7 +2920,6 @@ change_attach_type(
     DtbAttchEdAttchEdDialogInfo	attch_ed_cgen
 			    = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
-    ABAttachment		*attachment;
     int				offset,
 				position;
     ABObj			attach_obj = NULL;
@@ -3023,6 +2974,8 @@ change_attach_type(
 	    objlist_w = attch_ed_cgen->bottom_attach_objmenu;
 	    offset_w = attch_ed_cgen->bottom_offset_rowcolumn;
 	    position_w = attch_ed_cgen->bottom_position_rowcolumn;
+	break;
+	default:
 	break;
     }
 
@@ -3159,6 +3112,8 @@ change_opp_attach_type(
 	    opp_offset_w = attch_ed_cgen->top_offset_rowcolumn;
 	    opp_position_w = attch_ed_cgen->top_position_rowcolumn;
 	break;
+	default:
+	break;
     }
 
     /*
@@ -3273,8 +3228,6 @@ attach_obj_changed(
     XtPointer   calldata
 )
 {
-    DtbAttchEdAttchEdDialogInfo	attch_ed_cgen
-			    = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
     PropFieldSetting		offset_setting = NULL,
     				position_setting;
@@ -3447,9 +3400,6 @@ attch_edP_prevent_closeCB(
     XtPointer   call_data
 )
 {
-    AttchEditorSettingsRec	*ats = &attch_editor_settings_rec;
-    DtbAttchEdAttchEdDialogInfo attch_ed_cgen
-                            = &dtb_attch_ed_attch_ed_dialog;
     DTB_MODAL_ANSWER		answer = DTB_ANSWER_ACTION1;
 
     /* 
@@ -3618,44 +3568,6 @@ attch_ed_can_edit_attachments(
     return (TRUE);
 }
 
-static void
-print_attach_type(
-    ATTCH_ED_ATTACH_TYPE	attach_type
-)
-{
-    fprintf(stderr, "Attach type = ");
-    switch (attach_type)
-    {
-	case ATTCH_ED_PARENT:
-	    fprintf(stderr, "ATTCH_ED_PARENT\n");
-	break;
-
-	case ATTCH_ED_OPPOSITE_PARENT:
-	    fprintf(stderr, "ATTCH_ED_OPPOSITE_PARENT\n");
-	break;
-
-	case ATTCH_ED_SIBLING:
-	    fprintf(stderr, "ATTCH_ED_SIBLING\n");
-	break;
-
-	case ATTCH_ED_OPPOSITE_SIBLING:
-	    fprintf(stderr, "ATTCH_ED_OPPOSITE_SIBLING\n");
-	break;
-
-	case ATTCH_ED_GRIDLINE:
-	    fprintf(stderr, "ATTCH_ED_GRIDLINE\n");
-	break;
-
-	case ATTCH_ED_CENTER_GRIDLINE:
-	    fprintf(stderr, "ATTCH_ED_CENTER_GRIDLINE\n");
-	break;
-
-	case ATTCH_ED_NONE:
-	    fprintf(stderr, "ATTCH_ED_NONE\n");
-	break;
-    }
-}
-
 static BOOL
 attch_ed_verify_props(void)
 {
@@ -3679,7 +3591,6 @@ attch_ed_verify_props(void)
     if (parent && obj_is_group(parent) && 
 	(obj_get_group_type(parent) != AB_GROUP_IGNORE))
     {
-	DTB_MODAL_ANSWER	answer;
         DtbObjectHelpData	help_data;
 	XmString		xm_buf;
 	char			*format_str,
@@ -3741,7 +3652,7 @@ attch_ed_verify_props(void)
 	/*
 	 * Show warning message dialog
 	 */
-        answer = dtb_show_modal_message(AB_attch_ed_dialog, &dtb_attch_ed_grp_member_wrn, 
+        dtb_show_modal_message(AB_attch_ed_dialog, &dtb_attch_ed_grp_member_wrn, 
 			xm_buf, help_data, NULL);
 	
 	/*
@@ -3967,8 +3878,6 @@ top_attach_type_changed(
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
 
-    DtbAttchEdAttchEdDialogInfo attch_ed_cgen
-                            = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec      *ats = &attch_editor_settings_rec;
     ATTCH_ED_ATTACH_TYPE        attach_type = ATTCH_ED_NONE;
     XtArgVal                    value;
@@ -3999,8 +3908,6 @@ right_attach_type_changed(
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
 
-    DtbAttchEdAttchEdDialogInfo attch_ed_cgen
-                            = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec      *ats = &attch_editor_settings_rec;
     ATTCH_ED_ATTACH_TYPE        attach_type = ATTCH_ED_NONE;
     XtArgVal                    value;
@@ -4031,8 +3938,6 @@ bottom_attach_type_changed(
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
 
-    DtbAttchEdAttchEdDialogInfo attch_ed_cgen
-                            = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec      *ats = &attch_editor_settings_rec;
     ATTCH_ED_ATTACH_TYPE        attach_type = ATTCH_ED_NONE;
     XtArgVal                    value;
@@ -4063,8 +3968,6 @@ left_attach_type_changed(
 {
     /*** DTB_USER_CODE_START vvv Add C variables and code below vvv ***/
 
-    DtbAttchEdAttchEdDialogInfo attch_ed_cgen
-                            = &dtb_attch_ed_attch_ed_dialog;
     AttchEditorSettingsRec      *ats = &attch_editor_settings_rec;
     ATTCH_ED_ATTACH_TYPE        attach_type = ATTCH_ED_NONE;
     XtArgVal                    value;

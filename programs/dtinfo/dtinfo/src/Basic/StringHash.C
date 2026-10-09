@@ -76,10 +76,10 @@ string_hash (const char *key)
 {
   assert (key != NULL);
 
-  u_int pos, sum = 0;
+  u_int sum = 0;
   char c;
 
-  for (pos = 0; (c = *key++); pos++)
+  while ((c = *key++))
     sum = (sum << 5) + (sum >> (sizeof(int) * 8 - 6))
 	  + (c ^ lookup_table[(int)c]);
 

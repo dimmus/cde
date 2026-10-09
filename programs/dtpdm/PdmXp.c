@@ -48,9 +48,9 @@ typedef enum {
 /*
  * static function declarations
  */
+#if 0 && defined(PRINTING_SUPPORTED)
 static const char* PdmXpGetQualifier(PdmXp* me);
 static char* PdmXpBuildResourceName(PdmXp* me, PdmOid id_att);
-#if 0 && defined(PRINTING_SUPPORTED)
 static XrmDatabase PdmXpLoadPool(PdmXp* me, XPAttributes type);
 #endif /* PRINTING_SUPPORTED */
 
@@ -126,8 +126,10 @@ PdmXpOpen(PdmXp* me,
     me->display = XOpenDisplay(display_spec);
     if(me->display)
     {
+#if 0 && defined(PRINTING_SUPPORTED)
 	int error_base;
 	int event_base;
+#endif /* PRINTING_SUPPORTED */
 	/*
 	 * check to see if the display is a print server
 	 */
@@ -259,6 +261,7 @@ PdmXpLoadPool(PdmXp* me, XPAttributes type)
 }
 #endif /* PRINTING_SUPPORTED */
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: PdmXpGetQualifier
@@ -293,9 +296,11 @@ PdmXpGetQualifier(PdmXp* me)
     }
     return me->qualifier;
 }
+#endif /* PRINTING_SUPPORTED */
 
 
 
+#if 0 && defined(PRINTING_SUPPORTED)
 /*
  * ------------------------------------------------------------------------
  * Name: PdmXpBuildResourceName
@@ -338,6 +343,7 @@ PdmXpBuildResourceName(PdmXp* me, PdmOid id_att)
      */
     return res_name;
 }
+#endif /* PRINTING_SUPPORTED */
 
 
 /*

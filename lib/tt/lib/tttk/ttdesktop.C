@@ -287,7 +287,11 @@ _ttdt_contract_cb(
 			tt_message_reply( msg );
 			tt_message_destroy( msg );
 			return 0;
+		    default:
+			break;
 		}
+		break;
+	    default:
 		break;
 	}
 	if (_cb == 0) {
@@ -408,6 +412,8 @@ _ttdt_pat(
 	    case TTDT_PAUSE:
 	    case TTDT_RESUME:
 		// No args
+		break;
+	    default:
 		break;
 	}
 	fuse = (caddr_t)0;
@@ -907,6 +913,8 @@ _ttdt_do_wm_state(
 			return 0;
 		}
 		*iconified_or_mapped = mapped;
+		break;
+	    default:
 		break;
 	}
 	return msg;
@@ -1492,9 +1500,8 @@ ttdt_Get_Locale(
 	int                 send
 )
 {
-	const char *_handler = handler;
 	if ((handler == 0) && (commission != 0)) {
-		_handler = tt_message_sender( commission );
+		(void)tt_message_sender( commission );
 	}
 	if (clientCB == 0) {
 		clientCB = _ttDtApplyLocale;
@@ -1780,6 +1787,8 @@ _ttdt_posix_cb(
 		tt_message_reply( msg );
 		tttk_message_destroy( msg );
 		return 0;
+	    default:
+		break;
 	}
 	return msg;
 }

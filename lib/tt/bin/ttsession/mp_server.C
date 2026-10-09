@@ -814,7 +814,9 @@ print_usage_and_exit()
 void
 sig_handler(int sig)
 {
+#if defined(OPT_BSD_WAIT)
 	int		intrs = 100;
+#endif
 	pid_t		child_pid;
 	_Tt_wait_status	status;
 

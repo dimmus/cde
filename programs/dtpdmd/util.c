@@ -79,8 +79,7 @@ xpstrspn(
 {
 #ifdef NLS16
    wchar_t s1char, s2char;
-   int s1len, s2len;
-   int i;
+   int s1len;
    int count;
    char * ptr;
    Boolean match;
@@ -146,8 +145,7 @@ xpstrcspn(
 {
 #ifdef NLS16
    wchar_t s1char, s2char;
-   int s1len, s2len;
-   int i;
+   int s1len;
    int count;
    char * ptr;
 

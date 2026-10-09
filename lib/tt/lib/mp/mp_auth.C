@@ -160,11 +160,9 @@ read_auth_entries(FILE *fp, _tt_AuthFileEntryList **headp)
     _tt_AuthFileEntryList	*head;
     _tt_AuthFileEntryList	*el_new;
     _tt_AuthFileEntryList	*tail;
-    int			 	 n;
 
     entry = NULL;
     head = tail = NULL;
-    n = 0;
 
     while ((entry = _tt_ReadAuthFileEntry(fp)) != NULL) {
 
@@ -184,7 +182,6 @@ read_auth_entries(FILE *fp, _tt_AuthFileEntryList **headp)
 	else
 	  head = el_new;		/* first time through, so assign */
 	tail = el_new;
-	n++;
     }
 
     *headp = head;

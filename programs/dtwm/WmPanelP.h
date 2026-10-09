@@ -55,7 +55,7 @@
 
 typedef struct PanelData * WmPanelistObject;
 
-#define O_Panel(o) panel.form
+#define O_Panel(o) ((void)(o), panel.form)
 
 
 #include <time.h>

@@ -41,7 +41,6 @@
 #include "WmResource.h"
 #include "WmResNames.h"
 #include "WmWrkspace.h"
-#define DTWM_NEED_BACKBITS
 #include "WmIBitmap.h"
 #include "WmBackdrop.h"
 #include "WmError.h"
@@ -92,8 +91,6 @@ static Pixmap WmXmGetPixmap2(
 #define MAX_BAND_WIDTH	3
 #define TOP_BAND_WIDTH	2
 
-static int         bottom = BOTTOM;
-
 static int	   xa_NO_BACKDROP;
 
 
@@ -118,7 +115,6 @@ void
 ChangeBackdrop(
         WmWorkspaceData *pWS )
 {
-    int iwin;
 
 
     if (pWS->backdrop.window) 
@@ -188,20 +184,11 @@ ProcessBackdropResources(
     unsigned char *pchL = NULL;
     unsigned char *pch, *pLine;
     Pixmap tmpPix;
-    int x, y;
-    unsigned int w, h, bw, depth;
-    Window root;
-    unsigned long oldFlags;
     static String none_string = NULL;
     static String no_backdrop_string = NULL;
     Boolean bNone = False;
     unsigned int chlen;
     
-    if (callFlags & CHANGE_BACKDROP)
-    {
-	oldFlags = pWS->backdrop.flags;
-    }
-
     if (!no_backdrop_string && 
 	(no_backdrop_string = XtNewString (DTWM_REQP_BACKDROP_NONE)))
     {
@@ -234,7 +221,6 @@ ProcessBackdropResources(
 	    chlen = mblen ((char *)pch, MB_CUR_MAX);
 	    if (chlen >= 1)
 	    {
-		int j;
 		int il = 1+strlen ((char *)pch);
 		unsigned char *pchD = (unsigned char *)pWS->backdrop.image;
 
@@ -284,8 +270,8 @@ ProcessBackdropResources(
 		    GC gc;
 		    Display *display;
 		    Window win;
-		    int status, x, y;
-		    unsigned int bw, depth, h, w, junk;
+		    int status = 0, x, y;
+		    unsigned int bw, depth, h, w;
 
 		    /*
 		     * We're changing the backdrop, so the

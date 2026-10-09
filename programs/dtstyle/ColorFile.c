@@ -126,7 +126,6 @@ static void InitializeBW(
 /*+++++++++++++++++++++++++++++++++++++++*/
 static char *PALETTE_DIR = CDE_INSTALLATION_TOP "/palettes/";
 static char *PALETTE_DIR_ADM = "/etc/dt/palettes/";
-static char *DEFAULT_FILENAME = "palette.dt";
 static char *B_O_W = "BlackWhite.dp";
 static char *W_O_B = "WhiteBlack.dp";
 static char *W_ONLY = "White.dp";
@@ -1164,7 +1163,6 @@ ReadPaletteLoop(
 	Boolean startup )
 #endif
 {
-   char *tmpStr;
 
    if(style.count > 7)
       return(True);

@@ -917,13 +917,12 @@ mainwin_unconfig(
     ABObj       obj
 )
 {
-    ABObj       workobj, pwobj, mwobj;
+    ABObj       workobj, pwobj;
     ABObj       menubar, toolbar, footer;
 
     workobj = objxm_comp_get_subobj(obj, AB_CFG_PARENT_OBJ);
 
     pwobj = obj_get_child(obj, 0);
-    mwobj = obj_get_child(pwobj, 0);
 
     menubar = objxm_comp_mainwin_get_area(obj, AB_CONT_MENU_BAR);
     toolbar = objxm_comp_mainwin_get_area(obj, AB_CONT_TOOL_BAR);
@@ -1021,7 +1020,6 @@ mainwin_set_args(
 )
 {
     STRING      label;
-    ABObj       module = obj_get_module(obj);
     ABObj	pwobj = objxm_comp_get_subobj(obj, AB_CFG_WINDOW_PW_OBJ);
     ABObj	mwobj = objxm_comp_get_subobj(obj, AB_CFG_WINDOW_MW_OBJ);
     ABObj       shobj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
@@ -1133,7 +1131,6 @@ custdlg_xmconfig(
 {
     ABObj    		bbobj, pwobj, workobj;
     ABObj		button_panel, footer;
-    ABObj		apobj = NULL;
     STRING		name;
 
     /* DialogShell */
@@ -1390,7 +1387,6 @@ simple_unconfig(
     ABObj	obj
 )
 {
-    ABObj	mr_obj = NULL;
 
     /* Delete Menu-reference */
     objxm_comp_unconfig_menu_ref(obj);
@@ -1469,10 +1465,8 @@ choice_xmconfig(
     AB_CHOICE_TYPE type;
     ABObj       ch_obj, p_obj;
     ABObj	lbl_obj = NULL;
-    int         num_items;
 
     type = obj->info.choice.type;
-    num_items = obj_get_num_children(obj);
 
     obj->part_of = obj;
     obj_set_class_name(obj, _xmRowColumn);
@@ -1664,6 +1658,8 @@ choice_set_args(
 		if (lbl_obj)
     		    objxm_obj_set_ui_arg(lbl_obj, AB_ARG_INT, XmNmarginHeight, 8);
         	break;
+            default:
+        	break;
         }
 	if (obj_get_num_columns(obj) > 1)
 	    objxm_obj_set_literal_ui_arg(ch_obj, ctype, XmNpacking, XmPACK_COLUMN);
@@ -1744,7 +1740,6 @@ cpanel_unconfig(
     ABObj       obj
 )
 {
-    ABObj       mr_obj = NULL;
 
     /* Delete Menu-reference first */
     objxm_comp_unconfig_menu_ref(obj);
@@ -1766,7 +1761,6 @@ cpanel_set_args(
     ABObj		cp_obj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
     ABObj		xy_obj = objxm_comp_get_subobj(obj, AB_CFG_POSITION_OBJ);
     int			margin = 0;
-    unsigned char	resize_policy = XmRESIZE_GROW;
 
     objxm_comp_set_border_args(obj, ctype);
 
@@ -2075,7 +2069,6 @@ group_unconfig(
     ABObj       obj
 )
 {
-    ABObj       mr_obj = NULL;
 
     /* Delete Menu-reference first */
     objxm_comp_unconfig_menu_ref(obj);
@@ -2115,6 +2108,8 @@ group_set_args(
             case AB_PACK_EQUAL:
             	objxm_obj_set_literal_ui_arg(g_obj, ctype, XmNpacking, XmPACK_COLUMN);
             	break;
+            default:
+            	break;
         }
         switch (obj->info.container.group_type)
         {
@@ -2123,6 +2118,8 @@ group_set_args(
             	break;
             case AB_GROUP_ROWS:
             	objxm_obj_set_literal_ui_arg(g_obj, ctype, XmNorientation, XmHORIZONTAL);
+            	break;
+            default:
             	break;
         }
     }
@@ -2616,7 +2613,6 @@ textp_set_args(
 {
     AB_SCROLLBAR_POLICY	vsb_policy, hsb_policy;
     ABObj       	tx_obj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
-    ABObj		sz_obj = objxm_comp_get_subobj(obj, AB_CFG_SIZE_OBJ);
     ABObj		xy_obj = objxm_comp_get_subobj(obj, AB_CFG_POSITION_OBJ);
     ABObj		sw_obj;
     ABObj		parent;	/* ABObj parent NOT config parent */
@@ -3230,12 +3226,8 @@ separator_set_args(
     OBJXM_CONFIG_TYPE ctype
 )
 {
-    ABObj	   o_obj;
-
     objxm_comp_set_label_args(obj, ctype);
     objxm_comp_set_lbl_pos_args(obj, ctype);
-
-    o_obj = objxm_comp_get_subobj(obj, AB_CFG_OBJECT_OBJ);
 
     objxm_obj_set_orientation_arg(obj, ctype);
     objxm_obj_set_line_style_arg(obj, ctype);
@@ -3602,7 +3594,6 @@ fchooser_xmconfig(
 )
 {
     ABObj               pwobj, workobj;
-    ABObj               apobj = NULL;
 
     /* DialogShell */
     obj->part_of = obj;
@@ -3805,6 +3796,8 @@ fchooser_set_args(
         case AB_FILE_ANY:
             objxm_obj_set_literal_ui_arg(fsb_obj, ctype, XmNfileTypeMask,
                                         XmFILE_ANY_TYPE);
+            break;
+        default:
             break;
     }
 

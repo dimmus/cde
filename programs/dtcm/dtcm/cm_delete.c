@@ -47,10 +47,6 @@
  * (c) Copyright 1993, 1994 Novell, Inc. 				*
  */
 
-#ifndef lint
-static  char sccsid[] = "@(#)cm_delete.c 1.29 95/03/17 Copyr 1993 Sun Microsystems, Inc.";
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +78,6 @@ static nl_catd	DT_catd;
 static char cm_target[256] = "";	/* target for table (user@host) */
 static char cm_date[256] = "";		/* appointment date */
 static char cm_view[16] = "day";		/* view span (day,week,month) */
-static int cm_today = 0;		/* today's date (in epoch time) */
 static int cm_index = 0;		/* index to change/delete */
 
 static char**

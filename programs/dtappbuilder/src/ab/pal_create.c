@@ -299,7 +299,6 @@ palitem_drag_action(
 )
 {
     int x, y;
-    Display *dpy = XtDisplay(widget);
 
     if (event->type == ButtonPress)
     {
@@ -400,8 +399,8 @@ create_obj_action(
 	if (subtype != AB_NO_SUBTYPE)
 	    obj_set_subtype(obj, subtype);
 
-        if (errmsg = locate_obj_parent(obj, widget, bevent->x_root, 
-		bevent->y_root, &obj_parent, &ModuleCreated))
+        if ((errmsg = locate_obj_parent(obj, widget, bevent->x_root, 
+		bevent->y_root, &obj_parent, &ModuleCreated)))
         {
             obj_destroy(obj);
             if (!util_streq(errmsg, ""))
@@ -861,7 +860,6 @@ locate_obj_parent(
     ABObj		project = proj_get_project();
     ABObj		module  = proj_get_cur_module();
     ABObj		obj_parent = (ABObj) NULL;
-    Display     	*dpy = (Display *)XtDisplay(widget);
     int         	w_x, w_y;
     DTB_MODAL_ANSWER	answer = DTB_ANSWER_NONE;
     STRING		errmsg = (STRING) NULL;
@@ -1029,6 +1027,8 @@ locate_obj_parent(
 
                             case DTB_ANSWER_CANCEL:
 			        return "";
+                            default:
+                                break;
 			}
 		    }
 		    else
@@ -1051,6 +1051,8 @@ locate_obj_parent(
 
 			    case DTB_ANSWER_CANCEL:
 			    return "";
+			    default:
+			    break;
     		        }
 		    }
 		}
@@ -1101,6 +1103,8 @@ locate_obj_parent(
  
                             case DTB_ANSWER_HELP:
                                 break;
+                            default:
+                                break;
                         }
 		    }
 	 	    else
@@ -1120,6 +1124,8 @@ locate_obj_parent(
 
                             case DTB_ANSWER_CANCEL: /* Cancel */
                                 return "";
+                    	    default:
+                                break;
 		        }
 		    }
                 }
@@ -1156,6 +1162,8 @@ locate_obj_parent(
 
                         case DTB_ANSWER_HELP:
                             break;
+                        default:
+                            break;
                     }
 		}
 		/* The obj is a textpane, termpane, or draw area
@@ -1187,6 +1195,8 @@ locate_obj_parent(
 
                         case DTB_ANSWER_CANCEL:
 			    return "";
+                        default:
+                            break;
                     }
                 }
 	    }
@@ -1225,6 +1235,8 @@ locate_obj_parent(
 
                         case DTB_ANSWER_CANCEL:
 			    return "";
+                        default:
+                            break;
                     }
 		}
 	    }

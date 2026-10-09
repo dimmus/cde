@@ -74,8 +74,9 @@ struct dlink * _isdln_base_first(char *base, struct dlink *l)
 	struct dlink *val = (struct dlink *)(base + l->dln_forward);
 
 	if (val == NULL) {
-		if (NULL == (struct dlink *)(base + l->dln_forward) &&
-		    NULL == (struct dlink *)(base + l->dln_backward))
+		struct dlink *prev = (struct dlink *)(base + l->dln_backward);
+
+		if (NULL == val && NULL == prev)
 			_isdln_base_makeempty(base, l);
 		val = l;
 	}

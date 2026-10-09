@@ -663,7 +663,6 @@ _DtRetrievePixmapData(
 {
   PixmapData *pixmapData;
   char path[MAXPATHLEN];
-  char *iconName;
 
   pixmapData = (PixmapData *) XtMalloc(sizeof(PixmapData));
   if (!pixmapData)
@@ -760,7 +759,7 @@ _DtCheckAndFreePixmapData(
       char * tmp, * ptr;
 
       tmp = XtNewString( pixmapData->instanceIconName );
-      if( ptr = strrchr( tmp,'/' ) )
+      if( (ptr = strrchr( tmp,'/' ) ))
         *(ptr) = 0;
       XmeFlushIconFileCache( tmp );
 
@@ -870,7 +869,7 @@ _DtCheckForDataTypeProperty(
    {
      props = properties;
      prop = props;
-     while (props = DtStrchr(props, ','))
+     while ((props = DtStrchr(props, ',')))
      {
        *props = '\0';
        if (strcmp(prop, property) == 0)
@@ -937,7 +936,7 @@ _DtRetrieveDefaultAction(
                                            NULL);
    if (actions)
    {
-     if (acts = DtStrchr(actions, ','))
+     if ((acts = DtStrchr(actions, ',')))
        *acts = '\0';
      default_action = XtNewString(actions);
 
@@ -959,10 +958,10 @@ _DtBuildFMTitle(
 {
    char *title, *ptr, *fileLabel, *fileName;
 
-   if (fileLabel = DtDtsFileToAttributeValue(file_mgr_data->current_directory,
-                                             DtDTS_DA_LABEL))
+   if ((fileLabel = DtDtsFileToAttributeValue(file_mgr_data->current_directory,
+                                             DtDTS_DA_LABEL)))
       ptr = fileLabel;
-   else if (fileName = strrchr(file_mgr_data->current_directory, '/'))
+   else if ((fileName = strrchr(file_mgr_data->current_directory, '/')))
       ptr = fileName + 1;
    else
       ptr = "";
@@ -1267,10 +1266,7 @@ SetBufferFileNames (char **file_set,
                     DtDndBuffer *buffers,
                     int num_of_buffers)
 {
- int null_filenames_count = 0;
  int i;
- int first_nullfile_index = 0;
- Boolean NULL_FILENAMES=FALSE;
 
  DPRINTF (("Executing...SetBufferFileNames\n"));
 
@@ -1758,7 +1754,6 @@ char *
 _DtChangeTildeToHome (
         char *input_string)
 {
-   char *path;
    char *full_path;
    struct passwd * pwInfo;
 
