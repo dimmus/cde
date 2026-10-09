@@ -550,8 +550,36 @@ AC_CHECK_LIB(Xdmcp, XdmcpFlush, [XDMCPLIB="-lXdmcp"], [XDMCPLIB=""],
                  [${EXTRA_INCS} ${EXTRA_LIBS}])
 AC_SUBST(XDMCPLIB)
 
-dnl iconv
-AM_ICONV
+dnl iconv - part of libc on glibc, musl and the BSDs, a separate libiconv
+dnl elsewhere.  Checked here rather than with gettext's AM_ICONV, which
+dnl makes autoreconf run autopoint and copy gettext files into the tree.
+AC_MSG_CHECKING([for library containing iconv])
+LTLIBICONV=no
+save_LIBS="${LIBS}"
+for lib in "" -liconv; do
+   LIBS="${save_LIBS} ${lib}"
+   AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <stdlib.h>
+#include <iconv.h>]], [[iconv_t cd = iconv_open("", "");
+iconv(cd, NULL, NULL, NULL, NULL);
+iconv_close(cd);]])], [LTLIBICONV="${lib}"; break])
+done
+LIBS="${save_LIBS}"
+if test "x${LTLIBICONV}" = "xno"; then
+   AC_MSG_RESULT([no])
+   AC_MSG_ERROR([iconv not found, please install it])
+fi
+AC_MSG_RESULT([${LTLIBICONV:-none required}])
+AC_SUBST(LTLIBICONV)
+
+AC_MSG_CHECKING([whether iconv takes a const input buffer])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdlib.h>
+#include <iconv.h>
+extern size_t iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
+                    char **outbuf, size_t *outbytesleft);]], [])],
+   [iconv_const=const; AC_MSG_RESULT([yes])],
+   [iconv_const=; AC_MSG_RESULT([no])])
+AC_DEFINE_UNQUOTED([ICONV_CONST], [${iconv_const}],
+   [Define as const if the declaration of iconv() needs const.])
 
 dnl figure out pam support
 dnl Right now this only works on linux and netbsd (9.2 tested)

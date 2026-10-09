@@ -28,6 +28,7 @@
  */
 
 #include <Xm/TextStrSoP.h>
+#include <Xm/IconFileP.h>	/* XmeFlushIconFileCache */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -65,8 +66,6 @@ extern void _XmBulletinBoardSetDynDefaultButton(
 extern Boolean _XmGeoSetupKid(
                         XmKidGeometry geo,
                         Widget kidWid) ;
-/* Extracted from IconFileP.h */
-extern void XmeFlushIconFileCache(String	path);
 /* Extracted from ImageCachI.h */
 extern void _XmPutScaledImage (
     Display*		 display ,
