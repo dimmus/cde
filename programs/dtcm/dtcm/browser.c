@@ -1714,12 +1714,15 @@ popup_cb(Widget w, XtPointer client, XtPointer call)
  * When calendar is logged off, any registered callbacks for it
  * are destroyed automagically.
  */
+static XtIntervalId	mb_update_timer = 0;
+
 static void
-mb_update_handler(CSA_session_handle cal, CSA_flags reason,
-               CSA_buffer call_data, CSA_buffer client_data, CSA_extension *ext)
+mb_do_update(XtPointer data, XtIntervalId *id)
 {
         Calendar        *c = calendar;
 	Browser         *b = (Browser *)c->browser;
+
+	mb_update_timer = 0;
 
         /* sync whatever needs sync'ing */
 	if (b) {
@@ -1728,5 +1731,20 @@ mb_update_handler(CSA_session_handle cal, CSA_flags reason,
 			add_all_gappt((GEditor *)c->geditor);
 	}
  
+}
+
+/*
+ * Deferred and coalesced like update_handler() in calendarA.c: every
+ * browsed calendar sends its own callbacks, and each refresh redraws
+ * the browser and looks up every calendar in it.
+ */
+static void
+mb_update_handler(CSA_session_handle cal, CSA_flags reason,
+               CSA_buffer call_data, CSA_buffer client_data, CSA_extension *ext)
+{
+	if (mb_update_timer == 0)
+		mb_update_timer = XtAppAddTimeOut(
+				XtWidgetToApplicationContext(calendar->frame),
+				100, mb_do_update, NULL);
 }
 
