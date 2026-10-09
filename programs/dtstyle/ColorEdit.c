@@ -73,6 +73,7 @@
 /* include extern functions              */
 /*+++++++++++++++++++++++++++++++++++++++*/
 #include "ColorEdit.h"
+#include "TrueColor.h"
 
 /*+++++++++++++++++++++++++++++++++++++++*/
 /* Local #defines                        */
@@ -1002,20 +1003,25 @@ GenerateColors( void )
 	{
 		static unsigned long pixels[4];
 		static int count=0;
+		Visual *visual = DefaultVisualOfScreen(style.screen);
+		XColor *want[4];
+		int k;
 
 		if(count){
 			XFreeColors(style.display,style.colormap,pixels,count,0);
 			count=0;
 		}
 
-		if(XAllocColor(style.display,style.colormap,&edit.color_set->fg))
-			pixels[count++]=edit.color_set->fg.pixel;
-		if(XAllocColor(style.display,style.colormap,&edit.color_set->bg))
-			pixels[count++]=edit.color_set->bg.pixel;
-		if(XAllocColor(style.display,style.colormap,&edit.color_set->ts))
-			pixels[count++]=edit.color_set->ts.pixel;
-		if(XAllocColor(style.display,style.colormap,&edit.color_set->bs))
-			pixels[count++]=edit.color_set->bs.pixel;
+		/* computed locally on TrueColor: no round trips per drag
+		 * event; only server-allocated pixels are freed */
+		want[0] = &edit.color_set->fg;
+		want[1] = &edit.color_set->bg;
+		want[2] = &edit.color_set->ts;
+		want[3] = &edit.color_set->bs;
+		for (k = 0; k < 4; k++)
+			if (StyleAllocColor(style.display, style.colormap, visual,
+					    want[k]) == STYLE_COLOR_ALLOCATED)
+				pixels[count++] = want[k]->pixel;
 
 		XtVaSetValues(edit.newButton,
 			XmNbackground,edit.color_set->bg.pixel,

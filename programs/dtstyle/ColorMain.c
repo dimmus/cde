@@ -76,6 +76,7 @@
 #include "Main.h"
 #include "SaveRestore.h"
 #include "ColorMain.h"
+#include "TrueColor.h"
 #include "ColorFile.h"
 #include "ColorEdit.h"
 #include "ColorPalette.h"
@@ -611,6 +612,9 @@ InitializePaletteList(
   char            *class_str;
   char            *str_type_return;
   XrmValue         value_return;
+  /* items are added to the list in batches, not one XmListAddItem each */
+  XmString         batch[8];
+  int              nbatch = 0, batchPos = 0, i;
   
   if(style.count > 8)
     return(True);
@@ -675,11 +679,23 @@ InitializePaletteList(
 	  strcpy(loop_palette->desc, loop_palette->name);
 	}
       
-      XmListAddItem(list, CMPSTR(loop_palette->desc), loop_palette->item_position);
+      /* palettes come in list order; start a new batch if not */
+      if (nbatch == XtNumber(batch) ||
+          (nbatch > 0 && loop_palette->item_position != batchPos + nbatch))
+	{
+	  XmListAddItems(list, batch, nbatch, batchPos);
+	  for (i = 0; i < nbatch; i++)
+	    XmStringFree(batch[i]);
+	  nbatch = 0;
+	}
+      if (nbatch == 0)
+	batchPos = loop_palette->item_position;
+      batch[nbatch++] = CMPSTR(loop_palette->desc);
       
       /* if the item is the same as the default name provided by the
-	 color Server, save it */
-      if(!save.restoreFlag) {
+	 color Server, save it (also when restoring a session that did
+	 not record a palette) */
+      if(!save.restoreFlag || defaultName_restore[0] == 0) {
 	if (!(strcmp(loop_palette->name, defaultName)))
 	  loop_palette2 = loop_palette;
       }
@@ -690,10 +706,17 @@ InitializePaletteList(
       loop_palette = loop_palette->next;
       loopcount++;
       if((loopcount % 5 == 0) && startup)
-	{
-
-	return(False);}
+	break;
     }
+
+  if (nbatch > 0)
+    {
+      XmListAddItems(list, batch, nbatch, batchPos);
+      for (i = 0; i < nbatch; i++)
+	XmStringFree(batch[i]);
+    }
+  if (loop_palette != NULL)
+    return(False);      /* more to add on the next call */
   
   /*
    **  Make the palette named by the color Server the selected palette, if the
@@ -735,6 +758,7 @@ static void allocNewColors(void)
 	Arg args[10];
 	static unsigned long   pixels[XmCO_MAX_NUM_COLORS*5];
 	static int       count = 0;
+	Visual *visual = DefaultVisualOfScreen(style.screen);
 
 	if(count)
 	{
@@ -743,36 +767,35 @@ static void allocNewColors(void)
 		count=0;
 	}
 
+	/* On TrueColor the pixels are computed locally (StyleAllocColor),
+	 * not one XAllocColor round trip each; only pixels the server
+	 * allocated are remembered for freeing. */
+#define ALLOC_COLOR(xc) \
+	switch (StyleAllocColor(style.display, style.colormap, visual, (xc))) { \
+	case STYLE_COLOR_ALLOCATED: pixels[count++] = (xc)->pixel; break; \
+	case STYLE_COLOR_COMPUTED: break; \
+	default: goto done; }
+
 	for (i=0; i<pCurrentPalette->num_of_colors; i++)
 	{
 		n=0;
-		if (XAllocColor(style.display, style.colormap,
-			&(pCurrentPalette->color[i].fg)) == 0) break;
-		pixels[count++] = pCurrentPalette->color[i].fg.pixel;
+		ALLOC_COLOR(&(pCurrentPalette->color[i].fg));
 
-		if (XAllocColor(style.display, style.colormap,
-			&(pCurrentPalette->color[i].bg)) == 0) break;
-		pixels[count++] = pCurrentPalette->color[i].bg.pixel;
+		ALLOC_COLOR(&(pCurrentPalette->color[i].bg));
 		XtSetArg (args[n], XmNbackground,
 			pCurrentPalette->color[i].bg.pixel); n++;
 
-		if (XAllocColor(style.display, style.colormap,
-			&(pCurrentPalette->color[i].sc)) == 0)	break;
-		pixels[count++] = pCurrentPalette->color[i].sc.pixel;
+		ALLOC_COLOR(&(pCurrentPalette->color[i].sc));
 		XtSetArg (args[n], XmNarmColor,
 			pCurrentPalette->color[i].sc.pixel); n++;
 
 		if (UsePixmaps == FALSE)
 		{
-			if (XAllocColor(style.display, style.colormap,
-				&(pCurrentPalette->color[i].ts)) == 0) break;
-			pixels[count++] = pCurrentPalette->color[i].ts.pixel;
+			ALLOC_COLOR(&(pCurrentPalette->color[i].ts));
 			XtSetArg (args[n], XmNtopShadowColor,
 				pCurrentPalette->color[i].ts.pixel); n++;
 
-			if (XAllocColor(style.display, style.colormap,
-				&(pCurrentPalette->color[i].bs)) == 0) break;
-			pixels[count++] = pCurrentPalette->color[i].bs.pixel;
+			ALLOC_COLOR(&(pCurrentPalette->color[i].bs));
 			XtSetArg (args[n], XmNbottomShadowColor,
 				pCurrentPalette->color[i].bs.pixel); n++;
 		}
@@ -794,6 +817,9 @@ static void allocNewColors(void)
 		}
 		XtSetValues(colorButton[i], args, n);
 	}
+done:
+	return;
+#undef ALLOC_COLOR
 }
     
 /*
@@ -1461,7 +1487,7 @@ AddName(
     XmListSelectPos(paletteList, newPalette->item_position, TRUE);
     XmListSetBottomPos(paletteList, newPalette->item_position);
     selected_position = newPalette->item_position;
-    XSync(style.display, 0);
+    XFlush(style.display);
     XmStringFree(string);
 }
 
