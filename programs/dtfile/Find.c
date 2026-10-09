@@ -2146,6 +2146,7 @@ AlternateInputHandler(
                                                         NULL, NULL, NULL);
                if (_DtCheckForDataTypeProperty(file_type, "invisible"))
                   findptr = NULL;
+               DtDtsFreeDataType(file_type);
             }
 
             /*  Add string to the scrolled list of matches  */

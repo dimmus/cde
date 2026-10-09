@@ -462,7 +462,7 @@ fsRename(char *sourceP, char *targetP, int replace, int *rcP)
   if (*rcP < 0)
     *rcP = errno;
 
-  if ((replace && *rcP == ENOTDIR) || *rcP == EISDIR) {
+  if (replace && (*rcP == ENOTDIR || *rcP == EISDIR)) {
     /* error reason: tried to replace file by directory or vice versa */
     *rcP = EraseObject(targetP, replace);
     if (*rcP < 0)

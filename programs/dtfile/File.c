@@ -5313,7 +5313,10 @@ AddFileIcons(
 static int
 WidgetCmp(Widget *w1, Widget *w2)
 {
-  return *w1 - *w2;
+  /* (a pointer difference truncated to int can have the wrong sign) */
+  if (*w1 < *w2)
+    return -1;
+  return *w1 > *w2;
 }
 
 static void
