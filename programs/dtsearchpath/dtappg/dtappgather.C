@@ -291,10 +291,23 @@ void AppManagerDirectory::GatherAppsFromASearchElement
 	    CString dname(direntry->d_name);
 	    CString spath(source + "/" + dname);
 	    struct stat file;
+	    int wanted;
 
-	    // A directory or a plain file (one stat(), not one per test).
-	    if (stat(spath.data(), &file) == 0 &&
-		(S_ISDIR(file.st_mode) || S_ISREG(file.st_mode)))
+	    // A directory or a plain file (stat() follows links).  d_type
+	    // tells without a stat() unless the entry is a link or of a
+	    // type the file system does not report; it used to take one
+	    // stat() per test.
+#ifdef DT_DIR
+	    if (direntry->d_type == DT_DIR || direntry->d_type == DT_REG)
+		wanted = 1;
+	    else if (direntry->d_type != DT_LNK &&
+		     direntry->d_type != DT_UNKNOWN)
+		wanted = 0;
+	    else
+#endif
+		wanted = stat(spath.data(), &file) == 0 &&
+			 (S_ISDIR(file.st_mode) || S_ISREG(file.st_mode));
+	    if (wanted)
 		if (goodFile(dirname_, dname))
 		    user_->OS()->symbolicLink (spath, dirname_ + "/" + dname);
 	}
