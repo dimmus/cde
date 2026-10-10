@@ -388,18 +388,9 @@ programs/dtfile/dtfile_error
 programs/dtfile/dterror.ds
 
 # programs/dtdocbook
-programs/dtdocbook/doc_utils/MixedGen
-programs/dtdocbook/doc_utils/NCFGen
-programs/dtdocbook/doc_utils/NodeParser
-programs/dtdocbook/doc_utils/StyleUpdate
-programs/dtdocbook/doc_utils/dbdrv
 programs/dtdocbook/doc_utils/dtdocbook2infolib
-programs/dtdocbook/doc_utils/dtdocbook2infolib.c
 programs/dtdocbook/doc_utils/dtdocbook2man
 programs/dtdocbook/doc_utils/dtdocbook2sdl
-programs/dtdocbook/doc_utils/valBase
-programs/dtdocbook/doc_utils/validator
-programs/dtdocbook/doc_utils/validator.C
 programs/dtdocbook/dtdocbook2infolib
 programs/dtdocbook/dtdocbook2man
 programs/dtdocbook/dtdocbook2sdl
