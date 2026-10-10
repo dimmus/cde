@@ -189,6 +189,16 @@ typedef struct {
    String  filename;
 } TrashEntry;
 
+/* hash index over the trash list (see TrashLookupInit) */
+typedef struct
+{
+   int          *by_name;    /* hash slots over trashCan[].filename */
+   int          *by_path;    /* hash slots over trashCan[].intNew, or NULL */
+   unsigned int  mask;
+   char         *removed;    /* removed[i]: entry i is gone */
+   int           count;      /* numTrashItems when built */
+} TrashLookup;
+
 /* callback data MoveToTrash */
 typedef struct
 {
@@ -361,7 +371,14 @@ static void Noop (
                         Widget w,
                         XtPointer clientData,
                         XtPointer callData) ;
+static void TrashLookupInit(
+                        TrashLookup *tl,
+                        Boolean by_path) ;
+static void TrashLookupDone(
+                        TrashLookup *tl) ;
+static void GrowTrashList( void ) ;
 static void AddToDeleteList(
+                        TrashLookup *tl,
                         DeleteList *deleteList,
                         int i,
                         char *filename) ;
@@ -382,8 +399,18 @@ static void EmptyTrash(
 			int del_count,
 			int removeType,
 			Tt_message msg) ;
+/* walk directories relative to open directory fds where possible */
+#if defined(AT_FDCWD) && defined(O_DIRECTORY) && defined(DT_UNKNOWN) && \
+    defined(AT_EACCESS) && !defined(BLS)
+#define DELETE_PERMISSION_AT
+static int CheckDeletePermissionAt(
+                        int dirfd,
+                        const char *name,
+                        int d_type);
+#else
 static int CheckDeletePermissionRecur(
                         char *dir);
+#endif
 static void RestoreVerifyOk(
                         Widget w,
                         XtPointer client_data,
@@ -558,6 +585,7 @@ static Boolean
 ReadTrashList( void )
 {
    int intSize, extSize, bufSize;
+   int dropped = 0;
    FILE * trashInfoFileId;
    String external, intName, internal;
    char * trashEntry;
@@ -591,6 +619,9 @@ ReadTrashList( void )
    while( fgets( trashEntry, bufSize, trashInfoFileId ) != NULL )
    {
      int len = strlen( trashEntry );
+
+     /* every line that does not become an entry means a rewrite */
+     dropped++;
 
      if( sscanf( trashEntry, "%d %d", &extSize, &intSize ) == 2 )
      {
@@ -640,18 +671,14 @@ ReadTrashList( void )
          else
          {
            /* Add to trash list */
-           if (numTrashItems >= trashListSize)
-           {
-             trashListSize += 10;
-             trashCan = (TrashEntry *)XtRealloc((char *) trashCan,
-                                                sizeof(TrashEntry) * trashListSize);
-           }
+           GrowTrashList();
 
            trashCan[numTrashItems].intNew = internal;
            trashCan[numTrashItems].intOrig = XtNewString(external);
            trashCan[numTrashItems].external = external;
            trashCan[numTrashItems].filename = intName;
            numTrashItems++;
+           dropped--;
          } /* end if file exists */
        }
        else
@@ -662,7 +689,11 @@ ReadTrashList( void )
      }
    } /* end while */
    fclose(trashInfoFileId);
+   XtFree(trashEntry);
 
+   /* rewrite the file only if it lists objects no longer in the trash */
+   if (dropped == 0)
+     return( True );
    return( WriteTrashEntries() );
 }
 
@@ -707,8 +738,13 @@ WriteTrashEntries( void )
       if(-1 == chown(NewTrashInfoFileName, getuid(), getgid())) {
 	  return( False );      
       }
-      (void) remove(TrashInfoFileName);
-      (void) rename(NewTrashInfoFileName, TrashInfoFileName);
+      /* rename() replaces the old file atomically; removing it first
+       * would lose the trash information if we stopped in between */
+      if (rename(NewTrashInfoFileName, TrashInfoFileName) != 0)
+      {
+         (void) remove(TrashInfoFileName);
+         (void) rename(NewTrashInfoFileName, TrashInfoFileName);
+      }
       if(-1 == chown(TrashInfoFileName, getuid(), getgid())) {
 	  return( False );      
       }
@@ -2174,6 +2210,7 @@ Remove(
    int deleteCount;
    int removeType;
    int i;
+   TrashLookup tl;
 
 
    /* Remove may be called to remove a file or to remove a trash file;  */
@@ -2224,16 +2261,18 @@ Remove(
       /* Create the list of things being deleted */
       deleteList = (DeleteList *)XtMalloc(deleteCount * sizeof(DeleteList));
 
+      TrashLookupInit(&tl, False);
       if (match)
       {
          for (i = 0; i < deleteCount; i++)
          {
-            AddToDeleteList(deleteList, i,
+            AddToDeleteList(&tl, deleteList, i,
                    trashFileMgrData->selection_list[i]->file_data->file_name);
          }
       }
       else
-         AddToDeleteList(deleteList, 0, file_view_data->file_data->file_name);
+         AddToDeleteList(&tl, deleteList, 0, file_view_data->file_data->file_name);
+      TrashLookupDone(&tl);
 
    }
    else
@@ -2252,6 +2291,155 @@ Remove(
 
 /************************************************************************
  *
+ * TrashLookup
+ *   Finding K files in the trash list of N entries used to be a linear
+ *   search per file, and removing an entry shifted the rest of the list
+ *   down, so restoring or removing K files cost O(K*N).  A TrashLookup
+ *   hashes the list once; entries removed while it is active are only
+ *   marked, and TrashLookupDone compacts the list in one pass.
+ *
+ *   TrashLookupFind returns the lowest index whose filename (or, if
+ *   by_path, whose intNew) equals name and that has not been removed,
+ *   or -1: what the linear searches over the shrinking list found.
+ *
+ ************************************************************************/
+
+static unsigned int
+TrashHash(
+   const char *s)
+{
+   unsigned int h = 2166136261u;      /* FNV-1a */
+
+   while (*s)
+   {
+      h ^= (unsigned char)*s++;
+      h *= 16777619u;
+   }
+   return h;
+}
+
+static int *
+TrashHashBuild(
+   unsigned int mask,
+   Boolean path)
+{
+   int *slots = (int *)XtMalloc((mask + 1) * sizeof(int));
+   unsigned int h;
+   int i;
+
+   for (h = 0; h <= mask; h++)
+      slots[h] = -1;
+   for (i = 0; i < numTrashItems; i++)
+   {
+      h = TrashHash(path ? trashCan[i].intNew : trashCan[i].filename) & mask;
+      while (slots[h] >= 0)
+         h = (h + 1) & mask;
+      slots[h] = i;
+   }
+   return slots;
+}
+
+static void
+TrashLookupInit(
+   TrashLookup *tl,
+   Boolean by_path)
+{
+   unsigned int size = 16;
+
+   while (size < 2 * (unsigned int)numTrashItems)
+      size <<= 1;
+   tl->mask = size - 1;
+   tl->by_name = TrashHashBuild(tl->mask, False);
+   tl->by_path = by_path ? TrashHashBuild(tl->mask, True) : NULL;
+   tl->removed = XtCalloc(numTrashItems + 1, 1);
+   tl->count = numTrashItems;
+}
+
+static int
+TrashHashFind(
+   TrashLookup *tl,
+   int *slots,
+   Boolean path,
+   const char *name)
+{
+   unsigned int h = TrashHash(name) & tl->mask;
+   int i;
+
+   /* linear probing meets equal keys in increasing index order */
+   while ((i = slots[h]) >= 0)
+   {
+      if (!tl->removed[i] &&
+          strcmp(path ? trashCan[i].intNew : trashCan[i].filename, name) == 0)
+         return i;
+      h = (h + 1) & tl->mask;
+   }
+   return -1;
+}
+
+static int
+TrashLookupFind(
+   TrashLookup *tl,
+   const char *name)
+{
+   int i = TrashHashFind(tl, tl->by_name, False, name);
+   int j;
+
+   if (tl->by_path)
+   {
+      j = TrashHashFind(tl, tl->by_path, True, name);
+      if (j >= 0 && (i < 0 || j < i))
+         i = j;
+   }
+   return i;
+}
+
+/* free the strings of entry j and mark it removed */
+static void
+TrashLookupRemove(
+   TrashLookup *tl,
+   int j)
+{
+   XtFree ((char *) trashCan[j].intNew);
+   XtFree ((char *) trashCan[j].intOrig);
+   XtFree ((char *) trashCan[j].external);
+   XtFree ((char *) trashCan[j].filename);
+   tl->removed[j] = True;
+}
+
+/* compact the trash list (dropping removed entries) and free tl */
+static void
+TrashLookupDone(
+   TrashLookup *tl)
+{
+   int i, k;
+
+   for (i = k = 0; i < tl->count; i++)
+      if (!tl->removed[i])
+         trashCan[k++] = trashCan[i];
+   numTrashItems = k;
+
+   XtFree((char *)tl->by_name);
+   XtFree((char *)tl->by_path);
+   XtFree(tl->removed);
+}
+
+
+/* make room for one more trash list entry */
+static void
+GrowTrashList( void )
+{
+   if (numTrashItems >= trashListSize)
+   {
+      trashListSize = (trashListSize < 16) ? 32 : 2 * trashListSize;
+      trashCan = (TrashEntry *)XtRealloc((char *) trashCan,
+                                         sizeof(TrashEntry) * trashListSize);
+   }
+}
+
+
+
+/************************************************************************
+ *
  * AddToDeleteList
  *   Locate a file in the trash list and add it to the delete list.
  *
@@ -2259,6 +2447,7 @@ Remove(
 
 static void
 AddToDeleteList(
+   TrashLookup *tl,
    DeleteList *deleteList,
    int i,
    char *filename)
@@ -2266,16 +2455,13 @@ AddToDeleteList(
    int j;
 
    /* Locate file in trash list, add entry to delete list */
-   for (j = 0; j < numTrashItems; j++)
+   j = TrashLookupFind(tl, filename);
+   if (j >= 0)
    {
-      if (strcmp(filename, trashCan[j].filename) == 0)
-      {
-         /* file found in trash list */
-         deleteList[i].trash = XtNewString(trashCan[j].intNew);
-         deleteList[i].orig = XtNewString(trashCan[j].intOrig);
-         return;
-         break;
-      }
+      /* file found in trash list */
+      deleteList[i].trash = XtNewString(trashCan[j].intNew);
+      deleteList[i].orig = XtNewString(trashCan[j].intOrig);
+      return;
    }
 
    /* file not found in trash list */
@@ -3079,12 +3265,7 @@ MoveToTrashPipeCB(
      else
      {
        /* Add file to trash list */
-       if (numTrashItems >= trashListSize)
-       {
-         trashListSize += 10;
-         trashCan = (TrashEntry *)
-           XtRealloc((char *)trashCan, sizeof(TrashEntry) * trashListSize);
-       }
+       GrowTrashList();
 
        trashCan[numTrashItems].problem = False;
        trashCan[numTrashItems].intNew = cb_data->to[i];
@@ -3451,6 +3632,7 @@ RestoreProcess(
    char buf[MAX_PATH];
    short pipe_msg;
    int status;
+   TrashLookup tl;
 
    /* get full path name of target directory */
    if (target_dir)
@@ -3473,18 +3655,14 @@ RestoreProcess(
       full_dirname = NULL;
 
    /* restore the files */
+   TrashLookupInit(&tl, True);
    for (i = 0; i < file_count; i++)
    {
       /* Locate file in trash list */
-      for (j = 0; j < numTrashItems; j++)
-      {
-         /* file_list[i] may be a complete path or just a file name */
-         if (strcmp(file_list[i], trashCan[j].filename) == 0 ||
-             strcmp(file_list[i], trashCan[j].intNew) == 0)
-         {
-            break;
-         }
-      }
+      /* file_list[i] may be a complete path or just a file name */
+      j = TrashLookupFind(&tl, file_list[i]);
+      if (j < 0)
+         j = numTrashItems;
 
       /* determine source and target for the move */
       if (target_dir == NULL)
@@ -3532,6 +3710,8 @@ RestoreProcess(
          rc[i] = -1;
    }
 
+   TrashLookupDone(&tl);
+
    /* send return codes back trough the pipe */
    pipe_msg = PIPEMSG_DONE;
    DPRINTF(("RestoreProcess: sending DONE\n"));
@@ -3555,7 +3735,7 @@ RestorePipeCB(
 {
    RestoreFromTrashCBData *cb_data = (RestoreFromTrashCBData *)client_data;
    short pipe_msg;
-   int i, j, k, n, rc;
+   int i, j, n, rc;
    char *title, *err_msg, *err_arg;
    String buf;
    int bufsize;
@@ -3563,6 +3743,7 @@ RestorePipeCB(
    char **ToRestoreList=NULL;
    char **FromRestoreList=NULL;
    char *target_host,*target_dir;
+   TrashLookup tl;
 
    /* read the next msg from the pipe */
    pipe_msg = -1;
@@ -3607,21 +3788,20 @@ RestorePipeCB(
    buf = NULL;
    bufsize = 0;
 
+   TrashLookupInit(&tl, True);
    for (i = 0; i < cb_data->file_count; i++)
    {
       /* Locate file in trash list */
-      for (j = 0; j < numTrashItems; j++)
-      {
-         /* file_list[i] may be a complete path or just a file name */
-         if (strcmp(cb_data->file_list[i], trashCan[j].filename) == 0 ||
-             strcmp(cb_data->file_list[i], trashCan[j].intNew) == 0)
-         {
-            break;
-         }
-      }
+      /* file_list[i] may be a complete path or just a file name */
+      j = TrashLookupFind(&tl, cb_data->file_list[i]);
+      if (j < 0)
+         j = numTrashItems;
 
       if (cb_data->rc[i] == SKIP_FILE)
       {
+         /* (an entry that is not in the trash list cannot be put back) */
+         if (j >= numTrashItems)
+            continue;
 	 ToRestoreList = (char **) XtRealloc((char *)ToRestoreList,sizeof(char *) *
 				    (++RestoreIndex));
 	 ToRestoreList[RestoreIndex-1] = XtNewString(trashCan[j].intOrig);
@@ -3640,14 +3820,7 @@ RestorePipeCB(
             UpdateDirectoryOf(trashCan[j].intOrig);
 
             /* Remove this entry from the trash list */
-            XtFree ((char *) trashCan[j].intNew);
-            XtFree ((char *) trashCan[j].intOrig);
-            XtFree ((char *) trashCan[j].external);
-            XtFree ((char *) trashCan[j].filename);
-            for (k = j; k < (numTrashItems - 1); k++)
-               trashCan[k] = trashCan[k + 1];
-
-            numTrashItems--;
+            TrashLookupRemove(&tl, j);
          }
       }
       else
@@ -3663,6 +3836,7 @@ RestorePipeCB(
          XtFree(restore_header);
       }
    }
+   TrashLookupDone(&tl);
 
    /* Update the trash information file */
    if( ! WriteTrashEntries() )
@@ -3861,7 +4035,7 @@ EmptyTrashPipeCB(
 {
    EmptyTrashCBData *cb_data = (EmptyTrashCBData *)client_data;
    short pipe_msg;
-   int i, j, k, n, rc;
+   int i, j, n, rc;
    char *title, *err_msg, *err_arg;
    int problemCount, itemCount;
    String buf;
@@ -3915,12 +4089,15 @@ EmptyTrashPipeCB(
 
    if (cb_data->removeType == TRASH_FILE)
    {
+      TrashLookup tl;
+
+      TrashLookupInit(&tl, True);
       for (i = 0; i < cb_data->del_count; i++)
       {
-         /* Locate file in trash list */
-         for (j = 0; j < numTrashItems; j++)
-            if (strcmp(cb_data->del_list[i].trash, trashCan[j].intNew) == 0)
-               break;
+         /* Locate file in trash list (by its path in the trash) */
+         j = TrashHashFind(&tl, tl.by_path, True, cb_data->del_list[i].trash);
+         if (j < 0)
+            j = numTrashItems;
 
          /* Check the return code from the erase */
          if (cb_data->rc[i] == 0)
@@ -3929,14 +4106,7 @@ EmptyTrashPipeCB(
             if (j < numTrashItems)
             {
                /* Remove this entry from the trash list */
-               XtFree ((char *) trashCan[j].intNew);
-               XtFree ((char *) trashCan[j].intOrig);
-               XtFree ((char *) trashCan[j].external);
-               XtFree ((char *) trashCan[j].filename);
-               for (k = j; k < (numTrashItems - 1); k++)
-                  trashCan[k] = trashCan[k + 1];
-
-               numTrashItems--;
+               TrashLookupRemove(&tl, j);
             }
          }
          else
@@ -3957,6 +4127,7 @@ EmptyTrashPipeCB(
             }
          }
       }
+      TrashLookupDone(&tl);
 
       /* Update the trash information file */
       if( ! WriteTrashEntries() )
@@ -4143,7 +4314,9 @@ CheckDeletePermission(
 #else
   struct stat statbuf;
 #endif
+#ifndef DELETE_PERMISSION_AT
   char fname[PATH_MAX];
+#endif
 
 #if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
   if (statfs(parentdir,&statbuf) < 0)  /* does not exist */
@@ -4193,12 +4366,90 @@ CheckDeletePermission(
   if (CheckAccess(parentdir, W_OK | X_OK) < 0)
       return -1;
 
+#ifdef DELETE_PERMISSION_AT
+  return CheckDeletePermissionAt(AT_FDCWD, destinationPath, DT_UNKNOWN);
+#else
   /* copy destinationPath to tmp buffer */
   snprintf(fname, PATH_MAX, "%s", destinationPath);
 
   return CheckDeletePermissionRecur(fname);
+#endif
 }
 
+
+#ifdef DELETE_PERMISSION_AT
+/*
+ * CheckDeletePermissionAt: name (in the directory open as dirfd) can be
+ * deleted later: if it is a non-empty directory, it is writable and
+ * searchable and the same holds for everything in it.
+ *
+ * This is the check CheckDeletePermissionRecur makes, relative to open
+ * directories: the directory entry type spares a stat of every file,
+ * and no path is rebuilt and resolved again for every entry (nor can a
+ * deep tree overflow a PATH_MAX buffer).
+ */
+static int
+CheckDeletePermissionAt(
+  int dirfd,
+  const char *name,
+  int d_type)
+{
+  struct stat statbuf;
+  DIR *dirp;
+  struct dirent * dp;
+  Boolean first_file;
+  int fd;
+
+  if (d_type == DT_UNKNOWN)
+  {
+    if (fstatat(dirfd, name, &statbuf, AT_SYMLINK_NOFOLLOW) < 0)
+      return -1;  /* probably does not exist */
+    if (! S_ISDIR(statbuf.st_mode))
+      return 0;   /* no need to check anything more */
+  }
+  else if (d_type != DT_DIR)
+    return 0;
+
+  fd = openat(dirfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+  if (fd < 0 || (dirp = fdopendir(fd)) == NULL)
+  {
+    if (fd >= 0)
+      close(fd);
+    return -1;  /* could not read directory */
+  }
+
+  first_file = True;
+
+  while ((dp = readdir (dirp)))
+  {
+    if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
+    {
+      /* check for write permission in this directory */
+      if (first_file)
+      {
+        if (faccessat(dirfd, name, W_OK|X_OK, AT_EACCESS) < 0)
+        {
+          closedir(dirp);
+          return -1;
+        }
+        first_file = False;
+      }
+
+      /* recursively check permission on this file */
+      if (CheckDeletePermissionAt(fd, dp->d_name, dp->d_type))
+      {
+          closedir(dirp);
+          return -1;
+      }
+    }
+  }
+
+  closedir(dirp);
+
+  return 0;
+}
+
+#else /* DELETE_PERMISSION_AT */
 
 static int
 CheckDeletePermissionRecur(
@@ -4208,7 +4459,8 @@ CheckDeletePermissionRecur(
   DIR *dirp;
   struct dirent * dp;
   Boolean first_file;
-  char *fnamep;
+  char *fnamep = NULL;
+  size_t dirlen;
 
   DPRINTF(("CheckDeletePermissionRecur(\"%s\")\n", destinationPath));
 
@@ -4224,6 +4476,7 @@ CheckDeletePermissionRecur(
 
 
   first_file = True;
+  dirlen = strlen(destinationPath);
 
   while ((dp = readdir (dirp)))
   {
@@ -4238,13 +4491,18 @@ CheckDeletePermissionRecur(
         }
 
         /* append a '/' to the end of directory name */
-        fnamep = destinationPath + strlen(destinationPath);
+        fnamep = destinationPath + dirlen;
         *fnamep++ = '/';
 
         first_file = False;
       }
 
-      /* append file name to end of directory name */
+      /* append file name to end of directory name (the buffer is PATH_MAX) */
+      if (dirlen + 1 + strlen(dp->d_name) >= PATH_MAX)
+      {
+        closedir(dirp);
+        return -1;
+      }
       strcpy(fnamep, dp->d_name);
 
       /* recursively check permission on this file */
@@ -4261,6 +4519,7 @@ CheckDeletePermissionRecur(
 
   return 0;
 }
+#endif /* DELETE_PERMISSION_AT */
 
 static int
 RestoreObject(
