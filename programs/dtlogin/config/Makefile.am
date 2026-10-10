@@ -138,15 +138,15 @@ Xservers.nc: Xservers.src
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# $(AM_CPPFLAGS) -DNO_CONSOLE $< > $@
 
-Xsession: Xsession.src
+Xsession: Xsession.src _common.ksh.src
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# $(AM_CPPFLAGS) $< > $@
 
-Xsession.ive: Xsession.src
+Xsession.ive: Xsession.src _common.ksh.src
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# $(AM_CPPFLAGS) -DIVE $< > $@
 
-Xsetup: Xsetup.src
+Xsetup: Xsetup.src _common.ksh.src
 	$(RM) $@
 	$(GENCPP) -P -DXCOMM=# $(AM_CPPFLAGS) $< > $@
 

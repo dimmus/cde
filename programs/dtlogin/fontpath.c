@@ -156,6 +156,24 @@ ApplyFontPathMods( struct display *d, Display *dpy )
                 while (*s) s++;
                 s++;
             }
+            /*
+            **  Nothing to do if the path already is the new one (the
+            **  elements are there, in that order): setting the path
+            **  makes the server re-check every element, and XSync()
+            **  costs a round trip.
+            */
+            if (i == numPaths) {
+                for (j = 0; j < i; j++)
+                    if (strcmp(newList[j], fontPath[j]) != 0)
+                        break;
+                if (j == i) {
+                    Debug("  Font path unchanged\n");
+                    free(newList);
+                    newList = NULL;
+                }
+            }
+        }
+        if (newList) {
             if (debugLevel > 0)
                 DebugFontPath("Request (XSetFontPath)",newList,i);
 

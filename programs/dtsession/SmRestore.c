@@ -1297,7 +1297,37 @@ RestoreSettings( void )
 
     if(numArgs > 0)
     {
-	XSetFontPath(smGD.display, restorePtrArray, numArgs);
+	/*
+	 * Usually the saved path is the one the server has already (set
+	 * by Xsetup and dtlogin).  Setting it anyway makes the server
+	 * re-check every element; one XGetFontPath() round trip is
+	 * cheaper.
+	 */
+	char	**curPath;
+	int	numCur = 0;
+	int	same = 0;
+
+	if((curPath = XGetFontPath(smGD.display, &numCur)) != NULL)
+	{
+	    if(numCur == numArgs)
+	    {
+		int	j;
+
+		for(j = 0; j < numArgs; j++)
+		{
+		    if(strcmp(curPath[j], restorePtrArray[j]) != 0)
+		    {
+			break;
+		    }
+		}
+		same = (j == numArgs);
+	    }
+	    XFreeFontPath(curPath);
+	}
+	if(!same)
+	{
+	    XSetFontPath(smGD.display, restorePtrArray, numArgs);
+	}
     }
 
     /*
