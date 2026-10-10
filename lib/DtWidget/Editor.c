@@ -56,6 +56,7 @@
 
 #include <ctype.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #if defined(sun)
 # if (_XOPEN_VERSION==3)
@@ -4504,7 +4505,7 @@ _DtEditorUpdateLineDisplay(
 {
     XmTextWidget tw = (XmTextWidget) M_text(editor);
     Arg		al[10];
-    char 	tmpChars[8];
+    char 	tmpChars[16];
     int		lastLine;
     XmString	tmpXmStr;
 
@@ -4626,10 +4627,29 @@ SetCursorPosStatus(
     XmTextWidget tw = (XmTextWidget)w;
     XmTextVerifyCallbackStruct * cb = (XmTextVerifyCallbackStruct *) call_data;
     int startLine;
+    Boolean force = DONT_FORCE;
 
     startLine = _DtEditorGetLineIndex(tw, cb->newInsert) + 1;
 
-    _DtEditorUpdateLineDisplay( editor, startLine, FORCE );
+    /*
+     * On the same line, the line number field only needs resetting if
+     * the user typed something else into it.  This used to force
+     * XmTextFieldSetString(), and a redraw of the field, on every
+     * cursor motion.
+     */
+    if (M_status_showStatusLine(editor) == True &&
+	M_status_currentLine(editor) == startLine)
+    {
+	char tmpChars[16];
+	char *shown = XmTextFieldGetString(M_status_lineText(editor));
+
+	sprintf(tmpChars, "%d", startLine);
+	if (shown == NULL || strcmp(shown, tmpChars) != 0)
+	    force = FORCE;
+	XtFree(shown);
+    }
+
+    _DtEditorUpdateLineDisplay( editor, startLine, force );
 
 } /* end SetCursorPosStatus */
 
@@ -5322,6 +5342,22 @@ countBlanks(
     return count;
 }
 
+/* Write n blanks to fp (they were written one fwrite() at a time). */
+static void
+writeBlanks(
+	FILE *fp,
+	int n)
+{
+    static const char blanks[] = "                                ";
+
+    while (n > 0) {
+	int chunk = (n < (int)sizeof(blanks) - 1) ? n : (int)sizeof(blanks) - 1;
+
+	fwrite(blanks, sizeof(char), chunk, fp);
+	n -= chunk;
+    }
+}
+
 /*
  * fixLeftMarginAndNewlines - writes out a substring from the text widget,
  * inserting leading blanks as needed to set the left margin, and adding
@@ -5341,7 +5377,6 @@ fixLeftMarginAndNewlines(
 {
     Widget widget = M_text(editor);
     XmTextLineTable lineTable;
-    int i;
     int lineIndex, lineLen, nextLen, lineIndent, lastIndex,
         lineByteLen, total_lines;
     Boolean newPara = True;
@@ -5454,8 +5489,7 @@ fixLeftMarginAndNewlines(
 		    lineIndent = leftMargin - offset;
 		}
 	    }
-	    for(i = firstIndent; i-- > 0;)
-                fwrite(" ", sizeof(char), 1, fp); /* that's a _space_ */
+	    writeBlanks(fp, firstIndent);
 	    pFirstNonBlank = findNonBlank(pLine, lineLen);
             fwrite(pFirstNonBlank, sizeof(char), lineByteLen - 
 		   (pFirstNonBlank - pLine), fp);
@@ -5464,8 +5498,7 @@ fixLeftMarginAndNewlines(
 	    XtFree(pLine);
 	    continue;
 	}
-	for(i = lineIndent; i-- > 0;)
-            fwrite(" ", sizeof(char), 1, fp); /* that's a _space_ */
+	writeBlanks(fp, lineIndent);
 	pFirstNonBlank = findNonBlank(pLine, lineLen);
         fwrite(pFirstNonBlank, sizeof(char), lineByteLen - 
 	       (pFirstNonBlank - pLine), fp);
@@ -5489,8 +5522,7 @@ fixLeftMarginAndNewlines(
 
        if(lineLen > 0)
        {
-	   for(i = lineIndent; i-- > 0;)
-               fwrite(" ", sizeof(char), 1, fp); /* that's a _space_ */
+	   writeBlanks(fp, lineIndent);
 
            pLine = _XmStringSourceGetString((XmTextWidget)M_text(editor), 
 		    lineTable[lineIndex].start_pos, 
@@ -5764,7 +5796,7 @@ Center (FormatData *data,
 
 	if (! haveword)
 	{
-	  putc ('\n', data->pAdj->outfp);	/* "eat" any whitespace */
+	  putwc (L'\n', data->pAdj->outfp);	/* "eat" any whitespace */
 	  data->centerstartpara = True;	/* expect new paragraph */
 	}
 
@@ -5811,7 +5843,7 @@ Center (FormatData *data,
 	    {
 		putwc(outline[i], data->pAdj->outfp);
 	    }
-	    putc('\n', data->pAdj->outfp);
+	    putwc(L'\n', data->pAdj->outfp);
 	  } 
 
 	} /* else */
@@ -5960,7 +5992,7 @@ Fill (FormatData *data,
 	{
 	  data->inlinenum--;			/* don't count empty lines */
 	  Dump (data, True);		/* force end paragraph */
-	  fputc ('\n', data->pAdj->outfp);	/* put this empty line */
+	  putwc (L'\n', data->pAdj->outfp);	/* put this empty line */
 	  data->inlinenum = 0;		/* start new paragraph */
 	}
 	else				/* have text on line */
@@ -6205,7 +6237,7 @@ Dump (FormatData *data,
  */
 
       PrintWords (data, wordpast);
-      putwc('\n', data->pAdj->outfp);
+      putwc(L'\n', data->pAdj->outfp);
       data->wordfirst = wordpast;
       data->outlinenum++;				/* affects startpara */
 
@@ -6222,6 +6254,10 @@ Dump (FormatData *data,
  *
  * Print line indentation (if > 0), optionally using tabs where possible.
  * Does not print a newline.
+ *
+ * outfp is a wide-oriented stream (putwc), so no byte output functions
+ * may be used on it: with them mixed in, glibc drops whichever kind
+ * comes second.
  */
 
 static void
@@ -6234,11 +6270,12 @@ PrintIndent (FormatData *data,
       {
 	 while (indent >= data->tabsize)
          {
-	   putc ('\t', data->pAdj->outfp);
+	   putwc (L'\t', data->pAdj->outfp);
 	   indent -= data->tabsize;
          }
       }
-   fprintf (data->pAdj->outfp, "%*s", indent, "");/*[remaining] blanks */
+      while (indent-- > 0)		/* [remaining] blanks */
+	 putwc (L' ', data->pAdj->outfp);
    }
 } /* PrintIndent */
 
@@ -6861,9 +6898,11 @@ DoAdjust(
         XmTextPosition	start,
         XmTextPosition	end)
 {
-    char tempName1[L_tmpnam], tempName2[L_tmpnam];
+    char tempName2[64];
     DtEditorErrorCode returnVal;
     AdjRec adjRec;
+    FILE *writefp;
+    int fd;
 
     /* 
      * Check that valid margin values were passed in
@@ -6947,17 +6986,32 @@ DoAdjust(
 
 
        /*
-        * Create the two temp files
+        * Create the two temp files: an anonymous one for the input, and
+	* one with a name (mkstemp: tmpnam() was open to races) for the
+	* output, which DtEditorReplaceFromFile() reads back.
+	*
+	* The input is written with byte functions and read back with
+	* getwc(), so it is read through a second, fresh stream: a stream
+	* keeps the orientation of its first use, and glibc returned WEOF
+	* to getwc() on the byte stream, so Format came out empty.  The
+	* output is all putwc() for the same reason.
         */
-       (void)tmpnam(tempName1);
-       (void)tmpnam(tempName2);
-       if ((adjRec.infp = fopen(tempName1, "w+")) != (FILE *)NULL) {
+       snprintf(tempName2, sizeof(tempName2), "%s/dtfmtXXXXXX", P_tmpdir);
+       if ((writefp = tmpfile()) != (FILE *)NULL) {
 
          /* 
           * Successfully opened the first temporary file 
           */
+         adjRec.infp = NULL;
+         adjRec.outfp = NULL;
+         fd = mkstemp(tempName2);
+         if (fd >= 0 && (adjRec.outfp = fdopen(fd, "w")) == (FILE *)NULL) {
+            close(fd);
+            unlink(tempName2);
+            fd = -1;
+         }
 
-         if((adjRec.outfp = fopen(tempName2, "w")) != (FILE *)NULL) {
+         if (adjRec.outfp != (FILE *)NULL) {
 
             /* 
 	     * Successfully opened the second temporary file, so do the
@@ -6965,19 +7019,28 @@ DoAdjust(
 	     */ 
        	    returnVal = DtEDITOR_NO_ERRORS;
 
-            fixLeftMarginAndNewlines( editor, adjRec.infp, leftMargin, 
+            fixLeftMarginAndNewlines( editor, writefp, leftMargin, 
 				      rightMargin, (int)start, (int)end );
-            fflush(adjRec.infp);
-            rewind(adjRec.infp);
+            if (fflush(writefp) == 0 &&
+		(fd = dup(fileno(writefp))) >= 0) {
+               if (lseek(fd, 0, SEEK_SET) != 0 ||
+		   (adjRec.infp = fdopen(fd, "r")) == (FILE *)NULL)
+                  close(fd);
+            }
 
-            FormatText(&adjRec);
+            if (adjRec.infp != (FILE *)NULL) {
+               FormatText(&adjRec);
+               fclose(adjRec.infp);
+            }
+            else
+               returnVal = DtEDITOR_NO_TMP_FILE;
+            fclose(writefp);
 
-            fclose(adjRec.infp);
-            unlink(tempName1);
-
-            fclose(adjRec.outfp);
-            returnVal =
-	      DtEditorReplaceFromFile( (Widget)editor, start, end, tempName2 );
+            if (fclose(adjRec.outfp) != 0 && returnVal == DtEDITOR_NO_ERRORS)
+               returnVal = DtEDITOR_NO_TMP_FILE;
+            if (returnVal == DtEDITOR_NO_ERRORS)
+               returnVal = DtEditorReplaceFromFile( (Widget)editor,
+						    start, end, tempName2 );
             unlink(tempName2);
 
          } 
@@ -6985,8 +7048,7 @@ DoAdjust(
 	   /*
 	    * Could not open second temporary file, so clean up first one
 	    */
-           fclose(adjRec.infp);
-           unlink(tempName1);
+           fclose(writefp);
            returnVal = DtEDITOR_NO_TMP_FILE;
          }
 

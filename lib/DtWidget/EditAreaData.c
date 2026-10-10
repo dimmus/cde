@@ -1365,19 +1365,53 @@ StringAdd(
  *                 "virtual" lines.
  *
  *      Inputs: widget from which we get the data to write;
+ *              pString, the whole text of the widget (XmTextGetString);
  *              startPos determines the first character to write out;
  *              endPos determines the last character to write out;
  *              buf is the character buffer into which we write. It
- *                  is assumed to be large enough - be careful.
+ *                  is assumed to be large enough - be careful: the
+ *                  bytes of the characters copied, plus one per line
+ *                  if addNewlines, plus one.
  *              addNewlines specifies whether to add '/n' to "virtual" lines.
- *      Returns Nuthin'
- *
+ *      Returns the end of the copy in buf
  *
  ***************************************************************************/
+
+/*
+ * Advance (*pptr, *pchar) to character number target (>= *pchar) of
+ * the text.  Counts as the old byte-offset table did: an invalid
+ * multibyte sequence is one byte, and nothing moves past the NUL.
+ */
+static void
+SeekChar(
+	char **pptr,
+	XmTextPosition *pchar,
+	XmTextPosition target)
+{
+    char *bptr = *pptr;
+    int siz;
+
+    if (MB_CUR_MAX > 1)
+    {
+	for ( ; *pchar < target; (*pchar)++)
+	{
+	    if ( (siz = mblen(bptr, MB_CUR_MAX)) < 0)
+		siz = 1;
+	    bptr += siz;
+	}
+    }
+    else
+    {
+	bptr += target - *pchar;
+	*pchar = target;
+    }
+    *pptr = bptr;
+}
 
 static char *
 CopySubstring(
         XmTextWidget widget,
+        char *pString,
         XmTextPosition startPos,
         XmTextPosition endPos,
         char *buf,
@@ -1385,7 +1419,7 @@ CopySubstring(
 {
     XmTextLineTable line_table = widget->text.line_table;
     int currLine, firstLine;
-    char *pString, *pCurrChar, *pLastChar;
+    char *pCurrChar, *pLastChar;
     int numToCopy;
 
     if(startPos < 0)
@@ -1401,8 +1435,6 @@ CopySubstring(
     if(startPos > endPos)
         return buf;
 
-    pString = XmTextGetString((Widget)widget);
-
     if(addNewlines == False)
     {
         pCurrChar = _DtEditorGetPointer(pString, startPos);
@@ -1413,73 +1445,27 @@ CopySubstring(
     }
     else
     {
-	int *mb_str_loc, total, z, siz;
+	/*
+	 * The characters needed, the first and last of each line, come
+	 * in increasing order, so one walk through the text finds them
+	 * all.  (This used to fill a table with the byte offset of
+	 * every character first.)
+	 */
 	char *bptr;
-
-	mb_str_loc = (int *) XtMalloc(sizeof(int) * ((endPos-startPos)+1));
-	if (NULL == mb_str_loc)
-	{
-	    /* Should figure out some way to pass back an error code. */
-	    buf = CopySubstring(widget, startPos, endPos, buf, False);
-	    return buf;
-	}
-
-    /*
-     * mb_str_loc[] is being used to replace the call
-     * to _DtEditorGetPointer.  That function used
-     * mbtowc() to count the number of chars between the
-     * beginning of pString and startChar.  The problem
-     * was that it sat in a loop and was also called for
-     * every line, so it was SLOW.  Now, we count once
-     * and store the results in mb_str_loc[].
-     */
-
-	/* Because startPos may not always == 0:	*/
-	/*     mb_str_loc[0] = startPos 		*/
-	/*     mb_str_loc[endPos - startPos] = endPos 	*/
-	/*						*/
-	/* So when accessing items, dereference off of  */
-	/*  startPos.					*/
-	/* (mb_str_loc[k] is the byte offset of		*/
-	/* character startPos + k; the count used to	*/
-	/* start at character 0 whatever startPos was.)	*/
+	XmTextPosition bchar, z;
 
 	bptr = _DtEditorGetPointer(pString, startPos);
-	total = bptr - pString;
-	mb_str_loc[0] = total;
-	for(z=1; z <= (endPos - startPos); bptr += siz, z++)
-	{
-	   if (MB_CUR_MAX > 1)
-	   {
-	      if ( (siz = mblen(bptr, MB_CUR_MAX)) < 0)
-	      {
-		siz = 1;
-		total += 1;
-	      }
-	      else
-		total += siz;
-	   }
-	   else
-	   {
-		siz = 1;
-		total += 1;
-	   }
-
-	     mb_str_loc[z] = total;
-	}
-
+	bchar = startPos;
 
         firstLine = currLine = _DtEditorGetLineIndex(widget, startPos);
         do
         {
             if(startPos > (XmTextPosition)line_table[currLine].start_pos)
-		pCurrChar = pString + mb_str_loc[0];
+		z = startPos;
             else
-	    {
 		z = line_table[currLine].start_pos;
-		pCurrChar = pString +
-			mb_str_loc[z - startPos];
-	    }
+	    SeekChar(&bptr, &bchar, z);
+	    pCurrChar = bptr;
 
             if(addNewlines == True && currLine > firstLine &&
                line_table[currLine].virt_line != 0)
@@ -1490,17 +1476,13 @@ CopySubstring(
 	    }
 
             if(currLine >= (widget->text.total_lines - 1))
-		  pLastChar = pString +
-			mb_str_loc[endPos - startPos];
+		z = endPos;
             else if((XmTextPosition)line_table[currLine + 1].start_pos <= endPos)
-	    {
-		  z = line_table[currLine+1].start_pos - 1;
-		  pLastChar = pString +
-			mb_str_loc[z - startPos];
-	    }
+		z = line_table[currLine+1].start_pos - 1;
             else
-		  pLastChar = pString +
-			mb_str_loc[endPos - startPos];
+		z = endPos;
+	    SeekChar(&bptr, &bchar, z);
+	    pLastChar = bptr;
 
 	    numToCopy = pLastChar - pCurrChar + mblen(pLastChar, MB_CUR_MAX);
 
@@ -1509,30 +1491,7 @@ CopySubstring(
             currLine++;
         } while(currLine < widget->text.total_lines &&
                 (XmTextPosition)line_table[currLine].start_pos <= endPos);
-	XtFree((char*)mb_str_loc);
     }
-
-    XtFree(pString);
-    return buf;
-}
-
-/*************************************************************************
- *
- * _DtEditorCopyDataOut - Writes the entire text editor buffer contents to 
- *               	  the specified character array.
- *
- * Inputs: tw, to supply the data.
- *         buf, specifying the array to which to write the data.
- *
- *************************************************************************/
-
-static char *
-_DtEditorCopyDataOut(
-        XmTextWidget tw,
-        char *buf,
-	Boolean addNewlines)
-{
-    buf = CopySubstring(tw, 0, tw->text.last_position, buf, addNewlines);
 
     return buf;
 }
@@ -1545,15 +1504,17 @@ getStringValue(
 {
     XmTextWidget	 tw = (XmTextWidget) M_text(editor);
     int			 bufSize;
+    char		*pString;
     DtEditorErrorCode	 returnVal = DtEDITOR_NO_ERRORS;
 
     /*
-     * Calculate the size of the buffer we need for the data.
-     * 1. Start with MB_CUR_MAX for each char in the text.
-     * 3. Add in 1 char for each line, if we have to insert newlines.
-     * 4. Add 1 for a terminating NULL.
+     * Is there (roughly) enough memory for the data?  At least one byte
+     * per character, plus one per line if we have to insert newlines,
+     * plus a terminating NULL.  (This used to probe for, and then
+     * allocate, MB_CUR_MAX bytes per character, about 12 times the
+     * size of the text in a UTF-8 locale.)
      */
-    bufSize = tw->text.last_position * MB_CUR_MAX;
+    bufSize = tw->text.last_position;
     if(insertNewlines == True)
         bufSize += tw->text.total_lines;
     bufSize += 1;
@@ -1561,8 +1522,32 @@ getStringValue(
     returnVal = Check4EnoughMemory(bufSize);
     if (DtEDITOR_NO_ERRORS != returnVal) return returnVal;
 
+    pString = XmTextGetString((Widget)tw);
+
+    if(insertNewlines == False &&
+       *_DtEditorGetPointer(pString, tw->text.last_position) == (char)'\0')
+    {
+	/*
+	 * All of the text, as is: what CopySubstring() would copy is
+	 * the string itself.
+	 */
+	*buf = pString;
+	return returnVal;
+    }
+
+    /*
+     * The bytes of the text, plus one per line for the newlines, plus
+     * the NULL.
+     */
+    bufSize = strlen(pString) + 1;
+    if(insertNewlines == True)
+        bufSize += tw->text.total_lines;
+
     *buf = (char *) XtMalloc(bufSize);
-    (void) _DtEditorCopyDataOut(tw, *buf, insertNewlines);
+    **buf = (char)'\0';
+    (void) CopySubstring(tw, pString, 0, tw->text.last_position, *buf,
+			 insertNewlines);
+    XtFree(pString);
 
     return returnVal;
 } /* end getStringValue */

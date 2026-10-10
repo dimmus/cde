@@ -285,26 +285,29 @@ SetUndoDeletionState(
 	 * must have been no intervening insertions, and we must be deleting
 	 * from the same point, either forward or backward.
          */
-        char *oldUndo = M_deletedText(pPriv);
-        M_deletedText(pPriv) = XtMalloc( strlen(M_deletedText(pPriv)) +
-			                 strlen(pDeletedText) + 1 );
+        /*
+         * Grow the saved text in place (realloc) instead of allocating
+         * a new copy and copying all of it with strcpy/strcat each time.
+         */
+        size_t oldLen = strlen(M_deletedText(pPriv));
+        size_t addLen = strlen(pDeletedText);
+        char *undo = XtRealloc(M_deletedText(pPriv), oldLen + addLen + 1);
     
         if(cb->startPos == M_deletionStart(pPriv)) {
 	    /*
 	     * deleting forward - deletionStart remains the same.
 	     */
-	    strcpy(M_deletedText(pPriv), oldUndo);
-            strcat(M_deletedText(pPriv), pDeletedText);
+            memcpy(undo + oldLen, pDeletedText, addLen + 1);
         }
         else {
 	    /*
 	     * deleting backward (e.g. Backspace)
 	     */
-            strcpy(M_deletedText(pPriv), pDeletedText);
-	    strcat(M_deletedText(pPriv), oldUndo);
+            memmove(undo + addLen, undo, oldLen + 1);
+            memcpy(undo, pDeletedText, addLen);
 	    M_deletionStart(pPriv) = cb->startPos;
         }
-        XtFree(oldUndo);
+        M_deletedText(pPriv) = undo;
     }
     else 
     {
@@ -314,9 +317,9 @@ SetUndoDeletionState(
          */
 	_DtEditorResetUndo( pPriv );
 
-        M_deletedText(pPriv) = XtMalloc(strlen(pDeletedText) + 1);
-    
-        strcpy(M_deletedText(pPriv), pDeletedText);
+        /* take over the fetched copy instead of copying it again */
+        M_deletedText(pPriv) = pDeletedText;
+        pDeletedText = NULL;
         M_deletionStart(pPriv) = cb->startPos;
 	M_insertStart(pPriv) = cb->startPos;
 	M_insertionLength(pPriv) = 0;
