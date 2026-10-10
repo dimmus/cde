@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 ABINCLUDES = ../include
 
 EXTRA_DEFINES =  -D_POSIX_SOURCE=1
@@ -25,8 +27,8 @@ dtcodegen_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES
 dtcodegen_LDADD = ../libABil/libABil.a  \
 		  ../libABobjXm/libABobjXm.a  \
                   ../libABobj/libABobj.a ../libAButil/libAButil.a \
-		  $(LIBTERM) $(LIBSVC) $(LIBTT) $(LIBHELP) $(LIBXIN) \
-		  $(LIBWIDGET) $(UTILLIB) $(XTOOLLIB)
+		  $(LIBTERM) $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(UTILLIB) \
+		  $(XMLIB) $(XTLIB) $(X11LIB)
 
 
 dtcodegen_SOURCES = abmf.c                  args.c \

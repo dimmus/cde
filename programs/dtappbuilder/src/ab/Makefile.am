@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # The generator rules below each write several files.  They are grouped
 # targets ("&:", GNU make 4.3 or later), so a parallel make runs each
 # recipe once.  Older GNU makes have no grouped targets and would run the
@@ -78,7 +80,7 @@ SOURCES.msg = \
 dtbuilder_LDADD = ../libABil/libABil.a  ../libABobjXm/libABobjXm.a  \
         ../libABobj/libABobj.a ../libAButil/libAButil.a \
         $(LIBWIDGET) $(LIBTERM) $(LIBHELP) $(LIBSVC) \
-        $(LIBTT) $(LIBXIN) -lUil $(MRESOURCELIB) $(XTOOLLIB) \
+        -lUil $(MRESOURCELIB) $(XMLIB) $(XTLIB) $(X11LIB) \
 	$(UTILLIB)
 
 dtbuilder_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) -DPIXMAP_WORKAROUND $(ABINCLUDES)

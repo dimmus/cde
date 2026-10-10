@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = dtsearchpath
 
 dtsearchpath_CPPFLAGS = $(CDE_CPPFLAGS) -I../libCliSrv $(DT_INCDIR)

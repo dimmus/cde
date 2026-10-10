@@ -1,3 +1,5 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -22,7 +24,8 @@ dtfile_CPPFLAGS = $(CDE_CPPFLAGS) -I./dtcopy -DSHAPE -D_ILS_MACROS -DSUN_PERF \
 
 dtfile_LDADD = dtcopy/sharedFuncs.o \
 	dtcopy/fsrtns.o \
-	$(DTCLIENTLIBS) $(TIRPCLIB) $(XTOOLLIB) 
+	$(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(LIBXIN) $(TIRPCLIB) \
+	$(XMLIB) $(XTLIB) $(XEXTLIB) $(X11LIB)
 
 if OPENBSD
 dtfile_CPPFLAGS += -DFILE_MAP_OPTIMIZE

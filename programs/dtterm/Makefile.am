@@ -1,12 +1,14 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
 
 bin_PROGRAMS = dtterm
 
-dtterm_LDADD = $(LIBTERM) $(DTCLIENTLIBS) $(XTOOLLIB) 
+dtterm_LDADD = $(LIBTERM) $(LIBSVC) $(LIBTT) $(XMLIB) $(XTLIB) $(X11LIB)
 
 if BSD
 dtterm_LDADD += -lutil

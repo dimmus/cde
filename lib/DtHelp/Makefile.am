@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 SUBDIRS = il
 
 cfgdir = $(CDE_INSTALLATION_TOP)/config/svc
@@ -13,7 +15,8 @@ libDtHelp_la_CFLAGS = $(CDE_CFLAGS) -I./il -I./jpeg -I../DtSvc/DtUtil2 -DDTLIB \
 		      -DCDE_CONFIGURATION_TOP='"$(CDE_CONFIGURATION_TOP)"' \
 		      @DT_INCDIR@ @DTI_INCDIR@
 
-libDtHelp_la_LIBADD = $(JPEGLIB) il/libil.la $(LTLIBICONV)
+libDtHelp_la_LIBADD = il/libil.la $(LIBSVC) $(XMLIB) $(XTLIB) $(XPMLIB) \
+		      $(X11LIB) $(JPEGLIB) $(LTLIBICONV) $(MATHLIB)
 
 if SOLARIS
 libDtHelp_la_LIBADD += -lw -lgen
@@ -42,7 +45,7 @@ libDtHelp_la_SOURCES = Actions.c       AsciiSpc.c      Callbacks.c \
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0
+libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 3:0:1
+libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif

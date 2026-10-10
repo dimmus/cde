@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 CLEANFILES = init.c DtFuncs.dtsh libshell.a libshell.a.tmp ksh93.stamp
 
 SUBDIRS = examples
@@ -37,16 +39,19 @@ dtksh_CPPFLAGS = $(CDE_CPPFLAGS) -I$(KSH93SRC)/include/ast -I$(KSH93SRC)/src/cmd
 		 '-DERROR_CONTEXT_T=Error_context_t' \
 		 -D_API_ast=20100309 -DBUILD_DTKSH
 
-dtksh_LDADD = $(DTCLIENTLIBS) $(KSH93PMAIN) $(XTOOLLIB) libshell.a \
-	      $(KSH93LIBS)
+dtksh_LDADD = $(KSH93PMAIN) libshell.a $(KSH93LIBS) \
+	      $(LIBPRINT) $(LIBHELP) $(LIBSVC) $(LIBTT) \
+	      $(XMLIB) $(XTLIB) $(X11LIB) $(MATHLIB)
 
 if SOLARIS
 dtksh_LDADD += -lsecdb -lsocket -lnsl
 endif
 
+dtksh_LDFLAGS = $(CDE_LDFLAGS)
+
 if AIX
 dtksh_CPPFLAGS += -D_IBMRPC_
-dtksh_LDFLAGS = $(CDE_LDFLAGS) -bE:dtksh.exp
+dtksh_LDFLAGS += -bE:dtksh.exp
 endif
 
 dtksh_SOURCES = init.c \

@@ -26,7 +26,7 @@ dthelp_htag1_SOURCES = parser.c actutil.c \
 
 APPLOBJECTS = ../helptag/libhelptag.a
 
-dthelp_htag1_LDADD = $(APPLOBJECTS) $(HELPUTILLIB) $(DTCLIENTLIBS) $(XTOOLLIB)
+dthelp_htag1_LDADD = $(APPLOBJECTS) $(HELPUTILLIB)
 
 CPRODS = case.c context.h delim.h
 CTRASH = error delim.dat

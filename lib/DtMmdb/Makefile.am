@@ -24,6 +24,9 @@ lib_LTLIBRARIES = libDtMmdb.la
 
 libDtMmdb_la_SOURCES =
 
+# fake things so libtool links this as a C++ library (libstdc++)
+nodist_EXTRA_libDtMmdb_la_SOURCES = dummy.cxx
+
 libDtMmdb_la_LIBADD = HardCopy/libHardCopy.la \
 		      StyleSheet/libStyleSheet.la \
 		      api/libapi.la \
@@ -42,6 +45,6 @@ libDtMmdb_la_LIBADD = HardCopy/libHardCopy.la \
 		      oliasdb/liboliasdb.la \
 		      schema/libschema.la \
 		      storage/libstorage.la \
-		      utility/libutility.la
+		      utility/libutility.la $(LMDBLIB)
 
-libDtMmdb_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0
+libDtMmdb_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0

@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 include ../dtdocbook.am
 
 infolibdir = $(dtdocbooklibexecdir)/infolib
@@ -28,7 +30,7 @@ AM_CXXFLAGS = $(CDE_CXXFLAGS) $(KEEP_ASSERTS) \
 	      -DEXPAND_TEMPLATES \
 	      -I$(top_builddir)/lib/DtMmdb
 
-AM_LDFLAGS = $(CDE_LDFLAGS) $(XTOOLLIB) $(LIBMMDB) $(DTCLIENTLIBS) $(LMDBLIB)
+LDADD = $(LIBMMDB)
 
 MixedGen_SOURCES = \
 		   MixedGen.C \

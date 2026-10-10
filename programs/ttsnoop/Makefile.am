@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 appdefaultsdir = $(CDE_INSTALLATION_TOP)/app-defaults/C
 
 dist_appdefaults_DATA = Ttsnoop
@@ -33,7 +35,8 @@ $(if $(filter grouped-target,$(.FEATURES)),,$(eval .NOTPARALLEL:))
 
 bin_PROGRAMS = ttsnoop
 
-ttsnoop_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB) $(LIBTERM)
+ttsnoop_LDADD = $(LIBTERM) $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) \
+	$(XMLIB) $(XTLIB) $(X11LIB)
 
 BUILT_SOURCES = ttsnoop_ui.h apiTracer_ui.h ttChooser_ui.h patternProps_ui.h \
 		stringChooser_ui.h messageProps_ui.h sessionChooser_ui.h \

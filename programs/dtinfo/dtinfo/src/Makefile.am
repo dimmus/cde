@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -73,7 +75,8 @@ bin_PROGRAMS = dtinfo
 
 dtinfo_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
 
-dtinfo_LDADD = $(OLIASNORMALLIBS) $(LIBSEARCH) $(MMDB_LIBS) $(WWL_LIBS) \
-	$(DTCLIENTLIBS) $(XTOOLLIB) $(LMDBLIB)
+dtinfo_LDADD = $(OLIASNORMALLIBS) $(WWL_LIBS) $(LIBMMDB) $(LIBSEARCH) \
+	$(LIBPRINT) $(LIBHELP) $(LIBSVC) $(LIBTT) \
+	$(XMULIB) $(XMLIB) $(XTLIB) $(X11LIB) $(MATHLIB)
 
 dtinfo_SOURCES = main.C Support/InputNotifier.C

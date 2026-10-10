@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -10,7 +12,7 @@ dtstyle_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION
 	-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" -I../dthelp	\
 	$(DT_INCDIR)
 
-dtstyle_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtstyle_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 dtstyle_SOURCES = Main.c MainWin.c Font.c Audio.c Startup.c Mouse.c	\
 		  SaveRestore.c Backdrop.c Screen.c Keyboard.c		\

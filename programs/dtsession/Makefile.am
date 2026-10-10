@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -7,12 +9,6 @@ MAINTAINERCLEANFILES = Makefile.in
 bin_PROGRAMS = dtsession
 
 bin_SCRIPTS = dtsession_res
-
-if HAS_PAM_LIBRARY
-DTPAMSVCLIB = $(LIBPAMSVC)
-else
-DTPAMSVCLIB =
-endif
 
 dtsession_CFLAGS = $(CDE_CFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
           -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
@@ -30,7 +26,8 @@ dtsession_SOURCES = SmMain.c SmHelp.c SmGlobals.c SmCommun.c		\
 	SmMigResources.h SmSave.h SmXrm.h
 
 
-dtsession_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB) $(DTPAMSVCLIB)
+dtsession_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(LIBXIN) \
+	$(XMLIB) $(SMLIB) $(ICELIB) $(XTLIB) $(X11LIB) $(CRYPTLIB)
 
 if SOLARIS
 dtsession_SOURCES += OWsync.c

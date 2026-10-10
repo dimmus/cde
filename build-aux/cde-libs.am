@@ -1,0 +1,25 @@
+# In-tree libraries, for the _LDADD and _LIBADD of the Makefile.am files
+# that include this one.
+#
+# They are defined here rather than substituted by configure: automake
+# leaves a substituted variable out of a program's dependencies (it could
+# hold -l flags), so a program linked with $(LIBSVC) from configure was
+# never relinked when libDtSvc changed.  Defined here, automake sees the
+# .la files and adds them to the program's _DEPENDENCIES.
+#
+# Each program names the libraries it uses itself, and each library names
+# the libraries it uses in its _LIBADD (the libraries link with
+# -Wl,-z,defs, see CDE_LIB_LDFLAGS in configure.ac), so that a program
+# does not load libraries it has no use for.
+
+LIBTT = $(top_builddir)/lib/tt/lib/libtt.la
+LIBXIN = $(top_builddir)/lib/DtXinerama/libDtXinerama.la
+LIBSVC = $(top_builddir)/lib/DtSvc/libDtSvc.la
+LIBSEARCH = $(top_builddir)/lib/DtSearch/libDtSearch.la
+LIBWIDGET = $(top_builddir)/lib/DtWidget/libDtWidget.la
+LIBHELP = $(top_builddir)/lib/DtHelp/libDtHelp.la
+LIBPRINT = $(top_builddir)/lib/DtPrint/libDtPrint.la
+LIBTERM = $(top_builddir)/lib/DtTerm/libDtTerm.la
+LIBMRM = $(top_builddir)/lib/DtMrm/libDtMrm.la
+LIBCSA = $(top_builddir)/lib/csa/libcsa.la
+LIBMMDB = $(top_builddir)/lib/DtMmdb/libDtMmdb.la

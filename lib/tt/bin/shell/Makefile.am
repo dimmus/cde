@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 TT_VERSION = "CDE Version @CDE_VERSION_MAJOR@.@CDE_VERSION_MINOR@.@CDE_VERSION_MICRO@@CDE_VERSION_DEV@"
 TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
@@ -7,7 +9,7 @@ bin_PROGRAMS = ttmv ttrm ttcp ttrmdir
 
 AM_CXXFLAGS = $(CDE_CXXFLAGS) -I../../lib $(TT_VERSION_DEFINE)
 
-LDADD = $(LIBTT) $(TIRPCLIB) $(XTOOLLIB)
+LDADD = $(LIBTT) $(TIRPCLIB)
 
 if SOLARIS
 LDADD += -lintl -lsocket -lnsl

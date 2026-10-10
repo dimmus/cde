@@ -1,5 +1,7 @@
 bin_PROGRAMS = dtudcexch
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 FONTEDT_PATH1 = ../dtudcfonted
 
 dtudcexch_CFLAGS = $(CDE_CFLAGS) -I$(FONTEDT_PATH1) -I$(FONTEDT_PATH1)/include \

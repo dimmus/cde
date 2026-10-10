@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -16,8 +18,9 @@ AM_CPPFLAGS = $(CDE_CPPFLAGS) -DLARGECURSORS -DR2_COMPAT -DOPAQUE -DSHAPE -DUNMA
 	      -DBATCH_DRAG_REQUESTS -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 	      -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"
 
-dtwm_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
-dtfplist_LDADD = $(DTCLIENTLIBS) $(TIRPCLIB) $(XTOOLLIB)
+dtwm_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(LIBXIN) \
+	$(XMLIB) $(XTLIB) $(XRENDERLIB) $(XEXTLIB) $(X11LIB) $(MATHLIB)
+dtfplist_LDADD = $(LIBWIDGET) $(LIBSVC) $(TIRPCLIB) $(XMLIB) $(XTLIB) $(X11LIB)
 
 if SOLARIS
 dtwm_LDADD += -lintl -lresolv

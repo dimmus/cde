@@ -1,12 +1,14 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 lib_LTLIBRARIES = libDtSvc.la
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0
+libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 3:0:1
+libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
 
@@ -47,6 +49,8 @@ if SOLARIS
 libDtSvc_la_CPPFLAGS += -DOSMAJORVERSION=5 -DOSMINORVERSION=10
 endif
 
+
+libDtSvc_la_LIBADD = $(LIBTT) $(LIBXIN) $(XMLIB) $(XTLIB) $(X11LIB)
 
 libDtSvc_la_SOURCES = 	DtCodelibs/buf.C \
 	DtCodelibs/buf.h \
@@ -175,5 +179,5 @@ libDtSvc_la_SOURCES = 	DtCodelibs/buf.C \
 
 if HAS_PAM_LIBRARY
 libDtSvc_la_SOURCES += DtUtil2/SvcPam.c
-libDtSvc_la_LIBADD = $(PAMLIB)
+libDtSvc_la_LIBADD += $(PAMLIB)
 endif

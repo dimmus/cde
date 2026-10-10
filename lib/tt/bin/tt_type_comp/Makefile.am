@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 TT_VERSION = "CDE Version @CDE_VERSION_MAJOR@.@CDE_VERSION_MINOR@.@CDE_VERSION_MICRO@@CDE_VERSION_DEV@"
 TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
@@ -18,10 +20,10 @@ tt_type_comp_CXXFLAGS = $(CDE_CXXFLAGS) -I../../lib -I../../slib \
 tt_type_comp_SOURCES = mp_type_comp.C        mp_types_table.C \
 		frozen.mp_types_lex.C frozen.mp_types_gram.C
 
-tt_type_comp_LDADD = ../../slib/libstt.a $(LIBTT) $(TIRPCLIB) $(XTOOLLIB)
+tt_type_comp_LDADD = ../../slib/libstt.a $(LIBTT) $(TIRPCLIB)
 
 if SOLARIS
-tt_type_comp_LDADD += $(XTOOLLIB) -lintl -lsocket -lnsl
+tt_type_comp_LDADD += -lintl -lsocket -lnsl
 endif
 
 frozen.mp_types_lex.o: frozen.mp_types_gram.h

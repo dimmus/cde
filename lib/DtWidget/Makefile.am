@@ -1,3 +1,5 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -17,14 +19,16 @@ libDtWidget_la_CFLAGS = $(CDE_CFLAGS) -DI18N_MSG -DMULTIBYTE
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0
+libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 3:0:1
+libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+libDtWidget_la_LIBADD = $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 if SOLARIS
 libDtWidget_la_CFLAGS += -DNO_REGCOMP
-libDtWidget_la_LIBADD = -lw -lintl
+libDtWidget_la_LIBADD += -lw -lintl
 endif
 
 

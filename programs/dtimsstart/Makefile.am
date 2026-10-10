@@ -1,3 +1,5 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -12,7 +14,7 @@ dist_xsession_SCRIPTS = 0020.dtims
 
 dtimsstart_CFLAGS = $(CDE_CFLAGS) -DNLS
 
-dtimsstart_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtimsstart_LDADD = $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 dtimsstart_SOURCES = action.c env.c file.c main.c remote.c select.c	\
 		     start.c util.c win.c ximserr.h ximsfunc.h xims.h	\

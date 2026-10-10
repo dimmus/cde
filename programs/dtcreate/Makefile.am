@@ -1,8 +1,10 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = dtcreate
 
-dtcreate_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtcreate_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(XMLIB) $(XTLIB) $(X11LIB)
 
 dtcreate_SOURCES = main.c AddFiletype.c Confirmed.c			\
         CreateActionAppShell.c FileCharacteristics.c OpenFile.c		\

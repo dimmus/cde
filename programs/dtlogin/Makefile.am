@@ -1,3 +1,5 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -52,12 +54,13 @@ dtgreet_SOURCES = vgcallback.c vglogo.c vgmain.c vgutil.c vglang.c
 dtchooser_SOURCES = chooser.c dtchooser.c vglogo.c vgutil.c vgcallback.c \
 		    vglang.c
 
-dtlogin_LDADD = libresource.a $(DTCLIENTLIBS) $(XDMCPLIB) \
-	$(XTOOLLIB) $(TIRPCLIB)
+dtlogin_LDADD = libresource.a $(LIBSVC) $(XDMCPLIB) $(XMULIB) $(XAULIB) \
+	$(X11LIB) $(TIRPCLIB) $(CRYPTLIB)
 
-dtgreet_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtgreet_LDADD = $(LIBWIDGET) $(LIBSVC) $(LIBXIN) $(XMLIB) $(XTLIB) $(X11LIB)
 
-dtchooser_LDADD = $(DTCLIENTLIBS) $(XDMCPLIB) $(XTOOLLIB)
+dtchooser_LDADD = $(LIBWIDGET) $(LIBSVC) $(LIBXIN) $(XDMCPLIB) \
+	$(XMLIB) $(XTLIB) $(X11LIB)
 
 
 if LINUX

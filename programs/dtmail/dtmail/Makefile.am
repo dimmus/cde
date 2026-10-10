@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = dtmail
 
 # FORTIFY_SOURCE_2: RoamApp.C formatPropPair() sizes its sprintf buffer
@@ -10,7 +12,8 @@ dtmail_CXXFLAGS = $(CDE_CXXFLAGS) $(FORTIFY_SOURCE_2) -I../include -I../include/
 		  -DDTMAIL_TOOLTALK -DDTEDITOR
 
 dtmail_LDADD = ../libDtMail/libDtMail.a ../MotifApp/libMotifApp.a \
-		$(DTCLIENTLIBS) $(XTOOLLIB) $(TIRPCLIB)
+		$(LIBPRINT) $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) \
+		$(XMLIB) $(XTLIB) $(X11LIB) $(TIRPCLIB)
 
 dtmail_SOURCES = AliasListUiItem.C               AlternatesListUiItem.C \
 		 AntiCheckBoxUiItem.C            AttachArea.C \

@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 noinst_LIBRARIES = libcgm.a
 
 # get our env
@@ -17,6 +19,6 @@ noinst_PROGRAMS = testcgm
 testcgm_CPPFLAGS = $(CDE_CPPFLAGS) $(DTINFO_DEFINES) $(DTINFO_INCLUDES)	\
 	-I$(top_srcdir)/include/DtI
 testcgm_SOURCES = testcgm.c
-testcgm_LDADD = libcgm.a $(DTCLIENTLIBS) $(XTOOLLIB)
+testcgm_LDADD = libcgm.a $(LIBHELP) $(X11LIB) $(MATHLIB)
 
 

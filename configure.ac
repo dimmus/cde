@@ -35,7 +35,9 @@ dnl These must be up here for the compiler search list to actually work
 AC_PROG_CC([cc gcc clang])
 AC_PROG_CXX([c++ g++ clang++])
 
-LT_INIT
+dnl Shared libraries only: nothing links the static archives, and
+dnl building both compiles every libtool object twice.
+LT_INIT([disable-static])
 AC_PREFIX_DEFAULT(/usr/dt)
 
 PKG_PROG_PKG_CONFIG
@@ -190,23 +192,9 @@ AM_CONDITIONAL([PPC], [test "$is_ppc" = yes])
 AM_CONDITIONAL([RISCV], [test "$is_riscv" = yes])
 AM_CONDITIONAL([AARCH64], [test "$is_aarch64" = yes])
 
-dnl our main libraries
-dnl we use single quotes so that $top_buildir is evaluated in the makefiles,
-dnl not here.
-AC_SUBST(LIBTT, '$(top_builddir)/lib/tt/lib/libtt.la')
-AC_SUBST(LIBXIN, '$(top_builddir)/lib/DtXinerama/libDtXinerama.la')
-AC_SUBST(LIBWIDGET, '$(top_builddir)/lib/DtWidget/libDtWidget.la')
-AC_SUBST(LIBTERM, '$(top_builddir)/lib/DtTerm/libDtTerm.la')
-AC_SUBST(LIBSVC, '$(top_builddir)/lib/DtSvc/libDtSvc.la')
-AC_SUBST(LIBSEARCH, '$(top_builddir)/lib/DtSearch/libDtSearch.la')
-AC_SUBST(LIBPRINT, '$(top_builddir)/lib/DtPrint/libDtPrint.la')
-AC_SUBST(LIBMRM, '$(top_builddir)/lib/DtMrm/libDtMrm.la')
-AC_SUBST(LIBMMDB, '$(top_builddir)/lib/DtMmdb/libDtMmdb.la')
-AC_SUBST(LIBHELP, '$(top_builddir)/lib/DtHelp/libDtHelp.la')
-AC_SUBST(LIBCSA, '$(top_builddir)/lib/csa/libcsa.la')
-
-AC_SUBST(DTCLIENTLIBS, '$(LIBPRINT) $(LIBHELP) $(LIBWIDGET) $(LIBSVC) \
-$(LIBTT) $(LIBXIN)')
+dnl The in-tree libraries ($(LIBSVC), $(LIBTT), ...) are defined in
+dnl build-aux/cde-libs.am, which the Makefile.am files that link them
+dnl include, so that automake makes the programs depend on them.
 
 dnl set up come convenience replacements for global include dirs
 AC_SUBST(DT_INCDIR, '-I$(top_builddir)/include/Dt')
@@ -455,6 +443,21 @@ AC_SUBST(FORTIFY_SOURCE_2)
 dnl for code built by its own build system (ksh93)
 AC_SUBST(HARDEN_CFLAGS)
 
+dnl Linking.  Programs and libraries drop the libraries they do not use
+dnl (--as-needed; older libtool releases move it after the libraries on a
+dnl shared library's link line, where it does nothing, so each library's
+dnl _LIBADD still names exactly what it uses).  The libraries must record
+dnl every library they use (-no-undefined -Wl,-z,defs, CDE_LIB_LDFLAGS),
+dnl or --as-needed on a program could drop a library that only a CDE
+dnl library needs.
+LINK_LDFLAGS=""
+CDE_CHECK_LDFLAG([-Wl,-O1], [LINK_LDFLAGS])
+CDE_CHECK_LDFLAG([-Wl,--as-needed], [LINK_LDFLAGS])
+CDE_CHECK_LDFLAG([-Wl,--sort-common], [LINK_LDFLAGS])
+CDE_LIB_LDFLAGS="-no-undefined"
+CDE_CHECK_LDFLAG([-Wl,-z,defs], [CDE_LIB_LDFLAGS])
+AC_SUBST(CDE_LIB_LDFLAGS)
+
 dnl assert() checks (--enable-debug).  A release build defines NDEBUG.
 dnl Code that is not ready for that yet (asserts guarding the only use of
 dnl a variable, assert(0) in place of a return, its own NDEBUG-keyed
@@ -560,13 +563,20 @@ if test "x$enable_xrender" != xno; then
 fi
 
 dnl libraries
-AC_CHECK_LIB(m, cosf)
+dnl libm and libcrypt go only to the targets that use them ($(MATHLIB),
+dnl $(CRYPTLIB)), not into LIBS, which every library and program links.
+MATHLIB=""
+AC_CHECK_LIB(m, cosf, [MATHLIB="-lm"])
+AC_SUBST(MATHLIB)
 AC_SEARCH_LIBS(dlopen, [dl dld], [], [])
 
-AC_CHECK_LIB(crypt, crypt)
+CRYPTLIB=""
+AC_CHECK_LIB(crypt, crypt, [CRYPTLIB="-lcrypt"])
+AC_SUBST(CRYPTLIB)
 dnl this should be configurable, for now it is required
 AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
-                [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XINERAMA"],
+                [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XINERAMA";
+                 XINERAMALIB="-lXinerama"],
                 [AC_MSG_ERROR([libXinerama not found])], $X_LIBS)
 
 dnl Sun RPC: libtirpc where the C library has none (glibc 2.32 and
@@ -618,38 +628,52 @@ AC_CHECK_LIB(lmdb, mdb_version, [LMDBLIB="-llmdb"],
 AC_SUBST(LMDBLIB)
 
 dnl Setup XTOOLLIB - we do it in this specific order to avoid ordering
-dnl issues
+dnl issues.  XTOOLLIB is every X library.  The CDE libraries and programs
+dnl name the ones they use with the single-library variables (X11LIB,
+dnl XTLIB, XMLIB, ...).
 XTOOLLIB=""
-AC_CHECK_LIB(X11, XOpenDisplay, [XTOOLLIB="-lX11"], ,
+AC_CHECK_LIB(X11, XOpenDisplay, [XTOOLLIB="-lX11"; X11LIB="-lX11"], ,
                   [${EXTRA_LIBS}])
-AC_CHECK_LIB(Xext, XextFindDisplay, [XTOOLLIB="-lXext ${XTOOLLIB}"], ,
+AC_CHECK_LIB(Xext, XextFindDisplay, [XTOOLLIB="-lXext ${XTOOLLIB}"; XEXTLIB="-lXext"], ,
                   [${EXTRA_LIBS}])
 if test "x$enable_xrender" != "xno" ; then
    AC_CHECK_LIB(Xrender, XRenderComposite,
-                         [XTOOLLIB="-lXrender ${XTOOLLIB}";
+                         [XTOOLLIB="-lXrender ${XTOOLLIB}"; XRENDERLIB="-lXrender";
                           SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XRENDER"],
                          [if test "x$enable_xrender" = xyes; then
                              AC_MSG_ERROR([--enable-xrender was given but libXrender was not found])
                           fi],
                          [${EXTRA_LIBS}])
 fi
-AC_CHECK_LIB(Xau, XauReadAuth, [XTOOLLIB="-lXau ${XTOOLLIB}"], ,
+AC_CHECK_LIB(Xau, XauReadAuth, [XTOOLLIB="-lXau ${XTOOLLIB}"; XAULIB="-lXau"], ,
                   [${EXTRA_LIBS}])
-AC_CHECK_LIB(Xpm, XpmLibraryVersion, [XTOOLLIB="-lXpm ${XTOOLLIB}"], ,
+AC_CHECK_LIB(Xpm, XpmLibraryVersion, [XTOOLLIB="-lXpm ${XTOOLLIB}"; XPMLIB="-lXpm"], ,
                   [${EXTRA_LIBS}])
-AC_CHECK_LIB(Xt, XtInitialize, [XTOOLLIB="-lXt ${XTOOLLIB}"], ,
+AC_CHECK_LIB(Xt, XtInitialize, [XTOOLLIB="-lXt ${XTOOLLIB}"; XTLIB="-lXt"], ,
                  [${EXTRA_LIBS}])
-AC_CHECK_LIB(Xmu, XmuMakeAtom, [XTOOLLIB="-lXmu ${XTOOLLIB}"], ,
+AC_CHECK_LIB(Xmu, XmuMakeAtom, [XTOOLLIB="-lXmu ${XTOOLLIB}"; XMULIB="-lXmu"], ,
                  [${EXTRA_LIBS}])
-AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"], ,
+AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"; ICELIB="-lICE"], ,
                   [${EXTRA_LIBS}])
-AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"], ,
+AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"; SMLIB="-lSM"], ,
                  [${EXTRA_LIBS}])
-AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"],
+AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"; XMLIB="-lXm"],
                  [AC_MSG_ERROR([libXm (Motif) not found, please install it])],
                  [${EXTRA_LIBS}])
 XTOOLLIB="${EXTRA_LIBS} ${X_EXTRA_LIBS} ${XTOOLLIB}"
 AC_SUBST([XTOOLLIB])
+X11LIB="${X_EXTRA_LIBS} ${X11LIB}"
+AC_SUBST([X11LIB])
+AC_SUBST([XEXTLIB])
+AC_SUBST([XRENDERLIB])
+AC_SUBST([XAULIB])
+AC_SUBST([XPMLIB])
+AC_SUBST([XTLIB])
+AC_SUBST([XMULIB])
+AC_SUBST([ICELIB])
+AC_SUBST([SMLIB])
+AC_SUBST([XMLIB])
+AC_SUBST([XINERAMALIB])
 
 dnl Motif headers, the resource manager (libDtMrm) and the UIL compiler
 dnl library (dtbuilder)
@@ -747,7 +771,7 @@ dnl with the matching $(CDE_...) variable.
 CDE_CPPFLAGS="${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
 CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS}"
 CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS}"
-CDE_LDFLAGS="${HARDEN_LDFLAGS}"
+CDE_LDFLAGS="${HARDEN_LDFLAGS} ${LINK_LDFLAGS}"
 dnl squeeze the whitespace
 CDE_CPPFLAGS=`echo ${CDE_CPPFLAGS}`
 CDE_CFLAGS=`echo ${CDE_CFLAGS}`

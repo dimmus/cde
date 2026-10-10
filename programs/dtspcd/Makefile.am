@@ -1,3 +1,5 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
 # Delete a generated file whose recipe failed instead of keeping it
 # half-written.
 .DELETE_ON_ERROR:
@@ -10,7 +12,7 @@ dtspcd_CFLAGS = $(CDE_CFLAGS) -DCDE_CONFIGURATION_TOP=\"${prefix}\" \
 		-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 		$(DT_INCDIR)
 
-dtspcd_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtspcd_LDADD = $(LIBSVC) $(LIBTT)
 
 if SOLARIS
 dtspcd_LDADD += -lgen
