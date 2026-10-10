@@ -5149,9 +5149,17 @@ ProcessWorkspaceResources (WmWorkspaceData *pWS)
 
     /* This call will create the backdrop windows of the correct size */
     ProcessBackdropResources (pWS, 0);
-    /* 1 = CHANGE_BACKDROP HACK this call will handle changing from the
-     * default tiled, to centered, fill or fit */
-    ProcessBackdropResources (pWS, 1);
+    /*
+     * 1 = CHANGE_BACKDROP HACK this call will handle changing from the
+     * default tiled, to centered, fill or fit.  A tiled backdrop is
+     * done: the second pass would only copy the image into a private
+     * duplicate (and give up the Xm pixmap cache's copy, which other
+     * workspaces with the same image and colors share).
+     */
+    if (pWS->backdrop.imageType != DtWSM_BACKDROP_IMAGETYPE_TILED)
+    {
+	ProcessBackdropResources (pWS, 1);
+    }
 
 } /* END OF FUNCTION ProcessWorkspaceResources */
 

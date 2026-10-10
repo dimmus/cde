@@ -2011,3 +2011,54 @@ done:
     if (oldStates) XFree (oldStates);
     if (newStates) free (newStates);
 }
+
+/**
+ * @brief Removes states from the _NET_WM_STATE property and adds others,
+ *        with one read and one write: the same result as
+ *        UpdateNetWmState (remove, _NET_WM_STATE_REMOVE) followed by
+ *        UpdateNetWmState (add, _NET_WM_STATE_ADD).
+ *
+ * @param window
+ * @param remove
+ * @param nremove
+ * @param add
+ * @param nadd
+ */
+void ReplaceNetWmStates (Window window, Atom *remove, unsigned long nremove,
+			 Atom *add, unsigned long nadd)
+{
+    unsigned long i, j, k;
+    int actualFormat;
+    unsigned long nold, leftover;
+    Atom actualType;
+    unsigned long nnew = 0;
+    Atom type = wmGD.xa__NET_WM_STATE;
+    Atom *oldStates = NULL;
+    Atom *newStates = NULL;
+
+    if (!(XGetWindowProperty (DISPLAY, window, type, 0L, 1000000L, False,
+			      XA_ATOM, &actualType, &actualFormat, &nold,
+			      &leftover, (unsigned char **) &oldStates)
+	== Success && actualType == XA_ATOM)) nold = 0;
+
+    newStates = malloc ((1 + nadd + nold) * sizeof (Atom));
+
+    if (!newStates) goto done;
+
+    for (i = 0; i < nold; ++i)
+    {
+	Atom oldState = oldStates[i];
+	for (j = 0; j < nremove; ++j) if (oldState == remove[j]) break;
+	for (k = 0; k < nadd; ++k) if (oldState == add[k]) break;
+	if (j >= nremove && k >= nadd) newStates[nnew++] = oldState;
+    }
+
+    for (k = 0; k < nadd; ++k) newStates[nnew++] = add[k];
+
+    XChangeProperty (DISPLAY, window, type, XA_ATOM, 32, PropModeReplace,
+		     (unsigned char *) newStates, nnew);
+
+done:
+    if (oldStates) XFree (oldStates);
+    if (newStates) free (newStates);
+}

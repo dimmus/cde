@@ -644,26 +644,26 @@ void ConfigureNewState (ClientData *pcd)
 	}
     }
 
-    UpdateNetWmState (pcd->client, hints, sizeof(hints) / sizeof(hints[0]),
-		      _NET_WM_STATE_REMOVE);
-
-    if (pcd->maxConfig)
     {
-	unsigned long offset, nhints;
+	unsigned long offset = 0, nhints = 0;
 
-	if (pcd->fullscreen)
+	if (pcd->maxConfig)
 	{
-	    offset = 0;
-	    nhints = 1;
-	}
-	else
-	{
-	    offset = 1;
-	    nhints = 2;
+	    if (pcd->fullscreen)
+	    {
+		offset = 0;
+		nhints = 1;
+	    }
+	    else
+	    {
+		offset = 1;
+		nhints = 2;
+	    }
 	}
 
-	UpdateNetWmState (pcd->client, &hints[offset], nhints,
-			  _NET_WM_STATE_ADD);
+	ReplaceNetWmStates (pcd->client,
+			    hints, sizeof(hints) / sizeof(hints[0]),
+			    &hints[offset], nhints);
     }
 
     SendConfigureNotify (pcd);
