@@ -42,6 +42,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>	/* for *MAX* macros */
@@ -448,45 +449,94 @@ _DtGetLocalHostName( void )
  ******************************************************************************/
 
 
+/*
+ * gethostbyname results, remembered for a minute: _DtIsSameHost is
+ * called for every file argument of every action, and two lookups per
+ * call (each possibly a DNS query) is what it used to cost when the
+ * names differ.  Failed lookups are remembered too.
+ */
+#define HOST_MEMO_SIZE	8
+#define HOST_MEMO_TTL	60	/* seconds */
+
+static struct {
+	char	*name;		/* as looked up */
+	char	*canon;		/* h_name, or NULL if the lookup failed */
+	time_t	when;
+} hostMemo[HOST_MEMO_SIZE];
+
+/* Returns an XtMalloc'ed copy of name's canonical name, or NULL. */
+static char *
+CanonicalHostName(const char *name)
+{
+	struct hostent		*host_ret;
+	_Xgethostbynameparams	host_buf;
+	time_t	now = time(NULL);
+	char	*canon;
+	int	i, slot = 0;
+	(void) host_buf; /* unused unless XTHREADS */
+
+	_DtSvcProcessLock();
+	for (i = 0; i < HOST_MEMO_SIZE; i++)
+	{
+		if (hostMemo[i].name && !strcmp(hostMemo[i].name, name))
+		{
+			if (now >= hostMemo[i].when &&
+			    now - hostMemo[i].when < HOST_MEMO_TTL)
+			{
+				canon = hostMemo[i].canon ?
+					XtNewString(hostMemo[i].canon) : NULL;
+				_DtSvcProcessUnlock();
+				return canon;
+			}
+			slot = i;	/* expired: refresh this entry */
+			break;
+		}
+		if (!hostMemo[i].name)
+		{
+			slot = i;
+			break;
+		}
+		if (hostMemo[i].when < hostMemo[slot].when)
+			slot = i;	/* least recently looked up */
+	}
+
+	host_ret = _XGethostbyname(name, host_buf);
+
+	XtFree(hostMemo[slot].name);
+	XtFree(hostMemo[slot].canon);
+	hostMemo[slot].name = XtNewString(name);
+	hostMemo[slot].canon = host_ret && host_ret->h_name ?
+				XtNewString(host_ret->h_name) : NULL;
+	hostMemo[slot].when = now;
+	canon = hostMemo[slot].canon ? XtNewString(hostMemo[slot].canon) : NULL;
+	_DtSvcProcessUnlock();
+	return canon;
+}
+
 int
 _DtIsSameHost(const char *host1, const char *host2)
 {
-	char hostName1[MAXHOSTNAMELEN + 1];
-	char hostName2[MAXHOSTNAMELEN + 1];
-	struct hostent		*host_ret;
-	_Xgethostbynameparams	host_buf;
+	char *hostName1, *hostName2, *canon1 = NULL, *canon2 = NULL;
 	char *tp;
-	(void) host_buf; /* unused unless XTHREADS */
+	int same = False;
 
 	/*
-	 * If either parameter is null; use the local host name in its stead
+	 * If either parameter is null; use the local host name in its stead.
+	 * (The names used to be copied into MAXHOSTNAMELEN + 1 byte arrays,
+	 * which a long host name in a file argument, or a long canonical
+	 * name, overflowed.)
 	 */
-	if ( !host1 )
+	hostName1 = host1 ? XtNewString(host1) : _DtGetLocalHostName();
+	hostName2 = host2 ? XtNewString(host2) : _DtGetLocalHostName();
+	if ( !hostName1 || !hostName2 )
 	{
-		tp = _DtGetLocalHostName();
-		strcpy(hostName1,tp);
-		XtFree(tp);
-	}
-	else
-	{
-		strcpy(hostName1,host1);
-	}
-
-	if ( !host2)
-	{
-		tp = _DtGetLocalHostName();
-		strcpy(hostName2,tp);
-		XtFree(tp);
-	}
-	else
-	{
-		strcpy(hostName2,host2);
+		/* gethostname failed */
+		same = (!host1 && !host2);
+		goto done;
 	}
 
 	/*
-	 * We now have local copies of the hostnames in the
-	 * arrays hostName1 and hostName2.  Truncate the names
-	 * to their short form before doing the compare.
+	 * Truncate the names to their short form before doing the compare.
 	 */
 	if ( (tp = DtStrchr(hostName1,'.')) != NULL )
 		*tp = '\0';
@@ -497,38 +547,41 @@ _DtIsSameHost(const char *host1, const char *host2)
 	 * Try to avoid querying the name server (or /etc/hosts).
 	 * Do the name strings match?
 	 */
-
 	if ( !strcmp(hostName1,hostName2) )
-		return True;
+	{
+		same = True;
+		goto done;
+	}
 
-	if ( (host_ret = _XGethostbyname(hostName1, host_buf)) == NULL )
-		return False;	/* treat them as different on failure */
+	if ( (canon1 = CanonicalHostName(hostName1)) == NULL )
+		goto done;	/* treat them as different on failure */
 
 	/*
-	 * Save the data from gethostbyname() in "hostName1" so we can
-	 * call gethostbyname() again without losing it.
+	 * Try comparing the short canonical name again -- avoiding another
+	 * lookup if successful.
 	 */
-	strcpy(hostName1, host_ret->h_name);
-	if ( (tp = DtStrchr(hostName1,'.')) != NULL )
+	if ( (tp = DtStrchr(canon1,'.')) != NULL )
 		*tp = '\0';
-
-	/*
-	 * Try comparing again -- avoiding another gethostbyname
-	 * if successful.
-	 */
-	if ( !strcmp( hostName1,hostName2) )
-		return True;
+	if ( !strcmp(canon1,hostName2) )
+	{
+		same = True;
+		goto done;
+	}
 
 	/* restore the dot if necessary */
-	if ( tp) *tp = '.';
+	if ( tp ) *tp = '.';
 
-	if ( (host_ret = _XGethostbyname(hostName2, host_buf)) == NULL )
-		return False;	/* treat them as different on failure */
+	if ( (canon2 = CanonicalHostName(hostName2)) == NULL )
+		goto done;	/* treat them as different on failure */
 
-	if ( !strcmp(hostName1, host_ret->h_name) )
-		return	True;	
+	same = !strcmp(canon1, canon2);
 
-	return False;	/* The names are different */
+done:
+	XtFree(hostName1);
+	XtFree(hostName2);
+	XtFree(canon1);
+	XtFree(canon2);
+	return same;
 }
 
 

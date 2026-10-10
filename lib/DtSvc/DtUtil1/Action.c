@@ -298,10 +298,20 @@ static parsedMsg * CloneParsedMessageArray(
 static void FreeParsedMessageArray(
                         parsedMsg * parsedMessageArray,
                         int count ) ;
+/*
+ * A message being compiled.  The length is tracked so that appending is
+ * not a strlen plus a strcat of everything so far (quadratic in the
+ * number of arguments).
+ */
+typedef struct {
+   char *buf;		/* NUL-terminated, or NULL before the first append */
+   int   size;		/* allocated bytes */
+   int   len;		/* strlen(buf) */
+} MsgBuffer;
+
 static Boolean InsertArgumentString(
                         Widget w,
-                        char **bufPtr,
-                        int * bufSizePtr,
+                        MsgBuffer *msg,
                         ActionRequest *request,
                         ObjectData *object,
                         unsigned long mask,
@@ -310,14 +320,13 @@ static Boolean InsertArgumentString(
                         Boolean addLeadingSpace,
                         unsigned long processingMask ) ;
 static void InsertUnmappedArgumentString(
-                        char **bufPtr,
-                        int * bufSizePtr,
+                        MsgBuffer *msg,
                         ObjectData *object,
                         Boolean addLeadingSpace ) ;
-static char * GrowMsgBuffer( 
-                        char * buffer,
-                        int *size,
-                        int count) ;
+static void MsgAppend(
+                        MsgBuffer *msg,
+                        const char *str,
+                        Boolean addLeadingSpace) ;
 static void CmdInvSuccessfulRequest( 
                         char *message,
                         void *data2) ;
@@ -3121,8 +3130,7 @@ _DtCompileMessagePiece(
    int i, j;
    Boolean firstParmUsed;
    MsgComponent * segment;
-   char * compiledMsg = NULL;
-   int    compiledMsgSize = 0;
+   MsgBuffer compiledMsg = { NULL, 0, 0 };
    ObjectData tmpObjData;
    static char *sessionHostName= NULL;
    static char *displayHostName = NULL;
@@ -3177,9 +3185,7 @@ _DtCompileMessagePiece(
       /* Add any text preceding the keyword */
       if (segment->precedingText)
       {
-         compiledMsg = GrowMsgBuffer(compiledMsg, &compiledMsgSize, 
-                                 (int)strlen(segment->precedingText));
-         (void)strcat(compiledMsg, segment->precedingText);
+         MsgAppend(&compiledMsg, segment->precedingText, False);
       }
 
       /* Process the keyword */
@@ -3188,9 +3194,7 @@ _DtCompileMessagePiece(
          case LOCAL_HOST:
          {
             /* Add in the local host name */
-            compiledMsg = GrowMsgBuffer(compiledMsg, &compiledMsgSize, 
-                                      (int)strlen(localHostName));
-            (void)strcat(compiledMsg, localHostName);
+            MsgAppend(&compiledMsg, localHostName, False);
             break;
          }
 
@@ -3207,9 +3211,7 @@ _DtCompileMessagePiece(
             host = _DtHostString(fullPath);
 	    if (host)
 	    {
-	      compiledMsg = GrowMsgBuffer(compiledMsg, &compiledMsgSize,
-					  host ? (int)strlen(host) : 0);
-	      (void)strcat(compiledMsg, host);
+	      MsgAppend(&compiledMsg, host, False);
 	      XtFree(host);
 	    }
             XtFree(fullPath);
@@ -3221,9 +3223,7 @@ _DtCompileMessagePiece(
 	    /*
 	     * Use the displayHostName determined the first time thru
 	     */
-	    compiledMsg = GrowMsgBuffer(compiledMsg, &compiledMsgSize, 
-				  (int)strlen(displayHostName));
-	    (void)strcat(compiledMsg, displayHostName);
+	    MsgAppend(&compiledMsg, displayHostName, False);
 	    break;
          }
 
@@ -3234,9 +3234,7 @@ _DtCompileMessagePiece(
 	     * display management.  (i.e. the host where the login client
 	     * is running.) 
              */
-	    compiledMsg = GrowMsgBuffer(compiledMsg, &compiledMsgSize, 
-				  (int)strlen(sessionHostName));
-	    (void)strcat(compiledMsg, sessionHostName);
+	    MsgAppend(&compiledMsg, sessionHostName, False);
 	    break;
 
 	 }
@@ -3258,15 +3256,15 @@ _DtCompileMessagePiece(
                              NULL, request->promptInputs[*promptDataIndex],
                              NULL, False))
                {
-		  XtFree(compiledMsg);
+		  XtFree(compiledMsg.buf);
                   return(False);
                }
 
-               if (!InsertArgumentString(w, &compiledMsg, &compiledMsgSize, 
+               if (!InsertArgumentString(w, &compiledMsg, 
                           request, &tmpObjData, segment->mask, relPathHost, 
                           relPathDir, False, 0))
                {
-		  XtFree(compiledMsg);
+		  XtFree(compiledMsg.buf);
                   return(False);
                }
 
@@ -3290,12 +3288,11 @@ _DtCompileMessagePiece(
                          request->objects[j].u.file.origFilename)
                      {
                         if (!InsertArgumentString(w, &compiledMsg, 
-                                      &compiledMsgSize, 
                                       request, request->objects+j,
                                       segment->mask, relPathHost, relPathDir,
                                       firstParmUsed, processingMask))
                         {
-			   XtFree(compiledMsg);
+			   XtFree(compiledMsg.buf);
                            return(False);
                         }
                         firstParmUsed = True;
@@ -3333,12 +3330,12 @@ _DtCompileMessagePiece(
                     * single argument reference with no additional text).  In such
                     * cases the compiled message string will be ignored.
                     */
-                   if (!InsertArgumentString(w, &compiledMsg, &compiledMsgSize, 
+                   if (!InsertArgumentString(w, &compiledMsg, 
                              request, request->objects + segment->argNum - 1, 
                              segment->mask, relPathHost, relPathDir, False,
                              processingMask))
                   {
-		     XtFree(compiledMsg);
+		     XtFree(compiledMsg.buf);
                      return(False);
                   }
                }
@@ -3360,10 +3357,10 @@ _DtCompileMessagePiece(
       }
    }
 
-   if ((piece->compiledMessage = compiledMsg) == NULL)
+   if ((piece->compiledMessage = compiledMsg.buf) == NULL)
 	piece->msgLen = 0;
    else
-       piece->msgLen = compiledMsg ? strlen(compiledMsg) + 1: 0;
+       piece->msgLen = compiledMsg.len + 1;
    return(True);
 }
 
@@ -3376,8 +3373,7 @@ _DtCompileMessagePiece(
 static Boolean 
 InsertArgumentString(
         Widget w,
-        char **bufPtr,
-        int * bufSizePtr,
+        MsgBuffer *msg,
         ActionRequest *request,
         ObjectData *object,
         unsigned long mask,
@@ -3456,10 +3452,7 @@ InsertArgumentString(
                else
                   value = XtNewString(dataType);
 
-               *bufPtr = GrowMsgBuffer(*bufPtr, bufSizePtr, strlen(value) + 1);
-               if (addLeadingSpace)
-                  strcat(*bufPtr, " ");
-               strcat(*bufPtr, value);
+               MsgAppend(msg, value, addLeadingSpace);
                XtFree(value);
             }
             return(True);
@@ -3478,10 +3471,7 @@ InsertArgumentString(
                return(False);
             }
 
-            *bufPtr = GrowMsgBuffer(*bufPtr, bufSizePtr, strlen(path) + 1);
-            if (addLeadingSpace)
-               (void)strcat(*bufPtr, " ");
-            strcat(*bufPtr, path);
+            MsgAppend(msg, path, addLeadingSpace);
             XtFree(path);
          }
          else if (IS_TT_MSG(request->clonedAction->mask))
@@ -3498,7 +3488,7 @@ InsertArgumentString(
             {
                /* Map into "host:/path" */
                /* fdt: May need to instead map into 'network indep' form */
-               InsertUnmappedArgumentString(bufPtr, bufSizePtr, object, 
+               InsertUnmappedArgumentString(msg, object, 
                                             addLeadingSpace);
             }
             else
@@ -3511,10 +3501,7 @@ InsertArgumentString(
                   return(False);
                }
 
-               *bufPtr = GrowMsgBuffer(*bufPtr, bufSizePtr, strlen(path) + 1);
-               if (addLeadingSpace)
-                  (void)strcat(*bufPtr, " ");
-               strcat(*bufPtr, path);
+               MsgAppend(msg, path, addLeadingSpace);
                XtFree(path);
             }
          }
@@ -3531,7 +3518,7 @@ InsertArgumentString(
        */
    }
    else
-      InsertUnmappedArgumentString(bufPtr, bufSizePtr, object, addLeadingSpace);
+      InsertUnmappedArgumentString(msg, object, addLeadingSpace);
    return(True);
 }
 
@@ -3548,23 +3535,14 @@ InsertArgumentString(
 
 static void 
 InsertUnmappedArgumentString(
-        char **bufPtr,
-        int * bufSizePtr,
+        MsgBuffer *msg,
         ObjectData *object,
         Boolean addLeadingSpace )
 
 {
-   int size;
-
    /* No mapping is necessary here. */
    if (IS_FILE_OBJ(object->mask))
-   {
-      size = strlen(object->u.file.origFilename) + 4;
-      *bufPtr = GrowMsgBuffer(*bufPtr, bufSizePtr, size);
-      if (addLeadingSpace)
-          (void)strcat(*bufPtr, " ");
-      strcat(*bufPtr, object->u.file.origFilename);
-   }
+      MsgAppend(msg, object->u.file.origFilename, addLeadingSpace);
  /* 
   * RWV: 
   * Since we use tmp files for buffers and do not support
@@ -3579,32 +3557,37 @@ InsertUnmappedArgumentString(
 
 
 /*
- * This function checks to see if the message buffer is large enough
- * to hold the current contents + 'count' more bytes.  If it is not
- * large enough, then the buffer will be grown.  The buffer MUST BE
- * NULL terminated.
+ * Append 'str' (preceded by a space if 'addLeadingSpace') to the message
+ * buffer.  The buffer is allocated, and NUL-terminated, even when 'str'
+ * is empty, as the old GrowMsgBuffer/strcat code did.
  */
 
-static String 
-GrowMsgBuffer(
-        String buffer,
-        int *size,
-        int count )
+static void
+MsgAppend(
+        MsgBuffer *msg,
+        const char *str,
+        Boolean addLeadingSpace )
 
 {
-   int currentBufUsed = buffer ? strlen(buffer) : 0;
+   size_t n = strlen(str);
+   int count = (int)n + (addLeadingSpace ? 1 : 0);
 
-   if ((currentBufUsed + count + 1) >= *size)
+   if (msg->buf == NULL || msg->len + count + 1 > msg->size)
    {
-      (*size) += (count+1 > 1024) ? count + 1 : 1024;
-      buffer = (char *)XtRealloc(buffer, (Cardinal)*size);
+      int newSize = msg->size ? msg->size : 1024;
 
-      /* If this is the first alloc for the buffer, then terminate the buffer */
-      if(currentBufUsed == 0)
-         buffer[0] = '\0';
+      while (newSize < msg->len + count + 1)
+         newSize *= 2;
+      msg->buf = (char *)XtRealloc(msg->buf, (Cardinal)newSize);
+      if (msg->size == 0)
+         msg->buf[0] = '\0';
+      msg->size = newSize;
    }
 
-   return(buffer);
+   if (addLeadingSpace)
+      msg->buf[msg->len++] = ' ';
+   memcpy(msg->buf + msg->len, str, n + 1);
+   msg->len += (int)n;
 }
 
 
