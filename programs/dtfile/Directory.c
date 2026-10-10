@@ -106,12 +106,18 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <poll.h>
+#ifdef __linux__
+#include <sys/inotify.h>
+#include <sys/vfs.h>
+#define DT_USE_INOTIFY 1
+#endif
 
 #include <Xm/Xm.h>
 
 #include <Dt/Connect.h>
 #include <Dt/DtNlUtils.h>
 #include <Dt/Dts.h>
+#include <Dt/HourGlass.h>
 #include <Dt/Icon.h>
 #include <Tt/tttk.h>
 
@@ -158,6 +164,23 @@ extern Boolean removingTrash;
 #define	NILL '\0'
 
 /*
+ * Change detection.  On Linux, directories on local file systems are
+ * watched with inotify; the others (NFS, SMB, FUSE, ...), and all of
+ * them when inotify is not available, are polled every rereadTime
+ * seconds as before.
+ */
+#define EVENT_DELAY_MS      100   /* collect events this long first */
+#define EVENT_INTERVAL_MS  1000   /* at most one refresh per this, per dir */
+#define EVENT_RETRY_MS      500   /* recheck a directory that is busy */
+
+/*
+ * Directories no window shows any more stay in the cache for a while,
+ * so that going Back or Up does not read and type them again.
+ */
+#define DIR_CACHE_MAX         8   /* unviewed directories kept */
+#define DIR_CACHE_MAX_FILES 20000 /* ... with at most this many entries */
+
+/*
  * Background activities, ordered by priority:
  * (activity_idle must be the last one in the list!)
  */
@@ -193,8 +216,20 @@ typedef struct
    Boolean          errmsg_needed;
    int              errnum;
    time_t           modify_time;
+   struct timespec  mtim;          /* directory st_mtim at the last read */
+   struct timespec  ctim;          /* directory st_ctim at the last read */
    int              last_check;
    Boolean          link_check_needed;
+   Boolean          has_links;     /* some entry is a symbolic link */
+   Boolean          local_fs;      /* the last read found a local file system */
+   int              wd;            /* inotify watch (> 0), else polled */
+   Boolean          ev_pending;    /* an entry changed since the last read began */
+   Boolean          ev_self;       /* the directory itself changed */
+   Boolean          update_changed;/* this read/update changed something */
+   long             last_ev_refresh; /* when an event last started a refresh */
+   unsigned long    lru_stamp;     /* non-zero: unviewed, kept in the cache */
+   Boolean          stale;         /* (cached, unviewed) changed since */
+   Boolean          reread_needed; /* (cached, unviewed) missed a db reload */
    int              file_count;
    FileData       * file_data;
    FileData       * new_data;
@@ -220,6 +255,7 @@ typedef struct _spd
    int pipe_s2m_fd;
    int pipe_m2s_fd;
    Boolean idle;
+   int generation;               /* db_generation when it was forked */
    struct _spd *next;
 } StickyProcDesc;
 
@@ -288,6 +324,17 @@ static void CheckDesktopPipeCallback(
 			XtPointer client_data,
 			int *fd,
 			XtInputId *id);
+static Boolean SkipRefresh(
+			Directory *directory);
+static void ReadDirectoryFiles(
+			Widget w,
+			Directory *directory);
+static void EventTimer(
+			XtPointer client_data,
+			XtIntervalId *id);
+static Boolean SomeWindowMapped(void);
+static void FreeDirectory(
+			Directory *directory);
 static void SelectDesktopFile(FileMgrData *fmd);
 
 
@@ -308,10 +355,14 @@ static int          directory_set_size = 0;
 static char       * positionFileName = NULL;
 static XtAppContext app_context = None;
 static int          tickTime = 0;
-static int          ticksBetweenLinkChecks = 0;
 static Boolean      timer_suspended = False;
 static int          tick_count = 0;
-static int          lastLinkCheckTick = 0;
+static long         lastLinkCheckMs = 0;
+static int          db_generation = 0;   /* bumped by UpdateDirectorySet */
+static unsigned long lru_clock = 0;
+static int          inotify_fd = -1;
+static XtIntervalId event_timer = 0;
+static long         event_timer_due = 0;
 static Directory  dummy_dir_struct =
 {
   "dummy_host",
@@ -335,8 +386,8 @@ static struct
   { ReadDirectoryProcess, ReaddirPipeCallback, False,NULL },     /* reading */
   { UpdateAllProcess,     ReaddirPipeCallback, False,NULL },     /* update_all */
   { UpdateSomeProcess,    ReaddirPipeCallback, False,NULL },     /* update_some */
-  { TimerEventProcess,    TimerPipeCallback, False,NULL },       /* checking_links */
-  { CheckDesktopProcess,  CheckDesktopPipeCallback, False,NULL },/* checking_desktop */
+  { TimerEventProcess,    TimerPipeCallback, True, NULL },       /* checking_links */
+  { CheckDesktopProcess,  CheckDesktopPipeCallback, True, NULL },/* checking_desktop */
   { TimerEventProcess,    TimerPipeCallback, True, NULL },  /* checking_dir */
   { NULL,                 NULL, False, NULL }               /* idle */
 };
@@ -699,6 +750,724 @@ FileDataBatchAdd(
 }
 
 
+/*--------------------------------------------------------------------
+ *  Time stamps
+ *------------------------------------------------------------------*/
+
+static long
+MonotonicMs(void)
+{
+   struct timespec ts;
+
+   clock_gettime(CLOCK_MONOTONIC, &ts);
+   return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+}
+
+static Boolean
+TimespecEqual(
+        const struct timespec *a,
+        const struct timespec *b)
+{
+   return a->tv_sec == b->tv_sec && a->tv_nsec == b->tv_nsec;
+}
+
+/*
+ * The time stamps of a directory, as the background processes send them
+ * through the pipe.  st_mtime alone misses a second change within the
+ * same second, so the nanosecond st_mtim and st_ctim are compared.
+ */
+typedef struct
+{
+   long            modify_time;  /* st_mtime, 0 if the stat failed */
+   struct timespec mtim;
+   struct timespec ctim;
+   int             local_fs;     /* not a network file system */
+} DirStamp;
+
+static void
+DirStampSet(
+        DirStamp *ds,
+        const struct stat *st,
+        Boolean local_fs)
+{
+   memset(ds, 0, sizeof(*ds));
+   if (st != NULL)
+   {
+      ds->modify_time = st->st_mtime;
+      ds->mtim = st->st_mtim;
+      ds->ctim = st->st_ctim;
+   }
+   ds->local_fs = local_fs;
+}
+
+/* remember the time stamps of the directory as it was (re)read */
+static void
+DirStampStore(
+        Directory *directory,
+        const DirStamp *ds)
+{
+   if (ds->modify_time != 0)
+   {
+      directory->modify_time = ds->modify_time;
+      directory->mtim = ds->mtim;
+      directory->ctim = ds->ctim;
+   }
+}
+
+
+/*--------------------------------------------------------------------
+ *  IsLocalFileSystem
+ *	Is the open directory fd on a file system where inotify sees
+ *	every change?  It does not see changes that other clients make
+ *	to network file systems, so those are polled.
+ *------------------------------------------------------------------*/
+
+static Boolean
+IsLocalFileSystem(
+        int fd)
+{
+#ifdef DT_USE_INOTIFY
+   struct statfs sfs;
+
+   if (fd < 0 || fstatfs(fd, &sfs) != 0)
+      return False;
+
+   switch ((unsigned int) sfs.f_type)
+   {
+      case 0x6969u:      /* NFS */
+      case 0x517Bu:      /* SMB */
+      case 0xFF534D42u:  /* CIFS */
+      case 0xFE534D42u:  /* SMB2 */
+      case 0x65735546u:  /* FUSE (sshfs, ...) */
+      case 0x5346414Fu:  /* AFS */
+      case 0x6B414653u:  /* kAFS */
+      case 0x73757245u:  /* Coda */
+      case 0x564Cu:      /* NCP */
+      case 0x00C36400u:  /* Ceph */
+      case 0x01021997u:  /* 9P */
+      case 0x01161970u:  /* GFS2 */
+      case 0x7461636Fu:  /* OCFS2 */
+      case 0x0BD00BD0u:  /* Lustre */
+      case 0x47504653u:  /* GPFS */
+      case 0x19830326u:  /* BeeGFS */
+         return False;
+      default:
+         return True;
+   }
+#else
+   return False;
+#endif
+}
+
+
+/*--------------------------------------------------------------------
+ *  RestartTimer
+ *	Start the poll timer again if it was suspended (see TimerEvent).
+ *------------------------------------------------------------------*/
+
+static void
+RestartTimer(void)
+{
+   if (timer_suspended && tickTime != 0 && SomeWindowMapped())
+   {
+      XtAppAddTimeOut(app_context, tickTime * 1000, TimerEvent, NULL);
+      timer_suspended = False;
+   }
+}
+
+
+/*--------------------------------------------------------------------
+ *  inotify
+ *	Each directory read from a local file system gets a watch.  An
+ *	event marks the directory (ev_pending); EventTimer then starts an
+ *	update (which re-stats the entries and sends only what changed),
+ *	collecting the events of EVENT_DELAY_MS and starting at most one
+ *	update per directory every EVENT_INTERVAL_MS.  A read or update
+ *	that starts clears the mark, after taking in the queued events:
+ *	it sees every change made before it started.
+ *	Directories that lose their watch (deleted, renamed, unmounted)
+ *	are polled until a read finds them again.
+ *------------------------------------------------------------------*/
+
+#ifdef DT_USE_INOTIFY
+#define INOTIFY_MASK (IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | \
+                      IN_CLOSE_WRITE | IN_ATTRIB | IN_DELETE_SELF |        \
+                      IN_MOVE_SELF | IN_ONLYDIR | IN_EXCL_UNLINK)
+#endif
+
+static void
+EventTimerArm(
+        long ms)
+{
+   long due = MonotonicMs() + ms;
+
+   if (event_timer != 0)
+   {
+      if (due >= event_timer_due)
+         return;
+      XtRemoveTimeOut(event_timer);
+   }
+   event_timer_due = due;
+   event_timer = XtAppAddTimeOut(app_context, ms, EventTimer, NULL);
+}
+
+/* the watch of all directories with watch descriptor wd is gone */
+static void
+DirectoryWatchLost(
+        int wd)
+{
+   int i;
+
+   for (i = 0; i < directory_count; i++)
+   {
+      if (directory_set[i]->wd == wd)
+      {
+         directory_set[i]->wd = 0;
+         directory_set[i]->ev_pending = True;
+      }
+   }
+   RestartTimer();
+}
+
+static void
+DirectoryEventsHandle(
+        char *buf,
+        ssize_t len)
+{
+#ifdef DT_USE_INOTIFY
+   char *p = buf;
+   Boolean any = False;
+   int i;
+
+   while (p + sizeof(struct inotify_event) <= buf + len)
+   {
+      struct inotify_event *ev = (struct inotify_event *) p;
+      const char *name = (ev->len > 0) ? ev->name : NULL;
+
+      p += sizeof(struct inotify_event) + ev->len;
+      any = True;
+
+      if (ev->mask & IN_Q_OVERFLOW)
+      {
+         /* events were lost: everything may have changed */
+         for (i = 0; i < directory_count; i++)
+            if (directory_set[i]->wd > 0)
+               directory_set[i]->ev_pending = True;
+         continue;
+      }
+
+      /*
+       * Saving icon positions rewrites the position file in the
+       * directory itself; that alone does not make a refresh.
+       */
+      if (name != NULL && positionFileName != NULL &&
+          !(ev->mask & (IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO)) &&
+          strcmp(name, positionFileName) == 0)
+         continue;
+
+      if (ev->mask & IN_MOVE_SELF)
+      {
+         /* the path now names something else, or nothing */
+         inotify_rm_watch(inotify_fd, ev->wd);
+         DirectoryWatchLost(ev->wd);
+      }
+      else if (ev->mask & IN_IGNORED)
+         DirectoryWatchLost(ev->wd);
+      else
+      {
+         for (i = 0; i < directory_count; i++)
+            if (directory_set[i]->wd == ev->wd)
+               directory_set[i]->ev_pending = True;
+      }
+   }
+
+   if (any)
+      EventTimerArm(EVENT_DELAY_MS);
+#endif
+}
+
+/* take in all queued events */
+static void
+DirectoryEventsRead(void)
+{
+   long buf[1024];   /* (aligned for struct inotify_event) */
+   ssize_t n;
+
+   if (inotify_fd < 0)
+      return;
+
+   for (;;)
+   {
+      n = read(inotify_fd, buf, sizeof(buf));
+      if (n > 0)
+         DirectoryEventsHandle((char *)buf, n);
+      else if (n < 0 && errno == EINTR)
+         continue;
+      else
+         break;   /* EAGAIN: no more events */
+   }
+}
+
+static void
+DirectoryEventsCallback(
+        XtPointer client_data,
+        int *fd,
+        XtInputId *id)
+{
+   DirectoryEventsRead();
+}
+
+/*
+ * Watch a directory that was just read (if it is on a local file
+ * system and isn't watched yet).  A change between the read and the
+ * watch shows in the time stamps.
+ */
+static void
+DirectoryWatch(
+        Directory *directory)
+{
+#ifdef DT_USE_INOTIFY
+   struct stat st;
+   int wd;
+
+   if (inotify_fd < 0 || directory->wd > 0 || !directory->local_fs ||
+       directory->path_name == NULL || directory->path_name[0] == '\0')
+      return;
+
+   wd = inotify_add_watch(inotify_fd, directory->path_name, INOTIFY_MASK);
+   if (wd <= 0)
+      return;
+   directory->wd = wd;
+   DPRINTF(("DirectoryWatch: %s wd %d\n", directory->path_name, wd));
+
+   if (stat(directory->path_name, &st) != 0 ||
+       !TimespecEqual(&st.st_mtim, &directory->mtim) ||
+       !TimespecEqual(&st.st_ctim, &directory->ctim))
+   {
+      directory->ev_pending = True;
+      EventTimerArm(EVENT_DELAY_MS);
+   }
+#endif
+}
+
+static void
+DirectoryUnwatch(
+        Directory *directory)
+{
+#ifdef DT_USE_INOTIFY
+   int wd = directory->wd;
+   int i;
+
+   if (wd <= 0)
+      return;
+   directory->wd = 0;
+
+   /* two cached paths can name one directory, and share the watch */
+   for (i = 0; i < directory_count; i++)
+      if (directory_set[i] != directory && directory_set[i]->wd == wd)
+         return;
+   inotify_rm_watch(inotify_fd, wd);
+#endif
+}
+
+static void
+DirectoryEventsInit(void)
+{
+#ifdef DT_USE_INOTIFY
+   /* rereadTime 0 means: no automatic refresh */
+   if (rereadTime <= 0 || inotify_fd >= 0)
+      return;
+
+   inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+   if (inotify_fd < 0)
+      return;
+   XtAppAddInput(app_context, inotify_fd, (XtPointer)XtInputReadMask,
+                 DirectoryEventsCallback, NULL);
+#endif
+}
+
+/* does some view of this directory show in a mapped window? */
+static Boolean
+DirectoryMapped(
+        Directory *directory)
+{
+   int i;
+
+   for (i = 0; i < directory->numOfViews; i++)
+      if (directory->directoryView[i].mapped)
+         return True;
+   return False;
+}
+
+/*
+ * Start an update of every directory that changed.
+ */
+static void
+EventTimer(
+        XtPointer client_data,
+        XtIntervalId *id)
+{
+   Directory *directory;
+   long now, wait, retry = 0;
+   int i;
+
+   event_timer = 0;
+
+   /* don't change any directories while a drag is active (see TimerEvent) */
+   if (dragActive)
+   {
+      EventTimerArm(EVENT_RETRY_MS);
+      return;
+   }
+
+   now = MonotonicMs();
+   for (i = 0; i < directory_count; i++)
+   {
+      directory = directory_set[i];
+      if (!directory->ev_pending)
+         continue;
+
+      /* a cached directory nobody looks at: update it when shown again */
+      if (!directory->viewed)
+      {
+         directory->stale = True;
+         directory->ev_pending = False;
+         continue;
+      }
+
+      /*
+       * A read or update that hasn't started yet will see the change;
+       * one that is running re-arms this timer when it is done.
+       */
+      if (directory->busy[activity_reading] ||
+          directory->busy[activity_update_all])
+         continue;
+
+      /* being modified, or not shown right now */
+      if (SkipRefresh(directory))
+      {
+         /* (FileWindowMapUnmap re-arms the timer when it is mapped) */
+         if (DirectoryMapped(directory))
+            wait = EVENT_RETRY_MS;
+         else
+            continue;
+      }
+      else
+         wait = directory->last_ev_refresh + EVENT_INTERVAL_MS - now;
+
+      if (directory->last_ev_refresh != 0 && wait > 0)
+      {
+         if (retry == 0 || wait < retry)
+            retry = wait;
+         continue;
+      }
+
+      DPRINTF(("EventTimer: %s changed\n", directory->directory_name));
+      directory->last_ev_refresh = now;
+      directory->busy[activity_update_all] = True;
+      ScheduleActivity(directory);
+   }
+
+   if (retry > 0)
+      EventTimerArm(retry);
+}
+
+
+/*--------------------------------------------------------------------
+ *  Sticky background processes
+ *	The directory check, the link check and the desktop check keep
+ *	their process between runs (see ScheduleDirectoryActivity).  The
+ *	link and desktop checks need data from the main process; a reused
+ *	process gets it with its request: after the path name,
+ *	  link check:     int n; n * (string name, int link kind)
+ *	  desktop check:  int n; n * (string host, string dir, string file,
+ *	                              int physical type, string logical type)
+ *	A process forked for the request uses its own copy of the data.
+ *------------------------------------------------------------------*/
+
+/* link kinds, see TimerEventProcess */
+#define LINK_VALID      1
+#define LINK_RECURSIVE  2
+#define LINK_BROKEN     3
+
+typedef struct
+{
+   char *name;
+   int   kind;
+} LinkState;
+
+typedef struct
+{
+   char *host;
+   char *dir_linked_to;
+   char *file_name;
+   int   physical_type;
+   char *logical_type;
+} DesktopState;
+
+/* in a reused (sticky) process: the data of the last request */
+static LinkState    *sticky_links = NULL;
+static int           sticky_link_count = -1;    /* -1: none received */
+static DesktopState *sticky_desktop = NULL;
+static int           sticky_desktop_count = -1;
+
+static int
+LinkKind(
+        FileData *file_data)
+{
+   if (file_data->logical_type != NULL &&
+       strcmp(file_data->logical_type, LT_BROKEN_LINK) == 0)
+      return LINK_BROKEN;
+   if (file_data->logical_type != NULL &&
+       strcmp(file_data->logical_type, LT_RECURSIVE_LINK) == 0)
+      return LINK_RECURSIVE;
+   return LINK_VALID;
+}
+
+/* main process: add the data a sticky process needs to its request */
+static void
+StickyAddRequest(
+        PipeBuf *pb,
+        Directory *directory,
+        ActivityStatus activity)
+{
+   FileData *file_data;
+   int i, n;
+
+   PipeBufAddString(pb, directory->path_name);
+
+   if (activity == activity_checking_links)
+   {
+      n = 0;
+      for (file_data = directory->file_data; file_data;
+           file_data = file_data->next)
+         if (file_data->link != NULL && file_data->file_name != NULL)
+            n++;
+      PipeBufAdd(pb, &n, sizeof(int));
+      for (file_data = directory->file_data; file_data;
+           file_data = file_data->next)
+      {
+         if (file_data->link != NULL && file_data->file_name != NULL)
+         {
+            int kind = LinkKind(file_data);
+
+            PipeBufAddString(pb, file_data->file_name);
+            PipeBufAdd(pb, &kind, sizeof(int));
+         }
+      }
+   }
+   else if (activity == activity_checking_desktop)
+   {
+      n = desktop_data->numIconsUsed;
+      PipeBufAdd(pb, &n, sizeof(int));
+      for (i = 0; i < n; i++)
+      {
+         DesktopRec *desktopWindow = desktop_data->desktopWindows[i];
+         FileData *old_data = desktopWindow->file_view_data->file_data;
+         int physical_type = old_data->physical_type;
+
+         PipeBufAddString(pb, desktopWindow->host);
+         PipeBufAddString(pb, desktopWindow->dir_linked_to);
+         PipeBufAddString(pb, desktopWindow->file_name);
+         PipeBufAdd(pb, &physical_type, sizeof(int));
+         PipeBufAddString(pb, old_data->logical_type);
+      }
+   }
+}
+
+/* (an empty string comes through the pipe as NULL) */
+static char *
+PipeReadStringNonNull(
+        int fd)
+{
+   char *s = PipeReadString(fd);
+
+   return s ? s : XtNewString("");
+}
+
+/* sticky process: read the rest of a request (after the path name) */
+static int
+StickyReadRequest(
+        int fd,
+        ActivityStatus activity)
+{
+   int i, n;
+
+   if (activity == activity_checking_links)
+   {
+      for (i = 0; i < sticky_link_count; i++)
+         XtFree(sticky_links[i].name);
+      XtFree((char *)sticky_links);
+      sticky_links = NULL;
+      sticky_link_count = 0;
+
+      if (PipeRead(fd, &n, sizeof(int)) != sizeof(int) || n < 0)
+         return -1;
+      sticky_links = (LinkState *) XtMalloc((n + 1) * sizeof(LinkState));
+      for (i = 0; i < n; i++)
+      {
+         sticky_links[i].name = PipeReadStringNonNull(fd);
+         sticky_links[i].kind = 0;
+         sticky_link_count = i + 1;
+         if (PipeRead(fd, &sticky_links[i].kind, sizeof(int)) != sizeof(int))
+            return -1;
+      }
+   }
+   else if (activity == activity_checking_desktop)
+   {
+      for (i = 0; i < sticky_desktop_count; i++)
+      {
+         XtFree(sticky_desktop[i].host);
+         XtFree(sticky_desktop[i].dir_linked_to);
+         XtFree(sticky_desktop[i].file_name);
+         XtFree(sticky_desktop[i].logical_type);
+      }
+      XtFree((char *)sticky_desktop);
+      sticky_desktop = NULL;
+      sticky_desktop_count = 0;
+
+      if (PipeRead(fd, &n, sizeof(int)) != sizeof(int) || n < 0)
+         return -1;
+      sticky_desktop =
+         (DesktopState *) XtMalloc((n + 1) * sizeof(DesktopState));
+      for (i = 0; i < n; i++)
+      {
+         DesktopState *d = &sticky_desktop[i];
+
+         d->host = PipeReadStringNonNull(fd);
+         d->dir_linked_to = PipeReadStringNonNull(fd);
+         d->file_name = PipeReadStringNonNull(fd);
+         d->physical_type = 0;
+         d->logical_type = NULL;
+         sticky_desktop_count = i + 1;
+         if (PipeRead(fd, &d->physical_type, sizeof(int)) != sizeof(int))
+            return -1;
+         d->logical_type = PipeReadString(fd);
+      }
+   }
+   return 0;
+}
+
+/* end a sticky process and forget it */
+static void
+StickyProcRemove(
+        ActivityStatus activity,
+        StickyProcDesc *p,
+        Boolean tell_it)
+{
+   StickyProcDesc **lp;
+
+   for (lp = &ActivityTable[activity].sticky_procs; *lp; lp = &(*lp)->next)
+   {
+      if (*lp == p)
+      {
+         *lp = p->next;
+         break;
+      }
+   }
+
+   DPRINTF2(("StickyProcRemove: end sticky proc %ld\n", (long)p->child));
+   if (tell_it)
+      PipeWriteString(p->pipe_m2s_fd, NULL);
+   close(p->pipe_s2m_fd);
+   close(p->pipe_m2s_fd);
+   XtFree((char *)p);
+}
+
+/* after a database reload: end idle sticky procs that type with the old one */
+static void
+StickyProcsRetire(void)
+{
+   StickyProcDesc *p, *next;
+   int activity;
+
+   for (activity = 0; activity < activity_idle; activity++)
+   {
+      for (p = ActivityTable[activity].sticky_procs; p; p = next)
+      {
+         next = p->next;
+         if (p->idle && p->generation != db_generation)
+            StickyProcRemove(activity, p, True);
+      }
+   }
+}
+
+
+/*--------------------------------------------------------------------
+ *  Directory cache
+ *------------------------------------------------------------------*/
+
+/* remove directory_set[i] from the cache */
+static void
+DirectoryCacheRemove(
+        int i)
+{
+   int k;
+
+   DPRINTF(("DirectoryCacheRemove: removing %s:%s\n",
+            directory_set[i]->host_name, directory_set[i]->directory_name));
+
+   FreeDirectory(directory_set[i]);
+   for (k = i; k < directory_count - 1; k++)
+      directory_set[k] = directory_set[k + 1];
+   directory_count--;
+}
+
+/* keep at most DIR_CACHE_MAX unviewed directories, least recently used out */
+static void
+DirectoryCacheTrim(void)
+{
+   int i, n, files, oldest;
+
+   for (;;)
+   {
+      n = files = 0;
+      oldest = -1;
+      for (i = 0; i < directory_count; i++)
+      {
+         if (directory_set[i]->lru_stamp == 0)
+            continue;
+         n++;
+         files += directory_set[i]->file_count;
+         if (oldest < 0 ||
+             directory_set[i]->lru_stamp < directory_set[oldest]->lru_stamp)
+            oldest = i;
+      }
+      if (oldest < 0 || (n <= DIR_CACHE_MAX && files <= DIR_CACHE_MAX_FILES))
+         break;
+      DirectoryCacheRemove(oldest);
+   }
+}
+
+/*
+ * A cached directory is shown again: bring it up to date.  The cached
+ * entries show at once; an update re-stats them, and the views are
+ * redrawn only if something changed.  A watched directory without
+ * events and without links needs nothing.
+ */
+static void
+DirectoryRevalidate(
+        Directory *directory)
+{
+   directory->lru_stamp = 0;
+
+   if (directory->busy[activity_reading])
+      directory->reread_needed = directory->stale = False;
+   else if (directory->reread_needed)
+   {
+      directory->reread_needed = directory->stale = False;
+      ReadDirectoryFiles(NULL, directory);
+   }
+   else if (directory->wd <= 0 || directory->stale ||
+            directory->ev_pending || directory->has_links)
+   {
+      directory->stale = False;
+      directory->busy[activity_update_all] = True;
+      ScheduleActivity(directory);
+   }
+}
+
+
 /*====================================================================
  *
  * Initialization routines
@@ -742,20 +1511,18 @@ InitializeDirectoryRead(
    app_context = XtWidgetToApplicationContext(widget);
 
    /* start timer to check for modified directories and broken links */
-   tick_count = lastLinkCheckTick = 0;
+   tick_count = 0;
+   lastLinkCheckMs = MonotonicMs();
 
    if (rereadTime != 0)
-   {
      tickTime = rereadTime;
-     ticksBetweenLinkChecks = checkBrokenLink / rereadTime;
-   }
    else if (checkBrokenLink != 0)
-   {
      tickTime = checkBrokenLink;
-     ticksBetweenLinkChecks = 1;
-   }
    else
      tickTime = 0;
+
+   /* watch local directories instead of polling them */
+   DirectoryEventsInit();
 
    if (tickTime != 0)
       XtAppAddTimeOut (app_context, tickTime * 1000, TimerEvent, NULL);
@@ -904,6 +1671,8 @@ FreeDirectory(
    if( directory == NULL )
      return;
 
+   DirectoryUnwatch(directory);
+
    XtFree (directory->host_name);
    directory->host_name = NULL;
 
@@ -948,6 +1717,16 @@ FreeDirectory(
       file_data = next_file_data;
    }
    directory->file_data = NULL;
+
+   /* (what a read in progress had sent so far) */
+   file_data = directory->new_data;
+   while (file_data != NULL)
+   {
+      next_file_data = file_data->next;
+      FreeFileData(file_data, True);
+      file_data = next_file_data;
+   }
+   directory->new_data = NULL;
 
    XtFree((char *) directory);
 }
@@ -1757,7 +2536,8 @@ AddPathLogicalTypes(
         PipeBuf *pb,
         char *host_name,
         char *directory_name,
-        char *full_directory_name)
+        char *full_directory_name,
+        char *known_tt_path)
 {
    struct stat stat_buf;
    int path_count;
@@ -1855,24 +2635,37 @@ AddPathLogicalTypes(
    }
    XtFree((char *) path_logical_types);
 
-   /* the tt_path */
-   tt_path = GetTTPath(full_directory_name);
-   PipeBufAddString(pb, tt_path);
-   XtFree(tt_path);
+   /* the tt_path (it depends on the path only: an update of a directory
+      that was read before can send what the read found) */
+   if (known_tt_path != NULL)
+      PipeBufAddString(pb, known_tt_path);
+   else
+   {
+      tt_path = GetTTPath(full_directory_name);
+      PipeBufAddString(pb, tt_path);
+      XtFree(tt_path);
+   }
 }
 
 
-/* send a PIPEMSG_ERROR message */
+/* send a PIPEMSG_ERROR message (ds: the directory's time stamps, or NULL) */
 static void
 PipeWriteError(
         int pipe_fd,
         PipeBuf *pb,
         int rc,
-        long modify_time)
+        const DirStamp *ds)
 {
+   DirStamp none;
+
+   if (ds == NULL)
+   {
+      DirStampSet(&none, NULL, False);
+      ds = &none;
+   }
    PipeBufAddMsg(pb, PIPEMSG_ERROR);
    PipeBufAdd(pb, &rc, sizeof(int));
-   PipeBufAdd(pb, &modify_time, sizeof(long));
+   PipeBufAdd(pb, ds, sizeof(DirStamp));
    PipeBufFlush(pipe_fd, pb);
 }
 
@@ -1882,10 +2675,10 @@ static void
 PipeWriteDone(
         int pipe_fd,
         PipeBuf *pb,
-        long modify_time)
+        const DirStamp *ds)
 {
    PipeBufAddMsg(pb, PIPEMSG_DONE);
-   PipeBufAdd(pb, &modify_time, sizeof(long));
+   PipeBufAdd(pb, ds, sizeof(DirStamp));
    PipeBufFlush(pipe_fd, pb);
 }
 
@@ -1914,7 +2707,7 @@ ReadDirectoryProcess(
    char *host_name = directory->host_name;
    char *directory_name = directory->directory_name;
    struct stat stat_buf;
-   long modify_time;
+   DirStamp stamp;
    char *full_directory_name;
    DIR *dirp;
    struct dirent * dp;
@@ -1955,7 +2748,8 @@ ReadDirectoryProcess(
     * Send the logical data type of all components of the path, and
     * the tt_path, back through the pipe.
     */
-   AddPathLogicalTypes(&pb, host_name, directory_name, full_directory_name);
+   AddPathLogicalTypes(&pb, host_name, directory_name, full_directory_name,
+                       NULL);
    PipeBufFlush(pipe_fd, &pb);
 
    /*
@@ -1968,13 +2762,13 @@ ReadDirectoryProcess(
       /* send an error code back through the pipe */
       rc = errno;
       DPRINTF(("ReadDirectoryProcess: sending errno %d (stat failed)\n", rc));
-      PipeWriteError(pipe_fd, &pb, rc, 0);
+      PipeWriteError(pipe_fd, &pb, rc, NULL);
       PipeBufFree(&pb);
       XtFree(full_directory_name);
       return 1;
    }
 
-   modify_time = stat_buf.st_mtime;
+   DirStampSet(&stamp, &stat_buf, False);
 
    /*
     * We never want to display the '~/.dt/Desktop' directory, so when we
@@ -1995,12 +2789,13 @@ ReadDirectoryProcess(
       rc = errno;
       DPRINTF(("ReadDirectoryProcess: sending errno %d (opendir failed)\n",
                rc));
-      PipeWriteError(pipe_fd, &pb, rc, modify_time);
+      PipeWriteError(pipe_fd, &pb, rc, &stamp);
       PipeBufFree(&pb);
       XtFree( full_directory_name );
       return 1;
    }
    dir_fd = dirfd(dirp);
+   stamp.local_fs = IsLocalFileSystem(dir_fd);
    IsToolBox = DirectoryIsToolBox(directory);
 
    /*  Loop through the directory entries and update the file list  */
@@ -2140,7 +2935,7 @@ ReadDirectoryProcess(
 
    /* send a 'done' msg through the pipe (with the position info) */
    DPRINTF(("ReadDirectoryProcess: sending DONE\n"));
-   PipeWriteDone(pipe_fd, &pb, modify_time);
+   PipeWriteDone(pipe_fd, &pb, &stamp);
    PipeBufFree(&pb);
    return 0;
 }
@@ -2154,8 +2949,12 @@ ReadDirectoryProcess(
  *    of the entry itself.  (Comparing the lstat of a link with the
  *    stat of its target made every link look modified, so all links
  *    were retyped on every refresh.)
- *    dir_mtime is the directory's timestamp at the last read: a link
+ *    The change time is compared too, so that a chown or another
+ *    attribute change shows.
+ *    dir_mtim is the directory's timestamp at the last read: a link
  *    whose own timestamp is not older was (re)created since then.
+ *    A link that did not resolve (broken or recursive) has changed if
+ *    it resolves now, or fails differently.
  *------------------------------------------------------------------*/
 
 static Boolean
@@ -2165,9 +2964,12 @@ SameFileStat(
 {
    return a->st_mtim.tv_sec == b->st_mtim.tv_sec &&
           a->st_mtim.tv_nsec == b->st_mtim.tv_nsec &&
+          a->st_ctim.tv_sec == b->st_ctim.tv_sec &&
+          a->st_ctim.tv_nsec == b->st_ctim.tv_nsec &&
           a->st_ino == b->st_ino &&
           a->st_dev == b->st_dev &&
-          a->st_mode == b->st_mode;
+          a->st_mode == b->st_mode &&
+          a->st_size == b->st_size;
 }
 
 static Boolean
@@ -2175,9 +2977,10 @@ EntryChanged(
         int dir_fd,
         const char *name,
         FileData *old,
-        time_t dir_mtime)
+        const struct timespec *dir_mtim)
 {
    struct stat sbuf;
+   Boolean was_recursive;
 
    if (fstatat(dir_fd, name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0)
       return False;          /* gone meanwhile: keep the old data, as before */
@@ -2186,10 +2989,30 @@ EntryChanged(
       return old->link != NULL || !SameFileStat(&sbuf, &old->stat);
 
    /* a symbolic link */
-   if (old->link == NULL || old->is_broken)
-      return True;           /* new link, or broken/recursive: look again */
-   if (sbuf.st_mtime >= dir_mtime)
+   if (old->link == NULL)
+      return True;           /* new link */
+   if (sbuf.st_mtim.tv_sec > dir_mtim->tv_sec ||
+       (sbuf.st_mtim.tv_sec == dir_mtim->tv_sec &&
+        sbuf.st_mtim.tv_nsec >= dir_mtim->tv_nsec))
       return True;           /* the link itself was (re)created */
+
+   /*
+    * (old->is_broken can't tell: the main process clears it when it
+    * makes the icon; the logical type tells.)
+    */
+   was_recursive = old->logical_type != NULL &&
+                   strcmp(old->logical_type, LT_RECURSIVE_LINK) == 0;
+   if (was_recursive || (old->logical_type != NULL &&
+                         strcmp(old->logical_type, LT_BROKEN_LINK) == 0))
+   {
+      /* old->stat is the link's own; it did not resolve */
+      if (!SameFileStat(&sbuf, &old->stat))
+         return True;
+      if (fstatat(dir_fd, name, &sbuf, 0) == 0)
+         return True;        /* resolves now */
+      return (errno == ELOOP) != was_recursive;
+   }
+
    if (fstatat(dir_fd, name, &sbuf, 0) != 0)
       return True;           /* no longer resolves */
    return !SameFileStat(&sbuf, &old->stat);
@@ -2233,7 +3056,7 @@ UpdateAllProcess(
    char *directory_name = directory->directory_name;
    char *full_directory_name;
    struct stat stat_buf;
-   long modify_time;
+   DirStamp stamp;
    DIR *dirp;
    struct dirent * dp;
    Boolean inDtDir;
@@ -2286,7 +3109,8 @@ UpdateAllProcess(
    if(rc)
    {
       /* send the path_logical_types and the tt_path through the pipe */
-      AddPathLogicalTypes(&pb, host_name, directory_name, full_directory_name);
+      AddPathLogicalTypes(&pb, host_name, directory_name, full_directory_name,
+                          directory->tt_path_name);
       PipeBufFlush(pipe_fd, &pb);
    }
 
@@ -2294,7 +3118,7 @@ UpdateAllProcess(
    {
       rc = -1;
       DPRINTF(("UpdateAllProcess: sending errno %d (tooltalk failed)\n", rc));
-      PipeWriteError(pipe_fd, &pb, rc, 0);
+      PipeWriteError(pipe_fd, &pb, rc, NULL);
       PipeBufFree(&pb);
       return 1;
    }
@@ -2310,12 +3134,12 @@ UpdateAllProcess(
       /* send an error code back through the pipe */
       rc = errno;
       DPRINTF(("UpdateAllProcess: sending errno %d (stat failed)\n", rc));
-      PipeWriteError(pipe_fd, &pb, rc, 0);
+      PipeWriteError(pipe_fd, &pb, rc, NULL);
       PipeBufFree(&pb);
       XtFree( full_directory_name );
       return 1;
    }
-   modify_time = stat_buf.st_mtime;
+   DirStampSet(&stamp, &stat_buf, False);
 
    /* check if we are in the .dt directory */
    if ((ptr = strrchr(full_directory_name, '/')) &&
@@ -2333,12 +3157,13 @@ UpdateAllProcess(
       /* send an error code back through the pipe */
       rc = errno;
       DPRINTF(("UpdateAllProcess: sending errno %d (opendir failed)\n", rc));
-      PipeWriteError(pipe_fd, &pb, rc, modify_time);
+      PipeWriteError(pipe_fd, &pb, rc, &stamp);
       PipeBufFree(&pb);
       XtFree( full_directory_name );
       return 1;
    }
    dir_fd = dirfd(dirp);
+   stamp.local_fs = IsLocalFileSystem(dir_fd);
    IsToolBox = DirectoryIsToolBox(directory);
 
    /* index the files we knew about, and the list of modified files */
@@ -2380,8 +3205,7 @@ UpdateAllProcess(
           * If it hasn't changed and isn't on the modified list,
           * there is nothing to report.
           */
-         if (!EntryChanged(dir_fd, dp->d_name, olds[i],
-                           (time_t)directory->modify_time) &&
+         if (!EntryChanged(dir_fd, dp->d_name, olds[i], &directory->mtim) &&
              NameIndexFind(&modified_index, directory->modified_list,
                            dp->d_name, NULL) < 0)
             continue;
@@ -2421,7 +3245,7 @@ UpdateAllProcess(
 
    /* send a 'done' msg through the pipe */
    DPRINTF(("UpdateAllProcess: sending DONE\n"));
-   PipeWriteDone(pipe_fd, &pb, modify_time);
+   PipeWriteDone(pipe_fd, &pb, &stamp);
    PipeBufFree(&pb);
    return 0;
 }
@@ -2443,7 +3267,7 @@ UpdateSomeProcess(
    char *directory_name = directory->directory_name;
    char *full_directory_name;
    struct stat stat_buf;
-   long modify_time;
+   DirStamp stamp;
    FileDataBatch *batch;
    PipeBuf pb = { NULL, 0, 0 };
    int i;
@@ -2468,7 +3292,7 @@ UpdateSomeProcess(
      {
        rc = -1;
        DPRINTF(("UpdateSomeProcess: sending errno %d (stat failed)\n", rc));
-       PipeWriteError(pipe_fd, &pb, rc, 0);
+       PipeWriteError(pipe_fd, &pb, rc, NULL);
        PipeBufFree(&pb);
        return 1;
      }
@@ -2482,14 +3306,15 @@ UpdateSomeProcess(
       /* send an error code back through the pipe */
       rc = errno;
       DPRINTF(("UpdateSomeProcess: sending errno %d (stat failed)\n", rc));
-      PipeWriteError(pipe_fd, &pb, rc, 0);
+      PipeWriteError(pipe_fd, &pb, rc, NULL);
       PipeBufFree(&pb);
       XtFree( full_directory_name );
       return 1;
    }
-   modify_time = stat_buf.st_mtime;
+   DirStampSet(&stamp, &stat_buf, False);
 
    dir_fd = open(full_directory_name, O_RDONLY | O_DIRECTORY);
+   stamp.local_fs = IsLocalFileSystem(dir_fd);
    IsToolBox = DirectoryIsToolBox(directory);
    batch = FileDataBatchCreate(pipe_fd);
    TypeAttrCacheBegin();
@@ -2514,7 +3339,7 @@ UpdateSomeProcess(
 
    /* send a 'done' msg through the pipe */
    DPRINTF(("UpdateSomeProcess: sending DONE\n"));
-   PipeWriteDone(pipe_fd, &pb, modify_time);
+   PipeWriteDone(pipe_fd, &pb, &stamp);
    PipeBufFree(&pb);
    return 0;
 }
@@ -2657,12 +3482,14 @@ ReaddirPipeCallback(
    FileData *old_data;
    int i, n;
    int rc;
-   long modify_time = 0;
+   DirStamp stamp;
+   Boolean reread = False;
    char dirname[MAX_PATH];
    short file_data_count;
    struct timeval start_time, now;
 
    gettimeofday(&start_time, NULL);
+   DirStampSet(&stamp, NULL, False);
 
    for (;;)
    {
@@ -2795,6 +3622,8 @@ ReaddirPipeCallback(
          }
          directory->new_tail = new_nextp;
          XtFree((char *)file_data_buffer);
+         if (file_data_count > 0)
+           directory->update_changed = True;
 
          if (activity == activity_reading)
          {
@@ -2838,6 +3667,8 @@ ReaddirPipeCallback(
       }
 
       case PIPEMSG_POSITION_INFO:
+         directory->update_changed = True;
+
          /* free old position info names */
          for (i = 0; i < directory->position_count; i++)
             XtFree(directory->position_info[i].name);
@@ -2860,7 +3691,9 @@ ReaddirPipeCallback(
          break;
 
       case PIPEMSG_DONE:
-         PipeRead(*fd, &modify_time, sizeof(long));
+         PipeRead(*fd, &stamp, sizeof(DirStamp));
+         if (directory->errnum != 0)
+            directory->update_changed = True;
          directory->errnum = 0;
          directory->errmsg_needed = False;
          done = True;
@@ -2868,11 +3701,19 @@ ReaddirPipeCallback(
 
       case PIPEMSG_ERROR:
          PipeRead(*fd, &rc, sizeof(int));
-         PipeRead(*fd, &modify_time, sizeof(long));
+         PipeRead(*fd, &stamp, sizeof(DirStamp));
          if (rc != directory->errnum)
          {
+            /*
+             * An update that fails leaves the old entries in place;
+             * read the directory again, so that the views show the
+             * error (as when the timer finds it unreadable).
+             */
+            if (activity != activity_reading && directory->errnum == 0)
+               reread = True;
             directory->errnum = rc;
             directory->errmsg_needed = True;
+            directory->update_changed = True;
          }
          done = True;
          break;
@@ -2887,6 +3728,7 @@ ReaddirPipeCallback(
 	 }
          directory->errnum = -1;
          directory->errmsg_needed = False;
+         directory->update_changed = True;
          done = True;
    }
 
@@ -2908,7 +3750,7 @@ ReaddirPipeCallback(
       _DtPerfChkpntMsgSend("Done  Read Directory");
 #endif
       DPRINTF(("ReaddirPipeCallback: done, errno %d, time %ld\n",
-               directory->errnum, modify_time));
+               directory->errnum, stamp.modify_time));
 
       /* close the pipe and cancel the callback */
       close(*fd);
@@ -2996,17 +3838,24 @@ ReaddirPipeCallback(
 
       /* update the file count */
       directory->file_count = 0;
+      directory->has_links = False;
       for (new_data = directory->file_data; new_data; new_data = new_data->next)
+      {
          directory->file_count++;
+         if (new_data->link != NULL)
+            directory->has_links = True;
+      }
 
       /* update directory timestamp */
       if (activity == activity_reading ||
           activity == activity_update_all ||
           directory->was_up_to_date)
       {
-         if (modify_time != 0)
-            directory->modify_time = modify_time;
+         DirStampStore(directory, &stamp);
       }
+      if ((activity == activity_reading || activity == activity_update_all) &&
+          directory->errnum == 0)
+         directory->local_fs = stamp.local_fs;
 
       /*
        * Flush the Motif icon file cache for this directory.  If the
@@ -3071,11 +3920,24 @@ ReaddirPipeCallback(
 	    break;
         }
 
-      /* cause all views on this directory to be redrawn */
+      /*
+       * Cause all views on this directory to be redrawn.  An update
+       * that found nothing new (no entry, error or position changed)
+       * leaves the views as they are: redrawing re-sorts, re-filters
+       * and rebuilds every icon.
+       */
       for (i = 0; i < directory->numOfViews; i++)
       {
          file_mgr_data = directory->directoryView[i].file_mgr_data;
          file_mgr_rec = (FileMgrRec *)file_mgr_data->file_mgr_rec;
+         if (activity != activity_reading && !directory->update_changed &&
+             file_mgr_data->desktop_file == NULL)
+         {
+            DPRINTF(("ReaddirPipeCallback: %s unchanged\n",
+                     directory->directory_name));
+            _DtTurnOffHourGlass(file_mgr_rec->shell);
+            continue;
+         }
          FileMgrRedisplayFiles(file_mgr_rec, file_mgr_data, False);
  	 if(file_mgr_data->desktop_file)
  	 {
@@ -3085,6 +3947,18 @@ ReaddirPipeCallback(
          }
       }
       XtFree(client_data);
+
+      /* watch it for changes, or poll it */
+      if (directory->errnum == 0)
+         DirectoryWatch(directory);
+      if (directory->ev_pending)
+         EventTimerArm(EVENT_DELAY_MS);
+      if (directory->wd <= 0 || directory->has_links)
+         RestartTimer();
+
+      /* an update failed: read it again to show the error */
+      if (reread && !directory->busy[activity_reading])
+         ReadDirectoryFiles(NULL, directory);
 
       /* schedule the next background activity */
       ScheduleActivity(directory);
@@ -3174,6 +4048,10 @@ ReadDirectory(
    {
       /* The directory is already in the cache. */
       directory->viewed = True;
+
+      /* a cached directory no window showed: bring it up to date */
+      if (directory->lru_stamp != 0)
+         DirectoryRevalidate(directory);
 
       /* Look for the view in the view list */
       for (i = 0; i < directory->numOfViews; i++)
@@ -3274,11 +4152,8 @@ ReadDirectory(
    }
 
    /* Restart refresh timer, if necessary */
-   if (file_mgr_data->mapped && timer_suspended)
-   {
-      XtAppAddTimeOut(app_context, tickTime * 1000, TimerEvent, NULL);
-      timer_suspended = False;
-   }
+   if (file_mgr_data->mapped)
+      RestartTimer();
 
    /* return the file data */
    if (file_data != NULL && !directory->busy[activity_reading])
@@ -3475,10 +4350,17 @@ FileWindowMapUnmap(
       }
    }
 
-   if (file_mgr_data->mapped && timer_suspended)
+   if (file_mgr_data->mapped)
    {
-      XtAppAddTimeOut(app_context, tickTime * 1000, TimerEvent, NULL);
-      timer_suspended = False;
+      RestartTimer();
+
+      /* changes seen while it was iconified */
+      for (i = 0; i < directory_count; i++)
+         if (directory_set[i]->ev_pending)
+         {
+            EventTimerArm(EVENT_DELAY_MS);
+            break;
+         }
    }
 }
 
@@ -3813,9 +4695,18 @@ UpdateDirectorySet( void )
 
    DPRINTF(("UpdateDirectorySet ...\n"));
 
+   /* sticky procs type with the database they were forked with */
+   db_generation++;
+   StickyProcsRetire();
+
    for (i = 0; i < directory_count; i++)
-      if (!directory_set[i]->busy[activity_reading])
+   {
+      /* a cached directory nobody looks at is read when shown again */
+      if (directory_set[i]->lru_stamp != 0)
+         directory_set[i]->reread_needed = True;
+      else if (!directory_set[i]->busy[activity_reading])
          ReadDirectoryFiles (NULL, directory_set[i]);
+   }
 }
 
 
@@ -3887,46 +4778,45 @@ UpdateCachedDirectories(
          directory->directoryView[n].mapped = file_mgr_data->mapped;
          directory->numOfViews++;
          directory->viewed = True;
+         if (directory->lru_stamp != 0)
+            DirectoryRevalidate(directory);
       }
    }
 
 
    /*
     * Third step:
-    *   remove all directories that have empty view lists
+    *   directories that have empty view lists stay cached for a while
+    *   (unless they could not be read); the least recently used of
+    *   them go when there are too many.
     */
    i = 0;
    while (i < directory_count)
    {
-      if (directory_set[i]->numOfViews > 0 ||
-          strcmp(directory_set[i]->directory_name, trash_dir) == 0)
+      directory = directory_set[i];
+      if (directory->numOfViews > 0 ||
+          strcmp(directory->directory_name, trash_dir) == 0)
       {
          /* Keep this directory in the directory set. */
+         i++;
+      }
+      else if (directory->errnum == 0)
+      {
+         /* Keep it cached, unviewed. */
+         if (directory->lru_stamp == 0)
+            directory->lru_stamp = ++lru_clock;
          i++;
       }
       else
       {
          /* Delete the file data and remove from the directory set. */
-
-         DPRINTF(("UpdateCachedDirectories: removing %s:%s\n",
-                  directory_set[i]->host_name,
-                  directory_set[i]->directory_name));
-
-         FreeDirectory(directory_set[i]);
-
-         for (k = i; k < directory_count - 1; k++)
-            directory_set[k] = directory_set[k + 1];
-
-         directory_count--;
+         DirectoryCacheRemove(i);
       }
    }
+   DirectoryCacheTrim();
 
    /* Restart refresh timer, if necessary */
-   if (timer_suspended && SomeWindowMapped())
-   {
-      XtAppAddTimeOut(app_context, tickTime * 1000, TimerEvent, NULL);
-      timer_suspended = False;
-   }
+   RestartTimer();
 }
 
 
@@ -4626,6 +5516,44 @@ SkipRefresh(
 
 
 /*--------------------------------------------------------------------
+ * LinkChanged
+ *   Is the symbolic link name in the directory full_name (namep
+ *   points past its '/') no longer a link, or no longer of the kind
+ *   (LINK_VALID, LINK_RECURSIVE, LINK_BROKEN) it was?
+ *------------------------------------------------------------------*/
+
+static Boolean
+LinkChanged(
+        char *full_name,
+        char *namep,
+        const char *name,
+        int prev_link_kind)
+{
+   struct stat stat_buf;
+   int cur_link_kind;
+
+   if (namep + strlen(name) >= full_name + MAX_PATH)
+      return False;
+   strcpy(namep, name);
+
+   /* Check if the file is still a symbolic link */
+   if (lstat(full_name, &stat_buf) != 0 || !S_ISLNK(stat_buf.st_mode))
+      return True;
+
+   /* Check what kind of link it is now */
+   if (_DtFollowLink(full_name) == NULL)
+      cur_link_kind = LINK_RECURSIVE;
+   else if (stat(full_name, &stat_buf) != 0)
+      cur_link_kind = LINK_BROKEN;
+   else
+      cur_link_kind = LINK_VALID;
+
+   /* now we can tell if the link has changed */
+   return prev_link_kind != cur_link_kind;
+}
+
+
+/*--------------------------------------------------------------------
  * TimerEventProcess
  *   Main routine for the background process that checks directory
  *   timestamps and the status of links.
@@ -4639,14 +5567,14 @@ TimerEventProcess(
 {
    struct stat stat_buf;
    long modify_time;
+   DirStamp stamp;
    Boolean link_changed;
    FileData *file_data;
    char full_name[MAX_PATH];
    char *namep;
-   int prev_link_kind;
-   int cur_link_kind;
-   int link_rc;
    int rc;
+   int i;
+   PipeBuf pb = { NULL, 0, 0 };
 
    /*
     * Do a stat on the directory to get its last-modified time.
@@ -4667,12 +5595,14 @@ TimerEventProcess(
       /* stat or access failed */
       rc = errno;
       modify_time = 0;
+      DirStampSet(&stamp, NULL, False);
    }
    else
    {
       /* stat succeeded and the directory is still readable */
       rc = 0;
       modify_time = stat_buf.st_mtime;
+      DirStampSet(&stamp, &stat_buf, False);
    }
 
    /*
@@ -4690,53 +5620,38 @@ TimerEventProcess(
       if (namep[-1] != '/')
         *namep++ = '/';
 
-      /* check all links */
-      for (file_data = directory->file_data;
-           file_data && !link_changed;
-           file_data = file_data->next)
+      /* check all links: the ones of the last request, if this process
+         was reused, else those it knows from the main process */
+      if (sticky_link_count >= 0)
       {
-         /* Only worry about links */
-         if (file_data->link == NULL)
-            continue;
-
-         /* Check if the file is still a symbolic link */
-         strcpy(namep, file_data->file_name);
-         link_rc = lstat(full_name, &stat_buf);
-         if (link_rc != 0 || (stat_buf.st_mode & S_IFMT) != S_IFLNK)
+         for (i = 0; i < sticky_link_count && !link_changed; i++)
+            link_changed = LinkChanged(full_name, namep,
+                                       sticky_links[i].name,
+                                       sticky_links[i].kind);
+      }
+      else
+      {
+         for (file_data = directory->file_data;
+              file_data && !link_changed;
+              file_data = file_data->next)
          {
-            /* no longer a link */
-            link_changed = True;
-            break;
+            /* Only worry about links */
+            if (file_data->link == NULL || file_data->file_name == NULL)
+               continue;
+            link_changed = LinkChanged(full_name, namep,
+                                       file_data->file_name,
+                                       LinkKind(file_data));
          }
-
-         /* Check what kind of link this was the last time we looked:
-          * a normal link (1), a recursive link (2), or an otherwise
-          * broken link (3) */
-         if (strcmp(file_data->logical_type, LT_BROKEN_LINK) == 0)
-            prev_link_kind = 3;
-         else if (strcmp(file_data->logical_type, LT_RECURSIVE_LINK) == 0)
-            prev_link_kind = 2;
-         else
-            prev_link_kind = 1;
-
-         /* Check what kind of link it is now */
-         if (_DtFollowLink(full_name) == NULL)
-            cur_link_kind = 2;  /* recursive link */
-         else if (stat(full_name, &stat_buf) != 0)
-            cur_link_kind = 3;  /* broken link */
-         else
-            cur_link_kind = 1;  /* a valid link */
-
-         /* now we can tell if the link has changed */
-         if (prev_link_kind != cur_link_kind)
-           link_changed = True;
       }
    }
 
    /* send result back through the pipe */
-   write(pipe_fd, &rc, sizeof(int));
-   write(pipe_fd, &modify_time, sizeof(long));
-   write(pipe_fd, &link_changed, sizeof(Boolean));
+   PipeBufAdd(&pb, &rc, sizeof(int));
+   PipeBufAdd(&pb, &modify_time, sizeof(long));
+   PipeBufAdd(&pb, &link_changed, sizeof(Boolean));
+   PipeBufAdd(&pb, &stamp, sizeof(DirStamp));
+   PipeBufFlush(pipe_fd, &pb);
+   PipeBufFree(&pb);
    return 0;
 }
 
@@ -4753,33 +5668,26 @@ StickyProcIdle(
    StickyProcDesc *sticky_proc,
    int max_procs)
 {
-   StickyProcDesc *p, **lp;
+   StickyProcDesc *p, *next;
    int n;
 
    /* mark the process as idle */
    sticky_proc->idle = True;
 
-   /* if there are too many idle procs, make some of them go away */
+   /*
+    * If there are too many idle procs, make some of them go away;
+    * also the ones that still type with an old database.
+    */
    n = 0;
-   lp = &ActivityTable[activity].sticky_procs;
-   for (p = *lp; p; p = *lp)
+   for (p = ActivityTable[activity].sticky_procs; p; p = next)
    {
+      next = p->next;
       if (!p->idle)
-         lp = &p->next;
-      else if (n < max_procs)
-      {
+         continue;
+      if (n < max_procs && p->generation == db_generation)
          n++;
-         lp = &p->next;
-      }
       else
-      {
-         DPRINTF2(("StickyProcIdle: end sticky proc %ld\n", (long)p->child));
-         PipeWriteString(p->pipe_m2s_fd, NULL);
-         close(p->pipe_s2m_fd);
-         close(p->pipe_m2s_fd);
-         *lp = p->next;
-         XtFree((char *)p);
-      }
+         StickyProcRemove(activity, p, True);
    }
 }
 
@@ -4799,19 +5707,27 @@ TimerPipeCallback(
    PipeCallbackData *pipe_data = (PipeCallbackData *)client_data;
    Directory *directory = pipe_data->directory;
    int rc;
-   long modify_time;
-   Boolean link_changed;
+   long modify_time = 0;
+   Boolean link_changed = False;
+   DirStamp stamp;
+   Boolean ok;
 
    /* get return code from the pipe */
    rc = -1;
-   PipeRead(*fd, &rc, sizeof(int));
-   PipeRead(*fd, &modify_time, sizeof(long));
-   PipeRead(*fd, &link_changed, sizeof(Boolean));
+   DirStampSet(&stamp, NULL, False);
+   ok = PipeRead(*fd, &rc, sizeof(int)) == sizeof(int) &&
+        PipeRead(*fd, &modify_time, sizeof(long)) == sizeof(long) &&
+        PipeRead(*fd, &link_changed, sizeof(Boolean)) == sizeof(Boolean) &&
+        PipeRead(*fd, &stamp, sizeof(DirStamp)) == sizeof(DirStamp);
+   if (!ok)
+      rc = -1;
 
    /* close the pipe and cancel the callback */
-   if (pipe_data->sticky_proc)
+   if (pipe_data->sticky_proc && ok)
       StickyProcIdle(pipe_data->activity, pipe_data->sticky_proc,
                      maxRereadProcsPerTick);
+   else if (pipe_data->sticky_proc)
+      StickyProcRemove(pipe_data->activity, pipe_data->sticky_proc, False);
    else
       close(*fd);
    XtFree( client_data );
@@ -4832,6 +5748,12 @@ TimerPipeCallback(
    directory->busy[directory->activity] = False;
    directory->activity = activity_idle;
    ScheduleActivity(directory);
+   if (directory->ev_pending)
+      EventTimerArm(EVENT_DELAY_MS);
+
+   /* the check failed (its process died): try again next time */
+   if (!ok)
+      return;
 
    /* if directory-read already in progress, nothing more to do here */
    if (directory->busy[activity_reading] ||
@@ -4847,11 +5769,15 @@ TimerPipeCallback(
    {
       if (link_changed)
       {
+         /* (an update re-types the links whose target changed) */
          DPRINTF(("TimerPipeCallback: %s link changed\n",
                   directory->directory_name));
-         ReadDirectoryFiles(NULL, directory);
+         directory->busy[activity_update_all] = True;
+         ScheduleActivity(directory);
       }
-      else if (modify_time != directory->modify_time || directory->errnum != 0)
+      else if (!TimespecEqual(&stamp.mtim, &directory->mtim) ||
+               !TimespecEqual(&stamp.ctim, &directory->ctim) ||
+               directory->errnum != 0)
       {
          DPRINTF(("TimerPipeCallback: %s modified\n",
                   directory->directory_name));
@@ -4884,25 +5810,57 @@ CheckDesktopProcess(
 	Directory *directory,
 	ActivityStatus activity)
 {
-   int i, n;
-   DesktopRec *desktopWindow;
-   FileViewData *file_view_data;
+   int i, n, count;
+   DesktopState *objects, *obj;
    char *full_path;
    Tt_status tt_status;
    struct stat stat_buf;
-   short pipe_msg;
    FileData2 file_data2;
-   FileData *old_data, *new_data;
+   FileData *new_data;
+   Boolean IsToolBox;
+   PipeBuf pb = { NULL, 0, 0 };
 
-   for (i = 0; i < desktop_data->numIconsUsed; i++)
+   /*
+    * The desktop objects: those of the last request, if this process
+    * was reused, else the ones it knows from the main process.
+    */
+   if (sticky_desktop_count >= 0)
    {
-      desktopWindow = desktop_data->desktopWindows[i];
-      file_view_data = desktopWindow->file_view_data;
+      objects = sticky_desktop;
+      count = sticky_desktop_count;
+   }
+   else
+   {
+      count = desktop_data->numIconsUsed;
+      objects = (DesktopState *) XtMalloc((count + 1) * sizeof(DesktopState));
+      for (i = 0; i < count; i++)
+      {
+         DesktopRec *desktopWindow = desktop_data->desktopWindows[i];
+         FileData *old_data = desktopWindow->file_view_data->file_data;
 
-      full_path = ResolveLocalPathName( desktopWindow->host,
-                                        desktopWindow->dir_linked_to,
-                                        desktopWindow->file_name,
+         objects[i].host = desktopWindow->host;
+         objects[i].dir_linked_to = desktopWindow->dir_linked_to;
+         objects[i].file_name = desktopWindow->file_name;
+         objects[i].physical_type = old_data->physical_type;
+         objects[i].logical_type = old_data->logical_type;
+      }
+   }
+
+   if(directory->directoryView && directory->directoryView->file_mgr_data)
+       IsToolBox = directory->directoryView->file_mgr_data->toolbox;
+   else
+       IsToolBox = False;
+
+   for (i = 0; i < count; i++)
+   {
+      obj = &objects[i];
+
+      full_path = ResolveLocalPathName( obj->host,
+                                        obj->dir_linked_to,
+                                        obj->file_name,
                                         home_host_name, &tt_status);
+      if (full_path == NULL)
+         continue;
 
       /* Check if the file still exists */
       errno = 0;
@@ -4912,28 +5870,20 @@ CheckDesktopProcess(
          DPRINTF2((
            "CheckDesktopProcess: sending PIPEMSG_DESKTOP_REMOVED for %s\n",
            full_path));
-         pipe_msg = PIPEMSG_DESKTOP_REMOVED;
-         write(pipe_fd, &pipe_msg, sizeof(short));
-         PipeWriteString(pipe_fd, desktopWindow->host);
-         PipeWriteString(pipe_fd, desktopWindow->dir_linked_to);
-         PipeWriteString(pipe_fd, desktopWindow->file_name);
+         PipeBufAddMsg(&pb, PIPEMSG_DESKTOP_REMOVED);
+         PipeBufAddString(&pb, obj->host);
+         PipeBufAddString(&pb, obj->dir_linked_to);
+         PipeBufAddString(&pb, obj->file_name);
+         PipeBufFlush(pipe_fd, &pb);
       }
       else
       {
-         Boolean IsToolBox;
          /* See if the type has changed */
-         old_data = file_view_data->file_data;
-
-         if(directory->directoryView && directory->directoryView->file_mgr_data)
-             IsToolBox = directory->directoryView->file_mgr_data->toolbox;
-         else
-             IsToolBox = False;
-
          ReadFileData2(&file_data2, full_path, NULL,IsToolBox);
          new_data = FileData2toFileData(&file_data2, &n);
 
-         if (new_data->physical_type != old_data->physical_type ||
-             strcmp(new_data->logical_type, old_data->logical_type) != 0)
+         if (new_data->physical_type != obj->physical_type ||
+             !StringsEqual(new_data->logical_type, obj->logical_type))
          {
             /* the type has changed */
             DPRINTF2((
@@ -4941,14 +5891,14 @@ CheckDesktopProcess(
               full_path));
             DPRINTF2((
               "  old type %d %s, new type %d %s\n",
-              old_data->physical_type, old_data->logical_type,
+              obj->physical_type, obj->logical_type,
               new_data->physical_type, new_data->logical_type));
 
-            pipe_msg = PIPEMSG_DESKTOP_CHANGED;
-            write(pipe_fd, &pipe_msg, sizeof(short));
-            PipeWriteString(pipe_fd, desktopWindow->host);
-            PipeWriteString(pipe_fd, desktopWindow->dir_linked_to);
-            PipeWriteString(pipe_fd, desktopWindow->file_name);
+            PipeBufAddMsg(&pb, PIPEMSG_DESKTOP_CHANGED);
+            PipeBufAddString(&pb, obj->host);
+            PipeBufAddString(&pb, obj->dir_linked_to);
+            PipeBufAddString(&pb, obj->file_name);
+            PipeBufFlush(pipe_fd, &pb);
 
             PipeWriteFileData(pipe_fd, new_data);
          }
@@ -4959,10 +5909,14 @@ CheckDesktopProcess(
       full_path = NULL;
    }
 
+   if (objects != sticky_desktop)
+      XtFree((char *)objects);
+
    /* send a 'done' msg through the pipe */
    DPRINTF2(("CheckDesktopProcess: sending DONE\n"));
-   pipe_msg = PIPEMSG_DONE;
-   write(pipe_fd, &pipe_msg, sizeof(short));
+   PipeBufAddMsg(&pb, PIPEMSG_DONE);
+   PipeBufFlush(pipe_fd, &pb);
+   PipeBufFree(&pb);
    return 0;
 }
 
@@ -4990,15 +5944,16 @@ CheckDesktopPipeCallback(
 
    /* read the next msg from the pipe */
    msg = -1;
-   PipeRead(*fd, &msg, sizeof(short));
+   if (PipeRead(*fd, &msg, sizeof(short)) != sizeof(short))
+      msg = -1;
 
    if (msg == PIPEMSG_DESKTOP_REMOVED ||
        msg == PIPEMSG_DESKTOP_CHANGED)
    {
       /* get information from pipe */
-      host = PipeReadString(*fd);
-      dir_linked_to = PipeReadString(*fd);
-      file_name = PipeReadString(*fd);
+      host = PipeReadStringNonNull(*fd);
+      dir_linked_to = PipeReadStringNonNull(*fd);
+      file_name = PipeReadStringNonNull(*fd);
       if (msg == PIPEMSG_DESKTOP_CHANGED)
          new_data = PipeReadFileData(*fd);
       else
@@ -5055,10 +6010,15 @@ CheckDesktopPipeCallback(
         FreeFileData(new_data, True);
    }
 
-   else if (msg == PIPEMSG_DONE)
+   else
    {
-      /* close the pipe and cancel the callback */
-      close(*fd);
+      /* done, or the process died: close the pipe and cancel the callback */
+      if (pipe_data->sticky_proc && msg == PIPEMSG_DONE)
+         StickyProcIdle(pipe_data->activity, pipe_data->sticky_proc, 1);
+      else if (pipe_data->sticky_proc)
+         StickyProcRemove(pipe_data->activity, pipe_data->sticky_proc, False);
+      else
+         close(*fd);
       XtFree( client_data );
       XtRemoveInput(*id);
 
@@ -5112,6 +6072,9 @@ TimerEvent(
    static int *check_list = NULL;
    static int check_alloc = 0;
    int i, j, n;
+   long now, next;
+   Boolean need_poll, need_links, links_left;
+   Directory *directory;
 
 
    DPRINTF2(("Directory::TimerEvent\n"));
@@ -5134,27 +6097,34 @@ TimerEvent(
 
    /* update tick count */
    tick_count++;
+   now = MonotonicMs();
 
-   /* determine if we should also check for broken links this time */
+   /*
+    * Determine if we should also check for broken links this time
+    * (every checkBrokenLink seconds; half a tick early is on time).
+    * Only directories that have links need the check.
+    */
    if (checkBrokenLink > 0 &&
-       tick_count >= lastLinkCheckTick + ticksBetweenLinkChecks)
+       now - lastLinkCheckMs >= checkBrokenLink * 1000L - tickTime * 500L)
    {
      /* set link_check_needed flag on all directores */
      for (i = 0; i < directory_count; i++)
      {
+        directory = directory_set[i];
+
         /* skip this directory if no view is mapped */
-        if (SkipRefresh(directory_set[i]))
+        if (SkipRefresh(directory) || !directory->has_links)
            continue;
 
         /* if a check is already in progress, don't start another one */
-        if (directory_set[i]->busy[activity_checking_links])
+        if (directory->busy[activity_checking_links])
            continue;
 
         /* arrange for background process to be scheduled */
-        directory_set[i]->link_check_needed = True;
+        directory->link_check_needed = True;
      }
 
-     lastLinkCheckTick = tick_count;
+     lastLinkCheckMs = now;
    }
 
    /* make sure check_list array is big enough */
@@ -5165,17 +6135,33 @@ TimerEvent(
          (int *)XtRealloc((char *)check_list, check_alloc*sizeof(int));
    }
 
-   /* get a list of all directories that need to be checked */
+   /*
+    * Get a list of all directories that need to be checked: the ones
+    * that are not watched (see DirectoryWatch), and the ones that are
+    * due for a link check.
+    */
    n = 0;
+   need_poll = need_links = False;
    for (i = 0; i < directory_count; i++)
    {
+      directory = directory_set[i];
+
       /* skip this directory if no view is mapped */
-      if (SkipRefresh(directory_set[i]))
+      if (SkipRefresh(directory))
          continue;
 
+      if (directory->wd <= 0)
+         need_poll = True;
+      if (directory->has_links)
+         need_links = True;
+
       /* if a stat is already in progress, don't start another one */
-      if (directory_set[i]->busy[activity_checking_dir] ||
-          directory_set[i]->busy[activity_checking_links])
+      if (directory->busy[activity_checking_dir] ||
+          directory->busy[activity_checking_links])
+         continue;
+
+      /* a watched directory reports its changes itself */
+      if (directory->wd > 0 && !directory->link_check_needed)
          continue;
 
       /* add this directory to the check list */
@@ -5195,9 +6181,16 @@ TimerEvent(
    qsort(check_list, n, sizeof(int), (int (*)())CheckListCmp);
 
    /* arrange for background process to be started */
-   for (j = 0; j < n && j < maxRereadProcsPerTick; j++)
+   links_left = False;
+   for (j = 0; j < n; j++)
    {
       i = check_list[j];
+      if (j >= maxRereadProcsPerTick)
+      {
+         if (directory_set[i]->link_check_needed)
+            links_left = True;
+         continue;
+      }
       if (directory_set[i]->link_check_needed)
       {
          directory_set[i]->link_check_needed = False;
@@ -5209,11 +6202,30 @@ TimerEvent(
       directory_set[i]->last_check = tick_count;
    }
 
-   /*  Reset the timeout for the next interval.  */
-   if (SomeWindowMapped())
-      XtAppAddTimeOut(app_context, tickTime * 1000, TimerEvent, NULL);
-   else
+   /*
+    * Reset the timeout for the next interval: every tick while some
+    * directory is polled, else in time for the next link check.  With
+    * nothing to do, the timer stays off until RestartTimer.
+    */
+   if (!SomeWindowMapped())
+   {
       timer_suspended = True;
+      return;
+   }
+   if (need_poll || links_left)
+      next = tickTime * 1000L;
+   else if (need_links && checkBrokenLink > 0)
+   {
+      next = lastLinkCheckMs + checkBrokenLink * 1000L - now;
+      if (next < tickTime * 1000L)
+         next = tickTime * 1000L;
+   }
+   else
+   {
+      timer_suspended = True;
+      return;
+   }
+   XtAppAddTimeOut(app_context, next, TimerEvent, NULL);
 }
 
 
@@ -5389,6 +6401,20 @@ ScheduleDirectoryActivity(
      }
    }
 
+   /*
+    * A read or update sees every change made before it starts: take in
+    * the queued change events, and clear the directory's mark.
+    */
+   if (activity == activity_reading || activity == activity_update_all)
+   {
+      DirectoryEventsRead();
+      directory->ev_pending = False;
+      directory->stale = False;
+   }
+   if (activity == activity_reading || activity == activity_update_all ||
+       activity == activity_update_some)
+      directory->update_changed = False;
+
    /* now we are ready to start the next activity */
    directory->activity = activity;
    if (activity == activity_reading ||
@@ -5402,7 +6428,7 @@ ScheduleDirectoryActivity(
 
    /*
     * Special optimization for periodic background processes
-    * (currently only used for activity_checking_dir):
+    * (the directory, link and desktop checks):
     * Since this is done frequently, we don't want to fork new process each
     * time.  Hence, instead of exiting when it's done, the background process
     * is "sticky", i.e., it will stay around waiting for a message on stdin,
@@ -5412,7 +6438,9 @@ ScheduleDirectoryActivity(
    sticky = ActivityTable[activity].sticky;
    if (sticky)
    {
-      /* see if we can find an idle sticky proc that can do the work */
+      /* see if we can find an idle sticky proc that can do the work
+         (one that types with the current database) */
+      StickyProcsRetire();
       for (p = ActivityTable[activity].sticky_procs; p; p = p->next)
          if (p->idle)
             break;
@@ -5422,31 +6450,24 @@ ScheduleDirectoryActivity(
 
    if (p)
    {
+      PipeBuf pb = { NULL, 0, 0 };
+      void (*oldPipe)(int);
+
       /* We found an idle sticky proc that can be used */
       DPRINTF2(("ScheduleActivity:  use sticky proc %ld\n", (long)p->child));
 
-      /* Send the directory name to the sticky proc */
+      /* Send the directory name (and data) to the sticky proc */
+      StickyAddRequest(&pb, directory, activity);
+      oldPipe = signal(SIGPIPE, SIG_IGN);
+      rc = PipeBufFlush(p->pipe_m2s_fd, &pb);
+      signal(SIGPIPE, oldPipe);
+      PipeBufFree(&pb);
 
-      if (PipeWriteString(p->pipe_m2s_fd, directory->path_name) < 0) {
-        StickyProcDesc *d;
-
+      if (rc < 0)
+      {
         /* the pipe is broken, remove the old proc then start a new one */
-        for (d = ActivityTable[activity].sticky_procs; d && p; d = d->next) {
-          if (d == p)
-          {
-            /* the proc listed 1st is dead, remove it */
-            ActivityTable[activity].sticky_procs = p->next;
-            XtFree((void *)p);
-            p = NULL;
-          }
-          else if (d->next == p)
-          {
-            /* the process "p" is dead, remove it */
-            d->next = p->next;
-            XtFree((void *)p);
-            p = NULL;
-          }
-        }
+        StickyProcRemove(activity, p, False);
+        p = NULL;
       }
       else
       {
@@ -5478,6 +6499,7 @@ ScheduleDirectoryActivity(
          p->pipe_s2m_fd = pipe_s2m_fd[0];
          p->pipe_m2s_fd = pipe_m2s_fd[1];
          p->idle = False;
+         p->generation = db_generation;
       }
 
       /* fork a background process */
@@ -5502,9 +6524,9 @@ ScheduleDirectoryActivity(
 	  {
              close(pipe_m2s_fd[1]); /* child won't write to this pipe */
              close(pipe_m2s_fd[0]); /* parent won't read from this pipe */
-             p->pipe_s2m_fd = 0;
-             p->pipe_m2s_fd = 0;
-             p->idle = True;
+             /* forget the proc that was never started (it is first) */
+             ActivityTable[activity].sticky_procs = p->next;
+             XtFree((char *)p);
 	  }
 	  return;
       }
@@ -5520,6 +6542,8 @@ ScheduleDirectoryActivity(
          close(pipe_s2m_fd[0]);    /* child won't read from this pipe */
          if (sticky)
             close(pipe_m2s_fd[1]); /* child won't write to this pipe */
+         if (inotify_fd >= 0)
+            close(inotify_fd);
 
          /* run main routine for this activity from ActivityTable */
          for (;;)
@@ -5534,10 +6558,18 @@ ScheduleDirectoryActivity(
             if (s == NULL)
                break;
 
-            XtFree(directory->path_name);
-            directory->path_name = s;
+            if (directory == dummy_directory)
+               XtFree(s);         /* (its names are not allocated) */
+            else
+            {
+               XtFree(directory->path_name);
+               directory->path_name = s;
+            }
+            if (StickyReadRequest(pipe_m2s_fd[0], activity) != 0)
+               break;
 
-            DPRINTF2(("StickyActivity:  activity %d, dir %s\n", activity, s));
+            DPRINTF2(("StickyActivity:  activity %d, dir %s\n", activity,
+                      directory->path_name));
          }
 
          /* close pipes and end this process */
