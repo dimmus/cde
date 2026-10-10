@@ -185,6 +185,9 @@ typedef struct _FileViewData
    char *label;                  /* icon label string */
    long icon_mtime;              /* modified time of instance icon */
    ObjectPtr position_info;
+   Boolean more_after;           /* tree mode: a later entry of the same
+                                    directory is displayed (set by
+                                    LayoutFileIcons) */
 } FileViewData;
 
 

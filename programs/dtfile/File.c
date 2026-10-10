@@ -5723,6 +5723,9 @@ struct _IconState
 
 static PtrMap iconStates;        /* Widget -> IconState */
 
+/* the DtIcon gadget's minimum default spacing (SPACING_DEFAULT in Icon.c) */
+#define ICON_SPACING_DEFAULT 2
+
 static void
 IconStateDestroyCB(
         Widget w,
@@ -6300,21 +6303,34 @@ UpdateOneFileIcon(
     * If viewing by attributes, adjust spacing between the icon pixmap and
     * the file name so that all file names are aligned.
     */
-   if (file_mgr_data->view != BY_NAME_AND_ICON ||
-       file_mgr_data->show_type == MULTIPLE_DIRECTORY)
    {
-     Dimension pixmap_width = ((DtIconGadget)icon_widget)->icon.pixmap_width;
+     DtIconGadget g = (DtIconGadget)icon_widget;
+     Dimension pixmap_width = g->icon.pixmap_width;
+     Dimension spacing = G_Spacing(g);
 
-     if (pixmap_width < layout_data->pixmap_width)
+     if ((file_mgr_data->view != BY_NAME_AND_ICON ||
+          file_mgr_data->show_type == MULTIPLE_DIRECTORY) &&
+         pixmap_width < layout_data->pixmap_width)
      {
-        Dimension spacing =
+        spacing =
               layout_data->spacing + layout_data->pixmap_width - pixmap_width;
+     }
+     else if (state != NULL)
+     {
+        /*
+         * A full update sets the label, which makes the gadget reset its
+         * spacing to string height / 5, at least ICON_SPACING_DEFAULT
+         * (GetIconLayoutParms relies on that for "."); do the same.
+         */
+        spacing = G_StringHeight(g) / 5;
+        if (spacing < ICON_SPACING_DEFAULT)
+           spacing = ICON_SPACING_DEFAULT;
+     }
 
-        if (G_Spacing((DtIconGadget)icon_widget) != spacing)
-        {
-           XtSetArg (args[0], XmNspacing, spacing);
-           XtSetValues (icon_widget, args, 1);
-        }
+     if (G_Spacing(g) != spacing)
+     {
+        XtSetArg (args[0], XmNspacing, spacing);
+        XtSetValues (icon_widget, args, 1);
      }
    }
 
@@ -7022,7 +7038,11 @@ RedrawTreeLines(
       if (x  <= ex + ewidth  && x + TreeWd(level, sz) > ex &&
           y0 <= ey + eheight && y1 > ey)
       {
-         GetAncestorInfo(file_mgr_data, file_view_data, NULL, NULL, more);
+         /* for each level: are more siblings displayed after this one? */
+         FileViewData *pp = file_view_data;
+
+         for (i = level; i >= 0 && pp; i--, pp = pp->parent)
+            more[i] = pp->more_after;
 
          /* draw vertical connecting lines for upper tree levels */
          for (i = 0; i < level; i++) {
@@ -8035,6 +8055,22 @@ LayoutFileIcons(
    max_level = 0;
    if (file_mgr_data->show_type == MULTIPLE_DIRECTORY)
    {
+      /* note which entries have displayed siblings after them */
+      for (i = -1; i < file_mgr_data->directory_count; i++)
+      {
+         DirectorySet *ds = file_mgr_data->directory_set[i];
+         Boolean seen = False;
+
+         if (ds == NULL || ds->order_list == NULL)
+            continue;
+         for (j = ds->file_count - 1; j >= 0; j--)
+         {
+            ds->order_list[j]->more_after = seen;
+            if (ds->order_list[j]->displayed)
+               seen = True;
+         }
+      }
+
       for (i = 0; i < order_count; i++)
       {
          if (order_list[i]->displayed)
