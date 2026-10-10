@@ -565,7 +565,99 @@ FindChar (
     myIndex = x_pos / charWidth;
     if (myIndex >= max_len)
 	myIndex = max_len - 1;
-    
+
+    /*
+     * When the width of a prefix can only grow with its length (wide
+     * character or single byte strings; a byte prefix of a multi-byte
+     * string can end inside a character), find by bisection the index
+     * the step-by-step search below stops at: that measures O(n)
+     * prefixes of up to n characters for every mouse motion.
+     */
+    if (max_len > 1 && myIndex >= 0 &&
+		(_DtCvIsSegWideChar(segment) || 1 == canvas->mb_length))
+      {
+	int lo, hi, mid;
+
+	len = _DtCvGetStringWidth(canvas, segment, string, myIndex + 1);
+	if (len == x_pos)
+	  {
+	    myIndex++;
+	    myDiff = 0;
+	  }
+	else if (len > x_pos)
+	  {
+	    /*
+	     * stepping back stops at the longest prefix (of at least one
+	     * character) that is not wider than x_pos, or at 0.
+	     */
+	    lo = 1;
+	    hi = myIndex;
+	    while (lo <= hi)
+	      {
+		mid = lo + (hi - lo) / 2;
+		if (_DtCvGetStringWidth(canvas, segment, string, mid) <= x_pos)
+		    lo = mid + 1;
+		else
+		    hi = mid - 1;
+	      }
+	    if (hi >= 1)
+	      {
+		myIndex = hi;
+		myDiff  = x_pos - _DtCvGetStringWidth(canvas, segment,
+							string, hi);
+	      }
+	    else
+	      {
+		myDiff  = _DtCvGetStringWidth(canvas, segment, string, 1)
+								- x_pos;
+		myIndex = 0;
+	      }
+	  }
+	else if (myIndex + 1 >= max_len)
+	  {
+	    /*
+	     * the whole string is narrower than x_pos.
+	     */
+	    myDiff = x_pos - len;
+	  }
+	else
+	  {
+	    /*
+	     * stepping forward stops at the first prefix that is at least
+	     * x_pos wide.
+	     */
+	    lo = myIndex + 2;
+	    hi = max_len;
+	    while (lo < hi)
+	      {
+		mid = lo + (hi - lo) / 2;
+		if (_DtCvGetStringWidth(canvas, segment, string, mid) >= x_pos)
+		    hi = mid;
+		else
+		    lo = mid + 1;
+	      }
+	    len = _DtCvGetStringWidth(canvas, segment, string, lo);
+	    if (len < x_pos)
+	      {
+		myIndex = max_len - 1;
+		myDiff  = x_pos - len;
+	      }
+	    else if (len == x_pos)
+	      {
+		myIndex = lo;
+		myDiff  = 0;
+	      }
+	    else
+	      {
+		myIndex = lo - 1;
+		myDiff  = len - x_pos;
+	      }
+	  }
+
+	triedBack    = True;
+	triedForward = True;
+      }
+
     while (!triedBack || !triedForward)
       {
 	len = _DtCvGetStringWidth(canvas, segment, string, myIndex + 1);
