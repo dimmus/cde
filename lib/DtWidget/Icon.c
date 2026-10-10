@@ -3660,7 +3660,7 @@ LoadPixmap(
 
    XmeGetPixmapData(s, pm, NULL, NULL, NULL, NULL, NULL, NULL, &int_w, &int_h);
    G_PixmapWidth(new) = Limit((Dimension)int_w, G_MaxPixmapWidth(new));
-   G_PixmapHeight(new) = Limit((Dimension)int_h, G_MaxPixmapWidth(new));
+   G_PixmapHeight(new) = Limit((Dimension)int_h, G_MaxPixmapHeight(new));
    return(False);
 }
 

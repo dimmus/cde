@@ -156,30 +156,27 @@ StripEmbeddedNulls(
 	int *length)
 {
     DtEditorErrorCode returnVal = DtEDITOR_NO_ERRORS;
+    char *firstNull = memchr(stringData, '\0', *length);
 
-    if (strlen(stringData) != *length)
+    if (firstNull != NULL)
     {
-       int firstNull;
+       char *from, *to, *end = stringData + *length;
 
        returnVal = DtEDITOR_NULLS_REMOVED;
 
        /*
         * The file contains NULL characters, so we strip them out and
-        * report that we have done so.
+        * report that we have done so.  One pass: this used to strlen()
+        * from the start and memcpy() the (overlapping) rest of the data
+        * for each run of NULLs.
         */
-       while((firstNull = strlen(stringData)) != *length)
+       for (from = to = firstNull; from < end; from++)
        {
-          int lastNull = firstNull;
-
-          while((lastNull + 1) < *length &&
-                stringData[lastNull + 1] == (char)'\0')
-              lastNull++;
-
-          memcpy(&stringData[firstNull], &stringData[lastNull + 1],
-                 *length - lastNull);
-          *length -= 1 + lastNull - firstNull;
+          if (*from != (char)'\0')
+             *to++ = *from;
        }
-
+       *to = (char)'\0';
+       *length = to - stringData;
     }
 
     return( returnVal);
@@ -1443,10 +1440,14 @@ CopySubstring(
 	/*						*/
 	/* So when accessing items, dereference off of  */
 	/*  startPos.					*/
+	/* (mb_str_loc[k] is the byte offset of		*/
+	/* character startPos + k; the count used to	*/
+	/* start at character 0 whatever startPos was.)	*/
 
-	mb_str_loc[0] = 0;
-	for(total=0, bptr=pString, z=1;
-		z <= (endPos - startPos); bptr += siz, z++)
+	bptr = _DtEditorGetPointer(pString, startPos);
+	total = bptr - pString;
+	mb_str_loc[0] = total;
+	for(z=1; z <= (endPos - startPos); bptr += siz, z++)
 	{
 	   if (MB_CUR_MAX > 1)
 	   {
