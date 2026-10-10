@@ -106,6 +106,8 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
+#include <stdlib.h>
 #ifdef __linux__
 #include <sys/inotify.h>
 #include <sys/vfs.h>
@@ -5408,29 +5410,15 @@ GetDirectoryPositionInfo(
  *    postion information file.
  *------------------------------------------------------------------*/
 
+/* write (or, if position_count is 0, remove) a position file */
 static int
-WritePosInfoProcess(
-        int pipe_fd,
-	Directory *directory,
-	ActivityStatus activity)
+WritePosInfoFile(
+        const char *fileName,
+        int position_count,
+        PositionInfo *position_info)
 {
-   char *fileName;
-   int position_count = directory->position_count;
-   PositionInfo *position_info = directory->position_info;
    FILE *f;
    int i, rc;
-   Tt_status tt_status;
-
-   /* construct the full file name */
-   fileName = ResolveLocalPathName( directory->host_name,
-                                    directory->directory_name, positionFileName,
-                                    home_host_name, &tt_status );
-   /* Don't have to check for tt_status
-      directory->host_name is home_host_name and ResolveLocalPathName will
-      always return a good path
-   */
-   DPRINTF(("WritePosInfoProcess: count %d, file %s\n",
-            position_count, fileName));
 
    /* Remove old files, if no position information for this view */
    if (position_count <= 0)
@@ -5463,11 +5451,160 @@ WritePosInfoProcess(
          rc = 0;
       }
    }
+   return rc;
+}
+
+static char *
+PosInfoFileName(
+	Directory *directory)
+{
+   Tt_status tt_status;
+
+   /* Don't have to check for tt_status
+      directory->host_name is home_host_name and ResolveLocalPathName will
+      always return a good path
+   */
+   return ResolveLocalPathName( directory->host_name,
+                                directory->directory_name, positionFileName,
+                                home_host_name, &tt_status );
+}
+
+static int
+WritePosInfoProcess(
+        int pipe_fd,
+	Directory *directory,
+	ActivityStatus activity)
+{
+   char *fileName;
+   int rc;
+
+   /* construct the full file name */
+   fileName = PosInfoFileName(directory);
+   DPRINTF(("WritePosInfoProcess: count %d, file %s\n",
+            directory->position_count, fileName));
+
+   rc = WritePosInfoFile(fileName, directory->position_count,
+                         directory->position_info);
 
    /* send result back thorugh the pipe */
    DPRINTF(("WritePosInfoProcess: done (rc %d)\n", rc));
    write(pipe_fd, &rc, sizeof(int));
    XtFree( fileName );
+   return 0;
+}
+
+
+/*--------------------------------------------------------------------
+ *  StartPosInfoThread
+ *    Write the position information file in a thread instead of a
+ *    forked copy of the whole process: it is a few lines of text.  The
+ *    thread works on a copy of the data, uses no X, Xt or ToolTalk
+ *    calls, and reports through the pipe like WritePosInfoProcess, so
+ *    WritePosInfoPipeCallback handles both.  Returns 0 and the pipe's
+ *    read end in *pipe_fd, or -1 (then the caller forks as before).
+ *------------------------------------------------------------------*/
+
+typedef struct
+{
+   char         *file_name;
+   int           count;
+   PositionInfo *info;
+   int           pipe_fd;
+} PosInfoJob;
+
+static void
+PosInfoJobFree(
+        PosInfoJob *job)
+{
+   int i;
+
+   for (i = 0; i < job->count; i++)
+      free(job->info[i].name);
+   free(job->info);
+   free(job->file_name);
+   free(job);
+}
+
+static void *
+PosInfoThread(
+        void *arg)
+{
+   PosInfoJob *job = (PosInfoJob *)arg;
+   int rc;
+   ssize_t n;
+
+   rc = WritePosInfoFile(job->file_name, job->count, job->info);
+   do
+      n = write(job->pipe_fd, &rc, sizeof(int));
+   while (n < 0 && errno == EINTR);
+   close(job->pipe_fd);
+   PosInfoJobFree(job);
+   return NULL;
+}
+
+static int
+StartPosInfoThread(
+	Directory *directory,
+	int *pipe_fd)
+{
+   PosInfoJob *job;
+   pthread_attr_t attr;
+   pthread_t thread;
+   char *name;
+   int fds[2];
+   int i, rc;
+
+   job = (PosInfoJob *) calloc(1, sizeof(PosInfoJob));
+   if (job == NULL)
+      return -1;
+   name = PosInfoFileName(directory);
+   job->file_name = name ? strdup(name) : NULL;
+   XtFree(name);
+   job->count = directory->position_count > 0 ? directory->position_count : 0;
+   job->info = (PositionInfo *) calloc(job->count ? job->count : 1,
+                                       sizeof(PositionInfo));
+   if (job->file_name == NULL || job->info == NULL)
+   {
+      job->count = 0;
+      PosInfoJobFree(job);
+      return -1;
+   }
+   for (i = 0; i < job->count; i++)
+   {
+      job->info[i] = directory->position_info[i];
+      job->info[i].name = strdup(directory->position_info[i].name);
+      if (job->info[i].name == NULL)
+      {
+         job->count = i;
+         PosInfoJobFree(job);
+         return -1;
+      }
+   }
+
+   if (pipe(fds) < 0)
+   {
+      PosInfoJobFree(job);
+      return -1;
+   }
+   (void) fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+   (void) fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+   job->pipe_fd = fds[1];
+
+   pthread_attr_init(&attr);
+   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+   rc = pthread_create(&thread, &attr, PosInfoThread, job);
+   pthread_attr_destroy(&attr);
+   if (rc != 0)
+   {
+      close(fds[0]);
+      close(fds[1]);
+      PosInfoJobFree(job);
+      return -1;
+   }
+
+   DPRINTF(("StartPosInfoThread: %d positions, file %s\n",
+            directory->position_count, directory->directory_name));
+   *pipe_fd = fds[0];
    return 0;
 }
 
@@ -5536,18 +5673,25 @@ SetDirectoryPositionInfo(
    if (directory == NULL)
       return -1;
 
-   /* check if anything has changed */
+   /* check if anything has changed (a hash of the old names: in "as
+    * placed" mode every file has a position, and comparing each new
+    * name with all old ones was O(N^2)) */
    if (directory->position_count == position_count)
    {
+      NameIndex old_index;
+      char **old_names;
+
+      old_names = (char **) XtMalloc((position_count + 1) * sizeof(char *));
+      for (j = 0; j < position_count; j++)
+         old_names[j] = directory->position_info[j].name;
+      NameIndexInit(&old_index, old_names, position_count);
+
       unchanged = True;
       for (i = 0; i < position_count && unchanged; i++)
       {
-         for (j = 0; j < position_count; j++)
-            if (strcmp(position_info[i].name,
-                       directory->position_info[j].name) == 0)
-            {
-               break;
-            }
+         j = NameIndexFind(&old_index, old_names, position_info[i].name, NULL);
+         if (j < 0)
+            j = position_count;
 
          if (j == position_count ||
              position_info[i].x != directory->position_info[j].x ||
@@ -5558,6 +5702,8 @@ SetDirectoryPositionInfo(
             unchanged = False;
          }
       }
+      NameIndexFree(&old_index);
+      XtFree((char *)old_names);
 
       /* if nothing changed, don't do anything */
       if (unchanged)
@@ -6608,7 +6754,12 @@ ScheduleDirectoryActivity(
    }
 
 
-   if (!p)
+   if (!p && activity == activity_writing_posinfo &&
+       StartPosInfoThread(directory, &pipe_s2m_fd[0]) == 0)
+   {
+      /* (no process: pid stays 0) */
+   }
+   else if (!p)
    {
       /* Need to fork a new background process */
 

@@ -234,7 +234,7 @@ InitializeDesktopWindows(
    Arg args[20];
    char   *popup_name;
    Widget pu_shell, frame, drawA;
-   XtTranslations trans_table;
+   static XtTranslations trans_table = NULL;
 
    if(desktop_data == NULL)
    {
@@ -320,10 +320,10 @@ InitializeDesktopWindows(
       else
          XmAddToPostFromList(desktop_data->popupMenu->popup, drawA);
 
-      /* set up translations in main edit widget */
-      trans_table = XtParseTranslationTable(translations_da);
-
-      /* set up translations in main edit widget */
+      /* set up translations in main edit widget (parsed once: a table
+       * can be shared by all the desktop objects) */
+      if (trans_table == NULL)
+         trans_table = XtParseTranslationTable(translations_da);
       XtOverrideTranslations(drawA, trans_table);
 
       /* Event handler for posting popup menu */
