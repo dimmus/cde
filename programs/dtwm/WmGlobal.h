@@ -1718,6 +1718,9 @@ typedef struct _ClientData
     Pixmap	iconMask;			/* WM_HINTS field */
     Pixmap	hintIconPixmap;		/* WM_HINTS icon_pixmap and icon_mask */
     Pixmap	hintIconMask;		/* iconPixmap was made from */
+    int		stackRank;		/* scratch: see ChangeToWorkspace */
+    int		wmStateWritten;		/* WM_STATE last set, or -1 */
+    Window	wmStateIconWritten;
     Window	iconWindow;			/* WM_HINTS field */
 
     RList	*piconTopShadows;		/* these change to 	*/

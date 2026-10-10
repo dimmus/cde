@@ -145,6 +145,8 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->iconFlags = 0;
     pCD->hintIconPixmap = None;
     pCD->hintIconMask = None;
+    pCD->wmStateWritten = -1;
+    pCD->wmStateIconWritten = None;
     pCD->thisIconBox = NULL;
     pCD->pECD = NULL;
     pCD->pPRCD = NULL;

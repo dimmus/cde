@@ -1273,7 +1273,13 @@ SetCurrentWorkspaceProperty (WmScreenData *pSD)
 	32, PropModeReplace, (unsigned char *)&aCurrent,
 	(sizeof(Atom))/sizeof(long));
 
-    XSync (DISPLAY, False);     /* XFlush didn't work here, why? */
+    /*
+     * Make sure the server has the property before the ToolTalk notice
+     * of the change (dtSendWorkspaceModifyNotification) can reach a client
+     * that reads it: once flushed, the request could still be waiting in
+     * the server's input while the other client's request is processed.
+     */
+    XSync (DISPLAY, False);
 
 } /* END OF FUNCTION SetCurrentWorkspaceProperty */
 
@@ -1524,7 +1530,6 @@ void SetWorkspacePresence (Window propWindow, Atom *pWsPresence, unsigned long c
     XChangeProperty (DISPLAY, propWindow, wmGD.xa_DT_WORKSPACE_PRESENCE, 
 	wmGD.xa_DT_WORKSPACE_PRESENCE, 32, PropModeReplace, 
 	(unsigned char *)pWsPresence, cPresence);
-    XFlush (DISPLAY);
 
 } /* END OF FUNCTION SetWorkspacePresence */
 

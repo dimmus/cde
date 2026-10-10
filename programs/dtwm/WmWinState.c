@@ -763,6 +763,22 @@ static void UnmapClients (ClientData *pCD, unsigned int event_mask)
  *
  *************************************<->***********************************/
 
+/*
+ * Set the WM_STATE property of a client unless it already holds this
+ * state and icon: hiding and showing a client for a workspace change
+ * keeps it in the normal or iconic state.
+ */
+static void SetWMStateOnce (ClientData *pCD, int wmState, Window icon)
+{
+    if ((pCD->wmStateWritten != wmState) ||
+	(pCD->wmStateIconWritten != icon))
+    {
+	SetWMState (pCD->client, wmState, icon);
+	pCD->wmStateWritten = wmState;
+	pCD->wmStateIconWritten = icon;
+    }
+}
+
 void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 {
     ClientData *pNext;
@@ -781,7 +797,7 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 	}
 
         SetClientWsIndex (pNext);
-	SetWMState (pNext->client, wmState, ICON_FRAME_WIN(pNext));
+	SetWMStateOnce (pNext, wmState, ICON_FRAME_WIN(pNext));
 	if (pNext->maxConfig && mwmState == NORMAL_STATE)
 	{
 	    pNext->clientState = MAXIMIZED_STATE;
@@ -799,7 +815,7 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 	pNext = pNext->transientSiblings;
     }
 
-    SetWMState (pCD->client, wmState, ICON_FRAME_WIN(pCD));
+    SetWMStateOnce (pCD, wmState, ICON_FRAME_WIN(pCD));
     pCD->clientState = mwmState;
     if (bToUnseen)
 	pCD->clientState |= UNSEEN_STATE;
