@@ -412,20 +412,23 @@ int main(int argc, char **argv)
 				write(ds_fds[1], session_buf, 255);
 			}
 
+			// If we are running as a child ttsession, the
+			// session is now advertised and its RPC
+			// service is set up, so clients can connect:
+			// release our parent (and whoever is waiting
+			// for it, e.g. Xsession or an auto-starting
+			// client) now.  Requests that arrive while the
+			// types are read below are answered as soon as
+			// that is done.  (The parent used to be held
+			// until the types database had been read.)
+			if (background_mode) {
+				kill(getppid(), SIGTERM);
+			}
+
 			// initialize ptypes/otypes 
 			if (! init_types()) {
 				// init_types() has emitted diagnostic
 				exit(1);
-			}
-
-			// if we are running as a child ttsession then
-			// we're now at a point where we're ready to
-			// start servicing clients so kill off our
-			// parent. 
-			if (background_mode) {
-				// now were ready to accept requests so
-				// kill the parent app.
-				kill(getppid(), SIGTERM);
 			}
 			break;
 		      case TT_ERR_SESSION:
