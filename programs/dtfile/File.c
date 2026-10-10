@@ -284,6 +284,10 @@ static void RedisplayUsingStackingOrder (
                         Widget w,
                         XEvent *event,
                         Region region) ;
+static Boolean WidgetMayIntersect (
+                        FileMgrData * file_mgr_data,
+                        Widget w,
+                        Region region) ;
 static void ReorderChildrenList (
                         XmManagerWidget file_window,
                         Widget * manage,
@@ -3755,6 +3759,7 @@ RedisplayUsingStackingOrder (
    XRectangle rect;
    XEvent expEvent;
    int numChildren = 0;
+   int childrenSize = 0;
    Widget * children = NULL;
    Region widget_region;
    Region tmp_region;
@@ -3817,7 +3822,8 @@ RedisplayUsingStackingOrder (
          {
             child = file_view_data->widget;
 
-            if (child && XmIsGadget(child) && XtIsManaged(child))
+            if (child && XmIsGadget(child) && XtIsManaged(child) &&
+                WidgetMayIntersect(file_mgr_data, child, redrawRegion))
             {
                widget_region = XCreateRegion();
                WidgetRectToRegion(file_mgr_data, child, widget_region);
@@ -3825,8 +3831,12 @@ RedisplayUsingStackingOrder (
                if (!XEmptyRegion(widget_region))
                {
                   XSubtractRegion(redrawRegion, widget_region, redrawRegion);
-                  children = (Widget *)XtRealloc((char *)children,
-                                         (numChildren + 1) * sizeof(Widget));
+                  if (numChildren == childrenSize)
+                  {
+                     childrenSize = childrenSize ? 2 * childrenSize : 16;
+                     children = (Widget *)XtRealloc((char *)children,
+                                            childrenSize * sizeof(Widget));
+                  }
                   children[numChildren] = child;
                   numChildren++;
                }
@@ -3849,7 +3859,9 @@ RedisplayUsingStackingOrder (
          {
             child = file_view_data->widget;
 
-            if (child && XmIsGadget(child) && XtIsManaged(child))
+            if (child && XmIsGadget(child) && XtIsManaged(child) &&
+                (((numChildren >= 0) && (children[numChildren] == child)) ||
+                 WidgetMayIntersect(file_mgr_data, child, redrawRegion)))
             {
                widget_region = XCreateRegion();
                WidgetRectToRegion(file_mgr_data, child, widget_region);
@@ -3881,6 +3893,41 @@ RedisplayUsingStackingOrder (
    XDestroyRegion(redrawRegion);
    XtFree((char *)children);
    children = NULL;
+}
+
+
+/*
+ * Whether the region WidgetRectToRegion() builds for w could intersect
+ * region; tested rectangle by rectangle, without creating a Region.
+ */
+
+static Boolean
+WidgetMayIntersect (
+   FileMgrData * file_mgr_data,
+   Widget w,
+   Region region)
+{
+   XRectangle pRect, lRect;
+   unsigned char flags;
+
+   if ((file_mgr_data->show_type != SINGLE_DIRECTORY) ||
+       (file_mgr_data->view == BY_ATTRIBUTES))
+   {
+      return XRectInRegion(region, (short)w->core.x, (short)w->core.y,
+                           (unsigned short)w->core.width,
+                           (unsigned short)w->core.height) != RectangleOut;
+   }
+
+   _DtIconGetIconRects((DtIconGadget)w, &flags, &pRect, &lRect);
+   if ((flags & XmPIXMAP_RECT) &&
+       XRectInRegion(region, pRect.x, pRect.y, pRect.width, pRect.height)
+          != RectangleOut)
+      return True;
+   if ((flags & XmLABEL_RECT) &&
+       XRectInRegion(region, lRect.x, lRect.y, lRect.width, lRect.height)
+          != RectangleOut)
+      return True;
+   return False;
 }
 
 
@@ -4145,7 +4192,8 @@ OrderChildrenList (
    int num_managed;
    int num_unmanaged;
    ObjectPosition * top;
-   int i, j;
+   PtrMap in_stack = { NULL, NULL, 0, 0 };
+   int i;
 
    file_window = (XmManagerWidget) file_mgr_rec->file_window;
    managed = (Widget *)XtMalloc(sizeof(Widget *) *
@@ -4158,25 +4206,24 @@ OrderChildrenList (
    while(top)
    {
       if (top->file_view_data != NULL && top->file_view_data->widget != NULL)
+      {
          managed[num_managed++] = top->file_view_data->widget;
+         PtrMapPut(&in_stack, top->file_view_data->widget,
+                   top->file_view_data->widget);
+      }
       top = top->next;
    }
 
    /* All the rest get put at the end of the children's list */
    for (i = 0; i < file_window->composite.num_children; i++)
    {
-      for (j = 0; j < num_managed; j++)
-      {
-         if (managed[j] == file_window->composite.children[i])
-            break;
-      }
-
-      if (j >= num_managed)
+      if (PtrMapGet(&in_stack, file_window->composite.children[i]) == NULL)
          unmanaged[num_unmanaged++] = file_window->composite.children[i];
    }
 
    ReorderChildrenList(file_window, managed, num_managed, unmanaged,
                        num_unmanaged);
+   PtrMapFree(&in_stack);
    XtFree( (char *)managed );
    XtFree( (char *)unmanaged );
 }
