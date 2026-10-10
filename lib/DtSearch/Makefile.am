@@ -29,7 +29,7 @@ endif
 $(VSCRIPT_DIR)/libDtSearch-exports.ver: $(EXPORTS_DIR)/libDtSearch.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
 
-libDtSearch_la_LIBADD = raima/libraima.la $(LIBSVC)
+libDtSearch_la_LIBADD = raima/libraima.la $(LIBSVC) $(MATHLIB)
 
 libDtSearch_la_SOURCES = apndext.c	ausdopen.c	ausexit.c \
 			 bmstrstr.c	boolpars.c	boolsrch.c \
