@@ -124,6 +124,22 @@ static int ndirs = 0;
 static int nerr = 0;
 static char last_dir[MAX_PATH];
 
+/*
+ * While copying, X events are checked and the dialog's counters and
+ * status line are redrawn at most every CHECK_INTERVAL_MS, not after
+ * every file and every data block: each check used to cost an XSync
+ * round trip.  The dirty flags and the pending status hold what has not
+ * been shown yet.
+ */
+#define CHECK_INTERVAL_MS 50
+static struct timespec last_check;
+static Boolean summary_dirty = False;
+static Boolean errcount_dirty = False;
+static Boolean status_dirty = False;
+static char *pending_op = NULL;
+static char *pending_name = NULL;
+static size_t pending_name_size = 0;
+
 #define FILEOPNUM 14
 static char *LongFileOpNames[FILEOPNUM];
 static char *DefaultLongFileOpNames[] = {
@@ -449,7 +465,8 @@ UpdateErrorCount(void)
     sprintf(msg, GETMESSAGE(2, 8, "Errors: %d"), nerr);
 
   /* for the first error, manage the widgets used to display errors */
-  if (nerr == 1)
+  /* (updates are deferred, so the count may already be past 1)       */
+  if (nerr > 0 && !XtIsManaged(G_error_count))
   {
     XtVaSetValues(G_status_text,
                   XmNbottomAttachment, XmATTACH_NONE,
@@ -483,6 +500,61 @@ AppendErrorMsg(char *msg)
 }
 
 
+/*
+ * SetStatus: remember the status line to show at the next display update.
+ */
+static void
+SetStatus(char *op, char *name)
+{
+  size_t len = strlen(name) + 1;
+
+  if (len > pending_name_size) {
+    pending_name_size = len + 256;
+    pending_name = XtRealloc(pending_name, pending_name_size);
+  }
+  memcpy(pending_name, name, len);
+  pending_op = op;
+  status_dirty = True;
+}
+
+
+/*
+ * FlushDisplay: show the counters and status that changed since the last
+ * update.
+ */
+static void
+FlushDisplay(void)
+{
+  if (summary_dirty) {
+    summary_dirty = False;
+    UpdateSummary();
+  }
+  if (errcount_dirty) {
+    errcount_dirty = False;
+    UpdateErrorCount();
+  }
+  if (status_dirty) {
+    status_dirty = False;
+    UpdateStatus(pending_op, pending_name);
+  }
+  XmUpdateDisplay(G_toplevel);
+}
+
+
+/*
+ * WaitForInput: block until a dialog callback clears G_wait_on_input.
+ */
+static void
+WaitForInput(void)
+{
+  FlushDisplay();
+  G_wait_on_input = TRUE;
+  while (G_wait_on_input)
+    XtAppProcessEvent(app_context, XtIMAll);
+  clock_gettime(CLOCK_MONOTONIC, &last_check);
+}
+
+
 /*--------------------------------------------------------------------
  * Callback functions
  *------------------------------------------------------------------*/
@@ -503,24 +575,34 @@ CheckForMap(
 
 static int
 EventCheck(void)
-/* process X events until there are no more pending events queued */
+/*
+ * Update the display and process X events until there are no more pending
+ * events queued; while paused, wait for events until resumed.  Between
+ * two checks at least CHECK_INTERVAL_MS pass.
+ */
 {
   XEvent event;
+  struct timespec now;
+
+  if (!G_pause_copy) {
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if ((now.tv_sec - last_check.tv_sec) * 1000L +
+        (now.tv_nsec - last_check.tv_nsec) / 1000000L < CHECK_INTERVAL_MS)
+      return G_do_copy ? 0 : 1;
+  }
+
+  FlushDisplay();
 
   for (;;) {
-    if (!G_pause_copy) {
-      /* check if there are any X events */
-      if (!(XtAppPending(app_context) & XtIMXEvent)) {
-        /* maybe more events are "in the pipe" */
-        XSync(XtDisplay(G_toplevel), False);
-        if (!(XtAppPending(app_context) & XtIMXEvent))
-          break;
-      }
-    }
+    /* XtAppPending flushes the output and reads what the server sent */
+    if (!G_pause_copy && !(XtAppPending(app_context) & XtIMXEvent))
+      break;
     /* get the next event and process it */
     XtAppNextEvent(app_context, &event);
     XtDispatchEvent(&event);
   }
+
+  clock_gettime(CLOCK_MONOTONIC, &last_check);
 
   /* if the user clicked on the Cancel button and Warning 'yes' btn, abort the copy */
   if (G_do_copy)
@@ -538,17 +620,15 @@ ErrorHandler(FileOp op, char *fname, int errnum)
 
   /* increment the error count */
   nerr++;
-  UpdateErrorCount();
+  errcount_dirty = True;
 
   /* don't count this file as one that has been copied */
   nfiles--;
-  UpdateSummary();
+  summary_dirty = True;
 
   /* add error message to error_msgs */
-  sprintf(msg, "%s: %s\n", fname, strerror(errnum));
+  snprintf(msg, sizeof(msg), "%s: %s\n", fname, strerror(errnum));
   AppendErrorMsg(msg);
-
-  XmUpdateDisplay(G_toplevel);
 
   /* Initialize the error status variable. It will be set if the user */
   /* has chosen not to ignore errors */
@@ -557,10 +637,7 @@ ErrorHandler(FileOp op, char *fname, int errnum)
   if (!G_ignore_errors)
     {
        create_error_dialog(G_toplevel, LongFileOpNames[op], fname, errnum);
-
-       G_wait_on_input = TRUE;
-       while (G_wait_on_input)
-          EventCheck();
+       WaitForInput();
     }
 
   return (G_error_status);
@@ -586,7 +663,7 @@ ConfirmHandler(
   {
     ndirs++;
     strcpy(last_dir, sname);
-    UpdateSummary();
+    summary_dirty = True;
   }
   else if (op == op_copy || op == op_cplink || op == op_mklink)
   {
@@ -595,17 +672,15 @@ ConfirmHandler(
     if (!is_overwrite)
     {
       nfiles++;
-      UpdateSummary();
+      summary_dirty = True;
     }
   }
 
   /* display a message that tells the user what we are working on */
   if (op == op_delete || op == op_mkdir)
-    UpdateStatus(LongFileOpNames[op], tname);
+    SetStatus(LongFileOpNames[op], tname);
   else
-    UpdateStatus(LongFileOpNames[op], sname);
-
-  XmUpdateDisplay(G_toplevel);
+    SetStatus(LongFileOpNames[op], sname);
 
 
   if (is_overwrite)  {
@@ -620,18 +695,14 @@ ConfirmHandler(
     {
       overwrite_dialog = TRUE;
       create_overwrite_dialog (G_toplevel, sname, tname, ttype & ft_isdir);
-
-      G_wait_on_input = TRUE;
-      while (G_wait_on_input)
-        EventCheck();
+      WaitForInput();
 
     }
 
     if (G_overwrite_selection != G_SKIP)
     {
       nfiles++;
-      UpdateSummary();
-      XmUpdateDisplay(G_toplevel);
+      summary_dirty = True;
     }
 
     switch (G_overwrite_selection)
@@ -667,6 +738,7 @@ ConfirmHandler(
   }
 
   if (app_args.slow) {
+    FlushDisplay();
     XFlush(XtDisplay(G_toplevel));
     XSync(XtDisplay(G_toplevel), False);
     sleep(1);
@@ -864,7 +936,7 @@ main(int argc, char *argv[])
    */
   XtAddEventHandler(G_toplevel, StructureNotifyMask, False, CheckForMap, NULL);
   while (!is_mapped)
-    EventCheck();
+    XtAppProcessEvent(app_context, XtIMAll);
   XtRemoveEventHandler(G_toplevel, XtAllEvents, True, CheckForMap, NULL);
 
   /* Set up the Callbacks for the copy operation */
@@ -908,7 +980,8 @@ main(int argc, char *argv[])
     }
   }
 
-  /* display the result */
+  /* show the final counts, then the result */
+  FlushDisplay();
   if (G_do_copy)
     UpdateStatus(GETMESSAGE(2, 14, "Completed."), "");
   else

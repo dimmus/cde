@@ -50,6 +50,11 @@
  ****************************************************************************
  ************************************<+>*************************************/
 
+/* copy_file_range() is a GNU extension in glibc's <unistd.h> */
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -64,6 +69,19 @@
 #include <string.h>
 #include <limits.h>
 #include "fsrtns.h"
+
+#if defined(__linux__) && defined(__GLIBC__) && \
+    (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 27))
+#define HAVE_COPY_FILE_RANGE 1
+#endif
+
+/*
+ * Data is copied in chunks of COPY_CHUNK bytes; periodicCallback runs
+ * between chunks so a long copy stays cancellable.  COPY_BUFSIZE is the
+ * buffer for the read()/write() fallback.
+ */
+#define COPY_CHUNK   (8 * 1024 * 1024)
+#define COPY_BUFSIZE (256 * 1024)
 
 
 /*--------------------------------------------------------------------
@@ -82,13 +100,113 @@ static int CopyObject(char *sourceP, char *targetP, int repl, int link);
 static int EraseObject(char *nameP, int force);
 
 
+/*
+ * WriteAll: write len bytes, retrying after EINTR and short writes.
+ * Returns 0 or an errno value.
+ */
+static int
+WriteAll(int fd, const char *buf, size_t len)
+{
+  ssize_t n;
+
+  while (len > 0) {
+    n = write(fd, buf, len);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      return errno;
+    }
+    if (n == 0)
+      return EIO;
+    buf += n;
+    len -= n;
+  }
+  return 0;
+}
+
+
+/*
+ * CopyData: copy the rest of src to tgt from the current file offsets.
+ * Returns 0 on success, an errno value on failure, or -1 if
+ * periodicCallback asked to abort.
+ *
+ * Where available, copy_file_range() lets the kernel copy (or share)
+ * the data without passing it through user space; on any file system
+ * or file it does not support, the remaining data is copied with
+ * read()/write() through a large buffer.  Both paths advance the file
+ * offsets, so the fallback can take over after a partial in-kernel copy.
+ */
+static int
+CopyData(int src, int tgt)
+{
+  static char *buffer = NULL;
+  ssize_t nread;
+  int rc;
+
+#ifdef HAVE_COPY_FILE_RANGE
+  {
+    off_t total = 0;
+    ssize_t n;
+
+    for (;;) {
+      n = copy_file_range(src, NULL, tgt, NULL, COPY_CHUNK, 0);
+      if (n < 0) {
+        if (errno == EINTR)
+          continue;
+        if (total == 0 && (errno == ENOSYS || errno == EXDEV ||
+                           errno == EINVAL || errno == EOPNOTSUPP ||
+                           errno == EBADF || errno == EPERM ||
+                           errno == ETXTBSY))
+          break;                /* not supported here: use read/write */
+        return errno;
+      }
+      if (n == 0) {
+        /*
+         * End of file.  Some pseudo files report a size of 0 and return
+         * nothing from copy_file_range although read() delivers data;
+         * if nothing was copied, let read/write make sure.
+         */
+        if (total == 0)
+          break;
+        return 0;
+      }
+      total += n;
+
+      if (periodicCallback && periodicCallback() != 0)
+        return -1;
+    }
+  }
+#endif
+
+  if (buffer == NULL) {
+    buffer = malloc(COPY_BUFSIZE);
+    if (buffer == NULL)
+      return ENOMEM;
+  }
+
+  for (;;) {
+    do {
+      nread = read(src, buffer, COPY_BUFSIZE);
+    } while (nread < 0 && errno == EINTR);
+    if (nread < 0)
+      return errno;
+    if (nread == 0)
+      return 0;
+
+    if ((rc = WriteAll(tgt, buffer, nread)) != 0)
+      return rc;
+
+    if (periodicCallback && periodicCallback() != 0)
+      return -1;
+  }
+}
+
+
 static int
 CopyFile(char *sourceP, char *targetP, int repl, struct stat *statP)
 /* copy a file; if repl non-zero, overwrite any existing file */
 {
   int src, tgt;
-  int nread, nwrite;
-  char buffer[2048];
   struct utimbuf ut;
   int rc;
 
@@ -127,34 +245,14 @@ CopyFile(char *sourceP, char *targetP, int repl, struct stat *statP)
   }
 
   /* copy data */
-  for (;;) {
-    /* read data from source file */
-    do {
-      errno = 0;
-      nread = read(src, buffer, sizeof(buffer));
-    } while (nread < 0 && errno == EINTR);
-    if (nread <= 0)
-      break;
-
-    /* write data to target file */
-    do {
-      errno = 0;
-      nwrite = write(tgt, buffer, nread);
-    } while (nwrite < 0 && errno == EINTR);
-    if (nwrite != nread)
-      break;
-
-    if (periodicCallback)
-      if (periodicCallback() != 0) {
-        unlink(targetP);
-        close(src);
-        close(tgt);
-        return -1;
-      }
+  rc = CopyData(src, tgt);
+  if (rc < 0) {
+    /* aborted by periodicCallback */
+    unlink(targetP);
+    close(src);
+    close(tgt);
+    return -1;
   }
-
-  /* check if data copy ended abnormally */
-  rc = (nread == 0)? 0: (errno != 0)? errno: -1;
 
   /* close files */
   close(src);
