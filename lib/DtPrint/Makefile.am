@@ -13,14 +13,13 @@ else
 libDtPrint_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libDtPrint.sym
+# export only the symbols in build-aux/symbols/libDtPrint.sym
 if EXPORT_MAPS
-libDtPrint_la_LDFLAGS += -Wl,--version-script=libDtPrint.ver
-EXTRA_libDtPrint_la_DEPENDENCIES = libDtPrint.ver
+libDtPrint_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtPrint-exports.ver
+EXTRA_libDtPrint_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtPrint-exports.ver
 endif
-libDtPrint.ver: $(EXPORTS_DIR)/libDtPrint.sym
+$(VSCRIPT_DIR)/libDtPrint-exports.ver: $(EXPORTS_DIR)/libDtPrint.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtPrint.ver
 
 
 if SOLARIS

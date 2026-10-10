@@ -23,14 +23,13 @@ else
 libcsa_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libcsa.sym
+# export only the symbols in build-aux/symbols/libcsa.sym
 if EXPORT_MAPS
-libcsa_la_LDFLAGS += -Wl,--version-script=libcsa.ver
-EXTRA_libcsa_la_DEPENDENCIES = libcsa.ver
+libcsa_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libcsa-exports.ver
+EXTRA_libcsa_la_DEPENDENCIES = $(VSCRIPT_DIR)/libcsa-exports.ver
 endif
-libcsa.ver: $(EXPORTS_DIR)/libcsa.sym
+$(VSCRIPT_DIR)/libcsa-exports.ver: $(EXPORTS_DIR)/libcsa.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libcsa.ver
 
 if LINUX
 else

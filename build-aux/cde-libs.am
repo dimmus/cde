@@ -29,7 +29,12 @@ LIBMMDB = $(top_builddir)/lib/DtMmdb/libDtMmdb.la
 # one ($<) into a version script ($@) for the linker.  The script has no
 # version node, so the symbols it exports keep their unversioned ABI;
 # every other global symbol of the library becomes local.  (libtool's
-# -export-symbols does not do this for C++ libraries.)
-EXPORTS_DIR = $(top_srcdir)/build-aux/exports
-MAKE_VERSION_SCRIPT = { echo '{ global:'; sed -e 's/$$/;/' $<; \
-	echo 'local: *; };'; } > $@.tmp && mv -f $@.tmp $@
+# -export-symbols does not do this for C++ libraries.)  The script goes
+# to libtool's .libs directory, which "make clean" removes, under a name
+# that libtool does not delete before it links (.libs/libX-exports.ver,
+# not .libs/libX.*).
+EXPORTS_DIR = $(top_srcdir)/build-aux/symbols
+VSCRIPT_DIR = .libs
+MAKE_VERSION_SCRIPT = $(MKDIR_P) $(VSCRIPT_DIR) && \
+	{ echo '{ global:'; sed -e 's/$$/;/' $<; echo 'local: *; };'; } \
+	> $@.tmp && mv -f $@.tmp $@

@@ -3,7 +3,7 @@
 # gen-exports.py - regenerate the export lists of the CDE libraries
 #
 # Each CDE shared library exports only the symbols listed in
-# build-aux/exports/lib<name>.sym (libtool -export-symbols, which GNU ld
+# build-aux/symbols/lib<name>.sym (libtool -export-symbols, which GNU ld
 # turns into an unversioned version script, so the symbols that stay
 # exported keep their ABI).  Hiding the rest takes their symbolic
 # relocations and PLT calls out of every process start and lets the
@@ -32,7 +32,7 @@
 #
 #     ./configure --disable-export-maps ... && make
 #     python3 build-aux/gen-exports.py
-#     git diff build-aux/exports
+#     git diff build-aux/symbols
 #
 # A new in-tree use of a symbol that the list hides fails to link
 # ("undefined reference"); add the symbol to the list by hand, or
@@ -45,7 +45,7 @@ import subprocess
 import sys
 
 TOP = os.path.realpath(os.path.join(os.path.dirname(sys.argv[0]), '..')) + '/'
-OUT = TOP + 'build-aux/exports/'
+OUT = TOP + 'build-aux/symbols/'
 
 # name: (directory of the library, C++?)
 LIBS = {

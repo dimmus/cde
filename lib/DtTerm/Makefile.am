@@ -35,12 +35,11 @@ else
 libDtTerm_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libDtTerm.sym
+# export only the symbols in build-aux/symbols/libDtTerm.sym
 if EXPORT_MAPS
-libDtTerm_la_LDFLAGS += -Wl,--version-script=libDtTerm.ver
-EXTRA_libDtTerm_la_DEPENDENCIES = libDtTerm.ver
+libDtTerm_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtTerm-exports.ver
+EXTRA_libDtTerm_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtTerm-exports.ver
 endif
-libDtTerm.ver: $(EXPORTS_DIR)/libDtTerm.sym
+$(VSCRIPT_DIR)/libDtTerm-exports.ver: $(EXPORTS_DIR)/libDtTerm.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtTerm.ver
 

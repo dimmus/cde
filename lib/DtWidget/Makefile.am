@@ -24,14 +24,13 @@ else
 libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libDtWidget.sym
+# export only the symbols in build-aux/symbols/libDtWidget.sym
 if EXPORT_MAPS
-libDtWidget_la_LDFLAGS += -Wl,--version-script=libDtWidget.ver
-EXTRA_libDtWidget_la_DEPENDENCIES = libDtWidget.ver
+libDtWidget_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtWidget-exports.ver
+EXTRA_libDtWidget_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtWidget-exports.ver
 endif
-libDtWidget.ver: $(EXPORTS_DIR)/libDtWidget.sym
+$(VSCRIPT_DIR)/libDtWidget-exports.ver: $(EXPORTS_DIR)/libDtWidget.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtWidget.ver
 
 libDtWidget_la_LIBADD = $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 

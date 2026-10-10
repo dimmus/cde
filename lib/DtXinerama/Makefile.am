@@ -15,13 +15,12 @@ else
 libDtXinerama_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libDtXinerama.sym
+# export only the symbols in build-aux/symbols/libDtXinerama.sym
 if EXPORT_MAPS
-libDtXinerama_la_LDFLAGS += -Wl,--version-script=libDtXinerama.ver
-EXTRA_libDtXinerama_la_DEPENDENCIES = libDtXinerama.ver
+libDtXinerama_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtXinerama-exports.ver
+EXTRA_libDtXinerama_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtXinerama-exports.ver
 endif
-libDtXinerama.ver: $(EXPORTS_DIR)/libDtXinerama.sym
+$(VSCRIPT_DIR)/libDtXinerama-exports.ver: $(EXPORTS_DIR)/libDtXinerama.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtXinerama.ver
 
 

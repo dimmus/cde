@@ -51,11 +51,10 @@ libDtMmdb_la_LIBADD = HardCopy/libHardCopy.la \
 
 libDtMmdb_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 
-# export only the symbols in build-aux/exports/libDtMmdb.sym
+# export only the symbols in build-aux/symbols/libDtMmdb.sym
 if EXPORT_MAPS
-libDtMmdb_la_LDFLAGS += -Wl,--version-script=libDtMmdb.ver
-EXTRA_libDtMmdb_la_DEPENDENCIES = libDtMmdb.ver
+libDtMmdb_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtMmdb-exports.ver
+EXTRA_libDtMmdb_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtMmdb-exports.ver
 endif
-libDtMmdb.ver: $(EXPORTS_DIR)/libDtMmdb.sym
+$(VSCRIPT_DIR)/libDtMmdb-exports.ver: $(EXPORTS_DIR)/libDtMmdb.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtMmdb.ver

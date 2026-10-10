@@ -50,11 +50,10 @@ else
 libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libDtHelp.sym
+# export only the symbols in build-aux/symbols/libDtHelp.sym
 if EXPORT_MAPS
-libDtHelp_la_LDFLAGS += -Wl,--version-script=libDtHelp.ver
-EXTRA_libDtHelp_la_DEPENDENCIES = libDtHelp.ver
+libDtHelp_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtHelp-exports.ver
+EXTRA_libDtHelp_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtHelp-exports.ver
 endif
-libDtHelp.ver: $(EXPORTS_DIR)/libDtHelp.sym
+$(VSCRIPT_DIR)/libDtHelp-exports.ver: $(EXPORTS_DIR)/libDtHelp.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtHelp.ver

@@ -272,10 +272,10 @@ AC_ARG_ENABLE([hardening],
 )
 
 dnl Export maps: each library exports only the symbols listed in
-dnl build-aux/exports/lib<name>.sym (see build-aux/gen-exports.py, which
+dnl build-aux/symbols/lib<name>.sym (see build-aux/gen-exports.py, which
 dnl needs a tree built with --disable-export-maps to regenerate them).
 AC_ARG_ENABLE([export-maps],
-        AS_HELP_STRING([--disable-export-maps], [Export every global symbol of the CDE libraries, not only those in build-aux/exports (default=enabled)]),
+        AS_HELP_STRING([--disable-export-maps], [Export every global symbol of the CDE libraries, not only those in build-aux/symbols (default=enabled)]),
         [], [enable_export_maps=yes]
 )
 

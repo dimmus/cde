@@ -19,12 +19,11 @@ else
 libDtMrm_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
-# export only the symbols in build-aux/exports/libDtMrm.sym
+# export only the symbols in build-aux/symbols/libDtMrm.sym
 if EXPORT_MAPS
-libDtMrm_la_LDFLAGS += -Wl,--version-script=libDtMrm.ver
-EXTRA_libDtMrm_la_DEPENDENCIES = libDtMrm.ver
+libDtMrm_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtMrm-exports.ver
+EXTRA_libDtMrm_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtMrm-exports.ver
 endif
-libDtMrm.ver: $(EXPORTS_DIR)/libDtMrm.sym
+$(VSCRIPT_DIR)/libDtMrm-exports.ver: $(EXPORTS_DIR)/libDtMrm.sym
 	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
-MOSTLYCLEANFILES = libDtMrm.ver
 
