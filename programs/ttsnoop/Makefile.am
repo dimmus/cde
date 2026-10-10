@@ -22,8 +22,8 @@ DTCODEGEN_SCRATCH = $(SHELL) $(top_srcdir)/build-aux/dtcodegen-scratch \
 	"NLSPATH=$(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.cat $(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen"
 
 CLEANFILES = Ttsnoop Ttsnoop.tmp .dtcodegen.log *.BAK *.delta *.patched \
-	     $(AB_MAKEFILES) *_stubs.C *_ui.c *_ui.h ttsnoop.h dtb_utils.c \
-	     dtb_utils.h
+	     $(AB_MAKEFILES) *_stubs.C *_ui.c *_ui.h ttsnoop.C ttsnoop.h \
+	     dtb_utils.c dtb_utils.h
 
 # The generator rules below each write several files.  They are grouped
 # targets ("&:", GNU make 4.3 or later), so a parallel make runs each
