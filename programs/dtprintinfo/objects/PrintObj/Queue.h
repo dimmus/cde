@@ -33,6 +33,7 @@
 
 #include "BaseObj.h"
 #include "dtprintinfomsg.h"
+#include "ParseJobs.h"
 
 // Object Class Name
 extern const char *QUEUE;
@@ -53,6 +54,32 @@ extern const char *QUEUE_DEVICE;
 // Status Commands
 extern const char *GET_QUEUE_STATUS;
 extern const char *GET_DEVICE_STATUS;
+
+#ifndef aix
+// Command printing the status of all queues, or of queue name if not NULL
+extern char *QueueStatusCommand(const char *name = NULL);
+
+typedef struct
+{
+   const char *name;
+   boolean queue_up;
+   boolean device_up;
+   boolean have_queue;
+} QueueStatusEntry;
+
+// The queue and device states in the output of QueueStatusCommand()
+class QueueStatusTable
+{
+   char *_text;
+   QueueStatusEntry *entries;
+   int n_entries;
+
+ public:
+   QueueStatusTable(const char *output);
+   ~QueueStatusTable();
+   void Lookup(const char *name, boolean *queue_up, boolean *device_up);
+};
+#endif
 
 class Queue : public BaseObj {
 
@@ -103,6 +130,9 @@ class Queue : public BaseObj {
    boolean IsRemote();
    boolean RemoteUp() { return remote_up; }
    void ParseRemoteStatus(char *output);
+#ifdef HAVE_LOCAL_PRINT_JOBS_COMMAND
+   void ParseLocalStatus(char *output);
+#endif
 
    virtual const char *const ObjectClassName() { return QUEUE; }
 

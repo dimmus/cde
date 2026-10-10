@@ -118,24 +118,47 @@ void MotifUI::DoSetFocus(Widget w)
    XmProcessTraversal(w, XmTRAVERSE_CURRENT);
 }
 
+// Whether some part of w lies within every ancestor up to its shell, i.e.
+// whether it has not been scrolled or clipped out of view.  This is what
+// XmGetVisibility() computes first, from widget geometry; but it then also
+// runs XQueryTree() for sibling windows stacked above w, a round trip per
+// call, and the icon lists have no overlapping siblings.
+static Boolean WidgetInView(Widget w)
+{
+   if (!XtIsRealized(w) || !XtIsManaged(w))
+      return False;
+
+   // w's rectangle in the coordinates of the widget being looked at
+   int x1 = 0, y1 = 0;
+   int x2 = w->core.width, y2 = w->core.height;
+   Widget child = w;
+   Widget parent;
+   while ((parent = XtParent(child)) && !XtIsShell(child))
+    {
+      int dx = child->core.x + child->core.border_width;
+      int dy = child->core.y + child->core.border_width;
+      x1 += dx; x2 += dx;
+      y1 += dy; y2 += dy;
+      if (x1 < 0) x1 = 0;
+      if (y1 < 0) y1 = 0;
+      if (x2 > (int)parent->core.width) x2 = parent->core.width;
+      if (y2 > (int)parent->core.height) y2 = parent->core.height;
+      if (x1 >= x2 || y1 >= y2)
+	 return False;
+      if (XtIsShell(parent))
+	 break;
+      child = parent;
+    }
+   return True;
+}
+
 boolean MotifUI::DoIsVisible()
 {
+   // Application overrides this with state tracked from map and
+   // visibility events.
    boolean rc = true;
-   if (_w)
-    {
-      if (UIClass() == APPLICATION)
-       {
-	 if (XtIsRealized(_w))
-	  {
-	    XWindowAttributes attributes;
-	    XGetWindowAttributes(display, XtWindow(_w), &attributes);
-            if (attributes.map_state == IsUnmapped)
-               rc = false;
-	  }
-       }
-      else if (XmGetVisibility(_w) == XmVISIBILITY_FULLY_OBSCURED)
-         rc = false;
-    }
+   if (_w && !WidgetInView(_w))
+      rc = false;
    return rc;
 }
 

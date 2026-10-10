@@ -82,6 +82,10 @@ DtApp::DtApp(char *progname, int *argc, char **argv) :
       Application(progname, "Dtprintinfo", argc, argv)
 {
    save_state = false;
+   status_timer = 0;
+   status_running = false;
+   status_pending = false;
+   status_stale = false;
    connect_timeout = 15;
    old_dbsearchpath = NULL;
    single_printer = NULL;
@@ -459,25 +463,162 @@ void DtApp::UpdateStatusLine()
    free(msg2);
 }
 
-void DtApp::InitQueueDetails(BaseUI *obj, void *data)
+void DtApp::RequestStatusUpdate()
 {
-   ((DtPrinterIcon *)obj)->Update();
-   DtApp *app = (DtApp *)data;
-   app = (DtApp *)app->Parent();
+   if (app_mode == CONFIG_PRINTERS || save_state)
+      return;
+   if (status_running)
+      status_pending = true;
+   else
+      StartStatusPoll();
+}
 
+void DtApp::StartStatusPoll()
+{
+   status_pending = false;
+   int n = window->container->NumChildren();
+   if (n == 0)
+      return;
+#ifdef aix
+   // One "enq" per queue and device, as before
+   DtPrinterIcon **queues = (DtPrinterIcon **) window->container->Children();
+   int i;
+   for (i = 0; i < n; i++)
+      queues[i]->UpdateNow();
+   if (app_mode == SINGLE_PRINTER)
+      UpdateStatusLine();
+#else
+   char *cmd = QueueStatusCommand(app_mode == SINGLE_PRINTER && single_printer
+				  ? single_printer->QueueObj()->Name() : NULL);
+   status_running = true;
+   Thread(cmd, StatusOutputCB, 1024);
+   free(cmd);
+#endif
+}
+
+void DtApp::StatusOutputCB(BaseUI *obj, char *output, int rc)
+{
+#ifndef aix
+   DtApp *app = (DtApp *)obj;
+   app->status_running = false;
    if (app->save_state)
       return;
 
-   int n_siblings = obj->NumSiblings();
-   int i = obj->Order() + 1;
-   if (i < n_siblings)
+   // rc is -1 only if the command could not be started; keep the old state
+   if (rc != -1)
     {
-      BaseUI **siblings = obj->Siblings();
-      siblings[i]->AddTimeOut(InitQueueDetails, data, 3000);
+      QueueStatusTable table(output);
+      int i, n = app->window->container->NumChildren();
+      DtPrinterIcon **queues =
+	 (DtPrinterIcon **) app->window->container->Children();
+      for (i = 0; i < n; i++)
+       {
+	 boolean queue_up, device_up;
+	 table.Lookup(queues[i]->QueueObj()->Name(), &queue_up, &device_up);
+#ifdef sun
+	 // The device of a remote queue is not checked
+	 if (queues[i]->QueueObj()->IsRemote())
+	    device_up = queue_up;
+#endif
+	 queues[i]->SetStatus(queue_up, device_up);
+       }
+      if (app->app_mode == SINGLE_PRINTER)
+	 app->UpdateStatusLine();
     }
-   if (app->app_mode == SINGLE_PRINTER)
-      app->UpdateStatusLine();
+   if (app->status_pending)
+      app->StartStatusPoll();
+#endif
 }
+
+void DtApp::StartStatusTimer()
+{
+   if (status_timer)
+      XtRemoveTimeOut(status_timer);
+   status_timer = XtAppAddTimeOut(appContext, (unsigned long) Frequency,
+				  StatusTimerCB, (XtPointer) this);
+}
+
+void DtApp::StatusTimerCB(XtPointer data, XtIntervalId *)
+{
+   DtApp *app = (DtApp *)data;
+   app->status_timer = 0;
+   if (app->save_state)
+      return;
+   app->StartStatusTimer();
+
+   // if we are doing a Find operation, wait for the next tick
+   if (app->window->in_find)
+      return;
+   // If we are unmapped (iconified, in another workspace) or fully covered,
+   // catch up when we become visible again
+   if (app->IsVisible() == false)
+    {
+      app->status_stale = true;
+      return;
+    }
+   app->RequestStatusUpdate();
+   app->RefreshOpenQueues();
+}
+
+void DtApp::ShellVisibilityChanged(boolean visible)
+{
+   if (visible && status_stale)
+      XtAppAddTimeOut(appContext, 0, CatchUpCB, (XtPointer) this);
+}
+
+void DtApp::CatchUpCB(XtPointer data, XtIntervalId *)
+{
+   DtApp *app = (DtApp *)data;
+   if (!app->status_stale || app->save_state || app->window->in_find ||
+       app->IsVisible() == false)
+      return;
+   app->status_stale = false;
+   app->RequestStatusUpdate();
+   app->RefreshOpenQueues();
+}
+
+// Update the job lists of the open queues that can be seen
+void DtApp::RefreshOpenQueues()
+{
+   if (app_mode == CONFIG_PRINTERS || window->in_find)
+      return;
+   int i, n = window->container->NumChildren();
+   if (n == 0)
+      return;
+   // OpenClose() may run callbacks; work on a copy of the list
+   DtPrinterIcon **queues = new DtPrinterIcon *[n];
+   memcpy(queues, window->container->Children(), n * sizeof(DtPrinterIcon *));
+   for (i = 0; i < n; i++)
+    {
+      DtPrinterIcon *icon = queues[i];
+      Container *rc = icon->JobContainer();
+      // Skip queues that are filtered out, scrolled out of view or closed
+      if (!rc || icon->Visible() == false || icon->IsVisible() == false ||
+	  rc->Visible() == false)
+	 continue;
+      if (icon->Open() == true && icon->updating == false)
+	 OpenClose(icon);
+    }
+   delete [] queues;
+}
+
+#ifdef HAVE_LOCAL_PRINT_JOBS_COMMAND
+// The job list of a local queue has been read (see OpenClose)
+void DtApp::LocalStatusCB(BaseUI *obj, char *output, int)
+{
+   DtPrinterIcon *printer_icon = (DtPrinterIcon *)obj->Parent();
+   printer_icon->updating = false;
+   if (obj->InUpdate())
+      obj->EndUpdate();
+   // If the queue was closed while lpq was running, leave it empty
+   if (printer_icon->Open() == false)
+      return;
+   printer_icon->QueueObj()->ParseLocalStatus(output);
+   // Show the jobs
+   printer_icon->jobs_read = true;
+   printer_icon->Open(true);
+}
+#endif
 
 void DtApp::RemoteStatusCB(BaseUI *obj, char *output, int)
 {
@@ -596,14 +737,12 @@ void DtApp::OpenClose(BaseUI *obj)
 
       sprintf(message, MESSAGE(UpdatingL), obj->Name());
       if (!rc)
-       {
          rc = printer_icon->CreateContainer();
-         rc->AddTimeOut(UpdatePrintJobs, window, Frequency);
-       }
       else
 	 prev_open = rc->Visible();
       if (printer_icon->Visible())
          rc->Visible(true);
+      boolean have_jobs = false;
       if (queue->IsRemote() && printer_icon->waitForChildren == false)
        {
          if (printer_icon->updating == false)
@@ -620,6 +759,7 @@ void DtApp::OpenClose(BaseUI *obj)
                   rc->Refresh();
 		}
                printer_icon->UpdateExpand();
+	       delete [] message;
 	       rc->Thread(sockfd, RemoteStatusCB, 512);
 	       return;
 	     }
@@ -631,11 +771,48 @@ void DtApp::OpenClose(BaseUI *obj)
           }
 	 printer_icon->updating = false;
        }
+#ifdef HAVE_LOCAL_PRINT_JOBS_COMMAND
+      // Read the job list of a local queue without blocking; LocalStatusCB
+      // calls Open(true) again when it has been read.  Find needs the
+      // jobs right away (waitForChildren) and reads them synchronously.
+      else if (printer_icon->waitForChildren == false)
+       {
+         if (printer_icon->jobs_read)
+          {
+	    // Called from LocalStatusCB: the queue has its jobs
+            printer_icon->jobs_read = false;
+            have_jobs = true;
+          }
+	 else
+	  {
+	    // Show "Updating" first: the callback can run before Thread()
+	    // returns if the command cannot be started.
+            if (prev_open == false && rc->InUpdate() == false)
+             {
+               rc->BeginUpdate();
+               rc->UpdateMessage(message);
+               rc->Refresh();
+             }
+            printer_icon->UpdateExpand();
+            delete [] message;
+	    // If lpq is running already, its callback shows the jobs
+            if (printer_icon->updating == false)
+             {
+               char cmd[1000];
+               LocalPrintJobsCommand(queue->Name(), cmd, sizeof(cmd));
+               printer_icon->updating = true;
+               rc->Thread(cmd, LocalStatusCB, 512);
+             }
+            return;
+          }
+       }
+#endif
       DtWorkArea *container = (DtWorkArea *)obj->Parent();
       window->WorkingCursor(true);
       window->status_line->Name(message);
       container->Refresh();
-      if (queue->IsRemote() == false || printer_icon->waitForChildren)
+      if (have_jobs == false &&
+	  (queue->IsRemote() == false || printer_icon->waitForChildren))
          queue->UpdateChildren();
       PrintJob ** jobs = (PrintJob **)queue->Children();
       int n_jobs = queue->NumChildren();
@@ -950,50 +1127,6 @@ void DtApp::ActionCB(BaseUI *obj, char *actionReferenceName)
     }
 }
 
-void DtApp::UpdatePrintJobs(BaseUI *obj, // the print list box
-			    void *data)
-{
-   DtMainW *window = (DtMainW *) data;
-   if (((DtApp *)window->Parent())->save_state)
-      return;
-
-   int Frequency = (int)((DtApp *)window->Parent())->Frequency;
-   // if we are doing a Find operation or have been filtered, return
-   if (window->in_find || obj->Parent()->Visible() == false)
-    {
-      obj->AddTimeOut(UpdatePrintJobs, data, Frequency);
-      return;
-    }
-
-   DtPrinterIcon *icon = (DtPrinterIcon *)obj->Parent();
-   Application *app = (Application *) window->Parent();
-   // Check app's visibility to see if we are iconified or in a different
-   // workspace, also check the icon's visibility to see if it's visible
-   // in the scrolled window.
-   if (app->IsVisible() == false || icon->IsVisible() == false)
-    {
-      obj->AddTimeOut(UpdatePrintJobs, data, Frequency);
-      return;
-    }
-
-   // Queue Icon (parent) is visible, so update it
-   icon->Update();
-
-   if (obj->Visible() == false)
-    {
-      // The jobs list box is not visible, so add a timeout and return
-      obj->AddTimeOut(UpdatePrintJobs, window, Frequency);
-      return;
-    }
-
-   if (obj->Parent()->Open() == true)
-    {
-      if (icon->updating == false)
-         OpenClose(window, obj->Parent());
-    }
-   obj->AddTimeOut(UpdatePrintJobs, window, Frequency);
-}
-
 char *DtApp::GetBottomString(BaseObj *job, boolean need_details)
 {
    static char string[200];
@@ -1131,8 +1264,16 @@ void DtApp::PreferenceCB(PreferenceRequest req, char *value)
          int i;
          DtPrinterIcon **queues;
          queues = (DtPrinterIcon **) window->container->Children();
+#ifdef aix
          for (i = 0; i < window->container->NumChildren(); i++)
             queues[i]->Update();
+#else
+	 // Show or hide the flags now, then refresh the states
+         for (i = 0; i < window->container->NumChildren(); i++)
+            queues[i]->SetStatus(queues[i]->PrintQueueUp(),
+				 queues[i]->PrintDeviceUp());
+         RequestStatusUpdate();
+#endif
       }
       break;
    case SHOW_ONLY_MINE_ON:
@@ -1146,6 +1287,8 @@ void DtApp::PreferenceCB(PreferenceRequest req, char *value)
       break;
    case UPDATE_INTERVAL_CHANGED:
       Frequency = (long) value * 1000;
+      if (status_timer)
+         StartStatusTimer();
       break;
    }
 }
@@ -1383,7 +1526,7 @@ void DtApp::UpdateQueues()
 	       break;
 	     }
 	 delete _thread;
-	 delete output;
+	 free(output);
        }
       if (found == -1)
        {
@@ -1440,7 +1583,9 @@ void DtApp::UpdateQueues()
    if (app_mode != CONFIG_PRINTERS)
     {
       AddTimeOut(RestoreAppCB, this, 0);
-      printers[0]->AddTimeOut(InitQueueDetails, window, 3000);
+      // Status flags of all queues, then every Frequency ms
+      RequestStatusUpdate();
+      StartStatusTimer();
     }
 }
 

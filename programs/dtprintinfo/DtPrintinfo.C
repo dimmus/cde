@@ -81,15 +81,36 @@ int main(int argc, char **argv)
 
    if (!STRCMP(argv[1], "-help"))
     {
-      char *output;
-      char *cmd = new char [strlen(LIST_QUEUES) + 30];
-      sprintf(cmd, "%s | awk '{print \"\\t\", $1}'", LIST_QUEUES);
-      Invoke *_thread = new Invoke(cmd, &output);
-      printf(MESSAGE(CommandLineHelpL), output);
+      // Same as piping the queue list through awk '{print "\t", $1}'
+      char *queues = ListPrintQueues();
+      size_t n_lines = 0;
+      char *s;
+      for (s = queues; (s = strchr(s, '\n')); s++)
+         n_lines++;
+      char *output = (char *) malloc(strlen(queues) + 2 * n_lines + 1);
+      char *o = output;
+      char *line, *next;
+      for (line = queues; output && line && *line; line = next)
+       {
+         if ((next = strchr(line, '\n')))
+            *next++ = '\0';
+         char *end;
+         while (*line == ' ' || *line == '\t')
+            line++;
+         for (end = line; *end && *end != ' ' && *end != '\t'; end++)
+            ;
+         *o++ = '\t';
+         *o++ = ' ';
+         memcpy(o, line, end - line);
+         o += end - line;
+         *o++ = '\n';
+       }
+      if (output)
+         *o = '\0';
+      printf(MESSAGE(CommandLineHelpL), output ? output : "");
       printf("\n");
-      delete output;
-      delete [] cmd;
-      delete _thread;
+      free(output);
+      free(queues);
       return 0;
     }
 

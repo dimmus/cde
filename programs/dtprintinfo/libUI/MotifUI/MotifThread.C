@@ -71,6 +71,8 @@ void MotifThread::CreateThread(MotifUI *_obj, const char *cmd, int _pid,
    output = NULL;
    out1 = NULL;
    inputID = 0;
+   pid = -1;
+   fd = -1;
    if (_buf_len < 0)
       buf_len = 512;
    else
@@ -89,15 +91,15 @@ void MotifThread::CreateThread(MotifUI *_obj, const char *cmd, int _pid,
       if ((pid = fork()) == 0)  // In Child
        {
          close(m_stdout[0]);
-         close(1);
-         dup(m_stdout[1]);
+         dup2(m_stdout[1], 1);
          close(m_stdout[1]);
 
-         execlp(KORNSHELL, "ksh", "-c", cmd, NULL);
+         execlp(KORNSHELL, "ksh", "-c", cmd, (char *) NULL);
 
          char *msg = strerror(errno);
-         write(1, msg, strlen(msg));
-         exit(-1);
+         if (write(1, msg, strlen(msg)) < 0)
+	    _exit(-1);
+         _exit(-1);
        } 
       else if (pid == -1)
        {
@@ -146,9 +148,12 @@ void MotifThread::Halt()
    fd = -1;
    if (pid != -1)
     {
+      // Reap exactly our child; wait() could take a child that someone
+      // else (Invoke, another MotifThread) is waiting for.
       pid_t w;
-      while ((w = wait(&status)) != pid && w != -1);
-      status = (status >> 8) & 0xFF;
+      while ((w = waitpid(pid, &status, 0)) == -1 && errno == EINTR)
+	 ;
+      status = (w == pid) ? ((status >> 8) & 0xFF) : -1;
     }
    else
       status = 0;
@@ -171,6 +176,9 @@ void MotifThread::GetOutput()
       out1 += n;
       len = out2 - out1 + 1;
     }
+   else if (n < 0 && (errno == EINTR || errno == EAGAIN ||
+		      errno == EWOULDBLOCK))
+      return; // spurious wakeup, wait for more input
    else
      Halt();
 }

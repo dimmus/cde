@@ -34,6 +34,8 @@
 #include <Xm/ToggleB.h>
 #include <Xm/ArrowB.h>
 #include "WorkArea.h"
+#include <stdlib.h>
+#include <string.h>
 
 Button::Button(MotifUI *parent, char *name, ButtonType button_type,
 	       ButtonCallback callback, void * callback_data,
@@ -57,12 +59,15 @@ Button::Button(char *category, MotifUI *parent, char *name,
 
 Button::~Button()
 {
-   delete _iconFile;
+   free(_iconFile);
 }
 
 void Button::IconFile(char *iconFile)
 {
-   delete _iconFile;
+   // The expand button gets its icon again on every job list refresh
+   if (_iconFile && iconFile && !strcmp(_iconFile, iconFile))
+      return;
+   free(_iconFile);
    _iconFile = STRDUP(iconFile);
    if (_iconFile)
     {
@@ -123,14 +128,14 @@ void Button::CreateButton(MotifUI *parent, char *name, char * /*category*/,
                                    GuiNsuperNode, super_node, NULL);
    else
     {
-      int dir;
+      int dir = XmARROW_RIGHT;
 
       switch (button_type)
        {
-	case UP_ARROW_BUTTON: dir = XmARROW_UP;
-	case DOWN_ARROW_BUTTON: dir = XmARROW_DOWN;
-        case LEFT_ARROW_BUTTON: dir = XmARROW_LEFT;
-        case RIGHT_ARROW_BUTTON: dir = XmARROW_RIGHT;
+	case UP_ARROW_BUTTON: dir = XmARROW_UP; break;
+	case DOWN_ARROW_BUTTON: dir = XmARROW_DOWN; break;
+        case LEFT_ARROW_BUTTON: dir = XmARROW_LEFT; break;
+        case RIGHT_ARROW_BUTTON: dir = XmARROW_RIGHT; break;
         default: break;
        }
       _w = XtVaCreateManagedWidget("arrow", xmArrowButtonWidgetClass, parentW, 

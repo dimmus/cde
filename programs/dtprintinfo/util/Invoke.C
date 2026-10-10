@@ -28,43 +28,79 @@
  * (c) Copyright 1993, 1994 Novell, Inc.                                *
  */
 
+
 #include "Invoke.h"
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <sys/time.h>
+#include <poll.h>
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
-#if !defined(CSRG_BASED)
-#include <values.h>
-#endif
-#ifdef _AIX
-#include <strings.h>		/* need to get bzero defined */
-#endif /* _AIX */
 
 const int BUFFER_SIZE = 512;
+
+// Growable, always NUL-terminated buffer for one output stream of the child.
+struct InvokeBuffer
+{
+   char *data;
+   size_t len;
+   size_t size;
+};
+
+static int InvokeBufferInit(InvokeBuffer *buf)
+{
+   buf->len = 0;
+   buf->size = BUFFER_SIZE;
+   if (!(buf->data = (char *) malloc(buf->size)))
+      return -1;
+   *buf->data = '\0';
+   return 0;
+}
+
+// Read what is available on fd. Returns 1 while the stream is open, 0 at
+// end of file or on a read error, -1 if memory ran out.
+static int InvokeBufferRead(InvokeBuffer *buf, int fd)
+{
+   for (;;)
+    {
+      if (buf->size - buf->len < BUFFER_SIZE / 2)
+       {
+	 char *data = (char *) realloc(buf->data, buf->size * 2);
+	 if (!data)
+	    return -1;
+	 buf->data = data;
+	 buf->size *= 2;
+       }
+      ssize_t n = read(fd, buf->data + buf->len, buf->size - buf->len - 1);
+      if (n > 0)
+       {
+	 buf->len += n;
+	 buf->data[buf->len] = '\0';
+	 continue;
+       }
+      if (n < 0 && errno == EINTR)
+	 continue;
+      if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+	 return 1;
+      return 0;
+    }
+}
 
 Invoke::Invoke(const char *command,   // Command to Run
                char **out_ptr,        // ptr to output buffer ptr 
                char **err_ptr,        // ptr to error buffer ptr
                uid_t _uid)            // run command as this UID
 {
-   int m_stdout[2], m_stderr[2];       // progname file descriptors
-   pid_t c_pid;                        // child's pid 
-   pid_t w;                            // temp vars 
-   int out_num,err_num;                // # of chars read 
-   char *out_tmp = NULL, *err_tmp = NULL;     // temp buffer ptrs
-   char *out_end = NULL, *err_end = NULL; // ptr to end of buffer
-   int outb_size,errb_size;            // buffer size 
-   int out_count, err_count;           // # of buffers allocated 
-   int trap_out,trap_err;              // flags; if >0, trap output 
-   fd_set rdmask;                      // for select system call 
-   fd_set wrmask;                      // for select system call 
-   fd_set exmask;                      // for select system call 
-   int Nfdsmsgs;
+   int m_stdout[2] = { -1, -1 }, m_stderr[2] = { -1, -1 };
+   InvokeBuffer out = { NULL, 0, 0 }, err = { NULL, 0, 0 };
+   pid_t c_pid;
+   pid_t w;
+   int wstatus = 0;
+   int trap_out = (out_ptr != NULL);
+   int trap_err = (err_ptr != NULL);
 
    struct sigaction action;            // parameters of sigaction 
    struct sigaction oldsigint_act;
@@ -72,42 +108,20 @@ Invoke::Invoke(const char *command,   // Command to Run
 
    status = 0;
 
-   trap_out = (out_ptr != NULL);
-   trap_err = (err_ptr != NULL);
-
-   // initialize internal variables
-   out_num = err_num = 0;
-
-   // setup pipes if specified
+   // The callers always get a string back when they asked for one, even
+   // when the command could not be run.
    if (trap_out)
     {
-      *out_ptr = 0;
-
-      if (pipe(m_stdout) < 0)
-       {
-         status = -1;
-         return;
-       }
+      *out_ptr = NULL;
+      if (InvokeBufferInit(&out) < 0 || pipe(m_stdout) < 0)
+	 goto fail;
     }
-
    if (trap_err)
     {
-      *err_ptr = 0;
-
-      if (pipe(m_stderr) < 0)
-       {
-         if (trap_out)
-            close(m_stdout[0]);
-         status = -1;
-         return;
-       }
+      *err_ptr = NULL;
+      if (InvokeBufferInit(&err) < 0 || pipe(m_stderr) < 0)
+	 goto fail;
     }
-   if (trap_err)
-      Nfdsmsgs = m_stderr[0] + 1;
-   else if (trap_out)
-      Nfdsmsgs = m_stdout[0] + 1;
-   else
-      Nfdsmsgs = 0;
 
    // ignore these signals
    memset(&action, '\0', sizeof (struct sigaction));
@@ -122,40 +136,27 @@ Invoke::Invoke(const char *command,   // Command to Run
    if ((c_pid = fork()) == 0)
     { // ------------------------ child process --------------------------
 
-      if (_uid != (uid_t)-1)
-	 setuid(_uid);
+      if (_uid != (uid_t)-1 && setuid(_uid) != 0)
+	 _exit(127);
 
       if (trap_out)
        { // duplicate stdout
          close(m_stdout[0]);
-         close(1);
-         dup(m_stdout[1]);
+         dup2(m_stdout[1], 1);
          close(m_stdout[1]);
        }
 
       if (trap_err)
        { // duplicate stderr
          close(m_stderr[0]);
-         close(2);
-         dup(m_stderr[1]);
+         dup2(m_stderr[1], 2);
          close(m_stderr[1]);
        }
 
       // start the program 
       execlp(KORNSHELL, "ksh", "-c", command, (char *) 0);
 
-      exit(-1);
-    }
-   else if (c_pid == -1)
-    {
-      if (trap_err)
-         close(m_stderr[0]);
-
-      if (trap_out)
-         close(m_stdout[0]);
-
-      status = -1;
-      return;
+      _exit(-1);
     }
 
    // -------------------------- parent process --------------------------
@@ -164,193 +165,101 @@ Invoke::Invoke(const char *command,   // Command to Run
    sigaction(SIGINT, &oldsigint_act, NULL);
    sigaction(SIGQUIT, &oldsigquit_act, NULL);
 
-   // close the write side of the pipe for the parent
+   if (c_pid == -1)
+      goto fail;
+
+   // close the write side of the pipes for the parent
    if (trap_out)
     {
       close(m_stdout[1]);
-      fcntl(m_stdout[0], F_SETFL, O_NDELAY);
+      m_stdout[1] = -1;
+      fcntl(m_stdout[0], F_SETFL, O_NONBLOCK);
     }
-
    if (trap_err)
     {
       close(m_stderr[1]);
-      fcntl(m_stderr[0], F_SETFL, O_NDELAY);
-    }
-
-   if (!trap_out && !trap_err)
-    { // no piped output 
-      // wait for the child to die
-      while ((w = wait(&status)) != c_pid && w != -1)
-	 ;
-      status = (status >> 8) & 0xFF;
-      return;
-    }
-
-   // initialize buffer pointers
-   if (trap_out)
-    {
-      *out_ptr = (char *) malloc(BUFFER_SIZE);
-      if (*out_ptr == NULL)
-       {
-         close(m_stdout[0]);
-         if (trap_err)
-            close(m_stderr[0]);
-         status = -1;
-         return;
-       }
-
-      out_tmp = *out_ptr;
-      out_end = *out_ptr + BUFFER_SIZE - 1;
-      out_count = 1;
-      outb_size = BUFFER_SIZE;
-    }
-
-   if (trap_err)
-    {
-      *err_ptr = (char *) malloc(BUFFER_SIZE);
-      if (*err_ptr == NULL)
-       {
-         close(m_stderr[0]);
-         if (trap_out)
-            close(m_stdout[0]);
-
-         status = -1;
-         return;
-       }
-
-      *err_ptr = (char *) malloc(BUFFER_SIZE);
-      err_tmp = *err_ptr;
-      err_end = *err_ptr + BUFFER_SIZE - 1;
-      err_count = 1;
-      errb_size = BUFFER_SIZE;
+      m_stderr[1] = -1;
+      fcntl(m_stderr[0], F_SETFL, O_NONBLOCK);
     }
 
    while (trap_out || trap_err)
     {
-      // reset the file descriptor masks
-      FD_ZERO(&rdmask);
-      FD_ZERO(&wrmask);
-      FD_ZERO(&exmask);
+      struct pollfd fds[2];
+      int nfds = 0;
 
-      // set the bit masks for the descriptors to be checked
       if (trap_out)
-         FD_SET(m_stdout[0], &rdmask);
-      if (trap_err)
-         FD_SET(m_stderr[0], &rdmask);
-
-      // check the status
-      if (select(Nfdsmsgs,&rdmask,&wrmask,&exmask,(struct timeval *)NULL) == -1)
        {
-         if (errno == EINTR)
-            continue;
-         else
-          {
-            if (trap_out)
-               close(m_stdout[0]);
-            if (trap_err)
-               close(m_stderr[0]);
-
-            status = -1;
-            return;
-          }
+	 fds[nfds].fd = m_stdout[0];
+	 fds[nfds].events = POLLIN;
+	 nfds++;
        }
-      if (trap_out && FD_ISSET(m_stdout[0], &rdmask))
-
+      if (trap_err)
        {
-         // read the child's stdout
-         if ((out_num = read(m_stdout[0], out_tmp, outb_size)) < 0)
-          {
-            close(m_stdout[0]);
-            if (trap_err)
-               close(m_stderr[0]);
-
-            status = -1;
-            return;
-          }
-
-         if (out_num == 0)
-          {
-            // no more to read
-            trap_out = 0;
-            close(m_stdout[0]);
-            *out_tmp = '\0';
-          }
-         else if (out_num == outb_size)
-          {
-            // filled up a buffer; allocate another one
-            out_count++;
-            *out_ptr = (char *)realloc(*out_ptr, (out_count * BUFFER_SIZE));
-            if (*out_ptr == NULL)
-             {
-               close(m_stdout[0]);
-               if (trap_err)
-                  close(m_stderr[0]);
-               status = -1;
-               return;
-             }
-
-            out_tmp = *out_ptr + ((out_count - 1) * BUFFER_SIZE);
-            out_end = out_tmp + BUFFER_SIZE - 1;
-            outb_size = BUFFER_SIZE;
+	 fds[nfds].fd = m_stderr[0];
+	 fds[nfds].events = POLLIN;
+	 nfds++;
+       }
+      if (poll(fds, nfds, -1) < 0)
+       {
+	 if (errno == EINTR)
+	    continue;
+	 status = -1;
+	 break;
+       }
+      int i;
+      for (i = 0; i < nfds; i++)
+       {
+	 if (!fds[i].revents)
+	    continue;
+	 bool is_out = (trap_out && fds[i].fd == m_stdout[0]);
+	 int rc = InvokeBufferRead(is_out ? &out : &err, fds[i].fd);
+	 if (rc < 0)
+	    status = -1;
+	 if (rc <= 0)
+	  {
+	    if (is_out)
+	       trap_out = 0;
+	    else
+	       trap_err = 0;
 	  }
-         else if (out_num > 0)
-          {
-            // read less than a full buffer; reset amount to read next
-            out_tmp += out_num;
-            outb_size = out_end - out_tmp + 1;
-            outb_size = (outb_size > 0) ? outb_size : 0;
-          }
-       } // if trap_out
+       }
+      if (status == -1)
+	 break;
+    }
 
-      if (trap_err && FD_ISSET(m_stderr[0], &rdmask))
-       {
-         // read the child's stderr
-         if ((err_num = read(m_stderr[0], err_tmp, errb_size)) == -1)
-          {
-            if (trap_out)
-               close(m_stdout[0]);
+   // Close the read sides before reaping, so that a child still writing
+   // gets EPIPE instead of blocking forever.
+   if (m_stdout[0] != -1)
+      close(m_stdout[0]);
+   if (m_stderr[0] != -1)
+      close(m_stderr[0]);
+   m_stdout[0] = m_stderr[0] = -1;
 
-            close(m_stderr[0]);
+   // Reap only our own child: wait() could steal a child that an
+   // asynchronous reader (MotifThread) is waiting for.
+   while ((w = waitpid(c_pid, &wstatus, 0)) == -1 && errno == EINTR)
+      ;
+   if (status == 0)
+      status = (w == c_pid) ? ((wstatus >> 8) & 0xFF) : -1;
 
-            status = -1;
-            return;
-          }
+   if (out_ptr)
+      *out_ptr = out.data;
+   if (err_ptr)
+      *err_ptr = err.data;
+   return;
 
-         if (err_num == 0)
-          {
-            // no more to read
-            trap_err = 0;
-            close(m_stderr[0]);
-            *err_tmp = '\0';
-          }
-         else if (err_num == errb_size)
-          {
-            // filled up a buffer; allocate another one
-            err_count++;
-            *err_ptr = (char *)realloc(*err_ptr, (err_count * BUFFER_SIZE));
-            if (*err_ptr == NULL)
-             {
-               close(m_stderr[0]);
-               if (trap_out)
-                  close(m_stdout[0]);
-               status = -1;
-               return;
-             }
-
-            err_tmp = *err_ptr + ((err_count - 1) * BUFFER_SIZE);
-            err_end = err_tmp + BUFFER_SIZE - 1;
-            errb_size = BUFFER_SIZE;
-          }
-         else if (err_num > 0)
-          {
-            // read less than a full buffer; reset amount to read next
-            err_tmp += err_num;
-            errb_size = err_end - err_tmp + 1;
-            errb_size = (errb_size > 0) ? errb_size : 0;
-          }
-       } // if trap_err
-    } // while trap_out or trap_err
-
-   while ((w = wait(&status)) != c_pid && w != -1);
-   status = (status >> 8) & 0xFF;
+fail:
+   status = -1;
+   int i;
+   for (i = 0; i < 2; i++)
+    {
+      if (m_stdout[i] != -1)
+	 close(m_stdout[i]);
+      if (m_stderr[i] != -1)
+	 close(m_stderr[i]);
+    }
+   if (out_ptr)
+      *out_ptr = out.data ? out.data : strdup("");
+   if (err_ptr)
+      *err_ptr = err.data ? err.data : strdup("");
 }

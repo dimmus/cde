@@ -57,11 +57,11 @@ IconObj::IconObj(char *category, MotifUI *parent, char *name, char *iconFile,
 
 IconObj::~IconObj()
 {
-   delete _topString;
-   delete _bottomString;
-   delete _details;
-   delete _iconFile;
-   delete _stateIconName;
+   free(_topString);
+   free(_bottomString);
+   free(_details);
+   delete [] _iconFile;
+   free(_stateIconName);
 }
 
 void IconObj::CreateIconObj(MotifUI *parent, char *name, char * /*category*/,
@@ -146,8 +146,8 @@ void IconObj::CreateIconObj(MotifUI *parent, char *name, char * /*category*/,
    s = name;
 
    BaseUI *par = Parent();
-   if ((par && par->UISubClass() == ICON_LIST) ||
-       par->UISubClass() == SCROLLED_ICON_LIST)
+   if (par && (par->UISubClass() == ICON_LIST ||
+	       par->UISubClass() == SCROLLED_ICON_LIST))
       isOpened = true;
    else
       isOpened = false;
@@ -244,7 +244,7 @@ void IconObj::CreateIconObj(MotifUI *parent, char *name, char * /*category*/,
 
 void IconObj::StateIconFile(char *stateIconName)
 {
-   delete _stateIconName;
+   free(_stateIconName);
    _stateIconName = STRDUP(stateIconName);
    SetStateIconFile(IconView());
 }
@@ -329,7 +329,7 @@ void IconObj::Field(int index, char *string, int width, boolean visible,
 
 void IconObj::BottomString(char *bottomString)
 {
-   delete _bottomString;
+   free(_bottomString);
    _bottomString = STRDUP(bottomString);
    XmString xm_string = StringCreate(bottomString);
    XtVaSetValues(_w, GuiNbottomLabelString, xm_string, NULL);
@@ -338,7 +338,11 @@ void IconObj::BottomString(char *bottomString)
 
 void IconObj::TopString(char *topString)
 {
-   delete _topString;
+   // The job list sets the position of every job on every refresh; an
+   // unchanged label costs a geometry query in the icon widget.
+   if (_topString && topString && !strcmp(_topString, topString))
+      return;
+   free(_topString);
    _topString = STRDUP(topString);
    XmString xm_string = StringCreate(topString);
    XtVaSetValues(_w, GuiNtopLabelString, xm_string, NULL);
@@ -347,8 +351,7 @@ void IconObj::TopString(char *topString)
 
 void IconObj::IconFile(char *iconFile)
 {
-   delete _iconFile;
-   _iconFile = new char [strlen(iconFile) + 6];
+   delete [] _iconFile;
 
    // Get small and large pixmaps and masks
    char icon_type = 'p';
@@ -401,7 +404,7 @@ void IconObj::SetDetail()
 
 void IconObj::Details(char *details)
 {
-   delete _details;
+   free(_details);
    _details = STRDUP(details);
    if (IconView() == DETAILS)
        SetDetail();
@@ -421,8 +424,8 @@ boolean IconObj::SetOpen(boolean flag)
    BaseUI *parent = Parent();
    if (ContainerView() == TREE)
       isOpened = flag;
-   else if ((parent && parent->UISubClass() == ICON_LIST) ||
-            parent->UISubClass() == SCROLLED_ICON_LIST)
+   else if (parent && (parent->UISubClass() == ICON_LIST ||
+		       parent->UISubClass() == SCROLLED_ICON_LIST))
       isOpened = true;
    else
       isOpened = flag;
@@ -465,8 +468,8 @@ boolean IconObj::SetIcon(IconStyle style)
    BaseUI *parent = Parent();
    if (ContainerView() == TREE)
       isOpened = true;
-   else if ((parent && parent->UISubClass() == ICON_LIST) ||
-            parent->UISubClass() == SCROLLED_ICON_LIST)
+   else if (parent && (parent->UISubClass() == ICON_LIST ||
+		       parent->UISubClass() == SCROLLED_ICON_LIST))
       isOpened = true;
    else
       isOpened = Open();

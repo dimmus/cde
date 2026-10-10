@@ -418,6 +418,7 @@ class BaseUI {
    void ToFront();
    void BeginUpdate();
    void EndUpdate();
+   boolean InUpdate() { return _update ? false : true; }
    void MakeVisible();
    boolean IsVisible();
    void UpdateMessage(const char *message);
