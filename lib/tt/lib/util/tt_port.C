@@ -51,6 +51,9 @@
 #include <errno.h>
 #include <poll.h>
 #include <time.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#endif
 #include "tt_port.h"
 #include "tt_global_env.h"
 #include "tt_string.h"
@@ -181,6 +184,32 @@ _tt_restoredtablesize(void)
 		return setrlimit(RLIMIT_NOFILE, &original_dtablesize);
 	}
 #endif
+}
+
+
+/*
+ * Closes every descriptor from lowfd up, typically in a child between
+ * fork() and exec().  Uses close_range()/closefrom() where available:
+ * looping close() up to the descriptor limit (maxfds, used as-is by
+ * the fallback) costs one system call per possible descriptor, which
+ * with a raised limit (ttsession -N) is a million of them per process
+ * started.
+ */
+void
+_tt_close_fds_from(int lowfd, int maxfds)
+{
+#if defined(__linux__) && defined(SYS_close_range)
+	if (syscall(SYS_close_range, (unsigned int)lowfd, ~0U, 0) == 0) {
+		return;
+	}
+	// ENOSYS (kernel before 5.9): fall through.
+#elif defined(CSRG_BASED)
+	closefrom(lowfd);
+	return;
+#endif
+	for (int i = lowfd; i < maxfds; i++) {
+		close(i);
+	}
 }
 
 

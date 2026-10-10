@@ -67,6 +67,7 @@ _Tt_string	_tt_gethostname(void);
 int	_tt_getdtablesize(void);
 int	_tt_zoomdtablesize(void);
 int	_tt_restoredtablesize(void);
+void	_tt_close_fds_from(int lowfd, int maxfds);
 long	_tt_gethostid(void);
 int	_tt_sigset(int sig, SIG_PF handler);
 char   *_tt_putenv(const char *variable, const char *value);

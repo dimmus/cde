@@ -619,3 +619,11 @@ queued_messages()
 	return(_queued_messages);
 }
 
+
+void _Tt_s_session::
+unregister_rpc()
+{
+	if (! _rpc_server.is_null()) {
+		_rpc_server->unset();
+	}
+}

@@ -808,10 +808,11 @@ update_message(const _Tt_message_ptr &m, Tt_state newstate)
 
 
 // 
-// Returns the next undelivered message for this procid. Actually returns
-// a list of one message to allow for future optimizations with batching
-// messages if they prove to be useful (see commented old definition of
-// this method above.).  
+// Returns the next undelivered message for this procid, as a list: the
+// first undelivered message plus up to _TT_NEXT_MESSAGE_BATCH - 1
+// notices queued directly behind it.  (The commented-out definition
+// above batched requests too, which needed care to never hand two
+// requests to the receiver; notices need none of that.)
 // 
 // This method is responsible for telling the client side by way of the
 // special clear_signal field in args whether the client should clear the
@@ -822,6 +823,8 @@ update_message(const _Tt_message_ptr &m, Tt_state newstate)
 // See _Tt_c_procid::next_message for the associated client-side
 // processing. 
 //
+enum { _TT_NEXT_MESSAGE_BATCH = 32 };
+
 Tt_status _Tt_s_procid::
 next_message(_Tt_next_message_args &args)
 {
@@ -881,6 +884,27 @@ next_message(_Tt_next_message_args &args)
 		}
 	}
 	(void)_undelivered->pop();
+
+	// Batch the notices queued behind it into the same reply,
+	// so that N queued notices cost one NEXT_MESSAGE round trip
+	// instead of N.  Clients of every version accept a list (the
+	// client keeps the extras in its own _undelivered queue and
+	// leaves the signalling fd readable until that queue drains).
+	// Only notices are batched: their state never changes after
+	// they are queued, so the client cannot end up holding a
+	// stale copy that the server would otherwise have replaced in
+	// place (see add_message()).  Requests and offers still go one
+	// per call, because they move to _delivered and their state
+	// may change while queued.
+	int batched = 1;
+	while (   (batched < _TT_NEXT_MESSAGE_BATCH)
+	       && (_undelivered->count() > 0)
+	       && (_undelivered->top()->message_class() == TT_NOTICE))
+	{
+		args.msgs->push(_undelivered->top());
+		(void)_undelivered->pop();
+		batched++;
+	}
 
 	if (_undelivered->count() == 0) {
 		// the message was the last undelivered message so now

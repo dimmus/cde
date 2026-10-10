@@ -234,7 +234,6 @@ sig_handler(int sig)
 
 static pid_t do_fork(_Tt_trace_optobj& myopts)
 {
-	int		i;
 	int		_tt_getdtablesize(void);
 	int		_tt_restoredtablesize(void);
 	int		maxfds;	  // max TT fd's
@@ -247,9 +246,7 @@ static pid_t do_fork(_Tt_trace_optobj& myopts)
 		exit(2);
 	    case 0:		// child
 		maxfds = _tt_getdtablesize();
-		for (i = 3; i < maxfds; i++) {
-			close(i);
-		}
+		_tt_close_fds_from(3, maxfds);
 		_tt_restoredtablesize();
 		signal(SIGHUP, SIG_IGN);
 		(void) myopts.command(cmd); // existence of cmd already checked

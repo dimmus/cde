@@ -43,7 +43,7 @@
 
 class _Tt_rpc_server : public _Tt_object {
       public:
-	_Tt_rpc_server() { _version = 0; _socket = 0; _program = 0; _rpc_fd = 0; _transp = NULL; };
+	_Tt_rpc_server() { _version = 0; _socket = 0; _program = 0; _rpc_fd = 0; _transp = NULL; _registered = 0; };
 	_Tt_rpc_server(int program, int version, int Rsocket, _Tt_auth &auth);
 	virtual ~_Tt_rpc_server();
 	int			init(void (*service_fn)(svc_req *, SVCXPRT *));
@@ -52,7 +52,14 @@ class _Tt_rpc_server : public _Tt_object {
 	int			program() { return _program; };
 	int			version() { return _version; };
 	int			port();
+	// Removes our portmapper registrations (also done by the
+	// destructor); safe to call more than once.
+	void			unset();
+	// Makes a pending or the next run_until() return so that its
+	// caller rechecks *stop.  Async-signal-safe.
+	static void		wakeup();
       private:
+	int			_registered;
 	_Tt_auth		_auth;
 	int			_program;
 	int			_version;

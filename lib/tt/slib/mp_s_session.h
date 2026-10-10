@@ -58,6 +58,8 @@ class _Tt_s_session : public _Tt_session {
 	void			queue_message(_Tt_message_ptr &m);
 	void			pattern_added();
 	Tt_status		check_for_live_session(_Tt_string &seen);
+	// Removes the RPC service's portmapper registration (on exit).
+	void			unregister_rpc();
 
       private:
 	Tt_status		advertise_address(_Tt_string seen);
