@@ -298,7 +298,6 @@ CallInterpreter(
     int recursive;
     char *tcl_str;
     Tcl_DString tcl_dstr;
-    Tcl_Encoding tcl_enc;
 
 #if 0
     if (ib)
@@ -320,9 +319,9 @@ CallInterpreter(
 
     ProcesOutputSpec(ib, e, 0, 1);
     if (!recursive) {
-	tcl_enc = Tcl_GetEncoding(NULL, NULL);
+	/* a NULL encoding is the current system encoding */
 	tcl_str = Tcl_ExternalToUtfDString(
-			tcl_enc, GetOutputBuffer(), -1, &tcl_dstr);
+			NULL, GetOutputBuffer(), -1, &tcl_dstr);
 	result = Tcl_Eval(interpreter, tcl_str);
 	Tcl_DStringFree(&tcl_dstr);
 	ClearOutputBuffer();

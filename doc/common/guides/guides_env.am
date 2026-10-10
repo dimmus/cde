@@ -16,7 +16,10 @@ DTINFOGENOPTIONS = -L $(LANG) $(SSENTS) $(INFOLIBNAME) -d $(INFOLIBDESC)
 # dir. This is required for multi-core builds to work.
 DTINFOGENTMPDIR = /tmp/dtinfogen-guides.$$$$
 
-DTSRDIR = $(top_builddir)/programs/dtsr
+# This tree's dtsrcreate, dtsrload and dtsrindex come first in PATH, not
+# any installed ones.  The directory is absolute because dtdocbook2infolib
+# runs them from inside the bookcase.
+DTSRDIR = $(abs_top_builddir)/programs/dtsr
 
 SGMLDIR  = $(top_srcdir)/programs/dtdocbook/sgml
 SGMLDEPS = $(SGMLDIR)/docbook.dtd $(SGMLDIR)/isobox.gml \
@@ -25,5 +28,5 @@ SGMLDEPS = $(SGMLDIR)/docbook.dtd $(SGMLDIR)/isobox.gml \
     $(SGMLDIR)/isotech.gml
 
 DTINFOGEN = \
-	PATH=$(PATH):$(DTSRDIR) \
+	PATH=$(DTSRDIR):$$PATH \
 	$(top_srcdir)/programs/dtdocbook/doc_utils/dtdocbook2infolib

@@ -2,7 +2,8 @@ MAINTAINERCLEANFILES = Makefile.in
 
 include $(top_srcdir)/build-aux/cde-libs.am
 
-SUBDIRS = dtsr infolib instant locales sgml spec tcl tpt doc_utils
+# doc_utils wraps dtdocbook2infolib, which is built here (".")
+SUBDIRS = dtsr infolib instant locales sgml spec tcl tpt . doc_utils
 
 include dtdocbook.am
 

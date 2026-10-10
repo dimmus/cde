@@ -221,9 +221,10 @@ GraphicsTask::write_record( const Token &t )
     if ( gp ) {
 
       graphics_available=1;
-      int c;
-      while ( ( c=getc(gp) ) != EOF ) {
-	graphics_buffer.put(c);
+      char chunk[BUFSIZ];
+      size_t n;
+      while ( ( n = fread(chunk, 1, sizeof(chunk), gp) ) > 0 ) {
+	graphics_buffer.write(chunk, n);
       }
       
       fclose(gp);

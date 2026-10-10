@@ -112,8 +112,8 @@ static int TclPrintLocation(ClientData clientData,
 			    const char *argv[]);
 static int DefaultOutputString(ClientData clientData,
 			       Tcl_Interp *interp,
-			       int argc,
-			       const char *argv[]);
+			       int objc,
+			       Tcl_Obj *const objv[]);
 char		*GetOutFileBaseName();
 
 /* ______________________________________________________________________ */
@@ -158,11 +158,11 @@ main(
     interpreter = Tcl_CreateInterp();
 
     /* Add our output string routine as the default output string routine. */
-    Tcl_CreateCommand(interpreter,
-		      "OutputString",
-		      DefaultOutputString,
-		      0,
-		      0);
+    Tcl_CreateObjCommand(interpreter,
+			 "OutputString",
+			 DefaultOutputString,
+			 0,
+			 0);
 
     /* Add a hook so the interpreter can print the location in the
      * source file for user errors */
@@ -226,68 +226,37 @@ main(
 
 static int DefaultOutputString(ClientData clientData,
 			       Tcl_Interp *interp,
-			       int argc,
-			       const char *argv[])
+			       int objc,
+			       Tcl_Obj *const objv[])
 {
-    char *string = NULL, *pString = NULL;
-    const char *pArgv = NULL;
-    int retCode = 0, stringLength = 0;
+    static Tcl_Obj *puts_cmd, *nonewline;
+    Tcl_Obj *puts_objv[3];
 
-    if (argc < 2) {
+    if (objc < 2) {
 	Tcl_SetResult(interpreter, "Missing string to output", TCL_VOLATILE);
 	return TCL_ERROR;
     }
 
-    if (argc > 2) {
+    if (objc > 2) {
 	Tcl_SetResult(interpreter, "Too many arguments", TCL_VOLATILE);
 	return TCL_ERROR;
     }
 
-    /* leave room for worst case expansion plus quotes plus null */
-    pArgv = argv[1];
-    stringLength = (4 * strlen(pArgv)) + 3;
-
-    string = Tcl_Alloc(stringLength);
-    memset(string, 0, stringLength);
-    pString = string;
-
-
-    /* wrap the string in quotes and copy argv[1] over escaping
-     * any characters that will throw Tcl for a loop */
-    *pString++ = '"';
-    while (*pArgv) {
-	switch (*pArgv) {
-	    case '{':
-	    case '}':
-	    case '"':
-	    case '\'':
-	    case '[':
-	    case ']':
-	    case '$':
-	    case '\\':
-		*pString++ = '\\';
-	}
-	*pString++ = *pArgv++;
+    /* "puts -nonewline string", passed as words so that the string is
+     * neither quoted nor parsed again */
+    if (!puts_cmd) {
+	puts_cmd = Tcl_NewStringObj("puts", -1);
+	Tcl_IncrRefCount(puts_cmd);
+	nonewline = Tcl_NewStringObj("-nonewline", -1);
+	Tcl_IncrRefCount(nonewline);
     }
-    *pString++ = '"';
-    *pString++ = 0;
+    puts_objv[0] = puts_cmd;
+    puts_objv[1] = nonewline;
+    puts_objv[2] = objv[1];
 
-    /* put the string to the output */
-    retCode = Tcl_VarEval(interpreter, "puts -nonewline ", string,
-                          (char *)NULL);
-#if 0
-    /* JET*/
-    if (retCode != TCL_OK)
-    {
-        fprintf(stderr, "JET: retCode = %d, LEN = %d STRING = '%s'\n",
-                retCode, strlen(string), string);
-        fprintf(stderr, "\tstring[1] = 0x%02x\n", string[1]);
-    }
-#endif
-    Tcl_Free(string);
-
-    /* and ripple up any error code we got from the "puts" */
-    return retCode;
+    /* put the string to the output, and ripple up any error code we
+     * got from the "puts" */
+    return Tcl_EvalObjv(interpreter, 3, puts_objv, 0);
 }
 
 static int TclPrintLocation(ClientData clientData,

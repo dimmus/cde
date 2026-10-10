@@ -679,6 +679,44 @@ int FFlush(FILE *stream)
 
 
 /* ______________________________________________________________________ */
+/* Pass len bytes of s, in the system encoding, to the Tcl command
+ * "OutputString" (which a translation spec may rename or replace) as its
+ * one argument.  The words are handed to Tcl as they are, so nothing has
+ * to be quoted and nothing is parsed again.
+ */
+static int CallOutputString(const char *s, int len)
+{
+    static Tcl_Obj *cmd_name;
+    Tcl_DString tcl_dstr;
+    Tcl_Obj *objv[2];
+    int result;
+
+    if (!cmd_name) {
+	cmd_name = Tcl_NewStringObj("OutputString", -1);
+	Tcl_IncrRefCount(cmd_name);
+    }
+
+    /* a NULL encoding is the current system encoding */
+    Tcl_ExternalToUtfDString(NULL, s, len, &tcl_dstr);
+    objv[0] = cmd_name;
+    objv[1] = Tcl_NewStringObj(Tcl_DStringValue(&tcl_dstr),
+			       Tcl_DStringLength(&tcl_dstr));
+    Tcl_IncrRefCount(objv[1]);
+    Tcl_DStringFree(&tcl_dstr);
+
+    result = Tcl_EvalObjv(interpreter, 2, objv, 0);
+    if (result != TCL_OK) {
+	fprintf(stderr,
+		"interpreter error \"%s\" at line %d executing:\n",
+		Tcl_GetStringResult(interpreter),
+		Tcl_GetErrorLine(interpreter));
+	fprintf(stderr, "OutputString \"%s\"\n", Tcl_GetString(objv[1]));
+    }
+    Tcl_DecrRefCount(objv[1]);
+    return result;
+}
+
+/* ______________________________________________________________________ */
 /* local version of putc(3S)
  *
  * special cases a FILE of NULL by working into a buffer for later
@@ -692,15 +730,8 @@ int Putc(
     FILE *stream
 )
 {
-    int result;
-    int j;
-    char *pc;
-    char *tcl_str;
-    Tcl_DString tcl_dstr;
-    Tcl_Encoding tcl_enc;
     static int i = 0;
     static char argBuf[8];
-    static char commandBuf[] = "OutputString \"                 ";
 
     if (stream) {
 	argBuf[i++] = c;
@@ -719,34 +750,12 @@ int Putc(
 	    }
 	}
 
-	pc = &(commandBuf[14]);
-	switch (c) { /* escape those things that throw off tcl */
-	    case '{':
-	    case '}':
-	    case '"':
-	    case '\'':
-	    case '[':
-	    case ']':
-	    case '$':
-	    case '\\':
-		*pc++ = '\\';
-	}
-	for (j = 0; j < i; ++j) *pc++ = argBuf[j];
-	i = 0;
-	*pc++ = '"';
-	*pc++ = 0;
-	tcl_enc = Tcl_GetEncoding(NULL, NULL);
-	tcl_str = Tcl_ExternalToUtfDString(tcl_enc, commandBuf, -1, &tcl_dstr);
-	result = Tcl_Eval(interpreter, tcl_str);
-	Tcl_DStringFree(&tcl_dstr);
+	{
+	    int n = i;
 
-	if (result != TCL_OK) {
-	    fprintf(stderr,
-		    "interpreter error \"%s\" at line %d executing:\n",
-		    Tcl_GetStringResult(interpreter),
-		    Tcl_GetErrorLine(interpreter));
-	    fprintf(stderr, "\"%s\"\n", commandBuf);
-	    return EOF;
+	    i = 0;
+	    if (CallOutputString(argBuf, n) != TCL_OK)
+		return EOF;
 	}
 	return c;
     }
@@ -770,57 +779,14 @@ int FPuts(
     FILE *stream
 )
 {
-    static char commandBuf[128] = "OutputString \"";
-    char *pBuff,*pb;
-    const char *ps;
     int sLength;
-    int result;
-    char *tcl_str;
-    Tcl_DString tcl_dstr;
-    Tcl_Encoding tcl_enc;
 
     if ((sLength = strlen(s)) == 0)
 	return 0; /* no need to call CheckOutputBuffer() */
 
     if (stream) {
-	if (sLength > 100/2) { /* assume that every char must be escaped */
-	    pBuff = malloc(sLength + 14 + 1);
-	    commandBuf[14] = 0;
-	    strcpy(pBuff, commandBuf);
-	} else
-	    pBuff = commandBuf;
-	ps = s;
-	pb = pBuff + 14;
-	do {
-	    switch (*ps) { /* escape those things that throw off Tcl */
-		case '{':
-		case '}':
-		case '"':
-		case '\'':
-		case '[':
-		case ']':
-		case '\\':
-		    *pb++ = '\\';
-	    }
-	    *pb++ = *ps++;
-	} while (*ps);
-	*pb++ = '"';
-	*pb = 0;
-	tcl_enc = Tcl_GetEncoding(NULL, NULL);
-	tcl_str = Tcl_ExternalToUtfDString(tcl_enc, pBuff, -1, &tcl_dstr);
-	result = Tcl_Eval(interpreter, tcl_str);
-	Tcl_DStringFree(&tcl_dstr);
-
-	if (result != TCL_OK) {
-	    fprintf(stderr,
-		    "interpreter error \"%s\" at line %d executing:\n",
-		    Tcl_GetStringResult(interpreter),
-                    Tcl_GetErrorLine(interpreter));
-	    fprintf(stderr, "\"%s\"\n", pBuff);
-	    if (pBuff != commandBuf) free(pBuff);
+	if (CallOutputString(s, sLength) != TCL_OK)
 	    return EOF;
-	}
-	if (pBuff != commandBuf) free(pBuff);
 	return 0;
     }
 

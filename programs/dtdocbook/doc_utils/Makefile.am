@@ -1,77 +1,33 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-include $(top_srcdir)/build-aux/cde-libs.am
-
-# Delete a generated file whose recipe failed instead of keeping it
-# half-written.
-.DELETE_ON_ERROR:
-
 include ../dtdocbook.am
 
-infolib = ../infolib
+# Wrappers that run this tree's DocBook tools (dtdocbook2infolib, the
+# infolib programs, instant) on this tree's DocBook data, for the doc/
+# build.  The installed tools find both through the environment variables
+# dtdcbk_libexecdir and dtdcbk_datarootdir, so nothing here is compiled
+# again with build-tree paths in its flags.
 
-# SUBDIRS = $(infolib) ../dtsr ../instant
-
-noinst_PROGRAMS = \
-		  dtdocbook2infolib \
-		  MixedGen \
-		  NCFGen \
-		  NodeParser \
-		  StyleUpdate \
-		  dbdrv \
-		  valBase \
-		  validator
-
-noinst_SCRIPTS = dtdocbook2man dtdocbook2sdl
-
-AM_CXXFLAGS = $(CDE_CXXFLAGS) -DCDE_NEXT -I$(top_builddir)/lib/DtMmdb
-LDADD = $(LIBSVC)
+noinst_SCRIPTS = dtdocbook2infolib dtdocbook2man dtdocbook2sdl
+CLEANFILES = $(noinst_SCRIPTS) $(noinst_SCRIPTS:=.tmp)
 
 dtdcbk_datarootdir = $(abs_top_srcdir)/programs/dtdocbook
+dtdcbk_libexecdir = $(abs_top_builddir)/programs/dtdocbook
+dtdcbk_env = dtdcbk_libdir=$(dtdcbk_datarootdir) \
+	     dtdcbk_libexecdir=$(dtdcbk_libexecdir) \
+	     dtdcbk_datarootdir=$(dtdcbk_datarootdir)
 
-AM_CPPFLAGS = $(CDE_CPPFLAGS) \
-	      -DDTDCBK_DATAROOTDIR=\"$(dtdcbk_datarootdir)\" \
-	      -DINFOLIB_LIBEXECDIR=\"$(PWD)\"
+dtdocbook2infolib: ../dtdocbook2infolib$(EXEEXT) Makefile
+	echo "#!/bin/sh" > $@.tmp
+	echo "$(dtdcbk_env) exec $(dtdcbk_libexecdir)/dtdocbook2infolib \"\$$@\"" >> $@.tmp
+	chmod +x $@.tmp && mv -f $@.tmp $@
 
-validator_SOURCES = validator.C
-validator_LDADD = $(LIBMMDB)
+dtdocbook2man: ../dtdocbook2man Makefile
+	echo "#!/bin/sh" > $@.tmp
+	echo "$(dtdcbk_env) exec sh $(dtdcbk_libexecdir)/dtdocbook2man \"\$$@\"" >> $@.tmp
+	chmod +x $@.tmp && mv -f $@.tmp $@
 
-CLEANFILES = $(noinst_SCRIPTS) $(validator_SOURCES) dtdocbook2infolib.c
-
-dtdocbook2infolib.c: ../dtdocbook2infolib.c
-	$(RM) $@ && $(LN_S) $<
-
-validator.C: $(infolib)/validator.C
-	$(RM) $@ && $(LN_S) $<
-
-MixedGen$(EXEEXT): $(infolib)/MixedGen$(EXEEXT)
-	$(RM) $@ && $(LN_S) $<
-
-NCFGen$(EXEEXT): $(infolib)/NCFGen$(EXEEXT)
-	$(RM) $@ && $(LN_S) $<
-
-NodeParser$(EXEEXT): $(infolib)/NodeParser$(EXEEXT)
-	$(RM) $@ && $(LN_S) $<
-
-StyleUpdate$(EXEEXT): $(infolib)/StyleUpdate$(EXEEXT)
-	$(RM) $@ && $(LN_S) $<
-
-dbdrv$(EXEEXT): $(infolib)/dbdrv$(EXEEXT)
-	$(RM) $@ && $(LN_S) $<
-
-valBase$(EXEEXT): $(infolib)/valBase$(EXEEXT)
-	$(RM) $@ && $(LN_S) $<
-
-dtdocbook2man: ../dtdocbook2man
-	echo "#!/bin/sh" > $@ && chmod +x $@
-	echo "dtdcbk_libexecdir=$(dtdcbk_datarootdir) \
-		dtdcbk_datarootdir=$(dtdcbk_datarootdir) \
-		sh $(PWD)/$< \$$@" >> $@
-
-dtdocbook2sdl: ../dtdocbook2sdl
-	echo "#!$(KSH)" > $@ && chmod +x $@
-	echo "dtdcbk_libdir=$(dtdcbk_datarootdir) \
-		dtdcbk_libexecdir=$(dtdcbk_datarootdir) \
-		dtdcbk_datarootdir=$(dtdcbk_datarootdir) \
-		$(KSH) $(PWD)/$< \$$@" >> $@
-
+dtdocbook2sdl: ../dtdocbook2sdl Makefile
+	echo "#!$(KSH)" > $@.tmp
+	echo "$(dtdcbk_env) exec $(KSH) $(dtdcbk_libexecdir)/dtdocbook2sdl \"\$$@\"" >> $@.tmp
+	chmod +x $@.tmp && mv -f $@.tmp $@
