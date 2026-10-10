@@ -190,7 +190,8 @@ DtApp::DtApp(char *progname, int *argc, char **argv) :
        }
       else
        {
-         buf = new char[strlen(DBSearchPath) + strlen(lang) + 50];
+         // DBSearchPath may be NULL here
+         buf = new char[strlen(lang) + 50];
          sprintf(buf, "DTDATABASESEARCHPATH=/etc/dt/appconfig/types/%s", lang);
        }
       putenv(buf);
