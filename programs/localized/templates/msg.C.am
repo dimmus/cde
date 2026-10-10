@@ -1,6 +1,8 @@
 # process the message files...
 
 # BROKEN (always has been): fmt_tbl.cat
+# Not built, as dtudcfonted and dtudcexch themselves are not: dtudcexch.cat,
+# dtudcfonted.cat
 
 BUILT_SOURCES = Xm.cat Mrm.cat Uil.cat DtHelp.cat DtMail.cat		\
       DtPrint.cat DtWidget.cat MotifApp.cat SUNW_TOOLTALK.cat dt.cat	\
@@ -10,7 +12,7 @@ BUILT_SOURCES = Xm.cat Mrm.cat Uil.cat DtHelp.cat DtMail.cat		\
       dtksh.cat dtlogin.cat dtlp.cat dtmailopts.cat dtpad.cat		\
       dtpdm.cat dtpdmd.cat dtprintinfo.cat dtscreen.cat dtsearch.cat	\
       dtsession.cat dtstyle.cat dtterm.cat dttypes.cat dtwm.cat		\
-      dtudcexch.cat dtudcfonted.cat libdtcm.cat libDtMail.cat		\
+      libdtcm.cat libDtMail.cat					\
       dtinfo.cat dtinfo_start.cat
 
 CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
@@ -199,14 +201,6 @@ dttypes.cat: $(TOP)/util/dttypes/dttypes.msg
 	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtwm.cat: $(TOP)/dtwm/dtwm.msg
-	$(RM) $@ $@.tmp
-	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
-
-dtudcexch.cat: $(TOP)/dtudcexch/dtudcexch.msg
-	$(RM) $@ $@.tmp
-	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
-
-dtudcfonted.cat: $(TOP)/dtudcfonted/dtudcfonted.msg
 	$(RM) $@ $@.tmp
 	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 

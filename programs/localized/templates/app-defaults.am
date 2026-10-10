@@ -1,10 +1,11 @@
 # process the app-defaults files...
+# (not Dtudcfonted: dtudcfonted is not built)
 
 
 
 BUILT_SOURCES = Dthelpview Dtimsstart Dtlogin Dthello Dtsession		\
 	Dtscreen Dtwm Dtfile Dtstyle Dtpad Dticon Dtcreate Dtcalc	\
-	Dtcm Dtterm Dtmail Dtbuilder Dtudcfonted Dt Dtinfo
+	Dtcm Dtterm Dtmail Dtbuilder Dt Dtinfo
 
 CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
@@ -68,9 +69,6 @@ Dtbuilder: $(TOP)/dtappbuilder/src/ab/Dtbuilder.ad Dtbuilder.tmsg
 	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtinfo: $(TOP)/dtinfo/dtinfo/src/Dtinfo Dtinfo.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
-
-Dtudcfonted: $(TOP)/dtudcfonted/resource/Dtudcfonted Dtudcfonted.tmsg
 	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dt: $(DTSVCSRC)/DtUtil2/Dt.ad Dt.tmsg
