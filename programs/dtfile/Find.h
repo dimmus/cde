@@ -100,10 +100,22 @@ typedef struct
 
    FindApply  * apply_data;
    int          selectedItem;
-   FILE       * popenId;
+   int          pipeFd;          /* output of the find/grep process, or -1 */
    int          childpid;
    XtInputId    alternateInputId;
    Boolean      searchInProgress;
+   int          searchPhase;     /* what the process output lists */
+   char       * lineBuf;         /* output not yet processed */
+   int          lineLen;
+   int          lineSize;
+   char      ** grepDirs;        /* search by contents: folders found */
+   int          grepCount;
+   int          grepSize;
+   int          grepNext;        /* the next folder to search in */
+   char       * grepName;        /* file name pattern */
+   char       * grepContent;     /* text to search for */
+   void       * grepGlob;        /* glob_t of the current folder, or NULL */
+   size_t       grepGlobNext;    /* its next file to search in */
    FileMgrRec * fileMgrRec;
 } FindRec;
 
