@@ -839,7 +839,7 @@ ReloadResources(void)
 int 
 RestoreResources( Boolean errorHandlerInstalled, ... )
 {
-    pid_t  forkrc;
+    pid_t  forkrc, waited;
     int	   childStatus, execStatus, i;
     char *pgrm, *p;
     char *argv[20]; 
@@ -943,7 +943,7 @@ RestoreResources( Boolean errorHandlerInstalled, ... )
 	}
     }
 
-    while(waitpid(forkrc, &childStatus, 0) == -1 && errno == EINTR)
+    while((waited = waitpid(forkrc, &childStatus, 0)) == -1 && errno == EINTR)
 	;
 
     /*
@@ -952,6 +952,16 @@ RestoreResources( Boolean errorHandlerInstalled, ... )
     if(errorHandlerInstalled)
     {
 	sigaction(SIGCHLD, &smGD.childvec, (struct sigaction *) NULL);
+    }
+
+    /*
+     * -1 when dtsession_res is known to have failed (the session resource
+     * cache must not keep what it left behind then); 0 otherwise.
+     */
+    if((waited == forkrc) &&
+       !(WIFEXITED(childStatus) && (WEXITSTATUS(childStatus) == 0)))
+    {
+	return(-1);
     }
 
     return(0);

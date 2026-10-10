@@ -519,7 +519,19 @@ MakeLangList( void )
 
 }
 
-void
+/***************************************************************************
+ *
+ *  ScanNLSDir
+ *
+ *  Scan a directory structure to see if it contains an installed language.
+ *  If so, the name of the language is appended to a global list of languages.
+ *
+ *  Scan method and scan directory will vary by platform.
+ *
+ ***************************************************************************/
+
+
+static void
 ScanNLSDir(char *dirname)
 
 #if defined(_AIX)

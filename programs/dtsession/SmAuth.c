@@ -95,6 +95,14 @@ typedef struct _IceAuthFileEntryList
 #define AUTH_POLL_MS 100
 #define AUTH_RETRIES 120	/* x AUTH_POLL_MS = 12 s, > AUTH_DEADTIME */
 #define AUTH_DEADTIME 10L
+/*
+ * The lock file's ctime comes from the file server's clock, which may be
+ * off from ours (NFS home directories): a lock is only taken as stale
+ * after AUTH_DEADTIME by its ctime AND by our own clock (we waited that
+ * long for it), unless its ctime says it is older than libICE's usual
+ * dead time of ten minutes.
+ */
+#define AUTH_OLDTIME 600L
 
 /*
  * Private functions - forward declarations
@@ -146,6 +154,7 @@ lockAuthFile (
     int created = 0;
     int retries = AUTH_RETRIES;
     int fd;
+    time_t start = time(NULL), now, age;
 
     if (snprintf(creat_name, sizeof(creat_name), "%s-c", file_name)
 	    >= (int) sizeof(creat_name) ||
@@ -166,8 +175,10 @@ lockAuthFile (
 
     while (retries > 0)
     {
+	now = time(NULL);
 	if (stat(creat_name, &statb) == 0 &&
-	    time(NULL) - statb.st_ctime > AUTH_DEADTIME)
+	    ((age = now - statb.st_ctime) > AUTH_OLDTIME ||
+	     (age > AUTH_DEADTIME && now - start >= AUTH_DEADTIME)))
 	{
 	    unlink(creat_name);
 	    unlink(link_name);

@@ -77,7 +77,8 @@ static void   GetRemoteAddress( struct display *d, int fd) ;
 static SIGVAL PingBlocked( int arg ) ;
 static SIGVAL PingLost( int arg ) ;
 static SIGVAL abortOpen( int arg ) ;
-static int    serverPause( unsigned t, int serverPid, struct display *d) ;
+static int    serverPause( unsigned t, int serverPid, struct display *d,
+			   int probe) ;
 static int    serverListening( struct display *d ) ;
 static void   msleep( unsigned ms ) ;
 static SIGVAL serverPauseAbort( int arg ) ;
@@ -124,10 +125,20 @@ StartServerOnce( struct display *d )
     char	arg[1024];
     int		pid;
     char	**env;
+    int		probe;
     
     extern struct passwd   puser;	/* pseudo_user password entry	*/
 
     Debug ("Starting server for %s\n", d->name);
+
+    /*
+     * If something already accepts connections on the display's socket
+     * (another X server), the socket cannot tell that ours is ready:
+     * wait for SIGUSR1 or the server's death only, as before.
+     */
+    probe = !serverListening (d);
+    if (!probe)
+	Debug ("Display %s already accepts connections\n", d->name);
     receivedUsr1 = 0;
     signal (SIGUSR1, CatchUsr1);
     argv = d->argv;
@@ -202,7 +213,7 @@ StartServerOnce( struct display *d )
     }
     Debug ("Server started. Process ID = %d\n", pid);
     d->serverPid = pid;
-    if (serverPause ((unsigned) d->openDelay, pid, d))
+    if (serverPause ((unsigned) d->openDelay, pid, d, probe))
 	return FALSE;
     return TRUE;
 }
@@ -260,6 +271,8 @@ serverListening( struct display *d )
     int			ok = 0;
     int			pass;
     long		dpy_num;
+    sigset_t		block;
+    sigset_t		saved;
 
     if (d->displayType.location != Local || !d->name ||
 	!(colon = strrchr (d->name, ':')))
@@ -275,6 +288,15 @@ serverListening( struct display *d )
     dpy_num = strtol (p, NULL, 10);
     if (dpy_num < 0 || dpy_num > 65535)
 	return 0;
+
+    /*
+     * serverPause() siglongjmp()s out on SIGUSR1 and SIGALRM: keep them
+     * out while a socket is open, or it would leak.
+     */
+    sigemptyset (&block);
+    sigaddset (&block, SIGUSR1);
+    sigaddset (&block, SIGALRM);
+    sigprocmask (SIG_BLOCK, &block, &saved);
 
     /*
      * Linux servers also listen on an abstract socket of the same name;
@@ -301,13 +323,14 @@ serverListening( struct display *d )
 	    len = (socklen_t) sizeof (addr);
 	}
 	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) == -1)
-	    return 0;
+	    break;
 	/* Never block (on a full backlog, say). */
 	(void) fcntl (fd, F_SETFL, O_NONBLOCK);
 	if (connect (fd, (struct sockaddr *) &addr, len) == 0)
 	    ok = 1;
 	close (fd);
     }
+    sigprocmask (SIG_SETMASK, &saved, NULL);
     return ok;
 #else
     return 0;
@@ -340,7 +363,7 @@ serverPauseUsr1( int arg )
 }
 
 static int 
-serverPause( unsigned t, int serverPid, struct display *d )
+serverPause( unsigned t, int serverPid, struct display *d, int probe )
 {
     int			pid;
     unsigned		delay = 50;
@@ -371,7 +394,7 @@ serverPause( unsigned t, int serverPid, struct display *d )
 		Debug ("Server alive and kicking\n");
 		break;
 	    }
-	    if (serverListening (d)) {
+	    if (probe && serverListening (d)) {
 		Debug ("Server accepts connections\n");
 		break;
 	    }
