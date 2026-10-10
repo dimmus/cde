@@ -63,6 +63,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include <Dt/Icon.h>
 #include <Dt/IconP.h>
@@ -184,6 +185,102 @@ FileWindowExposeCallback(
  *
  ************************************************************************/
 
+/*
+ * Relayouts after resizes are coalesced: an interactive resize delivers
+ * a stream of ConfigureNotify events, and each used to relayout all
+ * icons at once.  Now a relayout runs once the pending events have been
+ * handled (from a work proc), and at most once per RELAYOUT_INTERVAL_MS;
+ * events within that interval are served by one relayout at its end.
+ */
+#define RELAYOUT_INTERVAL_MS 40
+
+static FileMgrRec  ** resize_pending = NULL;
+static int            resize_pending_count = 0;
+static int            resize_pending_size = 0;
+static XtWorkProcId   resize_work_id = 0;
+static XtIntervalId   resize_timer_id = 0;
+static struct timespec last_relayout = { 0, 0 };
+
+static long
+MsSinceLastRelayout( void )
+{
+   struct timespec t;
+
+   clock_gettime(CLOCK_MONOTONIC, &t);
+   return (t.tv_sec - last_relayout.tv_sec) * 1000L +
+          (t.tv_nsec - last_relayout.tv_nsec) / 1000000L;
+}
+
+static Boolean
+ResizeWorkProc(
+        XtPointer client_data )
+{
+   FileMgrRec  ** recs = resize_pending;
+   int            count = resize_pending_count;
+   DialogData  * dialog_data;
+   int i;
+
+   resize_work_id = 0;
+   resize_pending = NULL;
+   resize_pending_count = resize_pending_size = 0;
+   clock_gettime(CLOCK_MONOTONIC, &last_relayout);
+
+   for (i = 0; i < count; i++)
+   {
+      /* the view may have been closed meanwhile */
+      dialog_data = _DtGetInstanceData ((XtPointer)recs[i]);
+      if (dialog_data != NULL)
+         LayoutFileIcons (recs[i], (FileMgrData *) dialog_data->data,
+                          False, False);
+   }
+
+   XtFree ((char *) recs);
+   return True;
+}
+
+static void
+ResizeTimerProc(
+        XtPointer client_data,
+        XtIntervalId *id )
+{
+   resize_timer_id = 0;
+   if (resize_work_id == 0)
+      resize_work_id = XtAppAddWorkProc ((XtAppContext) client_data,
+                                         ResizeWorkProc, NULL);
+}
+
+static void
+ScheduleRelayout(
+        Widget w,
+        FileMgrRec * file_mgr_rec )
+{
+   int i;
+
+   for (i = 0; i < resize_pending_count; i++)
+      if (resize_pending[i] == file_mgr_rec)
+         return;
+
+   if (resize_pending_count == resize_pending_size)
+   {
+      resize_pending_size = resize_pending_size ? 2 * resize_pending_size : 4;
+      resize_pending = (FileMgrRec **) XtRealloc ((char *) resize_pending,
+                          resize_pending_size * sizeof(FileMgrRec *));
+   }
+   resize_pending[resize_pending_count++] = file_mgr_rec;
+
+   if (resize_work_id == 0 && resize_timer_id == 0)
+   {
+      XtAppContext app = XtWidgetToApplicationContext (w);
+      long ms = MsSinceLastRelayout();
+
+      if (ms >= 0 && ms < RELAYOUT_INTERVAL_MS)
+         resize_timer_id = XtAppAddTimeOut (app, RELAYOUT_INTERVAL_MS - ms,
+                                            ResizeTimerProc, (XtPointer) app);
+      else
+         resize_work_id = XtAppAddWorkProc (app, ResizeWorkProc, NULL);
+   }
+}
+
 void
 FileWindowResizeCallback(
         Widget w,
@@ -192,7 +289,6 @@ FileWindowResizeCallback(
 {
    FileMgrRec  * file_mgr_rec;
    DialogData  * dialog_data;
-   FileMgrData * file_mgr_data;
 
    if (event->type == ConfigureNotify)
    {
@@ -214,11 +310,7 @@ FileWindowResizeCallback(
 
       dialog_data = _DtGetInstanceData ((XtPointer)file_mgr_rec);
       if(dialog_data != NULL)
-      {
-         file_mgr_data = (FileMgrData *) dialog_data->data;
-
-         LayoutFileIcons (file_mgr_rec, file_mgr_data, False, False);
-      }
+         ScheduleRelayout (w, file_mgr_rec);
    }
 }
 

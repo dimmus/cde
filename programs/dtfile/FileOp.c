@@ -2602,6 +2602,7 @@ ChangeIconPipeCB(
             label = XmStringCreateLocalized(cb_data->new_name);
             XtSetArg(args[0], XmNstring, label);
             XtSetValues(file_view_data->widget, args, 1);
+            FileIconStateInvalidate(file_view_data->widget);
             XmStringFree(label);
             XmProcessTraversal(file_view_data->widget, XmTRAVERSE_CURRENT);
             XmUpdateDisplay (file_mgr_rec->file_window);

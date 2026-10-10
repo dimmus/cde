@@ -4848,6 +4848,85 @@ UpdateCachedDirectories(
  *==================================================================*/
 
 /*--------------------------------------------------------------------
+ * UserName, GroupName
+ *   Small caches of user and group names for GetLongName.  (A file
+ *   view by attributes used to look up the owner of every file unless
+ *   it was the same as the previous file's.)
+ *------------------------------------------------------------------*/
+
+#define ID_NAME_CACHE_SIZE 16
+#define ID_NAME_LEN        64
+
+typedef struct
+{
+   Boolean used;
+   long    id;
+   char    name[ID_NAME_LEN];
+} IdName;
+
+static IdName user_names[ID_NAME_CACHE_SIZE];
+static IdName group_names[ID_NAME_CACHE_SIZE];
+static int    next_user_slot, next_group_slot;
+
+static IdName *
+FindIdName(
+        IdName *cache,
+        long id)
+{
+   int i;
+
+   for (i = 0; i < ID_NAME_CACHE_SIZE; i++)
+      if (cache[i].used && cache[i].id == id)
+         return &cache[i];
+   return NULL;
+}
+
+static char *
+UserName(
+        uid_t uid)
+{
+   IdName *e = FindIdName(user_names, (long)uid);
+   struct passwd * user_data;
+
+   if (e == NULL)
+   {
+      e = &user_names[next_user_slot];
+      next_user_slot = (next_user_slot + 1) % ID_NAME_CACHE_SIZE;
+      e->used = True;
+      e->id = (long)uid;
+      user_data = getpwuid (uid);
+      if (user_data)
+         snprintf(e->name, sizeof(e->name), "%s", user_data->pw_name);
+      else
+         snprintf(e->name, sizeof(e->name), "%ld", (long)uid);
+   }
+   return e->name;
+}
+
+static char *
+GroupName(
+        gid_t gid)
+{
+   IdName *e = FindIdName(group_names, (long)gid);
+   struct group * group_data;
+
+   if (e == NULL)
+   {
+      e = &group_names[next_group_slot];
+      next_group_slot = (next_group_slot + 1) % ID_NAME_CACHE_SIZE;
+      e->used = True;
+      e->id = (long)gid;
+      group_data = getgrgid (gid);
+      if (group_data && group_data->gr_name[0] != '\0')
+         snprintf(e->name, sizeof(e->name), "%s", group_data->gr_name);
+      else
+         strcpy(e->name, "root");
+   }
+   return e->name;
+}
+
+
+/*--------------------------------------------------------------------
  * GetLongName
  *   Return a string that contains file information similar to "ls -l",
  *   including: permissions, owner, modified time, link (if any).
@@ -4864,26 +4943,22 @@ GetLongName(
 {
 #ifdef NLS16
    struct tm * tms;
+   struct tm tm_buf;
    char time_string[100];
 #else
    char * time_string;
 #endif /* NLS16 */
    char link_path[MAX_PATH + 5];
-   static gid_t group_id = (gid_t)-1;
-   static uid_t user_id = (uid_t)-1;
-   struct group * group_data;
-   struct passwd * user_data;
-   static char group_name[20];
-   static char user_name[20];
-   char * long_name;
+   char * group_name = "";
+   char * user_name = "";
+   char long_name[MAX_PATH * 3];
    time_t long_modify_time;
    char permission;
    char usr_read_priv, usr_write_priv, usr_exec_priv;
    char grp_read_priv, grp_write_priv, grp_exec_priv;
    char oth_read_priv, oth_write_priv, oth_exec_priv;
 
-   /*  Generate the long list name.  */
-   long_name = (char *) XtMalloc(sizeof(char) * (MAX_PATH * 3));
+   /*  Generate the long list name (copied to the heap at the end).  */
    long_name[0]='\0';
 
    /* Initially, assume their is not a soft link */
@@ -4891,31 +4966,8 @@ GetLongName(
 
    if (file_data->errnum == 0)
    {
-     if (file_data->stat.st_gid != group_id)
-     {
-       group_id = file_data->stat.st_gid;
-       group_data = getgrgid (file_data->stat.st_gid);
-       if (group_data)
-       {
-         strcpy (group_name, group_data->gr_name);
-         if (strlen (group_name) == 0)
-            strcpy (group_name, "root");
-       }
-       else
-         strcpy (group_name, "root");
-     }
-
-     if (file_data->stat.st_uid != user_id)
-     {
-       user_id = file_data->stat.st_uid;
-       user_data = getpwuid (file_data->stat.st_uid);
-       /* Initially, assume their is not a user name */
-       user_name[0] = '\0';
-       if (user_data)
-         strcpy (user_name, user_data->pw_name);
-       else
-         sprintf(user_name,"%ld",(long)user_id);
-     }
+     group_name = GroupName(file_data->stat.st_gid);
+     user_name = UserName(file_data->stat.st_uid);
    }
    else
    {
@@ -4926,7 +4978,7 @@ GetLongName(
       long_modify_time = 747616435;
                          /* just needed to determine the length of a date */
 #ifdef NLS16
-      tms = localtime(&long_modify_time);
+      tms = localtime_r(&long_modify_time, &tm_buf);
       strftime( time_string, 100,
                 GetSharedMessage(DIRECTORY_DATE_FORMAT),
                 tms);
@@ -4948,7 +5000,7 @@ GetLongName(
                             time_string,
                             0, error_msg );
 
-      return (long_name);
+      return XtNewString(long_name);
    }
 
 
@@ -5004,7 +5056,7 @@ GetLongName(
 
    long_modify_time = file_data->stat.st_mtime;
 #ifdef NLS16
-   tms = localtime(&long_modify_time);
+   tms = localtime_r(&long_modify_time, &tm_buf);
    strftime( time_string, 100,
              GetSharedMessage(DIRECTORY_DATE_FORMAT),
              tms);
@@ -5120,7 +5172,7 @@ GetLongName(
      } /* is_multibyte */
    }
 
-   return (long_name);
+   return XtNewString(long_name);
 }
 
 

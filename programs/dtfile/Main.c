@@ -4906,6 +4906,7 @@ ReloadDatabases(void)
    DesktopRec *desktopWindow;
 
    DtDbLoad();
+   _DtFlushTypeInfo();
 
    XmeFlushIconFileCache ( NULL );
 
@@ -5935,6 +5936,7 @@ BuildAndShowIconName(
                              widget,
                              (DtIconGadget) widget,
                              pixmapData);
+   FileIconStateInvalidate(widget);
 
    XtFree(new_file_type_name);
 }
@@ -6023,6 +6025,7 @@ ForceMyIconClosed (
                                 file_view_data->widget,
                                 (DtIconGadget) file_view_data->widget,
                                 pixmapData);
+      FileIconStateInvalidate(file_view_data->widget);
    }
 
    /* now check to see if any desktop objects are this directory */

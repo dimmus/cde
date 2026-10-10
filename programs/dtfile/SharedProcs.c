@@ -91,6 +91,8 @@
 #include <time.h>
 #include <pwd.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <string.h>
 
 #include <Xm/Xm.h>
 #include <Xm/XmP.h>
@@ -166,6 +168,158 @@ static void RenameCollisions(
                         int count) ;
 
 /********    End Static Function Declarations    ********/
+
+
+/************************************************************************
+ *
+ *  PtrMap
+ *      A hash map from a non-NULL pointer to a pointer, with linear
+ *      probing.  Used where dtfile used to search lists linearly for
+ *      a widget or a FileData pointer.
+ *
+ ************************************************************************/
+
+static unsigned int
+PtrMapHash(
+        void *key)
+{
+   uint64_t x = (uint64_t)(uintptr_t)key;
+
+   x ^= x >> 33;
+   x *= 0xff51afd7ed558ccdULL;
+   x ^= x >> 33;
+   return (unsigned int)x;
+}
+
+static void
+PtrMapGrow(
+        PtrMap *m)
+{
+   void **old_keys = m->keys;
+   void **old_vals = m->vals;
+   unsigned int old_size = m->size;
+   unsigned int i, j;
+
+   m->size = old_size ? 2 * old_size : 16;
+   m->keys = (void **)XtCalloc(m->size, sizeof(void *));
+   m->vals = (void **)XtMalloc(m->size * sizeof(void *));
+
+   for (i = 0; i < old_size; i++)
+   {
+      if (old_keys[i] == NULL)
+         continue;
+      for (j = PtrMapHash(old_keys[i]) & (m->size - 1);
+           m->keys[j] != NULL;
+           j = (j + 1) & (m->size - 1))
+         ;
+      m->keys[j] = old_keys[i];
+      m->vals[j] = old_vals[i];
+   }
+
+   XtFree((char *)old_keys);
+   XtFree((char *)old_vals);
+}
+
+/* Return the value stored for key, or NULL. */
+void *
+PtrMapGet(
+        PtrMap *m,
+        void *key)
+{
+   unsigned int j;
+
+   if (m->size == 0 || key == NULL)
+      return NULL;
+
+   for (j = PtrMapHash(key) & (m->size - 1);
+        m->keys[j] != NULL;
+        j = (j + 1) & (m->size - 1))
+   {
+      if (m->keys[j] == key)
+         return m->vals[j];
+   }
+   return NULL;
+}
+
+/* Store val for key (key must not be NULL); replaces an existing value. */
+void
+PtrMapPut(
+        PtrMap *m,
+        void *key,
+        void *val)
+{
+   unsigned int j;
+
+   if (key == NULL)
+      return;
+
+   if (2 * (m->count + 1) > m->size)
+      PtrMapGrow(m);
+
+   for (j = PtrMapHash(key) & (m->size - 1);
+        m->keys[j] != NULL;
+        j = (j + 1) & (m->size - 1))
+   {
+      if (m->keys[j] == key)
+      {
+         m->vals[j] = val;
+         return;
+      }
+   }
+   m->keys[j] = key;
+   m->vals[j] = val;
+   m->count++;
+}
+
+/* Remove key, if present. */
+void
+PtrMapRemove(
+        PtrMap *m,
+        void *key)
+{
+   unsigned int mask, i, j, k;
+
+   if (m->size == 0 || key == NULL)
+      return;
+
+   mask = m->size - 1;
+   for (i = PtrMapHash(key) & mask; m->keys[i] != key; i = (i + 1) & mask)
+      if (m->keys[i] == NULL)
+         return;
+
+   /* close the gap: move back later keys whose probe passed slot i */
+   for (j = (i + 1) & mask; m->keys[j] != NULL; j = (j + 1) & mask)
+   {
+      k = PtrMapHash(m->keys[j]) & mask;
+      if (i <= j ? (i < k && k <= j) : (i < k || k <= j))
+         continue;
+      m->keys[i] = m->keys[j];
+      m->vals[i] = m->vals[j];
+      i = j;
+   }
+   m->keys[i] = NULL;
+   m->count--;
+}
+
+/* Remove all keys but keep the storage. */
+void
+PtrMapClear(
+        PtrMap *m)
+{
+   if (m->count > 0)
+      memset(m->keys, 0, m->size * sizeof(void *));
+   m->count = 0;
+}
+
+void
+PtrMapFree(
+        PtrMap *m)
+{
+   XtFree((char *)m->keys);
+   XtFree((char *)m->vals);
+   m->keys = m->vals = NULL;
+   m->size = m->count = 0;
+}
 
 
 /************************************************************************
@@ -649,7 +803,117 @@ _DtBuildPath(
 
 
 /*
- * This is a function for retrieving the pixmap data for a data type.
+ * Data type attribute cache.
+ *
+ * Displaying a directory used to ask the data typing database for the
+ * same attributes of the same few types once or several times per file
+ * (icon, host, instance icon, drop actions, properties).  These depend
+ * only on the type and on the database, so they are looked up once per
+ * type.  ReloadDatabases() flushes the cache after DtDbLoad().
+ */
+
+#define TYPE_INFO_BUCKETS 256
+
+static TypeInfo *typeInfoCache[TYPE_INFO_BUCKETS];
+
+static unsigned int
+TypeInfoHash(
+        const char *s)
+{
+  unsigned int h = 2166136261u;
+
+  while (*s)
+    h = (h ^ (unsigned char)*s++) * 16777619u;
+  return h;
+}
+
+static char *
+TypeAttr(
+        char *type,
+        char *attr)
+{
+  char *v = DtDtsDataTypeToAttributeValue(type, attr, NULL);
+  char *copy = NULL;
+
+  if (v)
+  {
+    copy = XtNewString(v);
+    DtDtsFreeAttributeValue(v);
+  }
+  return copy;
+}
+
+static Boolean
+HasTypeAttr(
+        char *type,
+        char *attr)
+{
+  char *v = DtDtsDataTypeToAttributeValue(type, attr, NULL);
+
+  if (v == NULL)
+    return False;
+  DtDtsFreeAttributeValue(v);
+  return True;
+}
+
+TypeInfo *
+_DtGetTypeInfo(
+        char *type)
+{
+  TypeInfo *ti;
+  unsigned int b;
+
+  if (type == NULL)
+    return NULL;
+
+  b = TypeInfoHash(type) % TYPE_INFO_BUCKETS;
+  for (ti = typeInfoCache[b]; ti; ti = ti->next)
+    if (strcmp(ti->type, type) == 0)
+      return ti;
+
+  ti = (TypeInfo *) XtMalloc(sizeof(TypeInfo));
+  ti->type = XtNewString(type);
+  ti->host = TypeAttr(type, DtDTS_DA_DATA_HOST);
+  ti->icon = TypeAttr(type, DtDTS_DA_ICON);
+  /* an attribute exists for a file name if and only if it exists at all */
+  ti->has_instance_icon = HasTypeAttr(type, DtDTS_DA_INSTANCE_ICON);
+  ti->invisible = _DtCheckForDataTypeProperty(type, "invisible");
+  ti->drop_ops = 0;
+  if (HasTypeAttr(type, DtDTS_DA_MOVE_TO_ACTION))
+    ti->drop_ops |= XmDROP_MOVE;
+  if (HasTypeAttr(type, DtDTS_DA_COPY_TO_ACTION))
+    ti->drop_ops |= XmDROP_COPY;
+  if (HasTypeAttr(type, DtDTS_DA_LINK_TO_ACTION))
+    ti->drop_ops |= XmDROP_LINK;
+
+  ti->next = typeInfoCache[b];
+  typeInfoCache[b] = ti;
+  return ti;
+}
+
+void
+_DtFlushTypeInfo(void)
+{
+  TypeInfo *ti, *next;
+  int i;
+
+  for (i = 0; i < TYPE_INFO_BUCKETS; i++)
+  {
+    for (ti = typeInfoCache[i]; ti; ti = next)
+    {
+      next = ti->next;
+      XtFree(ti->type);
+      XtFree(ti->host);
+      XtFree(ti->icon);
+      XtFree((char *) ti);
+    }
+    typeInfoCache[i] = NULL;
+  }
+}
+
+
+/*
+ * This is the generic function for retrieving the pixmap data for a data type.
  */
 
 PixmapData *
@@ -662,6 +926,7 @@ _DtRetrievePixmapData(
 
 {
   PixmapData *pixmapData;
+  TypeInfo *typeInfo = _DtGetTypeInfo(dataType);
   char path[MAXPATHLEN];
 
   pixmapData = (PixmapData *) XtMalloc(sizeof(PixmapData));
@@ -674,15 +939,19 @@ _DtRetrievePixmapData(
   pixmapData->size = size;
 
   /* retrieve host name */
-  pixmapData->hostPrefix = DtDtsDataTypeToAttributeValue(dataType,
-                                                         DtDTS_DA_DATA_HOST,
-                                                         NULL);
+  if (typeInfo)
+    pixmapData->hostPrefix =
+                    typeInfo->host ? XtNewString(typeInfo->host) : NULL;
+  else
+    pixmapData->hostPrefix = DtDtsDataTypeToAttributeValue(dataType,
+                                                           DtDTS_DA_DATA_HOST,
+                                                           NULL);
 
   /*
      retrieve instance icon name if one exists; otherwise, retrieve class
      icon name
   */
-  if (path[0] != 0x0)
+  if (path[0] != 0x0 && (typeInfo == NULL || typeInfo->has_instance_icon))
   {
     pixmapData->instanceIconName = DtDtsDataTypeToAttributeValue(dataType,
                                             DtDTS_DA_INSTANCE_ICON,
@@ -693,8 +962,12 @@ _DtRetrievePixmapData(
 
   if (pixmapData->instanceIconName == NULL)
   {
-    pixmapData->iconName = DtDtsDataTypeToAttributeValue( dataType, 
-                                                          DtDTS_DA_ICON, NULL);
+    if (typeInfo)
+      pixmapData->iconName =
+                    typeInfo->icon ? XtNewString(typeInfo->icon) : NULL;
+    else
+      pixmapData->iconName = DtDtsDataTypeToAttributeValue( dataType,
+                                                            DtDTS_DA_ICON, NULL);
     if( pixmapData->iconName == NULL )
     {
       if( strcmp( dataType, LT_DIRECTORY ) == 0 )
@@ -841,6 +1114,26 @@ _DtCheckAndFreePixmapData(
   if (pixmapData->iconFileName)
      XtFree(pixmapData->iconFileName);
 
+  XtFree((char *) pixmapData);
+}
+
+
+/*
+ * Free pixmap data without touching any icon gadget (for callers that
+ * know the gadget already shows what this data describes).
+ */
+
+void
+_DtFreePixmapData(
+        PixmapData   *pixmapData)
+{
+  if (!pixmapData)
+    return;
+
+  DtDtsFreeAttributeValue(pixmapData->instanceIconName);
+  DtDtsFreeAttributeValue(pixmapData->iconName);
+  DtDtsFreeAttributeValue(pixmapData->hostPrefix);
+  XtFree(pixmapData->iconFileName);
   XtFree((char *) pixmapData);
 }
 

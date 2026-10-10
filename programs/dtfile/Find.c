@@ -2870,7 +2870,7 @@ findpopen(char *cmd, char *mode, int *childpid)
    if(*childpid == -1)
       return(NULL);
 
-   DBGFORK(("%s:  forked child<%d>, pipe %d\n", pname, childpid, parentside));
+   DBGFORK(("%s:  forked child<%d>, pipe %d\n", pname, *childpid, parentside));
 
    (void) close(childside);  /* We don't need child side, so close it */
    return(fdopen(parentside, mode));
