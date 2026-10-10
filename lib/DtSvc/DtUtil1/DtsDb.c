@@ -541,8 +541,7 @@ _DtDtsDbGetRecordByName(DtDtsDbDatabase *db, char *name)
 	{
 		struct _DtDtsDbNameIndex	*ix;
 
-		if (name_quark == NULLQUARK)
-			return NULL;	/* no record has this name */
+		/* (An unnamed record makes name_index_update() fail.) */
 		if ((ix = name_index_update(db)))
 		{
 			unsigned int	j = name_hash(name_quark) & ix->mask;

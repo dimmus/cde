@@ -394,7 +394,8 @@ shared_cache_name(void)
  * either the old or the new one.  A client whose database search path
  * differs from the one the shared cache was built for (another LANG or
  * DTDATABASESEARCHPATH) does not replace it, but builds a private one,
- * as before.
+ * as before; so does a client that cannot replace it (the file is not
+ * its own), and root does not create one.
  */
 int
 _DtDtsMMInit(int override)
@@ -438,9 +439,24 @@ _DtDtsMMInit(int override)
 				break;
 			}
 		}
-		else if(status == MM_ABSENT || status == MM_UNUSABLE)
+		else if(status == MM_UNUSABLE)
 		{
 			replace = 1;
+		}
+		else if(status == MM_ABSENT)
+		{
+			/*
+			 * Create it, unless we are root: a root client
+			 * (the login greeter, an application run with
+			 * sudo) would leave a file the user's clients
+			 * cannot replace.
+			 */
+			replace = (getuid() != 0);
+		}
+		if(geteuid() != getuid())
+		{
+			/* The file would not be owned by our real user. */
+			replace = 0;
 		}
 
 		if(replace)
