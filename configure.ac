@@ -35,6 +35,32 @@ dnl These must be up here for the compiler search list to actually work
 AC_PROG_CC([cc gcc clang])
 AC_PROG_CXX([c++ g++ clang++])
 
+dnl Link-time optimisation (--enable-lto).  Archives of LTO objects must
+dnl be made by the gcc-ar/gcc-ranlib/gcc-nm wrappers, which load the LTO
+dnl plugin, so this comes before LT_INIT, which picks AR, RANLIB and NM.
+AC_ARG_ENABLE([lto],
+        AS_HELP_STRING([--enable-lto], [Build with link-time optimisation, -flto=auto -fno-semantic-interposition (default=no)]),
+        [], [enable_lto=no]
+)
+LTO_CFLAGS=""
+LTO_CXXFLAGS=""
+LTO_LDFLAGS=""
+if test "x$enable_lto" != xno; then
+   CDE_CHECK_CFLAG([-flto=auto], [LTO_CFLAGS])
+   CDE_CHECK_CXXFLAG([-flto=auto], [LTO_CXXFLAGS])
+   CDE_CHECK_LDFLAG([-flto=auto], [LTO_LDFLAGS])
+   if test -z "$LTO_CFLAGS" || test -z "$LTO_CXXFLAGS" || test -z "$LTO_LDFLAGS"; then
+      AC_MSG_ERROR([--enable-lto: the compilers or the linker do not support -flto=auto])
+   fi
+   CDE_CHECK_CFLAG([-fno-semantic-interposition], [LTO_CFLAGS])
+   CDE_CHECK_CXXFLAG([-fno-semantic-interposition], [LTO_CXXFLAGS])
+   if test "x$GCC" = xyes; then
+      AC_CHECK_TOOL([AR], [gcc-ar])
+      AC_CHECK_TOOL([RANLIB], [gcc-ranlib])
+      AC_CHECK_TOOL([NM], [gcc-nm])
+   fi
+fi
+
 dnl Shared libraries only: nothing links the static archives, and
 dnl building both compiles every libtool object twice.
 LT_INIT([disable-static])
@@ -451,6 +477,7 @@ HARDEN_CFLAGS=""
 HARDEN_CXXFLAGS=""
 HARDEN_LDFLAGS=""
 FORTIFY_SOURCE_2=""
+FORTIFY_SOURCE_1=""
 if test "x$enable_hardening" != xno; then
    dnl _FORTIFY_SOURCE needs optimisation (see build-aux/cde-fortify.h).
    dnl Level 3 needs GCC 12 and glibc 2.34; older glibc treats it as
@@ -475,6 +502,9 @@ if test "x$enable_hardening" != xno; then
       dnl for targets whose code trips level 3's -Wformat-overflow checks
       dnl until it is fixed (added to their _CFLAGS/_CXXFLAGS)
       FORTIFY_SOURCE_2="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2"
+      dnl for code that uses %n in a format string built at run time,
+      dnl which level 2 and above abort on
+      FORTIFY_SOURCE_1="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=1"
    fi
    CDE_CHECK_CFLAG([-fstack-protector-strong], [HARDEN_CFLAGS])
    CDE_CHECK_CXXFLAG([-fstack-protector-strong], [HARDEN_CXXFLAGS])
@@ -484,6 +514,7 @@ if test "x$enable_hardening" != xno; then
    CDE_CHECK_LDFLAG([-Wl,-z,now], [HARDEN_LDFLAGS])
 fi
 AC_SUBST(FORTIFY_SOURCE_2)
+AC_SUBST(FORTIFY_SOURCE_1)
 dnl for code built by its own build system (ksh93)
 AC_SUBST(HARDEN_CFLAGS)
 
@@ -501,6 +532,50 @@ CDE_CHECK_LDFLAG([-Wl,--sort-common], [LINK_LDFLAGS])
 CDE_LIB_LDFLAGS="-no-undefined"
 CDE_CHECK_LDFLAG([-Wl,-z,defs], [CDE_LIB_LDFLAGS])
 AC_SUBST(CDE_LIB_LDFLAGS)
+
+dnl Another linker (--with-linker=mold, lld, gold or bfd): -fuse-ld=NAME.
+dnl mold and lld link much faster than GNU ld, which shows in the ~100
+dnl links (and libtool relinks at install time) of the tree.
+AC_ARG_WITH([linker],
+        AS_HELP_STRING([--with-linker=NAME], [Link with the linker NAME (mold, lld, gold, bfd) through -fuse-ld=NAME (default: the compiler's default linker)]),
+        [], [with_linker=no]
+)
+if test "x$with_linker" != xno && test "x$with_linker" != xyes; then
+   fuse_ld=""
+   CDE_CHECK_LDFLAG([-fuse-ld=$with_linker], [fuse_ld])
+   if test -z "$fuse_ld"; then
+      AC_MSG_ERROR([--with-linker=$with_linker: $CC cannot link with -fuse-ld=$with_linker])
+   fi
+   LINK_LDFLAGS="$fuse_ld $LINK_LDFLAGS"
+elif test "x$with_linker" = xyes; then
+   AC_MSG_ERROR([--with-linker needs the name of a linker, e.g. --with-linker=mold])
+fi
+
+dnl Build-tree paths out of the objects (__FILE__, the debug information):
+dnl the tree's directory is recorded as ".", which makes the build
+dnl reproducible and lets ccache share objects between trees (with its
+dnl base_dir set).  A debugger then finds the sources from the top of the
+dnl tree, or through its source path ("directory" in gdb).
+AC_ARG_ENABLE([file-prefix-map],
+        AS_HELP_STRING([--disable-file-prefix-map], [Record the absolute build directory in the objects and debug information (default=record "." through -ffile-prefix-map)]),
+        [], [enable_file_prefix_map=yes]
+)
+FILE_PREFIX_CFLAGS=""
+FILE_PREFIX_CXXFLAGS=""
+if test "x$enable_file_prefix_map" != xno; then
+   prefix_map_c=""
+   prefix_map_cxx=""
+   CDE_CHECK_CFLAG([-ffile-prefix-map=/=/], [prefix_map_c])
+   CDE_CHECK_CXXFLAG([-ffile-prefix-map=/=/], [prefix_map_cxx])
+   dnl (single quotes: make expands the directories)
+   prefix_map='-ffile-prefix-map=$(abs_top_srcdir)=. -ffile-prefix-map=$(abs_top_builddir)=.'
+   if test -n "$prefix_map_c"; then
+      FILE_PREFIX_CFLAGS="$prefix_map"
+   fi
+   if test -n "$prefix_map_cxx"; then
+      FILE_PREFIX_CXXFLAGS="$prefix_map"
+   fi
+fi
 
 dnl export maps need a linker that takes GNU version scripts
 if test "x$enable_export_maps" != xno; then
@@ -838,9 +913,9 @@ dnl a Makefile.am that sets one of those, or a per-target _CPPFLAGS,
 dnl _CFLAGS, _CXXFLAGS or _LDFLAGS (which replace the AM_ ones), starts it
 dnl with the matching $(CDE_...) variable.
 CDE_CPPFLAGS="${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
-CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS}"
-CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS}"
-CDE_LDFLAGS="${HARDEN_LDFLAGS} ${LINK_LDFLAGS}"
+CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS} ${LTO_CFLAGS} ${FILE_PREFIX_CFLAGS}"
+CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS} ${LTO_CXXFLAGS} ${FILE_PREFIX_CXXFLAGS}"
+CDE_LDFLAGS="${HARDEN_LDFLAGS} ${LINK_LDFLAGS} ${LTO_LDFLAGS}"
 dnl squeeze the whitespace
 CDE_CPPFLAGS=`echo ${CDE_CPPFLAGS}`
 CDE_CFLAGS=`echo ${CDE_CFLAGS}`

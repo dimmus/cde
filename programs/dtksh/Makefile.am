@@ -73,6 +73,14 @@ dtksh_SOURCES = init.c \
 # nothing else is built while it runs).  bin/package refuses to continue
 # when CC or CCFLAGS differ from those of the previous build, so start
 # over in that case.
+#
+# ksh93's build asks git for the commit and branch it is built from, to
+# put the commit into the version string and to choose between a release
+# and a development build; here it would find the CDE repository and
+# record the CDE commit, so that every commit recompiled part of ksh93
+# and dtksh (and ccache could not help).  GIT_CEILING_DIRECTORIES keeps
+# git out of the CDE repository: ksh93 is then built as from a release
+# tarball, the same in a git checkout as in a CDE tarball.
 KSH93_CC = $(CC)
 KSH93_CCFLAGS = $(strip $(KSH93_SHOPTS) $(HARDEN_CFLAGS) $(CFLAGS))
 KSH93_JOBS = $(or $(patsubst -j%,%,$(filter -j%,$(MAKEFLAGS))),1)
@@ -87,6 +95,7 @@ ksh93.stamp: $(KSH93_SRCFILES) Makefile
 		$(KSH93SRC)/bin/package clean || exit 1; \
 	fi; \
 	echo "$(KSH93SRC)/bin/package flat make -j $(KSH93_JOBS) CC='$$cc' CCFLAGS='$$ccflags'"; \
+	GIT_CEILING_DIRECTORIES='$(abs_srcdir)' \
 	$(KSH93SRC)/bin/package flat make -j $(KSH93_JOBS) CC="$$cc" CCFLAGS="$$ccflags"
 	@touch $@
 
