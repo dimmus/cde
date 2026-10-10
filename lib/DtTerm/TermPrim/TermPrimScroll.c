@@ -484,6 +484,14 @@ _DtTermPrimScrollText(Widget w, short lines)
 	if (newTopRow > (tpd->lastUsedRow - tpd->scrollLockTopRow)) {
 	    newTopRow = tpd->lastUsedRow - tpd->scrollLockTopRow;
 	}
+	/* ...but if the whole scroll region is below the lastUsedRow, there
+	 * is nothing to scroll.  (Without this, newTopRow ended up above
+	 * topRow, and even negative, and the lock area moves below read and
+	 * wrote line pointers in front of the buffer's line array.)
+	 */
+	if (newTopRow < oldTopRow) {
+	    newTopRow = oldTopRow;
+	}
     } else {
 	if (tpd->useHistoryBuffer) {
 	    if ((tpd->topRow + tpd->lastUsedHistoryRow) >= -lines)
@@ -808,8 +816,10 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 	/* no scroll in progress, let's scroll it... */
 	tpd->scrollTopRow = scrollStart;
 	tpd->scrollBottomRow = scrollStart + scrollLength - 1;
+	/* (this sets scrollInProgress if it does a copy area.  If it
+	 * doesn't, no NoExpose will come, so we must not set it...)
+	 */
 	(void) doActualScroll(w, scrollDistance);
-	tpd->scrollInProgress = True;
     }
 }
 
@@ -877,9 +887,10 @@ _DtTermPrimScrollComplete(Widget w, Boolean flush)
 	    tpd->scrollBottomRow = tpd->scroll.nojump.pendingScrollBottomRow;
 	    (void) doActualScroll(w, tpd->scroll.nojump.pendingScrollLines);
 
-	    /* no lines pending, but there is a scroll in progress... */
+	    /* no lines pending, but there is a scroll in progress (if
+	     * doActualScroll() did a copy area, it set scrollInProgress)...
+	     */
 	    tpd->scroll.nojump.pendingScrollLines = 0;
-	    tpd->scrollInProgress = True;
 	    tpd->scroll.nojump.pendingScroll = False;
 
 	    if (flush) {
