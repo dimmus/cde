@@ -403,40 +403,30 @@ typedef struct _fontArrayType {
 static fontArrayType *fontArray = (fontArrayType *) 0;
 static short fontArrayCount = 0;
 
+/* build the font array from the userFontList (no server requests: the
+ * point size labels are worked out when the menu is built).  This is
+ * done when the menus are first created, as the font array is also used
+ * to save and restore the font with the session...
+ */
 static void
-createFontMenu
+buildFontArray
 (
-    Widget		  w,
-    Widget		  menu
+    Widget		  w
 )
 {
     DtTermViewWidget	  tw = (DtTermViewWidget) w;
-    Widget		  submenu;
     long		  i1;
-    int			  i2;
     char		 *c1;
     char		 *c2;
-    char		  mnemonics[BUFSIZ];
     char		  buffer[BUFSIZ];
-    char		  fontName[BUFSIZ];
-    KeySym		  ks;
-    int			  dpi;
-    char		**fontNames;
-    int			  fontNameCount;
-    float		  pointSize;
-    Arg			  al[20];
-    int			  ac;
+
+    if (fontArray) {
+	return;
+    }
 
     if (!tw->termview.userFontList || !*tw->termview.userFontList) {
 	tw->termview.userFontList = _DtTermViewMenuDefaultFonts;
     }
-
-    /* calculate dots per inch... */
-    dpi = HeightOfScreen(XtScreen(w)) / (HeightMMOfScreen(XtScreen(w)) / 25.4);
-
-    ac = 0;
-    (void) XtSetArg(al[ac], XmNradioBehavior, True); ac++;
-    submenu = createPulldown(menu, "Font Size", al, ac);
 
     /* find out how many newlines there are in the userFontList so
      * that we can build an array big enough to hold them...
@@ -451,8 +441,13 @@ createFontMenu
 	    i1);
     for (i1 = 0, c1 = tw->termview.userFontList; *c1; ) {
 	/* copy over the userFontList up to the end, or a newline... */
-	for (c2 = buffer; *c1 && (*c1 != '\n'); ) {
+	for (c2 = buffer; *c1 && (*c1 != '\n') &&
+		(c2 < buffer + sizeof(buffer) - 1); ) {
 	    *c2++ = *c1++;
+	}
+	/* (skip the rest of an overlong entry)... */
+	while (*c1 && (*c1 != '\n')) {
+	    c1++;
 	}
 	/* null term the copy and skip over the newline... */
 	*c2++ = '\0';
@@ -474,96 +469,123 @@ createFontMenu
 	    /* and assign it to the fontName... */
 	    fontArray[i1].fontName = c2;
 	} else {
-	    /* calculate the pixelsize for the font... */
+	    /* the label will be the point size (see createFontMenu())...
+	     */
 	    fontArray[i1].fontName = fontArray[i1].labelName;
-	    (void) strcpy(fontName, fontArray[i1].labelName);
-
-	    /* clear out the .labelName... */
 	    fontArray[i1].labelName = (char *) 0;
-
-	    /* is it a fontset?... */
-	    if (fontName[strlen(fontName) - 1] == ':') {
-		/* let's turn in into an iso8859-1 name for the query... */
-		fontName[strlen(fontName) - 1] = '\0';
-		/* strip off a '-' before the ':' (should not have been
-		 * one, but)...
-		 */
-		if (fontName[strlen(fontName) - 1] == '-') {
-		    fontName[strlen(fontName) - 1] = '\0';
-		}
-		(void) strcat(fontName, (GETMESSAGE(NL_SETN_ViewMenu,4, "-iso8859-1")));
-	    }
-	    if ((fontNames =
-		    XListFonts(XtDisplay(w), fontName, 1, &fontNameCount))) {
-		c2 = *fontNames;
-		for (i2 = 0; i2 < 7; i2++) {
-		    while (*c2 && (*c2 != '-')) {
-			c2++;
-		    }
-		    if (!*c2) {
-			break;
-		    }
-		    /* skip over the '-'... */
-		    (void) c2++;
-		}
-		if (i2 == 7) {
-		    pointSize = ((float) strtol(c2, (char **) 0, 0)) *
-			    72 / dpi;
-		    /* this was taken from the style manager... */
-		    if (dpi <= 72) {
-			/* whole points... */
-			(void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,5, "%d point")),
-				(int) (pointSize + 0.5));
-		    } else if (dpi <= 144) {
-			/* half points... */
-			(void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,6, "%.1f point")),
-				((int) (pointSize * 2.0 + 0.5)) / 2.0);
-		    } else if (dpi <= 720) {
-			/* tenth point... */
-			(void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,7, "%.1f point")),
-				((int) (pointSize * 10.0 + 0.5)) / 10.0);
-		    } else {
-			/* hundredth point... */
-			(void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,8, "%.2f point")),
-				((int) (pointSize * 100.0 + 0.5)) / 100.0);
-		    }
-		    fontArray[i1].labelName = XtMalloc(strlen(fontName) + 1);
-		    (void) strcpy(fontArray[i1].labelName, fontName);
-		}
-		/* free up the fontNames... */
-		(void) XFreeFontNames(fontNames);
-	    }
-	    if (!fontArray[i1].labelName) {
-		fontArray[i1].labelName = fontArray[i1].fontName;
-	    }
 	}
+	fontArray[i1].fontList = (XmFontList) 0;
 	/* bump the count... */
 	(void) i1++;
     }
 
     /* we have our list... */
     fontArrayCount = i1;
+    fontSizeTogglesDefault = i1;
+}
 
-    /* clear out mnemonics string... */
-    *mnemonics = '\0';
+static void
+createFontMenu
+(
+    Widget		  w,
+    Widget		  menu
+)
+{
+    Widget		  submenu;
+    long		  i1;
+    int			  i2;
+    char		 *c2;
+    char		  buffer[BUFSIZ];
+    char		  fontName[BUFSIZ];
+    KeySym		  ks;
+    int			  dpi;
+    char		**fontNames;
+    int			  fontNameCount;
+    float		  pointSize;
+    Arg			  al[20];
+    int			  ac;
+
+    (void) buildFontArray(w);
+
+    /* calculate dots per inch... */
+    dpi = HeightOfScreen(XtScreen(w)) / (HeightMMOfScreen(XtScreen(w)) / 25.4);
+
+    ac = 0;
+    (void) XtSetArg(al[ac], XmNradioBehavior, True); ac++;
+    submenu = createPulldown(menu, "Font Size", al, ac);
+
+    /* label the fonts that have no label with their point size... */
+    for (i1 = 0; i1 < fontArrayCount; i1++) {
+	if (fontArray[i1].labelName) {
+	    continue;
+	}
+
+	/* calculate the pixelsize for the font... */
+	snprintf(fontName, sizeof(fontName), "%s", fontArray[i1].fontName);
+
+	/* is it a fontset?... */
+	if (*fontName && (fontName[strlen(fontName) - 1] == ':')) {
+	    /* let's turn in into an iso8859-1 name for the query... */
+	    fontName[strlen(fontName) - 1] = '\0';
+	    /* strip off a '-' before the ':' (should not have been
+	     * one, but)...
+	     */
+	    if (*fontName && (fontName[strlen(fontName) - 1] == '-')) {
+		fontName[strlen(fontName) - 1] = '\0';
+	    }
+	    (void) strncat(fontName,
+		    (GETMESSAGE(NL_SETN_ViewMenu,4, "-iso8859-1")),
+		    sizeof(fontName) - strlen(fontName) - 1);
+	}
+	if ((fontNames =
+		XListFonts(XtDisplay(w), fontName, 1, &fontNameCount))) {
+	    c2 = *fontNames;
+	    for (i2 = 0; i2 < 7; i2++) {
+		while (*c2 && (*c2 != '-')) {
+		    c2++;
+		}
+		if (!*c2) {
+		    break;
+		}
+		/* skip over the '-'... */
+		(void) c2++;
+	    }
+	    if (i2 == 7) {
+		pointSize = ((float) strtol(c2, (char **) 0, 0)) *
+			72 / dpi;
+		/* this was taken from the style manager... */
+		if (dpi <= 72) {
+		    /* whole points... */
+		    (void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,5, "%d point")),
+			    (int) (pointSize + 0.5));
+		} else if (dpi <= 144) {
+		    /* half points... */
+		    (void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,6, "%.1f point")),
+			    ((int) (pointSize * 2.0 + 0.5)) / 2.0);
+		} else if (dpi <= 720) {
+		    /* tenth point... */
+		    (void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,7, "%.1f point")),
+			    ((int) (pointSize * 10.0 + 0.5)) / 10.0);
+		} else {
+		    /* hundredth point... */
+		    (void) sprintf(fontName, (GETMESSAGE(NL_SETN_ViewMenu,8, "%.2f point")),
+			    ((int) (pointSize * 100.0 + 0.5)) / 100.0);
+		}
+		fontArray[i1].labelName = XtMalloc(strlen(fontName) + 1);
+		(void) strcpy(fontArray[i1].labelName, fontName);
+	    }
+	    /* free up the fontNames... */
+	    (void) XFreeFontNames(fontNames);
+	}
+	if (!fontArray[i1].labelName) {
+	    fontArray[i1].labelName = fontArray[i1].fontName;
+	}
+    }
 
     /* create the font buttons... */
     fontSizeToggles = (Widget *) XtMalloc((fontArrayCount + 1) * sizeof(Widget));
 
     for (i1 = 0; i1 < fontArrayCount; i1++) {
-#ifdef NOTDEF
-	for (c2 = fontArray[i1].labelName; *c2; c2++) {
-	    if (!strchr(mnemonics, *c2) && !isspace(*c2))
-		break;
-	}
-	if (*c2) {
-	    /* add it to the mnemonics list... */
-	    *c1++ = *c2;
-	    ks = XK_A + *c2 - 'A';
-	} else {
-	    ks = NULL;
-	}
-#endif 
 	fontSizeToggles[i1] = _DtTermViewCreateToggleButton(submenu,
 		fontArray[i1].labelName,
 		0, NULL, NULL, fontChangeCallback, (XtPointer) i1);
@@ -579,6 +601,110 @@ createFontMenu
 	    (GETMESSAGE(NL_SETN_ViewMenu,10, "Font Size")), 
 	    ks, 
 	    NULL, NULL, NULL, NULL);
+}
+
+/* the DtTermView a menu (or a cascade button in it) is working for...
+ */
+static Widget
+findTermView(Widget w)
+{
+    Widget rc;
+    Widget posted;
+
+    for (rc = w; rc && !XmIsRowColumn(rc); rc = XtParent(rc))
+	;
+    posted = rc ? XmGetPostedFromWidget(rc) : (Widget) 0;
+    for (w = posted ? posted : w;
+	    w && !XtIsShell(w) && !XtIsSubclass(w, dtTermViewWidgetClass);
+	    w = XtParent(w))
+	;
+    if (w && XtIsSubclass(w, dtTermViewWidgetClass)) {
+	return(w);
+    }
+    return((Widget) 0);
+}
+
+/* The "Options" pulldown is filled in the first time it is about to be
+ * posted, rather than at startup: its font size submenu asks the server
+ * for every font in the userFontList (an XListFonts round trip each),
+ * and it has no accelerators that would need its buttons to exist...
+ */
+static Widget optionsPulldown = (Widget) 0;
+static Boolean optionsBuilt = False;
+
+static void
+buildOptionsMenu(Widget termView)
+{
+    Widget		  menu = optionsPulldown;
+    Widget		  submenu;
+    Arg			  arglist[20];
+    int			  i;
+    KeySym		  ks;
+
+    optionsBuilt = True;
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,33, "M"));
+    menuBarToggle = _DtTermViewCreateToggleButton(menu, 
+		    (GETMESSAGE(NL_SETN_ViewMenu,32, "Menu Bar")), 
+		     ks,
+		     NULL, NULL, menuBarToggleCallback, NULL);
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,35, "S"));
+    scrollBarToggle = _DtTermViewCreateToggleButton(menu, 
+		     (GETMESSAGE(NL_SETN_ViewMenu,34, "Scroll Bar")),
+		      ks,
+		      NULL, NULL, scrollBarToggleCallback, NULL);
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,37, "G"));
+    (void) _DtTermViewCreatePushButton(menu, 
+	     (GETMESSAGE(NL_SETN_ViewMenu,36, "Global...")),
+	      ks,
+	      NULL, NULL, globalOptionsCallback, NULL);
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,39, "T"));
+    (void) _DtTermViewCreatePushButton(menu, 
+	      (GETMESSAGE(NL_SETN_ViewMenu,38, "Terminal...")),
+	      ks,
+	      NULL, NULL, terminalOptionsCallback, NULL);
+
+    (void) createSizeMenu(termView, menu);
+
+    (void) createFontMenu(termView, menu);
+
+    i = 0;
+    submenu = createPulldown(menu, "Reset", arglist, i);
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,41, "S"));
+    (void)_DtTermViewCreatePushButton(submenu, 
+	     (GETMESSAGE(NL_SETN_ViewMenu,40, "Soft Reset")),
+	     ks,
+	    NULL, NULL, softResetCallback, NULL);
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,43, "H"));
+    (void)_DtTermViewCreatePushButton(submenu, 
+	     (GETMESSAGE(NL_SETN_ViewMenu,42, "Hard Reset")),
+	      ks,
+	      NULL, NULL, hardResetCallback, NULL);
+
+    ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,45, "R"));
+    (void) _DtTermViewCreateCascadeButton(menu, submenu, 
+	    (GETMESSAGE(NL_SETN_ViewMenu,44, "Reset")),
+	    ks,
+	    NULL, NULL, NULL, NULL);
+}
+
+/*ARGSUSED*/
+static void
+optionsCascadingCallback(Widget w, XtPointer client_data,
+	XtPointer call_data)
+{
+    Widget termView;
+
+    _DtTermProcessLock();
+    if (!optionsBuilt && (termView = findTermView(w))) {
+	(void) buildOptionsMenu(termView);
+    }
+    _DtTermProcessUnlock();
 }
 
 #define	numPulldowns	5
@@ -597,7 +723,6 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
 #if defined(NOTDEF) || defined(HPVUE)
     Widget button;
 #endif	/* NOTDEF || HPVUE */
-    Widget submenu;
     Arg arglist[20];
     Arg *newArglist;
     int i;
@@ -732,68 +857,24 @@ CreateMenu(Widget termView, Widget parent, Boolean menuBar,
     if (first) {
 	i = 0;
 	pulldown[pc] = createPulldown(topLevel, "Options", arglist, i);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,33, "M"));
-	menuBarToggle = _DtTermViewCreateToggleButton(pulldown[pc], 
-	                (GETMESSAGE(NL_SETN_ViewMenu,32, "Menu Bar")), 
-		         ks,
-			 NULL, NULL, menuBarToggleCallback, NULL);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,35, "S"));
-	scrollBarToggle = _DtTermViewCreateToggleButton(pulldown[pc], 
-	                 (GETMESSAGE(NL_SETN_ViewMenu,34, "Scroll Bar")),
-		          ks,
-			  NULL, NULL, scrollBarToggleCallback, NULL);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,37, "G"));
-	(void) _DtTermViewCreatePushButton(pulldown[pc], 
-	         (GETMESSAGE(NL_SETN_ViewMenu,36, "Global...")),
-		  ks,
-		  NULL, NULL, globalOptionsCallback, NULL);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,39, "T"));
-	(void) _DtTermViewCreatePushButton(pulldown[pc], 
-	          (GETMESSAGE(NL_SETN_ViewMenu,38, "Terminal...")),
-		  ks,
-		  NULL, NULL, terminalOptionsCallback, NULL);
-
-	(void) createSizeMenu(termView, pulldown[pc]);
-
-	(void) createFontMenu(termView, pulldown[pc]);
-
-	i = 0;
-	submenu = createPulldown(pulldown[pc], "Reset", arglist, i);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,41, "S"));
-	(void)_DtTermViewCreatePushButton(submenu, 
-	         (GETMESSAGE(NL_SETN_ViewMenu,40, "Soft Reset")),
-		 ks,
-		NULL, NULL, softResetCallback, NULL);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,43, "H"));
-	(void)_DtTermViewCreatePushButton(submenu, 
-	         (GETMESSAGE(NL_SETN_ViewMenu,42, "Hard Reset")),
-		  ks,
-		  NULL, NULL, hardResetCallback, NULL);
-
-	ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,45, "R"));
-	(void) _DtTermViewCreateCascadeButton(pulldown[pc], submenu, 
-	        (GETMESSAGE(NL_SETN_ViewMenu,44, "Reset")),
-		ks,
-		NULL, NULL, NULL, NULL);
+	/* filled in when it is first posted (see buildOptionsMenu())... */
+	optionsPulldown = pulldown[pc];
+	(void) buildFontArray(termView);
     }
     if (menuBar || firstPopup) {
 #ifdef	PULLDOWN_ACCELERATORS
         ks = XStringToKeysym(GETMESSAGE(NL_SETN_ViewMenu,47, "O"));
-    (void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+	cascade = _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	          (GETMESSAGE(NL_SETN_ViewMenu,46, "Options")),
 		   ks,
 		   NULL, NULL, NULL, NULL);
 #else	/* PULLDOWN_ACCELERATORS */
-	(void) _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
+	cascade = _DtTermViewCreateCascadeButton(menu, pulldown[pc], 
 	          (GETMESSAGE(NL_SETN_ViewMenu,46, "Options")),
 		NoSymbol, NULL, NULL, NULL, NULL);
 #endif	/* PULLDOWN_ACCELERATORS */
+	(void) XtAddCallback(cascade, XmNcascadingCallback,
+		optionsCascadingCallback, (XtPointer) 0);
     }
 
     (void) pc++;
@@ -1042,6 +1123,17 @@ setContext(Widget w, XtPointer client_data, XtPointer call_data)
 #endif	/* WINDOW_SIZE_TOGGLES */
     (void) XtGetValues(w, arglist, i);
 
+    /* set the sensitivity on the new button... */
+    (void) XtSetSensitive(newButton, DtTermViewGetCloneEnabled(w));
+
+    if (!optionsBuilt) {
+	/* the "Options" pulldown has not been built yet, and it has all
+	 * the other toggles (see buildOptionsMenu())...
+	 */
+	_DtTermProcessUnlock();
+	return;
+    }
+
     /* set the toggles... */
     (void) XmToggleButtonGadgetSetState(scrollBarToggle, scrollBarState, False);
     (void) XmToggleButtonGadgetSetState(menuBarToggle, menuBarState, False);
@@ -1092,9 +1184,6 @@ setContext(Widget w, XtPointer client_data, XtPointer call_data)
 		False, False);
     }
 #endif	/* WINDOW_SIZE_TOGGLES */
-
-    /* set the sensitivity on the new button... */
-    (void) XtSetSensitive(newButton, DtTermViewGetCloneEnabled(w));
     _DtTermProcessUnlock();
 }
 

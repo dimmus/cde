@@ -58,6 +58,7 @@ extern char * _DtTermPrimGetMessage( char *filename, int set, int n, char *s );
 #include "TermPrimPendingTextP.h"
 #include "TermPrimRenderFont.h"
 #include "TermPrimRenderFontSet.h"
+#include "TermPrimRenderP.h"
 #include "TermPrimSelectP.h"
 #include "TermPrimSetUtmp.h"
 #include "TermPrimUtil.h"     
@@ -772,6 +773,274 @@ CreateRenderFont
     return(termFont);
 }
 
+/* make a bold version of the term font, by asking for the same font(s)
+ * with "bold" in the weight field...
+ */
+static TermFont
+CreateDefaultBoldFont
+(
+    Widget		  w
+)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    TermFont boldTermFont = (TermFont) 0;
+
+    /* let's try and build a bold fontlist off of the base fontlist... */
+    int num_fonts;
+    char **fontNames;
+    char *boldFontNames = NULL;
+    const char *bold = "bold";
+    size_t boldLen = strlen(bold);
+
+    if (tw->term.fontSet) {
+	int i;
+	XFontStruct **fonts;
+	size_t len = 1; /* 1: NUL */
+
+	Debug('f', fprintf(stderr, ">>generating bold fontset\n"));
+	num_fonts = XFontsOfFontSet(tw->term.fontSet, &fonts, &fontNames);
+
+	for (i = 0; i < num_fonts; ++i)
+	    /* 2: COMMA and SPACE */
+	    len += strlen(fontNames[i]) + boldLen + 2;
+
+	boldFontNames = malloc(len);
+    }
+
+    if (boldFontNames) {
+	char *c1;
+	char *c2;
+	int i1;
+	int i2;
+	char **missingCharsetList;
+	int missingCharsetCount;
+
+	for (i1 = 0, c2 = boldFontNames; i1 < num_fonts; i1++) {
+	    /* if this is not the first name we need a comma to
+	     * separate the names...
+	     */
+	    if (i1 > 0) {
+		*c2++ = ',';
+		*c2++ = ' ';
+	    }
+
+	    /* copy over the first 3 fields... */
+	    for (c1 = fontNames[i1], i2 = 0; (i2 < 3) && *c1; i2++) {
+		while (*c1 && (*c1 != '-')) {
+		    *c2++ = *c1++;
+		}
+		if (!*c1) {
+		    break;
+		}
+		/* copy over the '-'... */
+		*c2++ = *c1++;
+	    }
+	    /* make boldFont bold by swapping the bold in for the
+	     * weight...
+	     */
+	    (void) strcpy(c2, bold);
+	    c2 += boldLen;
+
+	    /* skip over the weight in the source... */
+	    while (*c1 && (*c1 != '-')) {
+		c1++;
+	    }
+
+	    /* copy over the rest of the fontname... */
+	    while (*c1) {
+		*c2++ = *c1++;
+	    }
+	}
+
+	/* null term... */
+	*c2 = '\0';
+
+	/* now create the fontset... */
+	tw->term.boldFontSet = XCreateFontSet(XtDisplay(w),
+		boldFontNames,
+		&missingCharsetList,
+		&missingCharsetCount,
+		(char **) 0);
+
+	free(boldFontNames);
+
+	if (missingCharsetCount > 0) {
+	    int i;
+
+	    for (i = 0; i < missingCharsetCount; i++)
+		Debug('f', fprintf(stderr,
+			">>missing charsets in boldfont \"%s\"\n",
+			missingCharsetList[i]));
+	    (void) XFreeStringList(missingCharsetList);
+	    if (tw->term.boldFontSet) {
+		(void) XFreeFontSet(XtDisplay(w), tw->term.boldFontSet);
+		tw->term.boldFontSet = (XFontSet) 0;
+	    }
+	}
+
+	/* create a bold render font... */
+	if (tw->term.boldFontSet) {
+	    boldTermFont =
+		    _DtTermPrimRenderFontSetCreate(w, tw->term.boldFontSet);
+	}
+    } else if (tw->term.font) {
+	unsigned long ret;
+	char *fontName;
+	char boldFontName[BUFSIZ];
+	char *c1;
+	char *c2;
+	int i2;
+
+	/* get the fontname associated with the font... */
+	if (XGetFontProperty(tw->term.font, XA_FONT, &ret)) {
+	    fontName = XGetAtomName(XtDisplay(w), ret);
+	    /* copy over the first 3 fields... */
+	    for (c1 = fontName, c2 = boldFontName, i2 = 0;
+		    (i2 < 3) && *c1; i2++) {
+		while (*c1 && (*c1 != '-')) {
+		    *c2++ = *c1++;
+		}
+		if (!*c1) {
+		    break;
+		}
+		/* copy over the '-'... */
+		*c2++ = *c1++;
+	    }
+	    /* make boldFont bold by swapping the bold in for the
+	     * weight...
+	     */
+	    (void) strcpy(c2, bold);
+	    c2 += boldLen;
+
+	    /* skip over the weight in the source... */
+	    while (*c1 && (*c1 != '-')) {
+		c1++;
+	    }
+
+	    /* copy over the rest of the fontname... */
+	    while (*c1) {
+		*c2++ = *c1++;
+	    }
+
+	    /* null term the string... */
+	    *c2 = '\0';
+
+	    tw->term.boldFont = XLoadQueryFont(XtDisplay(w), boldFontName);
+	    /* create a bold render font... */
+	    if (tw->term.boldFont) {
+		boldTermFont =
+			_DtTermPrimRenderFontCreate(w, tw->term.boldFont);
+	    }
+	    XFree(fontName) ;
+	}
+    }
+
+    return(boldTermFont);
+}
+
+/*
+ * The default bold font is only made when bold text is first drawn:
+ * making it means loading as many fonts as the term font has, each a
+ * few round trips (and for an iso10646-1 font, the metrics of every
+ * character), and plenty of terminals never show bold text.  Until then
+ * the bold font is this stand-in.  If no bold font can be made, bold
+ * text is drawn with the term font, overstruck, as it would have been
+ * with no bold font at all...
+ */
+typedef struct _LazyBoldFontRec {
+    TermFont boldTermFont;		/* the real one, once made	*/
+    Boolean tried;			/* have we tried to make it?	*/
+} LazyBoldFontRec, *LazyBoldFont;
+
+static void
+LazyBoldRenderFunction(
+    Widget		  w,
+    TermFont		  font,
+    Pixel		  fg,
+    Pixel		  bg,
+    unsigned long	  flags,
+    int			  x,
+    int			  y,
+    unsigned char	 *string,
+    int			  len
+)
+{
+    LazyBoldFont lazyBold = (LazyBoldFont) font->fontInfo;
+    TermFont termFont;
+
+    /* (the bold font is made from the term font's fontset or font, which
+     * is only the font it was made for while the term font has not been
+     * changed)...
+     */
+    if (!lazyBold->tried && (((DtTermPrimitiveWidget) w)->term.tpd->termFont ==
+	    ((DtTermPrimitiveWidget) w)->term.tpd->defaultTermFont)) {
+	lazyBold->tried = True;
+	lazyBold->boldTermFont = CreateDefaultBoldFont(w);
+    }
+    if (lazyBold->boldTermFont) {
+	termFont = lazyBold->boldTermFont;
+    } else {
+	termFont = ((DtTermPrimitiveWidget) w)->term.tpd->defaultTermFont;
+	flags |= TermENH_OVERSTRIKE;
+    }
+    (void) (*termFont->renderFunction)(w, termFont, fg, bg, flags, x, y,
+	    string, len);
+}
+
+static void
+LazyBoldExtentsFunction(
+    Widget		  w,
+    TermFont		  font,
+    unsigned char	 *string,
+    int			  len,
+    int			 *widthReturn,
+    int			 *heightReturn,
+    int			 *ascentReturn
+)
+{
+    LazyBoldFont lazyBold = (LazyBoldFont) font->fontInfo;
+    TermFont termFont = lazyBold->boldTermFont ? lazyBold->boldTermFont :
+	    ((DtTermPrimitiveWidget) w)->term.tpd->defaultTermFont;
+
+    (void) (*termFont->extentsFunction)(w, termFont, string, len,
+	    widthReturn, heightReturn, ascentReturn);
+}
+
+static void
+LazyBoldDestroyFunction(
+    Widget		  w,
+    TermFont		  font
+)
+{
+    LazyBoldFont lazyBold = (LazyBoldFont) font->fontInfo;
+
+    if (lazyBold->boldTermFont) {
+	(void) _DtTermPrimDestroyFont(w, lazyBold->boldTermFont);
+    }
+    (void) XtFree((char *) lazyBold);
+    (void) XtFree((char *) font);
+}
+
+static TermFont
+CreateLazyBoldFont
+(
+    Widget		  w
+)
+{
+    TermFont termFont;
+    LazyBoldFont lazyBold;
+
+    termFont = (TermFont) XtMalloc(sizeof(TermFontRec));
+    termFont->renderFunction = LazyBoldRenderFunction;
+    termFont->destroyFunction = LazyBoldDestroyFunction;
+    termFont->extentsFunction = LazyBoldExtentsFunction;
+    lazyBold = (LazyBoldFont) XtMalloc(sizeof(LazyBoldFontRec));
+    lazyBold->boldTermFont = (TermFont) 0;
+    lazyBold->tried = False;
+    termFont->fontInfo = (XtPointer) lazyBold;
+    return(termFont);
+}
+
 static void
 AdjustWindowUnits
 (
@@ -1097,155 +1366,10 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
 	tpd->boldTermFont = CreateRenderFont(w, tw->term.boldFontList,
 		&tw->term.boldFontSet, &tw->term.boldFont);
     } else {
-	/* let's try and build a bold fontlist off of the base fontlist... */
-	int num_fonts;
-	char **fontNames;
-	char *boldFontNames = NULL;
-	const char *bold = "bold";
-	size_t boldLen = strlen(bold);
-
-	if (tw->term.fontSet) {
-	    int i;
-	    XFontStruct **fonts;
-	    size_t len = 1; /* 1: NUL */
-
-	    Debug('f', fprintf(stderr, ">>generating bold fontset\n"));
-	    num_fonts = XFontsOfFontSet(tw->term.fontSet, &fonts, &fontNames);
-
-	    for (i = 0; i < num_fonts; ++i)
-		/* 2: COMMA and SPACE */
-		len += strlen(fontNames[i]) + boldLen + 2;
-
-	    boldFontNames = malloc(len);
-	}
-
-	if (boldFontNames) {
-	    char *c1;
-	    char *c2;
-	    int i1;
-	    int i2;
-	    char **missingCharsetList;
-	    int missingCharsetCount;
-
-	    for (i1 = 0, c2 = boldFontNames; i1 < num_fonts; i1++) {
-		/* if this is not the first name we need a comma to
-		 * separate the names...
-		 */
-		if (i1 > 0) {
-		    *c2++ = ',';
-		    *c2++ = ' ';
-		}
-
-		/* copy over the first 3 fields... */
-		for (c1 = fontNames[i1], i2 = 0; (i2 < 3) && *c1; i2++) {
-		    while (*c1 && (*c1 != '-')) {
-			*c2++ = *c1++;
-		    }
-		    if (!*c1) {
-			break;
-		    }
-		    /* copy over the '-'... */
-		    *c2++ = *c1++;
-		}
-		/* make boldFont bold by swapping the bold in for the
-		 * weight...
-		 */
-		(void) strcpy(c2, bold);
-		c2 += boldLen;
-
-		/* skip over the weight in the source... */
-		while (*c1 && (*c1 != '-')) {
-		    c1++;
-		}
-
-		/* copy over the rest of the fontname... */
-		while (*c1) {
-		    *c2++ = *c1++;
-		}
-	    }
-
-	    /* null term... */
-	    *c2 = '\0';
-
-	    /* now create the fontset... */
-	    tw->term.boldFontSet = XCreateFontSet(XtDisplay(w),
-		    boldFontNames,
-		    &missingCharsetList,
-		    &missingCharsetCount,
-		    (char **) 0);
-
-	    free(boldFontNames);
-
-	    if (missingCharsetCount > 0) {
-		int i;
-
-		for (i = 0; i < missingCharsetCount; i++)
-		    Debug('f', fprintf(stderr,
-			    ">>missing charsets in boldfont \"%s\"\n",
-			    missingCharsetList[i]));
-		(void) XFreeStringList(missingCharsetList);
-		if (tw->term.boldFontSet) {
-		    (void) XFreeFontSet(XtDisplay(w), tw->term.boldFontSet);
-		    tw->term.boldFontSet = (XFontSet) 0;
-		}
-	    }
-
-	    /* create a bold render font... */
-	    if (tw->term.boldFontSet) {
-		tpd->boldTermFont =
-			_DtTermPrimRenderFontSetCreate(w, tw->term.boldFontSet);
-	    }
-	} else if (tw->term.font) {
-	    unsigned long ret;
-	    char *fontName;
-	    char boldFontName[BUFSIZ];
-	    char *c1;
-	    char *c2;
-	    int i2;
-
-	    /* get the fontname associated with the font... */
-	    if (XGetFontProperty(tw->term.font, XA_FONT, &ret)) {
-		fontName = XGetAtomName(XtDisplay(w), ret);
-		/* copy over the first 3 fields... */
-		for (c1 = fontName, c2 = boldFontName, i2 = 0;
-			(i2 < 3) && *c1; i2++) {
-		    while (*c1 && (*c1 != '-')) {
-			*c2++ = *c1++;
-		    }
-		    if (!*c1) {
-			break;
-		    }
-		    /* copy over the '-'... */
-		    *c2++ = *c1++;
-		}
-		/* make boldFont bold by swapping the bold in for the
-		 * weight...
-		 */
-		(void) strcpy(c2, bold);
-		c2 += boldLen;
-
-		/* skip over the weight in the source... */
-		while (*c1 && (*c1 != '-')) {
-		    c1++;
-		}
-
-		/* copy over the rest of the fontname... */
-		while (*c1) {
-		    *c2++ = *c1++;
-		}
-
-		/* null term the string... */
-		*c2 = '\0';
-
-		tw->term.boldFont = XLoadQueryFont(XtDisplay(w), boldFontName);
-		/* create a bold render font... */
-		if (tw->term.boldFont) {
-		    tpd->boldTermFont =
-			    _DtTermPrimRenderFontCreate(w, tw->term.boldFont);
-		}
-                XFree(fontName) ;
-	    }
-	}
+	/* we will build a bold font off of the base font when it is
+	 * first needed...
+	 */
+	tpd->boldTermFont = CreateLazyBoldFont(w);
     }
 
     /* save away our original fonts as defaults... */
