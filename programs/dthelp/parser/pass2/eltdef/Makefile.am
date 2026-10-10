@@ -9,7 +9,8 @@ SDLELTDEFSRC = $(HTAG2)/eltdef
 SDLDTDFILE   = $(HTAG2SRC)/sdl.dtd
 SDLUTILSRC   = $(HTAG2)/util
 SDLBUILDSRC  = $(HTAG2)/build
-SDLUTILLIB   = $(HTAG2)/util/libutil.a
+SDLUTILLIB   = $(HTAG2)/../util/libhelputil.a
+SDLCONTEXT   = $(HTAG2)/../util/context
 SDLIFFILE    = $(HTAG2SRC)/sdl.if
 
 eltdef_LDADD = $(SDLUTILLIB)
@@ -47,9 +48,9 @@ EDONE: eltdef  $(SDLIFFILE)
 	./eltdef $(SDLIFFILE)
 	touch EDONE
 
-CDONE:  $(SDLUTILSRC)/context $(HTAG2SRC)/delim.elt context.dat
+CDONE:  $(SDLCONTEXT) $(HTAG2SRC)/delim.elt context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HTAG2SRC)/delim.elt delim.dat  # appl.-specific delim.dat
-	$(SDLUTILSRC)/context
+	$(SDLCONTEXT)
 	touch CDONE
 

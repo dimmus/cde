@@ -9,7 +9,8 @@ SDLELTDEFSRC = $(HTAG2)/eltdef
 SDLDTDFILE   = $(HTAG2SRC)/sdl.dtd
 SDLUTILSRC   = $(HTAG2)/util
 SDLBUILDSRC  = $(HTAG2)/build
-SDLUTILLIB   = $(HTAG2)/util/libutil.a
+SDLUTILLIB   = $(HTAG2)/../util/libhelputil.a
+SDLCONTEXT   = $(HTAG2)/../util/context
 SDLIFFILE    = $(HTAG2SRC)/help.if
 
 AM_CPPFLAGS = $(CDE_CPPFLAGS) -I. -I$(SDLUTILSRC) -I$(HTAG2SRC) -I$(SDLBUILDSRC) \
@@ -41,9 +42,9 @@ $(CPRODS): CDONE
 # first.
 $(dthelp_htag2_OBJECTS): CDONE
 
-CDONE:  $(SDLUTILSRC)/context $(HTAG2SRC)/delim.par context.dat
+CDONE:  $(SDLCONTEXT) $(HTAG2SRC)/delim.par context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HTAG2SRC)/delim.par delim.dat  # appl.-specific delim.dat
-	$(SDLUTILSRC)/context
+	$(SDLCONTEXT)
 	touch CDONE
 

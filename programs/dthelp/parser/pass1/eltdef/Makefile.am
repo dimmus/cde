@@ -9,7 +9,8 @@ HELPELTDEFSRC = $(HELPTAG)/eltdef
 HELPDTDFILE   = $(HELPTAGSRC)/hptag.dtd
 HELPUTILSRC   = $(HELPTAG)/util
 HELPBUILDSRC  = $(HELPTAG)/build
-HELPUTILLIB   = $(HELPTAG)/util/libutil.a
+HELPUTILLIB   = $(HELPTAG)/../util/libhelputil.a
+HELPCONTEXT   = $(HELPTAG)/../util/context
 HELPIFFILE    = $(HELPTAGSRC)/help.if
 HELPTSSFILE   = $(HELPTAGSRC)/htag.tss
 
@@ -48,9 +49,9 @@ EDONE: eltdef  $(HELPIFFILE) $(HELPTSSFILE)
 	./eltdef $(HELPIFFILE)
 	touch EDONE
 
-CDONE:  $(HELPUTILSRC)/context $(HELPTAGSRC)/delim.elt context.dat
+CDONE:  $(HELPCONTEXT) $(HELPTAGSRC)/delim.elt context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HELPTAGSRC)/delim.elt delim.dat  # appl.-specific delim.dat
-	$(HELPUTILSRC)/context
+	$(HELPCONTEXT)
 	touch CDONE
 

@@ -7,7 +7,8 @@ SDLELTDEFSRC = $(HTAG2)/eltdef
 SDLDTDFILE   = $(HTAG2SRC)/sdl.dtd
 SDLUTILSRC   = $(HTAG2)/util
 SDLBUILDSRC  = $(HTAG2)/build
-SDLUTILLIB   = $(HTAG2)/util/libutil.a
+SDLUTILLIB   = $(HTAG2)/../util/libhelputil.a
+SDLCONTEXT   = $(HTAG2)/../util/context
 SDLIFFILE    = $(HTAG2SRC)/help.if
 
 # The helptag library includes headers that ../parser generates (its

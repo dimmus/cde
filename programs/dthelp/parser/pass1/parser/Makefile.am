@@ -9,7 +9,8 @@ HELPELTDEFSRC = $(HELPTAG)/eltdef
 HELPDTDFILE   = $(HELPTAGSRC)/hptag.dtd
 HELPUTILSRC   = $(HELPTAG)/util
 HELPBUILDSRC  = $(HELPTAG)/build
-HELPUTILLIB   = $(HELPTAG)/util/libutil.a
+HELPUTILLIB   = $(HELPTAG)/../util/libhelputil.a
+HELPCONTEXT   = $(HELPTAG)/../util/context
 
 AM_CPPFLAGS = $(CDE_CPPFLAGS) -I. -I$(HELPUTILSRC) -I$(HELPTAGSRC) -I$(HELPBUILDSRC) \
 	   -I$(HELPELTDEFSRC)
@@ -40,9 +41,9 @@ $(CPRODS): CDONE
 # first.
 $(dthelp_htag1_OBJECTS): CDONE
 
-CDONE:  $(HELPUTILSRC)/context $(HELPTAGSRC)/delim.par context.dat
+CDONE:  $(HELPCONTEXT) $(HELPTAGSRC)/delim.par context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HELPTAGSRC)/delim.par delim.dat  # appl.-specific delim.dat
-	$(HELPUTILSRC)/context
+	$(HELPCONTEXT)
 	touch CDONE
 
