@@ -254,6 +254,14 @@ _DtCmsFreeCalendar(_DtCmsCalendar *cal)
 	if (cal->list)
 		hc_destroy(cal->list, NULL);
 
+	/* registrations hold cached callback handles (an open socket each) */
+	while (cal->rlist != NULL) {
+		_DtCmsRegistrationInfo *rinfo = cal->rlist;
+
+		cal->rlist = rinfo->next;
+		_DtCmsFreeRegistrationInfo(rinfo);
+	}
+
 	free(cal);
 }
 

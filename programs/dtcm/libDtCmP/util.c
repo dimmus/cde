@@ -1893,13 +1893,13 @@ setup_range(CSA_attribute **attrs, CSA_enum **ops, int *count, time_t start,
 	memset(op_ptr, 0, o_size);
 
 	initialize_entry_attr(CSA_ENTRY_ATTR_START_DATE_I, &attr_ptr[0], appt_write, version);
-	attr_ptr[0].value->item.string_value = malloc(BUFSIZ);
+	attr_ptr[0].value->item.string_value = calloc(1, BUFSIZ);
 	_csa_tick_to_iso8601(start, attr_ptr[0].value->item.string_value);
 
 	op_ptr[0] = CSA_MATCH_GREATER_THAN_OR_EQUAL_TO;
 
 	initialize_entry_attr(CSA_ENTRY_ATTR_START_DATE_I, &attr_ptr[1], appt_write, version);
-	attr_ptr[1].value->item.string_value = malloc(BUFSIZ);
+	attr_ptr[1].value->item.string_value = calloc(1, BUFSIZ);
 	_csa_tick_to_iso8601(stop, attr_ptr[1].value->item.string_value);
 	op_ptr[1] = CSA_MATCH_LESS_THAN_OR_EQUAL_TO;
 
@@ -1960,6 +1960,12 @@ CmRangeListInit(CmRangeList *rl, CSA_session_handle cal, int version,
 	memset(rl, 0, sizeof(CmRangeList));
 	rl->cal = cal;
 	rl->version = version;
+
+	/* the margin can reach before 1970 when printing from get_bot();
+	 * a negative tick cannot be converted for the server
+	 */
+	if (start < 0)
+		start = 0;
 
 	setup_range(&range_attrs, &ops, &n, start, stop, CSA_TYPE_EVENT, 0,
 		    B_FALSE, version);

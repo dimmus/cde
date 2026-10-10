@@ -28,14 +28,11 @@
  *  (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  */
 
-#if defined(__linux__)
-#define _GNU_SOURCE		/* strcasestr */
-#endif
-
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <csa.h>
 #include <Xm/Xm.h>
 #include <Xm/Form.h>
@@ -578,7 +575,7 @@ fmt_time_what(
 /*
  * The server matches case-insensitively in its own locale, normally C;
  * let it match only ASCII strings, so 8-bit locales keep their own
- * case folding (done here with strcasestr).
+ * case folding (done here with contains_nocase).
  */
 static boolean_t
 is_ascii(const char *s)
@@ -587,6 +584,21 @@ is_ascii(const char *s)
 		if ((unsigned char)*s >= 0x80)
 			return (B_FALSE);
 	return (B_TRUE);
+}
+
+/*
+ * Does 'str' contain 'sub', ignoring case?  The same per-position
+ * strncasecmp() test Find always used (strcasestr() is not in POSIX).
+ */
+static boolean_t
+contains_nocase(const char *str, const char *sub)
+{
+	size_t	len = strlen(sub);
+
+	for (; *str != '\0'; str++)
+		if (strncasecmp(str, sub, len) == 0)
+			return (B_TRUE);
+	return (B_FALSE);
 }
 
 /*
@@ -719,7 +731,13 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 			end_of_time = real_eot;
 	}
 
-	use_filter = is_ascii(astr);
+	/*
+	 * Older data versions (RPC v4 servers, the old v5 data store,
+	 * archives) are matched by libcsa on this side after fetching
+	 * every entry of the range, so a year per call would only make
+	 * the replies 13 times bigger: keep the 4-week chunks for them.
+	 */
+	use_filter = is_ascii(astr) && c->general->version >= DATAVER4;
 	stop = start + (use_filter ? FIND_CHUNK : FIND_CHUNK_UNFILTERED);
 
 	if ((stop > end_of_time) || (stop < 0))
@@ -768,7 +786,7 @@ find_appts(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs
 			 * server could not filter
 			 */
 			what = appt->what->value->item.string_value;
-			if (what == NULL || strcasestr(what, astr) == NULL)
+			if (what == NULL || !contains_nocase(what, astr))
 				continue;
 
 			if (nitems_used == nitems_max) {
