@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtprintinfo
 
-AM_CPPFLAGS = -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./objects	\
+AM_CPPFLAGS = $(CDE_CPPFLAGS) -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./objects	\
 	-I./objects/PrintObj -DKORNSHELL=\"$(KSH)\"
 
 dtprintinfo_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)

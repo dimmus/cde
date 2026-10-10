@@ -1,0 +1,57 @@
+#!/bin/sh
+# Run dtcodegen in a scratch directory.
+#
+# usage: dtcodegen-scratch DTCODEGEN [-i SRC=NAME]... OUTPUT[=DEST]... -- ARGS...
+#
+# dtcodegen -merge reads and rewrites every file it generates that already
+# exists next to the project, and several of those (the *_stubs.c files,
+# dtbuilder.h, ttsnoop.c) are tracked sources.  This script copies the
+# project (*.bip) and module (*.bil) files of the current directory into a
+# scratch directory, plus each SRC given with -i under the name NAME (the
+# file dtcodegen should merge into), runs DTCODEGEN ARGS there and moves
+# only the named OUTPUT files back (to DEST if given).  Nothing else in the
+# current directory is written.
+#
+# DTCODEGEN may be a command with leading VAR=value words; it is run
+# through "env" from inside the scratch directory, so its path must be
+# absolute.
+
+dtcodegen=$1
+shift
+inputs=
+outputs=
+while [ $# -gt 0 ]; do
+	case $1 in
+	--)	shift; break ;;
+	-i)	inputs="$inputs $2"; shift 2 ;;
+	*)	outputs="$outputs $1"; shift ;;
+	esac
+done
+
+tmp=.dtcodegen-scratch.$$
+rm -rf "$tmp"
+mkdir "$tmp" || exit 1
+trap 'rm -rf "$tmp"' 0
+trap 'exit 1' 1 2 15
+
+cp ./*.bip ./*.bil "$tmp"/ || exit 1
+for i in $inputs; do
+	src=${i%%=*}
+	name=${i#*=}
+	cp "$src" "$tmp/$name" || exit 1
+	chmod u+w "$tmp/$name"
+done
+
+(cd "$tmp" && env $dtcodegen "$@") || exit 1
+
+for o in $outputs; do
+	if [ ! -f "$tmp/${o%%=*}" ]; then
+		echo "dtcodegen-scratch: dtcodegen did not write ${o%%=*}" >&2
+		exit 1
+	fi
+done
+for o in $outputs; do
+	rm -f "${o#*=}"
+	mv "$tmp/${o%%=*}" "${o#*=}" || exit 1
+done
+exit 0

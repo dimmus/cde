@@ -2,12 +2,12 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtpad
 
-dtpad_CFLAGS = -DDT_LITE -DWORDWRAP
+dtpad_CFLAGS = $(CDE_CFLAGS) -DDT_LITE -DWORDWRAP
 
 dtpad_LDADD = $(DTCLIENTLIBS) $(TIRPCLIB) $(XTOOLLIB)
 
 if SOLARIS
-dtpad_LDFLAGS = -lintl -lresolv
+dtpad_LDFLAGS = $(CDE_LDFLAGS) -lintl -lresolv
 endif
 
 dtpad_SOURCES = dtpad.c         editCB.c        fileCB.c \

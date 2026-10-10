@@ -44,4 +44,4 @@ libDtMmdb_la_LIBADD = HardCopy/libHardCopy.la \
 		      storage/libstorage.la \
 		      utility/libutility.la
 
-libDtMmdb_la_LDFLAGS = -version-info 2:1:0
+libDtMmdb_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0

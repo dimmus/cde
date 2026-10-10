@@ -16,6 +16,9 @@ DTCODEGENCAT = NLSPATH=$(top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.
 
 DTCODEGEN = $(DTCODEGENCAT) $(top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen
 
+DTCODEGEN_SCRATCH = $(SHELL) $(top_srcdir)/build-aux/dtcodegen-scratch \
+	"NLSPATH=$(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.cat $(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen"
+
 CLEANFILES = Ttsnoop .dtcodegen.log *.BAK *.delta *.patched $(AB_MAKEFILES) \
 	     *_stubs.C *_ui.c
 
@@ -155,12 +158,12 @@ callbackChooser_ui.c callbackChooser_ui.h callbackChooser_stubs.C: ttsnoop.bip c
 	cat externC.h callbackChooser_ui.h closeBrace.h > callbackChooser_ui.h.patched
 	mv callbackChooser_ui.h.patched callbackChooser_ui.h
 
+# dtcodegen -main merges into ttsnoop.c, which is a tracked (stale) file
+# here: generate in a scratch directory instead and keep only the results.
 ttsnoop.C ttsnoop.h dtb_utils.c dtb_utils.h: ttsnoop.bip ttsnoop.C.src
-	$(CP) ttsnoop.C.src ttsnoop.c
-	-if [ ! -w ttsnoop.c ]; then chmod +w ttsnoop.c; fi
-	$(DTCODEGEN) -changed -merge -p ttsnoop.bip -main
-	$(RM) ttsnoop.C
-	mv ttsnoop.c ttsnoop.C
+	$(DTCODEGEN_SCRATCH) -i ttsnoop.C.src=ttsnoop.c \
+		ttsnoop.c=ttsnoop.C ttsnoop.h dtb_utils.c dtb_utils.h \
+		-- -changed -merge -p ttsnoop.bip -main
 	chmod -w ttsnoop.C
 	cat externC.h dtb_utils.h closeBrace.h > dtb_utils.h.patched
 	mv dtb_utils.h.patched dtb_utils.h

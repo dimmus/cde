@@ -22,8 +22,8 @@ noinst_PROGRAMS = mkdbd
 
 dtsearch = ../../../lib/DtSearch
 
-mkdbd_CPPFLAGS = -DBASE_FILE_NAME=\"dtsearch\"
-mkdbd_CFLAGS = $(DT_INCDIR) -I$(dtsearch)/raima
+mkdbd_CPPFLAGS = $(CDE_CPPFLAGS) -DBASE_FILE_NAME=\"dtsearch\"
+mkdbd_CFLAGS = $(CDE_CFLAGS) $(DT_INCDIR) -I$(dtsearch)/raima
 
 CLEANFILES = dtsearch.dbd mkdbd.c
 

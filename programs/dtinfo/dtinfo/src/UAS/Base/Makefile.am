@@ -8,7 +8,7 @@ include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 # class info
 include Classlist.mk
 
-libBase_a_CXXFLAGS = -I.. -I ../.. -I../Support $(DTINFO_DEFINES)	\
+libBase_a_CXXFLAGS = $(CDE_CXXFLAGS) -I.. -I ../.. -I../Support $(DTINFO_DEFINES)	\
 	$(DTINFO_INCLUDES)
 libBase_a_SOURCES = $(Base_SRCS)
 

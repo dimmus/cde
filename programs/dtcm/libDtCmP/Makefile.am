@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libDtCmP.a
 
-libDtCmP_a_CFLAGS = $(CSA_INCDIR) -I../../../lib/csa -DRFC_MIME	\
+libDtCmP_a_CFLAGS = $(CDE_CFLAGS) $(CSA_INCDIR) -I../../../lib/csa -DRFC_MIME	\
 	-DLINE_COUNT -DV2 -DOW_I18N
 
 libDtCmP_a_SOURCES = cm_tty.c cmfns.c dtfns.c props.c resource.c	\

@@ -8,7 +8,7 @@ include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 # class info
 include Classlist.mk
 
-libAgents_a_CXXFLAGS = $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
+libAgents_a_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
 libAgents_a_SOURCES = ../Prelude.h $(Agents_SRCS)
 
 RANLIB = echo

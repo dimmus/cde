@@ -20,7 +20,7 @@ DTTYPES = autoStart.dt user-prefs.dt uxstd.dt dt.dt develop.dt		\
 	xournal.dt caja.dt engrampa.dt file-roller.dt firestarter.dt	\
 	pgadmin.dt synaptic.dt System.dt virtualbox.dt wicd.dt		\
 	acroread.dt emacs.dt gv.dt kile.dt mgv.dt TeX.dt xdvi.dt	\
-	xournal.dt xpdf.dt
+	xpdf.dt
 
 BUILT_SOURCES = $(DTTYPES) action
 CLEANFILES = $(BUILT_SOURCES)

@@ -10,7 +10,7 @@ include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 # class info
 include Classlist.mk
 
-libUAS_a_CXXFLAGS = $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
+libUAS_a_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
 libUAS_a_SOURCES =
 
 libUAS_a_LIBADD = Base/libBase.a MMDB/libMMDB.a DtSR/libDtSR.a

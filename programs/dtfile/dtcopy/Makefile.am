@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtfile_copy
 
-dtfile_copy_CFLAGS = -DSHAPE
+dtfile_copy_CFLAGS = $(CDE_CFLAGS) -DSHAPE
 
 dtfile_copy_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB) $(TIRPCLIB) 
 

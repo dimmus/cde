@@ -16,7 +16,7 @@ SDLIFFILE    = $(HTAG2SRC)/sdl.if
 
 eltdef_LDADD = $(SDLUTILLIB)
 
-eltdef_CFLAGS = -I$(SDLUTILSRC) -I$(SDLBUILDSRC)
+eltdef_CFLAGS = $(CDE_CFLAGS) -I$(SDLUTILSRC) -I$(SDLBUILDSRC)
 
 eltdef_SOURCES = eltdef.c eltutil.c entity.c scan.c
 

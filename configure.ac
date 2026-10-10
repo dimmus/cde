@@ -23,8 +23,13 @@ AC_PREREQ([2.69])
 AC_CANONICAL_HOST
 AC_CANONICAL_BUILD
 
-C_STD="c99"
+dnl Language standards.  C is GNU C11 (C99 plus the C11 additions and
+dnl the GNU extensions the code base already relies on); C++ is pinned to
+dnl GNU C++17 so that it does not silently follow the compiler default.
+C_STD="gnu11"
+CXX_STD="gnu++17"
 AC_SUBST(C_STD)
+AC_SUBST(CXX_STD)
 
 dnl These must be up here for the compiler search list to actually work
 AC_PROG_CC([cc gcc clang])
@@ -95,8 +100,11 @@ supports_pam=no
 case "${build_os}" in
 	linux*)
 		build_linux=yes
-                SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -D_POSIX_SOURCE \
--D_DEFAULT_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE"
+                dnl _DEFAULT_SOURCE replaces the deprecated _BSD_SOURCE and
+                dnl _SVID_SOURCE (and implies _POSIX_SOURCE).  It is still
+                dnl needed: many files define _XOPEN_SOURCE or _POSIX_SOURCE
+                dnl themselves, which would otherwise hide the BSD/SVID API.
+                SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -D_DEFAULT_SOURCE"
                 supports_pam=yes
                  ;;
 	freebsd*)
@@ -177,10 +185,10 @@ AM_CONDITIONAL([I386], [test "$is_i386" = yes])
 AM_CONDITIONAL([X86_64], [test "$is_x86_64" = yes])
 AM_CONDITIONAL([ARM], [test "$is_arm" = yes])
 AM_CONDITIONAL([SPARC], [test "$is_sparc" = yes])
-AM_CONDITIONAL([MIPS], [test "is_mips" = yes])
-AM_CONDITIONAL([PPC], [test "is_ppc" = yes])
-AM_CONDITIONAL([RISCV], [test "is_riscv" = yes])
-AM_CONDITIONAL([AARCH64], [test "is_aarch64" = yes])
+AM_CONDITIONAL([MIPS], [test "$is_mips" = yes])
+AM_CONDITIONAL([PPC], [test "$is_ppc" = yes])
+AM_CONDITIONAL([RISCV], [test "$is_riscv" = yes])
+AM_CONDITIONAL([AARCH64], [test "$is_aarch64" = yes])
 
 dnl our main libraries
 dnl we use single quotes so that $top_buildir is evaluated in the makefiles,
@@ -208,56 +216,71 @@ AC_SUBST(XM_INCDIR, '-I$(top_builddir)/include/Xm')
 AC_SUBST(CSA_INCDIR, '-I$(top_builddir)/include/csa')
 AC_SUBST(SPC_INCDIR, '-I$(top_builddir)/include/SPC')
 
-dnl language enables
+dnl language enables.  AC_ARG_ENABLE sets enable_<feature> to "yes" for
+dnl --enable-<feature> and to "no" for --disable-<feature>, so the
+dnl action-if-given is left empty and only the default is filled in.
 
 AC_ARG_ENABLE([german],
         AS_HELP_STRING([--enable-german], [Build German locale (default=no)]),
-        [enable_de="yes"], [enable_de=""]
+        [], [enable_german=no]
 )
-AM_CONDITIONAL([GERMAN], [test -n "$enable_de"])
+AM_CONDITIONAL([GERMAN], [test "x$enable_german" != xno])
 
 AC_ARG_ENABLE([italian],
         AS_HELP_STRING([--enable-italian], [Build Italian locale (default=no)]),
-        [enable_it="yes"], [enable_it=""]
+        [], [enable_italian=no]
 )
-AM_CONDITIONAL([ITALIAN], [test -n "$enable_it"])
+AM_CONDITIONAL([ITALIAN], [test "x$enable_italian" != xno])
 
 AC_ARG_ENABLE([french],
         AS_HELP_STRING([--enable-french], [Build French locale (default=no)]),
-        [enable_fr="yes"], [enable_fr=""]
+        [], [enable_french=no]
 )
-AM_CONDITIONAL([FRENCH], [test -n "$enable_fr"])
+AM_CONDITIONAL([FRENCH], [test "x$enable_french" != xno])
 
 AC_ARG_ENABLE([spanish],
         AS_HELP_STRING([--enable-spanish], [Build Spanish locale (default=no)]),
-        [enable_es="yes"], [enable_es=""]
+        [], [enable_spanish=no]
 )
-AM_CONDITIONAL([SPANISH], [test -n "$enable_es"])
+AM_CONDITIONAL([SPANISH], [test "x$enable_spanish" != xno])
 
 AC_ARG_ENABLE([japanese],
         AS_HELP_STRING([--enable-japanese], [Build Japanese locale (default=no)]),
-        [enable_ja="yes"], [enable_ja=""]
+        [], [enable_japanese=no]
 )
-AM_CONDITIONAL([JAPANESE], [test -n "$enable_ja"])
+AM_CONDITIONAL([JAPANESE], [test "x$enable_japanese" != xno])
 
 dnl interface font
 AC_ARG_ENABLE([misc-fixed],
         AS_HELP_STRING([--enable-misc-fixed], [Set interface font to misc-fixed (default=no)]),
-        [enable_misc_fixed="yes"], [enable_misc_fixed=""]
+        [], [enable_misc_fixed=no]
 )
-AM_CONDITIONAL([MISC_FIXED], [test -n "$enable_misc_fixed"])
+AM_CONDITIONAL([MISC_FIXED], [test "x$enable_misc_fixed" != xno])
 
 dnl Build the help and dtinfo docs?
 AC_ARG_ENABLE([docs],
-        AS_HELP_STRING([--disable-docs], [Disable building help/dtinfo docs (default=no)]),
-        [disable_docs="yes"], [disable_docs=""]
+        AS_HELP_STRING([--disable-docs], [Do not build the help/dtinfo docs (default=build them)]),
+        [], [enable_docs=yes]
 )
-AM_CONDITIONAL([BUILD_DOCS], [test -z "$disable_docs"])
+AM_CONDITIONAL([BUILD_DOCS], [test "x$enable_docs" != xno])
 
 dnl Xrender usage
 AC_ARG_ENABLE([xrender],
-        AS_HELP_STRING([--disable-xrender], [Disable use of the Xrender extension (default=auto)]),
-        [disable_xrender="yes"], [disable_xrender=""]
+        AS_HELP_STRING([--disable-xrender], [Do not use the Xrender extension (default=auto)]),
+        [], [enable_xrender=auto]
+)
+
+dnl assert() checks.  A release build defines NDEBUG.
+AC_ARG_ENABLE([debug],
+        AS_HELP_STRING([--enable-debug], [Keep the assert() checks (default=no, build with -DNDEBUG)]),
+        [], [enable_debug=no]
+)
+
+dnl Hardening: _FORTIFY_SOURCE, stack protector, stack clash protection
+dnl and full RELRO.
+AC_ARG_ENABLE([hardening],
+        AS_HELP_STRING([--disable-hardening], [Do not build with _FORTIFY_SOURCE, -fstack-protector-strong, -fstack-clash-protection and -z relro -z now (default=enabled)]),
+        [], [enable_hardening=yes]
 )
 
 dnl copied from xdm...
@@ -336,8 +359,6 @@ dnl do.  This is not a replacement for cpp, used at runtime by
 dnl software such as tt_type_comp.
 AC_SUBST(GENCPP, '$(top_builddir)/util/tradcpp/tradcpp')
 
-LT_INIT
-
 dnl make sure it's installed
 AC_PROG_YACC
 if test -z "$ac_cv_prog_YACC"; then
@@ -372,21 +393,78 @@ AC_PATH_X
 AC_PATH_XTRA
 
 dnl check some compiler flags
-C_FLAG_CHECK([-Wall])
-CXX_FLAG_CHECK([-Wall])
+CDE_CHECK_CFLAG([-Wall])
+CDE_CHECK_CXXFLAG([-Wall])
 
-C_FLAG_CHECK([-Wno-format-truncation])
-CXX_FLAG_CHECK([-Wno-format-truncation])
+CDE_CHECK_CFLAG([-Wno-format-truncation])
+CDE_CHECK_CXXFLAG([-Wno-format-truncation])
 
-C_FLAG_CHECK([-fno-strict-aliasing])
-CXX_FLAG_CHECK([-fno-strict-aliasing])
+dnl C++ only: string literals passed as char * all over the old C++ code.
+CDE_CHECK_CXXFLAG([-Wno-write-strings])
 
-C_FLAG_CHECK([-Wno-write-strings])
-CXX_FLAG_CHECK([-Wno-write-strings])
+CDE_CHECK_CFLAG([-Wno-unused-result])
+CDE_CHECK_CXXFLAG([-Wno-unused-result])
 
-C_FLAG_CHECK([-Wno-unused-result])
-CXX_FLAG_CHECK([-Wno-unused-result])
+dnl -fno-strict-aliasing stays tree-wide: the old code type-puns in ways
+dnl -Wstrict-aliasing does not report (e.g. lib/DtHelp/GifUtils.c fills a
+dnl char * array and reads it back through pixel **, which with strict
+dnl aliasing only shows up as a bogus -Wmaybe-uninitialized), so it cannot
+dnl be limited to the places the warning finds.
+CDE_CHECK_CFLAG([-fno-strict-aliasing])
+CDE_CHECK_CXXFLAG([-fno-strict-aliasing])
 
+dnl Hardening flags (--enable-hardening, the default)
+HARDEN_CPPFLAGS=""
+HARDEN_CFLAGS=""
+HARDEN_CXXFLAGS=""
+HARDEN_LDFLAGS=""
+FORTIFY_SOURCE_2=""
+if test "x$enable_hardening" != xno; then
+   dnl _FORTIFY_SOURCE needs optimisation (see build-aux/cde-fortify.h).
+   dnl Level 3 needs GCC 12 and glibc 2.34; older glibc treats it as
+   dnl level 2.
+   AC_MSG_CHECKING([whether _FORTIFY_SOURCE can be used])
+   AC_LANG_PUSH([C])
+   ac_saved_cppflags="$CPPFLAGS"
+   CPPFLAGS="$CPPFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3"
+   ac_saved_ccflags="$CFLAGS"
+   CFLAGS="-O2 -Werror"
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <string.h>
+#include <stdio.h>]], [[char b[4]; snprintf(b, sizeof(b), "%d", 1); return (int)strlen(b);]])],
+      [fortify=yes], [fortify=no])
+   CPPFLAGS="$ac_saved_cppflags"
+   CFLAGS="$ac_saved_ccflags"
+   AC_LANG_POP([C])
+   AC_MSG_RESULT([$fortify])
+   if test "$fortify" = yes; then
+      dnl build-aux/cde-fortify.h defines _FORTIFY_SOURCE=3 only when
+      dnl optimising (single quotes: make expands $(top_srcdir))
+      HARDEN_CPPFLAGS='-U_FORTIFY_SOURCE -include $(top_srcdir)/build-aux/cde-fortify.h'
+      dnl for targets whose code trips level 3's -Wformat-overflow checks
+      dnl until it is fixed (added to their _CFLAGS/_CXXFLAGS)
+      FORTIFY_SOURCE_2="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2"
+   fi
+   CDE_CHECK_CFLAG([-fstack-protector-strong], [HARDEN_CFLAGS])
+   CDE_CHECK_CXXFLAG([-fstack-protector-strong], [HARDEN_CXXFLAGS])
+   CDE_CHECK_CFLAG([-fstack-clash-protection], [HARDEN_CFLAGS])
+   CDE_CHECK_CXXFLAG([-fstack-clash-protection], [HARDEN_CXXFLAGS])
+   CDE_CHECK_LDFLAG([-Wl,-z,relro], [HARDEN_LDFLAGS])
+   CDE_CHECK_LDFLAG([-Wl,-z,now], [HARDEN_LDFLAGS])
+fi
+AC_SUBST(FORTIFY_SOURCE_2)
+
+dnl assert() checks (--enable-debug).  A release build defines NDEBUG.
+dnl Code that is not ready for that yet (asserts guarding the only use of
+dnl a variable, assert(0) in place of a return, its own NDEBUG-keyed
+dnl assert macro) adds $(KEEP_ASSERTS) to its _CPPFLAGS, _CFLAGS or
+dnl _CXXFLAGS, after $(CDE_CPPFLAGS), and keeps its checks.
+DEBUG_CPPFLAGS=""
+KEEP_ASSERTS=""
+if test "x$enable_debug" = xno; then
+   DEBUG_CPPFLAGS="-DNDEBUG"
+   KEEP_ASSERTS="-UNDEBUG"
+fi
+AC_SUBST(KEEP_ASSERTS)
 
 dnl Add X11 goodies here
 EXTRA_LIBS="${X_LIBS} ${EXTRA_LIBS}"
@@ -471,8 +549,13 @@ dnl headers
 AC_CHECK_HEADERS([locale.h security/pam_appl.h utempter.h])
 
 dnl Xrender header
-AC_CHECK_HEADERS([X11/extensions/Xrender.h], [],
-    [ disable_xrender="yes"], [#include <X11/Xlib.h>])
+if test "x$enable_xrender" != xno; then
+   AC_CHECK_HEADERS([X11/extensions/Xrender.h], [],
+       [if test "x$enable_xrender" = xyes; then
+           AC_MSG_ERROR([--enable-xrender was given but X11/extensions/Xrender.h was not found])
+        fi
+        enable_xrender=no], [#include <X11/Xlib.h>])
+fi
 
 dnl libraries
 AC_CHECK_LIB(m, cosf)
@@ -484,14 +567,21 @@ AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
                 [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XINERAMA"],
                 [AC_MSG_ERROR([libXinerama not found])], $X_LIBS)
 
-dnl Special check for tirpc...
-AC_CHECK_LIB(tirpc, svc_register,
-      [CFLAGS="${CFLAGS} -DOPT_TIRPC -I/usr/include/tirpc";
-       CXXFLAGS="${CXXFLAGS} -DOPT_TIRPC -I/usr/include/tirpc";
-       TIRPCLIB=-ltirpc])
+dnl Sun RPC: libtirpc where the C library has none (glibc 2.32 and
+dnl later), found through pkg-config, with a plain library check as a
+dnl fallback for systems without libtirpc.pc.
+TIRPC_CPPFLAGS=""
+TIRPCLIB=""
+PKG_CHECK_MODULES([TIRPC], [libtirpc],
+      [TIRPC_CPPFLAGS="-DOPT_TIRPC ${TIRPC_CFLAGS}"; TIRPCLIB="${TIRPC_LIBS}"],
+      [AC_CHECK_LIB(tirpc, svc_register,
+            [TIRPC_CPPFLAGS="-DOPT_TIRPC -I/usr/include/tirpc";
+             TIRPCLIB=-ltirpc])])
 AC_SUBST(TIRPCLIB)
 
 dnl see if the rpc_inline_t type exists
+save_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${CPPFLAGS} ${TIRPC_CPPFLAGS}"
 AC_CHECK_TYPE(rpc_inline_t, [],
    [AC_DEFINE_UNQUOTED([rpc_inline_t], [int32_t],
        [Define to int32_t if not defined by including rpc/rpc.h])],
@@ -499,6 +589,7 @@ AC_CHECK_TYPE(rpc_inline_t, [],
 AC_INCLUDES_DEFAULT
 #include <rpc/rpc.h>
 ])
+CPPFLAGS="${save_CPPFLAGS}"
 
 dnl check sizeof time_t for RPC
 AC_CHECK_SIZEOF([int])
@@ -515,44 +606,47 @@ AC_CHECK_MEMBERS([struct tm.tm_gmtoff],,,
 dnl jpeg
 AC_CHECK_LIB(jpeg, jpeg_read_header, [JPEGLIB="-ljpeg"],
              [AC_MSG_ERROR([libjpeg not found, please install it])],
-             [${EXTRA_INCS} ${EXTRA_LIBS}])
+             [${EXTRA_LIBS}])
 AC_SUBST(JPEGLIB)
 
 dnl lmdb
 AC_CHECK_LIB(lmdb, mdb_version, [LMDBLIB="-llmdb"],
              [AC_MSG_ERROR([liblmdb not found, please install it])],
-             [${EXTRA_INCS} ${EXTRA_LIBS}])
+             [${EXTRA_LIBS}])
 AC_SUBST(LMDBLIB)
 
 dnl Setup XTOOLLIB - we do it in this specific order to avoid ordering
 dnl issues
 XTOOLLIB=""
 AC_CHECK_LIB(X11, XOpenDisplay, [XTOOLLIB="-lX11"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
+                  [${EXTRA_LIBS}])
 AC_CHECK_LIB(Xext, XextFindDisplay, [XTOOLLIB="-lXext ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-if test "x$disable_xrender" != "xyes" ; then
+                  [${EXTRA_LIBS}])
+if test "x$enable_xrender" != "xno" ; then
    AC_CHECK_LIB(Xrender, XRenderComposite,
                          [XTOOLLIB="-lXrender ${XTOOLLIB}";
-                          SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XRENDER"], ,
-                         [${EXTRA_INCS} ${EXTRA_LIBS}])
+                          SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XRENDER"],
+                         [if test "x$enable_xrender" = xyes; then
+                             AC_MSG_ERROR([--enable-xrender was given but libXrender was not found])
+                          fi],
+                         [${EXTRA_LIBS}])
 fi
 AC_CHECK_LIB(Xau, XauReadAuth, [XTOOLLIB="-lXau ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
+                  [${EXTRA_LIBS}])
 AC_CHECK_LIB(Xpm, XpmLibraryVersion, [XTOOLLIB="-lXpm ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
+                  [${EXTRA_LIBS}])
 AC_CHECK_LIB(Xt, XtInitialize, [XTOOLLIB="-lXt ${XTOOLLIB}"], ,
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
+                 [${EXTRA_LIBS}])
 AC_CHECK_LIB(Xmu, XmuMakeAtom, [XTOOLLIB="-lXmu ${XTOOLLIB}"], ,
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
+                 [${EXTRA_LIBS}])
 AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
+                  [${EXTRA_LIBS}])
 AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"], ,
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
+                 [${EXTRA_LIBS}])
 AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"],
                  [AC_MSG_ERROR([libXm (Motif) not found, please install it])],
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
-XTOOLLIB="${EXTRA_INCS} ${EXTRA_LIBS} ${X_EXTRA_LIBS} ${XTOOLLIB}"
+                 [${EXTRA_LIBS}])
+XTOOLLIB="${EXTRA_LIBS} ${X_EXTRA_LIBS} ${XTOOLLIB}"
 AC_SUBST([XTOOLLIB])
 
 dnl Motif headers, the resource manager (libDtMrm) and the UIL compiler
@@ -574,7 +668,7 @@ AC_CHECK_LIB(Uil, Uil, [:],
 
 dnl only needed by dtlogin
 AC_CHECK_LIB(Xdmcp, XdmcpFlush, [XDMCPLIB="-lXdmcp"], [XDMCPLIB=""],
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
+                 [${EXTRA_LIBS}])
 AC_SUBST(XDMCPLIB)
 
 dnl iconv - part of libc on glibc, musl and the BSDs, a separate libiconv
@@ -640,15 +734,32 @@ if test -n "$MISSING_PROGS"; then
    AC_MSG_ERROR([Please install the following REQUIRED programs: ${MISSING_PROGS}])
 fi
 
-dnl set CPPFLAGS, CFLAGS, and CXXFLAGS.
-dnl The Autoconf manual says that these are user variables and
-dnl shouldn't be modified.  It suggests that you create a special
-dnl variable and presumably add those to your Makefile.am files.  We
-dnl have 192 of these currently, so... The user will just have to
-dnl deal, or modify them here directly.
-CPPFLAGS="${CPPFLAGS} ${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS}"
-CFLAGS="${CFLAGS} -std=$C_STD ${C_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
-CXXFLAGS="${CXXFLAGS} ${CXX_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
+dnl Project compiler and linker flags.  CPPFLAGS, CFLAGS, CXXFLAGS and
+dnl LDFLAGS belong to the user (make CFLAGS=-O0, sanitizers, PGO), so the
+dnl flags the build needs go to CDE_CPPFLAGS, CDE_CFLAGS, CDE_CXXFLAGS and
+dnl CDE_LDFLAGS instead.  They reach every Makefile through AM_CPPFLAGS,
+dnl AM_CFLAGS, AM_CXXFLAGS and AM_LDFLAGS, which are substituted below;
+dnl a Makefile.am that sets one of those, or a per-target _CPPFLAGS,
+dnl _CFLAGS, _CXXFLAGS or _LDFLAGS (which replace the AM_ ones), starts it
+dnl with the matching $(CDE_...) variable.
+CDE_CPPFLAGS="${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
+CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS}"
+CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS}"
+CDE_LDFLAGS="${HARDEN_LDFLAGS}"
+dnl squeeze the whitespace
+CDE_CPPFLAGS=`echo ${CDE_CPPFLAGS}`
+CDE_CFLAGS=`echo ${CDE_CFLAGS}`
+CDE_CXXFLAGS=`echo ${CDE_CXXFLAGS}`
+CDE_LDFLAGS=`echo ${CDE_LDFLAGS}`
+AC_SUBST(CDE_CPPFLAGS)
+AC_SUBST(CDE_CFLAGS)
+AC_SUBST(CDE_CXXFLAGS)
+AC_SUBST(CDE_LDFLAGS)
+AC_SUBST([AM_CPPFLAGS], ['$(CDE_CPPFLAGS)'])
+AC_SUBST([AM_CFLAGS], ['$(CDE_CFLAGS)'])
+AC_SUBST([AM_CXXFLAGS], ['$(CDE_CXXFLAGS)'])
+AC_SUBST([AM_LDFLAGS], ['$(CDE_LDFLAGS)'])
+
 LIBS="${EXTRA_LIBS} ${LIBS} ${PTHREAD_LIBS}"
 
 dnl All of the makefiles we need to generate go here...

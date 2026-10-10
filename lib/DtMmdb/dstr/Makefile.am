@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libdstr.la
 
-libdstr_la_CXXFLAGS = -I..
+libdstr_la_CXXFLAGS = $(CDE_CXXFLAGS) -I..
 
 libdstr_la_SOURCES = set.C bset.C slist.C dlist_cell.C dlist.C heap.C \
 		     void_ptr_array.C void_ptr_stack.C memory_pool.C \

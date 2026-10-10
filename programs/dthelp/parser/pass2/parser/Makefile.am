@@ -17,7 +17,7 @@ SDLBUILDSRC  = $(HTAG2)/build
 SDLUTILLIB   = $(HTAG2)/util/libutil.a
 SDLIFFILE    = $(HTAG2SRC)/help.if
 
-AM_CPPFLAGS = -I. -I$(SDLUTILSRC) -I$(HTAG2SRC) -I$(SDLBUILDSRC) \
+AM_CPPFLAGS = $(CDE_CPPFLAGS) -I. -I$(SDLUTILSRC) -I$(HTAG2SRC) -I$(SDLBUILDSRC) \
 	   -I$(SDLELTDEFSRC)
 
 dthelp_htag2_SOURCES = parser.c actutil.c \

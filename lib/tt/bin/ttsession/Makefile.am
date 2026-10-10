@@ -5,7 +5,7 @@ TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
 bin_PROGRAMS = ttsession
 
-ttsession_CXXFLAGS = -I../../slib -I../../lib $(TT_VERSION_DEFINE)
+ttsession_CXXFLAGS = $(CDE_CXXFLAGS) -I../../slib -I../../lib $(TT_VERSION_DEFINE)
 
 ttsession_LDADD = $(LIBTT) $(X_LIBS) ../../slib/libstt.a
 

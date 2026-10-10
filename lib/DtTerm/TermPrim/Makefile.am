@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libTermPrim.la
 
-AM_CPPFLAGS = $(DT_INCDIR)
+AM_CPPFLAGS = $(CDE_CPPFLAGS) $(DT_INCDIR)
 
 libTermPrim_la_SOURCES = TermPrim.c \
         TermPrimAction.c \

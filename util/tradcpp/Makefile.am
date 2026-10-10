@@ -8,3 +8,6 @@ tradcpp_SOURCES = array.c directive.c files.c macro.h output.h		\
 	eval.h macro.c output.c union.h
 
 
+
+# a build tool whose own malloc checking lives in assert()s: keep them
+tradcpp_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS)

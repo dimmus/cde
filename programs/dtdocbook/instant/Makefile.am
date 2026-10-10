@@ -6,7 +6,7 @@ instantdir = $(dtdocbooklibexecdir)/instant
 
 instant_PROGRAMS = instant
 
-instant_CFLAGS = $(DT_INCDIR)
+instant_CFLAGS = $(CDE_CFLAGS) $(DT_INCDIR)
 
 instant_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
 

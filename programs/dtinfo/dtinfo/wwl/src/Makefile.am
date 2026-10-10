@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libWWL.a
 
-libWWL_a_CXXFLAGS = -I../include
+libWWL_a_CXXFLAGS = $(CDE_CXXFLAGS) -I../include
 
 if SOLARIS
 libWWL_a_CXXFLAGS += -DSYSV -DSVR4

@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libRFC.a
 
-libRFC_a_CXXFLAGS = -I../Common -I../../include -I../../include/utils \
+libRFC_a_CXXFLAGS = $(CDE_CXXFLAGS) -I../Common -I../../include -I../../include/utils \
 		    -DTTLOCK_OFF
 
 if SOLARIS

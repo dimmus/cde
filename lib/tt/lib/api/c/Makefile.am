@@ -4,7 +4,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libapi.la
 
-libapi_la_CXXFLAGS = -I../../../lib
+libapi_la_CXXFLAGS = $(CDE_CXXFLAGS) -I../../../lib
 
 libapi_la_SOURCES = api_api.C           api_auth.C \
         api_default.C       api_error.C \

@@ -18,17 +18,17 @@ noinst_PROGRAMS = \
 
 noinst_SCRIPTS = dtdocbook2man dtdocbook2sdl
 
-AM_CXXFLAGS = -DCDE_NEXT -I$(top_builddir)/lib/DtMmdb
-AM_LDFLAGS = $(DTCLIENTLIBS) $(XTOOLLIB)
+AM_CXXFLAGS = $(CDE_CXXFLAGS) -DCDE_NEXT -I$(top_builddir)/lib/DtMmdb
+AM_LDFLAGS = $(CDE_LDFLAGS) $(DTCLIENTLIBS) $(XTOOLLIB)
 
 dtdcbk_datarootdir = $(abs_top_srcdir)/programs/dtdocbook
 
-AM_CPPFLAGS = \
+AM_CPPFLAGS = $(CDE_CPPFLAGS) \
 	      -DDTDCBK_DATAROOTDIR=\"$(dtdcbk_datarootdir)\" \
 	      -DINFOLIB_LIBEXECDIR=\"$(PWD)\"
 
 validator_SOURCES = validator.C
-validator_LDFLAGS = $(LIBMMDB) $(LMDBLIB)
+validator_LDFLAGS = $(CDE_LDFLAGS) $(LIBMMDB) $(LMDBLIB)
 
 CLEANFILES = $(noinst_SCRIPTS) $(validator_SOURCES) dtdocbook2infolib.c
 

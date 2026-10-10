@@ -2,7 +2,7 @@ bin_PROGRAMS = dtudcexch
 
 FONTEDT_PATH1 = ../dtudcfonted
 
-dtudcexch_CFLAGS = -I$(FONTEDT_PATH1) -I$(FONTEDT_PATH1)/include \
+dtudcexch_CFLAGS = $(CDE_CFLAGS) -I$(FONTEDT_PATH1) -I$(FONTEDT_PATH1)/include \
 		   -I$(FONTEDT_PATH1)/libfal -I$(FONTEDT_PATH1)/dtgpftobdf \
 		   -DFONTC='"'$(BDFTOPCF)'"'
 

@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libMotifApp.a
 
-libMotifApp_a_CXXFLAGS = -I../include/MotifApp -I../include -I../include/utils 
+libMotifApp_a_CXXFLAGS = $(CDE_CXXFLAGS) -I../include/MotifApp -I../include -I../include/utils
 
 libMotifApp_a_SOURCES = Application.C           AskFirstCmd.C \
 			BasicComponent.C        BusyPixmap.C \

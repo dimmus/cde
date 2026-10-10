@@ -2,7 +2,7 @@ MAITAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtspcd
 
-dtspcd_CFLAGS = -DCDE_CONFIGURATION_TOP=\"${prefix}\" \
+dtspcd_CFLAGS = $(CDE_CFLAGS) -DCDE_CONFIGURATION_TOP=\"${prefix}\" \
 		-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 		$(DT_INCDIR)
 

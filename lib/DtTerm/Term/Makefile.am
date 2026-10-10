@@ -4,7 +4,7 @@ CLEANFILES = TermLineData.c
 
 noinst_LTLIBRARIES = libTerm.la
 
-libTerm_la_CFLAGS = -I../TermPrim @DT_INCDIR@
+libTerm_la_CFLAGS = $(CDE_CFLAGS) -I../TermPrim @DT_INCDIR@
 
 TermLineData.c: TermLineData.data
 	$(RM) $@

@@ -27,7 +27,7 @@ KSH93_SHOPTS = -DSHOPT_DYNAMIC=1 -DSHOPT_NAMESPACE=1 -DSHOPT_MULTIBYTE=1 \
 	-DSHOPT_ESH=1 -DSHOPT_VSH=1 -DSHOPT_FIXEDARRAY=1 -DSHOPT_SUID_EXEC=1 \
 	-DSHOPT_BRACEPAT=1 -DSHOPT_ECHOPRINT=1 -D_BLD_ksh
 
-dtksh_CPPFLAGS = -I$(KSH93SRC)/include/ast -I$(KSH93SRC)/src/cmd/ksh93/include \
+dtksh_CPPFLAGS = $(CDE_CPPFLAGS) -I$(KSH93SRC)/include/ast -I$(KSH93SRC)/src/cmd/ksh93/include \
 		 -I$(KSH93SRC)/src/cmd/ksh93 -I${srcdir}/lib/DtPrint \
 		 -I${srcdir}/lib/DtHelp $(KSH93_SHOPTS) \
 		 -D_PACKAGE_ast -DKSHELL \
@@ -44,7 +44,7 @@ endif
 
 if AIX
 dtksh_CPPFLAGS += -D_IBMRPC_
-dtksh_LDFLAGS = -bE:dtksh.exp
+dtksh_LDFLAGS = $(CDE_LDFLAGS) -bE:dtksh.exp
 endif
 
 dtksh_SOURCES = init.c \

@@ -8,7 +8,7 @@ dist_cfg_DATA = CDE.lcx
 
 lib_LTLIBRARIES = libDtHelp.la
 
-libDtHelp_la_CFLAGS = -I./il -I./jpeg -I../DtSvc/DtUtil2 -DDTLIB \
+libDtHelp_la_CFLAGS = $(CDE_CFLAGS) -I./il -I./jpeg -I../DtSvc/DtUtil2 -DDTLIB \
 		      -DCDE_INSTALLATION_TOP='"$(CDE_INSTALLATION_TOP)"' \
 		      -DCDE_CONFIGURATION_TOP='"$(CDE_CONFIGURATION_TOP)"' \
 		      @DT_INCDIR@ @DTI_INCDIR@
@@ -42,7 +42,7 @@ libDtHelp_la_SOURCES = Actions.c       AsciiSpc.c      Callbacks.c \
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtHelp_la_LDFLAGS = -version-info 2:1:0
+libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0
 else
-libDtHelp_la_LDFLAGS = -version-info 3:0:1
+libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 3:0:1
 endif

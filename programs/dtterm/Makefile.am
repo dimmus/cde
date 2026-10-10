@@ -12,7 +12,7 @@ if HAS_UTEMPTER_LIBRARY
 dtterm_LDADD += -lutempter
 endif
 
-dtterm_CFLAGS = -I$(top_builddir)/lib/DtTerm/TermPrim	\
+dtterm_CFLAGS = $(CDE_CFLAGS) -I$(top_builddir)/lib/DtTerm/TermPrim	\
 	-I$(top_builddir)/lib/DtTerm/Term			\
 	-I$(top_builddir)/lib/DtTerm/TermView	\
 	$(DT_INCDIR) \

@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dthelpview
 
-dthelpview_CFLAGS = -D_BMS
+dthelpview_CFLAGS = $(CDE_CFLAGS) -D_BMS
 
 dthelpview_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
 

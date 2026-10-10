@@ -3,7 +3,7 @@ MAINTAINERCLEANFILES = Makefile.in
 bin_PROGRAMS = dtsrcreate dtsrdbrec dtsrhan dtsrload dtsrindex dtsrdelete \
 	       huffcode dtsrkdump dtsrclean
 
-AM_CFLAGS = -I../../lib/DtSearch -I../../lib/DtSearch/raima	\
+AM_CFLAGS = $(CDE_CFLAGS) -I../../lib/DtSearch -I../../lib/DtSearch/raima	\
 	$(DT_INCDIR) -DMAIN_PROGRAM -DNO_XLIB
 
 BUILT_SOURCES = MsgCat.c

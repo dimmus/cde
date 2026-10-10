@@ -8,7 +8,7 @@ include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 # class info
 include Classlist.mk
 
-libMarks_a_CXXFLAGS = $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
+libMarks_a_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
 
 libMarks_a_SOURCES = ../Prelude.h $(Marks_SRCS)
 

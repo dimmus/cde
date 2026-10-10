@@ -4,14 +4,14 @@ lib_LTLIBRARIES = libDtSvc.la
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtSvc_la_LDFLAGS = -version-info 2:1:0
+libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 2:1:0
 else
-libDtSvc_la_LDFLAGS = -version-info 3:0:1
+libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) -version-info 3:0:1
 endif
 
 
 # USe CPPFLAGS so it will apply to both C and C++ components
-libDtSvc_la_CPPFLAGS = -I./include -DMULTIBYTE -DNLS16 -I../include \
+libDtSvc_la_CPPFLAGS = $(CDE_CPPFLAGS) $(KEEP_ASSERTS) -I./include -DMULTIBYTE -DNLS16 -I../include \
 	@DT_INCDIR@ -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
        -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"
 

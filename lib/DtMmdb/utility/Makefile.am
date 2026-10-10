@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libutility.la
 
-libutility_la_CXXFLAGS = -DPORTABLE_DB -I..
+libutility_la_CXXFLAGS = $(CDE_CXXFLAGS) -DPORTABLE_DB -I..
 
 libutility_la_SOURCES = funcs.C         pm_random.C \
 			atoi_pearson.C 	xtime.C         buffer.C \

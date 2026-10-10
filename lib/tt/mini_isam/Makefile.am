@@ -5,7 +5,7 @@ TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
 noinst_LIBRARIES= libisam.a
 
-libisam_a_CFLAGS = $(TT_VERSION_DEFINE)
+libisam_a_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(TT_VERSION_DEFINE)
 
 libisam_a_SOURCES = isaddindex.c isamaddindex.c isopen.c isamopen.c \
              isdelcurr.c isdelrec.c isamdelrec.c isbuild.c \

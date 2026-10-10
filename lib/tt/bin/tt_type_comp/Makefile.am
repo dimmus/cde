@@ -12,7 +12,7 @@ mp_types_gram.h:
 
 bin_PROGRAMS = tt_type_comp
 
-tt_type_comp_CXXFLAGS = -I../../lib -I../../slib \
+tt_type_comp_CXXFLAGS = $(CDE_CXXFLAGS) -I../../lib -I../../slib \
 			$(TT_VERSION_DEFINE) -DCPP_PROGRAM="\"$(CPP_PROGRAM)\""
 
 tt_type_comp_SOURCES = mp_type_comp.C        mp_types_table.C \
