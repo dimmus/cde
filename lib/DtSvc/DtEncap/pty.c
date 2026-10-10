@@ -41,6 +41,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <poll.h>
 
 #ifdef SVR4
 #include <sys/filio.h>
@@ -469,9 +470,9 @@ int read_pty_channel_object(SPC_Channel_Ptr channel,
 {
   int result;
   int fd=channel->file_descs[connector];
-  long numbytes;
-  fd_set read_mask;
-  struct timeval tv={0, 50000};
+  int numbytes = 0;	/* FIONREAD stores an int; this was a long whose
+			   upper half was never written */
+  struct pollfd pfd;
 
   result=ioctl(fd, FIONREAD, &numbytes);
   if(numbytes == 0)
@@ -482,15 +483,19 @@ int read_pty_channel_object(SPC_Channel_Ptr channel,
 	SPC_Change_State(channel, connector, 0, -1);
 	return(0);
       }
-      FD_ZERO(&read_mask);
-      FD_SET(fd, &read_mask);
       /*
-       **
-       ** This call to select doesn't have the cast to (int*), because
-       ** this clause of the ifdef is not compiled on HPUX.
-       **
-      */ 
-      result=select(fd+1, &read_mask, NULL, NULL, &tv);
+       * Wait up to 50 ms for data.  (This used select() with a timeval
+       * that select() decremented and nobody reset, so after the first
+       * timeout it spun at full CPU until data or the child's exit.)
+       */
+      pfd.fd = fd;
+      pfd.events = POLLIN;
+      pfd.revents = 0;
+      result = poll(&pfd, 1, 50);
+      if (result > 0 && (pfd.revents & POLLNVAL)) {
+	result = -1;
+	errno = EBADF;
+      }
       if((result == -1) && (errno != EINTR)) {
 	SPC_XtRemoveInput(&channel->wires[connector]->read_toolkit_id, SPC_Input);
 	SPC_Change_State(channel, connector, 0, -1);

@@ -38,6 +38,16 @@
 #include <SPC/spcP.h>
 #include <bms/MemoryMgr.h>
 #include "DtSvcLock.h"
+#include "DtSvcFd.h"
+#include <fcntl.h>
+#include <sys/select.h>	/* FD_SETSIZE */
+#include <unistd.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#ifndef CLOSE_RANGE_CLOEXEC
+#define CLOSE_RANGE_CLOEXEC	(1U << 2)
+#endif
+#endif
 
 /* The application's SPC activation list */
 SPC_Channel_Ptr spc_activation_list = NULL;
@@ -106,6 +116,45 @@ spc_close(int fd)
   
   return(fd);
   
+}
+
+/*----------------------------------------------------------------------+*/
+void
+_DtSvcCloseFrom(int lowfd, int cloexec)
+/*----------------------------------------------------------------------+*/
+{
+  /*
+   * Close, or mark close-on-exec, all descriptors >= lowfd.  Called in
+   * children between fork and exec, so: no allocation, no stdio.
+   *
+   * The loop over every possible descriptor costs one system call per
+   * descriptor up to the limit (1024 to over a million, depending on
+   * RLIMIT_NOFILE) on every action launch; close_range does it in one.
+   */
+  long fd, max;
+
+#if defined(__linux__) && defined(SYS_close_range)
+  /* ENOSYS before Linux 5.9, EINVAL for CLOSE_RANGE_CLOEXEC before 5.11 */
+  if (syscall(SYS_close_range, (unsigned int) lowfd, ~0U,
+	      cloexec ? CLOSE_RANGE_CLOEXEC : 0) == 0)
+    return;
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || \
+      defined(__DragonFly__) || defined(__sun)
+  if (!cloexec) {
+    closefrom(lowfd);
+    return;
+  }
+#endif
+
+  max = sysconf(_SC_OPEN_MAX);
+  if (max < 0)
+    max = FD_SETSIZE;
+  for (fd = lowfd; fd < max; fd++) {
+    if (cloexec)
+      (void) fcntl((int) fd, F_SETFD, FD_CLOEXEC);
+    else
+      (void) close((int) fd);
+  }
 }
 
 /*----------------------------------------------------------------------+*/

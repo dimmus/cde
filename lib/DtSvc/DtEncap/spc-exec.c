@@ -53,6 +53,7 @@
 
 #include <Tt/tt_c.h>
 #include "DtSvcLock.h"
+#include "DtSvcFd.h"
 
 /* Global vars. */
 
@@ -166,9 +167,7 @@ void SPC_Close_Unused(void)
 /*----------------------------------------------------------------------+*/
 {
   /* Close any and all unused file descriptors */
-  int fd;
- 
-  for (fd = STDERR + 1; fd < max_fds; fd++) spc_close(fd);
+  _DtSvcCloseFrom(STDERR + 1, 0);
 }
 
 /*----------------------------------------------------------------------+*/

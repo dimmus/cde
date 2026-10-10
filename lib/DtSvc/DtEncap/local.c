@@ -39,6 +39,7 @@
 #include <time.h>
 #include <errno.h>
 #include <signal.h>
+#include <poll.h>
 
 #include <SPC/spcP.h>
 #include <SPC/spc-proto.h>
@@ -181,29 +182,21 @@ void local_channel_object_input_handler(void * client_data,
 /*----------------------------------------------------------------------+*/
 {
 
-/* WARNING!!! This routine is NOT XPG3 compliant.  The timeval struct */
-/*            is the problem here. 				      */
-
   SPC_Channel_Ptr channel=(SPC_Channel_Ptr) client_data;
   int fd=(*source);
   int connector;
-  fd_set read_fd_vect, except_fd_vect;
   SPC_Channel_Ptr tmp, this_ptr;
-  struct timeval timeout;		  /* Not part of XPG3 !!! */
+  struct pollfd pfd;
 
-  /* This ^&@$#% select is here to get around an X toolkit bug */
+  /* This ^&@$#% check is here to get around an X toolkit bug: ignore
+     the callback unless fd really is readable (or has an exceptional
+     condition).  poll, unlike the select(max_fds, ...) it replaces,
+     works for any fd number and does not scan max_fds descriptors. */
 
-  FD_ZERO(&read_fd_vect);
-  FD_ZERO(&except_fd_vect);
-
-  FD_SET(fd, &read_fd_vect);
-  FD_SET(fd, &except_fd_vect);
-
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 0;
-  
-  select(max_fds, &read_fd_vect, NULL, &except_fd_vect, &timeout);
-  if(! (FD_ISSET(fd, &read_fd_vect) || FD_ISSET(fd, &except_fd_vect))) {
+  pfd.fd = fd;
+  pfd.events = POLLIN | POLLPRI;
+  pfd.revents = 0;
+  if (poll(&pfd, 1, 0) == 0) {
     return /* (FALSE) */;
   }
 

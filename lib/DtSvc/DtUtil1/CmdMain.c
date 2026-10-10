@@ -60,6 +60,7 @@
 #include <Dt/ActionUtilP.h>
 #include "myassertP.h"
 #include "DtSvcLock.h"
+#include "DtSvcFd.h"
 
 #include <SPC/spcE.h>
 #include <SPC/spcP.h>
@@ -637,7 +638,7 @@ _DtCmdCommandInvokerExecute (
 	void *failure_data)
 
 {
-   int ioMode, i, index1;
+   int ioMode, index1;
    int windowType;
    pid_t commandPid;
    char context[MAXPATHLEN];
@@ -993,26 +994,7 @@ _DtCmdCommandInvokerExecute (
 	 /* 
 	  * Mark file descriptiors >=3 as "Close on Exec".
 	  */
-	 {
-	   long	open_max;
-
-	   open_max = sysconf(_SC_OPEN_MAX);
-	   if (open_max == -1)
-	   {
-#ifdef _SUN_OS
-             open_max = NOFILE;
-#else
-#if defined(_AIX)
-             open_max = FOPEN_MAX;
-#else
-             open_max = FD_SETSIZE;
-#endif
-#endif /* _SUN_OS */
-	   }
-
-           for (i=3; i < open_max; i++)
-	       (void) fcntl (i, F_SETFD, 1);
-	 }
+	 _DtSvcCloseFrom (3, 1);
 
 
 	 (void) execvp (commandArray[0], commandArray);
