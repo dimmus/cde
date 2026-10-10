@@ -150,10 +150,6 @@ static void    DisplayErrorMessage(
                  char *dir);
 static Boolean    IsInParentDir(char *from,char *to);
 
-/* the amount of time we wait for a file move/copy to complete */
-/* @@@ should make this a resource */
-#define FILE_MOVE_COPY_WAIT_TIME 2
-
 
 /* types of messages sent through the pipe */
 #define PIPEMSG_FILEOP_ERROR     1
@@ -209,6 +205,10 @@ typedef struct
    void (*finish_callback)();
    XtPointer callback_data;
    int child;
+   /* drag state when the operation started (it completes asynchronously,
+    * possibly after the drag has finished and these globals changed) */
+   XtPointer initiating_view;
+   int dropx, dropy;
 } FileOpCBData;
 
 
@@ -1935,7 +1935,7 @@ FileOpPipeCB(
                 file_set[actual_count++] = cb_data->updates[i].file;
           }
           RepositionIcons(cb_data->file_mgr_data, file_set,actual_count,
-             G_dropx, G_dropy, True);
+             cb_data->dropx, cb_data->dropy, True);
           XtFree((char *)file_set);
           file_set = NULL;
         }
@@ -2001,7 +2001,8 @@ FileOpPipeCB(
 	       /* If it is workspace drag and drop and the move operation
 		  is not because of  Select.MoveTo menu option  */
 
-	       if(initiating_view == NULL && cb_data->callback_data == NULL)
+	       if(cb_data->initiating_view == NULL &&
+                  cb_data->callback_data == NULL)
 	       {
                  snprintf( fileName, sizeof(fileName), "%s/%s", cb_data->directory,
 			      cb_data->updates[i].file );
@@ -2061,10 +2062,6 @@ _FileMoveCopy(
    int pipe_m2s[2];
    int pipe_s2m[2];
    int pid;
-   fd_set select_fds;
-   int fd;
-   struct timeval now, select_end, select_timeout;
-   Boolean operation_done;
    int rc;
 
 
@@ -2116,6 +2113,9 @@ _FileMoveCopy(
    cb_data->directory = XtNewString(directory);
    cb_data->finish_callback = finish_callback;
    cb_data->callback_data = callback_data;
+   cb_data->initiating_view = initiating_view;
+   cb_data->dropx = G_dropx;
+   cb_data->dropy = G_dropy;
 
 
    /* mark the target directory as being modified in the directory cache */
@@ -2149,6 +2149,21 @@ _FileMoveCopy(
     }
     else
     {
+      /*
+       * Hash of the distinct (host, directory) entries: a drop of K files
+       * from one folder used to compare each with all before it (K^2/2).
+       */
+      unsigned int size = 16, h, mask;
+      int *slots;
+      const char *c;
+
+      while (size < 2 * (unsigned int)file_count)
+         size <<= 1;
+      mask = size - 1;
+      slots = (int *) XtMalloc(size * sizeof(int));
+      for (h = 0; h < size; h++)
+         slots[h] = -1;
+
       /* Seperate file names, directories, and hosts */
       /* when dealing with real files                */
       for (i=0; i< file_count; i++)
@@ -2173,10 +2188,22 @@ _FileMoveCopy(
 	}
 
         /* see if this directory is already in the list */
-        for (j = 0; j < i; j++)
-          if (strcmp(updates[j].host, host_set[i]) == 0 &&
-              strcmp(updates[j].directory, source_dir) == 0)
-            break;
+        h = 2166136261u;                       /* FNV-1a */
+        for (c = host_set[i]; *c; c++)
+          h = (h ^ (unsigned char)*c) * 16777619u;
+        h = (h ^ '\n') * 16777619u;
+        for (c = source_dir; *c; c++)
+          h = (h ^ (unsigned char)*c) * 16777619u;
+        h &= mask;
+        while ((j = slots[h]) >= 0 &&
+               (strcmp(updates[j].host, host_set[i]) != 0 ||
+                strcmp(updates[j].directory, source_dir) != 0))
+          h = (h + 1) & mask;
+        if (j < 0)
+        {
+          slots[h] = i;
+          j = i;
+        }
 
         if (j < i)
         {  /* already in the list */
@@ -2210,6 +2237,7 @@ _FileMoveCopy(
 
         if (NULL != ptr) *ptr = '/';
       }/* end for loop */
+      XtFree((char *)slots);
     } /* endif */
 
 
@@ -2265,68 +2293,17 @@ _FileMoveCopy(
    cb_data->mode = mode;
 
    /*
-    * We wait a certain amount of time for the background process to finish.
-    * If it doesn't finish within that time, we do the rest asynchronously.
+    * The results are read from the pipe as they arrive.  This used to wait
+    * up to 2 seconds in select() first, with the
+    * user interface frozen (and any confirmation dialog the operation
+    * raised unanswerable) for that time.  The drag state the completion
+    * needs is kept in cb_data.  The operation is never done yet.
     */
+   XtAppAddInput(XtWidgetToApplicationContext(toplevel),
+                 pipe_s2m[0], (XtPointer)XtInputReadMask,
+                 FileOpPipeCB, (XtPointer)cb_data);
 
-   /* set up fd set for select */
-   FD_ZERO(&select_fds);
-   fd = pipe_s2m[0];
-
-   /* compute until what time we want to wait */
-   gettimeofday(&select_end, NULL);
-   select_end.tv_sec += FILE_MOVE_COPY_WAIT_TIME;
-
-   operation_done = False;
-   for (;;)
-   {
-      /* determine how much time is left */
-      gettimeofday(&now, NULL);
-      select_timeout.tv_sec = select_end.tv_sec - now.tv_sec;
-      select_timeout.tv_usec = select_end.tv_usec - now.tv_usec;
-      if (select_timeout.tv_usec < 0)
-      {
-         select_timeout.tv_sec--;
-         select_timeout.tv_usec += 1000000;
-      }
-
-      if ((int) select_timeout.tv_sec < 0)
-      {
-         /* check if our time is up */
-         DPRINTF(("FileMoveCopy: timed out; adding input callback\n"));
-         XtAppAddInput(XtWidgetToApplicationContext(toplevel),
-                       pipe_s2m[0], (XtPointer)XtInputReadMask,
-                       FileOpPipeCB, (XtPointer)cb_data);
-         break;
-      }
-
-      /* do the select */
-      FD_SET(fd, &select_fds);
-      rc = select(fd + 1, &select_fds, NULL, NULL, &select_timeout);
-      if (rc < 0 && errno != EINTR)
-      {
-         perror("select failed in FileMoveCopy");
-         break;
-      }
-      else if (rc == 1)
-      {
-         /* call FileOpPipeCB to read & process the data from the pipe */
-         FileOpPipeCB((XtPointer)cb_data, &fd, NULL);
-         DPRINTF(("FileMoveCopy: FileOpPipeCB -> fd = %d\n", fd));
-
-         /*
-          * If the background process is done, FileOpPipeCB sets fd
-          * to zero (in case of success) or -1 (in case of failure).
-          */
-         if (fd <= 0)
-         {
-            operation_done = (fd == 0);
-            break;
-         }
-      }
-   }
-
-   return operation_done;
+   return False;
 }
 
 
@@ -3477,7 +3454,7 @@ DisplayDuplicateOpError(
   {
     if(cb_data->callback_data == NULL)
     {
-      if(initiating_view == NULL)
+      if(cb_data->initiating_view == NULL)
         return;
       else
       {

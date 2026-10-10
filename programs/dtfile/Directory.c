@@ -246,6 +246,8 @@ typedef struct
    Boolean          was_up_to_date;
    int              modified_count;
    char          ** modified_list;
+   int              modified_size; /* allocated entries of modified_list */
+   struct _NameIndex *modified_index; /* hash of modified_list, or NULL */
    int              numOfViews;
    DirectoryView  * directoryView;
 } Directory;
@@ -518,7 +520,7 @@ PipeBufFree(
  *	replaces.
  *------------------------------------------------------------------*/
 
-typedef struct
+typedef struct _NameIndex
 {
    int          *slots;      /* index into keys, or -1 */
    unsigned int  mask;
@@ -590,6 +592,50 @@ NameIndexFree(
 {
    XtFree((char *)ni->slots);
    ni->slots = NULL;
+}
+
+static void NameIndexAdd(NameIndex *ni, char **keys, int i);
+
+/* free and clear the modified_list of a directory */
+static void
+FreeModifiedList(
+	Directory *directory)
+{
+   int i;
+
+   for (i = 0; i < directory->modified_count; i++)
+      XtFree(directory->modified_list[i]);
+   XtFree((char *)directory->modified_list);
+   directory->modified_list = NULL;
+   directory->modified_count = 0;
+   directory->modified_size = 0;
+   if (directory->modified_index)
+   {
+      NameIndexFree(directory->modified_index);
+      XtFree((char *)directory->modified_index);
+      directory->modified_index = NULL;
+   }
+}
+
+/* add keys[i], the last of i+1 keys, growing the table as needed */
+static void
+NameIndexAdd(
+	NameIndex *ni,
+	char **keys,
+	int i)
+{
+   unsigned int h;
+
+   if (ni->slots == NULL || 2 * (unsigned int)(i + 1) > ni->mask + 1)
+   {
+      NameIndexFree(ni);
+      NameIndexInit(ni, keys, i + 1);
+      return;
+   }
+   h = NameHash(keys[i] ? keys[i] : "") & ni->mask;
+   while (ni->slots[h] >= 0)
+      h = (h + 1) & ni->mask;
+   ni->slots[h] = i;
 }
 
 
@@ -1716,10 +1762,7 @@ FreeDirectory(
    XtFree ((char *) directory->position_info);
    directory->position_info = NULL;
 
-   for (i = 0; i < directory->modified_count; i++)
-      XtFree(directory->modified_list[i]);
-   XtFree ((char *) directory->modified_list);
-   directory->modified_list = NULL;
+   FreeModifiedList(directory);
 
    XtFree ((char *) directory->directoryView);
    directory->directoryView = NULL;
@@ -4159,6 +4202,8 @@ ReadDirectory(
       directory->modified_count = 0;
       directory->was_up_to_date = True;
       directory->modified_list = NULL;
+      directory->modified_size = 0;
+      directory->modified_index = NULL;
       directory->activity = activity_idle;
       for (i = 0; i < activity_idle; i++)
         directory->busy[i] = False;
@@ -4617,16 +4662,28 @@ DirectoryFileModified(
    directory = FindDirectory(host_name, directory_name);
    if (directory != NULL)
    {
-      /* see if the file is already on the list */
-      for( i = 0; i < directory->modified_count; ++i )
-        if( strcmp( directory->modified_list[i], file_name ) == 0 )
-          return;
+      /* see if the file is already on the list (hashed: a move or copy
+       * of K files calls this K times) */
+      if (directory->modified_index == NULL)
+      {
+         directory->modified_index = XtNew(NameIndex);
+         directory->modified_index->slots = NULL;
+      }
+      else if (NameIndexFind(directory->modified_index,
+                             directory->modified_list, file_name, NULL) >= 0)
+        return;
 
       /* add the file to the modified_list */
       i = directory->modified_count++;
-      directory->modified_list = (char **)
-        XtRealloc((char *)directory->modified_list, (i + 1)*sizeof(char *));
+      if (i >= directory->modified_size)
+      {
+         directory->modified_size = i < 8 ? 16 : 2 * i;
+         directory->modified_list = (char **)
+           XtRealloc((char *)directory->modified_list,
+                     directory->modified_size * sizeof(char *));
+      }
       directory->modified_list[i] = XtNewString(file_name);
+      NameIndexAdd(directory->modified_index, directory->modified_list, i);
    }
 }
 
@@ -6671,12 +6728,7 @@ ScheduleDirectoryActivity(
           activity == activity_update_all ||
           activity == activity_update_some)
       {
-         for (i = 0; i < directory->modified_count; i++)
-            XtFree(directory->modified_list[i]);
-         XtFree((char *)directory->modified_list);
-
-         directory->modified_count = 0;
-         directory->modified_list = NULL;
+         FreeModifiedList(directory);
       }
 
       /* close unused pipe connections */
