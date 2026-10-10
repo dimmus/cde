@@ -150,6 +150,68 @@ ChangeBackdrop(
 
 /******************************<->*************************************
  *
+ *  ShareBackdropPixmap (pWS, callFlags, width, height)
+ *
+ *  Description:
+ *  -----------
+ *  In the startup pass (BACKDROP_RESOURCE_PASS), a centered, fit or
+ *  fill backdrop depends only on the image named in the resources, its
+ *  colors, its type and the size of the screen.  When another workspace
+ *  of the screen already made the same one, use its full-screen pixmap
+ *  rather than making another (about 33 MB per workspace at 4K).
+ *  FreeBackdropPixmap frees a shared pixmap only when no other
+ *  workspace uses it.
+ *
+ *  Returns True if pWS->backdrop.imagePixmap is now a shared pixmap.
+ *
+ *************************************<->***********************************/
+static Boolean
+ShareBackdropPixmap (
+        WmWorkspaceData *pWS,
+        unsigned long callFlags,
+        unsigned int width,
+        unsigned int height)
+{
+    WmScreenData *pSD = pWS->pSD;
+    int i;
+
+    if (!(callFlags & BACKDROP_RESOURCE_PASS) || !pWS->backdrop.image)
+	return (False);
+
+    for (i = 0; i < pSD->numWorkspaces; i++)
+    {
+	WmWorkspaceData *pOther = &pSD->pWS[i];
+	unsigned int ow, oh, junk;
+	int jx, jy;
+	Window jwin;
+
+	if ((pOther == pWS) ||
+	    !pOther->backdrop.imagePixmapShareable ||
+	    !pOther->backdrop.imagePixmapOwned ||
+	    !pOther->backdrop.image ||
+	    (pOther->backdrop.imageType != pWS->backdrop.imageType) ||
+	    (pOther->backdrop.background != pWS->backdrop.background) ||
+	    (pOther->backdrop.foreground != pWS->backdrop.foreground) ||
+	    strcmp (pOther->backdrop.image, pWS->backdrop.image))
+	    continue;
+
+	/* the same size, i.e. made for the same backdrop window size */
+	if (!XGetGeometry (DISPLAY, pOther->backdrop.imagePixmap, &jwin,
+			   &jx, &jy, &ow, &oh, &junk, &junk) ||
+	    (ow != width) || (oh != height))
+	    continue;
+
+	pWS->backdrop.imagePixmap = pOther->backdrop.imagePixmap;
+	return (True);
+    }
+
+    return (False);
+}
+
+
+
+/******************************<->*************************************
+ *
  *  ProcessBackdropResources (pWS, callFlags)
  *
  *  Description:
@@ -209,6 +271,7 @@ ProcessBackdropResources(
     {
 	pWS->backdrop.imagePixmapOwned = False;
     }
+    pWS->backdrop.imagePixmapShareable = False;
 
     /*
      *  see if we're using a bitmap 
@@ -306,6 +369,8 @@ ProcessBackdropResources(
 				  display, pWS->backdrop.window,
 				  &wwin, &wx, &wy, &ww, &wh, &wbw, &wdepth);
 
+				if (!ShareBackdropPixmap (pWS, callFlags, ww, wh))
+				{
 				/* Create a pixmap the size of the whole desktop */
 				pWS->backdrop.imagePixmap =
 				  XCreatePixmap(display, tmpPix, ww, wh, depth);
@@ -320,6 +385,9 @@ ProcessBackdropResources(
 				  XtDisplay(pWS->workspaceTopLevelW),
 				  tmpPix, pWS->backdrop.imagePixmap, gc,
 				  0, 0, w, h, (ww - w) / 2, (wh - h) / 2);
+				}
+				pWS->backdrop.imagePixmapShareable =
+				  (callFlags & BACKDROP_RESOURCE_PASS) != 0;
 			    }
 			}
 #if defined(USE_XRENDER)
@@ -352,6 +420,11 @@ ProcessBackdropResources(
 				    XGetGeometry(
 				      display, pWS->backdrop.window,
 				      &wwin, &wx, &wy, &ww, &wh, &wbw, &wdepth);
+
+				    pWS->backdrop.imagePixmapShareable =
+				      (callFlags & BACKDROP_RESOURCE_PASS) != 0;
+				    if (!ShareBackdropPixmap (pWS, callFlags, ww, wh))
+				    {
 
 				    /* Create a pixmap the size of the whole desktop */
 				    pWS->backdrop.imagePixmap =
@@ -408,6 +481,7 @@ ProcessBackdropResources(
 
 				    if(src_pict) { XRenderFreePicture(display, src_pict); }
 				    if(dst_pict) { XRenderFreePicture(display, dst_pict); }
+				    }
 				}
 			    }
 			}
@@ -700,7 +774,22 @@ FreeBackdropPixmap (WmWorkspaceData *pWS)
     {
 	if (pWS->backdrop.imagePixmapOwned)
 	{
-	    XFreePixmap (DISPLAY, pWS->backdrop.imagePixmap);
+	    WmScreenData *pSD = pWS->pSD;
+	    int i;
+
+	    /* a pixmap shared with another workspace stays theirs */
+	    for (i = 0; i < pSD->numWorkspaces; i++)
+	    {
+		if ((&pSD->pWS[i] != pWS) &&
+		    pSD->pWS[i].backdrop.imagePixmapOwned &&
+		    (pSD->pWS[i].backdrop.imagePixmap ==
+		     pWS->backdrop.imagePixmap))
+		    break;
+	    }
+	    if (i >= pSD->numWorkspaces)
+	    {
+		XFreePixmap (DISPLAY, pWS->backdrop.imagePixmap);
+	    }
 	}
 	else
 	{
@@ -711,6 +800,7 @@ FreeBackdropPixmap (WmWorkspaceData *pWS)
     }
     pWS->backdrop.imagePixmap = None;
     pWS->backdrop.imagePixmapOwned = False;
+    pWS->backdrop.imagePixmapShareable = False;
 }
 
 

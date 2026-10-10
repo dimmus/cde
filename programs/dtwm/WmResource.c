@@ -5168,7 +5168,7 @@ ProcessWorkspaceResources (WmWorkspaceData *pWS)
      */
     if (pWS->backdrop.imageType != DtWSM_BACKDROP_IMAGETYPE_TILED)
     {
-	ProcessBackdropResources (pWS, 1);
+	ProcessBackdropResources (pWS, 1 | BACKDROP_RESOURCE_PASS);
     }
 
 } /* END OF FUNCTION ProcessWorkspaceResources */

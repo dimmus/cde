@@ -1395,6 +1395,8 @@ typedef struct _WmBackdropData
     Pixmap		imagePixmap;
     Boolean		imagePixmapOwned;	/* created here, not in the
 						   Xm pixmap cache */
+    Boolean		imagePixmapShareable;	/* made at startup from image,
+						   colors and imageType only */
     int			colorSet;		/* resource */
     Pixel 		background;		/* resource */
     Pixel 		foreground;		/* resource */
