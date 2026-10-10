@@ -12,7 +12,8 @@
 Each line of TRACE is "<seconds> <pid> <component> <event> [realtime]"
 (see startup-trace.h and startup-trace.ksh).  Lines marked "realtime"
 (from ksh) are moved onto the monotonic clock with the offset of the
-last "clock realtime=<s> monotonic=<s>" line, which --stamp-clock
+last "clock realtime=<s> monotonic=<s>" line before them (or of the first
+one, for the stamps that precede every clock line), which --stamp-clock
 appends.
 
 Printed: every stamp relative to the first one, and
@@ -40,23 +41,36 @@ def stamp_clock(path):
 def parse(path):
     offset = None
     stamps = []
+    pending = []        # realtime stamps seen before any clock line
     with open(path) as f:
         for line in f:
             parts = line.split()
             if not parts:
                 continue
-            if parts[0] == "clock":
-                kv = dict(p.split("=", 1) for p in parts[1:])
-                offset = float(kv["monotonic"]) - float(kv["realtime"])
-                continue
-            if len(parts) < 4:
-                continue
-            t = float(parts[0])
-            if parts[-1] == "realtime":
-                if offset is None:
+            try:
+                if parts[0] == "clock":
+                    kv = dict(p.split("=", 1) for p in parts[1:] if "=" in p)
+                    offset = float(kv["monotonic"]) - float(kv["realtime"])
+                    stamps.extend((t + offset, pid, comp, ev)
+                                  for t, pid, comp, ev in pending)
+                    pending = []
                     continue
-                t += offset
-            stamps.append((t, int(parts[1]), parts[2], parts[3]))
+                if len(parts) < 4:
+                    continue
+                stamp = (float(parts[0]), int(parts[1]), parts[2], parts[3])
+            except (KeyError, ValueError):
+                print("startup-trace: ignoring the line %r" % line.rstrip(),
+                      file=sys.stderr)
+                continue
+            if parts[-1] == "realtime" and len(parts) > 4:
+                if offset is None:
+                    pending.append(stamp)
+                    continue
+                stamp = (stamp[0] + offset,) + stamp[1:]
+            stamps.append(stamp)
+    if pending:
+        print("startup-trace: %d realtime stamps and no clock line (see "
+              "--stamp-clock); left out" % len(pending), file=sys.stderr)
     stamps.sort()
     return stamps
 

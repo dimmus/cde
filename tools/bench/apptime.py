@@ -18,8 +18,11 @@ trip totals are reported when it exits.  Reported, as one JSON object:
   idle_s     launch until the process last used CPU before staying idle
              for --idle-ms (default 1000) milliseconds: "all done"
   cpu_s      CPU time of the process (user + system) until then
-  mallocs, requests, round_trips   the preload's totals at exit
-                                   (when the process exits normally)
+  mallocs, requests, round_trips   the preload's totals at exit (or at
+                                   the SIGTERM that stops it) of the
+                                   process started, not of its children
+  children_mallocs  the mallocs of its forked children that exited
+                    normally (dtfile reads folders in such children)
 
 With --ttsession a private "ttsession -s -S -d $DISPLAY" runs for the
 duration, so that ToolTalk clients (dtfile, dtmail) find a session
@@ -84,6 +87,16 @@ def find_window(regex):
     return out[0] if out else None
 
 
+def remove_dtdbcache(display):
+    """Remove the shared action database cache the clients of a private
+    display build (it would outlive the display, and make the next run
+    on the same display number skip the build)."""
+    try:
+        os.unlink("/tmp/dtdbcache_" + display)
+    except OSError:
+        pass
+
+
 def start_xvfb():
     rd, wr = os.pipe()
     proc = subprocess.Popen(["Xvfb", "-displayfd", str(wr), "-screen", "0",
@@ -103,22 +116,34 @@ def start_xvfb():
         proc.kill()
         raise SystemExit("apptime: Xvfb did not start")
     os.environ["DISPLAY"] = ":" + number.decode().strip()
+    remove_dtdbcache(os.environ["DISPLAY"])
     return proc
 
 
-def read_counters(path, comm):
+def read_counters(path, pid):
+    """The preload's line of process pid, and the mallocs of the lines of
+    its children (each counts its own work: the preload restarts the
+    counters in a forked child)."""
     res = {}
+    children = 0
     try:
         with open(path) as f:
             for line in f:
                 kv = dict(t.split("=", 1) for t in line.split()[1:]
                           if "=" in t)
-                if comm is None or kv.get("comm", "").startswith(comm[:15]):
-                    res = {"mallocs": int(kv["mallocs"]),
-                           "requests": int(kv["requests"]),
-                           "round_trips": int(kv["rtrips"])}
-    except (OSError, KeyError, ValueError):
+                try:
+                    if int(kv.get("pid", -1)) == pid:
+                        res.update({"mallocs": int(kv["mallocs"]),
+                                    "requests": int(kv["requests"]),
+                                    "round_trips": int(kv["rtrips"])})
+                    elif int(kv.get("ppid", -1)) == pid:
+                        children += int(kv["mallocs"])
+                except (KeyError, ValueError):
+                    continue
+    except OSError:
         pass
+    if children:
+        res["children_mallocs"] = children
     return res
 
 
@@ -145,17 +170,21 @@ def main():
         raise SystemExit("apptime: needs xdotool")
 
     helpers = []
+    private_display = None
     work = tempfile.mkdtemp(prefix="apptime.")
     counters = os.path.join(work, "counters")
     try:
         if args.xvfb or not os.environ.get("DISPLAY"):
             helpers.append(start_xvfb())
+            private_display = os.environ["DISPLAY"]
         env = dict(os.environ)
         if args.ttsession:
             tts = shutil.which("ttsession", path=os.path.join(
                 os.environ.get("CDE_TOP", os.path.join(HERE, "..", "..")),
                 "lib", "tt", "bin", "ttsession", ".libs") + os.pathsep +
                 os.environ.get("PATH", ""))
+            if not tts:
+                raise SystemExit("apptime: no ttsession for --ttsession")
             helpers.append(subprocess.Popen(
                 [tts, "-s", "-S", "-d", os.environ["DISPLAY"]],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -163,6 +192,8 @@ def main():
         if not args.no_preload:
             env["LD_PRELOAD"] = os.path.join(HERE, "libcdebench_preload.so")
             env["CDEBENCH_REPORT"] = counters
+            # It is stopped with SIGTERM once idle: report then too.
+            env["CDEBENCH_REPORT_SIGTERM"] = "1"
 
         t0 = time.monotonic()
         proc = subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL,
@@ -211,7 +242,7 @@ def main():
                "name": args.label or os.path.basename(cmd[0]),
                "map_s": round(map_s, 4) if map_s is not None else None,
                "idle_s": round(idle_s, 4), "cpu_s": round(last_cpu, 3)}
-        res.update(read_counters(counters, os.path.basename(cmd[0])))
+        res.update(read_counters(counters, proc.pid))
         print(json.dumps(res), flush=True)
         return 0 if map_s is not None else 1
     finally:
@@ -221,6 +252,8 @@ def main():
                 h.wait(10)
             except subprocess.TimeoutExpired:
                 h.kill()
+        if private_display:
+            remove_dtdbcache(private_display)
         shutil.rmtree(work, ignore_errors=True)
 
 

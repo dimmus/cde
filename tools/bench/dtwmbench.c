@@ -61,6 +61,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -72,6 +73,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -149,13 +151,43 @@ static double now_ns(void)
 	return ts.tv_sec * 1e9 + ts.tv_nsec;
 }
 
+/* Remove path and, if it is a directory, what is in it. */
+static void rm_tree(const char *path)
+{
+	struct stat st;
+	struct dirent *e;
+	char sub[PATH_MAX];
+	DIR *d;
+
+	if (lstat(path, &st))
+		return;
+	if (!S_ISDIR(st.st_mode)) {
+		unlink(path);
+		return;
+	}
+	if ((d = opendir(path))) {
+		while ((e = readdir(d))) {
+			if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+				continue;
+			snprintf(sub, sizeof sub, "%s/%s", path, e->d_name);
+			rm_tree(sub);
+		}
+		closedir(d);
+	}
+	rmdir(path);
+}
+
+/*
+ * The work directory is dtwm's HOME too, where it makes .dt/ (sessions,
+ * tmp, types, errorlog) and .TTauthority: remove all of it.
+ */
 static void cleanup(void)
 {
 	stop_wm();
 	if (*logpath && !keep_log)
 		unlink(logpath);
 	if (*workdir)
-		rmdir(workdir);
+		rm_tree(workdir);
 	*logpath = *workdir = '\0';
 }
 
@@ -176,14 +208,28 @@ static void die(const char *fmt, ...)
 			fprintf(stderr, "dtwm: %s", line);
 		fclose(f);
 	}
+	/*
+	 * No X requests from here (die may run inside the X error handler,
+	 * where Xlib must not be called): exit's closing of the connection
+	 * destroys the fence window anyway.
+	 */
+	fence = 0;
 	cleanup();
 	exit(1);
 }
 
 static void on_signal(int sig)
 {
-	if (wm_pid > 0)
+	if (wm_pid > 0) {
 		kill(wm_pid, SIGKILL);
+		waitpid(wm_pid, NULL, 0);
+	}
+	/* No stdio, no X; opendir is not async-signal-safe, but the
+	 * alternative is a directory left in /tmp at every interruption. */
+	if (*logpath && !keep_log)
+		unlink(logpath);
+	if (*workdir)
+		rm_tree(workdir);
 	signal(sig, SIG_DFL);
 	raise(sig);
 }

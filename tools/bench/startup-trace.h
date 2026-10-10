@@ -30,6 +30,11 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Older feature-test settings (_XOPEN_SOURCE 600) leave it out. */
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 static inline void cde_startup_trace(const char *component, const char *event)
 {
 	const char *path = getenv("CDE_STARTUP_TRACE");

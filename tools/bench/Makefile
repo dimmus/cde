@@ -36,7 +36,7 @@ PROGS    := libcdebench_preload.so libdtwmbench_preload.so dtsvcbench \
 all: $(PROGS)
 
 libcdebench_preload.so: preload.c benchutil.h
-	$(CC) $(CFLAGS) $(WARN) -fPIC -shared -o $@ preload.c -ldl
+	$(CC) $(CFLAGS) $(WARN) -fPIC -shared -o $@ preload.c -ldl -pthread
 
 libdtwmbench_preload.so: dtwmpreload.c dtwmbench.h
 	$(CC) $(CFLAGS) $(WARN) -fPIC -shared -o $@ dtwmpreload.c -ldl

@@ -62,8 +62,17 @@ run() {	# name locale saveLines command bytes
 	fi
 	read -r t0 t1 < "$res"
 	s=$(awk -v a="$t0" -v b="$t1" 'BEGIN { printf "%.3f", (b - a) / 1e9 }')
-	req=$(awk '/comm=dtterm/ { for (i = 1; i <= NF; i++) if ($i ~ /^requests=/) { sub("requests=", "", $i); r = $i } } END { print r + 0 }' "$cnt" 2>/dev/null)
-	rt=$(awk '/comm=dtterm/ { for (i = 1; i <= NF; i++) if ($i ~ /^rtrips=/) { sub("rtrips=", "", $i); r = $i } } END { print r + 0 }' "$cnt" 2>/dev/null)
+	# dtterm's own line: of the dtterm processes (a forked helper that
+	# exits normally reports too), the one that sent the most requests.
+	read -r req rt <<-EOF
+	$(awk '/ comm=dtterm / { q = t = 0
+		for (i = 1; i <= NF; i++) {
+			if ($i ~ /^requests=/) q = substr($i, 10) + 0
+			if ($i ~ /^rtrips=/) t = substr($i, 8) + 0
+		}
+		if (!seen || q > r) { r = q; rt = t; seen = 1 } }
+	END { print r + 0, rt + 0 }' "$cnt" 2>/dev/null)
+	EOF
 	printf '{"bench": "dtterm", "name": "%s", "locale": "%s", "save_lines": "%s", "bytes": %s, "seconds": %s, "mb_per_s": %s, "requests": %s, "round_trips": %s}\n' \
 		"$name" "$loc" "$sl" "$bytes" "$s" \
 		"$(awk -v b="$bytes" -v s="$s" 'BEGIN { printf "%.2f", (s > 0 ? b / 1048576 / s : 0) }')" \

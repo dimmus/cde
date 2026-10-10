@@ -90,9 +90,12 @@ static void register_pattern(Tt_category cat, Tt_scope scope, const char *op)
 
 static void run_responder(int ready_fd)
 {
-	char *procid = tt_open();
+	char *procid;
 	struct pollfd pfd;
 
+	/* Do not outlive ttbench should it die without sending OP_QUIT. */
+	prctl(PR_SET_PDEATHSIG, SIGTERM);
+	procid = tt_open();
 	if (tt_ptr_error(procid) != TT_OK)
 		_exit(2);
 	register_pattern(TT_HANDLE, TT_SESSION, OP_PING);
@@ -117,6 +120,9 @@ static void run_responder(int ready_fd)
 
 		if (poll(&pfd, 1, -1) < 0 && errno != EINTR)
 			_exit(4);
+		/* ttsession is gone. */
+		if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL))
+			_exit(5);
 		while ((m = tt_message_receive()) != NULL &&
 		       tt_ptr_error(m) == TT_OK) {
 			op = tt_message_op(m);
@@ -163,6 +169,8 @@ static void wait_reply(Tt_message m)
 			}
 			tt_message_destroy(r);
 		}
+		if (r && tt_ptr_error(r) == TT_ERR_NOMP)
+			bench_die("ttbench: lost the connection to ttsession");
 		if (bench_now_ns() > deadline)
 			bench_die("ttbench: timed out waiting for a reply");
 		poll(&pfd, 1, 100);
@@ -294,6 +302,9 @@ static int child_main(char **argv)
 
 	if (!strcmp(mode, "responder"))
 		run_responder(fd);
+	if (!strcmp(mode, "hold"))
+		/* Keep the patterns until the parent is done (or gone). */
+		prctl(PR_SET_PDEATHSIG, SIGTERM);
 	if (!strcmp(mode, "patterns") || !strcmp(mode, "hold"))
 		child_open_procids();
 	if (bench_counters())
@@ -309,8 +320,6 @@ static int child_main(char **argv)
 	child_report(fd, t0, p0, &c0);
 	close(fd);
 	if (!strcmp(mode, "hold")) {
-		/* Keep the patterns until the parent is done (or gone). */
-		prctl(PR_SET_PDEATHSIG, SIGTERM);
 		for (;;)
 			pause();
 	}
@@ -544,6 +553,15 @@ static const struct bench_case cases[] = {
 	  100, file_db_setup, file_notice_db_run, NULL },
 };
 
+/* At exit (bench_die included): no tt calls, just stop the children. */
+static void kill_children(void)
+{
+	if (holder > 0)
+		kill(holder, SIGTERM);
+	if (responder > 0)
+		kill(responder, SIGTERM);
+}
+
 static void stop_responder(void)
 {
 	if (responder > 0) {
@@ -571,6 +589,7 @@ int main(int argc, char **argv)
 		return child_main(argv);
 	self_argv = argv;
 	signal(SIGPIPE, SIG_IGN);
+	atexit(kill_children);
 	if (sess && *sess) {
 		start_responder();
 		main_procid = tt_open();

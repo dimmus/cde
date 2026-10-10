@@ -27,13 +27,13 @@ under `/usr/dt` or `/etc/dt` (dtsvcbench).
 
 | File | What it does |
 |---|---|
-| `preload.c` → `libcdebench_preload.so` | LD_PRELOAD counters: malloc/calloc/moving realloc calls, X requests (the `requests` argument of `xcb_writev`, i.e. the XNextRequest delta of every display) and round trips (waits in `xcb_wait_for_reply*` after requests were sent: what counting `_XReply` gives, also where libX11 is `-Bsymbolic-functions`).  The benchmarks read them in-process; any program reports its totals at exit with `CDEBENCH_REPORT=FILE` (or `1` for stderr).  `CDEBENCH_REPLY_BACKTRACE=1` prints a backtrace per round trip. |
+| `preload.c` → `libcdebench_preload.so` | LD_PRELOAD counters: malloc/calloc/moving realloc calls, X requests (the `requests` argument of `xcb_writev`, i.e. the XNextRequest delta of every display) and round trips (waits in `xcb_wait_for_reply*` after requests were sent: what counting `_XReply` gives, also where libX11 is `-Bsymbolic-functions`).  The benchmarks read them in-process; any program reports its totals at exit with `CDEBENCH_REPORT=FILE` (or `1` for stderr), one line per process with its pid and ppid; a forked child counts from zero, and `CDEBENCH_REPORT_SIGTERM=1` also reports on a default-action SIGTERM.  `CDEBENCH_REPLY_BACKTRACE=1` prints a backtrace per round trip. |
 | `benchutil.[ch]` | The harness of the C benchmarks: case table, `-r REPEAT` (median, default 5), `-s SCALE`, `-j FILE` JSON, re-exec with the preload library. |
 | `dtsvcbench.c` | libDtSvc/libDtWidget: `_DtDtsMMInit(0)` with a valid and a stale dtdbcache, `DtDtsDataToDataType` per entry of a generated 10k-entry tree (or `CDEBENCH_DTS_DIR`, e.g. an sshfs mount), `DtDtsDataTypeToAttributeValue`, `DtActionLabel`/`Icon`/`Exists`, `XeSPCSpawn("/bin/true")` under `RLIMIT_NOFILE` 1024 and the hard limit, `DtComboBoxAddItem`/`DtSpinBoxAddItem` ×1k, DtEditor: 1 MB with ~100k NUL runs, Replace All with 10k hits, 10k cursor moves with the status line. |
 | `ttbench.c` | ToolTalk under a private `ttsession -s -c`: `tt_open`/`tt_close`, `ttdt_open`+`ttdt_session_join`, request/reply ping, a burst of notices, 1k and 10k patterns over 50 procids, ping with 10k patterns registered, `tt_file_netfile`, `tt_message_file_set`, `TT_FILE_IN_SESSION` notices, `TT_FILE` notices (with `CDEBENCH_TTDBSERVER=1` and a running rpc.ttdbserver). |
 | `dtwmbench.c`, `dtwmpreload.c`, `dtwmbench.h` | Motif's `mwmbench` ported to dtwm (front panel off): map 500 clients (also as WM_CLASS Dtterm, which makes dtwm look up an icon image), destroy, 10k `WM_NAME`/`_NET_WM_NAME` changes, 10k urgency-hint toggles, opaque/outline move and resize drags through XTest.  Reports dtwm's own CPU, mallocs, requests and round trips per operation, and the X server's CPU. |
 | `proxy.c` → `cdebench-proxy` | Motif's `xmbench-proxy`: an X proxy that adds latency per direction and counts requests, replies, events and round trips per connection (`cdebench-proxy -d 2 9 /tmp/.X11-unix/X0` then `DISPLAY=127.0.0.1:9`), to make round trips visible in wall time ("less page-down with 2 ms added delay"). |
-| `apptime.py` | Launch an X program, report the time to its first visible window (`map_s`), to idle (`idle_s`: no more CPU for `--idle-ms`), its CPU time and the preload's totals. |
+| `apptime.py` | Launch an X program, report the time to its first visible window (`map_s`), to idle (`idle_s`: no more CPU for `--idle-ms`), its CPU time and the preload's totals for that process (also when it is stopped with SIGTERM, through `CDEBENCH_REPORT_SIGTERM`), plus its forked children's mallocs. |
 | `dtterm-throughput.sh` | dtterm writing 100 MB of base64 and `yes \| head -c 16M`, in `C` and UTF-8, with `-sl 4s` and `-sl 10000`; MB/s, requests and round trips. |
 | `dtfile-gendir.py`, `dtfile-time.sh` | A 1k/10k/100k-entry folder (the dtsvcbench mix), and dtfile's time to first paint and to idle on it, cold and warm, per view mode. |
 | `mbox-gen.py`, `dtmail-time.sh` | A synthetic mbox (1k/10k/50k messages, no Content-Length, 30% multipart) and dtmail's time to open it; the script checks that dtmail did not rewrite it. |
@@ -129,13 +129,19 @@ What stands out:
 
 Tree `775b066d3-dirty`, 2026-10-10T05:04:13, 5 rounds (C benchmarks), 1 (scripts), pinned: True.
 
+`dts-type` was measured again later (same machine, less loaded: the old
+binary then took 6.0 us per entry) after a fix to the generated tree:
+its symlinks to files used to be broken, so 9% of the entries were
+skipped but still counted.  Typing those links through their targets
+makes it 21 mallocs per entry instead of 17.
+
 ### dtsvcbench
 
 | case | n | ns/op | cpu ns/op | mallocs/op | requests/op | round trips/op |
 |---|---:|---:|---:|---:|---:|---:|
 | mm-init-valid | 20 | 112,513 | 111,133 | 42.00 | 0.00 | 0.000 |
 | mm-init-stale | 5 | 19,246,325 | 18,472,962 | 39,850 | 0.00 | 0.000 |
-| dts-type | 10,000 | 8,639 | 8,126 | 17.00 | 0.00 | 0.000 |
+| dts-type | 10,000 | 7,569 | 7,297 | 20.93 | 0.00 | 0.000 |
 | dts-attr | 100,000 | 209 | 201 | 0.36 | 0.00 | 0.000 |
 | action-label | 100,000 | 268 | 260 | 1.60 | 0.00 | 0.000 |
 | action-icon | 100,000 | 198 | 193 | 0.80 | 0.00 | 0.000 |
@@ -195,10 +201,19 @@ Tree `775b066d3-dirty`, 2026-10-10T05:04:13, 5 rounds (C benchmarks), 1 (scripts
 
 | case | first window s | idle s | cpu s | mallocs | requests | round trips |
 |---|---:|---:|---:|---:|---:|---:|
-| dtfile-1000-by_name_and_icon-cold | 2.12 | 2.20 | 0.11 | 85,368 | 1,276 | 91 |
-| dtfile-1000-by_name_and_icon-warm | 2.17 | 2.29 | 0.14 | 85,380 | 1,276 | 91 |
-| dtfile-10000-by_name_and_icon-cold | 2.13 | 3.65 | 1.04 | 3,167,184 | 44,182 | 10,844 |
-| dtfile-10000-by_name_and_icon-warm | 2.15 | 3.63 | 1.03 | 3,167,234 | 44,182 | 10,844 |
+| dtfile-1000-by_name_and_icon-cold | 2.18 | 2.27 | 0.12 | 157,011 | 6,888 | 1,565 |
+| dtfile-1000-by_name_and_icon-warm | 2.12 | 2.27 | 0.13 | 156,990 | 6,888 | 1,565 |
+| dtfile-10000-by_name_and_icon-cold | 2.12 | 3.39 | 0.89 | 3,177,277 | 44,184 | 10,845 |
+| dtfile-10000-by_name_and_icon-warm | 2.13 | 3.46 | 0.93 | 3,177,303 | 44,184 | 10,845 |
+
+The dtfile rows were measured again after a fix to the preload's
+reporting: the counters used to be those of whichever dtfile process
+reported last, which was a forked folder-reading child carrying a copy
+of the parent's counts from the time of the fork (85k mallocs, 1,276
+requests and 91 round trips for 1k entries).  They are now the main
+process's totals when it is stopped once idle; the forked children's
+own mallocs are in `children_mallocs` of `baseline.json` (18,860 and
+178,621).
 
 ### dtmail-time.sh
 

@@ -35,6 +35,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -120,6 +121,18 @@ static void cleanup(void)
 		rm_tree(workdir);
 }
 
+/*
+ * Interrupted (bench.py stops a benchmark that overruns with SIGTERM):
+ * remove the work directory and the cache all the same.  Not strictly
+ * async-signal-safe (opendir), but the alternative is litter in /tmp.
+ */
+static void on_signal(int sig)
+{
+	cleanup();
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
 static void write_file(const char *path, const void *data, size_t len)
 {
 	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -141,6 +154,9 @@ static void setup_env(void)
 	if (!mkdtemp(workdir))
 		bench_die("dtsvcbench: mkdtemp: %s", strerror(errno));
 	atexit(cleanup);
+	signal(SIGINT, on_signal);
+	signal(SIGTERM, on_signal);
+	signal(SIGHUP, on_signal);
 	snprintf(typesdir, sizeof typesdir, "%s/types", workdir);
 	snprintf(stalefile, sizeof stalefile, "%s/cdebench.dt", typesdir);
 	snprintf(treedir, sizeof treedir, "%s/tree", workdir);
@@ -183,8 +199,11 @@ static int need_x(void)
 	app = XtCreateApplicationContext();
 	dpy = XtOpenDisplay(app, real_display, "dtsvcbench", "DtSvcBench",
 			    NULL, 0, &fake_argc, fake_argv);
-	if (!dpy)
+	if (!dpy) {
+		fprintf(stderr, "dtsvcbench: cannot open display %s; skipping "
+			"the X cases\n", real_display);
 		return 1;
+	}
 	toplevel = XtVaAppCreateShell("dtsvcbench", "DtSvcBench",
 				      applicationShellWidgetClass, dpy,
 				      XmNallowShellResize, True, NULL);
@@ -256,9 +275,9 @@ static long mm_stale_run(long n)
 
 	/*
 	 * Each time, the shared cache no longer matches the database
-	 * files: _DtDtsMMInit maps it, finds it stale, and rebuilds a
-	 * private one (as every client does until dtsession rebuilds the
-	 * shared one).
+	 * files: _DtDtsMMInit maps it, finds it stale, and rebuilds it
+	 * (in place, under the shared name, since c7a8949d3; a private
+	 * copy before, in every client until dtsession rebuilt it).
 	 */
 	for (i = 0; i < n; i++) {
 		touch_stale();
@@ -330,8 +349,9 @@ static void make_tree(long n)
 			break;
 		case 8:
 			snprintf(path, sizeof path, "%s/link%06ld", treedir, i);
-			snprintf(target, sizeof target, "file%06ld.c",
-				 i - 8);
+			/* file i - 8, with its suffix */
+			snprintf(target, sizeof target, "file%06ld%s", i - 8,
+				 suffixes[((i - 8) / 10) % N_SUFFIXES]);
 			if (symlink(target, path))
 				bench_die("dtsvcbench: symlink: %s",
 					  strerror(errno));
@@ -440,7 +460,7 @@ static void add_type_seen(const char *type)
 
 static long dts_type_run(long n)
 {
-	long i;
+	long i, typed = 0;
 
 	(void)n;
 	for (i = 0; i < ntree; i++) {
@@ -449,6 +469,7 @@ static long dts_type_run(long n)
 
 		if (t->is_link == 2)
 			continue;
+		typed++;
 		type = DtDtsDataToDataType(t->path, NULL, 0, &t->st,
 					   t->is_link ? t->link_target : NULL,
 					   NULL, NULL);
@@ -457,7 +478,8 @@ static long dts_type_run(long n)
 			DtDtsFreeDataType(type);
 		}
 	}
-	return ntree;
+	/* Per entry typed: the broken links of a CDEBENCH_DTS_DIR are not. */
+	return typed;
 }
 
 static const char *const attrs[] = {
@@ -854,7 +876,7 @@ static const struct bench_case cases[] = {
 	  "_DtDtsMMInit(0): map and validate a valid dtdbcache",
 	  20, mm_valid_setup, mm_valid_run, NULL },
 	{ "mm-init-stale", "mm",
-	  "_DtDtsMMInit(0): find the cache stale, rebuild a private one",
+	  "_DtDtsMMInit(0): find the cache stale, rebuild it",
 	  5, mm_stale_setup, mm_stale_run, NULL },
 	{ "dts-type", "dts",
 	  "DtDtsDataToDataType per entry of a 10k-entry tree",

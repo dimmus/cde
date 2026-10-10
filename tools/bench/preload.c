@@ -31,11 +31,16 @@
  * appends one line per process at exit:
  *
  *   cdebench pid=1234 comm=dtterm mallocs=... frees=... requests=...
- *       rtrips=...
+ *       rtrips=... ppid=...
  *
- * to the file (or to stderr with CDEBENCH_REPORT=1 or "-").  No signal
- * handler is installed: the program's own handlers are left alone.
- * Processes that leave with _exit() or a signal do not report.
+ * to the file (or to stderr with CDEBENCH_REPORT=1 or "-").  The counters
+ * restart from zero in a child made by fork(), so that each line counts
+ * the work of its own process only (dtfile, for one, reads folders in
+ * forked children that exit normally); tell the processes apart by pid.
+ * No signal handler is installed, unless CDEBENCH_REPORT_SIGTERM is set:
+ * then a SIGTERM that would kill the process with the default action
+ * reports first (a handler of the program's own replaces ours).
+ * Processes that leave with _exit() or another signal do not report.
  *
  * With CDEBENCH_REPLY_BACKTRACE set, every round trip prints a backtrace
  * to stderr, to find where they come from.
@@ -49,6 +54,8 @@
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,8 +102,13 @@ void free(void *ptr)
 	__libc_free(ptr);
 }
 
+/* Requests were sent since the last round trip. */
+static int sent;
+
 static void report(void) __attribute__((destructor));
 
+/* Only async-signal-safe calls (snprintf of integers aside): it also
+ * runs from the SIGTERM handler. */
 static void report(void)
 {
 	const char *dest = getenv("CDEBENCH_REPORT");
@@ -114,9 +126,10 @@ static void report(void)
 	}
 	len = snprintf(line, sizeof line,
 		       "cdebench pid=%d comm=%s mallocs=%lu frees=%lu "
-		       "requests=%lu rtrips=%lu\n", (int)getpid(), comm,
-		       cdebench_counters.mallocs, cdebench_counters.frees,
-		       cdebench_counters.requests, cdebench_counters.rtrips);
+		       "requests=%lu rtrips=%lu ppid=%d\n", (int)getpid(),
+		       comm, cdebench_counters.mallocs,
+		       cdebench_counters.frees, cdebench_counters.requests,
+		       cdebench_counters.rtrips, (int)getppid());
 	if (len <= 0)
 		return;
 	if (len >= (int)sizeof line)
@@ -134,8 +147,31 @@ static void report(void)
 		close(fd);
 }
 
-/* Requests were sent since the last round trip. */
-static int sent;
+static void on_sigterm(int sig)
+{
+	report();
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
+/* A forked child counts its own work from zero. */
+static void forked_child(void)
+{
+	memset(&cdebench_counters, 0, sizeof cdebench_counters);
+	sent = 0;
+}
+
+static void preload_init(void) __attribute__((constructor));
+
+static void preload_init(void)
+{
+	struct sigaction old;
+
+	pthread_atfork(NULL, NULL, forked_child);
+	if (getenv("CDEBENCH_REPORT_SIGTERM") &&
+	    sigaction(SIGTERM, NULL, &old) == 0 && old.sa_handler == SIG_DFL)
+		signal(SIGTERM, on_sigterm);
+}
 
 static void count_reply(void)
 {

@@ -50,6 +50,6 @@ for f in "$@"; do
 	esac
 	printf '{"bench": "loader", "name": "%s", "dsos": %s, "unused": %s, "exported": %s%s}\n' \
 		"${f#"$CDE_TOP"/}" "$dsos" "$unused" "$exported" \
-		"${rel:+, \"relocations\": $rel, \"relocations_from_cache\": $look}" |
+		"${rel:+, \"relocations\": $rel, \"relocations_from_cache\": ${look:-null}}" |
 		tee -a "${OUT:-/dev/null}"
 done
