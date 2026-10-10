@@ -70,6 +70,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
+#include <spawn.h>
 
 #if defined(sun) && !defined(SVR4)
 #include <ufs/fs.h>
@@ -101,6 +102,55 @@
 static char * MOVE_CMD = "/bin/mv";
 static char * LINK_CMD = "/bin/ln";
 static char * DTCOPY = CDE_INSTALLATION_TOP "/bin/dtfile_copy";
+
+extern char **environ;
+
+
+/************************************************************************
+ *
+ *  SpawnDtCopy
+ *    Start dtfile_copy with the given arguments (argv[0] is set here)
+ *    and do not wait for it.  posix_spawn avoids duplicating this
+ *    (large) process just to exec.  Returns False only if no process
+ *    could be created; that is reported through errorHandler like a
+ *    failed fork() was.  If dtfile_copy cannot be executed, the error
+ *    is printed and True returned, as the forked child used to do.
+ *
+ ************************************************************************/
+static Boolean
+SpawnDtCopy(
+        Widget w,
+        char **argv,
+        void (*errorHandler)())
+{
+   pid_t pid;
+   int rc;
+   char * msg;
+   char * tmpStr;
+
+   argv[0] = "dtfile_copy";
+   rc = posix_spawn(&pid, DTCOPY, NULL, NULL, argv, environ);
+   if (rc == EAGAIN || rc == ENOMEM)
+   {
+      if (errorHandler)
+      {
+         tmpStr = GETMESSAGE(11, 39, "Cannot create child process.\nThe maximum number of processes for this system has been reached.\nStop some of the processes or programs that are currently\nrunning and then retry this function.");
+         msg = XtNewString(tmpStr);
+         (*errorHandler) (w, msg, NULL);
+         XtFree(msg);
+      }
+      return False;
+   }
+   if (rc != 0)
+   {
+      errno = rc;
+      perror ("Could not exec child process \"dtfile_copy\"");
+      return True;
+   }
+
+   DPRINTF(("SpawnDtCopy: started child<%d>\n", (int) pid));
+   return True;
+}
 
 
 /************************************************************************
@@ -313,9 +363,6 @@ MoveDir(
         char ** targetRtn ,
         int type )
 {
-#ifdef DEBUG
-   static char *pname = "MoveDir";
-#endif
    char *p;
 
    char * targetDir;            /* original target dir path */
@@ -325,10 +372,9 @@ MoveDir(
    char * cptr;
    int len, val, val1;
 
-   static char buf [BUF_SIZE];  /* generic buffer */
+   static char buf [MAX_PATH];  /* generic buffer */
    char * msg;
    char * tmpStr;
-   int child_pid;
 
    /* Copy target so we have it for an error dialog if we need it */
    targetDir = XtNewString(target);
@@ -352,6 +398,20 @@ MoveDir(
          {
             char * tmpStr;
             tmpStr = GetSharedMessage(CANT_OVERWRITE_ERROR);
+            msg = XtNewString(tmpStr);
+            (*errorHandler) (w, msg, target);
+            XtFree(msg);
+         }
+         XtFree(targetDir);
+         return (False);
+      }
+
+      /* buf used to be BUF_SIZE (256) bytes: longer paths overflowed it */
+      if (strlen (target) + strlen (DName (source)) + 2 > sizeof (buf))
+      {
+         if (errorHandler)
+         {
+            tmpStr = GetSharedMessage(CANT_CREATE_ERROR);
             msg = XtNewString(tmpStr);
             (*errorHandler) (w, msg, target);
             XtFree(msg);
@@ -485,45 +545,26 @@ MoveDir(
       /* Determine correct Geometry Placement fo Move Dialog */
       /* @@@ ... to be added */
 
-      child_pid = fork();
-      if (child_pid == -1)
       {
-         if (errorHandler)
-         {
-            tmpStr = GETMESSAGE(11, 39, "Cannot create child process.\nThe maximum number of processes for this system has been reached.\nStop some of the processes or programs that are currently\nrunning and then retry this function.");
-            msg = XtNewString(tmpStr);
-            (*errorHandler) (w, msg, NULL);
-            XtFree(msg);
-         }
-         XtFree(targetDir);
-         return False;
-      }
-
-      if (child_pid == 0)
-      {
-	 DBGFORK(("%s:  child forked\n", pname));
-
          /* pass in geometry, and other command lines params when available */
-	 if(type == TRASH_DIRECTORY)
-           execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
-		 "-confirmErrors", "-popDown","-checkPerms", source, target, NULL);
-	 else
-           execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
-		 "-confirmErrors", "-popDown", source, target, NULL);
+         char *argv[10];
+         int n = 1;
+         Boolean ok;
 
-         /* call errorhandler */
-         perror ("Could not exec child process \"dtfile_copy\"");
+         argv[n++] = "-move";
+         argv[n++] = "-confirmReplace";
+         argv[n++] = "-confirmErrors";
+         argv[n++] = "-popDown";
+         if (type == TRASH_DIRECTORY)
+            argv[n++] = "-checkPerms";
+         argv[n++] = source;
+         argv[n++] = target;
+         argv[n] = NULL;
 
-	 DBGFORK(("%s:  child exiting\n", pname));
-
-         exit (1);
+         ok = SpawnDtCopy(w, argv, errorHandler);
+         XtFree(targetDir);
+         return (ok);
       }
-
-      DBGFORK(("%s:  forked child<%d>\n", pname, child_pid));
-
-
-      XtFree(targetDir);
-      return (True);
    }
 
 
@@ -590,15 +631,12 @@ CopyDir(
         Boolean checkForBusyDir,
         int type )
 {
-#ifdef DEBUG
-   static char *pname = "CopyDir";
-#endif
    char * cptr;
    int len;
    char target [MAX_PATH];	/* buffer to hold the full file name */
    char target_dir [MAX_PATH], target_file [MAX_PATH];
    struct stat  s2;             /* status of to file   */
-   int child_pid, rc, target_rc;
+   int rc, target_rc;
    char *msg, *tmpStr;
 
    /* Check if source is readable */
@@ -703,49 +741,33 @@ CopyDir(
 
    /* If all the above checks have passed, then fork off the copy dialog */
 
-   child_pid = fork();
-   if (child_pid == -1)
    {
-      if (errorHandler)
-      {
-         tmpStr = GETMESSAGE(11, 39, "Cannot create child process.\nThe maximum number of processes for this system has been reached.\nStop some of the processes or programs that are currently\nrunning and then retry this function.");
-         msg = XtNewString(tmpStr);
-         (*errorHandler) (w, msg, NULL);
-         XtFree(msg);
-      }
-      return False;
-   }
-
-   if (child_pid == 0)
-   {
-      DBGFORK(("%s:  child forked\n", pname));
-
       /* pass in geometry, and other command lines params when available */
+      char *argv[12];
+      int n = 1;
+
       if (mode == MERGE_DIR)
-        /* merge source & target directories */
-        rc = execlp(DTCOPY, "dtfile_copy",
-                     "-dontDelete", "-forceCopies", "-copyTop",
-                     "-confirmReplace", "-confirmErrors", "-popDown",
-                    from, target, (char *)NULL);
+      {
+         /* merge source & target directories */
+         argv[n++] = "-dontDelete";
+         argv[n++] = "-forceCopies";
+         argv[n++] = "-copyTop";
+         argv[n++] = "-confirmReplace";
+      }
       else
+      {
          /* replace target dir */
-         rc = execlp(DTCOPY, "dtfile_copy",
-                     "-forceCopies", "-copyTop",
-                     "-confirmErrors", "-popDown",
-                     from, target, (char *)NULL);
+         argv[n++] = "-forceCopies";
+         argv[n++] = "-copyTop";
+      }
+      argv[n++] = "-confirmErrors";
+      argv[n++] = "-popDown";
+      argv[n++] = from;
+      argv[n++] = target;
+      argv[n] = NULL;
 
-      /* call errorhandler */
-      perror ("Could not exec child process \"dtfile_copy\"");
-
-      DBGFORK(("%s:  child exiting\n", pname));
-
-      exit (1);
+      return SpawnDtCopy(w, argv, errorHandler);
    }
-
-   DBGFORK(("%s:  forked child<%d>\n", pname, child_pid));
-
-
-   return TRUE;
 }
 
 
