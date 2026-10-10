@@ -242,6 +242,7 @@ typedef struct
    FileData       * dir_data;
    int              path_count;
    char          ** path_logical_types;
+   int              path_generation; /* db_generation they were typed in */
    int              position_count;
    PositionInfo   * position_info;
    int              modify_begin;
@@ -370,6 +371,8 @@ static unsigned long lru_clock = 0;
 static int          inotify_fd = -1;
 static XtIntervalId event_timer = 0;
 static long         event_timer_due = 0;
+static XtIntervalId poll_timer = 0;      /* the pending TimerEvent, or 0 */
+static long         poll_timer_due = 0;
 static Directory  dummy_dir_struct =
 {
   "dummy_host",
@@ -917,13 +920,29 @@ IsLocalFileSystem(
  *------------------------------------------------------------------*/
 
 static void
+PollTimerArm(
+        long ms)
+{
+   if (poll_timer != 0)
+      XtRemoveTimeOut(poll_timer);
+   poll_timer_due = MonotonicMs() + ms;
+   poll_timer = XtAppAddTimeOut(app_context, ms, TimerEvent, NULL);
+   timer_suspended = False;
+}
+
+/*
+ * (Also when the timer only waits for the next link check, which can be
+ * checkBrokenLink seconds away: a directory that needs polling now, e.g.
+ * one that lost its watch or is on NFS, must not wait that long.)
+ */
+static void
 RestartTimer(void)
 {
-   if (timer_suspended && tickTime != 0 && SomeWindowMapped())
-   {
-      XtAppAddTimeOut(app_context, tickTime * 1000, TimerEvent, NULL);
-      timer_suspended = False;
-   }
+   if (tickTime == 0 || !SomeWindowMapped())
+      return;
+   if (timer_suspended ||
+       (poll_timer != 0 && poll_timer_due - MonotonicMs() > tickTime * 1000L))
+      PollTimerArm(tickTime * 1000L);
 }
 
 
@@ -1594,7 +1613,7 @@ InitializeDirectoryRead(
    DirectoryEventsInit();
 
    if (tickTime != 0)
-      XtAppAddTimeOut (app_context, tickTime * 1000, TimerEvent, NULL);
+      PollTimerArm(tickTime * 1000L);
 
    /* start timer to check for broken desktop objects */
    if( desktop_data->numIconsUsed > 0
@@ -3600,8 +3619,11 @@ ReaddirPipeCallback(
            path_logical_types[i] = PipeReadString(*fd);
          tt_path = PipeReadString(*fd);
 
-         /* the path icons only need redrawing if a type changed */
-         changed = (n != directory->path_count);
+         /* the path icons only need redrawing if a type changed (or
+            the database was reloaded: a type may have a new icon) */
+         changed = (n != directory->path_count ||
+                    directory->path_generation != db_generation);
+         directory->path_generation = db_generation;
          for (i = 0; i < n && !changed; i++)
            changed = !StringsEqual(path_logical_types[i],
                                    directory->path_logical_types[i]);
@@ -4115,10 +4137,6 @@ ReadDirectory(
       /* The directory is already in the cache. */
       directory->viewed = True;
 
-      /* a cached directory no window showed: bring it up to date */
-      if (directory->lru_stamp != 0)
-         DirectoryRevalidate(directory);
-
       /* Look for the view in the view list */
       for (i = 0; i < directory->numOfViews; i++)
          if (directory->directoryView[i].file_mgr_data == file_mgr_data)
@@ -4136,6 +4154,11 @@ ReadDirectory(
 
       /* set mapped flag for the view */
       directory->directoryView[i].mapped = file_mgr_data->mapped;
+
+      /* a cached directory no window showed: bring it up to date (now
+         that the view is listed: the update types for it, e.g. toolbox) */
+      if (directory->lru_stamp != 0)
+         DirectoryRevalidate(directory);
 
       /* check if we need to popup an error message */
       if (directory->errmsg_needed &&
@@ -5525,6 +5548,46 @@ PosInfoJobFree(
    free(job);
 }
 
+/*
+ * A forked writer finished its file even if dtfile exited meanwhile; a
+ * thread dies with the process, leaving a truncated file.  So exit()
+ * waits (a little) for the writer threads still running.
+ */
+static pthread_mutex_t posinfo_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  posinfo_cond = PTHREAD_COND_INITIALIZER;
+static int             posinfo_threads = 0;
+static pid_t           posinfo_pid = 0;     /* the process that has them */
+
+static void
+PosInfoThreadsWait(void)
+{
+   struct timespec deadline;
+
+   /* (forked children inherit the count, but not the threads) */
+   if (getpid() != posinfo_pid)
+      return;
+
+   clock_gettime(CLOCK_REALTIME, &deadline);
+   deadline.tv_sec += 2;
+   pthread_mutex_lock(&posinfo_lock);
+   while (posinfo_threads > 0)
+      if (pthread_cond_timedwait(&posinfo_cond, &posinfo_lock,
+                                 &deadline) != 0)
+         break;
+   pthread_mutex_unlock(&posinfo_lock);
+}
+
+static void
+PosInfoThreadsAdd(
+        int n)
+{
+   pthread_mutex_lock(&posinfo_lock);
+   posinfo_threads += n;
+   if (posinfo_threads == 0)
+      pthread_cond_broadcast(&posinfo_cond);
+   pthread_mutex_unlock(&posinfo_lock);
+}
+
 static void *
 PosInfoThread(
         void *arg)
@@ -5534,6 +5597,7 @@ PosInfoThread(
    ssize_t n;
 
    rc = WritePosInfoFile(job->file_name, job->count, job->info);
+   PosInfoThreadsAdd(-1);
    do
       n = write(job->pipe_fd, &rc, sizeof(int));
    while (n < 0 && errno == EINTR);
@@ -5590,12 +5654,20 @@ StartPosInfoThread(
    (void) fcntl(fds[1], F_SETFD, FD_CLOEXEC);
    job->pipe_fd = fds[1];
 
+   if (posinfo_pid == 0)
+   {
+      posinfo_pid = getpid();
+      atexit(PosInfoThreadsWait);
+   }
+
+   PosInfoThreadsAdd(1);
    pthread_attr_init(&attr);
    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
    rc = pthread_create(&thread, &attr, PosInfoThread, job);
    pthread_attr_destroy(&attr);
    if (rc != 0)
    {
+      PosInfoThreadsAdd(-1);
       close(fds[0]);
       close(fds[1]);
       PosInfoJobFree(job);
@@ -6355,6 +6427,8 @@ TimerEvent(
 
    DPRINTF2(("Directory::TimerEvent\n"));
 
+   poll_timer = 0;      /* (this one has fired) */
+
    if (dragActive)
    {
       /*
@@ -6367,7 +6441,7 @@ TimerEvent(
        * Schedule the next TimerEvent in 1/2 second, so that check will
        * be done soon after the drag is finished.
        */
-      XtAppAddTimeOut (app_context, 500, TimerEvent, NULL);
+      PollTimerArm(500);
       return;
    }
 
@@ -6501,7 +6575,7 @@ TimerEvent(
       timer_suspended = True;
       return;
    }
-   XtAppAddTimeOut(app_context, next, TimerEvent, NULL);
+   PollTimerArm(next);
 }
 
 

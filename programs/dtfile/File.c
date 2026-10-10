@@ -6596,7 +6596,9 @@ _UpdateFileIcons(
    layout_data->next_icon_to_use = layout_data->reuse_icons;
    layout_data->next_btn_to_use = layout_data->reuse_btns;
 
-   layout_data->manage = (Widget *)XtMalloc(2*order_count*sizeof(Widget));
+   /* (every icon, its tree button, and the rename text field: all are
+      now managed in one go at the end, see DisplayWorkProc) */
+   layout_data->manage = (Widget *)XtMalloc((2*order_count + 1)*sizeof(Widget));
    layout_data->manage_count = 0;
 
    layout_data->i_do_next_vis = 0;
@@ -7561,8 +7563,9 @@ do_this_entry:
 					child->core.height,
 					child->core.border_width);
 
-                     /* manage it */
-                     AddToManage(layout_data, manage, &manageCount, child);
+                     /* manage it (once) */
+                     if (PtrMapGet(&layout_data->manage_set, child) == NULL)
+                        AddToManage(layout_data, manage, &manageCount, child);
                   }
                   break;
                }
