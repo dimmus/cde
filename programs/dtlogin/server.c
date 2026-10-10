@@ -52,6 +52,12 @@
 # include	<setjmp.h>
 # include       <errno.h>
 # include	<pwd.h>
+# include	<stddef.h>
+# include	<time.h>
+# include	<sys/wait.h>
+#ifdef UNIXCONN
+# include	<sys/un.h>
+#endif
 # include	"dm.h"
 # include	"vgmsg.h"
 
@@ -71,7 +77,9 @@ static void   GetRemoteAddress( struct display *d, int fd) ;
 static SIGVAL PingBlocked( int arg ) ;
 static SIGVAL PingLost( int arg ) ;
 static SIGVAL abortOpen( int arg ) ;
-static int    serverPause( unsigned t, int serverPid) ;
+static int    serverPause( unsigned t, int serverPid, struct display *d) ;
+static int    serverListening( struct display *d ) ;
+static void   msleep( unsigned ms ) ;
 static SIGVAL serverPauseAbort( int arg ) ;
 static SIGVAL serverPauseUsr1( int arg ) ;
 
@@ -194,7 +202,7 @@ StartServerOnce( struct display *d )
     }
     Debug ("Server started. Process ID = %d\n", pid);
     d->serverPid = pid;
-    if (serverPause ((unsigned) d->openDelay, pid))
+    if (serverPause ((unsigned) d->openDelay, pid, d))
 	return FALSE;
     return TRUE;
 }
@@ -219,8 +227,98 @@ StartServer( struct display *d )
 
 
 /*
- * sleep for t seconds, return 1 if the server is dead when
- * the sleep finishes, 0 else
+ * Sleeps for ms milliseconds (less if a signal arrives).
+ */
+static void
+msleep( unsigned ms )
+{
+    struct timespec	ts;
+
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (long) (ms % 1000) * 1000000L;
+    (void) nanosleep (&ts, NULL);
+}
+
+/*
+ * Returns 1 if the X server of a local display accepts connections on
+ * its Unix domain socket, 0 if not or if that cannot be told (no such
+ * socket for this kind of display, say).
+ *
+ * The server sends SIGUSR1 when it is ready, but not if a wrapper
+ * script runs it as a child, and not every server does.  Without the
+ * signal the wait below used to last openDelay seconds (5 by default).
+ */
+static int
+serverListening( struct display *d )
+{
+#ifdef UNIXCONN
+    const char		*colon;
+    const char		*p;
+    struct sockaddr_un	addr;
+    socklen_t		len;
+    int			fd;
+    int			ok = 0;
+    int			pass;
+    long		dpy_num;
+
+    if (d->displayType.location != Local || !d->name ||
+	!(colon = strrchr (d->name, ':')))
+	return 0;
+
+    /* Only ":N" or "unix:N" go through the Unix domain socket. */
+    if (colon != d->name &&
+	!(colon - d->name == 4 && strncmp (d->name, "unix", 4) == 0))
+	return 0;
+    p = colon + 1;
+    if (*p < '0' || *p > '9')
+	return 0;
+    dpy_num = strtol (p, NULL, 10);
+    if (dpy_num < 0 || dpy_num > 65535)
+	return 0;
+
+    /*
+     * Linux servers also listen on an abstract socket of the same name;
+     * try that first, then the file system one.
+     */
+    for (pass = 0; pass < 2 && !ok; pass++) {
+	memset (&addr, 0, sizeof (addr));
+	addr.sun_family = AF_UNIX;
+#ifdef __linux__
+	if (pass == 0) {
+	    snprintf (addr.sun_path + 1, sizeof (addr.sun_path) - 1,
+		      "/tmp/.X11-unix/X%ld", dpy_num);
+	    len = (socklen_t) (offsetof (struct sockaddr_un, sun_path) + 1 +
+			       strlen (addr.sun_path + 1));
+	}
+	else
+#else
+	if (pass == 0)
+	    continue;
+#endif
+	{
+	    snprintf (addr.sun_path, sizeof (addr.sun_path),
+		      "/tmp/.X11-unix/X%ld", dpy_num);
+	    len = (socklen_t) sizeof (addr);
+	}
+	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) == -1)
+	    return 0;
+	/* Never block (on a full backlog, say). */
+	(void) fcntl (fd, F_SETFL, O_NONBLOCK);
+	if (connect (fd, (struct sockaddr *) &addr, len) == 0)
+	    ok = 1;
+	close (fd);
+    }
+    return ok;
+#else
+    return 0;
+#endif
+}
+
+/*
+ * Waits up to t seconds for the server to get ready: until it sends
+ * SIGUSR1, accepts connections (polled after 50 ms, then 100, 200 and
+ * every 250 ms) or dies.  Returns 1 if the server is dead, 0 else (also
+ * when the time runs out, as before).
  */
 
 static sigjmp_buf	pauseAbort;
@@ -242,43 +340,26 @@ serverPauseUsr1( int arg )
 }
 
 static int 
-serverPause( unsigned t, int serverPid )
+serverPause( unsigned t, int serverPid, struct display *d )
 {
-    int		pid;
+    int			pid;
+    unsigned		delay = 50;
 
     serverPauseRet = 0;
     Debug ("Display Manager pausing until SIGUSR1 from server or timeout\n");
     if (!sigsetjmp (pauseAbort, 1)) {
 	signal (SIGALRM, serverPauseAbort);
 	signal (SIGUSR1, serverPauseUsr1);
-#ifdef SYSV
-	if (receivedUsr1)
-	    alarm ((unsigned) 1);
-	else
-	    alarm (t);
-#else
 	if (!receivedUsr1)
 	    alarm (t);
 	else
 	    Debug ("ServerPause(): already received USR1\n");
-#endif
 	for (;;) {
-#ifdef SYSV
-	    pid = wait ((waitType *) 0);
-#else
-	    if (!receivedUsr1)
-		pid = wait ((waitType *) 0);
-	    else
-#  ifdef	SVR4
-                {
-		    int dummy;
-		pid = waitpid ((pid_t) 0,&dummy,WNOHANG);
-                }
-#  else
-		pid = wait3 ((waitType *) 0, WNOHANG,
-			     (struct rusage *) 0);
-#  endif
-#endif
+	    /*
+	     * Only the server is waited for here: a wait() for any child
+	     * used to reap (and lose) other displays' processes too.
+	     */
+	    pid = waitpid ((pid_t) serverPid, NULL, WNOHANG);
 	    if (pid == serverPid ||
 		(pid == -1 && errno == ECHILD))
 	    {
@@ -286,12 +367,17 @@ serverPause( unsigned t, int serverPid )
 		serverPauseRet = 1;
 		break;
 	    }
-#ifndef SYSV
-	    if (pid == 0) {
+	    if (receivedUsr1) {
 		Debug ("Server alive and kicking\n");
 		break;
 	    }
-#endif
+	    if (serverListening (d)) {
+		Debug ("Server accepts connections\n");
+		break;
+	    }
+	    msleep (delay);
+	    if ((delay *= 2) > 250)
+		delay = 250;
 	}
     }
     alarm ((unsigned) 0);
@@ -370,42 +456,68 @@ LogOpenError( int count )
 }
 
 
+/*
+ * Opens the display.  An attempt that fails is retried after 50 ms,
+ * then 100, 200 and every 250 ms until openDelay seconds have passed,
+ * and that openRepeat times; it used to sleep openDelay seconds after
+ * each failure.
+ */
 int 
 WaitForServer( struct display *d )
 {
     int	    i;
+    int	    hung = 0;
 
-    for (i = 0; i < (d->openRepeat > 0 ? d->openRepeat : 1); i++) {
-    	(void) signal (SIGALRM, abortOpen);
-    	(void) alarm ((unsigned) d->openTimeout);
-	if (!sigsetjmp (openAbort, 1)) {
-	    Debug ("Before XOpenDisplay(%s)\n", d->name);
-	    errno = 0;
-	    dpy = XOpenDisplay (d->name);
-	    (void) alarm ((unsigned) 0);
-	    (void) signal (SIGALRM, SIG_DFL);
-	    Debug ("After XOpenDisplay()\n");
-	    if (dpy) {
-	    	if (d->displayType.location == Foreign)
-		    GetRemoteAddress (d, ConnectionNumber (dpy));
-	    	RegisterCloseOnFork (ConnectionNumber (dpy));
-                (void) fcntl (ConnectionNumber (dpy), F_SETFD, 0);
-	    	return 1;
+    for (i = 0; i < (d->openRepeat > 0 ? d->openRepeat : 1) && !hung; i++) {
+	struct timespec	start;
+	struct timespec	t;
+	unsigned	delay = 50;
+	long		elapsed;
+
+	clock_gettime (CLOCK_MONOTONIC, &start);
+	for (;;) {
+	    (void) signal (SIGALRM, abortOpen);
+	    (void) alarm ((unsigned) d->openTimeout);
+	    if (!sigsetjmp (openAbort, 1)) {
+		Debug ("Before XOpenDisplay(%s)\n", d->name);
+		errno = 0;
+		dpy = XOpenDisplay (d->name);
+		(void) alarm ((unsigned) 0);
+		(void) signal (SIGALRM, SIG_DFL);
+		Debug ("After XOpenDisplay()\n");
+		if (dpy) {
+		    if (d->displayType.location == Foreign)
+			GetRemoteAddress (d, ConnectionNumber (dpy));
+		    RegisterCloseOnFork (ConnectionNumber (dpy));
+		    (void) fcntl (ConnectionNumber (dpy), F_SETFD, 0);
+		    return 1;
+		} else {
+		    Debug ("OpenDisplay failed %d (%s)\n",
+			   errno, _SysErrorMsg (errno));
+		}
 	    } else {
-	    	Debug ("OpenDisplay failed %d (%s)\n",
-		       errno, _SysErrorMsg (errno));
+		Debug ("Hung in open, aborting\n");
+		if (LogOpenError(d->startTries))
+		    LogError(ReadCatalog(
+			    MC_LOG_SET,MC_LOG_HUNG_DPY,MC_DEF_LOG_HUNG_DPY),
+			       d->name, d->startTries);
+		(void) signal (SIGALRM, SIG_DFL);
+		hung = 1;
+		break;
 	    }
+
+	    clock_gettime (CLOCK_MONOTONIC, &t);
+	    elapsed = (t.tv_sec - start.tv_sec) * 1000L +
+		      (t.tv_nsec - start.tv_nsec) / 1000000L;
+	    if (elapsed >= (long) d->openDelay * 1000L)
+		break;
 	    Debug ("Waiting for server to start %d\n", i);
-	    sleep ((unsigned) d->openDelay);
-    	} else {
-	    Debug ("Hung in open, aborting\n");
-	    if (LogOpenError(d->startTries))
-		LogError(ReadCatalog(
-			MC_LOG_SET,MC_LOG_HUNG_DPY,MC_DEF_LOG_HUNG_DPY),
-			   d->name, d->startTries);
-	    (void) signal (SIGALRM, SIG_DFL);
-	    break;
-    	}
+	    if ((long) delay > (long) d->openDelay * 1000L - elapsed)
+		delay = (unsigned) ((long) d->openDelay * 1000L - elapsed);
+	    msleep (delay);
+	    if ((delay *= 2) > 250)
+		delay = 250;
+	}
     }
     Debug ("Giving up on server\n");
     if (LogOpenError(d->startTries))
