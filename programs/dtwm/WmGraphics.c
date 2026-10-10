@@ -1112,11 +1112,21 @@ void WmDrawXmString (Display *dpy, Window w, XmFontList xmfontlist,
 		     XmString xmstring, GC gc, Position x, Position y, 
 		     Dimension width,  XRectangle *pbox, Boolean bCenter)
 {
-    Dimension textWidth;
-    int alignment;
-    
+    WmDrawXmStringWidth (dpy, w, xmfontlist, xmstring,
+			 XmStringWidth (xmfontlist, xmstring), gc, x, y,
+			 width, pbox, bCenter);
+}
 
-    textWidth = XmStringWidth(xmfontlist, xmstring);
+/*
+ *  WmDrawXmStringWidth: same as WmDrawXmString, for callers that already
+ *  know textWidth, the XmStringWidth of xmstring in xmfontlist.
+ */
+void WmDrawXmStringWidth (Display *dpy, Window w, XmFontList xmfontlist,
+			  XmString xmstring, Dimension textWidth, GC gc,
+			  Position x, Position y, Dimension width,
+			  XRectangle *pbox, Boolean bCenter)
+{
+    int alignment;
 
     alignment = bCenter ? XmALIGNMENT_CENTER : XmALIGNMENT_BEGINNING;
 
@@ -1136,7 +1146,7 @@ void WmDrawXmString (Display *dpy, Window w, XmFontList xmfontlist,
 	XmStringDraw (dpy, w, xmfontlist, xmstring, gc, x, y, width, 
 		      alignment, XmSTRING_DIRECTION_L_TO_R, pbox);
     }
-} /* END OF FUNCTION WmDrawXmString */
+} /* END OF FUNCTION WmDrawXmStringWidth */
 
 /*************************************<->*************************************
  *

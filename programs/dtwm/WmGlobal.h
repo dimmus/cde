@@ -1684,6 +1684,11 @@ typedef struct _ClientData
     int		fullscreenWidth;		/* fullscreen width */
     int		fullscreenHeight;		/* fullscreen height */
     XmString	instantTitle;			/* instant title */
+    XmString	titleWidthString;		/* title the width is for, */
+    XmFontList	titleWidthFont;			/* in this font list, */
+    Dimension	titleWidth;			/* is cached here */
+    Boolean	titleFromNetWmName;		/* title is _NET_WM_NAME */
+    Boolean	iconTitleFromNetWmName;		/* ... _NET_WM_ICON_NAME */
 
     /* client window frame graphic data: */
 

@@ -445,6 +445,7 @@ findXSMPClientDBMatch(ClientData *pCD, char **workSpaceNamesP)
 		!= (char *)NULL)
 	    {
 		pCD->instantTitle = XmStringCreateLocalized(resourcePtr);
+		pCD->titleWidthString = NULL;
 	    }
 	}
 
@@ -740,6 +741,7 @@ findProxyClientDBMatch(ClientData *pCD, char **workSpaceNamesP)
 		!= (char *)NULL)
 	    {
 		pCD->instantTitle = XmStringCreateLocalized(resourcePtr);
+		pCD->titleWidthString = NULL;
 	    }
 
 	    return True;

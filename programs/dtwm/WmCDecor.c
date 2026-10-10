@@ -1093,6 +1093,39 @@ void AdoptClient (ClientData *pcd)
 
 /*************************************<->*************************************
  *
+ *  GetClientTitleWidth (pcd, fontList)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Returns the width of the client's displayed title in fontList.  The
+ *  value is cached in the client data since the title is redrawn far
+ *  more often (focus changes, exposures, resizes) than it changes.  Code
+ *  that sets pcd->clientTitle or pcd->instantTitle must reset
+ *  pcd->titleWidthString to NULL (port of motif 7242649d).
+ *
+ *************************************<->***********************************/
+
+Dimension GetClientTitleWidth (ClientData *pcd, XmFontList fontList)
+{
+    XmString title = CLIENT_DISPLAY_TITLE(pcd);
+
+    if ((fontList == NULL) || (title == NULL) ||
+	(pcd->titleWidthString != title) || (pcd->titleWidthFont != fontList))
+    {
+	pcd->titleWidth = XmStringWidth (fontList, title);
+	pcd->titleWidthString = title;
+	pcd->titleWidthFont = fontList;
+    }
+
+    return (pcd->titleWidth);
+
+} /* END OF FUNCTION GetClientTitleWidth */
+
+
+
+/*************************************<->*************************************
+ *
  *  GetTextBox (pcd, pBox)
  *
  *
@@ -1159,7 +1192,7 @@ void GetTextBox (ClientData *pcd, XRectangle *pBox)
 	    fontList = CLIENT_TITLE_APPEARANCE(pcd).fontList;
 	else
 	    fontList = CLIENT_APPEARANCE(pcd).fontList;
-	textWidth = XmStringWidth(fontList, CLIENT_DISPLAY_TITLE(pcd));
+	textWidth = GetClientTitleWidth(pcd, fontList);
 
 	offset = TitleBarHeight(pcd)/2;
 
@@ -1277,11 +1310,13 @@ void DrawWindowTitle (ClientData *pcd, Boolean eraseFirst)
     }
 
 #ifdef  DT_LEFT_JUSTIFIED_TITLE
-    WmDrawXmString(DISPLAY, win, fontList, title, clientGC,
+    WmDrawXmStringWidth(DISPLAY, win, fontList, title,
+		   GetClientTitleWidth(pcd, fontList), clientGC,
 		   textBox.x, textBox.y, textBox.width, &textBox,
 		   ((wmGD.frameStyle == WmSLAB) ? False : True));
 #else /* DT_LEFT_JUSTIFIED_TITLE */
-    WmDrawXmString(DISPLAY, win, fontList, title, clientGC,
+    WmDrawXmStringWidth(DISPLAY, win, fontList, title,
+		   GetClientTitleWidth(pcd, fontList), clientGC,
 		   textBox.x, textBox.y, textBox.width, &textBox,
 		   True);
 #endif /* DT_LEFT_JUSTIFIED_TITLE */
