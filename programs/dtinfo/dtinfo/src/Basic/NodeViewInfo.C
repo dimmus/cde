@@ -89,10 +89,7 @@
 NodeViewInfo::NodeViewInfo (UAS_Pointer<UAS_Common> &node_ptr, _DtCvTopicInfo *topic)
 : f_node_ptr (node_ptr),
   f_topic(topic),
-  f_current_hit(NULL),
-  f_def_key(""),
-  f_def_val((unsigned long)-1),
-  f_color_dict(f_def_key, f_def_val)
+  f_current_hit(NULL)
 {
 #ifdef DEBUG
   printf( "make NodeViewInfo %p\n\n", this );
@@ -852,6 +849,58 @@ NodeViewInfo::search_hit_idx()
     return i;
 }
 
+// Named colours of the style sheet are allocated once per display and
+// colormap for the whole process; they used to be allocated again for
+// every node viewed (and never freed).  A name that cannot be allocated
+// is remembered too (FAILED_PIXEL) and its segments keep the "not
+// computed" pixel, as before.
+#define UNKNOWN_PIXEL	((unsigned long)-1)
+#define FAILED_PIXEL	((unsigned long)-2)
+
+struct NamedColorCache
+{
+    Display*			     dpy;
+    Colormap			     cmap;
+    Dict<UAS_String, unsigned long>  dict;
+    NamedColorCache*		     next;
+
+    NamedColorCache(Display* d, Colormap c, NamedColorCache* n)
+	: dpy(d), cmap(c), dict(UAS_String(""), UNKNOWN_PIXEL), next(n) {}
+};
+
+static NamedColorCache* g_named_colors = NULL;
+
+static Dict<UAS_String, unsigned long>&
+named_color_dict(Display* dpy, Colormap cmap)
+{
+    NamedColorCache* c;
+
+    for (c = g_named_colors; c != NULL; c = c->next)
+	if (c->dpy == dpy && c->cmap == cmap)
+	    return c->dict;
+
+    g_named_colors = new NamedColorCache(dpy, cmap, g_named_colors);
+    return g_named_colors->dict;
+}
+
+// the pixel for a named colour, or UNKNOWN_PIXEL if it can't be allocated
+static unsigned long
+named_color_pixel(Display* dpy, Colormap cmap, const char* name)
+{
+    unsigned long& pixel = named_color_dict(dpy, cmap)[UAS_String(name)];
+
+    if (pixel == UNKNOWN_PIXEL) {
+	XColor screen, exact;
+
+	if (XAllocNamedColor(dpy, cmap, name, &screen, &exact))
+	    pixel = screen.pixel;
+	else
+	    pixel = FAILED_PIXEL;
+    }
+
+    return (pixel == FAILED_PIXEL) ? UNKNOWN_PIXEL : pixel;
+}
+
 void
 NodeViewInfo::comp_pixel_values_traverse(_DtCvSegment* seg, Display* dpy,
 					 Colormap &cmap)
@@ -862,32 +911,19 @@ NodeViewInfo::comp_pixel_values_traverse(_DtCvSegment* seg, Display* dpy,
     unsigned long seg_ptype = seg->type & _DtCvPRIMARY_MASK;
 
     if (seg_ptype == _DtCvSTRING && seg->client_use) {
-	XColor screen, exact;
 	SegClientData* pSCD = (SegClientData*)seg->client_use;
 	assert( pSCD->type() == _DtCvSTRING );
 
-	if (pSCD->bg_color() && pSCD->bg_pixel() == (unsigned long)-1) {
-	    UAS_String bg_color = pSCD->bg_color();
-	    unsigned long& bg_pixel = f_color_dict[bg_color];
-	    if (bg_pixel == (unsigned long)-1) {
-		if (XAllocNamedColor(dpy, cmap, pSCD->bg_color(),
-							&screen, &exact))
-		    pSCD->bg_pixel(bg_pixel = screen.pixel);
-	    }
-	    else
-		pSCD->bg_pixel(bg_pixel);
+	if (pSCD->bg_color() && pSCD->bg_pixel() == UNKNOWN_PIXEL) {
+	    unsigned long pixel = named_color_pixel(dpy, cmap, pSCD->bg_color());
+	    if (pixel != UNKNOWN_PIXEL)
+		pSCD->bg_pixel(pixel);
 	}
 
-	if (pSCD->fg_color() && pSCD->fg_pixel() == (unsigned long)-1) {
-	    UAS_String fg_color = pSCD->fg_color();
-	    unsigned long& fg_pixel = f_color_dict[fg_color];
-	    if (fg_pixel == (unsigned long)-1) {
-		if (XAllocNamedColor(dpy, cmap, pSCD->fg_color(),
-							&screen, &exact))
-		    pSCD->fg_pixel(fg_pixel = screen.pixel);
-	    }
-	    else
-		pSCD->fg_pixel(fg_pixel);
+	if (pSCD->fg_color() && pSCD->fg_pixel() == UNKNOWN_PIXEL) {
+	    unsigned long pixel = named_color_pixel(dpy, cmap, pSCD->fg_color());
+	    if (pixel != UNKNOWN_PIXEL)
+		pSCD->fg_pixel(pixel);
 	}
     }
 
@@ -917,7 +953,8 @@ NodeViewInfo::comp_pixel_values(Display* dpy, Colormap &cmap)
 
 #ifdef CM_DEBUG
     DictIter<UAS_String, unsigned long> dictiter;
-    for (dictiter = f_color_dict.first(); dictiter() ; dictiter++) {
+    for (dictiter = named_color_dict(dpy, cmap).first(); dictiter() ;
+								dictiter++) {
 	fprintf(stderr, "(DEBUG) color=\"%s\", pixel=0x%lx\n",
 				(char*)dictiter.key(), dictiter.value());
     }

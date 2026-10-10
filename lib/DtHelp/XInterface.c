@@ -1086,9 +1086,14 @@ DADrawString (
 	     */
 	    if (pSCD->fg_pixel == (unsigned long)-1)
 	      {
+		/*
+		 * keep the pixel: this runs on every redraw, and the
+		 * colour was allocated (and leaked) again each time.
+		 */
 		if (XAllocNamedColor(dpy, pDAS->colormap, pSCD->fg_color,
 							&screen, &exact))
 		  {
+		    pSCD->fg_pixel = screen.pixel;
 		    XSetForeground(dpy, drawGC, screen.pixel);
 		    XSetBackground(dpy, fillGC, screen.pixel);
 		  }
@@ -1123,6 +1128,7 @@ DADrawString (
 		if (XAllocNamedColor(dpy, pDAS->colormap, pSCD->bg_color,
 							&screen, &exact))
 		  {
+		    pSCD->bg_pixel = screen.pixel;
 		    XSetBackground(dpy, drawGC, screen.pixel);
 		    XSetForeground(dpy, fillGC, screen.pixel);
 		  }
