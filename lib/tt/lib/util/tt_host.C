@@ -150,26 +150,30 @@ init_byaddr(_Tt_string addr)
 
 /* 
  * Initializes a _Tt_host object from a string representing the host
- * address in Internet '.' notation.
+ * address in Internet '.' notation.  With resolve_name 0 the name is not
+ * looked up (no reverse DNS query, which can stall for seconds when the
+ * resolver is slow or unreachable); the host is then known by its
+ * address, exactly as when the reverse lookup fails.
  */
 int _Tt_host::
-init_bystringaddr(_Tt_string addr)
+init_bystringaddr(_Tt_string addr, int resolve_name)
 {
-	unsigned long	*ip_address;
-	unsigned long 	ip_address_buf;
-	struct hostent		*addr_ret;
+	in_addr_t		ip_address;
+	struct hostent		*addr_ret = 0;
 	_Xgethostbynameparams	addr_buf;
 
 	memset((char*) &addr_buf, 0, sizeof(_Xgethostbynameparams));
-	ip_address = &ip_address_buf;
 
-	*ip_address = inet_addr((char *)addr);
-	if (*ip_address == INADDR_NONE) {
+	ip_address = inet_addr((char *)addr);
+	if (ip_address == INADDR_NONE) {
 		return(0);
 	}
 
-	_addr.set((const unsigned char *)ip_address, 4);
-	addr_ret = _XGethostbyaddr((char *)_addr, 4, AF_INET, addr_buf);
+	_addr.set((const unsigned char *)&ip_address, 4);
+	if (resolve_name) {
+		addr_ret = _XGethostbyaddr((char *)_addr, 4, AF_INET,
+					   addr_buf);
+	}
 	if (! init_from_hostent(addr_ret)) {
 		// given an ip address we can still communicate with
 		// this host but we may not know it's name
@@ -184,7 +188,9 @@ init_bystringaddr(_Tt_string addr)
 	// gethostbyaddr is effectively built on gethostent.  If
 	// endhostent is not called, storage is left around to save the
 	// name service connection, etc.  bug 1111175
-	endhostent();
+	if (resolve_name) {
+		endhostent();
+	}
 #endif
 	return(1);
 }
@@ -219,7 +225,18 @@ init_byname(_Tt_string name)
              * CDE
              */
             _name = _tt_gethostname();
-            if(!_XGethostbyname((char *)_name, host_buf))
+            host_ret = _XGethostbyname((char *)_name, host_buf);
+            if (host_ret != NULL) {
+                /* The name resolves: use this answer instead of
+                 * asking the resolver the same question again below.
+                 */
+                result = init_from_hostent(host_ret);
+#ifdef OPT_BUG_SUNOS_5
+                endhostent();
+#endif
+                return result;
+            }
+            else
             {
                 /* this gets a little verbose - you see one for every
                  * client, so if-0 out.  Leave for future debugging
