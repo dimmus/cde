@@ -59,6 +59,7 @@ $END$
 #else
 #include <regex.h>            /* for regcomp,regexec */
 #endif
+#include <pthread.h>
 
 /* for Xrm */
 #include <X11/Intrinsic.h>
@@ -153,11 +154,15 @@ initGuard:     used to test whether Db initialized
 #endif
 
 /*$DEF$*/
+struct __DtXlateMemoEnt;
+
 typedef struct __DtXlateDbRec
 {
   XrmDatabase  xrmDb;
   int          initGuard;
   Boolean      debugMode;
+  struct __DtXlateMemoEnt * memo;     /* query results, see MemoFind() */
+  int          memoNext;              /* next slot to (re)use */
 } __DtXlateDbRec;
 /*$END$*/
 
@@ -286,6 +291,183 @@ char * ExpandPath (
     return pathName;                             /* RETURN: found */
 }  /* $END$ */
 
+/*========================================================*/
+/*==================== Query memo ========================*/
+/*========================================================*/
+/*
+ * Every translation query enumerates the whole Xrm database and, for
+ * regex specs of the right operation, compiles and runs a regex per
+ * candidate (about 60 us per query with the Linux and CDE databases).
+ * Applications ask the same few questions over and over (dtmail asks
+ * several per message body part), so each database remembers the
+ * answers to its last XLATE_MEMO_SIZE queries.  The memo is emptied
+ * whenever another database is merged into this one, and is not used
+ * in debug mode, so that the debug trace still shows every search.
+ */
+#define XLATE_MEMO_SIZE   256
+
+typedef struct __DtXlateMemoEnt
+{
+   unsigned int  hash;      /* 0: unused entry */
+   char          dir;       /* 'S' std-to-op, 'O' op-to-std */
+   int           version;
+   char *        platform;  /* may be NULL */
+   char *        operation;
+   char *        value;
+   int           ret;       /* the query's return value */
+   char *        result;    /* the translated value when ret == 0 */
+} __DtXlateMemoEnt;
+
+static pthread_mutex_t memoLock = PTHREAD_MUTEX_INITIALIZER;
+
+static
+unsigned int MemoHash(
+       char          dir,
+       const char *  platform,
+       int           version,
+       const char *  operation,
+       const char *  value)
+{
+   const char * strs[3];
+   unsigned int h = 2166136261u ^ (unsigned char) dir;
+   int i;
+
+   strs[0] = platform; strs[1] = operation; strs[2] = value;
+   h = (h ^ (unsigned int) version) * 16777619u;
+   for (i = 0; i < 3; i++)
+   {
+      const unsigned char * p = (const unsigned char *) strs[i];
+      if (p) while (*p) h = (h ^ *p++) * 16777619u;
+      h = (h ^ (p ? 0xffu : 0xfeu)) * 16777619u; /* separator; NULL != "" */
+   }
+   return h ? h : 1;
+}
+
+static
+Boolean MemoStrEq(
+       const char * a,
+       const char * b)
+{
+   if (a == NULL || b == NULL) return a == b;
+   return strcmp(a,b) == 0;
+}
+
+static
+void MemoClearEnt(
+       __DtXlateMemoEnt * ent)
+{
+   free(ent->platform);
+   free(ent->operation);
+   free(ent->value);
+   free(ent->result);
+   memset(ent,0,sizeof(*ent));
+}
+
+static
+void MemoClear(
+       _DtXlateDb  db)
+{
+   int i;
+
+   pthread_mutex_lock(&memoLock);
+   if (db->memo)
+      for (i = 0; i < XLATE_MEMO_SIZE; i++)
+         MemoClearEnt(&db->memo[i]);
+   db->memoNext = 0;
+   pthread_mutex_unlock(&memoLock);
+}
+
+static
+void MemoFree(
+       _DtXlateDb  db)
+{
+   MemoClear(db);
+   free(db->memo);
+   db->memo = NULL;
+}
+
+/* On a hit, returns True with *ret_ret and (when ret_result is not
+   NULL and the query succeeded) a malloc()ed copy of the result. */
+static
+Boolean MemoFind(
+       _DtXlateDb    db,
+       char          dir,
+       const char *  platform,
+       int           version,
+       const char *  operation,
+       const char *  value,
+       int *         ret_ret,
+       char * *      ret_result)
+{
+   unsigned int h = MemoHash(dir,platform,version,operation,value);
+   Boolean found = False;
+   int i;
+
+   pthread_mutex_lock(&memoLock);
+   for (i = 0; db->memo && i < XLATE_MEMO_SIZE; i++)
+   {
+      __DtXlateMemoEnt * ent = &db->memo[i];
+      if (   ent->hash == h && ent->dir == dir && ent->version == version
+          && MemoStrEq(ent->platform,platform)
+          && MemoStrEq(ent->operation,operation)
+          && MemoStrEq(ent->value,value))
+      {
+         char * copy = NULL;
+
+         if (ent->ret == 0 && ret_result && ent->result
+             && (copy = strdup(ent->result)) == NULL)
+            break;                      /* out of memory: search again */
+         *ret_ret = ent->ret;
+         if (ent->ret == 0 && ret_result) *ret_result = copy;
+         found = True;
+         break;
+      }
+   }
+   pthread_mutex_unlock(&memoLock);
+   return found;
+}
+
+/* Remembers a query result; takes a copy of everything. */
+static
+void MemoStore(
+       _DtXlateDb    db,
+       char          dir,
+       const char *  platform,
+       int           version,
+       const char *  operation,
+       const char *  value,
+       int           ret,
+       const char *  result)
+{
+   __DtXlateMemoEnt * ent;
+
+   pthread_mutex_lock(&memoLock);
+   if (db->memo == NULL)
+   {
+      db->memo = calloc(XLATE_MEMO_SIZE,sizeof(__DtXlateMemoEnt));
+      db->memoNext = 0;
+   }
+   if (db->memo)
+   {
+      ent = &db->memo[db->memoNext];
+      db->memoNext = (db->memoNext + 1) % XLATE_MEMO_SIZE;
+      MemoClearEnt(ent);
+      ent->dir = dir;
+      ent->version = version;
+      ent->ret = ret;
+      ent->platform = platform ? strdup(platform) : NULL;
+      ent->operation = strdup(operation);
+      ent->value = strdup(value);
+      ent->result = (ret == 0 && result) ? strdup(result) : NULL;
+      if (   (platform && !ent->platform) || !ent->operation || !ent->value
+          || (ret == 0 && result && !ent->result))
+         MemoClearEnt(ent);             /* out of memory: forget it */
+      else
+         ent->hash = MemoHash(dir,platform,version,operation,value);
+   }
+   pthread_mutex_unlock(&memoLock);
+}
+
 #if DOC
 /*========================================================*/
 $PFUNBEG$:  DeleteDbMem()
@@ -304,6 +486,7 @@ static
 void DeleteDbMem(
       _DtXlateDb * io_db)
 { /*$CODE$*/
+       MemoFree(*io_db);
        /* zero out object mem and free it */
        (*io_db)->xrmDb = NULL;
        (*io_db)->initGuard = 0;
@@ -1651,6 +1834,7 @@ int  _DtXlateOpenAndMergeDbs(
 
     /* merge and destroy xrmDb for me */
     XrmMergeDatabases(xrmDb,&(*io_db)->xrmDb);
+    MemoClear(*io_db);       /* answers may have changed */
 
     /* check for debug mode */
     SetDebugModeState(*io_db);
@@ -1718,9 +1902,12 @@ int  _DtXlateMergeDbs(
        || (*io_mergeIntoDb)->initGuard != INIT_OCCURRED 
        || (*io_mergeIntoDb)->xrmDb == NULL)
     {
-       /* just move dbToMerge into mergeIntoDb */
+       /* just move dbToMerge into mergeIntoDb.  (This used to call
+          DeleteDbMem(io_dbToMerge), which freed the db that had just
+          been moved: _DtLcxOpenAllDbs returned a freed db whenever no
+          platform-specific .lcx file was found.) */
        *io_mergeIntoDb = *io_dbToMerge;
-       DeleteDbMem(io_dbToMerge);
+       *io_dbToMerge = NULL;
 
        return 0;				/* RETURN */
     }
@@ -1728,6 +1915,7 @@ int  _DtXlateMergeDbs(
     /* merge and destroy io_dbToMerge->xrmDb for me */
     XrmMergeDatabases((*io_dbToMerge)->xrmDb,&(*io_mergeIntoDb)->xrmDb);
     DeleteDbMem(io_dbToMerge);
+    MemoClear(*io_mergeIntoDb);       /* answers may have changed */
 
     /* check for debug mode */
     SetDebugModeState(*io_mergeIntoDb);
@@ -1877,14 +2065,14 @@ $RETURNS$:
 /*================================================$SKIP$==*/
 #endif
 
-int _DtXlateStdToOpValue(
+static
+int XlateStdToOpValue(
        _DtXlateDb        db,
        const char *      platform,
        const int         version,
        const char *      operation,
        const char *      stdValue,
-       char * *          ret_opValue,
-       void *            ret_reserved)
+       char * *          ret_opValue)
 {       /*$CODE$*/
    __DtXlateSrchData srchData;
    XrmQuark  empty = NULLQUARK;
@@ -1980,14 +2168,14 @@ $RETURNS$:
 /*================================================$SKIP$==*/
 #endif
 
-int _DtXlateOpToStdValue(
+static
+int XlateOpToStdValue(
        _DtXlateDb        db,
        const char *      platform,
        const int         version,
        const char *      operation,
        const char *      opValue,
-       char * *          ret_stdValue,
-       void *            ret_reserved)
+       char * *          ret_stdValue)
 {       /*$CODE$*/
    __DtXlateSrchData srchData;
    XrmQuark  empty = NULLQUARK;
@@ -2067,6 +2255,74 @@ int _DtXlateOpToStdValue(
    }
    return -1;                                /* RETURN: search failed */
 }       /*$END$*/
+
+/*
+ * The public entry points: XlateStdToOpValue/XlateOpToStdValue through
+ * the memo.  Invalid arguments and debug mode bypass it.
+ */
+static
+int MemoizedXlate(
+       char              dir,
+       _DtXlateDb        db,
+       const char *      platform,
+       const int         version,
+       const char *      operation,
+       const char *      value,
+       char * *          ret_value)
+{
+   int    ret;
+   char * result = NULL;
+
+   if (   NULL == db
+       || db->initGuard != INIT_OCCURRED
+       || NULL == operation
+       || operation[0] == EOS
+       || NULL == value
+       || db->debugMode)
+      return (dir == 'S')
+           ? XlateStdToOpValue(db,platform,version,operation,value,ret_value)
+           : XlateOpToStdValue(db,platform,version,operation,value,ret_value);
+
+   if (MemoFind(db,dir,platform,version,operation,value,&ret,ret_value))
+      return ret;                              /* RETURN: remembered */
+
+   /* always ask for the value: the return code is the same either way */
+   ret = (dir == 'S')
+       ? XlateStdToOpValue(db,platform,version,operation,value,&result)
+       : XlateOpToStdValue(db,platform,version,operation,value,&result);
+   MemoStore(db,dir,platform,version,operation,value,ret,result);
+
+   if (ret == 0 && ret_value) *ret_value = result;
+   else free(result);
+   return ret;
+}
+
+int _DtXlateStdToOpValue(
+       _DtXlateDb        db,
+       const char *      platform,
+       const int         version,
+       const char *      operation,
+       const char *      stdValue,
+       char * *          ret_opValue,
+       void *            ret_reserved)
+{
+   return MemoizedXlate('S',db,platform,version,operation,stdValue,
+                        ret_opValue);
+}
+
+int _DtXlateOpToStdValue(
+       _DtXlateDb        db,
+       const char *      platform,
+       const int         version,
+       const char *      operation,
+       const char *      opValue,
+       char * *          ret_stdValue,
+       void *            ret_reserved)
+{
+   return MemoizedXlate('O',db,platform,version,operation,opValue,
+                        ret_stdValue);
+}
+
 
 
 
