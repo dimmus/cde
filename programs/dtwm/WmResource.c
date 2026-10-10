@@ -732,6 +732,16 @@ XtResource wmGlobalResources[] =
     },
 
     {
+	WmNslideSubpanels,
+	WmCSlideSubpanels,
+	XtRBoolean,
+	sizeof (Boolean),
+        XtOffsetOf(WmGlobalData, slideSubpanels),
+	XtRImmediate,
+	(XtPointer)True
+    },
+
+    {
 	WmNiconAutoPlace,
 	WmCIconAutoPlace,
 	XtRBoolean,

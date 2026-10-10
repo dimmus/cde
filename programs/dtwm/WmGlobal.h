@@ -1441,6 +1441,7 @@ typedef struct _SlideOutRec
     SlideDirection	direction;
     Boolean		mapping;
     Widget		wSubpanel;
+    unsigned long	lastTick;	/* ms, monotonic clock */
 } SlideOutRec;
 
 /*
@@ -2062,6 +2063,7 @@ typedef struct _WmGlobalData
     Boolean	enforceKeyFocus;		/* resource */
     Boolean	freezeOnConfig;			/* resource - testing */
     Boolean	useWindowOutline;		/* resource */
+    Boolean	slideSubpanels;			/* resource */
     Boolean	iconAutoPlace;			/* resource */
     Boolean	iconClick;			/* resource */
     Boolean	interactivePlacement;		/* resource */
