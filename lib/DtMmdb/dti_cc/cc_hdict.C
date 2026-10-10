@@ -112,9 +112,21 @@ kv_pair<K, V>* hashTable<K,V>::_find(const K* k) const
    if ( b == 0 )
      return 0;
 
+   // The probe only borrows the caller's key: make sure its destructor
+   // can never delete it (it deletes its key while clearAndDestroy()
+   // runs), not even when the comparison throws.
    kv_pair<K, V> key((K*)k);
+   kv_pair<K, V>* result = 0;
 
-   return b -> find(&key);
+   try {
+      result = b -> find(&key);
+   } catch (...) {
+      key.f_key = 0;
+      throw;
+   }
+   key.f_key = 0;
+
+   return result;
 }
 
 template <class K, class V>
@@ -166,7 +178,15 @@ K* hashTable<K,V>::remove(const K* k)
       return 0;
 
    kv_pair<K, V> key((K*)k, 0);
-   kv_pair<K, V>* result = b -> remove(&key);
+   kv_pair<K, V>* result = 0;
+
+   try {			// the key is borrowed: see _find()
+      result = b -> remove(&key);
+   } catch (...) {
+      key.f_key = 0;
+      throw;
+   }
+   key.f_key = 0;
 
    if ( result == 0 )
      return 0;
