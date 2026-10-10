@@ -102,9 +102,6 @@ public :
    inline Boolean	GetMatchPos(WXmString s, int **p, int *c) const {
       return XmListGetMatchPos (widget, s, p, c);
    }
-   inline Boolean	GetSelectedPos(int **p, int *c) const {
-      return XmListGetSelectedPos (widget, p, c);
-   }
    inline Boolean	ItemExists(WXmString s) const {
       return XmListItemExists (widget, s);
    }

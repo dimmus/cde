@@ -64,10 +64,6 @@ public :
    DEFINE_GETTER_SETTER (ScrolledWindowMarginHeight,short,"scrolledWindowMarginHeight")
    DEFINE_GETTER_SETTER (Spacing,Dimension,"spacing")
    DEFINE_GETTER_SETTER (ShadowThickness,short,"shadowThickness")
-   inline void SetAreas(WXmScrollBar hsb, WXmScrollBar vsb, WObject work) const
-   {
-      XmScrolledWindowSetAreas (widget, (Widget)hsb, (Widget)vsb, (Widget)work);
-   }
 };
 
 #define	NULLWXmScrolledWindow		WXmScrolledWindow((Widget)0)

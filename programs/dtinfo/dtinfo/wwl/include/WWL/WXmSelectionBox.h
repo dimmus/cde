@@ -71,8 +71,6 @@ public :
 	DEFINE_CALLBACK (CancelCallback,"cancelCallback")
 	DEFINE_GETTER_SETTER (DialogType,unsigned char,"dialogType")
 
-	Widget GetChild (unsigned char child)
-	  { return (XmSelectionBoxGetChild (widget, child)); }
 };
 
 #define	NULLWXmSelectionBox		WXmSelectionBox((Widget)0)
