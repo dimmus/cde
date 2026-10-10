@@ -91,7 +91,10 @@ DtWsmGetWorkspaceInfo(
 {
     int rcode;
     Atom aProperty;
-    Window wmWindow;
+    Atom actualType;
+    int actualFormat;
+    unsigned long nitems, leftover;
+    unsigned char *value;
     DtWsmWorkspaceInfo *pWsInfo;
     char *pchName, *pch;
     int  iLen;
@@ -124,22 +127,31 @@ DtWsmGetWorkspaceInfo(
     /* 
      * Get window where property is 
      */
-    if ((rcode=_DtGetMwmWindow (display, root, &wmWindow)) == Success)
+    /*
+     * Read it the way XGetTextProperty does, from the (cached) window
+     * manager window.
+     */
+    if ((rcode=_DtGetMwmWindowProperty (display, root, aProperty,
+			1000000L, AnyPropertyType, &actualType, &actualFormat,
+			&nitems, &leftover, &value)) == Success)
     {
 	/*
-	 * XGetTextProperty returns a Status (non-zero on success), not an
-	 * error code; XmbTextPropertyToTextList returns Success, a count of
+	 * XmbTextPropertyToTextList returns Success, a count of
 	 * unconvertible characters, or a negative error.  The old code
-	 * compared both with Success and stored the comparison, so a
-	 * missing property or a failed conversion returned Success with
-	 * a NULL *ppWsInfo.
+	 * compared XGetTextProperty's Status and this with Success and
+	 * stored the comparison, so a missing property or a failed
+	 * conversion returned Success with a NULL *ppWsInfo.
 	 */
-	if (!XGetTextProperty(display, wmWindow, &tp, aProperty))
+	if (actualType == None)
 	{
 	    rcode = BadAtom;	/* no such property */
 	}
 	else
 	{
+	    tp.value = value;
+	    tp.encoding = actualType;
+	    tp.format = actualFormat;
+	    tp.nitems = nitems;
 	    if ((rcode=XmbTextPropertyToTextList (
 				display,
 				&tp,
