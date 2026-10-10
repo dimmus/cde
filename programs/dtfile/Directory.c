@@ -1517,6 +1517,12 @@ DirectoryCacheTrim(void)
             continue;
          n++;
          files += directory_set[i]->file_count;
+         /*
+          * (not one with a background process running: its callback
+          * would take a new Directory at the same address for it)
+          */
+         if (directory_set[i]->activity != activity_idle)
+            continue;
          if (oldest < 0 ||
              directory_set[i]->lru_stamp < directory_set[oldest]->lru_stamp)
             oldest = i;
