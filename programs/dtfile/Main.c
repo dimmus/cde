@@ -2341,7 +2341,7 @@ SaveDefaultOkCB(
 
    FileMgrRec * file_mgr_rec;
    static char * name_list[] = { DTFILE_CLASS_NAME, NULL, NULL };
-   char view_number[5];
+   char view_number[12];
    int fd;
    Arg args[1];
 
@@ -2562,7 +2562,7 @@ SaveSession(
    static char * name_list[] = { DTFILE_CLASS_NAME, NULL, NULL, NULL,
                                  NULL, NULL};
    char view_number[12];
-   char number[5];
+   char number[12];
    char workspaceNumber[11];
    int fd;
    Atom * ws_presence = NULL;

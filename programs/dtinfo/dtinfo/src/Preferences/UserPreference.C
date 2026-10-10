@@ -132,7 +132,7 @@ revert_from_backup (const char *filename)
 {
   int ret;
   // Failed, so look for the backup file.
-  char backup[256];
+  char backup[256 + sizeof(".bak")];	// form_filename() is up to 255
   snprintf (backup, sizeof(backup), "%s.bak", filename);
   struct stat file_info;
 
@@ -288,7 +288,7 @@ PreferenceRecord::write_prefs()
     }
 
   // Create a backup file from the current preferences, if any.
-  char backup[256];
+  char backup[256 + sizeof(".bak")];	// form_filename() is up to 255
   backup[0] = '\0';
   if (status == 0)
     {

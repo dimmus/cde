@@ -96,7 +96,7 @@ extern void Display_XBMFile(int, int);
 
 
 char  *tmpSave;            /* Save the file path being saved */
-char  dummy[256];           /* mask file for use in main */
+char  dummy[MAX_FNAME + 3];  /* mask file for use in main ("_m.") */
 extern int SaveMeNot;
 extern int SavedOnce;
 
@@ -222,7 +222,7 @@ Read_File(
         char *fnameIn )
 {
   char *base_name = NULL, *suffix = NULL,
-      fname[MAXPATHLEN], *tmp = NULL, *tmp2 = NULL;
+      fname[MAX_FNAME], *tmp = NULL, *tmp2 = NULL;
   unsigned int mask_width_ret = 0, mask_height_ret = 0;
   int mask_x_hot = 0, mask_y_hot = 0, first = 0;
   struct stat statBuf = {};
@@ -454,7 +454,7 @@ Write_File(
   int i, j;
   int mask_needed = False;
   Boolean SUN;
-  char *base_name, *suffix, fname[MAXPATHLEN], *tmp, *tmp2, *vend;
+  char *base_name, *suffix, fname[MAX_FNAME], *tmp, *tmp2, *vend;
   Pixmap scratch_pix;
   XImage *scratch_shape, *scratch_mask;
   struct stat statbuf;        /* Information on a file. */
@@ -480,8 +480,8 @@ Write_File(
     netfile = tt_host_file_netfile(fnameIn, tmp+1);
     localfile = tt_netfile_file(netfile);
 
-    strncpy(fname, localfile, MAXPATHLEN - 1);
-    fname[MAXPATHLEN - 1] = 0;
+    strncpy(fname, localfile, sizeof(fname) - 1);
+    fname[sizeof(fname) - 1] = 0;
     tmp[0] = ':';
 
     tt_free(netfile);

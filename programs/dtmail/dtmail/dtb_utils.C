@@ -3049,12 +3049,16 @@ determine_exe_dir(
 	if (path_prefix != NULL)
 	{
 	    char *abs_exe_dir = new char[MAXPATHLEN+1];
+	    int len;
 	    if (strcmp(buf, ".") != 0) {
-		snprintf(abs_exe_dir, MAXPATHLEN+1, "%s/%s", path_prefix, buf);
+		len = snprintf(abs_exe_dir, MAXPATHLEN+1, "%s/%s", path_prefix, buf);
 	    } else {
-		snprintf(abs_exe_dir, MAXPATHLEN+1, "%s", path_prefix);
+		len = snprintf(abs_exe_dir, MAXPATHLEN+1, "%s", path_prefix);
 	    }
-	    strcpy(buf, abs_exe_dir);
+	    // a path that does not fit stays relative rather than truncated
+	    if (len >= 0 && len <= MAXPATHLEN) {
+		strcpy(buf, abs_exe_dir);
+	    }
 	    delete [] abs_exe_dir;
 	}
     }

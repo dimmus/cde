@@ -134,9 +134,10 @@ else
 	quit++;
 	else
 	*cp = '\0';
-	snprintf(buf, sizeof(buf), "%s/%s", path, m_argv[0]);
-
-	if (access(buf, 1) == 0)
+	/* (a name too long for buf is not this program) */
+	if (snprintf(buf, sizeof(buf), "%s/%s", path, m_argv[0])
+		< (int) sizeof(buf) &&
+	    access(buf, 1) == 0)
 	    {
 	    install = (char*) m_malloc(strlen(path) + 1,
 				       "installation directory");

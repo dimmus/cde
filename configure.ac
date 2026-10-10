@@ -454,9 +454,6 @@ dnl check some compiler flags
 CDE_CHECK_CFLAG([-Wall])
 CDE_CHECK_CXXFLAG([-Wall])
 
-CDE_CHECK_CFLAG([-Wno-format-truncation])
-CDE_CHECK_CXXFLAG([-Wno-format-truncation])
-
 dnl C++ only: string literals passed as char * all over the old C++ code.
 CDE_CHECK_CXXFLAG([-Wno-write-strings])
 

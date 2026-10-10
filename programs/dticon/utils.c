@@ -2364,7 +2364,7 @@ SaveSession( void )
     char *tmpStr, *tmpStr2;
     Position x,y;
     Dimension width, height;
-    char bufr[1024];        /* make bigger if needed */
+    char bufr[MAX_FNAME + 16];  /* "*file: <last_fname>\n" */
     XmVendorShellExtObject  vendorExt;
     XmWidgetExtData         extData;
     WM_STATE *wmState;

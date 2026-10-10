@@ -552,7 +552,8 @@ cm_tty_lookup(nl_catd catd, CSA_session_handle target, int version, char *date, 
 	int			span, day, lineno = 1, last_day = -1, i;
 	CSA_uint32		a_total;
 	char			start_buf[MAXNAMELEN], end_buf[MAXNAMELEN];
-	char			buf[MAXNAMELEN], date_str[MAXNAMELEN];
+	char			buf[2 * MAXNAMELEN + 2]; /* start-end */
+	char			date_str[MAXNAMELEN];
 	time_t			tick, start, stop;
 	Lines			*lines = NULL, *next_line;
 	DisplayType		dt;
@@ -635,7 +636,7 @@ cm_tty_lookup(nl_catd catd, CSA_session_handle target, int version, char *date, 
 		}
 		last_day = day;
 
-		memset(buf, '\0', MAXNAMELEN);
+		memset(buf, '\0', sizeof(buf));
 		if (appt->show_time->value->item.sint32_value &&
 		    !magic_time(start_tick)) {
 			dt = get_int_prop(p, CP_DEFAULTDISP);

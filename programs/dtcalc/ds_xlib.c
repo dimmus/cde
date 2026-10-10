@@ -88,7 +88,7 @@ char *
 ds_get_resource(XrmDatabase rDB, char *appname, char *resource)                          
 {
   char app[MAXLINE], res[MAXLINE] ;
-  char cstr[MAXLINE], nstr[MAXLINE] ;
+  char cstr[2 * MAXLINE], nstr[2 * MAXLINE] ;   /* "app.res" */
   char *str_type[20] ;
   XrmValue value ;
 
@@ -210,7 +210,9 @@ ds_put_resource(XrmDatabase *rDB, char *appname, char *rstr, char *rval)
 
   snprintf(app, sizeof(app), "%s", appname) ;
   if (isupper(app[0])) app[0] = tolower(app[0]) ;
-  snprintf(resource, sizeof(resource), "%s.%s", app, rstr) ;
+  if (snprintf(resource, sizeof(resource), "%s.%s", app, rstr) >=
+      (int) sizeof(resource))
+    return ;                    /* a cut off name would be another resource */
 
   XrmPutStringResource(rDB, resource, rval) ;
 }

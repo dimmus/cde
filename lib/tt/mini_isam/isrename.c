@@ -218,11 +218,10 @@ _rename_datfile(char *isfname, char *newname)
      * Replace the last element of the old path with newname.
      */
     _removelast(newbuf);
-    if (strcmp(newbuf, "/") != 0) {
-        snprintf(newbuftemp, sizeof(newbuftemp),  "%s/", newbuf);
-        strcpy(newbuf, newbuftemp);
-    }
-    snprintf(newbuftemp, sizeof(newbuftemp), "%s%s", newbuf, newname);
+    if (snprintf(newbuftemp, sizeof(newbuftemp), "%s%s%s", newbuf,
+                 strcmp(newbuf, "/") != 0 ? "/" : "", newname)
+        >= (int) sizeof(newbuftemp))
+        return;                 /* the new path does not fit */
     strcpy(newbuf, newbuftemp);
 
     _makedat_isfname(namebuf);
@@ -246,11 +245,10 @@ _rename_indfile(char *isfname, char *newname)
      * Replace the last element of the old path with newname.
      */
     _removelast(newbuf);
-    if (strcmp(newbuf, "/") != 0) {
-        snprintf(newbuftemp, sizeof(newbuftemp), "%s/", newbuf);
-        strcpy(newbuf, newbuftemp);
-    }
-    snprintf(newbuftemp, sizeof(newbuftemp), "%s%s", newbuf, newname);
+    if (snprintf(newbuftemp, sizeof(newbuftemp), "%s%s%s", newbuf,
+                 strcmp(newbuf, "/") != 0 ? "/" : "", newname)
+        >= (int) sizeof(newbuftemp))
+        return;                 /* the new path does not fit */
     strcpy(newbuf, newbuftemp);
 
     _makeind_isfname(namebuf);
@@ -274,11 +272,10 @@ _rename_varfile(char *isfname, char *newname)
      * Replace the last element of the old path with newname.
      */
     _removelast(newbuf);
-    if (strcmp(newbuf, "/") != 0) {
-        snprintf(newbuftemp, sizeof(newbuftemp), "%s/", newbuf);
-        strcpy(newbuf, newbuftemp);
-    }
-    snprintf(newbuftemp, sizeof(newbuftemp), "%s%s", newbuf, newname);
+    if (snprintf(newbuftemp, sizeof(newbuftemp), "%s%s%s", newbuf,
+                 strcmp(newbuf, "/") != 0 ? "/" : "", newname)
+        >= (int) sizeof(newbuftemp))
+        return;                 /* the new path does not fit */
     strcpy(newbuf, newbuftemp);
 
     _makevar_isfname(namebuf);

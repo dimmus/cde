@@ -119,7 +119,7 @@ static int	assert_c_ident_ok(STRING ident);
 STRING
 abmfP_get_c_name_global(ABObj obj)
 {
-    static char	name[MAX_NAME_SIZE];
+    static char	name[3 * MAX_NAME_SIZE];	/* "struct.substruct.field" */
     ABObj	structObj = NULL;
     ABObj	substructObj = NULL;
     STRING	structName= NULL;
@@ -462,7 +462,7 @@ abmfP_get_c_struct_or_ptr_name(
 			BOOL		wantPtr
 )
 {
-    static char	nameBuf[MAX_NAME_SIZE] = "";
+    static char	nameBuf[MAX_NAME_SIZE + 3] = "";	/* "&(name)" */
     STRING	name = NULL;
     ABObj	structObj = abmfP_obj_get_struct_obj(obj);
 
@@ -638,7 +638,7 @@ abmfP_get_c_substruct_name(GenCodeInfo genCodeInfo, ABObj obj)
 STRING
 abmfP_get_c_substruct_global_name(ABObj obj)
 {
-    static char	name[256];
+    static char	name[2 * MAX_NAME_SIZE];	/* "struct.field" */
     ABObj	subsObj = abmfP_obj_get_substruct_obj(obj);
     ABObj	structObj = NULL;
     STRING	structVar = NULL;
@@ -694,8 +694,8 @@ abmfP_get_c_substruct_type_name(ABObj obj)
 STRING
 abmfP_get_c_substruct_ptr_type_name(ABObj obj)
 {
-    static char		ptrTypeName[MAX_NAME_SIZE];
-    char		ptrTypeNameTmp[sizeof(ptrTypeName)];
+    char		ptrTypeNameTmp[MAX_NAME_SIZE];
+    static char		ptrTypeName[2 * MAX_NAME_SIZE + 5];	/* + "Items" */
     STRING		varName = NULL;
     ABObj		module = NULL;
     
@@ -1279,7 +1279,7 @@ assert_c_ident_ok(STRING ident)
 STRING
 abmfP_get_msg_clear_proc_name(ABObj msgObj)
 {
-    static char name[MAX_NAME_SIZE];
+    static char name[MAX_NAME_SIZE + 11];	/* + "_initialize" */
 
     snprintf(name, sizeof(name), "%s_initialize", abmfP_get_c_struct_global_name(msgObj));
 

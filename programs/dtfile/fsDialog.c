@@ -115,8 +115,6 @@
  *   global variables
  *----------------------*/
 
-#define EMSGMAX 4096
-char g_errorMessage[EMSGMAX];
 
 
 /*--------------------
@@ -205,8 +203,8 @@ configFileOK(void)
    {
       msg1 = GETMESSAGE(21, 22, "Cannot open file manager configuration file: ");
       msg2 = strerror(errno);
-      snprintf(g_errorMessage, sizeof(g_errorMessage), "%s%s\n   %s\n",msg1,fname,msg2);
-      _DtSimpleError (application_name, DtError, NULL, g_errorMessage, NULL);
+      _DtSimpleError (application_name, DtError, NULL, "%s%s\n   %s\n",
+                      msg1, fname, msg2);
       return FALSE;
    }
 
@@ -323,8 +321,8 @@ readConfigFile(const String      fsType,
    {
       msg1 = GETMESSAGE(21, 22, "Cannot open file manager configuration file: ");
       msg2 = strerror(errno);
-      snprintf(g_errorMessage, sizeof(g_errorMessage), "%s%s\n   %s\n",msg1,fname,msg2);
-      _DtSimpleError (application_name, DtError, NULL, g_errorMessage, NULL);
+      _DtSimpleError (application_name, DtError, NULL, "%s%s\n   %s\n",
+                      msg1, fname, msg2);
       return;
    }
 
@@ -564,8 +562,8 @@ readDialogData(      FILE      * fptr,
             else
             {
                msg1 = GETMESSAGE(21, 24, "Unknown field label in file manager configuration file: ");
-               sprintf(g_errorMessage,"%s\"%s\"\n",msg1,token1);
-               _DtSimpleError (application_name, DtWarning, NULL, g_errorMessage, NULL);
+               _DtSimpleError (application_name, DtWarning, NULL, "%s\"%s\"\n",
+                               msg1, token1);
             }
             lineLength = readLine(fptr,line);
             if (lineLength != EOF)
@@ -586,8 +584,8 @@ readDialogData(      FILE      * fptr,
    if ( ! *dialogAvailable )
    {
       msg1 = GETMESSAGE(21, 25, "No information found in file manager configuration file for file-system identifier");
-      sprintf(g_errorMessage,"%s \"%s\"\n",msg1,fsID);
-      _DtSimpleError (application_name, DtError, NULL, g_errorMessage, NULL);
+      _DtSimpleError (application_name, DtError, NULL, "%s \"%s\"\n",
+                      msg1, fsID);
    }
 
 }  /* end readDialogData */

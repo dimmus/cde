@@ -607,17 +607,29 @@ void            read_d2x (struct or_hwordrec * glob_word, long field)
 /* performs vista RECWRITE on curr word record.
  * CALLER MUST CHECK DB_STATUS.
  */
+/* Copy a word into a fixed-size key field: cut to size - 1 bytes and
+ * NUL-terminated, as snprintf() would (short words go to the short-word
+ * records, so the cut does not happen there).
+ */
+static void     copy_wordkey (char *dst, size_t size, const char *src)
+{
+    size_t	len = strnlen (src, size - 1);
+
+    memcpy (dst, src, len);
+    dst[len] = '\0';
+}
+
 static void     write_d2x (struct or_hwordrec * glob_word, long field)
 {
     if (field == OR_SWORDKEY) {
-	snprintf(d21new.or_swordkey, 16, "%s", glob_word->or_hwordkey);
+	copy_wordkey (d21new.or_swordkey, sizeof (d21new.or_swordkey), glob_word->or_hwordkey);
 	d21new.or_swoffset =	htonl (glob_word->or_hwoffset);
 	d21new.or_swfree =	htonl (glob_word->or_hwfree);
 	d21new.or_swaddrs =	htonl (glob_word->or_hwaddrs);
 	RECWRITE (PROGNAME "102", &d21new, 0);
     }
     else if (field == OR_LWORDKEY) {
-	snprintf(d22new.or_lwordkey, 40, "%s", glob_word->or_hwordkey);
+	copy_wordkey (d22new.or_lwordkey, sizeof (d22new.or_lwordkey), glob_word->or_hwordkey);
 	d22new.or_lwoffset =	htonl (glob_word->or_hwoffset);
 	d22new.or_lwfree =	htonl (glob_word->or_hwfree);
 	d22new.or_lwaddrs =	htonl (glob_word->or_hwaddrs);

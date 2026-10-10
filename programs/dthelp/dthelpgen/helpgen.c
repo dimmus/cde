@@ -1050,7 +1050,12 @@ main(
 				myName, errno);
 	    exit (1);
 	  }
-        snprintf(baseNameTemp, sizeof(baseNameTemp), "%s/%s", baseName, App_args.dir);
+        if (snprintf(baseNameTemp, sizeof(baseNameTemp), "%s/%s",
+                     baseName, App_args.dir) >= (int) sizeof(baseNameTemp))
+          {
+	    fprintf (stderr, "%s: %s: path too long\n", myName, App_args.dir);
+	    exit (1);
+          }
         strcpy(baseName, baseNameTemp);
       }
     else
@@ -1071,7 +1076,12 @@ main(
 
     snprintf(tmpVolume, sizeof(tmpVolume), "%s", ptr);
     if (tmpVolume[strlen (tmpVolume) - 1] != '/') {
-        snprintf(tmpVolumeTemp, sizeof(tmpVolumeTemp), "%s%s", tmpVolume, SlashString);
+        if (snprintf(tmpVolumeTemp, sizeof(tmpVolumeTemp), "%s%s",
+                     tmpVolume, SlashString) >= (int) sizeof(tmpVolumeTemp))
+          {
+	    fprintf (stderr, "%s: %s: path too long\n", myName, tmpVolume);
+	    exit (1);
+          }
         strcpy(tmpVolume, tmpVolumeTemp);
     }
 

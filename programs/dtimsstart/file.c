@@ -899,8 +899,9 @@ int	set_select_mode(int cur_mode, int new_mode)
 	char	*lp, *valp;
 	int	n, line_num, mode_line;
 
-	snprintf(new_fname, sizeof(new_fname), "%s,tmp", path);
-	if (!(new_fp = fopen(new_fname, "w"))) {
+	if (snprintf(new_fname, sizeof(new_fname), "%s,tmp", path)
+		>= (int) sizeof(new_fname)
+	    || !(new_fp = fopen(new_fname, "w"))) {
 	    fclose(fp);
 	    DPR(("set_select_mode(): cannot create %s\n", new_fname));
 	    setErrFile(path);

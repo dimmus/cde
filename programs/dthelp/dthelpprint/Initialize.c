@@ -73,6 +73,7 @@ $COPYRIGHT$:
 #define DIR_SLASH_STR s_DirSlashStr
 
 #define RSRCSPECLEN   100
+#define RSRCSUFFIXLEN 32    /* room for the ".resource" strcat'd to a prefix */
 
 #define INSET    5       /* message catalog set */
 
@@ -812,25 +813,43 @@ static float dphm = 300.*2540.;
    int i;
    
    /* build printer resource name and class */
-   snprintf(name_prefix, sizeof(name_prefix), "%s%s", appname, RN_printer);    /* e.g. dthelpprint.printer */
-   snprintf(class_prefix, sizeof(class_prefix), "%s%s", appclass, RC_printer); /* e.g. Dthelpprint.Printer */
+   /* (an application name or class too long to leave room for the
+      resource names strcat'd below is replaced by the default one) */
+   if (snprintf(name_prefix, sizeof(name_prefix), "%s%s", appname, RN_printer)    /* e.g. dthelpprint.printer */
+       >= (int) sizeof(name_prefix) - RSRCSUFFIXLEN)
+      snprintf(name_prefix, sizeof(name_prefix), "%s%s",
+               HELPPRINT_APPLICATION_NAME, RN_printer);
+   if (snprintf(class_prefix, sizeof(class_prefix), "%s%s", appclass, RC_printer) /* e.g. Dthelpprint.Printer */
+       >= (int) sizeof(class_prefix) - RSRCSUFFIXLEN)
+      snprintf(class_prefix, sizeof(class_prefix), "%s%s",
+               HELPPRINT_APPLICATION_CLASS, RC_printer);
    
    /********************/
    /* Get printer name */
    /********************/
    
-   snprintf(resource_name, sizeof(resource_name), "%s%s", name_prefix, RN_rsrcname);    /* e.g. dthelpprint.printer.name */
-   snprintf(resource_class, sizeof(resource_class), "%s%s", class_prefix, RC_rsrcname); /* e.g. Dthelpprint.Printer.Name */
+   /* the prefixes leave room for these, as for the ones below */
+   strcpy(resource_name, name_prefix);
+   strcat(resource_name, RN_rsrcname);     /* e.g. dthelpprint.printer.name */
+   strcpy(resource_class, class_prefix);
+   strcat(resource_class, RC_rsrcname);    /* e.g. Dthelpprint.Printer.Name */
    if (XrmGetResource(appDB, resource_name, resource_class,
                       str_type, &value) == True)
       name = value.addr;
    else name = EMPTY_STR;
    if (name[0] != EOS)
    {
-      snprintf(name_prefix_temp, sizeof(name_prefix_temp), "%s%s%s", name_prefix, DOT_STR, name);    /* e.g. dthelpprint.printer.<name> */
-      strcpy(name_prefix, name_prefix_temp);
-      snprintf(class_prefix_temp, sizeof(class_prefix_temp), "%s%s%s", class_prefix, DOT_STR, name); /* e.g. Dthelpprint.Printer.<name> */
-      strcpy(class_prefix, class_prefix_temp);
+      /* A printer name too long to leave room for the resource names
+         strcat'd to the prefixes below is not used (it used to overflow
+         them). */
+      int nlen = snprintf(name_prefix_temp, sizeof(name_prefix_temp), "%s%s%s", name_prefix, DOT_STR, name);    /* e.g. dthelpprint.printer.<name> */
+      int clen = snprintf(class_prefix_temp, sizeof(class_prefix_temp), "%s%s%s", class_prefix, DOT_STR, name); /* e.g. Dthelpprint.Printer.<name> */
+      if (nlen >= 0 && nlen < (int) sizeof(name_prefix_temp) - RSRCSUFFIXLEN &&
+          clen >= 0 && clen < (int) sizeof(class_prefix_temp) - RSRCSUFFIXLEN)
+      {
+         strcpy(name_prefix, name_prefix_temp);
+         strcpy(class_prefix, class_prefix_temp);
+      }
    }
    
    /**************************/

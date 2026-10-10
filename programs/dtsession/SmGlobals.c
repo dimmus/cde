@@ -1066,8 +1066,16 @@ SetSavePath(
 	     * runs a Current session and saves the session.
 	     */
 	    strcpy (savedDir, smGD.clientPath);
-            snprintf(smGD.etcPath, sizeof(smGD.etcPath), "%s.%s", smGD.clientPath, SM_OLD_EXTENSION);
-            status = stat(smGD.etcPath, &buf);
+            if (snprintf(smGD.etcPath, sizeof(smGD.etcPath), "%s.%s",
+                         smGD.clientPath, SM_OLD_EXTENSION)
+                >= (int) sizeof(smGD.etcPath))
+            {
+                /* the ".old" path does not fit: move nothing */
+                smGD.etcPath[0] = 0;
+                status = -1;
+            }
+            else
+                status = stat(smGD.etcPath, &buf);
             if(status == 0)
 	    {
 		char 		* tmpName;
@@ -1097,7 +1105,8 @@ SetSavePath(
                   }
                 XtFree((char *) tmpName);
 	    }
-	    MoveDirectory(smGD.clientPath, smGD.etcPath, False);
+	    if (smGD.etcPath[0])
+	        MoveDirectory(smGD.clientPath, smGD.etcPath, False);
         }
 
         smGD.clientPath[0] = 0;

@@ -159,7 +159,9 @@ Boolean disk_hash::rehash(data_t& w)
 {
 //MESSAGE(cerr, "REHASH:");
    char tmp_name[PATHSIZ];
-   snprintf(tmp_name, sizeof(tmp_name), "%s.tmp", key_store -> my_name());
+   if ( snprintf(tmp_name, sizeof(tmp_name), "%s.tmp", key_store -> my_name())
+        >= (int)sizeof(tmp_name) )
+      throw(stringException("disk_hash::rehash(): store name too long"));
 
    fstream pool(form("%s/%s", key_store -> my_path(), tmp_name),
                 ios::in | ios::out

@@ -965,11 +965,14 @@ LoadAltDtsResources(struct display *d)
                 if ((strcmp(dp->d_name, DOT)    != 0) &&
                     (strcmp(dp->d_name, DOTDOT) != 0)) {
 
-                    snprintf(res_file, sizeof(res_file), "%s%s", dirname[j], dp->d_name);
+                    if (snprintf(res_file, sizeof(res_file), "%s%s",
+                                 dirname[j], dp->d_name)
+                        >= (int) sizeof(res_file))
+                        continue;	/* the path does not fit */
                     if ((access (res_file, R_OK)) != 0)
 		    {
                         Debug("LoadAltDtsResources- cant access %s.\n",
-			      resources);
+			      res_file);
                         Debug("\t %s.\n", strerror(errno));
                         continue;
 		    }

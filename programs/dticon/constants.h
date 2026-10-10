@@ -29,6 +29,7 @@
 *      Novell, Inc.
 **********************************************************************/
 #include <X11/Xlib.h>
+#include <limits.h>
 
 /***
 #define DEBUG         True
@@ -91,8 +92,8 @@ typedef struct {
 #define MAX_ICON_WIDTH   256
 #define MAX_ICON_HEIGHT  256
 
-/* Maximum icon demensions */
-#define MAX_FNAME        256
+/* Maximum file name length (a path) */
+#define MAX_FNAME        PATH_MAX
 
 #define min(a, b)	((a < b) ? a : b)
 #define max(a, b)	((a > b) ? a : b)

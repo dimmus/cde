@@ -625,7 +625,16 @@ _tt_process_transaction()
 		UNLOCK_RPC();
 		return;
 	}
-        snprintf(_tt_target_db, MAXPATHLEN, "%s", _tt_log_buf);
+	// The path is stored NUL-terminated; a log without the NUL in what
+	// was read (or with a path too long for _tt_target_db) is corrupt.
+	char *path_end = (char *) memchr(_tt_log_buf, '\0', nbytes);
+	if ((path_end == NULL) || (path_end - _tt_log_buf >= MAXPATHLEN)) {
+		_tt_syslog(errstr, LOG_ERR, "%s: bad target path", _tt_log_file);
+		_tt_dbserver_prog_cleanup(log_fd);
+		UNLOCK_RPC();
+		return;
+	}
+	memcpy(_tt_target_db, _tt_log_buf, path_end - _tt_log_buf + 1);
 	/* open the NetISAM transaction target database */
 	int isfd = cached_isopen(_tt_target_db, ISINOUT+ISFIXLEN+ISMANULOCK);
 	if (isfd == -1) {
