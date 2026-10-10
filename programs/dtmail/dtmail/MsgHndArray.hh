@@ -96,6 +96,12 @@ class MsgHndArray {
     void	mark_for_delete(int position);
     void	compact(int start_pos);
     void	replace(int postition, MsgStruct *a_msg_struct);
+
+    // insert() every entry of 'others', in order.
+    void	insert_all(MsgHndArray *others);
+    // remove_entry(ms) for every entry of 'others' (by_identity), or
+    // remove_entry(indexof(ms)) (matching session number and handle).
+    void	remove_all(MsgHndArray *others, Boolean by_identity);
 };
 
 #endif

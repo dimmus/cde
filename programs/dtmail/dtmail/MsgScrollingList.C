@@ -40,6 +40,9 @@
  *+ENOTICE
  */
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include <EUSCompat.h>
 #include <ctype.h>
 #include <assert.h>
@@ -756,15 +759,19 @@ MsgScrollingList::deleteSelected(Boolean silent)
     first_selected_pos = *position_list;
     undel_dialog = parent()->get_undel_dialog();
 
+    // The deleted messages go to the Deleted Messages list in one
+    // batch, not one row (and one scroll) at a time.
+    MsgHndArray *newly_deleted =
+	undel_dialog ? new MsgHndArray(position_count) : NULL;
+
     for (i=0; i < position_count; i++ )
     {
 	position_in_list = *(position_list + i);
 	a_del_msg_struct = get_message_struct(position_in_list);
 	_msgs->mark_for_delete(position_in_list - 1);
 	_deleted_messages->append(a_del_msg_struct);
-	if (undel_dialog)
-	  undel_dialog->insertMsg(mail_error, a_del_msg_struct);
-	if (mail_error.isSet()) parent()->postErrorDialog(mail_error);
+	if (newly_deleted)
+	  newly_deleted->append(a_del_msg_struct);
 
 	// See if there is a standalone view of the message.
 	// If there is, quit it.
@@ -786,6 +793,13 @@ MsgScrollingList::deleteSelected(Boolean silent)
 	cur_state = msg->flagIsSet(error, DtMailMessageNew);
 
 	if (cur_state == DTM_TRUE) num_new_messages--;
+    }
+
+    if (newly_deleted)
+    {
+	undel_dialog->loadMsgs(mail_error, newly_deleted, position_count);
+	if (mail_error.isSet()) parent()->postErrorDialog(mail_error);
+	delete newly_deleted;
     }
 
     _msgs->compact(0);
@@ -1553,12 +1567,21 @@ MsgScrollingList::select_all_and_display_last(
 
   XmListDeselectAllItems(baseWidget());
 
+  // Map each handle to its position once, instead of searching the
+  // list for every match (the first position wins, as with indexof).
+  std::unordered_map<DtMailMessageHandle, int> positions;
+  int nmsgs = _msgs->length();
+  positions.reserve(nmsgs);
+  for (int m = 0; m < nmsgs; m++)
+    positions.emplace(_msgs->at(m)->message_handle, m);
+
   while (--handleOffset >= 0 && error.isNotSet()) {
 
-    item_pos = _msgs->indexof(handleArray[handleOffset]);	// Get position
-    if (item_pos < 0) {
+    auto found = positions.find(handleArray[handleOffset]);	// Get position
+    if (found == positions.end()) {
       continue;
     }
+    item_pos = found->second;
     
     //
     // Select this message in the scrolling list and IF
@@ -2031,15 +2054,13 @@ void
 MsgScrollingList::undelete_messages(MsgHndArray *tmpMHlist)
 {
     FORCE_SEGV_DECL(MsgStruct, tmpMS);
-    int  i, num_entries, entry_position, del_pos;
+    int  i, num_entries, entry_position;
     DtMail::MailBox	*mbox=parent()->mailbox();
     DtMail::Message * tmpMsg;
     DtMailEnv mail_error;
-    DtMailMessageHandle tmpMH;
 #ifdef undef
     XmString read_status, new_status;
 #endif
-    XmString complete_header;	// read status + glyph + header_text.
 
 #ifdef undef
 /* NL_COMMENT
@@ -2072,8 +2093,6 @@ MsgScrollingList::undelete_messages(MsgHndArray *tmpMHlist)
 
     for (i = 0; i < num_entries; i++)
     {
-	DtMailHeaderLine info;
-
 	tmpMS = tmpMHlist->at(i);
 	tmpMS->is_deleted = FALSE;
 
@@ -2083,51 +2102,70 @@ MsgScrollingList::undelete_messages(MsgHndArray *tmpMHlist)
 
 	tmpMsg = mbox->getMessage(mail_error, tmpMS->message_handle);
 	tmpMsg->resetFlag(mail_error, DtMailMessageDeletePending);
-	tmpMH = tmpMS->message_handle;
-	
-	// Remove chosen item from list of deleted messages;
-	// insert it back into _msgs at the right place (which is 
-	// determined by session_number of retrieved MsgStruct).
-	// Insert back into scrolling list for visual display
-	// at the position session_number.
 
-	entry_position = _msgs->insert(tmpMS);
+	if (tmpMsg->flagIsSet(mail_error, DtMailMessageNew) == DTM_TRUE)
+	  num_new_messages++;
+    }
 
-	// Increment by one, because the index into the scrolling
-	// list is always one greater than the index into the
-	// message handle array that we got the index from.
+    // Put the messages back into _msgs at the right places (which are
+    // determined by their session numbers), and take them off the
+    // list of deleted messages, each in one pass.
+    _msgs->insert_all(tmpMHlist);
+    _deleted_messages->remove_all(tmpMHlist, FALSE);
 
-	entry_position = entry_position + 1;
+    // Insert them back into the scrolling list for visual display,
+    // selected, at their new positions. Each run of adjacent ones is
+    // added with one call.
+    std::unordered_set<MsgStruct *> restored;
+    restored.reserve(num_entries);
+    for (i = 0; i < num_entries; i++)
+      restored.insert(tmpMHlist->at(i));
+
+    int nmsgs = _msgs->length();
+    XmString *run = new XmString[nmsgs];
+    for (int m = 0; m < nmsgs; )
+    {
+	if (!restored.count(_msgs->at(m)))
+	{
+	    m++;
+	    continue;
+	}
+
+	int first = m, nrun = 0;
+	for (; m < nmsgs && restored.count(_msgs->at(m)); m++)
+	{
+	    DtMailHeaderLine info;
+	    MsgStruct *ms = _msgs->at(m);
+
+	    mbox->getMessageSummary(mail_error, ms->message_handle,
+				    _header_info, info);
+	    DtMail::Message * msg = mbox->getMessage(mail_error,
+						     ms->message_handle);
+	    run[nrun++] = formatHeader(
+			   info,
+			   ms->indexNumber,
+			   show_with_attachments(msg),
+			   msg->flagIsSet(mail_error, DtMailMessageNew));
+	    mbox->clearMessageSummary(info);
+	}
+
+	// List positions are one greater than _msgs indices.
+	XmListAddItems(_w, run, nrun, first + 1);
+	for (int r = 0; r < nrun; r++)
+	{
+	    XmListSelectPos(_w, first + 1 + r, FALSE);
+	    XmStringFree(run[r]);
+	}
 
 	// Maintain the assumption that the item at entry_position
 	// is the selected item
-
+	entry_position = first + nrun;
 	_selected_item_position = entry_position;
-
-	mbox->getMessageSummary(mail_error, tmpMS->message_handle,
-				_header_info, info);
-	DtMail::Message * msg = mbox->getMessage(mail_error, tmpMH);
-	complete_header = formatHeader(
-			   info,
-			   tmpMS->indexNumber,
-			   show_with_attachments(msg),
-			   msg->flagIsSet(mail_error, DtMailMessageNew));
-
-	mbox->clearMessageSummary(info);
-
-	if (msg->flagIsSet(mail_error, DtMailMessageNew) == DTM_TRUE)
-	  num_new_messages++;
-
-	XmListAddItem(_w, complete_header, entry_position);
-	XmListSelectItem(_w, complete_header, FALSE);
-	XmStringFree(complete_header);
-
-	// Get position of undeleted message structure in _deleted_messages
-	// and remove the entry from _deleted_messages
-
-	del_pos = _deleted_messages->indexof(tmpMS);
-	_deleted_messages->remove_entry(del_pos);
     }
+    delete [] run;
+
+    // The last message restored is the one displayed.
+    tmpMS = tmpMHlist->at(num_entries - 1);
 
     // Display this message and select it.
 
@@ -2396,6 +2434,8 @@ MsgScrollingList::updateListItems(int current,
     resetIndexNums();
 
     mailrc->getValue(mail_error, "showmsgnum", &value);
+    if (NULL != value)
+      free((void*) value);
     if (mail_error.isSet() && renumber_only) return;
 
     if (selected_messages)
@@ -2467,16 +2507,21 @@ MsgScrollingList::updateListItems(int current,
 
     if (selected_messages)
     {
+        // Reselect the messages that were selected, wherever they are
+        // now: one pass over the list against a set of the selected
+        // ones, rather than comparing every row with every selection.
+        std::unordered_set<MsgStruct *> selected;
+        int nselected = selected_messages->length();
+
+        selected.reserve(nselected);
+        for (int s=0; s<nselected; s++)
+          selected.insert(selected_messages->at(s));
+
         XmListDeselectAllItems(_w);
-        for (int m=0, nselected=selected_messages->length(); m<nmsgs; m++)
+        for (int m=0; m<nmsgs; m++)
         {
-            MsgStruct *ms = get_message_struct(m+1);
-	    for (int s=0; s<nselected; s++)
-	    {
-		MsgStruct *sms = selected_messages->at(s);
-		if (ms == sms)
-		  XmListSelectPos(_w, m+1, FALSE);
-	    }
+            if (selected.count(get_message_struct(m+1)))
+              XmListSelectPos(_w, m+1, FALSE);
         }
         XtVaSetValues (_w, XmNselectionPolicy, XmEXTENDED_SELECT, NULL);
     }
@@ -2494,13 +2539,12 @@ MsgScrollingList::formatHeader(DtMailHeaderLine & info,
 			       DtMailBoolean has_attachments,
 			       DtMailBoolean new_msg)
 {
-    char *buf = new char[BUFSIZ];
-    memset(buf, 0, BUFSIZ);
+    char buf[BUFSIZ];
     const char *from=NULL;
     char *subject;
     int contentLength;
     char contentStr[20];
-    char *date = new char[BUFSIZ];
+    char date[BUFSIZ];
     int msg_num = sess_num + 1;
     static XmString attachment_glyph = NULL;
     static XmString no_attachment_glyph = NULL;
@@ -2631,7 +2675,7 @@ MsgScrollingList::formatHeader(DtMailHeaderLine & info,
 #endif
 	    }
 
-	    SafeStrftime(date, BUFSIZ, dateformat, &tm_struct);
+	    SafeStrftime(date, sizeof(date), dateformat, &tm_struct);
 	}
 	else
 	  // Couldn't get Date string from Message. Make it empty.
@@ -2644,7 +2688,7 @@ MsgScrollingList::formatHeader(DtMailHeaderLine & info,
 
         /* Refer to strftime man page for explanation of the date format.  */
 	dateformat = CATGETS(DT_catd, 1, 259, "%a %b %d  %Y");
-	SafeStrftime(date, BUFSIZ, dateformat, &epoch);
+	SafeStrftime(date, sizeof(date), dateformat, &epoch);
     }
     
     if (info.header_values[2].length() > 0) {
@@ -2675,9 +2719,15 @@ MsgScrollingList::formatHeader(DtMailHeaderLine & info,
     mbox = parent()->mailbox();
     mailrc = mbox->session()->mailRc(mail_error);
 
+    // Look the options up once per row, not once per use.
     const char * value = NULL;
     mailrc->getValue(mail_error, "showmsgnum", &value);
-    if (mail_error.isSet()) {
+    DtMailBoolean show_msg_num = mail_error.isSet() ? DTM_FALSE : DTM_TRUE;
+    if (NULL != value)
+      free((void*) value);
+    value = NULL;
+
+    if (!show_msg_num) {
         // No message numbers ... keep usual "35" col. "Subject".
       if (showto)
               sprintf(buf, " To %-15.15s %-35.35s %-17.17s %-5.5s",
@@ -2708,42 +2758,17 @@ MsgScrollingList::formatHeader(DtMailHeaderLine & info,
                       date,
                       contentStr);
     }
-    if (NULL != value)
-      free((void*) value);
 
-    XmString header_text = XmStringCreateLocalized(buf);
-    XmString item, item2, complete_header;
+    // [number] status glyph text. XmStringConcatAndFree() frees the
+    // pieces it is given, so each row costs no extra copies.
+    XmString complete_header;
 
-    if (has_attachments == DTM_TRUE) {
-	item = XmStringConcat(attachment_glyph, header_text);
-	XmStringFree(header_text);
-    }
-    else {
-	item = XmStringConcat(no_attachment_glyph, header_text);
-	XmStringFree(header_text);
-    }
-
-    if (new_msg == DTM_FALSE) {
-	item2 = XmStringConcat(read_status, item);
-	XmStringFree(item);
-    }
-    else {
-	item2 = XmStringConcat(new_status, item);
-	XmStringFree(item);
-    }
-
-    value = NULL;
-    mailrc->getValue(mail_error, "showmsgnum", &value);
-    if (mail_error.isSet()) {
-//	complete_header = XmStringCopy(item2);
-	complete_header = item2;
+    if (!show_msg_num) {
+	complete_header = NULL;
 	_numbered = DTM_FALSE;
     }
     else {
 	char num_buf[64];
-
-        if (NULL != value)
-          free((void*) value);
 
 	mailrc->getValue(mail_error, "nerdmode", &value);
 	if (mail_error.isSet()) {
@@ -2752,21 +2777,30 @@ MsgScrollingList::formatHeader(DtMailHeaderLine & info,
 	else {
 	    sprintf(num_buf, "%4x ", msg_num - 1);
 	}
+	if (NULL != value)
+	  free((void*) value);
 
-	XmString num_str = XmStringCreateLocalized(num_buf);
-        complete_header = XmStringConcat(num_str, item2);
-	XmStringFree(item2);
-	XmStringFree(num_str);
+	complete_header = XmStringCreateLocalized(num_buf);
 	_numbered = DTM_TRUE;
     }
-    if (NULL != value)
-      free((void*) value);
+
+    XmString status = XmStringCopy(new_msg == DTM_FALSE ?
+				   read_status : new_status);
+    complete_header = complete_header ?
+		      XmStringConcatAndFree(complete_header, status) :
+		      status;
+    complete_header =
+	XmStringConcatAndFree(complete_header,
+			      XmStringCopy(has_attachments == DTM_TRUE ?
+					   attachment_glyph :
+					   no_attachment_glyph));
+    complete_header =
+	XmStringConcatAndFree(complete_header,
+			      XmStringCreateLocalized(buf));
 
     delete addr_seq;
-    delete subject;
+    delete [] subject;
     
-    delete [] buf;
-    delete [] date;
     return(complete_header);
 }
 

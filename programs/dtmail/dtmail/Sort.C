@@ -93,14 +93,7 @@ Sort::sortMessages(MsgScrollingList	*displayList,
     // Add in the deleted messages for the purpose of sorting.
     //
     if (NULL != deletedMsgHandles)
-    {
-        numberMessages = deletedMsgHandles->length();
-        for (int i = 0; i < numberMessages; i++)
-        {
-	    MsgStruct *ms = deletedMsgHandles->at(i);
-	    msgHandles->insert(ms);
-        }
-    }
+      msgHandles->insert_all(deletedMsgHandles);
 
     numberMessages = msgHandles->length();
     if (numberMessages > 0)
@@ -130,6 +123,10 @@ Sort::sortMessages(MsgScrollingList	*displayList,
 	// Get the handle and envelope and header.
 	//
 	messages[offset].msg_struct = msgHandles->at(msgno);
+	// A message that cannot be read sorts with empty keys.
+	messages[offset].primary_key_str = NULL;
+	messages[offset].primary_key_int = 0;
+	messages[offset].secondary_key_int = 0;
 
 	if (howToSort != SortMsgNum)
 	{
@@ -162,8 +159,11 @@ Sort::sortMessages(MsgScrollingList	*displayList,
 	primary_key_int = 0;
 
 	// Set up the secondary sort key using the received timestamp.
-	envelope->getHeader(error, DtMailMessageReceivedTime, DTM_TRUE, value);
-	if (error.isSet())
+	// (Sorting by message number does not read the envelope.)
+	if (envelope != NULL)
+	  envelope->getHeader(error, DtMailMessageReceivedTime,
+			      DTM_TRUE, value);
+	if (envelope == NULL || error.isSet())
 	  secondary_key_int = 0;
 	else
 	{
@@ -188,6 +188,7 @@ Sort::sortMessages(MsgScrollingList	*displayList,
 	  {
 	      // Stole from MsgScrollingList
 	      DtMailAddressSeq	*addr_seq = (value[0])->toAddress();
+	      DtMailAddressSeq	*to_seq = NULL;
 	      DtMailValueAddress *addr = (*addr_seq)[0];
 
 	      //
@@ -216,8 +217,8 @@ Sort::sortMessages(MsgScrollingList	*displayList,
 					DTM_TRUE, tovalue);
 	   		  if (error.isNotSet())
 			  {
-			      addr_seq = (tovalue[0])->toAddress();
-			      addr = (*addr_seq)[0];
+			      to_seq = (tovalue[0])->toAddress();
+			      addr = (*to_seq)[0];
 			  }
 		      }
 		  }
@@ -229,13 +230,13 @@ Sort::sortMessages(MsgScrollingList	*displayList,
 		primary_key_str = strdup(addr->dtm_person);
 	      else
 	      {
-		char *str;
 		if (NULL != addr->dtm_address)
-		  str = strdup(addr->dtm_address);
+		  primary_key_str = strdup(addr->dtm_address);
 		else
-		  str = strdup("");
-		primary_key_str = strdup(str);
+		  primary_key_str = strdup("");
 	      }
+	      delete to_seq;
+	      delete addr_seq;
 	  }
 	  break;
 
@@ -362,14 +363,7 @@ Sort::sortMessages(MsgScrollingList	*displayList,
     // Remove the deleted messages.
     //
     if (NULL != deletedMsgHandles)
-    {
-        numberMessages = deletedMsgHandles->length();
-        for (int i = 0; i < numberMessages; i++)
-        {
-	    MsgStruct *ms = deletedMsgHandles->at(i);
-	    msgHandles->remove_entry(ms);
-        }
-    }
+      msgHandles->remove_all(deletedMsgHandles, TRUE);
 
     //
     // Figure out the new offset for displayed_ms message
