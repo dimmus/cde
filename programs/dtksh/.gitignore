@@ -105,3 +105,4 @@ ksh93/src/lib/libdll/dll.req
 ksh93/src/lib/libdll/dlldefs.h
 ksh93/src/lib/libsum/FEATURE/
 ksh93/src/lib/libsum/sum.req
+ksh93.stamp

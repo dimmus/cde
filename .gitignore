@@ -459,7 +459,6 @@ programs/dthelp/parser/canon1/parser/delim.dat
 programs/dthelp/parser/canon1/parser/delim.h
 programs/dthelp/parser/canon1/parser/error
 programs/dthelp/parser/canon1/parser/parser
-programs/dthelp/parser/canon1/util/context
 programs/dthelp/parser/canon1/util/fclndir
 programs/dthelp/parser/pass1/build/arc.h
 programs/dthelp/parser/pass1/build/build
@@ -499,7 +498,6 @@ programs/dthelp/parser/pass1/parser/delim.dat
 programs/dthelp/parser/pass1/parser/delim.h
 programs/dthelp/parser/pass1/parser/dthelp_htag1
 programs/dthelp/parser/pass1/parser/error
-programs/dthelp/parser/pass1/util/context
 programs/dthelp/parser/pass1/util/fclndir
 programs/dthelp/parser/pass2/build/arc.h
 programs/dthelp/parser/pass2/build/build
@@ -540,9 +538,9 @@ programs/dthelp/parser/pass2/parser/delim.dat
 programs/dthelp/parser/pass2/parser/delim.h
 programs/dthelp/parser/pass2/parser/error
 programs/dthelp/parser/pass2/parser/parser
-programs/dthelp/parser/pass2/util/context
 programs/dthelp/parser/pass2/util/fclndir
 programs/dthelp/parser/helptag/dthelptag
+programs/dthelp/parser/util/context
 
 # programs/dtinfo
 programs/dtinfo/clients/dtinfo_start/dtinfo_start
