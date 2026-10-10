@@ -532,6 +532,37 @@ _DtTermPrimLineDrawFreeFont(LineDrawFont lineDrawFont)
 }
 
 
+#ifndef	USE_PIXMAPS
+/* the segments and rectangles of a whole run of glyphs are collected
+ * here and drawn with one PolySegment and one PolyFillRectangle request
+ * (rather than two requests per glyph).  Both are drawn with the same
+ * GC and every pixel the same, so the order does not matter...
+ */
+#define	LINE_DRAW_BATCH	256
+
+typedef struct _LineDrawBatch {
+    XSegment segs[LINE_DRAW_BATCH];
+    int numSegs;
+    XRectangle rects[LINE_DRAW_BATCH];
+    int numRects;
+} LineDrawBatch;
+
+static void
+flushLineDrawBatch(Display *display, Drawable d, GC gc,
+	LineDrawBatch *batch)
+{
+    if (batch->numSegs > 0) {
+	(void) XDrawSegments(display, d, gc, batch->segs, batch->numSegs);
+	batch->numSegs = 0;
+    }
+    if (batch->numRects > 0) {
+	(void) XFillRectangles(display, d, gc, batch->rects,
+		batch->numRects);
+	batch->numRects = 0;
+    }
+}
+#endif	/* USE_PIXMAPS */
+
 void
 _DtTermPrimLineDrawImageString(Display *display, Drawable d,
 	LineDrawFont lineDrawFont,
@@ -539,8 +570,8 @@ _DtTermPrimLineDrawImageString(Display *display, Drawable d,
 {
     int glyph;
 #ifndef	USE_PIXMAPS
-    XSegment segs[20];
-    XRectangle rects[20];
+    LineDrawBatch batch;
+    ScaledCharInfo info;
     int i;
 #endif	/* USE_PIXMAPS */
 
@@ -551,6 +582,9 @@ _DtTermPrimLineDrawImageString(Display *display, Drawable d,
     }
 
 #ifndef	USE_PIXMAPS
+    batch.numSegs = 0;
+    batch.numRects = 0;
+
     /* clear the area... */
     (void) XFillRectangle(display,		/* Display		*/
 	    d,					/* Window		*/
@@ -592,53 +626,44 @@ _DtTermPrimLineDrawImageString(Display *display, Drawable d,
 		1);				/* plane		*/
 
 #else	/* USE_PIXMAPS */
-	if (!lineDrawFont->scaledCharInfo[glyph].scaled) {
+	info = &(lineDrawFont->scaledCharInfo[glyph]);
+	if (!info->scaled) {
 	    /* first time, scale this character... */
-	    (void) ScaleCharacter(&(lineDrawFont->scaledCharInfo[glyph]),
-		    &(lineDrawFont->glyphInfo[glyph]), lineDrawFont->width, lineDrawFont->height);
+	    (void) ScaleCharacter(info, &(lineDrawFont->glyphInfo[glyph]),
+		    lineDrawFont->width, lineDrawFont->height);
 	}
 
-	if (lineDrawFont->scaledCharInfo[glyph].numSegs > 0) {
-	    for (i = 0; i < lineDrawFont->scaledCharInfo[glyph].numSegs; i++) {
-		segs[i].x1 = x + lineDrawFont->scaledCharInfo[glyph].segs[i].x1;
-		segs[i].x2 = x + lineDrawFont->scaledCharInfo[glyph].segs[i].x2;
-		segs[i].y1 =
-			y + lineDrawFont->scaledCharInfo[glyph].segs[i].y1 -
-			lineDrawFont->ascent;
-		segs[i].y2 =
-			y + lineDrawFont->scaledCharInfo[glyph].segs[i].y2 -
-			lineDrawFont->ascent;
-	    }
-	    (void) XDrawSegments(display,	/* Display		*/
-		d,				/* dest			*/
-		gc,				/* GC			*/
-		segs,				/* segments		*/
-		lineDrawFont->scaledCharInfo[glyph].numSegs);
-						/* num segs		*/
+	/* make room for this glyph... */
+	if ((batch.numSegs + info->numSegs > LINE_DRAW_BATCH) ||
+		(batch.numRects + info->numRects > LINE_DRAW_BATCH)) {
+	    (void) flushLineDrawBatch(display, d, gc, &batch);
 	}
 
-	if (lineDrawFont->scaledCharInfo[glyph].numRects > 0) {
-	    for (i = 0; i < lineDrawFont->scaledCharInfo[glyph].numRects; i++) {
-		rects[i].x = x + lineDrawFont->scaledCharInfo[glyph].rects[i].x;
-		rects[i].y =
-			y + lineDrawFont->scaledCharInfo[glyph].rects[i].y -
-			lineDrawFont->ascent;
-		rects[i].width =
-			lineDrawFont->scaledCharInfo[glyph].rects[i].width;
-		rects[i].height =
-			lineDrawFont->scaledCharInfo[glyph].rects[i].height;
-	    }
-	    (void) XFillRectangles(display,	/* Display		*/
-		d,				/* dest			*/
-		gc,				/* GC			*/
-		rects,				/* rectangles		*/
-		lineDrawFont->scaledCharInfo[glyph].numRects);
-						/* num rects		*/
+	for (i = 0; i < info->numSegs; i++) {
+	    XSegment *seg = &batch.segs[batch.numSegs++];
+
+	    seg->x1 = x + info->segs[i].x1;
+	    seg->x2 = x + info->segs[i].x2;
+	    seg->y1 = y + info->segs[i].y1 - lineDrawFont->ascent;
+	    seg->y2 = y + info->segs[i].y2 - lineDrawFont->ascent;
+	}
+
+	for (i = 0; i < info->numRects; i++) {
+	    XRectangle *rect = &batch.rects[batch.numRects++];
+
+	    rect->x = x + info->rects[i].x;
+	    rect->y = y + info->rects[i].y - lineDrawFont->ascent;
+	    rect->width = info->rects[i].width;
+	    rect->height = info->rects[i].height;
 	}
 #endif	/* USE_PIXMAPS */
 	/* slide over one character... */
 	x += lineDrawFont->width;
     }
+
+#ifndef	USE_PIXMAPS
+    (void) flushLineDrawBatch(display, d, gc, &batch);
+#endif	/* USE_PIXMAPS */
 
     _DtTermProcessUnlock();
     return;

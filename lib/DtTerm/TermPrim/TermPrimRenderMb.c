@@ -387,7 +387,7 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 			    tpd->cellHeight - 1,
 						/* Y1			*/
 			    (chunkStartColumn + chunkWidth) * tpd->cellWidth +
-			    tpd->offsetX,	/* X2			*/
+			    tpd->offsetX - 1,	/* X2			*/
 			    startRow * tpd->cellHeight + tpd->offsetY +
 			    tpd->cellHeight - 1);
 						/* Y2			*/
