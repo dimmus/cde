@@ -171,6 +171,8 @@ extern Boolean removingTrash;
  */
 #define EVENT_DELAY_MS      100   /* collect events this long first */
 #define EVENT_INTERVAL_MS  1000   /* at most one refresh per this, per dir */
+/* (doubling up to rereadTime seconds while a directory keeps changing:
+   no more often than the poll of a directory that changes all the time) */
 #define EVENT_RETRY_MS      500   /* recheck a directory that is busy */
 
 /*
@@ -227,6 +229,7 @@ typedef struct
    Boolean          ev_self;       /* the directory itself changed */
    Boolean          update_changed;/* this read/update changed something */
    long             last_ev_refresh; /* when an event last started a refresh */
+   long             ev_interval;   /* the least time to the next one */
    unsigned long    lru_stamp;     /* non-zero: unviewed, kept in the cache */
    Boolean          stale;         /* (cached, unviewed) changed since */
    Boolean          reread_needed; /* (cached, unviewed) missed a db reload */
@@ -882,7 +885,8 @@ RestartTimer(void)
  *	event marks the directory (ev_pending); EventTimer then starts an
  *	update (which re-stats the entries and sends only what changed),
  *	collecting the events of EVENT_DELAY_MS and starting at most one
- *	update per directory every EVENT_INTERVAL_MS.  A read or update
+ *	update per directory every EVENT_INTERVAL_MS (longer while it keeps
+ *	changing, up to rereadTime).  A read or update
  *	that starts clears the mark, after taking in the queued events:
  *	it sees every change made before it started.
  *	Directories that lose their watch (deleted, renamed, unmounted)
@@ -1153,7 +1157,11 @@ EventTimer(
             continue;
       }
       else
-         wait = directory->last_ev_refresh + EVENT_INTERVAL_MS - now;
+      {
+         if (directory->ev_interval < EVENT_INTERVAL_MS)
+            directory->ev_interval = EVENT_INTERVAL_MS;
+         wait = directory->last_ev_refresh + directory->ev_interval - now;
+      }
 
       if (directory->last_ev_refresh != 0 && wait > 0)
       {
@@ -1161,6 +1169,19 @@ EventTimer(
             retry = wait;
          continue;
       }
+
+      /* back off while it changes all the time, recover when it calms */
+      if (directory->last_ev_refresh != 0 &&
+          now - directory->last_ev_refresh < 2 * directory->ev_interval)
+      {
+         directory->ev_interval *= 2;
+         if (directory->ev_interval > rereadTime * 1000L)
+            directory->ev_interval = rereadTime * 1000L;
+         if (directory->ev_interval < EVENT_INTERVAL_MS)
+            directory->ev_interval = EVENT_INTERVAL_MS;
+      }
+      else
+         directory->ev_interval = EVENT_INTERVAL_MS;
 
       DPRINTF(("EventTimer: %s changed\n", directory->directory_name));
       directory->last_ev_refresh = now;
