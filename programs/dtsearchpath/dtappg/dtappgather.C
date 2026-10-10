@@ -75,6 +75,7 @@
 #include "dtappgather.h"
 #include "DirIterator.h"
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <iostream>
 
 Options * options;
@@ -288,11 +289,14 @@ void AppManagerDirectory::GatherAppsFromASearchElement
 
 	while ((direntry = iter())) {
 	    CString dname(direntry->d_name);
-	    if (user_->OS()->isDirectory(source + "/" + dname)
-	     || user_->OS()->isFile(source + "/" + dname))
+	    CString spath(source + "/" + dname);
+	    struct stat file;
+
+	    // A directory or a plain file (one stat(), not one per test).
+	    if (stat(spath.data(), &file) == 0 &&
+		(S_ISDIR(file.st_mode) || S_ISREG(file.st_mode)))
 		if (goodFile(dirname_, dname))
-		    user_->OS()->symbolicLink (source + "/" + dname, 
-					       dirname_ + "/" + dname);
+		    user_->OS()->symbolicLink (spath, dirname_ + "/" + dname);
 	}
 
 	user_->OS()->setUserId();

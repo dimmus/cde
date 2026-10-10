@@ -8,7 +8,12 @@ if SOLARIS
 dtsearchpath_CPPFLAGS += -DIOSTREAMSWORKS
 endif
 
-dtsearchpath_LDADD = ../libCliSrv/libCliSrv.a $(DTCLIENTLIBS) $(XTOOLLIB)
+# It needs libtt (TTFile), and libtt needs Xt and X11 (it does not
+# record them itself), but nothing else of the desktop and X libraries;
+# linking them all made every run (one per login) load ~50 shared
+# libraries.
+dtsearchpath_LDADD = ../libCliSrv/libCliSrv.a $(LIBTT) $(TIRPCLIB) \
+		     $(X_LIBS) -lXt -lX11
 
 dtsearchpath_SOURCES = AppSearchPath.C DbSearchPath.C			\
 		       HelpSearchPath.C IconSearchPath.C		\
