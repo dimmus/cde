@@ -73,6 +73,7 @@ extern int errno;
 #include "CanvasError.h"
 #include "bufioI.h"
 #include "FormatUtilI.h"
+#include "StringFuncsI.h"
 
 #if defined(NLS16) || !defined(NO_MESSAGE_CATALOG)
 #include <Dt/MsgCatP.h>
@@ -778,10 +779,14 @@ _DtHelpFmtFindBreak (
     int   numChars = 0;
     int   mySize;
     short done = 0;
+    int   ascii = _DtHelpCeAsciiIsSingleByte();
 
     while (0 == done && '\0' != *ptr)
       {
-        mySize = mblen(ptr, MB_CUR_MAX);
+	if (ascii && ((unsigned char) *ptr) < 0x80)
+	    mySize = 1;
+	else
+            mySize = mblen(ptr, MB_CUR_MAX);
         done   = 1;
         if (0 < mySize &&
 		((1 != mb_len && 1 != mySize) || (1 == mb_len && 1 == mySize)))
