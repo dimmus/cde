@@ -53,8 +53,8 @@
 #include "db/tt_db_hostname_global_map_ref.h"
 
 // A cached dbserver connection that failed is dropped, so that the next
-// call reconnects (as _tt_db_network_path() does).
-static void
+// call reconnects (as _tt_db_network_path() does).  Returns 1 if it was.
+static int
 dropBrokenDB(_Tt_db_hostname_global_map_ref &map_ref,
 	     const _Tt_string &hostname, _Tt_db_results db_status)
 {
@@ -63,7 +63,9 @@ dropBrokenDB(_Tt_db_hostname_global_map_ref &map_ref,
 	    db_status == TT_DB_ERR_RPC_FAILED ||
 	    db_status == TT_DB_ERR_DB_OPEN_FAILED) {
 		map_ref.removeDB(hostname);
+		return 1;
 	}
+	return 0;
 }
 
 // "magic" (in the /etc/magic sense) prefix for netfile strings
@@ -194,18 +196,27 @@ _tt_host_file_netfile(const char * host, const char * filename)
 
 	// Connect to dbserver on remote host, reusing the connection
 	// (and remembering a failure) from earlier calls.
+	// A cached connection can have gone stale (the dbserver was
+	// restarted, say); one that fails is dropped and the call is
+	// made once more on a new connection, as each call used to make
+	// its own.
 	_Tt_db_results	db_status;
 	_Tt_db_hostname_global_map_ref map_ref;
-	_Tt_db_client_ptr h_dbserv = map_ref.getDirectDB(hostname, db_status);
+	_Tt_db_client_ptr h_dbserv;
 
-	// run _tt_file_netfile() on the remote host.
-	if ((status = _tt_get_api_error(db_status,
-					  _TT_API_FILE_MAP)) == TT_OK) {
-
+	for (int attempt = 0; ; attempt++) {
+		h_dbserv = map_ref.getDirectDB(hostname, db_status);
+		if (db_status != TT_DB_OK) {
+			break;
+		}
+		// run _tt_file_netfile() on the remote host.
 		db_status = h_dbserv->file_netfile(path, netfile);
-		dropBrokenDB(map_ref, hostname, db_status);
-		status = _tt_get_api_error(db_status, _TT_API_FILE_MAP);
+		if (! dropBrokenDB(map_ref, hostname, db_status) ||
+		    attempt > 0) {
+			break;
+		}
 	}
+	status = _tt_get_api_error(db_status, _TT_API_FILE_MAP);
 
 	if (status != TT_OK) {
 		return (char *)_tt_error_pointer(status);
@@ -258,19 +269,27 @@ _tt_host_netfile_file(const char * host, const char * netfilename)
 
 	// Connect to dbserver on remote host, reusing the connection
 	// (and remembering a failure) from earlier calls.
+	// (A stale cached connection is retried once, as above.)
 	_Tt_db_results	db_status;
 	_Tt_db_hostname_global_map_ref map_ref;
-	_Tt_db_client_ptr h_dbserv = map_ref.getDirectDB(hostname, db_status);
+	_Tt_db_client_ptr h_dbserv;
 
-	// run _tt_netfile_file() on the remote host.
-	if ((status = _tt_get_api_error(db_status,
-				        _TT_API_FILE_MAP)) != TT_OK) {
-		status = status == TT_ERR_PATH ? TT_ERR_NETFILE : status;
-		return (char *)_tt_error_pointer(status);
+	for (int attempt = 0; ; attempt++) {
+		h_dbserv = map_ref.getDirectDB(hostname, db_status);
+		if (db_status != TT_DB_OK) {
+			status = _tt_get_api_error(db_status,
+						   _TT_API_FILE_MAP);
+			status = status == TT_ERR_PATH ? TT_ERR_NETFILE
+						       : status;
+			return (char *)_tt_error_pointer(status);
+		}
+		// run _tt_netfile_file() on the remote host.
+		db_status = h_dbserv->netfile_file(path, file);
+		if (! dropBrokenDB(map_ref, hostname, db_status) ||
+		    attempt > 0) {
+			break;
+		}
 	}
-	
-	db_status = h_dbserv->netfile_file(path, file);
-	dropBrokenDB(map_ref, hostname, db_status);
 	if ((status = _tt_get_api_error(db_status,
 					_TT_API_FILE_MAP)) == TT_OK) {
 		return _tt_strdup((char *) file);

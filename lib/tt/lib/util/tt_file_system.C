@@ -173,16 +173,18 @@ procMountsSnapshot(size_t &len)
 	struct stat	st;
 
 	if (procMountsFd != -1) {
-		if (procMountsPid != pid) {
+		if (fstat(procMountsFd, &st) != 0 ||
+		    st.st_dev != procMountsDev ||
+		    st.st_ino != procMountsIno) {
+			// Someone closed our descriptor (and the number
+			// may have been reused, e.g. by a child that
+			// closed every descriptor after fork()); it is
+			// no longer ours, so it must not be closed.
+			procMountsFd = -1;
+		} else if (procMountsPid != pid) {
 			// Forked: the open file (and its change marker) is
 			// shared with the parent, so get our own.
 			close(procMountsFd);
-			procMountsFd = -1;
-		} else if (fstat(procMountsFd, &st) != 0 ||
-			   st.st_dev != procMountsDev ||
-			   st.st_ino != procMountsIno) {
-			// Someone closed our descriptor (and the number
-			// may have been reused); it is no longer ours.
 			procMountsFd = -1;
 		}
 	}
