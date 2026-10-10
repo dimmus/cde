@@ -126,9 +126,10 @@ WriteAll(int fd, const char *buf, size_t len)
 
 
 /*
- * CopyData: copy the rest of src to tgt from the current file offsets.
+ * fsCopyData: copy the rest of src to tgt from the current file offsets.
  * Returns 0 on success, an errno value on failure, or -1 if
- * periodicCallback asked to abort.
+ * periodicCallback asked to abort.  If readErrP is not NULL, it is set
+ * to 1 when the error came from reading the source, 0 otherwise.
  *
  * Where available, copy_file_range() lets the kernel copy (or share)
  * the data without passing it through user space; on any file system
@@ -136,12 +137,15 @@ WriteAll(int fd, const char *buf, size_t len)
  * read()/write() through a large buffer.  Both paths advance the file
  * offsets, so the fallback can take over after a partial in-kernel copy.
  */
-static int
-CopyData(int src, int tgt)
+int
+fsCopyData(int src, int tgt, int *readErrP)
 {
   static char *buffer = NULL;
   ssize_t nread;
   int rc;
+
+  if (readErrP)
+    *readErrP = 0;
 
 #ifdef HAVE_COPY_FILE_RANGE
   {
@@ -188,8 +192,11 @@ CopyData(int src, int tgt)
     do {
       nread = read(src, buffer, COPY_BUFSIZE);
     } while (nread < 0 && errno == EINTR);
-    if (nread < 0)
+    if (nread < 0) {
+      if (readErrP)
+        *readErrP = 1;
       return errno;
+    }
     if (nread == 0)
       return 0;
 
@@ -245,7 +252,7 @@ CopyFile(char *sourceP, char *targetP, int repl, struct stat *statP)
   }
 
   /* copy data */
-  rc = CopyData(src, tgt);
+  rc = fsCopyData(src, tgt, NULL);
   if (rc < 0) {
     /* aborted by periodicCallback */
     unlink(targetP);

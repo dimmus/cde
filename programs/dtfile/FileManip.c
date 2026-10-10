@@ -91,6 +91,7 @@
 #include "Main.h"
 #include "Help.h"
 #include "SharedMsgs.h"
+#include "fsrtns.h"
 
 #ifndef CDE_INSTALLATION_TOP
 #define CDE_INSTALLATION_TOP "/usr/dt"
@@ -554,7 +555,13 @@ MoveDir(
    else
 */
    {
-     if (RunFileCommand (MOVE_CMD, source, target, NULL) == 0)
+     /*
+      * Both parents are on the same file system, so this is a rename.
+      * /bin/mv is only needed when the kernel still refuses with EXDEV
+      * (e.g. different mounts of one file system), as it can then copy.
+      */
+     if (rename (source, target) == 0 ||
+         (errno == EXDEV && RunFileCommand (MOVE_CMD, source, target, NULL) == 0))
      {
        XtFree(targetDir);
        return (True);
@@ -777,7 +784,6 @@ FileManip(
    struct stat s2;      /* status of to file e.g.   stat info  */
    struct stat s3;      /* status of to file e.g.   lstat info */
 
-   char buf [BLOCK_SIZE];		/* generic buffer */
    char filename [MAX_PATH];		/* buffer to hold the full file name */
    char * msg;
    int link_result;
@@ -1094,6 +1100,18 @@ FileManip(
 
             if(strcmp(link_path, from) != 0)
                  link_result = symlink(link_path, to);
+            else if (mode == MOVE_FILE)
+            {
+                 /*
+                  * A move within a file system is a rename.  If that is
+                  * not possible (e.g. another file system, or a sticky
+                  * directory), copy the file and remove the original
+                  * below, which also reports the error.
+                  */
+                 if (rename (from, to) == 0)
+                    return (True);
+                 link_result = (-1);
+            }
             else
                  link_result = link (from, to);
          }
@@ -1177,12 +1195,11 @@ FileManip(
 
    /*  do the copy  */
 
-
-   while ((n = read (fold, buf, BLOCK_SIZE)))
    {
-     int result;
+     int read_error;
 
-     if (n < 0)
+     n = fsCopyData(fold, fnew, &read_error);
+     if (n != 0 && read_error)
      {
        if (errorHandler)
        {
@@ -1196,9 +1213,8 @@ FileManip(
        return (False);
      }
 
-     errno = 0;
-     result = write(fnew, buf, n);
-     if (result != n)
+     errno = (n > 0) ? n : 0;
+     if (n != 0)
      {
        (void) close (fold);
        (void) close (fnew);
