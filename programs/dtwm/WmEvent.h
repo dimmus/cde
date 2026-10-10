@@ -37,6 +37,7 @@ extern int smAckState;
 extern Boolean CheckForButtonAction (XButtonEvent *buttonEvent, 
 				     Context context, Context subContext, 
 				     ClientData *pCD);
+extern void InitServerTimeCounter (void);
 extern Time GetTimestamp (void);
 extern Boolean HandleKeyPress (XKeyEvent *keyEvent, KeySpec *keySpecs, 
 			       Boolean checkContext, Context context, 

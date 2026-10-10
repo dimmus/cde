@@ -1532,11 +1532,18 @@ void UnpostMenu (MenuSpec *menuSpec)
 
 void ActivateCallback (Widget w, caddr_t client_data, caddr_t call_data)
 {
-    WmScreenData *pSD;
+    WmScreenData *pSD = NULL;
 
-    /* set active screen */
-    pSD = GetScreenForWindow (XtWindow(w));
-    if (pSD) SetActiveScreen (pSD);
+    /*
+     * Set the active screen: the menu is on the screen of its widget,
+     * which Xt knows without asking the server.
+     */
+    if (!XFindContext (DISPLAY, RootWindowOfScreen (XtScreen (w)),
+		       wmGD.screenContextType, (caddr_t *)&pSD) &&
+	pSD && pSD->screenTopLevelW)
+    {
+	SetActiveScreen (pSD);
+    }
 
     ((MenuItem *)client_data)->wmFunction (
 		((MenuItem *)client_data)->wmFuncArgs, wmGD.menuClient, NULL);

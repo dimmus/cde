@@ -143,6 +143,8 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->clientID = ++(pSD->clientCounter);
     pCD->clientFlags = WM_INITIALIZATION;
     pCD->iconFlags = 0;
+    pCD->hintIconPixmap = None;
+    pCD->hintIconMask = None;
     pCD->thisIconBox = NULL;
     pCD->pECD = NULL;
     pCD->pPRCD = NULL;
@@ -855,7 +857,8 @@ ProcessSmClientID (ClientData *pCD)
 	pCD->smClientID = (String)NULL;
     }
 
-    if ((XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_SM_CLIENT_ID,
+    if (HasProperty (pCD, wmGD.xa_SM_CLIENT_ID) &&
+	(XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_SM_CLIENT_ID,
 			    0L, (long)1000000, False, AnyPropertyType,
 			    &actualType, &actualFormat, &nitems,
 			    &leftover, (unsigned char **)&clientID)
@@ -902,7 +905,8 @@ ProcessWmSaveHint (ClientData *pCD)
     unsigned long nitems, leftover;
     BITS32 *saveHintFlags = (BITS32 *)NULL;
 
-    if ((XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_WMSAVE_HINT,
+    if (HasProperty (pCD, wmGD.xa_WMSAVE_HINT) &&
+	(XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_WMSAVE_HINT,
 			    0L, (long)1000000, False, AnyPropertyType,
 			    &actualType, &actualFormat, &nitems,
 			    &leftover, (unsigned char **)&saveHintFlags)
@@ -1139,6 +1143,8 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
 		         */
 
 		        pCD->iconFlags |= ICON_HINTS_PIXMAP;
+			pCD->hintIconPixmap = pXWMHints->icon_pixmap;
+			pCD->hintIconMask = iconMask;
 		    }
 		    else
 		    {
@@ -1262,7 +1268,18 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
 	    iconMask = (flags & IconMaskHint)?
                        pXWMHints->icon_mask : (Pixmap) NULL;
 
-	    if ((iconPixmap = 
+	    /*
+	     * WM_HINTS changes for other reasons (the urgency or the input
+	     * hint): when the client names the pixmap and mask that the
+	     * icon image was made from, there is nothing to remake.
+	     */
+	    if ((pCD->iconFlags & ICON_HINTS_PIXMAP) && pCD->iconPixmap &&
+		(pXWMHints->icon_pixmap == pCD->hintIconPixmap) &&
+		(iconMask == pCD->hintIconMask))
+	    {
+		/* unchanged */
+	    }
+	    else if ((iconPixmap = 
 		 MakeClientIconPixmap (pCD, pXWMHints->icon_pixmap, 
 					     iconMask)) != None)
 	    {
@@ -1289,6 +1306,8 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
                 }
 		
                 pCD->iconPixmap = iconPixmap;
+		pCD->hintIconPixmap = pXWMHints->icon_pixmap;
+		pCD->hintIconMask = iconMask;
 		
                 /*
                  * Display new icon image if the icon is showing:

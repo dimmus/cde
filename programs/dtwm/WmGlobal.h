@@ -52,6 +52,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/sync.h>
 #include <X11/IntrinsicP.h>
 #include <X11/Intrinsic.h>
 #include <X11/StringDefs.h>
@@ -1715,6 +1716,8 @@ typedef struct _ClientData
     XmString	iconTitle;			/* WM_ICON_NAME field */
     Pixmap	iconPixmap;			/* WM_HINTS field */
     Pixmap	iconMask;			/* WM_HINTS field */
+    Pixmap	hintIconPixmap;		/* WM_HINTS icon_pixmap and icon_mask */
+    Pixmap	hintIconMask;		/* iconPixmap was made from */
     Window	iconWindow;			/* WM_HINTS field */
 
     RList	*piconTopShadows;		/* these change to 	*/
@@ -2099,6 +2102,7 @@ typedef struct _WmGlobalData
 
     Boolean     hasShape;                /* server supports Shape extension */
     int         shapeEventBase, shapeErrorBase;
+    XSyncCounter serverTimeCounter;      /* SYNC SERVERTIME, or None */
     /* Need to replay enter notify events on windows with the
        pointer that used to be modalized.  This is for pointer focus. */
     int         replayEnterEvent;

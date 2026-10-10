@@ -118,10 +118,13 @@ HasOpenLookHints(
     Boolean rval = False;
     OLWinAttr *property = NULL;
 
-    if (ValidPropertyList (pCD) &&
-	HasProperty(pCD, wmGD.xa_OL_WIN_ATTR))
+    if (ValidPropertyList (pCD))
     {
-	rval = True;
+	/*
+	 * The window's properties have been listed: no need to read it
+	 * to know whether it is there.
+	 */
+	rval = HasProperty (pCD, wmGD.xa_OL_WIN_ATTR);
     }
     else if ((property=GetOLWinAttr (pCD)) != NULL)
     {
@@ -257,6 +260,11 @@ GetOLDecorFlags(
     unsigned long leftover;
     Atom *pAtoms = NULL;
 
+    if (!HasProperty (pCD, property))
+    {
+	return (False);
+    }
+
     status = XGetWindowProperty (DISPLAY, pCD->client, property,
 		  0L, ENTIRE_CONTENTS,
 		  False, XA_ATOM, 
@@ -326,7 +334,12 @@ ProcessOLDecoration(
     unsigned long OLdecor;
     long decorMask;
 
-    if (HasOpenLookHints (pCD) && 
+    /*
+     * HasProperty skips the read when the window's properties have been
+     * listed and _OL_WIN_ATTR is not among them; otherwise the property
+     * is read once, here (HasOpenLookHints would read it a second time).
+     */
+    if (HasProperty (pCD, wmGD.xa_OL_WIN_ATTR) &&
 	((pOLWinAttr = GetOLWinAttr (pCD)) != NULL))
     {
 	/*

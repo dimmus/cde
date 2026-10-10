@@ -808,6 +808,9 @@ void ProcessWmColormapWindows (ClientData *pCD)
      * Read the WM_COLORMAP_WINDOWS property.
      */
 
+    if (!HasProperty (pCD, wmGD.xa_WM_COLORMAP_WINDOWS))
+	rValue = ~Success;
+    else
     rValue = XGetWindowProperty (DISPLAY, pCD->client,
 		 wmGD.xa_WM_COLORMAP_WINDOWS, 0L,
 		 (long)MAX_COLORMAP_WINDOWS_COUNT, False, AnyPropertyType,
@@ -1043,6 +1046,9 @@ GetMwmMenuItems(
      */
 
     textProperty.value = (unsigned char *)NULL;
+    if (!HasProperty (pCD, wmGD.xa_MWM_MENU))
+	rValue = 0;
+    else
     rValue = XGetTextProperty(DISPLAY, pCD->client, &textProperty,
 			      wmGD.xa_MWM_MENU);
     if ((rValue == 0) || (textProperty.value == (unsigned char *)NULL))
