@@ -24,6 +24,15 @@ else
 libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
+# export only the symbols in build-aux/exports/libDtWidget.sym
+if EXPORT_MAPS
+libDtWidget_la_LDFLAGS += -Wl,--version-script=libDtWidget.ver
+EXTRA_libDtWidget_la_DEPENDENCIES = libDtWidget.ver
+endif
+libDtWidget.ver: $(EXPORTS_DIR)/libDtWidget.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+MOSTLYCLEANFILES = libDtWidget.ver
+
 libDtWidget_la_LIBADD = $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 if SOLARIS

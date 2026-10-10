@@ -11,6 +11,15 @@ else
 libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
+# export only the symbols in build-aux/exports/libDtSvc.sym
+if EXPORT_MAPS
+libDtSvc_la_LDFLAGS += -Wl,--version-script=libDtSvc.ver
+EXTRA_libDtSvc_la_DEPENDENCIES = libDtSvc.ver
+endif
+libDtSvc.ver: $(EXPORTS_DIR)/libDtSvc.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+MOSTLYCLEANFILES = libDtSvc.ver
+
 
 # USe CPPFLAGS so it will apply to both C and C++ components
 libDtSvc_la_CPPFLAGS = $(CDE_CPPFLAGS) $(KEEP_ASSERTS) -I./include -DMULTIBYTE -DNLS16 -I../include \

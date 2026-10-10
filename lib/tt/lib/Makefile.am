@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 SUBDIRS = api db mp util tttk
 
 lib_LTLIBRARIES = libtt.la
@@ -26,4 +28,13 @@ libtt_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
 libtt_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+# export only the symbols in build-aux/exports/libtt.sym
+if EXPORT_MAPS
+libtt_la_LDFLAGS += -Wl,--version-script=libtt.ver
+EXTRA_libtt_la_DEPENDENCIES = libtt.ver
+endif
+libtt.ver: $(EXPORTS_DIR)/libtt.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+MOSTLYCLEANFILES = libtt.ver
 

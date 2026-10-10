@@ -271,6 +271,14 @@ AC_ARG_ENABLE([hardening],
         [], [enable_hardening=yes]
 )
 
+dnl Export maps: each library exports only the symbols listed in
+dnl build-aux/exports/lib<name>.sym (see build-aux/gen-exports.py, which
+dnl needs a tree built with --disable-export-maps to regenerate them).
+AC_ARG_ENABLE([export-maps],
+        AS_HELP_STRING([--disable-export-maps], [Export every global symbol of the CDE libraries, not only those in build-aux/exports (default=enabled)]),
+        [], [enable_export_maps=yes]
+)
+
 dnl copied from xdm...
 
 AC_ARG_WITH(utmp_file,
@@ -457,6 +465,27 @@ CDE_CHECK_LDFLAG([-Wl,--sort-common], [LINK_LDFLAGS])
 CDE_LIB_LDFLAGS="-no-undefined"
 CDE_CHECK_LDFLAG([-Wl,-z,defs], [CDE_LIB_LDFLAGS])
 AC_SUBST(CDE_LIB_LDFLAGS)
+
+dnl export maps need a linker that takes GNU version scripts
+if test "x$enable_export_maps" != xno; then
+   AC_MSG_CHECKING([if the linker supports version scripts])
+   AC_LANG_PUSH([C])
+   ac_saved_ldflags="$LDFLAGS"
+   echo '{ global: main; local: *; };' > conftest.ver
+   LDFLAGS="$LDFLAGS -Wl,--version-script=conftest.ver"
+   AC_LINK_IFELSE([AC_LANG_PROGRAM([])], [ld_vscript=yes], [ld_vscript=no])
+   LDFLAGS="$ac_saved_ldflags"
+   rm -f conftest.ver
+   AC_LANG_POP([C])
+   AC_MSG_RESULT([$ld_vscript])
+   if test "$ld_vscript" != yes; then
+      if test "x$enable_export_maps" = xyes; then
+         AC_MSG_WARN([the linker does not take version scripts; the libraries export every global symbol])
+      fi
+      enable_export_maps=no
+   fi
+fi
+AM_CONDITIONAL([EXPORT_MAPS], [test "x$enable_export_maps" != xno])
 
 dnl assert() checks (--enable-debug).  A release build defines NDEBUG.
 dnl Code that is not ready for that yet (asserts guarding the only use of

@@ -49,3 +49,12 @@ libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
 libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+# export only the symbols in build-aux/exports/libDtHelp.sym
+if EXPORT_MAPS
+libDtHelp_la_LDFLAGS += -Wl,--version-script=libDtHelp.ver
+EXTRA_libDtHelp_la_DEPENDENCIES = libDtHelp.ver
+endif
+libDtHelp.ver: $(EXPORTS_DIR)/libDtHelp.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+MOSTLYCLEANFILES = libDtHelp.ver

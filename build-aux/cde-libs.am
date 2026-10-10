@@ -23,3 +23,13 @@ LIBTERM = $(top_builddir)/lib/DtTerm/libDtTerm.la
 LIBMRM = $(top_builddir)/lib/DtMrm/libDtMrm.la
 LIBCSA = $(top_builddir)/lib/csa/libcsa.la
 LIBMMDB = $(top_builddir)/lib/DtMmdb/libDtMmdb.la
+
+# The lists of the symbols each library exports (with --enable-export-maps,
+# the default; see build-aux/gen-exports.py), and the command that turns
+# one ($<) into a version script ($@) for the linker.  The script has no
+# version node, so the symbols it exports keep their unversioned ABI;
+# every other global symbol of the library becomes local.  (libtool's
+# -export-symbols does not do this for C++ libraries.)
+EXPORTS_DIR = $(top_srcdir)/build-aux/exports
+MAKE_VERSION_SCRIPT = { echo '{ global:'; sed -e 's/$$/;/' $<; \
+	echo 'local: *; };'; } > $@.tmp && mv -f $@.tmp $@

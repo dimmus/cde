@@ -21,6 +21,15 @@ else
 libDtSearch_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
 
+# export only the symbols in build-aux/exports/libDtSearch.sym
+if EXPORT_MAPS
+libDtSearch_la_LDFLAGS += -Wl,--version-script=libDtSearch.ver
+EXTRA_libDtSearch_la_DEPENDENCIES = libDtSearch.ver
+endif
+libDtSearch.ver: $(EXPORTS_DIR)/libDtSearch.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+MOSTLYCLEANFILES = libDtSearch.ver
+
 libDtSearch_la_LIBADD = raima/libraima.la $(LIBSVC)
 
 libDtSearch_la_SOURCES = apndext.c	ausdopen.c	ausexit.c \

@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 SUBDIRS = HardCopy \
 	  StyleSheet \
 	  api \
@@ -48,3 +50,12 @@ libDtMmdb_la_LIBADD = HardCopy/libHardCopy.la \
 		      utility/libutility.la $(LMDBLIB)
 
 libDtMmdb_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
+
+# export only the symbols in build-aux/exports/libDtMmdb.sym
+if EXPORT_MAPS
+libDtMmdb_la_LDFLAGS += -Wl,--version-script=libDtMmdb.ver
+EXTRA_libDtMmdb_la_DEPENDENCIES = libDtMmdb.ver
+endif
+libDtMmdb.ver: $(EXPORTS_DIR)/libDtMmdb.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+MOSTLYCLEANFILES = libDtMmdb.ver
