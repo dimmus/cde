@@ -76,6 +76,7 @@ extern int errno;
 #include "RegionI.h"
 #include "StringFuncsI.h"
 #include "XInterfaceI.h"
+#include "Lock.h"
 
 #include <X11/bitmaps/root_weave>
 
@@ -811,25 +812,43 @@ ResolveFont (
     DtHelpDispAreaStruct *pDAS = (DtHelpDispAreaStruct *) client_data;
     XrmName	xrmList[_DtHelpFontQuarkNumber];
 
+    /*
+     * this runs for every chunk of text: look the constant quarks up
+     * once.
+     */
+    static XrmQuark qM = NULLQUARK, qItalic, qBold, qSerif, qSymbol, qC;
+
+    _DtHelpProcessLock();
+    if (NULLQUARK == qM)
+      {
+	qItalic = XrmStringToQuark("italic");
+	qBold   = XrmStringToQuark("bold");
+	qSerif  = XrmStringToQuark("serif");
+	qSymbol = XrmStringToQuark("symbol");
+	qC      = XrmStringToQuark("C");
+	qM      = XrmStringToQuark("m");
+      }
+    _DtHelpProcessUnlock();
+
     _DtHelpCopyDefaultList(xrmList);
 
     if (font_attr.spacing != _DtHelpFontSpacingProp)
-        xrmList[_DT_HELP_FONT_SPACING] = XrmStringToQuark("m");
+        xrmList[_DT_HELP_FONT_SPACING] = qM;
 
     sprintf(buffer, "%d", font_attr.pointsz);
     xrmList[_DT_HELP_FONT_SIZE]    = XrmStringToQuark(buffer);
 
     if (font_attr.slant != _DtHelpFontSlantRoman)
       {
-        xrmList[_DT_HELP_FONT_ANGLE]  = XrmStringToQuark("italic");
+        xrmList[_DT_HELP_FONT_ANGLE]  = qItalic;
 	if (font_attr.xlfdi != NULL)
 	    xlfdSpec = font_attr.xlfdi;
       }
 
     if (font_attr.weight == _DtHelpFontWeightBold)
       {
-        xrmList[_DT_HELP_FONT_WEIGHT] = XrmStringToQuark("bold");
-	if (xrmList[_DT_HELP_FONT_ANGLE] == XrmStringToQuark("italic"))
+        xrmList[_DT_HELP_FONT_WEIGHT] = qBold;
+	if (xrmList[_DT_HELP_FONT_ANGLE] == qItalic)
 	  {
 	    if (font_attr.xlfdib != NULL)
 	        xlfdSpec = font_attr.xlfdib;
@@ -839,11 +858,11 @@ ResolveFont (
       }
 
     if (font_attr.style == _DtHelpFontStyleSerif)
-        xrmList[_DT_HELP_FONT_TYPE] = XrmStringToQuark("serif");
+        xrmList[_DT_HELP_FONT_TYPE] = qSerif;
     else if (font_attr.style == _DtHelpFontStyleSymbol)
-        xrmList[_DT_HELP_FONT_TYPE] = XrmStringToQuark("symbol");
+        xrmList[_DT_HELP_FONT_TYPE] = qSymbol;
 
-    xrmList[_DT_HELP_FONT_LANG_TER] = XrmStringToQuark ("C");
+    xrmList[_DT_HELP_FONT_LANG_TER] = qC;
     if (lang != NULL)
 	xrmList[_DT_HELP_FONT_LANG_TER] = XrmStringToQuark(lang);
 
@@ -1847,6 +1866,15 @@ _DtHelpDAResolveSpc (
     spcStr = SpcTable[spcTbIdx].spc_string;
 
     result = ResolveFont(client_data, lang, newSet, font_attr, &fontIdx);
+
+    /*
+     * If not even the default special character has a font, draw it in
+     * the default font (fontIdx), as every later request does (a quark
+     * list that found no font is remembered with the default font).
+     * The callers ignore a failure, and the region would be left unset.
+     */
+    if (result != 0 && spc_symbol == DefaultStr)
+	result = 0;
 
     if (result == 0)
       {
