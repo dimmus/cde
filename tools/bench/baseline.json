@@ -1,0 +1,1086 @@
+{
+ "bench": "cde",
+ "version": 1,
+ "tree": "775b066d3-dirty",
+ "date": "2026-10-10T05:04:13",
+ "rounds": 5,
+ "script_rounds": 1,
+ "pinned": true,
+ "results": {
+  "dtsvc": [
+   {
+    "name": "mm-init-valid",
+    "group": "mm",
+    "n": 20,
+    "ns_per_op": 112512.75,
+    "cpu_ns_per_op": 111133.2,
+    "mallocs_per_op": 42.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "mm-init-stale",
+    "group": "mm",
+    "n": 5,
+    "ns_per_op": 19246324.8,
+    "cpu_ns_per_op": 18472962.0,
+    "mallocs_per_op": 39850.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "dts-type",
+    "group": "dts",
+    "n": 10000,
+    "ns_per_op": 8638.81,
+    "cpu_ns_per_op": 8125.97,
+    "mallocs_per_op": 16.9982,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "dts-attr",
+    "group": "dts",
+    "n": 100000,
+    "ns_per_op": 208.76,
+    "cpu_ns_per_op": 200.6,
+    "mallocs_per_op": 0.3588,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "action-label",
+    "group": "action",
+    "n": 100000,
+    "ns_per_op": 268.1,
+    "cpu_ns_per_op": 259.52,
+    "mallocs_per_op": 1.6,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "action-icon",
+    "group": "action",
+    "n": 100000,
+    "ns_per_op": 198.48,
+    "cpu_ns_per_op": 192.69,
+    "mallocs_per_op": 0.8,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "action-exists",
+    "group": "action",
+    "n": 100000,
+    "ns_per_op": 89.48,
+    "cpu_ns_per_op": 85.42,
+    "mallocs_per_op": 0.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "spc-spawn-nofile-1k",
+    "group": "spc",
+    "n": 100,
+    "ns_per_op": 3034843.47,
+    "cpu_ns_per_op": 3515.14,
+    "mallocs_per_op": 0.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "spc-spawn-nofile-max",
+    "group": "spc",
+    "n": 100,
+    "ns_per_op": 46157646.43,
+    "cpu_ns_per_op": 2523.82,
+    "mallocs_per_op": 0.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "combobox-additem",
+    "group": "widget",
+    "n": 1000,
+    "ns_per_op": 30363.02,
+    "cpu_ns_per_op": 24748.19,
+    "mallocs_per_op": 3.598,
+    "requests_per_op": 12.468,
+    "round_trips_per_op": 0.001
+   },
+   {
+    "name": "spinbox-additem",
+    "group": "widget",
+    "n": 1000,
+    "ns_per_op": 17803.04,
+    "cpu_ns_per_op": 11468.71,
+    "mallocs_per_op": 20.013,
+    "requests_per_op": 28.004,
+    "round_trips_per_op": 0.002
+   },
+   {
+    "name": "editor-set-nul",
+    "group": "widget",
+    "n": 1,
+    "ns_per_op": 3336995351.0,
+    "cpu_ns_per_op": 3212781151.0,
+    "mallocs_per_op": 8.0,
+    "requests_per_op": 34.0,
+    "round_trips_per_op": 1.0
+   },
+   {
+    "name": "editor-replace-all",
+    "group": "widget",
+    "n": 10000,
+    "ns_per_op": 8171.1,
+    "cpu_ns_per_op": 6746.66,
+    "mallocs_per_op": 5.0007,
+    "requests_per_op": 9.0006,
+    "round_trips_per_op": 0.0002
+   },
+   {
+    "name": "editor-cursor-status",
+    "group": "widget",
+    "n": 10000,
+    "ns_per_op": 386179.9,
+    "cpu_ns_per_op": 82314.09,
+    "mallocs_per_op": 46.014,
+    "requests_per_op": 400.9555,
+    "round_trips_per_op": 0.0062
+   }
+  ],
+  "tt": [
+   {
+    "name": "open-close",
+    "group": "tt",
+    "n": 200,
+    "ns_per_op": 2281453.88,
+    "cpu_ns_per_op": 729173.23,
+    "mallocs_per_op": 360.625,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "ttdt-open-join",
+    "group": "tt",
+    "n": 50,
+    "ns_per_op": 4099492.9,
+    "cpu_ns_per_op": 1368144.92,
+    "mallocs_per_op": 1181.5,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "ping",
+    "group": "tt",
+    "n": 10000,
+    "ns_per_op": 202098.27,
+    "cpu_ns_per_op": 45466.78,
+    "mallocs_per_op": 57.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "burst",
+    "group": "tt",
+    "n": 1000,
+    "ns_per_op": 60474.11,
+    "cpu_ns_per_op": 4773.02,
+    "mallocs_per_op": 22.057,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "patterns-1k",
+    "group": "tt",
+    "n": 1000,
+    "ns_per_op": 98590.88,
+    "cpu_ns_per_op": 52744.27,
+    "mallocs_per_op": 36.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "patterns-10k",
+    "group": "tt",
+    "n": 10000,
+    "ns_per_op": 1059239.69,
+    "cpu_ns_per_op": 871989.08,
+    "mallocs_per_op": 36.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "ping-10k-patterns",
+    "group": "tt",
+    "n": 1000,
+    "ns_per_op": 222608.3,
+    "cpu_ns_per_op": 41996.33,
+    "mallocs_per_op": 57.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "netfile",
+    "group": "file",
+    "n": 100,
+    "ns_per_op": 5055.23,
+    "cpu_ns_per_op": 4737.53,
+    "mallocs_per_op": 72.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "message-file-set",
+    "group": "file",
+    "n": 100,
+    "ns_per_op": 3804.76,
+    "cpu_ns_per_op": 3816.63,
+    "mallocs_per_op": 34.0,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   },
+   {
+    "name": "file-notice",
+    "group": "file",
+    "n": 100,
+    "ns_per_op": 45880.98,
+    "cpu_ns_per_op": 8274.11,
+    "mallocs_per_op": 34.57,
+    "requests_per_op": 0.0,
+    "round_trips_per_op": 0.0
+   }
+  ],
+  "dtwm": [
+   {
+    "name": "map",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 1922516.58,
+    "cpu_ns_per_op": 583998.14,
+    "server_cpu_ns_per_op": 1227978.31,
+    "mallocs_per_op": 150.902,
+    "requests_per_op": 103.014,
+    "round_trips_per_op": 18.0,
+    "mapped_ns_per_op": 1232425.63,
+    "rss_kib": 20972,
+    "rss_delta_kib": 4
+   },
+   {
+    "name": "map-dtterm",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 3134727.97,
+    "cpu_ns_per_op": 1200087.98,
+    "server_cpu_ns_per_op": 1706130.81,
+    "mallocs_per_op": 271.992,
+    "requests_per_op": 138.014,
+    "round_trips_per_op": 31.0,
+    "mapped_ns_per_op": 2433786.98,
+    "rss_kib": 20988,
+    "rss_delta_kib": 0
+   },
+   {
+    "name": "hints-urgency",
+    "group": "dtwm",
+    "n": 10000,
+    "ns_per_op": 15559.49,
+    "cpu_ns_per_op": 8268.66,
+    "server_cpu_ns_per_op": 6805.43,
+    "mallocs_per_op": 7.0006,
+    "requests_per_op": 1.0002,
+    "round_trips_per_op": 1.0
+   },
+   {
+    "name": "destroy",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 195261.06,
+    "cpu_ns_per_op": 42358.34,
+    "server_cpu_ns_per_op": 130527.66,
+    "mallocs_per_op": 14.958,
+    "requests_per_op": 7.106,
+    "round_trips_per_op": 0.006
+   },
+   {
+    "name": "title",
+    "group": "dtwm",
+    "n": 10000,
+    "ns_per_op": 42444.95,
+    "cpu_ns_per_op": 21423.46,
+    "server_cpu_ns_per_op": 19107.58,
+    "mallocs_per_op": 15.0003,
+    "requests_per_op": 6.0002,
+    "round_trips_per_op": 2.0
+   },
+   {
+    "name": "title-paced",
+    "group": "dtwm",
+    "n": 2000,
+    "ns_per_op": 85768.05,
+    "cpu_ns_per_op": 36965.31,
+    "server_cpu_ns_per_op": 35260.2,
+    "mallocs_per_op": 18.0015,
+    "requests_per_op": 7.001,
+    "round_trips_per_op": 2.0
+   },
+   {
+    "name": "title-net",
+    "group": "dtwm",
+    "n": 10000,
+    "ns_per_op": 27140.99,
+    "cpu_ns_per_op": 13169.58,
+    "server_cpu_ns_per_op": 12334.44,
+    "mallocs_per_op": 8.0005,
+    "requests_per_op": 5.0002,
+    "round_trips_per_op": 1.0
+   },
+   {
+    "name": "drag-move",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 132122.54,
+    "cpu_ns_per_op": 31592.23,
+    "server_cpu_ns_per_op": 90073.4,
+    "mallocs_per_op": 5.21,
+    "requests_per_op": 6.454,
+    "round_trips_per_op": 1.006
+   },
+   {
+    "name": "drag-move-outline",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 61779.07,
+    "cpu_ns_per_op": 18922.93,
+    "server_cpu_ns_per_op": 34229.56,
+    "mallocs_per_op": 5.052,
+    "requests_per_op": 7.286,
+    "round_trips_per_op": 1.006
+   },
+   {
+    "name": "drag-resize",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 91537.52,
+    "cpu_ns_per_op": 25377.7,
+    "server_cpu_ns_per_op": 52790.26,
+    "mallocs_per_op": 5.1,
+    "requests_per_op": 7.288,
+    "round_trips_per_op": 1.008
+   }
+  ],
+  "dtterm": [
+   {
+    "bench": "dtterm",
+    "name": "cat-base64-C-sl4s",
+    "locale": "C",
+    "save_lines": "4s",
+    "bytes": 106237306,
+    "seconds": 18.851,
+    "mb_per_s": 5.37,
+    "requests": 2760954,
+    "round_trips": 89,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "yes-C-sl4s",
+    "locale": "C",
+    "save_lines": "4s",
+    "bytes": 16777216,
+    "seconds": 25.825,
+    "mb_per_s": 0.62,
+    "requests": 16770905,
+    "round_trips": 337,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "cat-base64-C-sl10000",
+    "locale": "C",
+    "save_lines": "10000",
+    "bytes": 106237306,
+    "seconds": 25.531,
+    "mb_per_s": 3.97,
+    "requests": 2766209,
+    "round_trips": 81,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "yes-C-sl10000",
+    "locale": "C",
+    "save_lines": "10000",
+    "bytes": 16777216,
+    "seconds": 67.524,
+    "mb_per_s": 0.24,
+    "requests": 16774900,
+    "round_trips": 337,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "cat-base64-utf8-sl4s",
+    "locale": "C.utf8",
+    "save_lines": "4s",
+    "bytes": 106237306,
+    "seconds": 18.86,
+    "mb_per_s": 5.37,
+    "requests": 2764523,
+    "round_trips": 82,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "yes-utf8-sl4s",
+    "locale": "C.utf8",
+    "save_lines": "4s",
+    "bytes": 16777216,
+    "seconds": 26.126,
+    "mb_per_s": 0.61,
+    "requests": 16778487,
+    "round_trips": 338,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "cat-base64-utf8-sl10000",
+    "locale": "C.utf8",
+    "save_lines": "10000",
+    "bytes": 106237306,
+    "seconds": 24.437,
+    "mb_per_s": 4.15,
+    "requests": 2763879,
+    "round_trips": 84,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm",
+    "name": "yes-utf8-sl10000",
+    "locale": "C.utf8",
+    "save_lines": "10000",
+    "bytes": 16777216,
+    "seconds": 67.588,
+    "mb_per_s": 0.24,
+    "requests": 16770904,
+    "round_trips": 337,
+    "rounds": 1
+   }
+  ],
+  "dtfile": [
+   {
+    "bench": "apptime",
+    "name": "dtfile-1000-by_name_and_icon-cold",
+    "map_s": 2.1241,
+    "idle_s": 2.2042,
+    "cpu_s": 0.11,
+    "mallocs": 85368,
+    "requests": 1276,
+    "round_trips": 91,
+    "rounds": 1
+   },
+   {
+    "bench": "apptime",
+    "name": "dtfile-1000-by_name_and_icon-warm",
+    "map_s": 2.1695,
+    "idle_s": 2.2877,
+    "cpu_s": 0.14,
+    "mallocs": 85380,
+    "requests": 1276,
+    "round_trips": 91,
+    "rounds": 1
+   },
+   {
+    "bench": "apptime",
+    "name": "dtfile-10000-by_name_and_icon-cold",
+    "map_s": 2.133,
+    "idle_s": 3.6524,
+    "cpu_s": 1.04,
+    "mallocs": 3167184,
+    "requests": 44182,
+    "round_trips": 10844,
+    "rounds": 1
+   },
+   {
+    "bench": "apptime",
+    "name": "dtfile-10000-by_name_and_icon-warm",
+    "map_s": 2.1506,
+    "idle_s": 3.6285,
+    "cpu_s": 1.03,
+    "mallocs": 3167234,
+    "requests": 44182,
+    "round_trips": 10844,
+    "rounds": 1
+   }
+  ],
+  "dtmail": [
+   {
+    "bench": "apptime",
+    "name": "dtmail-1000",
+    "map_s": 0.1015,
+    "idle_s": 0.1529,
+    "cpu_s": 0.1,
+    "rounds": 1
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-10000",
+    "map_s": 0.0954,
+    "idle_s": 0.7428,
+    "cpu_s": 0.58,
+    "rounds": 1
+   }
+  ],
+  "loader": [
+   {
+    "bench": "loader",
+    "name": "programs/dtaction/.libs/dtaction",
+    "dsos": 47,
+    "unused": 17,
+    "exported": 5,
+    "relocations": 11036,
+    "relocations_from_cache": 10574
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcalc/.libs/dtcalc",
+    "dsos": 47,
+    "unused": 16,
+    "exported": 17,
+    "relocations": 11048,
+    "relocations_from_cache": 10578
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcreate/.libs/dtcreate",
+    "dsos": 47,
+    "unused": 15,
+    "exported": 26,
+    "relocations": 11059,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdbcache/.libs/dtdbcache",
+    "dsos": 47,
+    "unused": 17,
+    "exported": 3,
+    "relocations": 11033,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/.libs/dtdocbook2infolib",
+    "dsos": 47,
+    "unused": 21,
+    "exported": 2,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtexec/.libs/dtexec",
+    "dsos": 47,
+    "unused": 20,
+    "exported": 1,
+    "relocations": 11031,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtfile/.libs/dtfile",
+    "dsos": 47,
+    "unused": 13,
+    "exported": 28,
+    "relocations": 11071,
+    "relocations_from_cache": 10732
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dthello/.libs/dthello",
+    "dsos": 47,
+    "unused": 19,
+    "exported": 3,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dticon/.libs/dticon",
+    "dsos": 47,
+    "unused": 14,
+    "exported": 28,
+    "relocations": 11060,
+    "relocations_from_cache": 10582
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtimsstart/.libs/dtimsstart",
+    "dsos": 47,
+    "unused": 18,
+    "exported": 6,
+    "relocations": 11036,
+    "relocations_from_cache": 10572
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtksh/.libs/dtksh",
+    "dsos": 47,
+    "unused": 14,
+    "exported": 64,
+    "relocations": 11313,
+    "relocations_from_cache": 10586
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtlogin/.libs/dtchooser",
+    "dsos": 47,
+    "unused": 16,
+    "exported": 8,
+    "relocations": 11039,
+    "relocations_from_cache": 10589
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtlogin/.libs/dtgreet",
+    "dsos": 47,
+    "unused": 16,
+    "exported": 8,
+    "relocations": 11040,
+    "relocations_from_cache": 10591
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtlogin/.libs/dtlogin",
+    "dsos": 47,
+    "unused": 18,
+    "exported": 2,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtpad/.libs/dtpad",
+    "dsos": 47,
+    "unused": 14,
+    "exported": 13,
+    "relocations": 11045,
+    "relocations_from_cache": 10610
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtpdm/.libs/dtpdm",
+    "dsos": 47,
+    "unused": 16,
+    "exported": 18,
+    "relocations": 11049,
+    "relocations_from_cache": 10570
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtpdmd/.libs/dtpdmd",
+    "dsos": 47,
+    "unused": 18,
+    "exported": 1,
+    "relocations": 11031,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtprintinfo/.libs/dtprintinfo",
+    "dsos": 47,
+    "unused": 16,
+    "exported": 22,
+    "relocations": 11062,
+    "relocations_from_cache": 10774
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtscreen/.libs/dtscreen",
+    "dsos": 47,
+    "unused": 17,
+    "exported": 3,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsession/.libs/dtsession",
+    "dsos": 48,
+    "unused": 12,
+    "exported": 11,
+    "relocations": 11062,
+    "relocations_from_cache": 10668
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtspcd/.libs/dtspcd",
+    "dsos": 47,
+    "unused": 20,
+    "exported": 18,
+    "relocations": 11048,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrclean",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 6,
+    "relocations": 274,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrcreate",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 7,
+    "relocations": 276,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrdbrec",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 8,
+    "relocations": 275,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrdelete",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 11,
+    "relocations": 280,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrhan",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 7,
+    "relocations": 274,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrindex",
+    "dsos": 5,
+    "unused": 1,
+    "exported": 10,
+    "relocations": 278,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrkdump",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 7,
+    "relocations": 275,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/dtsrload",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 11,
+    "relocations": 279,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsr/.libs/huffcode",
+    "dsos": 5,
+    "unused": 2,
+    "exported": 5,
+    "relocations": 273,
+    "relocations_from_cache": 13
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtstyle/.libs/dtstyle",
+    "dsos": 47,
+    "unused": 16,
+    "exported": 10,
+    "relocations": 11042,
+    "relocations_from_cache": 10653
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtterm/.libs/dtterm",
+    "dsos": 49,
+    "unused": 18,
+    "exported": 7,
+    "relocations": 11271,
+    "relocations_from_cache": 11021
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtwm/.libs/dtfplist",
+    "dsos": 47,
+    "unused": 17,
+    "exported": 2,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtwm/.libs/dtwm",
+    "dsos": 47,
+    "unused": 11,
+    "exported": 25,
+    "relocations": 11064,
+    "relocations_from_cache": 10950
+   },
+   {
+    "bench": "loader",
+    "name": "programs/ttsnoop/.libs/ttsnoop",
+    "dsos": 49,
+    "unused": 16,
+    "exported": 45,
+    "relocations": 11312,
+    "relocations_from_cache": 11012
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcm/dtcm/.libs/dtcm",
+    "dsos": 48,
+    "unused": 14,
+    "exported": 34,
+    "relocations": 11196,
+    "relocations_from_cache": 10696
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcm/dtcm/.libs/dtcm_delete",
+    "dsos": 48,
+    "unused": 21,
+    "exported": 10,
+    "relocations": 11166,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcm/dtcm/.libs/dtcm_editor",
+    "dsos": 48,
+    "unused": 15,
+    "exported": 28,
+    "relocations": 11185,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcm/dtcm/.libs/dtcm_insert",
+    "dsos": 48,
+    "unused": 21,
+    "exported": 10,
+    "relocations": 11166,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcm/dtcm/.libs/dtcm_lookup",
+    "dsos": 48,
+    "unused": 21,
+    "exported": 10,
+    "relocations": 11166,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtcm/server/.libs/rpc.cmsd",
+    "dsos": 48,
+    "unused": 21,
+    "exported": 12,
+    "relocations": 11223,
+    "relocations_from_cache": 10691
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/doc_utils/.libs/dtdocbook2infolib",
+    "dsos": 47,
+    "unused": 21,
+    "exported": 2,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/doc_utils/.libs/validator",
+    "dsos": 8,
+    "unused": 3,
+    "exported": 6,
+    "relocations": 5220,
+    "relocations_from_cache": 3431
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/MixedGen",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 32,
+    "relocations": 13382,
+    "relocations_from_cache": 12270
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/NCFGen",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 40,
+    "relocations": 13386,
+    "relocations_from_cache": 12269
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/NodeParser",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 28,
+    "relocations": 13375,
+    "relocations_from_cache": 12295
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/StyleUpdate",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 33,
+    "relocations": 13379,
+    "relocations_from_cache": 12281
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/dbdrv",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 6,
+    "relocations": 13367,
+    "relocations_from_cache": 12263
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/restore",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 9,
+    "relocations": 13372,
+    "relocations_from_cache": 12263
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/valBase",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 12,
+    "relocations": 13372,
+    "relocations_from_cache": 12263
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/infolib/.libs/validator",
+    "dsos": 49,
+    "unused": 23,
+    "exported": 6,
+    "relocations": 13369,
+    "relocations_from_cache": 12263
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtdocbook/instant/.libs/instant",
+    "dsos": 48,
+    "unused": 22,
+    "exported": 5,
+    "relocations": 12113,
+    "relocations_from_cache": 11273
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtfile/dtcopy/.libs/dtfile_copy",
+    "dsos": 47,
+    "unused": 17,
+    "exported": 11,
+    "relocations": 11042,
+    "relocations_from_cache": 10624
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dthelp/dthelpgen/.libs/dthelpgen",
+    "dsos": 47,
+    "unused": 19,
+    "exported": 1,
+    "relocations": 11031,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dthelp/dthelpprint/.libs/dthelpprint",
+    "dsos": 47,
+    "unused": 19,
+    "exported": 2,
+    "relocations": 11032,
+    "relocations_from_cache": 10567
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dthelp/dthelpview/.libs/dthelpview",
+    "dsos": 47,
+    "unused": 17,
+    "exported": 5,
+    "relocations": 11036,
+    "relocations_from_cache": 10576
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtmail/dtmail/.libs/dtmail",
+    "dsos": 47,
+    "unused": 14,
+    "exported": 35,
+    "relocations": 11074,
+    "relocations_from_cache": 10970
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtmail/dtmailpr/.libs/dtmailpr",
+    "dsos": 47,
+    "unused": 20,
+    "exported": 4,
+    "relocations": 11039,
+    "relocations_from_cache": 10708
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsearchpath/dtappg/.libs/dtappgather",
+    "dsos": 47,
+    "unused": 22,
+    "exported": 1,
+    "relocations": 11035,
+    "relocations_from_cache": 10583
+   },
+   {
+    "bench": "loader",
+    "name": "programs/dtsearchpath/dtsp/.libs/dtsearchpath",
+    "dsos": 47,
+    "unused": 21,
+    "exported": 2,
+    "relocations": 11035,
+    "relocations_from_cache": 10590
+   },
+   {
+    "bench": "loader",
+    "name": "programs/util/dttypes/.libs/dttypes",
+    "dsos": 47,
+    "unused": 20,
+    "exported": 3,
+    "relocations": 11033,
+    "relocations_from_cache": 10567
+   }
+  ]
+ }
+}

@@ -61,7 +61,7 @@ cdebench-proxy: proxy.c
 	$(CC) $(CFLAGS) $(WARN) -o $@ proxy.c
 
 run: all
-	./bench.py run -o baseline.json
+	mkdir -p results && ./bench.py run -o results/run.json
 
 clean:
 	rm -f $(PROGS) *.o
