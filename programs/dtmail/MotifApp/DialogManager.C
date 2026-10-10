@@ -70,6 +70,7 @@
 #include <assert.h>
 
 #include <Dt/MsgCatP.h>
+#include "XmCompat.h"
 extern nl_catd catd;
 
 DialogManager::DialogManager ( char   *name ): UIComponent ( name )
@@ -209,8 +210,7 @@ Widget DialogManager::post (char	  *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmMessageBoxGetChild ( dialog,
-					  XmDIALOG_OK_BUTTON );
+	Widget w = XmCompatOkButton(dialog);
         XtUnmanageChild ( w );
       }
 
@@ -222,8 +222,7 @@ Widget DialogManager::post (char	  *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmMessageBoxGetChild ( dialog,
-					  XmDIALOG_CANCEL_BUTTON );
+	Widget w = XmCompatCancelButton(dialog);
         XtUnmanageChild ( w );
       }
     
@@ -235,8 +234,7 @@ Widget DialogManager::post (char	  *title,
 		       (XtPointer) dcb );
     else
     {
-	Widget w = XmMessageBoxGetChild ( dialog,
-					 XmDIALOG_HELP_BUTTON );
+	Widget w = XmCompatHelpButton(dialog);
         XtUnmanageChild ( w );
     }
     
@@ -295,8 +293,7 @@ Widget DialogManager::post (char	  *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmMessageBoxGetChild ( dialog,
-					  XmDIALOG_OK_BUTTON );
+	Widget w = XmCompatOkButton(dialog);
         XtUnmanageChild ( w );
       }
 
@@ -308,8 +305,7 @@ Widget DialogManager::post (char	  *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmMessageBoxGetChild ( dialog,
-					  XmDIALOG_CANCEL_BUTTON );
+	Widget w = XmCompatCancelButton(dialog);
         XtUnmanageChild ( w );
       }
     
@@ -321,8 +317,7 @@ Widget DialogManager::post (char	  *title,
 		       (XtPointer) dcb );
     else
     {
-	Widget w = XmMessageBoxGetChild ( dialog,
-					 XmDIALOG_HELP_BUTTON );
+	Widget w = XmCompatHelpButton(dialog);
         XtUnmanageChild ( w );
     }
     

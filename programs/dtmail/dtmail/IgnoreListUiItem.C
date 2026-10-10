@@ -48,6 +48,7 @@
 #include <DtMail/PropUi.hh>
 #include <DtMail/ListUiItem.hh>
 #include <DtMail/IgnoreListUiItem.hh>
+#include "XmCompat.h"
 
 void handleIgnoreSelection(Widget w, XtPointer clientdata, XtPointer calldata);
 extern Boolean props_changed;
@@ -217,7 +218,7 @@ void IgnoreListUiItem::handleAddButtonPress()
 	new_pair->label = strdup(test_str);
 	new_pair->value = NULL;
       
-	if(XmListGetSelectedPos(this->getWidget(),
+	if(XmCompatListGetSelectedPos(this->getWidget(),
 				&pos_list,
 				&num_pos))
 	  {
@@ -265,7 +266,7 @@ void IgnoreListUiItem::handleChangeButtonPress()
   int *pos_list, num_pos;
 
   // if nothing selected nothing to change...
-  if(XmListGetSelectedPos(this->getWidget(),
+  if(XmCompatListGetSelectedPos(this->getWidget(),
 			  &pos_list,
 			  &num_pos))
     {
@@ -311,7 +312,7 @@ void IgnoreListUiItem::handleDeleteButtonPress()
   int *p_list, p_count;
 
   // get the selected position
-  if(XmListGetSelectedPos(list_widget,
+  if(XmCompatListGetSelectedPos(list_widget,
 			  &p_list,
 			  &p_count))
     {

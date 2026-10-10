@@ -48,6 +48,7 @@
 #include <DtMail/PropUi.hh>
 #include <DtMail/ListUiItem.hh>
 #include <DtMail/AliasListUiItem.hh>
+#include "XmCompat.h"
 
 extern Boolean props_changed;
 void alias_stuffing_func(char * key, void * data, void * client_data);
@@ -267,7 +268,7 @@ void AliasListUiItem::handleAddButtonPress()
 	else
 	  new_pair->value = NULL;
 	
-	if(XmListGetSelectedPos(this->getWidget(),
+	if(XmCompatListGetSelectedPos(this->getWidget(),
 				&pos_list,
 				&num_pos))
 	  {
@@ -322,7 +323,7 @@ void AliasListUiItem::handleChangeButtonPress()
   int *pos_list, num_pos;
 
   // if nothing selected nothing to change...
-  if(XmListGetSelectedPos(this->getWidget(),
+  if(XmCompatListGetSelectedPos(this->getWidget(),
 			  &pos_list,
 			  &num_pos))
     {
@@ -382,7 +383,7 @@ void AliasListUiItem::handleDeleteButtonPress()
   int *p_list, p_count;
 
   // get the selected position
-  if(XmListGetSelectedPos(list_widget,
+  if(XmCompatListGetSelectedPos(list_widget,
 			  &p_list,
 			  &p_count))
     {

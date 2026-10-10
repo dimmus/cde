@@ -142,6 +142,7 @@ extern XtPointer _XmStringUngenerate (
 
 
 #include <sys/file.h>
+#include "XmCompat.h"
 
 
 extern void forceUpdate( Widget );
@@ -2546,7 +2547,7 @@ SaveAsTextCmd::doit()
 	(list = _roam_menu_window->list()) &&
 	(listW = list->get_scrolling_list()))
     {
-        if (!XmListGetSelectedPos(listW, &pos_list, &pos_count))
+        if (!XmCompatListGetSelectedPos(listW, &pos_list, &pos_count))
           return;
 
         if (0 == pos_count)
@@ -2701,7 +2702,7 @@ RenameAttachCmd::RenameAttachCmd (
 		  NULL);
 
     XmStringFree(ok_str);
-    XtUnmanageChild(XmSelectionBoxGetChild(renameDialog, XmDIALOG_HELP_BUTTON));
+    XtUnmanageChild(XmCompatHelpButton(renameDialog));
 
     _parent->get_editor()->attachArea()->setRenameDialog(renameDialog);
     XtAddCallback(renameDialog, XmNcancelCallback, 

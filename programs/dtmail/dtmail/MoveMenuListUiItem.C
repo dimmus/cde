@@ -47,6 +47,7 @@
 #include <DtMail/PropUi.hh>
 #include <DtMail/ListUiItem.hh>
 #include <DtMail/MoveMenuListUiItem.hh>
+#include "XmCompat.h"
 
 extern void handleIgnoreSelection(Widget, XtPointer, XtPointer );
 extern Boolean props_changed;
@@ -253,7 +254,7 @@ void MoveMenuListUiItem::handleAddButtonPress()
 	new_pair->label = strdup(test_str);
 	new_pair->value = NULL;
       
-	if(XmListGetSelectedPos(this->getWidget(),
+	if(XmCompatListGetSelectedPos(this->getWidget(),
 				&pos_list,
 				&num_pos))
 	  {
@@ -301,7 +302,7 @@ void MoveMenuListUiItem::handleChangeButtonPress()
   int *pos_list, num_pos;
 
   // if nothing selected nothing to change...
-  if(XmListGetSelectedPos(this->getWidget(),
+  if(XmCompatListGetSelectedPos(this->getWidget(),
 			  &pos_list,
 			  &num_pos))
     {
@@ -341,7 +342,7 @@ void MoveMenuListUiItem::handleDeleteButtonPress()
   int *p_list, p_count;
 
   // get the selected position
-  if(XmListGetSelectedPos(list_widget,
+  if(XmCompatListGetSelectedPos(list_widget,
 			  &p_list,
 			  &p_count))
     {

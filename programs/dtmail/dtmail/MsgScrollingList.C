@@ -67,6 +67,7 @@
 
 
 #include <X11/IntrinsicP.h> // Include for moving X location of titles
+#include "XmCompat.h"
 
 extern int force( Widget );
 
@@ -737,7 +738,7 @@ MsgScrollingList::deleteSelected(Boolean silent)
     mail_error.clear();
 
     XtVaGetValues( _w, XmNitemCount, &num_msgs, NULL );
-    any_selected = XmListGetSelectedPos(_w, &position_list, &position_count);
+    any_selected = XmCompatListGetSelectedPos(_w, &position_list, &position_count);
     if (!any_selected) return;
 
 
@@ -949,7 +950,7 @@ MsgScrollingList::copySelected(
     RoamMenuWindow	*rmw;
 
 
-    any_selected = XmListGetSelectedPos(_w,
+    any_selected = XmCompatListGetSelectedPos(_w,
 					&position_list,
 					&position_count);
     // If there aren't any selected messages, then there isn't
@@ -1135,7 +1136,7 @@ MsgScrollingList::selected()
     // We need the number selected so that we can allocate 
     // space for that many mesasgeStructs to be returned.
 
-    any_selected = XmListGetSelectedPos(_w,
+    any_selected = XmCompatListGetSelectedPos(_w,
  					&position_list, 
  					&position_count);
 

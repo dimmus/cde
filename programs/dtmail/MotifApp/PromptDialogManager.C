@@ -68,6 +68,7 @@
 #include <Xm/Xm.h>
 #include <Xm/SelectioB.h>
 #include <assert.h>
+#include "XmCompat.h"
 // Define an instance to be available throughout the framework.
 
 PromptDialogManager *thePromptDialogManager = 
@@ -140,8 +141,7 @@ PromptDialogManager::post( char *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmSelectionBoxGetChild ( dialog,
-					  XmDIALOG_OK_BUTTON );
+	Widget w = XmCompatOkButton(dialog);
         XtUnmanageChild ( w );
       }
 
@@ -153,8 +153,7 @@ PromptDialogManager::post( char *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmSelectionBoxGetChild ( dialog,
-					  XmDIALOG_CANCEL_BUTTON );
+	Widget w = XmCompatCancelButton(dialog);
         XtUnmanageChild ( w );
       }
     
@@ -166,8 +165,7 @@ PromptDialogManager::post( char *title,
 		       (XtPointer) dcb );
     else
     {
-	Widget w = XmSelectionBoxGetChild ( dialog,
-					 XmDIALOG_HELP_BUTTON );
+	Widget w = XmCompatHelpButton(dialog);
         XtUnmanageChild ( w );
     }
     
@@ -229,8 +227,7 @@ PromptDialogManager::post( char *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmSelectionBoxGetChild ( dialog,
-					  XmDIALOG_OK_BUTTON );
+	Widget w = XmCompatOkButton(dialog);
         XtUnmanageChild ( w );
       }
 
@@ -242,8 +239,7 @@ PromptDialogManager::post( char *title,
 		      (XtPointer) dcb );
     else
       {
-	Widget w = XmSelectionBoxGetChild ( dialog,
-					  XmDIALOG_CANCEL_BUTTON );
+	Widget w = XmCompatCancelButton(dialog);
         XtUnmanageChild ( w );
       }
     
@@ -255,8 +251,7 @@ PromptDialogManager::post( char *title,
 		       (XtPointer) dcb );
     else
     {
-	Widget w = XmSelectionBoxGetChild ( dialog,
-					 XmDIALOG_HELP_BUTTON );
+	Widget w = XmCompatHelpButton(dialog);
         XtUnmanageChild ( w );
     }
     

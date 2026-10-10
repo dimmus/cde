@@ -48,6 +48,7 @@
 #include <DtMail/PropUi.hh>
 #include <DtMail/ListUiItem.hh>
 #include <DtMail/CustomListUiItem.hh>
+#include "XmCompat.h"
 
 extern void handleCustSelection(Widget, XtPointer, XtPointer );
 extern Boolean props_changed;
@@ -281,7 +282,7 @@ void CustomListUiItem::handleAddButtonPress()
 	else
 	  new_pair->value = NULL;
 	
-	if(XmListGetSelectedPos(this->getWidget(),
+	if(XmCompatListGetSelectedPos(this->getWidget(),
 				&pos_list,
 				&num_pos))
 	  {
@@ -336,7 +337,7 @@ void CustomListUiItem::handleChangeButtonPress()
   int *pos_list, num_pos;
 
   // if nothing selected nothing to change...
-  if(XmListGetSelectedPos(this->getWidget(),
+  if(XmCompatListGetSelectedPos(this->getWidget(),
 			  &pos_list,
 			  &num_pos))
     {
@@ -389,7 +390,7 @@ void CustomListUiItem::handleDeleteButtonPress()
   int *p_list, p_count;
 
   // get the selected position
-  if(XmListGetSelectedPos(list_widget,
+  if(XmCompatListGetSelectedPos(list_widget,
 			  &p_list,
 			  &p_count))
     {

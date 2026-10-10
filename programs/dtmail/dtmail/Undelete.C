@@ -60,6 +60,7 @@
 #include "MemUtils.hh"
 #include "MailMsg.h"
 #include "DtMailGenDialog.hh"
+#include "XmCompat.h"
 
 
 UndelMsgScrollingList::UndelMsgScrollingList (RoamMenuWindow *rmw, Widget w,
@@ -94,7 +95,7 @@ UndelMsgScrollingList::deleteSelected(Boolean)
                    XmNitemCount, &num_msgs,
                    NULL );
  
-    any_selected = XmListGetSelectedPos(_w,
+    any_selected = XmCompatListGetSelectedPos(_w,
                                         &position_list,
                                         &position_count);
  
@@ -472,7 +473,7 @@ UndelFromListDialog::undelSelected()
     int position_count;
     Boolean any_selected = FALSE;
 
-    any_selected = XmListGetSelectedPos(_list->get_scrolling_list(),
+    any_selected = XmCompatListGetSelectedPos(_list->get_scrolling_list(),
 					&position_list,
 					&position_count);
 

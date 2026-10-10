@@ -45,6 +45,7 @@
 #include <Xm/TextF.h>
 #include <Xm/Label.h>
 #include <Xm/RowColumn.h>
+#include "XmCompat.h"
 
 PasswordDialogManager *thePasswordDialogManager = 
     new PasswordDialogManager ( "PasswordDialog" );
@@ -68,11 +69,9 @@ Widget PasswordDialogManager::createDialog ( Widget parent )
 		  XmNdialogStyle, XmDIALOG_FULL_APPLICATION_MODAL,
 		  NULL );
 
-  XtUnmanageChild( XmSelectionBoxGetChild( dialog,
-				      XmDIALOG_TEXT ) );
+  XtUnmanageChild( XmCompatSelectionText(dialog) );
 
-  XtUnmanageChild( XmSelectionBoxGetChild( dialog,
-				      XmDIALOG_SELECTION_LABEL ) );
+  XtUnmanageChild( XmCompatSelectionLabel(dialog) );
 
   Widget rc = XtCreateManagedWidget ( "PasswordArea",
 				      xmRowColumnWidgetClass,

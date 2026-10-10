@@ -117,6 +117,7 @@
 #include "EUSDebug.hh"
 
 #include "SortCmd.hh"
+#include "XmCompat.h"
 
 extern int force( Widget );
 
@@ -1117,7 +1118,7 @@ RoamMenuWindow::msgListConvertCallback(
 	    listW = msgList->get_scrolling_list();
 	    mbox = rmw->mailbox();
 
-	    if (!XmListGetSelectedPos(listW, &pos_list, &pos_count)) {
+	    if (!XmCompatListGetSelectedPos(listW, &pos_list, &pos_count)) {
 		convertInfo->status = DtDND_FAILURE;
 		return;
 	    }

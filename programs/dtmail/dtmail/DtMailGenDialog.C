@@ -61,6 +61,7 @@
 #include "DtMailHelp.hh"
 #include "Help.hh"
 #include "MailMsg.h"
+#include "XmCompat.h"
 
 static const char	*ABOUT_TITLE = NULL;
 static char		*DTMAIL_VERSION = NULL;
@@ -114,9 +115,9 @@ DtMailGenDialog::post(void *clientData,
     assert (dialog != NULL);
 
     // Make sure the dialog buttons are managed
-    Widget ok_button = XmMessageBoxGetChild(dialog, XmDIALOG_OK_BUTTON);
-    Widget cancel_button = XmMessageBoxGetChild(dialog, XmDIALOG_CANCEL_BUTTON);
-    Widget help_button = XmMessageBoxGetChild(dialog, XmDIALOG_HELP_BUTTON);
+    Widget ok_button = XmCompatOkButton(dialog);
+    Widget cancel_button = XmCompatCancelButton(dialog);
+    Widget help_button = XmCompatHelpButton(dialog);
 	
     // Create an object to carry the additional data needed
     // to cache the dialogs.
@@ -625,13 +626,12 @@ DtMailGenDialog::post_and_return(
     assert ( _w != NULL );
 
     Widget dialog = NULL;
-    Widget cancel_w = XmMessageBoxGetChild ( _w, XmDIALOG_CANCEL_BUTTON );
+    Widget cancel_w = XmCompatCancelButton(_w);
 
     if (_otherWidget == NULL) {
 	_otherWidget = XtVaCreateWidget(otherLabelString,
 				xmPushButtonGadgetClass, _w,
-				XmNleftAttachment, XmMessageBoxGetChild ( _w,
-					  XmDIALOG_OK_BUTTON ),
+				XmNleftAttachment, XmCompatOkButton(_w),
 				XmNrightAttachment, cancel_w,
 				NULL);
 	XtManageChild (_otherWidget);
