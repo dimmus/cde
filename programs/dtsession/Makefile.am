@@ -12,13 +12,13 @@ endif
 
 dtsession_CFLAGS = -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
           -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
-	  -Ddtsession
+	  -DXRDB_PROGRAM=\"$(XRDB)\" -Ddtsession
 
 dtsession_SOURCES = SmMain.c SmHelp.c SmGlobals.c SmCommun.c		\
 	SmError.c SmProperty.c SmProtocol.c SmSave.c SmScreen.c		\
 	SmRestore.c SmUI.c SmWindow.c SmLock.c SrvPalette.c		\
 	SrvFile_io.c SmStrDefs.c SmConMgmt.c SmXSMP.c SmAuth.c		\
-	SmWatch.c SmProp.c SmDB.c OWsync.h SmGlobals.h SmProperty.h	\
+	SmWatch.c SmProp.c SmDB.c SmResCache.c OWsync.h SmGlobals.h SmProperty.h	\
 	SmScreen.h SmXSMP.h SmAuth.h Sm.h SmProp.h SmUI.h		\
 	SrvFile_io.h SmCommun.h SmHelp.h SmProtocol.h SmWatch.h Srv.h	\
 	SmConMgmt.h SmHftRing.h SmResource.h SmWindow.h SrvPalette.h	\

@@ -259,6 +259,12 @@ that it should not be surrounded by quotes.  Also, if any
 other window manager other than \fIdtwm\fP is used, clients will be restored,
 but may not be restored to the correct position.  By default, this resource
 contains a NULL value.
+.sp 1
+\fIdtwm\fP tells \fIdtsession\fP when it is ready.  Another window manager is
+taken to be ready when it owns the ICCCM \fBWM_S\fP\fIn\fP selection of the
+screen; one that does not is waited for at most 10 seconds, unless
+\fBwaitWmTimeout\fP is set.  When \fIdtsession\fP stops waiting it sets the
+\fB_DT_SM_WM_READY\fP property on the root window.
 .IP "\fBwriteXrdbColors\fP"
 This resource should only be used if you are running non HP Motif 1.1 clients
 that have color schemes that conflict with HP DT colors.  This has no
@@ -269,6 +275,22 @@ be written out with the values of the current palette.  This means that
 non HP Motif 1.1 clients will not get HP DT colors when they are started.
 The default value is True.
 .sp 1
+.SH FILES
+.TP 8
+.B $HOME/.dt/cache/dtsession_res-\fIhost\fP-\fIdisplay\fP
+At startup \fIdtsession\fP loads the session resources with
+\fIdtsession_res\fP, which runs them through \fIxrdb\fP and the C
+preprocessor.  The resulting \fBRESOURCE_MANAGER\fP and
+\fBSCREEN_RESOURCES\fP properties are kept in this file, together with the
+contents of the resource files and a description of the X server.  When
+none of that has changed at the next login, the properties are set from the
+file and \fIdtsession_res\fP is not run.  Nothing is kept when a resource
+file uses \fB#include\fP.  The file can be removed at any time.
+.SH ENVIRONMENT
+.TP 8
+.B DT_NO_RESOURCE_CACHE
+When set, \fIdtsession\fP always runs \fIdtsession_res\fP and neither
+reads nor writes the resource cache.
 .SH COPYRIGHT
 Copyright 1990, 1991, 1992 Hewlett-Packard Company.
 .br
