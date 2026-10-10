@@ -1,16 +1,6 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-TT_VERSION = "CDE Version @CDE_VERSION_MAJOR@.@CDE_VERSION_MINOR@.@CDE_VERSION_MICRO@@CDE_VERSION_DEV@"
-TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
-
-noinst_SCRIPTS = ttce2xdr
-BUILT_SOURCES = ttce2xdr
-CLEANFILES = ttce2xdr
-
-AM_CPPFLAGS = $(TT_VERSION_DEFINE)
-
-
-ttce2xdr: ttce2xdr.cpp
-	$(RM) $@
-	$(GENCPP) -P -DXCOMM=# $(AM_CPPFLAGS) $< > $@
-
+# ttce2xdr, the Classing Engine to XDR types converter, was only run by
+# ttsession under OPT_CLASSING_ENGINE, which is never defined, and was
+# never installed; it has been removed.  This directory stays only
+# because configure.ac still lists its Makefile.

@@ -45,9 +45,6 @@
 
 #include <string.h>
 #include "tt_options.h"
-#ifdef OPT_CLASSING_ENGINE
-#include "../slib/ce_err.h"
-#endif
 #include "util/tt_enumname.h"
      
 /* following macros save a lot of typing */
@@ -303,35 +300,3 @@ _tt_enumname(Tt_callback_action x) {
         }
 }
 
-#ifdef OPT_CLASSING_ENGINE
-
-const char *
-_tt_enumname(_Tt_ce_status ce_err)
-{
-	switch (ce_err) {
-	      TTC(CE_ERR_INTERNAL_ERROR);
-	      TTC(CE_ERR_ERROR_READING_DB);
-	      TTC(CE_ERR_WRITE_IN_PROGRESS);
-	      TTC(CE_ERR_DB_NOT_LOADED);
-	      TTC(CE_ERR_WRITE_NOT_STARTED);
-	      TTC(CE_ERR_NAMESPACE_EXISTS);
-	      TTC(CE_ERR_NAMESPACE_NOT_EMPTY);
-	      TTC(CE_ERR_NAMESPACE_DOES_NOT_EXIST);
-	      TTC(CE_ERR_NS_ENTRY_EXISTS);
-	      TTC(CE_ERR_ENTRY_NOT_ALLOCED);
-	      TTC(CE_ERR_ATTRIBUTE_EXISTS);
-	      TTC(CE_ERR_NO_MEMORY);
-	      TTC(CE_ERR_NO_PERMISSION_TO_WRITE);
-	      TTC(CE_ERR_WRONG_ARGUMENTS);
-	      TTC(CE_ERR_ERROR_WRITING_DB);
-	      TTC(CE_ERR_OPENING_DB);
-	      TTC(CE_ERR_DB_LOCKED);
-	      TTC(CE_ERR_ERROR_OPENING_FILE);
-	      TTC(CE_ERR_WRONG_DATABASE_VERSION);
-	      TTC(CE_ERR_UNKNOWN_DATABASE_NAME);
-	      TTC(CE_ERR_BAD_DATABASE_FILE);
-	      default:
-	      return "! _Tt_ce_status";
-	}
-}
-#endif

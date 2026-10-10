@@ -305,12 +305,6 @@ int main(int argc, char **argv)
 			cmd = (char *)0;
 			print_sessid = 1;
 			break;
-#ifdef OPT_CLASSING_ENGINE
-		      case 'E':
-			// turn on use of Classing Engine
-			option_classing_engine = 1;
-			break;
-#endif			
 		      case 'X':
 			option_classing_engine = 0;
 			break;
@@ -833,9 +827,6 @@ init_types()
 {
 	Tt_status		err;
 
-#ifdef OPT_CLASSING_ENGINE
-	_Tt_typedb::ce2xdr();
-#endif
 	_tt_s_mp->tdb = new _Tt_typedb();
 	if (option_classing_engine) {
 		err = _tt_s_mp->tdb->init_ce();
@@ -879,11 +870,7 @@ print_usage_and_exit()
 	_tt_syslog( errstr, LOG_ERR, "%s%s%s%s%s",
 		    catgets( _ttcatd, 3, 16,
 "\nUsage: ttsession [-a cookie|unix|des][-d display][-spStvhNX" ),
-#if defined(OPT_CLASSING_ENGINE)
-		    "E",
-#else
 		    "",
-#endif
 		    catgets( _ttcatd, 3, 17,
 "][-c command]\n"
 " -c [command]	start a process tree session, and run command in it.\n"
@@ -897,12 +884,7 @@ print_usage_and_exit()
 " -N		maximize the number of clients allowed\n"
 " -t		turn on message tracing\n"
 " -X		use XDR databases for static types (default)\n" ),
-#if defined(OPT_CLASSING_ENGINE)
-		    catgets( _ttcatd, 3, 18,
-" -E		use Classing Engine for static types\n" ),
-#else
 		    "",
-#endif
 		    catgets( _ttcatd, 3, 19,
 "\n"
 " -v		print out version number\n"

@@ -1945,12 +1945,15 @@ cached_isopen(const char *filepath, int mode)
 	_Tt_string fp(filepath);
 	_Tt_db_info *p;
 
+	// Only called when a table is opened (the partition databases
+	// stay open), so a scan of the 128 slots is fine; test the cheap
+	// fields before the path (_Tt_string == compares lengths first).
 	for (i=0; i<_TT_MAX_ISFD; i++) {
 
 		p = _tt_db_table+i;
 		if (!p->client_has_open &&
-		    p->db_path == fp &&
-		    p->open_mode == mode) {
+		    p->open_mode == mode &&
+		    p->db_path == fp) {
 			p->client_has_open = 1;
 			p->reftime = _tt_refclock++;
 			return i;
