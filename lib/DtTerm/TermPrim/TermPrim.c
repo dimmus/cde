@@ -1519,6 +1519,11 @@ InitOrResizeTermBuffer(Widget w)
 
     /* resize/create the term buffer... */
     if (tpd->termBuffer) {
+	/* paint any queued scroll and deferred text while they still
+	 * match the window...
+	 */
+	(void) _DtTermPrimPaintFrame(w);
+
 	/* restore the buffer-to-window ratio of our off-window buffer
 	 * is less than 75% of the original off-window buffer...
 	 */
@@ -1929,6 +1934,14 @@ handleNonMaskableEvents(Widget w, XtPointer eventData, XEvent *event,
     case NoExpose:
 	/* clear the scroll flag... */
 	tpd->scrollInProgress = False;
+
+	if (tw->term.jumpScroll) {
+	    /* this was a jump scroll's copy area.  Nothing waits for it to
+	     * complete (_DtTermPrimScrollWait() waits itself if it needs to
+	     * do another one first)...
+	     */
+	    break;
+	}
 
 	if (tpd->scroll.nojump.pendingScroll) {
 	    (void) _DtTermPrimScrollComplete(w, False);
@@ -2744,6 +2757,13 @@ Destroy(Widget w)
 	    tw->term.tpd->scrollRefreshRows = (Boolean *) 0;
 	}
 
+	/* and the deferred rendering state... */
+	(void) _DtTermPrimRenderFreeDirty(w);
+	if (tw->term.tpd->frameTimerId) {
+	    (void) XtRemoveTimeOut(tw->term.tpd->frameTimerId);
+	    tw->term.tpd->frameTimerId = (XtIntervalId) 0;
+	}
+
         /* free up the selection information */
 	if (tw->term.tpd->selectInfo) {
 	    (void) _DtTermPrimSelectDestroy(w, tw->term.tpd->selectInfo);
@@ -2980,6 +3000,74 @@ elapsedNs(struct timespec *start)
 	    (now.tv_nsec - start->tv_nsec));
 }
 
+/* the end of output frame we put off has come due (see endOfOutput())...
+ */
+/*ARGSUSED*/
+static void
+frameTimeout(XtPointer client_data, XtIntervalId *id)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) client_data;
+
+    tw->term.tpd->frameTimerId = (XtIntervalId) 0;
+    /* paint and turn the cursor back on... */
+    (void) _DtTermPrimCursorOn((Widget) tw);
+}
+
+/* the output has stopped for now.  Paint it and turn the cursor back on
+ * -- unless we painted less than a frame ago and there is something to
+ * paint: then do it when the frame is due, so that output that comes in
+ * bursts is painted once per frame and not once per burst...
+ */
+static void
+endOfOutput(DtTermPrimitiveWidget tw)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll &&
+	    (tpd->scroll.jump.scrolled || tpd->dirtyRows) &&
+	    !_DtTermPrimFrameDue((Widget) tw)) {
+	if (!tpd->frameTimerId) {
+	    tpd->frameTimerId =
+		    XtAppAddTimeOut(XtWidgetToApplicationContext((Widget) tw),
+		    _DtTermPrimFrameRemainingMs((Widget) tw), frameTimeout,
+		    (XtPointer) tw);
+	}
+	return;
+    }
+    /* turn the cursor back on (this paints everything)... */
+    (void) _DtTermPrimCursorOn((Widget) tw);
+}
+
+/* more output is on its way.  Paint what we have if a frame is due...
+ */
+static void
+paintIfFrameDue(DtTermPrimitiveWidget tw)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll &&
+	    (tpd->scroll.jump.scrolled || tpd->dirtyRows) &&
+	    _DtTermPrimFrameDue((Widget) tw)) {
+	(void) _DtTermPrimPaintFrame((Widget) tw);
+    }
+}
+
+/* leave readPty() early because input has been turned off (^S, a
+ * non-jump scroll waiting for its copy area to complete, ...)...
+ */
+static void
+inputTurnedOff(DtTermPrimitiveWidget tw)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll) {
+	/* show what we have so far... */
+	(void) _DtTermPrimPaintFrame((Widget) tw);
+    }
+    tpd->deferRender = False;
+    tpd->readInProgress = False;
+}
+
 /* readPty...
  *
  * Process output from the pty (or text looped back with
@@ -3008,6 +3096,15 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
     Debug('i', fprintf(stderr, ">>readPty() starting\n"));
     tpd->readInProgress = True;
     (void) _DtTermPrimCursorOff((Widget) tw);
+    /* we will decide again when to paint... */
+    if (tpd->frameTimerId) {
+	(void) XtRemoveTimeOut(tpd->frameTimerId);
+	tpd->frameTimerId = (XtIntervalId) 0;
+    }
+    /* in jump scroll, hold back the painting of text until the end of
+     * the frame (see _DtTermPrimRefreshText())...
+     */
+    tpd->deferRender = tw->term.jumpScroll;
     /* if we are using a history buffer and have scrolled into it, we
      * need to snap back down before we do anything...
      */
@@ -3034,7 +3131,7 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
 	    /* we need to wait until we get a graphicsexpose (count==0)
 	     * or a noexpose...
 	     */
-	    tpd->readInProgress = False;
+	    (void) inputTurnedOff(tw);
 	    Debug('i', fprintf(stderr, ">>readPty() finished\n"));
 	    return;
 	}
@@ -3101,7 +3198,7 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
 		/* we know we have more input, so we don't need to turn on
 		 * the cursor...
 		 */
-		tpd->readInProgress = False;
+		(void) inputTurnedOff(tw);
 		Debug('i', fprintf(stderr, ">>readPty() finished\n"));
 		return;
 	    }
@@ -3119,6 +3216,7 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
 	/* more input is waiting.  We will be called again as soon as
 	 * the main loop has handled any pending events...
 	 */
+	(void) paintIfFrameDue(tw);
     } else {
 	/* we won't be getting an input select so we need to check on
 	 * pending text and force a read if we still have some...
@@ -3126,11 +3224,14 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
 	if (TextIsPending(tpd->pendingRead)) {
 	    (void) XtAppAddTimeOut(XtWidgetToApplicationContext((Widget) tw),
 		    0, _DtTermPrimForcePtyRead, (XtPointer) tw);
+	    (void) paintIfFrameDue(tw);
 	} else {
-	    /* turn the cursor back on... */
-	    (void) _DtTermPrimCursorOn((Widget) tw);
+	    /* paint and turn the cursor back on... */
+	    tpd->deferRender = False;
+	    (void) endOfOutput(tw);
 	}
     }
+    tpd->deferRender = False;
     tpd->readInProgress = False;
     Debug('i', fprintf(stderr, ">>readPty() finished\n"));
 }

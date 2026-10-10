@@ -116,6 +116,9 @@ _DtTermPrimBell(Widget w)
     int i;
 
     if (tw->term.visualBell) {
+	/* flash what is really in the buffer... */
+	(void) _DtTermPrimRenderFlushDirty(w);
+
 	/* the speed of this operation is not critical, so we will just
 	 * use the standard text rendering GC and restore it after we
 	 * are done...
@@ -147,6 +150,134 @@ _DtTermPrimBell(Widget w)
     }
 }
 
+/*
+** Deferred rendering.
+**
+** While output is processed in jump scroll mode, readPty() sets
+** tpd->deferRender, and _DtTermPrimRefreshText() only records the area
+** it was asked to paint as a span of dirty columns in each row.  The
+** spans are painted by _DtTermPrimRenderFlushDirty() once per frame: when
+** the cursor is turned back on, before anything is moved with a copy
+** area, and when a frame is due while output keeps coming.  Text that is
+** overwritten several times within a frame (progress bars, spinners,
+** full screen applications redrawing a line piece by piece) is then
+** drawn once.
+**
+** The spans are in screen coordinates, so they are only valid as long
+** as nothing moves on the screen.  When a jump scroll is queued, they
+** are turned into scrollRefreshRows flags (which are scrolled along with
+** the queued scroll) by _DtTermPrimRenderDirtyToRefreshRows().  While a
+** jump scroll is queued, the scrollRefreshRows flags are used instead,
+** so there are never spans and a queued scroll at the same time.
+*/
+static void
+recordDirty(Widget w, short startColumn, short startRow, short endColumn,
+	short endRow)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    short row;
+
+    if (tpd->dirtyRowsAlloc < tw->term.rows) {
+	tpd->dirtyStartCol = (short *) XtRealloc((char *) tpd->dirtyStartCol,
+		tw->term.rows * sizeof(short));
+	tpd->dirtyEndCol = (short *) XtRealloc((char *) tpd->dirtyEndCol,
+		tw->term.rows * sizeof(short));
+	for (row = tpd->dirtyRowsAlloc; row < tw->term.rows; row++) {
+	    tpd->dirtyStartCol[row] = -1;
+	    tpd->dirtyEndCol[row] = -1;
+	}
+	tpd->dirtyRowsAlloc = tw->term.rows;
+    }
+
+    for (row = startRow; row <= endRow; row++) {
+	if (tpd->dirtyStartCol[row] < 0) {
+	    tpd->dirtyStartCol[row] = startColumn;
+	    tpd->dirtyEndCol[row] = endColumn;
+	} else {
+	    if (startColumn < tpd->dirtyStartCol[row])
+		tpd->dirtyStartCol[row] = startColumn;
+	    if (endColumn > tpd->dirtyEndCol[row])
+		tpd->dirtyEndCol[row] = endColumn;
+	}
+    }
+    tpd->dirtyRows = True;
+}
+
+/* paint (and forget) the dirty spans... */
+void
+_DtTermPrimRenderFlushDirty(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    Boolean saveDeferRender;
+    short startColumn;
+    short endColumn;
+    short row;
+
+    if (!tpd->dirtyRows) {
+	return;
+    }
+    tpd->dirtyRows = False;
+
+    saveDeferRender = tpd->deferRender;
+    tpd->deferRender = False;
+    for (row = 0; row < tpd->dirtyRowsAlloc; row++) {
+	if (tpd->dirtyStartCol[row] < 0) {
+	    continue;
+	}
+	startColumn = tpd->dirtyStartCol[row];
+	endColumn = tpd->dirtyEndCol[row];
+	tpd->dirtyStartCol[row] = -1;
+	if (row < tw->term.rows) {
+	    (void) _DtTermPrimRefreshText(w, startColumn, row, endColumn, row);
+	}
+    }
+    tpd->deferRender = saveDeferRender;
+    (void) _DtTermPrimNoteFramePainted(w);
+}
+
+/* a jump scroll is about to be queued: hand the dirty rows over to the
+ * scrollRefreshRows flags, which will be scrolled with it...
+ */
+void
+_DtTermPrimRenderDirtyToRefreshRows(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    short row;
+
+    if (!tpd->dirtyRows) {
+	return;
+    }
+    tpd->dirtyRows = False;
+
+    for (row = 0; row < tpd->dirtyRowsAlloc; row++) {
+	if (tpd->dirtyStartCol[row] >= 0) {
+	    tpd->dirtyStartCol[row] = -1;
+	    if (row < tw->term.rows) {
+		tpd->scrollRefreshRows[row] = True;
+	    }
+	}
+    }
+}
+
+/* forget the dirty spans (the whole window is going to be repainted, or
+ * the widget is being destroyed)...
+ */
+void
+_DtTermPrimRenderFreeDirty(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    (void) XtFree((char *) tpd->dirtyStartCol);
+    tpd->dirtyStartCol = (short *) 0;
+    (void) XtFree((char *) tpd->dirtyEndCol);
+    tpd->dirtyEndCol = (short *) 0;
+    tpd->dirtyRowsAlloc = 0;
+    tpd->dirtyRows = False;
+}
+
 void
 _DtTermPrimRefreshText(Widget w, short startColumn, short startRow,
 	short endColumn, short endRow)
@@ -172,6 +303,23 @@ _DtTermPrimRefreshText(Widget w, short startColumn, short startRow,
     DebugF('t', 0, fprintf(stderr,
 	    ">>_DtTermPrimRefreshText() startCol=%hd  startRow=%hd  endCol=%hd  endRow=%hd\n",
 	    startColumn, startRow, endColumn, endRow));
+
+    if (tpd->deferRender && tw->term.jumpScroll &&
+	    !tpd->scroll.jump.scrolled) {
+	/* just remember what needs to be painted (see recordDirty())... */
+	if (startColumn < 0)
+	    startColumn = 0;
+	if (startRow < 0)
+	    startRow = 0;
+	if (endColumn >= tw->term.columns)
+	    endColumn = tw->term.columns - 1;
+	if (endRow >= tw->term.rows)
+	    endRow = tw->term.rows - 1;
+	if ((startColumn <= endColumn) && (startRow <= endRow)) {
+	    (void) recordDirty(w, startColumn, startRow, endColumn, endRow);
+	}
+	return;
+    }
 
     if (tpd->mbCurMax > 1)
     {
@@ -648,6 +796,20 @@ _DtTermPrimExposeText(Widget w, int x, int y, int width, int height,
     DebugF('e', 0, fprintf(stderr,
 	    ">>             offsetX=%d  offsetY=%d  cellHeight=%d  cellWidth=%d\n",
 	    tpd->offsetX, tpd->offsetY, tpd->cellHeight, tpd->cellWidth));
+
+    /* The area is damaged where it is on the screen now.  If a jump
+     * scroll is queued, the text there will be copied somewhere else
+     * when the scroll is performed, and the scrollRefreshRows flags we
+     * would set below are for the rows after the scroll.  So instead,
+     * have the queued scroll repaint its whole region...
+     */
+    if (((DtTermPrimitiveWidget) w)->term.jumpScroll &&
+	    tpd->scroll.jump.scrolled && (tpd->scroll.jump.scrollLines != 0)) {
+	int regionRows = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
+
+	tpd->scroll.jump.scrollLines = (tpd->scroll.jump.scrollLines > 0) ?
+		regionRows : -regionRows;
+    }
 
     /* The following "hack" takes care of the problem of an exposure event
      * from the server and a copy area from the client crossing.  The

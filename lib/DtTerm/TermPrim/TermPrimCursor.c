@@ -235,6 +235,17 @@ _DtTermPrimCursorOn(Widget w)
     }
     _DtTermProcessUnlock();
 
+    /* paint any text we have been holding back (before we draw the
+     * cursor over it)...
+     */
+    (void) _DtTermPrimRenderFlushDirty(w);
+
+    /* the frame we may have been waiting to paint is painted now... */
+    if (tpd->frameTimerId) {
+	(void) XtRemoveTimeOut(tpd->frameTimerId);
+	tpd->frameTimerId = (XtIntervalId) 0;
+    }
+
 #ifdef	DISOWN_SELECTION_ON_CURSOR_ON_OR_OFF 
     if ( _DtTermPrimSelectIsAboveSelection(w,tpd->cursorRow,
 	    tpd->cursorColumn)) {
