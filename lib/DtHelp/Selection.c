@@ -478,7 +478,8 @@ AddSegmentToData(
 
                 pChar = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg),
 					_DtCvIsSegWideChar(pSeg), start);
-                len   = _DtCvStrLen (pChar, _DtCvIsSegWideChar(pSeg));
+                len   = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(pSeg),
+								copy_cnt);
 
                 if (len > copy_cnt)
                     len = copy_cnt;

@@ -47,6 +47,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <X11/Intrinsic.h>	/* XtProcessLock() */
 
 /*
  * Canvas Engine includes
@@ -63,6 +64,7 @@
 #include "LayoutUtilI.h"
 #include "SelectionI.h"
 #include "VirtFuncsI.h"
+#include "Lock.h"
 
 #ifdef NLS16
 #endif
@@ -151,6 +153,248 @@ static	_DtCanvasStruct	DefaultCanvas =
 /*****************************************************************************
  *		Private Functions
  *****************************************************************************/
+/*****************************************************************************
+ * The y index of a canvas's text lines.
+ *
+ * Exposing or scrolling a window renders only the lines in a band of y,
+ * but the line table is in layout order (cells of a table, text next
+ * to a graphic, ...) so finding them meant testing every line of the
+ * topic.  The index holds the lines sorted by top y, with the running
+ * maximum of their bottom y, so the lines in a band are found with two
+ * binary searches.
+ *
+ * It is kept beside the canvas (whose structure is shared with other
+ * code), built on the first render after a layout and dropped by every
+ * layout, _DtCanvasClean and _DtCanvasDestroy (_DtCvDropYIndex).  The
+ * table pointer and count are checked as well.
+ *****************************************************************************/
+typedef struct _dtCvYIndex {
+	struct _dtCvYIndex	*next;
+	_DtCanvasStruct		*canvas;
+	_DtCvDspLine		*lst;		/* the txt_lst it indexes  */
+	long			 cnt;		/* and its txt_cnt         */
+	int			*order;		/* line indices by top y   */
+	_DtCvUnit		*top;		/* top y, in that order    */
+	_DtCvUnit		*bot;		/* bottom y, in that order */
+	_DtCvUnit		*max_bot;	/* max of bot[0..k]        */
+} _DtCvYIndex;
+
+typedef struct {
+	_DtCvUnit	top;
+	int		idx;
+} _DtCvYKey;
+
+/*
+ * the index is only used for tables at least this long.
+ */
+#define	YINDEX_MIN_LINES	128
+
+static _DtCvYIndex	*YIndexList = NULL;
+
+static int
+CompareYKeys (const void *a, const void *b)
+{
+    const _DtCvYKey *ka = (const _DtCvYKey *) a;
+    const _DtCvYKey *kb = (const _DtCvYKey *) b;
+
+    if (ka->top != kb->top)
+	return (ka->top < kb->top ? -1 : 1);
+    return (ka->idx - kb->idx);
+}
+
+static int
+CompareInts (const void *a, const void *b)
+{
+    return (*((const int *) a) - *((const int *) b));
+}
+
+static void
+FreeYIndex (_DtCvYIndex *yi)
+{
+    free(yi->order);
+    free(yi->top);
+    free(yi->bot);
+    free(yi->max_bot);
+    free(yi);
+}
+
+/*
+ * call with the process lock held.
+ */
+static _DtCvYIndex *
+BuildYIndex (_DtCanvasStruct *canvas)
+{
+    long	 i;
+    long	 n = canvas->txt_cnt;
+    _DtCvYKey	*keys;
+    _DtCvYIndex	*yi = (_DtCvYIndex *) calloc(1, sizeof(_DtCvYIndex));
+
+    if (NULL == yi)
+	return NULL;
+
+    keys        = (_DtCvYKey *) malloc(sizeof(_DtCvYKey) * n);
+    yi->order   = (int *) malloc(sizeof(int) * n);
+    yi->top     = (_DtCvUnit *) malloc(sizeof(_DtCvUnit) * n);
+    yi->bot     = (_DtCvUnit *) malloc(sizeof(_DtCvUnit) * n);
+    yi->max_bot = (_DtCvUnit *) malloc(sizeof(_DtCvUnit) * n);
+    if (NULL == keys || NULL == yi->order || NULL == yi->top ||
+				NULL == yi->bot || NULL == yi->max_bot)
+      {
+	free(keys);
+	FreeYIndex(yi);
+	return NULL;
+      }
+
+    for (i = 0; i < n; i++)
+      {
+	keys[i].top = canvas->txt_lst[i].baseline - canvas->txt_lst[i].ascent;
+	keys[i].idx = (int) i;
+      }
+    qsort(keys, n, sizeof(_DtCvYKey), CompareYKeys);
+
+    for (i = 0; i < n; i++)
+      {
+	_DtCvDspLine *line = &(canvas->txt_lst[keys[i].idx]);
+
+	yi->order[i]   = keys[i].idx;
+	yi->top[i]     = keys[i].top;
+	yi->bot[i]     = line->baseline + line->descent;
+	yi->max_bot[i] = yi->bot[i];
+	if (i > 0 && yi->max_bot[i - 1] > yi->max_bot[i])
+	    yi->max_bot[i] = yi->max_bot[i - 1];
+      }
+    free(keys);
+
+    yi->canvas = canvas;
+    yi->lst    = canvas->txt_lst;
+    yi->cnt    = n;
+    return yi;
+}
+
+/*****************************************************************************
+ * Function: _DtCvDropYIndex
+ *
+ * Purpose:  Forget the y index of a canvas whose line table is about to
+ *	     change or go away.
+ *****************************************************************************/
+static void
+DropYIndexLocked (_DtCanvasStruct *canvas)
+{
+    _DtCvYIndex	**pp;
+
+    for (pp = &YIndexList; NULL != *pp; pp = &((*pp)->next))
+      {
+	if ((*pp)->canvas == canvas)
+	  {
+	    _DtCvYIndex *yi = *pp;
+
+	    *pp = yi->next;
+	    FreeYIndex(yi);
+	    break;
+	  }
+      }
+}
+
+void
+_DtCvDropYIndex (_DtCanvasStruct *canvas)
+{
+    _DtHelpProcessLock();
+    DropYIndexLocked(canvas);
+    _DtHelpProcessUnlock();
+}
+
+/*****************************************************************************
+ * Function: GetLinesInBand
+ *
+ * Returns:  0 and, in ascending order, the indices of the text lines with
+ *	     bottom >= y1 and top <= y2, plus the smallest top below y2
+ *	     (or -1); -1 if there is no index (fall back to a scan).
+ *****************************************************************************/
+static int
+GetLinesInBand (
+    _DtCanvasStruct	*canvas,
+    _DtCvUnit		 y1,
+    _DtCvUnit		 y2,
+    int			**ret_idx,
+    int			 *ret_cnt,
+    _DtCvUnit		 *ret_next_top)
+{
+    int		 lo, hi, mid, k;
+    int		 cnt = 0;
+    int		*idx;
+    _DtCvYIndex	*yi;
+
+    _DtHelpProcessLock();
+    for (yi = YIndexList; NULL != yi && yi->canvas != canvas; yi = yi->next)
+	;
+
+    if (NULL != yi && (yi->lst != canvas->txt_lst || yi->cnt != canvas->txt_cnt))
+      {
+	DropYIndexLocked(canvas);
+	yi = NULL;
+      }
+
+    if (NULL == yi)
+      {
+	yi = BuildYIndex(canvas);
+	if (NULL == yi)
+	  {
+	    _DtHelpProcessUnlock();
+	    return -1;
+	  }
+	yi->next   = YIndexList;
+	YIndexList = yi;
+      }
+
+    /*
+     * hi: the first line whose top is below y2.
+     */
+    lo = 0;
+    hi = (int) yi->cnt;
+    while (lo < hi)
+      {
+	mid = lo + (hi - lo) / 2;
+	if (yi->top[mid] <= y2)
+	    lo = mid + 1;
+	else
+	    hi = mid;
+      }
+    *ret_next_top = (hi < yi->cnt ? yi->top[hi] : -1);
+
+    /*
+     * lo: the first line for which any line up to it reaches y1.
+     */
+    k  = hi;
+    lo = 0;
+    while (lo < k)
+      {
+	mid = lo + (k - lo) / 2;
+	if (yi->max_bot[mid] < y1)
+	    lo = mid + 1;
+	else
+	    k = mid;
+      }
+
+    idx = (int *) malloc(sizeof(int) * (hi - lo + 1));
+    if (NULL == idx)
+      {
+	_DtHelpProcessUnlock();
+	return -1;
+      }
+
+    for (k = lo; k < hi; k++)
+	if (yi->bot[k] >= y1)
+	    idx[cnt++] = yi->order[k];
+
+    _DtHelpProcessUnlock();
+
+    qsort(idx, cnt, sizeof(int), CompareInts);
+
+    *ret_idx = idx;
+    *ret_cnt = cnt;
+    return 0;
+}
+
 /*****************************************************************************
  * Function: RenderSubSet
  *
@@ -1360,7 +1604,8 @@ _DtCvGetCharIdx(
 	          {
                     pChar = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg),
 					_DtCvIsSegWideChar(pSeg), start);
-		    len   = _DtCvStrLen (pChar, _DtCvIsSegWideChar(pSeg));
+		    len   = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(pSeg),
+								count);
 
 	            if (len > count)
 		        len = count;
@@ -1470,7 +1715,12 @@ _DtCvGetWidthOfSegment(
 	  {
             pChar    = _DtCvStrPtr(_DtCvStringOfStringSeg(p_seg),
 					_DtCvIsSegWideChar(p_seg), start);
-	    *ret_cnt = _DtCvStrLen (pChar, _DtCvIsSegWideChar(p_seg));
+	    /*
+	     * (only scan as far as max_cnt: the rest of a long paragraph
+	     * may follow.)
+	     */
+	    *ret_cnt = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(p_seg),
+								max_cnt);
             if (*ret_cnt > max_cnt)
 	      {
 	        *ret_cnt = max_cnt;
@@ -1874,7 +2124,8 @@ _DtCvDrawSegments(
 		 */
                 pChar = _DtCvStrPtr(_DtCvStringOfStringSeg(p_seg),
 					_DtCvIsSegWideChar(p_seg), start_char);
-	        len   = _DtCvStrLen (pChar, _DtCvIsSegWideChar(p_seg));
+	        len   = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(p_seg),
+								count);
 
 		/*
 		 * if length of the string is longer than we want to
@@ -2094,6 +2345,7 @@ _DtCanvasClean (_DtCvHandle canvas_handle)
     /*
      * zero the lists
      */
+    _DtCvDropYIndex(canvas);
     canvas->txt_cnt  = 0;
     canvas->line_cnt = 0;
     canvas->mark_cnt = 0;
@@ -2183,6 +2435,9 @@ _DtCanvasRender (
     _DtCanvasStruct	*canvas = (_DtCanvasStruct *) canvas_handle;
     _DtCvDspLine	*lines;
     _DtCvFlags		 sideCk;
+    int			*bandIdx;
+    int			 bandCnt;
+    _DtCvUnit		 nextTop;
 
     /*
      * check the list of page breaks, it may constrain y2
@@ -2203,6 +2458,47 @@ _DtCanvasRender (
 
     if (-1 != nextY && y2 > nextY)
 	y2 = nextY - 1;
+
+    /*
+     * Partial rendering of a long topic: draw the lines in [y1,y2]
+     * found through the y index, in line table order, as the scan
+     * below would.  (The scan clears every line's processed flag
+     * first; here only the drawn lines' flags are touched.  Every other
+     * user of the flags clears them before use.)
+     */
+    if (_DtCvRENDER_PARTIAL == flag && y1 <= y2 &&
+			canvas->txt_cnt >= YINDEX_MIN_LINES &&
+			NULL != canvas->txt_lst &&
+			0 == GetLinesInBand(canvas, y1, y2, &bandIdx, &bandCnt,
+								&nextTop))
+      {
+	for (i = 0; i < bandCnt; i++)
+	  {
+	    lines = &(canvas->txt_lst[bandIdx[i]]);
+	    maxY  = lines->baseline + lines->descent;
+
+	    (void) DrawText (canvas, lines, bandIdx[i], 0, 0);
+	    _DtCvSetProcessed(*lines);
+
+	    if (lastY < maxY)
+		lastY = maxY;
+	  }
+	free(bandIdx);
+
+	/*
+	 * a line below y2 'starts' the next page.
+	 */
+	if (-1 != nextTop && (-1 == nextY || nextY > nextTop))
+	    nextY = nextTop;
+
+	if (lastY > y2)
+	    lastY = y2;
+	if (NULL != max_y)
+	    *max_y = lastY;
+	if (NULL != next_y)
+	    *next_y = nextY;
+	return;
+      }
 
     /*
      * clear the processed flag from all the text lines.
@@ -2543,7 +2839,8 @@ _DtCanvasGetPosLink (
 		     * only interested in in the part of the line
 		     * that is on the line selected.
 		     */
-		    len = _DtCvStrLen (pChar, _DtCvIsSegWideChar(pSeg));
+		    len = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(pSeg),
+								count);
 		    if (len > count)
 			len = count;
     
@@ -2818,7 +3115,8 @@ _DtCanvasGetSpotInfo (
 		     * only interested in in the part of the line
 		     * that is on the line selected.
 		     */
-		    len = _DtCvStrLen (pChar, _DtCvIsSegWideChar(pSeg));
+		    len = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(pSeg),
+								count);
 		    if (len > count)
 			len = count;
     

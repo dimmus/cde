@@ -112,6 +112,8 @@
 /*
  */
 #define	GROW_SIZE	10
+/* grow the canvas arrays geometrically: appending stays O(1) amortised */
+#define	GROW_MAX(m)	((m) < GROW_SIZE ? GROW_SIZE : (m) * 2)
 
 /******************************************************************************
  *
@@ -713,7 +715,7 @@ GetLinkInfo (
 	     * only interested in in the part of the line
 	     * that is on the line selected.
 	     */
-	    len = _DtCvStrLen (pChar, _DtCvIsSegWideChar(pSeg));
+	    len = _DtCvStrLenMax (pChar, _DtCvIsSegWideChar(pSeg), count);
 	    if (len > count)
 		len = count;
 	 
@@ -812,7 +814,7 @@ CheckForPageBreak(
 	 */
 	if (canvas->brk_cnt >= canvas->brk_max)
 	  {
-	    canvas->brk_max += GROW_SIZE;
+	    canvas->brk_max = GROW_MAX(canvas->brk_max);
 	    if (NULL != canvas->pg_breaks)
 	        canvas->pg_breaks = (_DtCvUnit *) realloc (
 					(void *) canvas->pg_breaks,
@@ -1149,7 +1151,7 @@ SaveLine (
 
     if (i >= canvas->line_max)
       {
-	canvas->line_max += GROW_SIZE;
+	canvas->line_max = GROW_MAX(canvas->line_max);
 	if (canvas->line_lst)
 	    canvas->line_lst = (_DtCvLineSeg *) realloc (
 				(void *) canvas->line_lst,
@@ -5294,7 +5296,12 @@ LayoutCanvas (
     _DtCvStatus		 result;
 
     int i, search_cnt = canvas->search_cnt;
-    
+
+    /*
+     * the line table is about to be rebuilt.
+     */
+    _DtCvDropYIndex(canvas);
+
     do {
 	redo = False;
         result = LayoutCanvasInfo(canvas, layout, divisor, target_id);

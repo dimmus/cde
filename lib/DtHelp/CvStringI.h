@@ -77,6 +77,14 @@ extern	int	   _DtCvStrcspn(
 extern	int	  _DtCvStrLen (
 			const void	*p1,
 			int		 type);
+extern	int	  _DtCvStrLenMax (
+			const void	*p1,
+			int		 type,
+			int		 count);
+extern	int	  _DtCvStrNLen (
+			const void	*p1,
+			int		 type,
+			int		 max);
 extern	void	 *_DtCvStrPtr (
 			const void	*p1,
 			int		 type,

@@ -50,6 +50,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #ifdef __GLIBC__
 #include <malloc.h>	/* malloc_usable_size() */
 #endif
@@ -106,6 +107,58 @@ _DtCvStrLen (
       }
 
     return len;
+}
+
+/******************************************************************************
+ * Function: _DtCvStrNLen (const void *p1, int type, int max)
+ *
+ * Returns:	The number of characters in p1 (bytes or wide characters,
+ *		as _DtCvStrLen), but at most 'max'; a negative 'max' means
+ *		no limit.
+ *
+ * Purpose:	Lets callers that only compare the length with a bound
+ *		avoid scanning the rest of a long string.
+ *****************************************************************************/
+int
+_DtCvStrNLen (
+    const void    *p1,
+    int            type,
+    int            max)
+{
+    const wchar_t *wcs = (const wchar_t *) p1;
+    int            len = 0;
+
+    if (max < 0)
+	return _DtCvStrLen(p1, type);
+
+    if (0 == type)
+	return ((int) strnlen((const char *) p1, (size_t) max));
+
+    while (len < max && 0 != wcs[len])
+	len++;
+
+    return len;
+}
+
+/******************************************************************************
+ * Function: _DtCvStrLenMax (const void *p1, int type, int count)
+ *
+ * Returns:	The number of characters in p1 when that is not more than
+ *		'count'; otherwise some number greater than 'count'.
+ *
+ * Purpose:	For the many "len = strlen; if (len > count) ..." tests:
+ *		the string is often the rest of a long paragraph.
+ *****************************************************************************/
+int
+_DtCvStrLenMax (
+    const void    *p1,
+    int            type,
+    int            count)
+{
+    if (count < 0 || count == INT_MAX)
+	return _DtCvStrLen(p1, type);
+
+    return _DtCvStrNLen(p1, type, count + 1);
 }
 
 /******************************************************************************
