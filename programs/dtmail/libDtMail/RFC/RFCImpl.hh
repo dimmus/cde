@@ -395,6 +395,10 @@ class RFCEnvelope : public DtMail::Envelope {
 			    const char * name,
 			    DtMailValueSeq & value);
 
+    // An envelope parsed on its own (MIMEPartial) has no message.
+    DtMail::Session * parentSession(void)
+	{ return _parent ? _parent->session() : NULL; }
+
     DtMailBoolean matchName(const ParsedHeader &, const char *);
 
     void parseUnixFrom(DtMailEnv &,
@@ -724,6 +728,7 @@ class RFCMailBox : public DtMail::MailBox
 	RFCMessage	*message;
 	DtMailBoolean	delete_pending;
 	int		slot;		// Hint: index in _msg_list.
+	DtMailBoolean	partial_type;	// Content-Type: message/partial
     };
 
     // Methods below this point are specific to RFCMailBox.
@@ -786,6 +791,7 @@ class RFCMailBox : public DtMail::MailBox
     // scanning _msg_list for every lookup.
     std::unordered_set<const MessageCache *> _live_handles;
     int				 _last_msg_slot; // lookupByMsg() cursor.
+    int				 _partial_msgs;	 // # with partial_type set
     _partialData		**_partialList;
     unsigned int		 _partialListCount;
     struct stat			 _stinfo;
@@ -837,6 +843,12 @@ class RFCMailBox : public DtMail::MailBox
     int		handleSlot(DtMailMessageHandle handle);
     void	appendMessage(MessageCache *mc);
     void	destroyMessage(int slot);
+    int		destroyMessagesIf(
+			DtMailBoolean (*doomed)(RFCMailBox *, MessageCache *));
+    static DtMailBoolean
+		isDeletedPartial(RFCMailBox *, MessageCache *);
+    static DtMailBoolean
+		isDeletePending(RFCMailBox *, MessageCache *);
     void	renumberSlots(int from);
     void	mailboxAccessHide(char *prefix);
     void	mailboxAccessShow(time_t mtime, char *prefix);

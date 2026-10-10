@@ -155,9 +155,10 @@ decode1522(const char * enc_start, const char * max_end, char **output, DtMail::
 	  return (enc_start);
     }
 
-    // Do codeset conversion if charset is present
-    char *from_cs = s->csToConvName(cs_name);
-    char *to_cs = s->locToConvName();
+    // Do codeset conversion if charset is present (a value that
+    // belongs to no session is left in its own charset)
+    char *from_cs = s ? s->csToConvName(cs_name) : NULL;
+    char *to_cs = s ? s->locToConvName() : NULL;
     if ( from_cs && to_cs ) {
         if ( strcasecmp(from_cs, to_cs) != 0 ) {
             unsigned long tmplen = (unsigned long) strlen(*output);

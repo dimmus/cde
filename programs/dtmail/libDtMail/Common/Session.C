@@ -45,6 +45,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <pwd.h>
+#include <wordexp.h>
 #include <sys/socket.h>
 #include <ctype.h>
 
@@ -584,20 +585,40 @@ DtMail::Session::expandPath(DtMailEnv & error, const char * path)
 	return(NULL);
     }
     if (strchr(path, '$') != NULL) {
-    	sprintf (exp_name, "echo %s", path);
-    	FILE *fp;
-    	if ((fp = popen(exp_name, "r")) != NULL) {
-          	exp_name[0] = '\0';
-          	if (fgets(exp_name, MAXIMUM_PATH_LENGTH, fp) != NULL &&
-			exp_name[0] != '\0') 
-    	        	// get rid of \n at end of string
-	  		exp_name[strlen(exp_name)-1] = '\0';
-	  	else
-			strcpy(exp_name, path); 
-	  	pclose(fp);
-    	}
-	else 
-		strcpy(exp_name, path);
+	// Expand variables the way "echo <path>" in a shell did, but
+	// without forking a shell for it, and without running whatever
+	// command substitution or ';' the path might contain: such a
+	// path is used as it is. The words are joined with single
+	// spaces, as echo printed them.
+	//
+	wordexp_t we;
+	int status = wordexp(path, &we, WRDE_NOCMD);
+
+	if (status == 0) {
+	    size_t used = 0;
+
+	    exp_name[0] = '\0';
+	    for (size_t w = 0; w < we.we_wordc; w++) {
+		size_t wlen = strlen(we.we_wordv[w]);
+
+		if (used + (w ? 1 : 0) + wlen >= MAXIMUM_PATH_LENGTH) {
+		    break;
+		}
+		if (w) {
+		    exp_name[used++] = ' ';
+		}
+		memcpy(exp_name + used, we.we_wordv[w], wlen);
+		used += wlen;
+		exp_name[used] = '\0';
+	    }
+	    wordfree(&we);
+	}
+	else {
+	    if (status == WRDE_NOSPACE) {
+		wordfree(&we);
+	    }
+	    strcpy(exp_name, path);
+	}
     }
     else 
 	strcpy(exp_name, path);
@@ -659,6 +680,7 @@ DtMail::Session::expandPath(DtMailEnv & error, const char * path)
 	      pw_p = getpwnam(name);
 
 	      if (!pw_p) {
+		  delete [] name;
 		  error.clear();
 		  error.setError(DTME_NoSuchFile);
 		  break;

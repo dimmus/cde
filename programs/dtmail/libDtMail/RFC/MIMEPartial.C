@@ -422,8 +422,9 @@ RFCMailBox::_assemblePartial(DtMailEnv	& error,
 		endHeader = const_cast <char *> (strstr((const char *)contents, "\n\n"));
 
 		if (endHeader != NULL) {
+		  // Its values belong to the session of part 1.
 		  RFCEnvelope	embEnv(error,
-				       (DtMail::Message *)NULL,
+				       (DtMail::Message *)messages[0],
 				       (const char *)contents,
 				       (int)((unsigned long)endHeader
 					     - (unsigned long)contents));

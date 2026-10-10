@@ -58,6 +58,8 @@ class DtVirtArrayImpl : public DtCPlusPlusAllocator {
     void insert(void * handle, const int at);
     void remove(const int at);
     void remove(void * handle);
+    void replace(const int at, void * handle);
+    void truncate(const int count);
     
   private:
     void make_slot(const int at);
@@ -86,6 +88,8 @@ class DtVirtArray : public DtCPlusPlusAllocator {
     void insert(Element handle, const int at) { my_array.insert((void *)handle, at); }
     void remove(const int at) { my_array.remove(at); }
     void remove(Element handle) { my_array.remove((void *)handle); }
+    void replace(const int at, Element handle) { my_array.replace(at, (void *)handle); }
+    void truncate(const int count) { my_array.truncate(count); }
 
   private:
     DtVirtArrayImpl	my_array;

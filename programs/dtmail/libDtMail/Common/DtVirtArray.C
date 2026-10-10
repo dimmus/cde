@@ -145,6 +145,32 @@ DtVirtArrayImpl::remove(void * handle)
     remove(pos);
 }
 
+// Overwrite the element at 'at'; out-of-range positions are ignored.
+//
+void
+DtVirtArrayImpl::replace(const int at, void * handle)
+{
+    MutexLock lock_scope(_mutex);
+
+    if (at >= 0 && at < _count) {
+	_elements[at] = handle;
+    }
+}
+
+// Drop every element from position 'count' on. Together with replace()
+// this lets a caller remove many elements in one pass instead of
+// shifting the array once per removal.
+//
+void
+DtVirtArrayImpl::truncate(const int count)
+{
+    MutexLock lock_scope(_mutex);
+
+    if (count >= 0 && count < _count) {
+	_count = count;
+    }
+}
+
 void
 DtVirtArrayImpl::make_slot(const int at)
 {

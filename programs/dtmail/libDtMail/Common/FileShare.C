@@ -46,6 +46,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <time.h>
 
 #include <DtMail/FileShare.hh>
 #include <DtMail/DtMailXtProc.h>
@@ -343,16 +345,31 @@ FileShare::lockFile(DtMailEnv & error)
 	ttdt_Save(NULL, _path, TT_FILE, DtMailDamageContext, FileShareTimeout);
       }
 
-      // Give the other mailer FileShareTimeout seconds to give up the lock
+      // Give the other mailer FileShareTimeout (milliseconds; this
+      // used to compare it with seconds, which meant 10 days) to give
+      // up the lock. Ask again after 50 ms, then back off to every 2 s
+      // rather than every 5 s, so the handover is not held up for
+      // seconds after the other mailer has let go.
       time_t t_start;
+      long delay_ms = 50;
 
       time(&t_start);
       while (1) {
-	sleep(5);
+	struct timespec req;
+	req.tv_sec = delay_ms / 1000;
+	req.tv_nsec = (delay_ms % 1000) * 1000000L;
+	while (nanosleep(&req, &req) < 0 && errno == EINTR)
+	  continue;
+	if (delay_ms < 2000) {
+	  delay_ms *= 2;
+	  if (delay_ms > 2000)
+	    delay_ms = 2000;
+	}
+
 	if (isModified(error) == DTM_FALSE) {
 	  break;
 	} else {
-	  if (time(NULL) - t_start > FileShareTimeout) {
+	  if (time(NULL) - t_start > FileShareTimeout / 1000) {
 	    // time out!
 	    error.setError(DTME_OtherOwnsWrite);
 	    return;
