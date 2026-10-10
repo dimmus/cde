@@ -1,34 +1,33 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-# We need to ensure that the jobs here are run in sequence to build up
-# the types.xdr file.
-.NOTPARALLEL:
-
-SUFFIXES: .ptype .done
-
-# FIXME - dtinfo ones use #include which seems to fail with syntax error...
-
-LOCALDEPFILES = \
-        dtfile.done \
-        dticon.done \
-        dtpad.done \
-        dtcm.done \
-        dtmail.done \
-        dtdbcache.done \
-        dtterm.done \
-        dtinfo.done \
-        dtinfo_start.done
+# Merged into types.xdr in this order; a type defined in a later file
+# replaces one of the same name from an earlier file.
+PTYPES = \
+        dtfile.ptype \
+        dticon.ptype \
+        dtpad.ptype \
+        dtcm.ptype \
+        dtmail.ptype \
+        dtdbcache.ptype \
+        dtterm.ptype \
+        dtinfo.ptype \
+        dtinfo_start.ptype
 
 BUILT_SOURCES = types.xdr
-CLEANFILES = *.done types.xdr .tt_lock
+CLEANFILES = types.xdr .tt_lock *.ptype.deps *.done
 
 tttypesdir = $(CDE_INSTALLATION_TOP)/appconfig/tttypes
 dist_tttypes_DATA = $(BUILT_SOURCES)
 
-types.xdr: $(LOCALDEPFILES)
-
 TT_TYPE_COMP = $(top_builddir)/lib/tt/bin/tt_type_comp/tt_type_comp
 
-.ptype.done:
-	$(RM) $@
-	TTPATH=. $(TT_TYPE_COMP) -sd user -m $< && touch $@ ; $(RM) .tt_lock
+# One tt_type_comp run parses every file and writes types.xdr once.
+# DISPLAY and the session variables are unset so that tt_type_comp
+# does not contact, or autostart, a ttsession just to announce the
+# new build-tree types.xdr (the libtool wrapper would also make an
+# installed ttsession run against the build tree's libtt).
+types.xdr: $(PTYPES) dtinfo_start.opnums $(TT_TYPE_COMP)
+	$(RM) $@ .tt_lock
+	(unset DISPLAY TT_SESSION _SUN_TT_SESSION; \
+	 TTPATH=. $(TT_TYPE_COMP) -sd user -m $(PTYPES)); \
+	status=$$?; $(RM) .tt_lock; exit $$status
