@@ -35,7 +35,11 @@
 #if defined(__OpenBSD__) || defined(__NetBSD__)
   pexec=$(LC_TIME=C ps -p $PPID | awk 'NR==2 {print $5}')
 #elif defined(__linux__)
-  pexec=$(LC_TIME=C /bin/ps -p $PPID 2>/dev/null | awk 'NR==2 {print $4}')
+  HASH The command name of the parent, as ps prints it, without ps or awk.
+  pexec=
+  [ -r /proc/$PPID/comm ] && read pexec </proc/$PPID/comm
+  [ -z "$pexec" ] && \
+    pexec=$(LC_TIME=C /bin/ps -p $PPID 2>/dev/null | awk 'NR==2 {print $4}')
 #elif defined(__FreeBSD__)
   pexec=$(LC_TIME=C /bin/ps -o comm= -p $PPID 2>/dev/null)
 #else
