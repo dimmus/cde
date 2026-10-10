@@ -55,6 +55,7 @@
 #include <Xm/TextP.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <Xm/TextF.h>
 #include <Xm/LabelG.h>
 #include <Dt/HourGlass.h>
@@ -255,33 +256,31 @@ LoadFile(
 char *
 GetTempFile(void)
 {
-    char *tempname = (char *)XtMalloc(L_tmpnam); /* Temporary file name. */
-    FILE *tfp;
+    static const char *dirs[] = { P_tmpdir, "/usr/tmp", "/tmp" };
+    char *tempname = XtMalloc(256);   /* Temporary file name. */
+    int i, fd;
+    mode_t mask = umask(0);
 
-    (void)tmpnam(tempname);
-    if ((tfp = fopen(tempname, "w")) == NULL)
+    umask(mask);
+
+    /*
+     * mkstemp() creates the file, so nobody else can create the name
+     * first (as tmpnam() and fopen() allowed).  Try a couple of
+     * directories if necessary.
+     */
+    for (i = 0; i < (int) XtNumber(dirs); i++)
     {
-        pid_t pid;
-        /*
-         * If tmpnam fails, then try to create our own temp name.
-         * Try a couple of different names if necessary.
-         */
-        XtFree(tempname);
-        tempname = XtMalloc(256);
-        pid = getpid();
-        sprintf(tempname, "/usr/tmp/editor%ld", (long)pid);
-        if ((tfp = fopen(tempname, "w")) == NULL)
+        snprintf(tempname, 256, "%s/dtpadXXXXXX", dirs[i]);
+        if ((fd = mkstemp(tempname)) != -1)
         {
-            sprintf(tempname, "/tmp/editor%ld", (long)pid);
-            if ((tfp = fopen(tempname, "w")) == NULL)
-            {
-                XtFree(tempname);
-                return (char *)NULL;
-            }
+            /* The mode fopen() gave it: a print spooler may read it */
+            fchmod(fd, 0666 & ~mask);
+            close(fd);
+            return tempname;
         }
     }
-    fclose(tfp);
-    return tempname;
+    XtFree(tempname);
+    return (char *)NULL;
 }
 
 

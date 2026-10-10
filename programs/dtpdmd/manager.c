@@ -363,8 +363,26 @@ void mgr_launch_pdm( XpPdmServiceRec *rec )
 	 * Create new .Xauthority file.
 	 */
 	original_umask = umask (0077);      /* disallow non-owner access */
-	tmpnam( rec->auth_filename );
-	rec->auth_file = fopen( rec->auth_filename, "w" );
+	/*
+	 * mkstemp() creates the file (mode 0600): with tmpnam() and
+	 * fopen() someone else could create the name first, e.g. as a
+	 * symlink, and read or redirect the cookies.
+	 */
+	snprintf( rec->auth_filename, sizeof(rec->auth_filename),
+		  "/tmp/dtpdmdXXXXXX" );
+	{
+	    int fd = mkstemp( rec->auth_filename );
+
+	    rec->auth_file = NULL;
+	    if (fd != -1) {
+		if (!(rec->auth_file = fdopen( fd, "w" ))) {
+		    close( fd );
+		    unlink( rec->auth_filename );
+		}
+	    }
+	    if (!rec->auth_file)
+		rec->auth_filename[0] = '\0';
+	}
 
 	if (rec->auth_file) {
 	    /*

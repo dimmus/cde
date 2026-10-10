@@ -1164,6 +1164,7 @@ addOkCB(
   int              count;
   int              ii, length;
   int              len;
+  int              fd;
 
   /* Get the text from the promp dialog */
   name = XmTextFieldGetString( XmSelectionBoxGetChild(addDialog, XmDIALOG_TEXT));
@@ -1232,13 +1233,20 @@ addOkCB(
   strcpy(newPalette->directory, style.home);
   strcat(newPalette->directory, DT_PAL_DIR);
   
-  /* makeup a new name for the palette */
+  /* makeup a new name for the palette: reserve dtXXXXXX.dp, the file */
+  /* WriteOutPalette() writes (mktemp() checked a name without .dp)   */
   tmpstr = (char *)XtMalloc(strlen(style.home) + strlen(DT_PAL_DIR) + 
-			    strlen("dtXXXXXX") + 1);
+			    strlen("dtXXXXXX") + strlen(PALETTE_SUFFIX) + 1);
   strcpy(tmpstr, newPalette->directory);
   len = strlen(tmpstr);
   strcat(tmpstr, "dtXXXXXX");
-  mktemp(tmpstr);
+  strcat(tmpstr, PALETTE_SUFFIX);
+  if ((fd = mkstemps(tmpstr, strlen(PALETTE_SUFFIX))) != -1)
+    close(fd);
+  else
+    /* WriteOutPalette() will report why the directory is not usable */
+    sprintf(tmpstr + len, "dt%06ld", (long) getpid() % 1000000);
+  tmpstr[len + strlen("dtXXXXXX")] = '\0';
 
   newPalette->name = (char *) XtMalloc(15 * sizeof(char));
   strcpy(newPalette->name, tmpstr + len);
@@ -1286,6 +1294,14 @@ addOkCB(
   /* Write out the palette */
   if ((WriteOutPalette(newPalette->name)) == -1)
     {
+      /* remove the file reserved above */
+      filename = (char *)XtMalloc(strlen(newPalette->directory) +
+				  strlen(newPalette->name) +
+				  strlen(PALETTE_SUFFIX) + 1);
+      sprintf(filename, "%s%s%s", newPalette->directory, newPalette->name,
+	      PALETTE_SUFFIX);
+      unlink(filename);
+      XtFree(filename);
       XtFree(name);
       
       /*  remove palette from list */
