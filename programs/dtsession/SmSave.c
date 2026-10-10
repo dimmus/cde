@@ -56,6 +56,8 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/param.h>
 
 #include <sys/socket.h>
@@ -1607,6 +1609,132 @@ ResBatchAdd(
 }
 
 
+/*
+ * SortResourceFile - XrmPutFileDatabase() writes the entries in the order
+ * of Xrm's quark table, which depends on everything the process interned
+ * before, so the same preferences can come out in a different order at
+ * each save.  dt.resources is part of the key of the session resource
+ * cache (SmResCache.c); writing its entries sorted lets an unchanged
+ * session hit the cache at the next login.  An entry continues over the
+ * next line when its line ends in an odd number of backslashes.  The
+ * file is left as it is when it holds anything but entries.
+ */
+typedef struct {
+    const char	*text;
+    size_t	len;
+} ResEntry;
+
+static int
+CompareResEntry(
+	const void	*a,
+	const void	*b)
+{
+    const ResEntry	*x = a, *y = b;
+    size_t		n = (x->len < y->len) ? x->len : y->len;
+    int			cmp = memcmp(x->text, y->text, n);
+
+    if (cmp != 0)
+	return cmp;
+    return (x->len < y->len) ? -1 : (x->len > y->len);
+}
+
+#define MAX_SORTED_RESOURCE_FILE	(4 * 1024 * 1024)
+
+static void
+SortResourceFile(
+	const char	*path)
+{
+    struct stat	st;
+    char	*buf = NULL, *p, *end, *tmp = NULL;
+    ResEntry	*ent = NULL;
+    size_t	n = 0, room = 0, i, got = 0;
+    ssize_t	r;
+    int		fd, sorted = 1;
+    FILE	*fp;
+
+    if ((fd = open(path, O_RDONLY)) < 0)
+	return;
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size == 0 ||
+	st.st_size > MAX_SORTED_RESOURCE_FILE ||
+	(buf = malloc((size_t) st.st_size)) == NULL)
+    {
+	close(fd);
+	return;
+    }
+    while (got < (size_t) st.st_size &&
+	   (r = read(fd, buf + got, (size_t) st.st_size - got)) > 0)
+	got += (size_t) r;
+    close(fd);
+    if (got != (size_t) st.st_size || buf[got - 1] != '\n')
+	goto done;
+
+    end = buf + got;
+    for (p = buf; p < end; )
+    {
+	char	*q = p;
+
+	if (*p == '!' || *p == '#' || *p == '\n')
+	    goto done;		/* not just entries: leave the file alone */
+	for (;;)
+	{
+	    char	*nl = memchr(q, '\n', end - q);
+	    char	*b = nl;
+	    size_t	bs = 0;
+
+	    while (b > q && b[-1] == '\\')
+	    {
+		b--;
+		bs++;
+	    }
+	    q = nl + 1;
+	    if ((bs % 2) == 0 || q >= end)
+		break;
+	}
+	if (n == room)
+	{
+	    ResEntry	*e;
+
+	    room = (room == 0) ? 64 : room * 2;
+	    if ((e = realloc(ent, room * sizeof(ResEntry))) == NULL)
+		goto done;
+	    ent = e;
+	}
+	ent[n].text = p;
+	ent[n].len = q - p;
+	if (n > 0 && CompareResEntry(&ent[n - 1], &ent[n]) > 0)
+	    sorted = 0;
+	n++;
+	p = q;
+    }
+    if (sorted)
+	goto done;
+
+    qsort(ent, n, sizeof(ResEntry), CompareResEntry);
+
+    if ((tmp = malloc(strlen(path) + 8)) == NULL)
+	goto done;
+    sprintf(tmp, "%sXXXXXX", path);
+    if ((fd = mkstemp(tmp)) < 0)
+	goto done;
+    (void) fchmod(fd, st.st_mode & 07777);
+    if ((fp = fdopen(fd, "w")) == NULL)
+    {
+	close(fd);
+	unlink(tmp);
+	goto done;
+    }
+    for (i = 0; i < n; i++)
+	fwrite(ent[i].text, 1, ent[i].len, fp);
+    if (fclose(fp) != 0 || rename(tmp, path) != 0)
+	unlink(tmp);
+
+done:
+    free(tmp);
+    free(ent);
+    free(buf);
+}
+
+
 /*************************************<->*************************************
  *
  *  OutputResource ()
@@ -1762,6 +1890,7 @@ OutputResource( void )
     db  = XrmGetStringDatabase((char *)data);
 
     XrmPutFileDatabase(db, smGD.resourcePath);
+    SortResourceFile(smGD.resourcePath);
 
     /*
      * Don't forget to free your data
