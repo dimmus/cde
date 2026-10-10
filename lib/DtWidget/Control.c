@@ -48,7 +48,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <time.h>
+#include <pwd.h>
+#include <unistd.h>
 #include <sys/stat.h>
+#ifdef __linux__
+#include <fcntl.h>
+#include <sys/inotify.h>
+#include <sys/vfs.h>
+#define DT_CONTROL_INOTIFY 1
+#endif
 #define X_INCLUDE_STRING_H
 #define X_INCLUDE_TIME_H
 #define XOS_USE_XT_LOCKING
@@ -96,6 +107,15 @@ static void FileCheckTimeout(
                         XtPointer client_data,
                         XtIntervalId *id) ;
 static void CheckFile( 
+                        DtControlGadget g) ;
+static Boolean StartFileWatch( 
+                        DtControlGadget g) ;
+static void StopFileWatch( 
+                        DtControlGadget g) ;
+static void LoadAnimationImages( 
+                        DtControlGadget g,
+                        Boolean push) ;
+static void FreeAnimationNames( 
                         DtControlGadget g) ;
 static void ClassInitialize( void ) ;
 static void ClassPartInitialize(
@@ -475,7 +495,8 @@ CheckFile(
   long		file_size = 0;
   struct stat	stat_buf;
   
-  if (stat (G_FileName (g), &stat_buf) == 0)
+  memset (&stat_buf, 0, sizeof (stat_buf));
+  if (G_FileName (g) != NULL && stat (G_FileName (g), &stat_buf) == 0)
     {
       file_size = stat_buf.st_size;
     }
@@ -524,6 +545,536 @@ CheckFile(
 
 
 
+/*-------------------------------------------------------------
+**	File watches (mail and monitor controls)
+**
+**	On Linux, a control whose file is on a local file system is
+**	checked when inotify reports a change to it, instead of by
+**	stat()ing it every monitorTime (30 s) for ever.  A network file
+**	system (where inotify does not see other clients' changes), a
+**	missing directory, or no inotify, keeps the poll timer.
+**
+**	The file's directory is watched for the name coming and going
+**	and for changes to the file; the file itself is watched too (for
+**	a hard link elsewhere; a symbolic link is polled).  Events
+**	are collected until the file is quiet for WATCH_QUIET_MS (at most
+**	WATCH_MAX_DELAY_MS), so a mailbox that is being rewritten is
+**	looked at once, when it is done.
+*/
+
+#ifdef DT_CONTROL_INOTIFY
+
+#define WATCH_QUIET_MS		1000
+#define WATCH_MAX_DELAY_MS	10000
+
+#define WATCH_FILE_EVENTS	(IN_MODIFY | IN_ATTRIB | IN_ACCESS | \
+				 IN_CLOSE_WRITE | IN_DELETE_SELF | IN_MOVE_SELF)
+#define WATCH_DIR_EVENTS	(IN_MODIFY | IN_ATTRIB | IN_ACCESS | \
+				 IN_CLOSE_WRITE | IN_CREATE | IN_DELETE | \
+				 IN_MOVED_FROM | IN_MOVED_TO | \
+				 IN_DELETE_SELF | IN_MOVE_SELF)
+
+typedef struct {
+  DtControlGadget	g;
+  int			file_wd;	/* -1: none */
+  int			dir_wd;
+  char *		dir;
+  char *		base;
+  Boolean		dirty;		/* changed since the last check */
+  Boolean		busy;		/* ... in the current quiet period */
+  long			first_event;	/* ms, of the first unchecked change */
+} FileWatch;
+
+static int		watch_fd = -1;
+static XtInputId	watch_input = 0;	/* 0 while waiting */
+static XtIntervalId	watch_timer = 0;
+static XtAppContext	watch_app = NULL;
+static FileWatch *	watches = NULL;
+static int		num_watches = 0;
+
+static void WatchInput (XtPointer client_data, int *source, XtInputId *id);
+
+static long
+NowMs (void)
+{
+  struct timespec ts;
+
+  clock_gettime (CLOCK_MONOTONIC, &ts);
+  return (long) ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+/* Does inotify see every change on the file system of path? */
+static Boolean
+IsLocalFileSystem (const char *path)
+{
+  struct statfs sfs;
+
+  if (statfs (path, &sfs) != 0)
+    return False;
+
+  switch ((unsigned int) sfs.f_type)
+    {
+    case 0x6969u:	/* NFS */
+    case 0x517Bu:	/* SMB */
+    case 0xFF534D42u:	/* CIFS */
+    case 0xFE534D42u:	/* SMB2 */
+    case 0x65735546u:	/* FUSE (sshfs, ...) */
+    case 0x5346414Fu:	/* AFS */
+    case 0x6B414653u:	/* kAFS */
+    case 0x73757245u:	/* Coda */
+    case 0x564Cu:	/* NCP */
+    case 0x00C36400u:	/* Ceph */
+    case 0x01021997u:	/* 9P */
+    case 0x01161970u:	/* GFS2 */
+    case 0x7461636Fu:	/* OCFS2 */
+    case 0x0BD00BD0u:	/* Lustre */
+    case 0x47504653u:	/* GPFS */
+    case 0x19830326u:	/* BeeGFS */
+      return False;
+    default:
+      return True;
+    }
+}
+
+static FileWatch *
+FindWatch (DtControlGadget g)
+{
+  int i;
+
+  for (i = 0; i < num_watches; i++)
+    if (watches[i].g == g)
+      return &watches[i];
+  return NULL;
+}
+
+/* Is wd used by another watch than w? (Watches of one inode share it.) */
+static Boolean
+WatchShared (FileWatch *w, int wd)
+{
+  int i;
+
+  for (i = 0; i < num_watches; i++)
+    if (&watches[i] != w &&
+	(watches[i].file_wd == wd || watches[i].dir_wd == wd))
+      return True;
+  return False;
+}
+
+static void
+WatchFile (FileWatch *w)
+{
+  if (w->file_wd < 0)
+    w->file_wd = inotify_add_watch (watch_fd, G_FileName (w->g),
+				    WATCH_FILE_EVENTS);
+}
+
+static void
+PollFile (DtControlGadget g)
+{
+  if (G_MonitorTimer (g) == 0)
+    G_MonitorTimer (g) =
+      XtAppAddTimeOut (XtWidgetToApplicationContext ((Widget) g),
+		       G_MonitorTime (g), FileCheckTimeout, (XtPointer) g);
+}
+
+static void
+WatchChanged (FileWatch *w, long now)
+{
+  if (!w->dirty)
+    w->first_event = now;
+  w->dirty = True;
+  w->busy = True;
+}
+
+/* Read the queued events, marking the watches they concern. */
+static Boolean
+ReadWatchEvents (void)
+{
+  char buf[4096] __attribute__ ((aligned (__alignof__ (struct inotify_event))));
+  ssize_t len;
+  long now = NowMs ();
+  Boolean any = False;
+
+  while ((len = read (watch_fd, buf, sizeof (buf))) > 0)
+    {
+      char *p;
+
+      for (p = buf; p < buf + len;
+	   p += sizeof (struct inotify_event) + ((struct inotify_event *) p)->len)
+	{
+	  struct inotify_event *ev = (struct inotify_event *) p;
+	  int i;
+
+	  for (i = 0; i < num_watches; i++)
+	    {
+	      FileWatch *w = &watches[i];
+
+	      if (ev->mask & IN_Q_OVERFLOW)
+		{
+		  WatchChanged (w, now);	/* events were lost */
+		  any = True;
+		  continue;
+		}
+
+	      if (ev->wd == w->file_wd)
+		{
+		  if (ev->mask & IN_IGNORED)
+		    w->file_wd = -1;	/* gone; watched again at the check */
+		  WatchChanged (w, now);
+		  any = True;
+		}
+
+	      if (ev->wd == w->dir_wd)
+		{
+		  if (ev->mask & IN_IGNORED)
+		    {
+		      /* the directory went: poll as before */
+		      w->dir_wd = -1;
+		      PollFile (w->g);
+		      WatchChanged (w, now);
+		      any = True;
+		    }
+		  else if ((ev->mask & (IN_DELETE_SELF | IN_MOVE_SELF)) ||
+			   (ev->len > 0 && strcmp (ev->name, w->base) == 0))
+		    {
+		      WatchChanged (w, now);
+		      any = True;
+		    }
+		}
+	    }
+	}
+    }
+  return any;
+}
+
+/*
+ * A quiet period ended: check the files that changed and have been
+ * quiet since (or waited long enough), and wait again for the others.
+ * The input is not read meanwhile, so a file that keeps changing costs
+ * one wakeup per quiet period (the kernel merges repeated events),
+ * not one per change.
+ */
+static void
+WatchTimeout (XtPointer client_data, XtIntervalId *id)
+{
+  long now;
+  Boolean waiting = False;
+  int i;
+
+  watch_timer = 0;
+  (void) ReadWatchEvents ();
+  now = NowMs ();
+
+  for (i = 0; i < num_watches; i++)
+    {
+      FileWatch *w = &watches[i];
+
+      if (!w->dirty)
+	continue;
+      if (w->busy && now - w->first_event < WATCH_MAX_DELAY_MS)
+	{
+	  w->busy = False;
+	  waiting = True;
+	  continue;
+	}
+      w->dirty = w->busy = False;
+    }
+
+  /*
+   * Check the files (CheckFile may run callbacks that destroy
+   * controls, so look each one up again).
+   */
+  for (i = 0; i < num_watches; )
+    {
+      FileWatch *w = &watches[i];
+      DtControlGadget g = w->g;
+
+      if (w->dirty || w->first_event == 0)
+	{
+	  i++;
+	  continue;
+	}
+      w->first_event = 0;
+      /* the file (or the link's target) may be new: watch it again */
+      WatchFile (w);
+      CheckFile (g);
+      i = 0;			/* (the table may have changed) */
+    }
+
+  if (waiting)
+    watch_timer = XtAppAddTimeOut (watch_app, WATCH_QUIET_MS,
+				   WatchTimeout, NULL);
+  else if (watch_input == 0)
+    watch_input = XtAppAddInput (watch_app, watch_fd,
+				 (XtPointer) XtInputReadMask,
+				 WatchInput, NULL);
+}
+
+static void
+WatchInput (XtPointer client_data, int *source, XtInputId *id)
+{
+  int i;
+
+  if (!ReadWatchEvents ())
+    return;
+
+  /* the quiet period starts now */
+  for (i = 0; i < num_watches; i++)
+    watches[i].busy = False;
+
+  /* wait for the files to be quiet, without reading the input */
+  XtRemoveInput (watch_input);
+  watch_input = 0;
+  if (watch_timer == 0)
+    watch_timer = XtAppAddTimeOut (watch_app, WATCH_QUIET_MS,
+				   WatchTimeout, NULL);
+}
+
+/*
+ * Watch g's file instead of polling it; False to poll.
+ */
+static Boolean
+StartFileWatch (DtControlGadget g)
+{
+  XtAppContext app = XtWidgetToApplicationContext ((Widget) g);
+  const char *name = G_FileName (g);
+  const char *slash;
+  FileWatch *w;
+  char *dir;
+  int dir_wd;
+
+  struct stat st;
+
+  if (name == NULL || *name == '\0')
+    return False;
+
+  /*
+   * A symbolic link is polled: the directory of its target, where the
+   * target can come and go, is not watched.
+   */
+  if (lstat (name, &st) == 0 && S_ISLNK (st.st_mode))
+    return False;
+
+  _DtProcessLock ();
+  if (watch_fd < 0)
+    {
+      watch_fd = inotify_init1 (IN_NONBLOCK | IN_CLOEXEC);
+      if (watch_fd < 0)
+	{
+	  _DtProcessUnlock ();
+	  return False;
+	}
+      watch_app = app;
+      watch_input = XtAppAddInput (app, watch_fd, (XtPointer) XtInputReadMask,
+				   WatchInput, NULL);
+    }
+  if (app != watch_app)		/* (another application context) */
+    {
+      _DtProcessUnlock ();
+      return False;
+    }
+
+  slash = strrchr (name, '/');
+  if (slash == NULL)
+    dir = XtNewString (".");
+  else if (slash == name)
+    dir = XtNewString ("/");
+  else
+    {
+      dir = XtMalloc (slash - name + 1);
+      memcpy (dir, name, slash - name);
+      dir[slash - name] = '\0';
+    }
+
+  if (!IsLocalFileSystem (dir) ||
+      (dir_wd = inotify_add_watch (watch_fd, dir, WATCH_DIR_EVENTS)) < 0)
+    {
+      XtFree (dir);
+      _DtProcessUnlock ();
+      return False;
+    }
+
+  watches = (FileWatch *) XtRealloc ((char *) watches,
+				     (num_watches + 1) * sizeof (FileWatch));
+  w = &watches[num_watches++];
+  w->g = g;
+  w->dir = dir;
+  w->base = XtNewString (slash ? slash + 1 : name);
+  w->dir_wd = dir_wd;
+  w->file_wd = -1;
+  w->dirty = w->busy = False;
+  w->first_event = 0;
+  WatchFile (w);
+  _DtProcessUnlock ();
+  return True;
+}
+
+static void
+StopFileWatch (DtControlGadget g)
+{
+  FileWatch *w;
+
+  _DtProcessLock ();
+  if ((w = FindWatch (g)) != NULL)
+    {
+      if (w->file_wd >= 0 && !WatchShared (w, w->file_wd))
+	inotify_rm_watch (watch_fd, w->file_wd);
+      if (w->dir_wd >= 0 && !WatchShared (w, w->dir_wd))
+	inotify_rm_watch (watch_fd, w->dir_wd);
+      XtFree (w->dir);
+      XtFree (w->base);
+      *w = watches[--num_watches];
+    }
+  _DtProcessUnlock ();
+}
+
+#else /* DT_CONTROL_INOTIFY */
+
+static Boolean
+StartFileWatch (DtControlGadget g)
+{
+  return False;
+}
+
+static void
+StopFileWatch (DtControlGadget g)
+{
+}
+
+#endif /* DT_CONTROL_INOTIFY */
+
+
+/*-------------------------------------------------------------
+**	Animation images
+**
+**	_DtControlAdd{Push,Drop}AnimationImage only remember the image
+**	name; the pixmaps are loaded the first time the animation runs.
+**	(They were all loaded when the front panel was built, whether
+**	an animation ever ran or not.)  The names live beside the gadget
+**	so that the installed instance record keeps its layout.
+*/
+
+typedef struct {
+  String *	push;		/* names not loaded yet (NULL: loaded) */
+  int		num_push;
+  String *	drop;
+  int		num_drop;
+} AnimationNames;
+
+static XContext animationContext = 0;
+
+static AnimationNames *
+GetAnimationNames (DtControlGadget g, Boolean create)
+{
+  Display *dpy = XtDisplayOfObject ((Widget) g);
+  XPointer data;
+  AnimationNames *names;
+
+  _DtProcessLock ();
+  if (animationContext == 0)
+    animationContext = XUniqueContext ();
+  _DtProcessUnlock ();
+
+  if (XFindContext (dpy, (XID) (uintptr_t) g, animationContext, &data) == 0)
+    return (AnimationNames *) data;
+  if (!create)
+    return NULL;
+
+  names = (AnimationNames *) XtMalloc (sizeof (AnimationNames));
+  memset (names, 0, sizeof (AnimationNames));
+  if (XSaveContext (dpy, (XID) (uintptr_t) g, animationContext,
+		    (XPointer) names) != 0)
+    {
+      XtFree ((char *) names);
+      return NULL;
+    }
+  return names;
+}
+
+/* Remember image as animation image i; False if it must load now. */
+static Boolean
+DeferAnimationImage (DtControlGadget g, Boolean push, int i, String image)
+{
+  AnimationNames *names = GetAnimationNames (g, True);
+  String **list;
+  int *num;
+
+  if (names == NULL || image == NULL)
+    return False;
+
+  list = push ? &names->push : &names->drop;
+  num = push ? &names->num_push : &names->num_drop;
+  if (i >= *num)
+    {
+      int n = push ? G_MaxPushImages (g) : G_MaxDropImages (g);
+
+      *list = (String *) XtRealloc ((char *) *list, n * sizeof (String));
+      memset (*list + *num, 0, (n - *num) * sizeof (String));
+      *num = n;
+    }
+  (*list)[i] = XtNewString (image);
+  return True;
+}
+
+static void
+LoadAnimationImages (DtControlGadget g, Boolean push)
+{
+  AnimationNames *names = GetAnimationNames (g, False);
+  String *list;
+  int i, n;
+
+  if (names == NULL)
+    return;
+
+  list = push ? names->push : names->drop;
+  n = push ? G_NumPushImages (g) : G_NumDropImages (g);
+  if (n > (push ? names->num_push : names->num_drop))
+    n = push ? names->num_push : names->num_drop;
+
+  for (i = 0; i < n; i++)
+    {
+      Pixmap pix, mask;
+
+      if (list[i] == NULL)
+	continue;
+      pix = XmGetPixmap (XtScreen (g), list[i],
+			 G_PixmapForeground (g), G_PixmapBackground (g));
+      mask = _DtGetMask (XtScreen (g), list[i]);
+      if (push)
+	{
+	  G_PushPixmaps (g)[i] = pix;
+	  G_PushMasks (g)[i] = mask;
+	}
+      else
+	{
+	  G_DropPixmaps (g)[i] = pix;
+	  G_DropMasks (g)[i] = mask;
+	}
+      XtFree (list[i]);
+      list[i] = NULL;
+    }
+}
+
+static void
+FreeAnimationNames (DtControlGadget g)
+{
+  AnimationNames *names = GetAnimationNames (g, False);
+  int i;
+
+  if (names == NULL)
+    return;
+  for (i = 0; i < names->num_push; i++)
+    XtFree (names->push[i]);
+  for (i = 0; i < names->num_drop; i++)
+    XtFree (names->drop[i]);
+  XtFree ((char *) names->push);
+  XtFree ((char *) names->drop);
+  XDeleteContext (XtDisplayOfObject ((Widget) g), (XID) (uintptr_t) g,
+		  animationContext);
+  XtFree ((char *) names);
+}
+
+
 /*-------------------------------------------------------------
 **	ClickTimeout
 **		An XtTimerCallbackProc.
@@ -844,6 +1395,12 @@ Initialize(
 		  if ((str = getenv ("MAIL")) == NULL)
 		    {
 		      str = getenv ("LOGNAME");
+		      if (str == NULL)	/* (was a strlen(NULL)) */
+			{
+			  struct passwd *pw = getpwuid (getuid ());
+
+			  str = pw ? pw->pw_name : "";
+			}
 		      G_FileName (new) = 
 			XtMalloc (strlen (MAIL_DIR) + strlen (str) + 1);
 		      strcpy (G_FileName (new), MAIL_DIR);
@@ -880,10 +1437,12 @@ Initialize(
 	  ((G_ControlType (new) == XmCONTROL_MONITOR) ||
 	   (G_ControlType (new) == XmCONTROL_MAIL)))
 	{
+	  /* (watch first, so that no change goes unseen) */
+	  if (!StartFileWatch (new))
+	    G_MonitorTimer (new) =
+	      XtAppAddTimeOut (app_context, G_MonitorTime (new),
+			       FileCheckTimeout, (XtPointer) new);
 	  CheckFile (new);
-	  G_MonitorTimer (new) =
-	    XtAppAddTimeOut (app_context, G_MonitorTime (new),
-			     FileCheckTimeout, (XtPointer) new);
 	}
 
       /*	Check for Control state change.
@@ -943,6 +1502,9 @@ Destroy(
 {
   DtControlGadget	g =	(DtControlGadget) w;
   
+  StopFileWatch (g);
+  FreeAnimationNames (g);
+
   if (G_FileName (g) != NULL)
     XtFree (G_FileName (g));
   
@@ -1838,6 +2400,7 @@ _DtControlDoPushAnimation(
   
   if ((G_NumPushImages (g) > 0) && (G_PushImagePosition (g) == 0))
     {
+      LoadAnimationImages (g, True);
       G_PushImagePosition (g) = 1;
       PushAnimationTimeout ((XtPointer) g, NULL);
     }
@@ -1878,6 +2441,13 @@ _DtControlAddPushAnimationImage(
    */
   i = G_NumPushImages (g)++;
   G_PushDelays (g)[i] = delay;
+  if (DeferAnimationImage (g, True, i, image))
+    {
+      /* loaded by _DtControlDoPushAnimation */
+      G_PushPixmaps (g)[i] = XmUNSPECIFIED_PIXMAP;
+      G_PushMasks (g)[i] = XmUNSPECIFIED_PIXMAP;
+      return;
+    }
   G_PushPixmaps (g)[i] = XmGetPixmap (XtScreen (g), image,
 				      G_PixmapForeground (g), 
 				      G_PixmapBackground (g));
@@ -1927,6 +2497,7 @@ _DtControlDoDropAnimation(
   
   if ((G_NumDropImages (g) > 0) && (G_DropImagePosition (g) == 0))
     {
+      LoadAnimationImages (g, False);
       G_DropImagePosition (g) = 1;
       DropAnimationTimeout ((XtPointer) g, NULL);
     }
@@ -1967,6 +2538,13 @@ _DtControlAddDropAnimationImage(
    */
   i = G_NumDropImages (g)++;
   G_DropDelays (g)[i] = delay;
+  if (DeferAnimationImage (g, False, i, image))
+    {
+      /* loaded by _DtControlDoDropAnimation */
+      G_DropPixmaps (g)[i] = XmUNSPECIFIED_PIXMAP;
+      G_DropMasks (g)[i] = XmUNSPECIFIED_PIXMAP;
+      return;
+    }
   G_DropPixmaps (g)[i] = XmGetPixmap (XtScreen (g), image,
 				      G_PixmapForeground (g), 
 				      G_PixmapBackground (g));
