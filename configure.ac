@@ -452,6 +452,8 @@ if test "x$enable_hardening" != xno; then
    CDE_CHECK_LDFLAG([-Wl,-z,now], [HARDEN_LDFLAGS])
 fi
 AC_SUBST(FORTIFY_SOURCE_2)
+dnl for code built by its own build system (ksh93)
+AC_SUBST(HARDEN_CFLAGS)
 
 dnl assert() checks (--enable-debug).  A release build defines NDEBUG.
 dnl Code that is not ready for that yet (asserts guarding the only use of
@@ -1117,8 +1119,32 @@ include/Makefile
 
 copyright
 doc/common/help/HELPEnt.sgm
-include/Dt/Dt.h
 lib/tt/bin/ttauth/ttauth.man
+])
+
+dnl include/Dt/Dt.h carries the version and is included by most of the
+dnl tree.  Write it only when its content changes, so that rerunning
+dnl configure does not rebuild everything that includes it.  (The
+dnl top-level Makefile has the same rule for when Dt.h.in changes.)
+AC_CONFIG_COMMANDS([include/Dt/Dt.h], [
+  cde_dt_h_tmp=include/Dt/Dt.h.tmp
+  sed -e "s|@CDE_VERSION_MAJOR@|$cde_version_major|g" \
+      -e "s|@CDE_VERSION_MINOR@|$cde_version_minor|g" \
+      -e "s|@CDE_VERSION_MICRO@|$cde_version_micro|g" \
+      -e "s|@CDE_VERSION_DEV@|$cde_version_dev|g" \
+      "$cde_srcdir/include/Dt/Dt.h.in" > "$cde_dt_h_tmp" || exit 1
+  if cmp -s "$cde_dt_h_tmp" include/Dt/Dt.h; then
+    AC_MSG_NOTICE([include/Dt/Dt.h is unchanged])
+    rm -f "$cde_dt_h_tmp"
+  else
+    mv -f "$cde_dt_h_tmp" include/Dt/Dt.h || exit 1
+  fi
+], [
+  cde_srcdir="$srcdir"
+  cde_version_major="$CDE_VERSION_MAJOR"
+  cde_version_minor="$CDE_VERSION_MINOR"
+  cde_version_micro="$CDE_VERSION_MICRO"
+  cde_version_dev="$CDE_VERSION_DEV"
 ])
 
 AC_OUTPUT
