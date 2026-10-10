@@ -1596,7 +1596,14 @@ static void UnmapCallback (Widget w, XtPointer client_data,
     }
 
     ForceColormapFocus (ACTIVE_PSD, ACTIVE_PSD->colormapFocus);
-    PullExposureEvents();
+
+    /*
+     * Repaint what has already been exposed; the rest is handled by
+     * the event loop, by an interactive move or resize while it waits
+     * for the pointer, or before it grabs the server (DoGrabs).  This
+     * used to XSync both connections at every unpost.
+     */
+    PullQueuedExposureEvents();
 
 } /* END OF FUNCTION UnmapCallback */
 

@@ -2798,6 +2798,12 @@ Boolean DoGrabs (Window grab_win, Cursor cursor, unsigned int pmask, Time grabTi
 	if (!pCD || ((pCD->pSD->moveOpaque && alwaysGrab) ||
 	           (!(pCD->pSD->moveOpaque))))
 	{
+	    /*
+	     * Repaint what earlier requests uncovered (a menu that was
+	     * just unposted to start this move or resize, for instance)
+	     * while the server still serves everyone.
+	     */
+	    PullExposureEvents ();
 	    XGrabServer(DISPLAY);
         }
     }
