@@ -334,6 +334,13 @@ KeepClosedVolume (_DtHelpVolume vol)
 	return;
       }
 
+    /*
+     * the formatted title belongs to the display area that asked for it
+     * (and may be destroyed with it); the next opener formats its own.
+     */
+    if (vol->sdl_flag == True)
+	_DtHelpCeForgetSdlVolTitle((_DtHelpVolumeHdl) vol);
+
     if (CLOSED_VOL_MAX == ClosedCnt)
 	DropClosedVolume(ClosedCnt - 1);
 

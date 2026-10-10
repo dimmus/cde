@@ -1264,10 +1264,11 @@ WidthUpTo (
     int		 ascii = _DtHelpCeAsciiIsSingleByte();
 
     /*
-     * every string is at least one unit wide.
+     * no width is negative.  (A limit of 0 is still measured: an empty
+     * or zero width string fits it.)
      */
-    if (limit < 1)
-	return 1;
+    if (limit < 0)
+	return 0;
 
     _DtCvFontMetrics(canvas, _DtCvFontOfStringSeg(p_seg),
 					NULL, NULL, &maxWidth, NULL, NULL);

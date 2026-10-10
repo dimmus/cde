@@ -50,6 +50,8 @@ extern	void		 _DtHelpCeCleanSdlVolume(
 				_DtHelpVolumeHdl	volume );
 extern	void		 _DtHelpCeCloseSdlVolume (
 				_DtHelpVolumeHdl	volume);
+extern	void		 _DtHelpCeForgetSdlVolTitle (
+				_DtHelpVolumeHdl	volume);
 extern	int		 _DtHelpCeFindSdlId (
 				_DtHelpVolumeHdl  vol,
 				char		 *target_id,

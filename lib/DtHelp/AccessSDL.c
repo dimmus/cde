@@ -1109,6 +1109,37 @@ _DtHelpCeCloseSdlVolume (
       }
 }
 
+/*******************************************************************************
+ * Function:    void _DtHelpCeForgetSdlVolTitle (_DtHelpVolumeHdl volume);
+ *
+ * Purpose:     Free the volume's formatted title and snb.  They were made
+ *              for (and hold fonts, special characters and graphics of)
+ *              the display area that first asked for the title, and they
+ *              are freed through that display area.  A volume that stays
+ *              loaded after its last close must not keep them: that
+ *              display area may be destroyed, and the next opener formats
+ *              the title again for its own.
+ ******************************************************************************/
+void
+_DtHelpCeForgetSdlVolTitle (
+     _DtHelpVolumeHdl	 volume)
+{
+    CESDLVolume	*sdlVol = _DtHelpCeGetSdlVolumePtr(volume);
+
+    if (sdlVol != NULL)
+      {
+	_DtHelpFreeSegments(sdlVol->snb  , _DtCvFALSE, sdlVol->destroy_region,
+							sdlVol->client_data);
+	_DtHelpFreeSegments(sdlVol->title, _DtCvFALSE, sdlVol->destroy_region,
+							sdlVol->client_data);
+	sdlVol->snb             = NULL;
+	sdlVol->title           = NULL;
+	sdlVol->client_data     = NULL;
+	sdlVol->destroy_region  = NULL;
+	sdlVol->title_processed = False;
+      }
+}
+
 /*****************************************************************************
  * Function: Boolean _DtHelpCeGetSdlHomeTopicId (_DtHelpVolume vol,
  *					char *target_id,

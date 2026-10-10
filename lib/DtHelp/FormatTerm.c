@@ -381,7 +381,9 @@ TermStrDraw (
 		continue;
 	      }
 	    n = mbtowc(&wch, mb, byte_len);
-	    if (n <= 0)
+	    if (n == 0)
+		break;		/* end of the string: don't read past it */
+	    if (n < 0)
 	      {
 		wch = (wchar_t) '?';
 		n   = 1;

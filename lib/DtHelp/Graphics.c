@@ -596,12 +596,19 @@ GreyScale (
   for (j=0, x = 0; j<height; j++)
     for (i=0; i<width; i++, x++) {
       n = XGetPixel(in_image, i, j);
-      if (rshift)
+      /*
+       * Do_Direct passes the (non-zero) masks, Do_Pseudo zeros; a
+       * shift of 0 (red in the low bits) is still a direct image.
+       * Out of range indexes (a corrupt file) don't index the map.
+       */
+      if (rmask)
 	{
 	  ret_color.red   = (n >> rshift) & rmask;
 	  ret_color.green = (n >> gshift) & gmask;
 	  ret_color.blue  = (n >> bshift) & bmask;
-	  if (ncolors)
+	  if (ncolors && ret_color.red < (unsigned) ncolors
+		&& ret_color.green < (unsigned) ncolors
+		&& ret_color.blue < (unsigned) ncolors)
 	    {
 	      ret_color.red   = colors[ret_color.red  ].red;
 	      ret_color.green = colors[ret_color.green].green;
@@ -617,9 +624,11 @@ GreyScale (
           value = (((int)(ret_color.red*299) + (int)(ret_color.green*587) +
 				(int)(ret_color.blue*114)) / 1000) >> 8;
 	}
-      else
+      else if (n < (Pixel) ncolors)
           value = (((int)(colors[n].red*299) + (int)(colors[n].green*587) +
 				(int)(colors[n].blue*114)) / 1000) >> 8;
+      else
+          value = 0;
       grey_scale[x] = value;
       valueArray[value]++;
      } /* for(i...) */
