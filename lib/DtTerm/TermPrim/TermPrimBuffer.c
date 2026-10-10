@@ -38,6 +38,7 @@
 
 #include <stdlib.h>
 #include <wchar.h>
+#include <string.h>
 #include <Xm/Xm.h>
 #include "TermHeader.h"       /* for MIN/MAX */
 #include "TermPrim.h"
@@ -178,6 +179,8 @@ _DtTermPrimBufferCreateBuffer
     ** Initialize the new TermBuffer.
     */
     LINES(newTB)                = newTL;
+    newTB->term_buffer.linesBase  = newTL;
+    newTB->term_buffer.linesAlloc = MAX(rows, 1);
     TABS(newTB)                 = tabs;
     ROWS(newTB)                 = rows;
     COLS(newTB)                 = cols;
@@ -234,7 +237,7 @@ _DtTermPrimBufferFreeBuffer
 	(void) free(LINES(tb)[i]);
     }
     (void) free(TABS(tb));
-    (void) free(LINES(tb));
+    (void) free(tb->term_buffer.linesBase);
     (void) free(tb);
 }
 
@@ -426,8 +429,10 @@ _DtTermPrimBufferResizeBuffer
 		*/
 		memcpy(newTL, LINES(*oldTB), sizeof(TermLine) * 
 		       ROWS(*oldTB));
-		free(LINES(*oldTB));
+		free((*oldTB)->term_buffer.linesBase);
 		LINES(*oldTB) = newTL;
+		(*oldTB)->term_buffer.linesBase = newTL;
+		(*oldTB)->term_buffer.linesAlloc = *newRows;
 		
 		/*
 		** now initialize the new lines...
@@ -1649,6 +1654,104 @@ _DtTermPrimBufferMoveLockArea
 }
 
 
+/*
+** Move lines [0, length) of the buffer to [ROWS - length, ROWS) and the
+** lines below them up by length (what scrolling a full buffer, or adding
+** a line to a full history buffer, does on every new line).  Lines past
+** ROWS (unused after the buffer shrank) stay where they are.
+**
+** Rather than moving every line pointer, this slides the start of the
+** line array forward in an allocation that has room for that, and only
+** moves the array back to the start of the allocation when it runs out of
+** room (every MAX_ROWS lines or so).
+**
+** Returns False (having changed nothing) if it can't.
+*/
+#define	ROTATE_MAX_LINES	16
+
+static Boolean
+rotateLinesUp(const TermBuffer tb, const short length)
+{
+    TermLine save[ROTATE_MAX_LINES];
+    TermLine *lines;
+    TermLine *newBase;
+    int maxRows = MAX_ROWS(tb);
+    int newAlloc;
+
+    if ((length <= 0) || (length > ROTATE_MAX_LINES) || (length >= ROWS(tb))) {
+	return(False);
+    }
+
+    if ((LINES(tb) - tb->term_buffer.linesBase) + maxRows + length >
+	    tb->term_buffer.linesAlloc) {
+	/* no room to slide forward... */
+	newAlloc = 2 * maxRows + ROTATE_MAX_LINES;
+	if (tb->term_buffer.linesAlloc < newAlloc) {
+	    /* make room... */
+	    newBase = (TermLine *) malloc(newAlloc * sizeof(TermLine));
+	    if (!newBase) {
+		return(False);
+	    }
+	    (void) memcpy(newBase, LINES(tb), maxRows * sizeof(TermLine));
+	    free(tb->term_buffer.linesBase);
+	    tb->term_buffer.linesBase = newBase;
+	    tb->term_buffer.linesAlloc = newAlloc;
+	} else {
+	    /* move back to the start... */
+	    (void) memmove(tb->term_buffer.linesBase, LINES(tb),
+		    maxRows * sizeof(TermLine));
+	}
+	LINES(tb) = tb->term_buffer.linesBase;
+    }
+
+    lines = LINES(tb);
+    (void) memcpy(save, lines, length * sizeof(TermLine));
+    if (maxRows > ROWS(tb)) {
+	(void) memmove(&lines[ROWS(tb) + length], &lines[ROWS(tb)],
+		(maxRows - ROWS(tb)) * sizeof(TermLine));
+    }
+    (void) memcpy(&lines[ROWS(tb)], save, length * sizeof(TermLine));
+    LINES(tb) = lines + length;
+    return(True);
+}
+
+/**************************************************************************
+ *  Function:
+ *	_DtTermPrimBufferSwapLines(): exchange a line of one buffer with a
+ *		line of another one (such as the active and the history
+ *		buffer), if the two buffers have the same kind of lines.
+ *
+ *  Returns:
+ *	True if the lines were exchanged.
+ */
+Boolean
+_DtTermPrimBufferSwapLines
+(
+    const TermBuffer tb1,
+    const short row1,
+    const TermBuffer tb2,
+    const short row2
+)
+{
+    TermLine tmp;
+
+    if (!tb1 || !tb2 || !VALID_ROW(tb1, row1) || !VALID_ROW(tb2, row2) ||
+	    (MAX_COLS(tb1) != MAX_COLS(tb2)) ||
+	    (SIZE_OF_LINE(tb1) != SIZE_OF_LINE(tb2)) ||
+	    (BYTES_PER_CHAR(tb1) != BYTES_PER_CHAR(tb2)) ||
+	    (NUM_ENH_FIELDS(tb1) != NUM_ENH_FIELDS(tb2)) ||
+	    (BUFFER_FREE(tb1) != BUFFER_FREE(tb2)) ||
+	    (CLEAR_LINE(tb1) != CLEAR_LINE(tb2)) ||
+	    (SET_ENH(tb1) != SET_ENH(tb2))) {
+	return(False);
+    }
+
+    tmp = LINE_OF_TBUF(tb1, row1);
+    LINE_OF_TBUF(tb1, row1) = LINE_OF_TBUF(tb2, row2);
+    LINE_OF_TBUF(tb2, row2) = tmp;
+    return(True);
+}
+
 /**************************************************************************
  *  Function:
  *	_DtTermPrimBufferInsertLine():  insert one or more lines of text from
@@ -1735,6 +1838,17 @@ _DtTermPrimBufferInsertLine
 	for (i = 0; (i < length) && ((i + dest) < ROWS(tb)); i++) {
             _DtTermPrimBufferClearLine(tb, src + i, 0);
 	}
+	return;
+    }
+
+    /* the common case of moving the top lines to the bottom of the
+     * buffer...
+     */
+    if ((src == 0) && (dest == ROWS(tb) - 1) && rotateLinesUp(tb, length)) {
+	for (i = 0; i < length; i++) {
+            _DtTermPrimBufferClearLine(tb, dest - length + 1 + i, 0);
+	}
+	DebugF('B', 1, CheckTermBuffer(tb,refLines,refLineCount));
 	return;
     }
 

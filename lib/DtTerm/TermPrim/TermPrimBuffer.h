@@ -542,6 +542,15 @@ _DtTermPrimBufferInsertLineFromTB
     const InsertSource    insertSource
 );
 
+extern Boolean
+_DtTermPrimBufferSwapLines
+(
+    const TermBuffer	    tb1,
+    const short	            row1,
+    const TermBuffer	    tb2,
+    const short	            row2
+);
+
 extern void
 _DtTermPrimBufferDeleteLine
 (

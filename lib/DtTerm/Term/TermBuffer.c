@@ -312,8 +312,10 @@ _DtTermBufferResize
 	    ** free it...
 	    */
 	    memcpy(lines, DT_LINES(tb), sizeof(DtLine) * MAX_ROWS(tb));
-	    free(DT_LINES(tb));
+	    free(tb->term_buffer.linesBase);
 	    LINES(tb) = (TermLine *)lines;
+	    tb->term_buffer.linesBase = (TermLine *)lines;
+	    tb->term_buffer.linesAlloc = *newRows;
 	    
 	    /*
 	    ** now initialize the new lines...

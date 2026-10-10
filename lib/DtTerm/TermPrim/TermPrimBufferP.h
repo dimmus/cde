@@ -167,6 +167,8 @@ typedef struct _TermBufferPart
     TermLineSetWidth    set_line_width;
     TermLineClear       clear_line;
     Widget		widget;	      /* the widget that created this buffer */
+    TermLine           *linesBase;    /* the allocation lines points into    */
+    int                 linesAlloc;   /* number of TermLines allocated       */
 } TermBufferPart;
 
 typedef struct _TermBufferRec

@@ -804,6 +804,21 @@ _DtTermPrimFillScreenGap(Widget w)
 			termChar *overflowChars;
 			short overflowCount;
 
+			/* the cheap way: give the line itself to the history
+			 * buffer, and the active buffer the unused history
+			 * line, which is cleared when it is moved to the
+			 * bottom below (its selection flag has to be clear
+			 * before that, or we would release the selection)...
+			 */
+			if (_DtTermPrimBufferSwapLines(tpd->historyBuffer,
+				tpd->lastUsedHistoryRow, tBuffer, i1)) {
+			    (void) _DtTermPrimBufferSetInSelectionFlag(
+				tBuffer, i1, (TermLineSelection) 0);
+			    (void) tpd->lastUsedHistoryRow++;
+			    (void) linesCopied++;
+			    continue;
+			}
+
 			/* get the line from the active buffer... */
 			length = _DtTermPrimBufferGetLineLength(tBuffer,
 				i1);
