@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 bin_PROGRAMS = dthello
 
 dthello_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)

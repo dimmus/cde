@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 # get our env variables
 include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 
@@ -31,8 +35,10 @@ BUILT_SOURCES = Prelude.h Support/Support.d Support/Support.h		\
 
 CLEANFILES = $(BUILT_SOURCES)
 
-Prelude.h:
-	$(top_builddir)/programs/dtinfo/tools/misc/pmaker $(CLASSLIBS)
+PMAKER = $(top_builddir)/programs/dtinfo/tools/misc/pmaker
+
+Prelude.h: Classlist.mk $(PMAKER)
+	$(PMAKER) $(CLASSLIBS)
 
 Dtinfo: Dtinfo.res $(RESFILES)
 	$(CPP_PROGRAM) -traditional -nostdinc -C Dtinfo.res | $(TREERES) > $@
@@ -45,13 +51,14 @@ include $(top_srcdir)/programs/dtinfo/dtinfo/src/dtinfo_dfiles_hfiles.mk
 
 noinst_DATA = dtinfo.msg.updated
 
-dtinfo.msg.updated:
-	(msgs=; for i in $(MSGS) ; do msgs="$$msgs $$i/$$i.msg"; done; \
-	 cat $$msgs >dtinfo.cpp && \
-	 $(CPP_PROGRAM) -traditional -nostdinc -P -C dtinfo_msg.tmpl | $(MSGSETS) > dtinfo.msg.updated; \
-	 $(RM) dtinfo.cpp )
+dtinfo.msg.updated: $(foreach i,$(MSGS),$(i)/$(i).msg) dtinfo_msg.tmpl $(MSGSETS)
+	msgs=; for i in $(MSGS) ; do msgs="$$msgs $$i/$$i.msg"; done; \
+	cat $$msgs >dtinfo.cpp && \
+	$(CPP_PROGRAM) -traditional -nostdinc -P -C dtinfo_msg.tmpl | $(MSGSETS) > $@.tmp && \
+	mv -f $@.tmp $@; \
+	status=$$?; $(RM) dtinfo.cpp; exit $$status
 
-CLEANFILES += dtinfo.msg.updated dtinfo.cpp
+CLEANFILES += dtinfo.msg.updated dtinfo.msg.updated.tmp dtinfo.cpp
 
 ## dtinfo proper
 OLIASNORMALLIBS= Agents/libAgents.a Other/libOther.a			\

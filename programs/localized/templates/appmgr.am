@@ -85,7 +85,7 @@ appmgr_allfiles = $(desktop_apps_SCRIPTS) $(graphics_SCRIPTS)		\
 	$(information_SCRIPTS)
 
 BUILT_SOURCES = $(appmgr_allfiles)
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 $(appmgr_allfiles): $(ACTION)
-	$(CP) $(ACTION) $@ || $(RM) $@
+	$(CP) $(ACTION) $@.tmp && mv -f $@.tmp $@

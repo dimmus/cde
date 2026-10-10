@@ -13,7 +13,7 @@ BUILT_SOURCES = Xm.cat Mrm.cat Uil.cat DtHelp.cat DtMail.cat		\
       dtudcexch.cat dtudcfonted.cat libdtcm.cat libDtMail.cat		\
       dtinfo.cat dtinfo_start.cat
 
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 msgcatdir = $(CDE_INSTALLATION_TOP)/lib/nls/msg/$(LANG)
 dist_msgcat_DATA = $(BUILT_SOURCES)
@@ -25,26 +25,26 @@ TOPMOTIF = $(top_builddir)/imports/
 MKCATDEFS = $(TOP)/localized/util/mkcatdefs
 
 Xm.cat: $(top_srcdir)/imports/motif/localized/$(LANG)/msg/Xm.msg
-	$(RM) $@
+	$(RM) $@ $@.tmp
 	$(MKCATDEFS) Xm $^ -h > Xm.tmp.msg
-	LANG=C $(GENCAT) $@ Xm.tmp.msg || $(RM) $@
+	LANG=C $(GENCAT) $@.tmp Xm.tmp.msg && mv -f $@.tmp $@
 	$(RM) Xm.tmp.msg
 
 Mrm.cat: $(top_srcdir)/imports/motif/localized/$(LANG)/msg/Mrm.msg
-	$(RM) $@
+	$(RM) $@ $@.tmp
 	$(MKCATDEFS) Mrm $^ -h > Mrm.tmp.msg
-	LANG=C $(GENCAT) $@ Mrm.tmp.msg || $(RM) $@
+	LANG=C $(GENCAT) $@.tmp Mrm.tmp.msg && mv -f $@.tmp $@
 	$(RM) Mrm.tmp.msg
 
 Uil.cat: $(top_srcdir)/imports/motif/localized/$(LANG)/msg/Uil.msg
-	$(RM) $@
+	$(RM) $@ $@.tmp
 	$(MKCATDEFS) Uil $^ -h > Uil.tmp.msg
-	LANG=C $(GENCAT) $@ Uil.tmp.msg || $(RM) $@
+	LANG=C $(GENCAT) $@.tmp Uil.tmp.msg && mv -f $@.tmp $@
 	$(RM) Uil.tmp.msg
 
 DtHelp.cat: $(TOPLIB)/DtHelp/DtHelp.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 # FIXME This appears to have been broken a long time ago.  Needs
 # investigation.
@@ -54,178 +54,178 @@ DtHelp.cat: $(TOPLIB)/DtHelp/DtHelp.msg
 #	LANG=C $(GENCAT) $@ $^ || $(RM) $@
 
 DtMail.cat: $(TOP)/dtmail/dtmail/DtMail.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 DtPrint.cat: $(TOPLIB)/DtPrint/DtPrint.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 DtWidget.cat: $(TOPLIB)/DtWidget/DtWidget.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 MotifApp.cat: $(TOP)/dtmail/MotifApp/MotifApp.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 SUNW_TOOLTALK.cat: $(TOPLIB)/tt/SUNW_TOOLTALK.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dt.cat: $(TOPLIB)/DtSvc/dtsvc.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtact.cat: $(TOP)/dtaction/dtact.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtcodegen.cat: $(TOP)/dtappbuilder/src/libAButil/libAButil.msg $(TOP)/dtappbuilder/src/libABobjXm/libABobjXm.msg $(TOP)/dtappbuilder/src/libABil/libABil.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtbuilder.cat: $(TOP)/dtappbuilder/src/libAButil/libAButil.msg $(TOP)/dtappbuilder/src/libABobjXm/libABobjXm.msg $(TOP)/dtappbuilder/src/libABil/libABil.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtcalc.cat: $(TOP)/dtcalc/dtcalc.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtcm.cat: $(TOP)/dtcm/dtcm/dtcm.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtconfig.cat: $(TOP)/dtconfig/dtconfig.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtcopy.cat: $(TOP)/dtfile/dtcopy/dtcopy.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtcreate.cat: $(TOP)/dtcreate/dtcreate.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtfile.cat: $(TOP)/dtfile/dtfile.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dthello.cat: $(TOP)/dthello/dthello.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dthelpgen.cat: $(TOP)/dthelp/dthelpgen/dthelpgen.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dthelpprint.cat: $(TOP)/dthelp/dthelpprint/dthelpprint.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dticon.cat: $(TOP)/dticon/dticon.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtimsstart.cat: $(TOP)/dtimsstart/dtimsstart.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtinfo.cat: $(TOP)/dtinfo/dtinfo/src/dtinfo.msg.updated
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtinfo_start.cat: $(TOP)/dtinfo/clients/dtinfo_start/dtinfo_start.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtksh.cat: $(TOP)/dtksh/dtksh.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtlogin.cat: $(TOP)/dtlogin/dtlogin.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtlp.cat: $(TOP)/dtprintegrate/dtlp.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtmailopts.cat: $(TOP)/dtmail/dtmail/dtmailopts.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtpad.cat: $(TOP)/dtpad/dtpad.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtpdm.cat: $(TOP)/dtpdm/dtpdm.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtpdmd.cat: $(TOP)/dtpdmd/dtpdmd.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 # This one assumes that sym2num was already run on this berfore we get here
 dtprintinfo.cat: $(TOP)/dtprintinfo/dtprintinfo.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtscreen.cat: $(TOP)/dtscreen/dtscreen.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtsearch.cat: $(TOPLIB)/DtSearch/dtsearch.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtsession.cat: $(TOP)/dtsession/dtsession.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtstyle.cat: $(TOP)/dtstyle/dtstyle.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtterm.cat: $(TOP)/dtterm/dtterm.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dttypes.cat: $(TOP)/util/dttypes/dttypes.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtwm.cat: $(TOP)/dtwm/dtwm.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtudcexch.cat: $(TOP)/dtudcexch/dtudcexch.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 dtudcfonted.cat: $(TOP)/dtudcfonted/dtudcfonted.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 libABil.cat: $(TOP)/dtappbuilder/src/libABil/libABil.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 libABobjXm.cat: $(TOP)/dtappbuilder/src/libABobjXm/libABobjXm.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 libAButil.cat: $(TOP)/dtappbuilder/src/libAButil/libAButil.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 libdtcm.cat: $(TOP)/dtcm/libDtCmP/libdtcm.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 libDtMail.cat: $(TOP)/dtmail/libDtMail/Common/libDtMail.msg
-	$(RM) $@
-	LANG=C $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=C $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@

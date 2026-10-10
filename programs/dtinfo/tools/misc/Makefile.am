@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 noinst_PROGRAMS = dfiles pmaker msgsets
 
 noinst_SCRIPTS = treeres

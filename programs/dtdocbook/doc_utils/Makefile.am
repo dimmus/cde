@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 include ../dtdocbook.am
 
 infolib = ../infolib
@@ -19,7 +23,7 @@ noinst_PROGRAMS = \
 noinst_SCRIPTS = dtdocbook2man dtdocbook2sdl
 
 AM_CXXFLAGS = $(CDE_CXXFLAGS) -DCDE_NEXT -I$(top_builddir)/lib/DtMmdb
-AM_LDFLAGS = $(CDE_LDFLAGS) $(DTCLIENTLIBS) $(XTOOLLIB)
+LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
 
 dtdcbk_datarootdir = $(abs_top_srcdir)/programs/dtdocbook
 
@@ -28,7 +32,7 @@ AM_CPPFLAGS = $(CDE_CPPFLAGS) \
 	      -DINFOLIB_LIBEXECDIR=\"$(PWD)\"
 
 validator_SOURCES = validator.C
-validator_LDFLAGS = $(CDE_LDFLAGS) $(LIBMMDB) $(LMDBLIB)
+validator_LDADD = $(LIBMMDB) $(LMDBLIB) $(LDADD)
 
 CLEANFILES = $(noinst_SCRIPTS) $(validator_SOURCES) dtdocbook2infolib.c
 
@@ -69,6 +73,3 @@ dtdocbook2sdl: ../dtdocbook2sdl
 		dtdcbk_datarootdir=$(dtdcbk_datarootdir) \
 		$(KSH) $(PWD)/$< \$$@" >> $@
 
-install:
-
-distclean:

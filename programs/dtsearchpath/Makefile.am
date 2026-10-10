@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 SUBDIRS = libCliSrv dtsp dtappg
 
 BUILT_SOURCES = 0010.dtpaths 0030.dttmpdir

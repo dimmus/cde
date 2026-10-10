@@ -1,3 +1,7 @@
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 configdir = $(CDE_INSTALLATION_TOP)/config/C
 
 SUBDIRS = dtcopy

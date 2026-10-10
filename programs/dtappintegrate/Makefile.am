@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 bin_SCRIPTS = dtappintegrate
 BUILT_SOURCES = $(bin_SCRIPTS)
 CLEANFILES = $(bin_SCRIPTS)

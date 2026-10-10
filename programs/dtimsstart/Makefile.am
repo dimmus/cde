@@ -1,3 +1,7 @@
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 xsessiondir = $(CDE_INSTALLATION_TOP)/config/Xsession.d
 
 MAINTAINERCLEANFILES = Makefile.in

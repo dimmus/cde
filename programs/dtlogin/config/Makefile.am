@@ -1,3 +1,7 @@
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 
 GENCPP_DEFINES = -DCDE_CONFIGURATION_TOP=$(CDE_CONFIGURATION_TOP) \
             -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \

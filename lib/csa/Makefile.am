@@ -1,3 +1,7 @@
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 csadir = $(includedir)/csa
 
 MAINTAINERCLEANFILES = Makefile.in

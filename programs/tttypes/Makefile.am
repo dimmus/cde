@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 # Merged into types.xdr in this order; a type defined in a later file
 # replaces one of the same name from an earlier file.
 PTYPES = \
