@@ -503,7 +503,9 @@ Sort::_sortCmp(char ** one, char ** two)
   messageRecord	* first = (messageRecord *) *one;
   messageRecord	* second = (messageRecord *) *two;
 
-  if (first->primary_key_str == NULL)
+  // Keys are either all ints or all strings, except that a message
+  // that could not be read has no string key: it sorts as "".
+  if (first->primary_key_str == NULL && second->primary_key_str == NULL)
   {
     if (first->primary_key_int < second->primary_key_int)
       return -1;
@@ -518,7 +520,8 @@ Sort::_sortCmp(char ** one, char ** two)
   }
   else
   {
-    int retval = strcmp(first->primary_key_str, second->primary_key_str);
+    int retval = strcmp(first->primary_key_str ? first->primary_key_str : "",
+			second->primary_key_str ? second->primary_key_str : "");
     if (retval)
       return retval;
     else if (first->secondary_key_int < second->secondary_key_int)

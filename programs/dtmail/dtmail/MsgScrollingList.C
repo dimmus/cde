@@ -2464,7 +2464,9 @@ MsgScrollingList::updateListItems(int current,
 
     	if (mail_error.isSet())
 	  fprintf(stderr, "dtmail: getMessage: Couldn't get message #%d\n", m);
-	
+
+	// A failed lookup leaves info alone: do not free the last row's.
+	info.header_values = NULL;
 	mbox->getMessageSummary(
 			mail_error, _msgs->at(m)->message_handle,
 			_header_info, info);
