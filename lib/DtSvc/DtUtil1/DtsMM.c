@@ -31,6 +31,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -43,7 +44,6 @@
 #include <sys/param.h>
 #endif
 #include <string.h>
-#include <libgen.h>
 #define X_INCLUDE_DIRENT_H
 #define XOS_USE_XT_LOCKING
 #include <X11/Xos_r.h>
@@ -54,7 +54,7 @@
 #include "DtSvcLock.h"
 
 extern char *strdup(const char *);
-static int MMValidateDb(DtDirPaths *dirs, char *suffix);
+static int MMValidateDb(DtDirPaths *dirs);
 static int _debug_print_name(char *name, char *label);
 
 typedef	int	(*genfunc)(const void *, const void *);
@@ -328,52 +328,136 @@ _DtDtsMMCompareFieldNames(DtDtsMMField *a, DtDtsMMField *b)
 
 #include <Dt/Dts.h>
 
+/* Results of mm_map_file() */
+enum
+{
+	MM_MAPPED,	/* mapped */
+	MM_ABSENT,	/* no such file */
+	MM_UNUSABLE,	/* ours, but not a cache file of this version */
+	MM_FOREIGN	/* not ours, not a plain file, or unreadable */
+};
+
+/* Results of MMValidateDb() */
+enum
+{
+	MM_VALID,
+	MM_STALE,	/* built from database files that have changed */
+	MM_OTHER_PATH	/* built for another database search path */
+};
+
+static int	mm_map_file(const char *CacheFile);
+
+/*
+ * The name of the cache file shared by the clients of a display
+ * (see _DTDTSMMTEMPDIR), or NULL if DISPLAY is not set.
+ */
+static char *
+shared_cache_name(void)
+{
+	char	*dsp = getenv("DISPLAY");
+	char	*results;
+	char	*c;
+	size_t	len;
+
+	if(!dsp || !*dsp)
+	{
+		return NULL;
+	}
+	len = strlen(_DTDTSMMTEMPDIR) + strlen(_DTDTSMMTEMPFILE) +
+	      strlen(dsp) + 2;
+	results = malloc(len);
+	if(!results)
+	{
+		return NULL;
+	}
+	snprintf(results, len, "%s/%s%s", _DTDTSMMTEMPDIR,
+		 _DTDTSMMTEMPFILE, dsp);
+	/* Drop the screen number.  (A DISPLAY without ':' used to crash.) */
+	c = strrchr(results, ':');
+	if(c && (c = strchr(c, '.')))
+	{
+		*c = '\0';
+	}
+	return results;
+}
+
+/*
+ * Maps the action/data type database, from the cache file shared by
+ * the clients of the display if it is up to date, or else from a new
+ * one.  With override, a new shared cache file is always built.
+ *
+ * A client that finds the shared cache missing, unusable (an older
+ * format, say) or out of date rebuilds it under the shared name for the
+ * clients that follow; it used to build a private copy, so every client
+ * started re-read all the database files until dtdbcache rebuilt the
+ * shared one.  The new file is renamed into place, so other clients see
+ * either the old or the new one.  A client whose database search path
+ * differs from the one the shared cache was built for (another LANG or
+ * DTDATABASESEARCHPATH) does not replace it, but builds a private one,
+ * as before.
+ */
 int
 _DtDtsMMInit(int override)
 {
 	DtDirPaths *dirs = _DtGetDatabaseDirPaths();
-	char	*CacheFile = _DtDtsMMCacheName(1);
+	char	*CacheFile = shared_cache_name();
+	int	ok;
+
 	if(override)
 	{
-		if (!_DtDtsMMCreateDb(dirs, CacheFile, override))
+		/* Without DISPLAY there is no shared name: build a private one. */
+		ok = _DtDtsMMCreateDb(dirs, CacheFile, CacheFile ? override : 0);
+		if (ok)
 		{
-			free(CacheFile);
-			_DtFreeDatabaseDirPaths(dirs);
-			return 0;
+			_debug_print_name(CacheFile ? CacheFile : "(private)",
+					  "Init");
 		}
-		_debug_print_name(CacheFile, "Init");
 	}
 	else
 	{
-		int success = _DtDtsMMapDB(CacheFile);
-		if(success)
+		int	replace = 0;
+		int	status = MM_FOREIGN;
+
+		if(CacheFile)
 		{
-			if(!MMValidateDb(dirs, ".dt"))
-			{
-				success = 0;
-			}
-			else
-			{
-				_debug_print_name(CacheFile, "Mapped");
-			}
+			status = mm_map_file(CacheFile);
 		}
-		if(!success)
+		if(status == MM_MAPPED)
 		{
-			free(CacheFile);
-			CacheFile = _DtDtsMMCacheName(0);
-			_debug_print_name(CacheFile, "Private");
-			/* Check return status, and pass status to caller. */
-			if (!_DtDtsMMCreateDb(dirs, CacheFile, override))
+			switch(MMValidateDb(dirs))
 			{
+			case MM_VALID:
+				_debug_print_name(CacheFile, "Mapped");
 				free(CacheFile);
 				_DtFreeDatabaseDirPaths(dirs);
-				return 0;
+				return 1;
+			case MM_STALE:
+				replace = 1;
+				break;
+			default:
+				break;
 			}
+		}
+		else if(status == MM_ABSENT || status == MM_UNUSABLE)
+		{
+			replace = 1;
+		}
+
+		if(replace)
+		{
+			_debug_print_name(CacheFile, "Rebuilt");
+			ok = _DtDtsMMCreateDb(dirs, CacheFile,
+					      DTDTSMM_SHARED_OR_PRIVATE);
+		}
+		else
+		{
+			_debug_print_name("(private)", "Private");
+			ok = _DtDtsMMCreateDb(dirs, NULL, 0);
 		}
 	}
 	free(CacheFile);
 	_DtFreeDatabaseDirPaths(dirs);
-	return 1;
+	return ok ? 1 : 0;
 }
 
 char **
@@ -499,107 +583,55 @@ _DtDtsMMGetRecordByName(DtDtsMMDatabase *db, const char *name)
 	}
 	return (&rec_ptr_list[*idx]);
 }
-int
-_DtDtsMMPathHash(DtDirPaths *dirs)
-{
-	int	pathhash = 0;
-	DIR	*dirp;
-	int	suffixLen;
-	int	nameLen;
-	char	*file_suffix;
-	char	*suffix = ".dt";
-	int	i;
-	char	*cur_dir = getcwd(0,MAXPATHLEN);
-	struct	stat	buf;
-
-	_Xreaddirparams dirEntryBuf;
-	struct dirent *result;
-	(void) dirEntryBuf; /* unused unless XTHREADS */
-
-	for(i = 0; dirs->paths[i] ; i++)
-	{
-		if(chdir(dirs->paths[i]) == -1)
-		{
-			continue;
-		}
-		dirp = opendir (".");
-		while ((result = _XReaddir(dirp, dirEntryBuf)) != NULL)
-		{
-			if ((int)strlen (result->d_name) >= (int)strlen(suffix))
-			{
-				suffixLen = DtCharCount(suffix);
-				nameLen = DtCharCount(result->d_name);
-				file_suffix = (char *)_DtGetNthChar(result->d_name,
-						nameLen - suffixLen);
-				stat(result->d_name, &buf);
-				if (file_suffix &&
-					(strcmp(file_suffix, suffix) == 0) &&
-					(buf.st_mode&S_IFREG))
-				{
-					char *c = dirs->paths[i];
-					while(*c)
-					{
-						pathhash += (int)*c;
-						c++;
-					}
-					break;
-				}
-			}
-		}
-		closedir(dirp);
-	}
-	chdir(cur_dir);
-	free(cur_dir);
-	return(pathhash);
-}
-
+/*
+ * The name of the shared cache file of the display, with override (and
+ * DISPLAY set); otherwise a name for a private one (no longer used by
+ * libDtSvc, whose private caches have no name).
+ */
 char *
 _DtDtsMMCacheName(int override)
 {
-	char	*dsp = getenv("DISPLAY");
-	char	*results = 0;
-	char	*c;
+	char	*results = override ? shared_cache_name() : NULL;
+	size_t	len;
+	int	fd;
 
-	if(override && dsp)
+	if(!results)
 	{
-		results = malloc(strlen(_DTDTSMMTEMPDIR)+
-				 strlen(_DTDTSMMTEMPFILE)+
-				strlen(dsp)+3);
-		sprintf(results, "%s/%s%s",
-				_DTDTSMMTEMPDIR,
-				_DTDTSMMTEMPFILE,
-				dsp);
-		c = strchr(results, ':');
-		c = strchr(c, '.');
-		if(c)
+		/*
+		 * A name not in use.  mkstemp() makes sure of that, and
+		 * the file is removed again: the caller creates it.
+		 * (tmpnam(), used before, is not safe.)
+		 */
+		len = strlen(_DTDTSMMTEMPDIR) + strlen(_DTDTSMMTEMPFILE) + 8;
+		results = malloc(len);
+		if(!results)
 		{
-			*c = '\0';
+			return NULL;
 		}
-	}
-	else
-	{
-	/* tempnam(3) is affected by the TMPDIR environment variable. */
-	/* This creates problems for rename() if "tmpfile" and "cacheFile" */
-	/* are on different file systems.  Use tmpnam(3) to create the */
-	/* unique file name instead. */
-		char tmpnam_buf[L_tmpnam + 1];
-
-		results = (char *)malloc(strlen(_DTDTSMMTEMPDIR) +
-					 strlen(_DTDTSMMTEMPFILE) +
-					 L_tmpnam + 3);
-		tmpnam(tmpnam_buf);
-		sprintf(results, "%s/%s%s", _DTDTSMMTEMPDIR, _DTDTSMMTEMPFILE,
-			basename(tmpnam_buf));
+		snprintf(results, len, "%s/%sXXXXXX", _DTDTSMMTEMPDIR,
+			 _DTDTSMMTEMPFILE);
+		if((fd = mkstemp(results)) != -1)
+		{
+			close(fd);
+			unlink(results);
+		}
 	}
 	return(results);
 }
 
 
-int
-_DtDtsMMapDB(const char *CacheFile)
+/*
+ * Maps the cache file open as fd (and takes over fd: it is closed when
+ * the database is unloaded, or now on failure), first unloading the
+ * database mapped before.  The file must be a plain file of ours, and a
+ * cache file of this version.  Returns an MM_* status.
+ */
+static int
+mm_map_fd(int fd)
 {
 	struct	stat	buf;
-	int	success = FALSE;
+	int	status = MM_FOREIGN;
+	caddr_t	db;
 
 	_DtSvcProcessLock();
 
@@ -609,89 +641,220 @@ _DtDtsMMapDB(const char *CacheFile)
 		_DtDtsMMUnLoad();
 	}
 
-	mmaped_fd  = open(CacheFile, O_RDONLY|O_CLOEXEC, 0400);
-	if(mmaped_fd !=  -1)
+	if(fstat(fd, &buf) == 0 && S_ISREG(buf.st_mode) &&
+	   buf.st_uid == getuid())
 	{
-		if(fstat(mmaped_fd, &buf) == 0 && buf.st_uid == getuid())
+		status = MM_UNUSABLE;
+		if(buf.st_size < (off_t)sizeof(DtDtsMMHeader))
 		{
-			caddr_t	db = (char *)mmap(NULL,
-					buf.st_size,
-					PROT_READ,
+			/* empty or truncated */
+		}
+		else if((db = (char *)mmap(NULL,
+				buf.st_size,
+				PROT_READ,
 #if defined(sun)
-					/* MAP_NORESERVE is only supported
-					   on sun and novell platforms */
-					MAP_SHARED|MAP_NORESERVE,
+				/* MAP_NORESERVE is only supported
+				   on sun and novell platforms */
+				MAP_SHARED|MAP_NORESERVE,
 #else
-					MAP_SHARED,
+				MAP_SHARED,
 #endif
-					mmaped_fd,
-					0);
-			if(db != (void *) -1)
-			{
-				DtShmIntList	int_list;
+				fd,
+				0)) == (void *) -1)
+		{
+			status = MM_FOREIGN;
+			_DtSimpleError(DtProgName, DtError, NULL,
+				       "mmap of dts_cache file", NULL);
+		}
+		else if(((DtDtsMMHeader *)db)->magic != DTDTSMM_MAGIC ||
+			((DtDtsMMHeader *)db)->version != DTDTSMM_VERSION ||
+			((DtDtsMMHeader *)db)->size != buf.st_size)
+		{
+			munmap(db, buf.st_size);
+		}
+		else
+		{
+			DtShmIntList	int_list;
 
-				success = TRUE;
-				mmaped_size = buf.st_size;
-				head = (DtDtsMMHeader *)db;
-				int_list = (DtShmIntList)&db[sizeof(DtDtsMMHeader)];
-				db_list = (DtDtsMMDatabase *)&int_list[head->db_offset];
-				mm_generation++;
-				/* Publish the mapping only once it is usable. */
-				__atomic_store_n(&mmaped_db, db, __ATOMIC_RELEASE);
-			}
-			else
-			{
-			    _DtSimpleError(
-					DtProgName, DtError, NULL,
-					(char*) CacheFile, NULL);
-			}
+			status = MM_MAPPED;
+			mmaped_fd = fd;
+			mmaped_size = buf.st_size;
+			head = (DtDtsMMHeader *)db;
+			int_list = (DtShmIntList)&db[sizeof(DtDtsMMHeader)];
+			db_list = (DtDtsMMDatabase *)&int_list[head->db_offset];
+			mm_generation++;
+			/* Publish the mapping only once it is usable. */
+			__atomic_store_n(&mmaped_db, db, __ATOMIC_RELEASE);
 		}
 	}
-	if(!success)
+	if(status != MM_MAPPED)
 	{
+		close(fd);
 		mmaped_db = 0;
 	}
 	_DtSvcProcessUnlock();
-	return(success);
+	return(status);
+}
+
+int
+_DtDtsMMapFd(int fd)
+{
+	return(mm_map_fd(fd) == MM_MAPPED);
 }
 
 static int
-MMValidateDb(DtDirPaths *dirs, char *suffix)
+mm_map_file(const char *CacheFile)
 {
-	struct stat		buf;
-	DtShmBoson		*boson_list = 0;
-	time_t			*mtime_list;
-	int			count = 0;
+	int	fd;
+
+	/* The shared cache is a plain file; do not follow a symbolic link. */
+	fd = open(CacheFile, O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
+	if(fd == -1)
+	{
+		return(errno == ENOENT ? MM_ABSENT : MM_FOREIGN);
+	}
+	return(mm_map_fd(fd));
+}
+
+int
+_DtDtsMMapDB(const char *CacheFile)
+{
+	return(mm_map_file(CacheFile) == MM_MAPPED);
+}
+
+void
+_DtDtsMMFillStamp(DtDtsMMStamp *stamp, const struct stat *st, int error)
+{
+	unsigned long long	t;
+
+	memset(stamp, 0, sizeof(*stamp));
+	if(!st)
+	{
+		stamp->error = error ? error : -1;
+		return;
+	}
+	stamp->size = (int)st->st_size;
+	t = (unsigned long long)st->st_mtime;
+	stamp->mtime[0] = (int)(unsigned int)t;
+	stamp->mtime[1] = (int)(unsigned int)(t >> 32);
+	t = (unsigned long long)st->st_ctime;
+	stamp->ctime[0] = (int)(unsigned int)t;
+	stamp->ctime[1] = (int)(unsigned int)(t >> 32);
+	/* POSIX 2008: struct timespec st_mtim, st_ctim. */
+	stamp->mtime[2] = (int)st->st_mtim.tv_nsec;
+	stamp->ctime[2] = (int)st->st_ctim.tv_nsec;
+}
+
+static int
+stamp_matches(const DtDtsMMStamp *old, const struct stat *st, int error)
+{
+	DtDtsMMStamp	now;
+
+	_DtDtsMMFillStamp(&now, st, error);
+	now.path = old->path;
+	now.is_dir = old->is_dir;
+	if(old->error && now.error)
+	{
+		/* Still not there (or not readable): no change. */
+		return 1;
+	}
+	return(memcmp(&now, old, sizeof(now)) == 0);
+}
+
+/*
+ * Whether the mapped cache file was built from the database files as
+ * they are now.  It must have been built for the same database search
+ * path (else MM_OTHER_PATH); the directories it was built from must
+ * still be the existing database directories, in the same order, and
+ * none of them, or of the database files, may have changed since (else
+ * MM_STALE).  Adding, removing or renaming a file changes its directory.
+ * (This used to compare a sum of bytes of the path names, change into
+ * each database directory and stat() every entry, and ignore errors.)
+ */
+static int
+MMValidateDb(DtDirPaths *dirs)
+{
+	const DtDtsMMStamp	*stamp;
+	char			*searchpath;
+	const char		*path;
+	int			count;
 	int			i;
-	const char		*file;
-	int			pathhash = _DtDtsMMPathHash(dirs);
+	int			d = 0;
+	int			dfd = -1;
+	int			result = MM_VALID;
 
 	_DtSvcProcessLock();
-	if(head->pathhash != pathhash)
-	{
-	        _DtSvcProcessUnlock();
-		return(0);
-	}
-
 	count = head->files_count;
-	mtime_list = _DtDtsMMGetPtr(head->mtimes_offset);
-	boson_list = _DtDtsMMGetPtr(head->files_offset);
+	stamp = _DtDtsMMGetPtr(head->files_offset);
 
-	for(i = 0; i < count; i++)
+	searchpath = _DtDtsMMSearchPath();
+	path = _DtDtsMMBosonToString(head->searchpath);
+	if(!searchpath || !path || strcmp(searchpath, path) != 0)
 	{
-		file = _DtDtsMMBosonToString(boson_list[i]);
-		/* A file that is gone (or unreadable) invalidates the cache. */
-		if(!file || stat(file, &buf) == -1 ||
-		   mtime_list[i] != buf.st_mtime)
+		XtFree(searchpath);
+		_DtSvcProcessUnlock();
+		return(MM_OTHER_PATH);
+	}
+	XtFree(searchpath);
+
+	for(i = 0; i < count && result == MM_VALID; i++)
+	{
+		struct stat	buf;
+		int		error = 0;
+
+		if(!(path = _DtDtsMMBosonToString(stamp[i].path)))
 		{
-		        _DtSvcProcessUnlock();
-			return(0);
+			result = MM_STALE;
+			break;
 		}
+		if(stamp[i].is_dir)
+		{
+			/* A database directory, in search path order. */
+			if(!dirs->paths[d] || strcmp(dirs->paths[d], path) != 0)
+			{
+				result = MM_STALE;
+				break;
+			}
+			d++;
+			if(dfd != -1)
+			{
+				close(dfd);
+			}
+			dfd = open(path, O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+			if(dfd == -1 || fstat(dfd, &buf) == -1)
+			{
+				error = errno;
+			}
+		}
+		else
+		{
+			/* A database file of the last directory. */
+			const char	*base = strrchr(path, '/');
+
+			if(dfd != -1 && base
+			   ? fstatat(dfd, base + 1, &buf, 0) == -1
+			   : stat(path, &buf) == -1)
+			{
+				error = errno;
+			}
+		}
+		if(!stamp_matches(&stamp[i], error ? NULL : &buf, error))
+		{
+			result = MM_STALE;
+		}
+	}
+	if(dfd != -1)
+	{
+		close(dfd);
+	}
+	if(result == MM_VALID && dirs->paths[d])
+	{
+		/* A new database directory. */
+		result = MM_STALE;
 	}
 
 	_DtSvcProcessUnlock();
-	return(1);
-
+	return(result);
 }
 
 /*

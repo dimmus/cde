@@ -38,6 +38,9 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <dirent.h>
 
 #ifdef NLS16
 #include <limits.h>
@@ -62,13 +65,13 @@
 #include "DtSvcLock.h"
 
 static void build_file_list(DtShmProtoIntList, DtDirPaths *,
-			    DtDtsMMHeader *, const char *);
+			    DtDtsMMHeader *);
 extern	int	cde_dc_field_compare(DtDtsDbField **, DtDtsDbField **);
 extern	int	cde_dc_compare(DtDtsDbRecord **, DtDtsDbRecord **);
 static void	_DtMMSortDataTypes(DtShmProtoStrtab str_handle);
 static void	_DtMMAddActionsToDataAttribute(DtDtsDbDatabase *db_ptr);
 static int	write_db(DtDtsMMHeader *header, void *index, int size,
-			 const char *CacheFile);
+			 const char *CacheFile, int quiet);
 static int	build_new_db(DtShmProtoStrtab, DtShmProtoIntList, int, DtDtsDbDatabase **);
 static int	build_name_list(DtDtsDbDatabase *, DtShmProtoIntList, DtDtsMMHeader *);
 
@@ -77,33 +80,164 @@ static	DtShmProtoIntList	int_handle = 0;
 
 #define QtB(a)	_DtShmProtoAddStrtab(shm_handle, XrmQuarkToString(a), &isnew)
 
-/* DtsMM.c */
-extern int _DtDtsMMPathHash(DtDirPaths *dirs);
+/*
+ * The database directories and files, as _DtDtsMMStampDirs() found them
+ * before the files were read (so that a change made while they are read
+ * makes the cache stale).
+ */
+static DtDtsMMStamp	*stamps;
+static char		**stamp_paths;	/* the path of each stamp */
+static int		stamp_count;
+static int		stamp_max;
+static char		*stamp_searchpath;
 
+static void
+free_stamps(void)
+{
+	int	i;
 
+	for (i = 0; i < stamp_count; i++)
+	{
+		free(stamp_paths[i]);
+	}
+	free(stamps);
+	free(stamp_paths);
+	XtFree(stamp_searchpath);
+	stamps = NULL;
+	stamp_paths = NULL;
+	stamp_searchpath = NULL;
+	stamp_count = stamp_max = 0;
+}
+
+static void
+add_stamp(const char *path, int is_dir, const struct stat *st, int error)
+{
+	if (stamp_count == stamp_max)
+	{
+		stamp_max = stamp_max ? 2 * stamp_max : 128;
+		stamps = realloc(stamps, stamp_max * sizeof(*stamps));
+		stamp_paths = realloc(stamp_paths,
+				      stamp_max * sizeof(*stamp_paths));
+		if (!stamps || !stamp_paths)
+		{
+			_DtSimpleError(DtProgName, DtError, NULL,
+				       "out of memory", NULL);
+			abort();
+		}
+	}
+	_DtDtsMMFillStamp(&stamps[stamp_count], st, error);
+	stamps[stamp_count].is_dir = is_dir;
+	stamps[stamp_count].path = 0;
+	stamp_paths[stamp_count] = strdup(path);
+	stamp_count++;
+}
+
+/*
+ * Records the search path, and each database directory followed by its
+ * database files (the files _DtDbRead() reads: those
+ * _DtFindMatchingFiles() finds), with what stat() says about them.
+ * MMValidateDb() (DtsMM.c) checks them the same way.
+ */
+void
+_DtDtsMMStampDirs(DtDirPaths *dirs)
+{
+	int		i;
+
+	_DtSvcProcessLock();
+	free_stamps();
+	stamp_searchpath = _DtDtsMMSearchPath();
+	for(i = 0; dirs->paths[i]; i++)
+	{
+		struct stat	buf;
+		struct dirent	*entry;
+		DIR		*dirp = NULL;
+		int		dfd;
+
+		/* The directory first: a file added later changes its mtime. */
+		dfd = open(dirs->paths[i], O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+		if (dfd == -1 || fstat(dfd, &buf) == -1)
+		{
+			add_stamp(dirs->paths[i], 1, NULL, errno);
+		}
+		else
+		{
+			add_stamp(dirs->paths[i], 1, &buf, 0);
+			dirp = fdopendir(dfd);
+		}
+		if (!dirp)
+		{
+			if (dfd != -1)
+				close(dfd);
+			continue;
+		}
+		while ((entry = readdir(dirp)) != NULL)
+		{
+			char	*pathname;
+			size_t	len;
+#ifdef DT_UNKNOWN
+			unsigned char	d_type = entry->d_type;
+#else
+			unsigned char	d_type = 0;
+#endif
+
+			if (!_DtDbFileMatches(dirfd(dirp), entry->d_name,
+					      d_type, ".dt"))
+			{
+				continue;
+			}
+			len = strlen(dirs->paths[i]) + strlen(entry->d_name) + 2;
+			pathname = malloc(len);
+			if (!pathname)
+				continue;
+			snprintf(pathname, len, "%s/%s", dirs->paths[i],
+				 entry->d_name);
+			if (fstatat(dirfd(dirp), entry->d_name, &buf, 0) == -1)
+				add_stamp(pathname, 0, NULL, errno);
+			else
+				add_stamp(pathname, 0, &buf, 0);
+			free(pathname);
+		}
+		closedir(dirp);
+	}
+	_DtSvcProcessUnlock();
+}
+
+/*
+ * Writes the database to a new cache file, which replaces CacheFile, or,
+ * if CacheFile is NULL (or replacing it fails and fallback is set), is
+ * already unlinked.  Returns the file open for reading, or -1.
+ */
 int
 _MMWriteDb(DtDirPaths *dirs, int num_db, DtDtsDbDatabase **db_list,
-	   const char *CacheFile)
+	   const char *CacheFile, int fallback)
 {
 	DtDtsMMHeader		header;
-	char			*suffix = ".dt";
 	int			tbl_size;
 	void			*tbl_data;
 	DtDtsDbDatabase	        *db;
 	int			returnCode;
+	int			isnew;
 
 	_DtSvcProcessLock();
 	memset(&header, '\0', sizeof(header));
 	int_handle = _DtShmProtoInitIntLst(50000);
 	shm_handle = _DtShmProtoInitStrtab(10000);
 
-	build_file_list(int_handle, dirs, &header, suffix);
+	if (!stamps)
+	{
+		_DtDtsMMStampDirs(dirs);
+	}
+	build_file_list(int_handle, dirs, &header);
 
 	_DtMMSortDataTypes(shm_handle);
 	db = (DtDtsDbDatabase	*) _DtDtsDbGet(DtDTS_DA_NAME);
 	_DtMMAddActionsToDataAttribute(db);
 
-	header.pathhash = _DtDtsMMPathHash(dirs);
+	header.magic = DTDTSMM_MAGIC;
+	header.version = DTDTSMM_VERSION;
+	header.searchpath = _DtShmProtoAddStrtab(shm_handle,
+			stamp_searchpath ? stamp_searchpath : "", &isnew);
+	free_stamps();
 	header.num_db = num_db;
 	header.db_offset = build_new_db(shm_handle, int_handle, num_db,
 db_list);
@@ -120,8 +254,13 @@ db_list);
 	tbl_data = (void *)malloc(tbl_size);
 	memset(tbl_data, '\0', tbl_size);
 	tbl_data = (void *)_DtShmProtoCopyIntLst(int_handle, tbl_data);
+	header.size = sizeof(header) + tbl_size;
 
-	returnCode = write_db(&header, tbl_data, tbl_size, CacheFile);
+	returnCode = write_db(&header, tbl_data, tbl_size, CacheFile, fallback);
+	if (returnCode == -1 && CacheFile && fallback)
+	{
+		returnCode = write_db(&header, tbl_data, tbl_size, NULL, 0);
+	}
 	_DtShmProtoDestroyStrtab(shm_handle);
 	_DtShmProtoDestroyIntLst(int_handle);
 	_DtSvcProcessUnlock();
@@ -132,20 +271,11 @@ db_list);
 
 static void
 build_file_list(DtShmProtoIntList int_handle, DtDirPaths *dirs,
-		DtDtsMMHeader *header, const char *suffix)
+		DtDtsMMHeader *header)
 {
-	DIR 			*dirp;
-	struct stat		buf;
-	char			cur_path[MAXPATHLEN+1];
 	void			*data;
 	int			i;
 	int			isnew;
-	DtShmBoson		*boson_list = 0;
-	time_t			*mtime_list = 0;
-	int			count = 0;
-	_Xreaddirparams		dirEntryBuf;
-	struct dirent		*result;
-	(void) dirEntryBuf; /* unused unless XTHREADS */
 
 	/* Theses here to make sure it gets into the string tables
 	   because actions uses it in its "types" field. */
@@ -153,46 +283,19 @@ build_file_list(DtShmProtoIntList int_handle, DtDirPaths *dirs,
 	_DtShmProtoAddStrtab(shm_handle, DtDTS_DT_RECURSIVE_LINK, &isnew);
 	_DtShmProtoAddStrtab(shm_handle, DtDTS_DT_BROKEN_LINK, &isnew);
 
-	getcwd(cur_path, sizeof(cur_path));
-	for(i = 0; dirs->paths[i]; i++)
+	for(i = 0; i < stamp_count; i++)
 	{
-		chdir(dirs->paths[i]);
-		stat(".", &buf);
-		count++;
-		boson_list = (int *)realloc(boson_list, count*sizeof(int));
-		mtime_list = (time_t *)realloc(mtime_list, count*sizeof(time_t));
-
-		mtime_list[count-1] = buf.st_mtime;
-		boson_list[count-1] = _DtShmProtoAddStrtab(shm_handle, dirs->paths[i], &isnew);
-		dirp = opendir(".");
-		while ((result = _XReaddir(dirp, dirEntryBuf)) != NULL)
-		{
-			char	*c = strrchr(result->d_name, suffix[0]);
-			if(c && strcmp(c, suffix) == 0)
-			{
-	                        char	*pathname = malloc(MAXPATHLEN+1);
-				sprintf(pathname, "%s/%s", dirs->paths[i], result->d_name);
-				stat(result->d_name, &buf);
-				count++;
-				boson_list = (int *)realloc(boson_list, count*sizeof(int));
-				mtime_list = (time_t *)realloc(mtime_list, count*sizeof(time_t));
-				mtime_list[count-1] = buf.st_mtime;
-				boson_list[count-1] = _DtShmProtoAddStrtab(shm_handle,
-					pathname, &isnew);
-				free(pathname);
-				continue;
-			}
-		}
-		(void)closedir( dirp );
+		stamps[i].path = _DtShmProtoAddStrtab(shm_handle,
+					stamp_paths[i], &isnew);
 	}
-	chdir(cur_path);
-	data = _DtShmProtoAddIntLst(int_handle, count, &header->files_offset);
-	memcpy(data, boson_list, count*sizeof(int));
-	data = _DtShmProtoAddIntLst(int_handle, count*sizeof(time_t)/sizeof(int), &header->mtimes_offset);
-	memcpy(data, mtime_list, count*sizeof(time_t));
-	header->files_count = count;
-	free(boson_list);
-	free(mtime_list);
+	data = _DtShmProtoAddIntLst(int_handle,
+			stamp_count * sizeof(DtDtsMMStamp) / sizeof(int),
+			&header->files_offset);
+	if (stamp_count)
+	{
+		memcpy(data, stamps, stamp_count * sizeof(DtDtsMMStamp));
+	}
+	header->files_count = stamp_count;
 	return;
 }
 
@@ -233,31 +336,46 @@ _DtMMSortDataTypes(DtShmProtoStrtab str_handle)
 	_DtSvcProcessUnlock();
 }
 
+/*
+ * Adds the field name=value to rec_ptr unless it has one of that name
+ * (then value, malloc'ed, is freed).  The fields are kept sorted by
+ * name: the new one goes where sorting the list would put it, without
+ * sorting the whole list again.
+ */
 static void
 add_if_missing(DtDtsDbRecord *rec_ptr, XrmQuark name, char *value)
 {
 	DtDtsDbField	*fld_ptr;
 	int		fld;
-	int		found = 0;
+	int		pos;
 
 	for(fld = 0; fld < rec_ptr->fieldCount; fld++)
 	{
 		fld_ptr = rec_ptr->fieldList[fld];
 		if(name == fld_ptr->fieldName)
 		{
-			found = 1;
-			break;
+			free(value);
+			return;
 		}
-	}
-	if(found)
-	{
-		return;
 	}
 
 	fld_ptr = _DtDtsDbAddField(rec_ptr);
 	fld_ptr->fieldName = name;
 	fld_ptr->fieldValue = value;
-	_DtDtsDbFieldSort(rec_ptr, 0);
+
+	if(rec_ptr->compare != _DtDtsDbCompareFieldNames)
+	{
+		_DtDtsDbFieldSort(rec_ptr, 0);
+		return;
+	}
+	/* The other fields are sorted by name; none has this name. */
+	for(pos = rec_ptr->fieldCount - 1;
+	    pos > 0 && rec_ptr->fieldList[pos - 1]->fieldName > name;
+	    pos--)
+	{
+		rec_ptr->fieldList[pos] = rec_ptr->fieldList[pos - 1];
+	}
+	rec_ptr->fieldList[pos] = fld_ptr;
 
 	return;
 }
@@ -527,13 +645,15 @@ printf("head->buffer_start_index = %d\n", head->buffer_start_index);
 	   duplicates need to be in separate lists.
 	*/
 	indexList = _DtShmProtoInitInttab(next+3);
+	/* A list never holds more than all next records (it used to grow
+	   by one entry at a time). */
+	list_of_recs = (int *)malloc((next > 0 ? next : 1)*sizeof(int));
 	for(i = 0; i <= next; i++)
 	{
 		if(i != next && (last_boson == -1 || name_index[i].boson == last_boson))
 		{
 			/* this a new list of records or an addition to one */
-			list_of_recs = (int *)realloc(list_of_recs, 
-					++list_count*sizeof(int));
+			++list_count;
 			last_boson = name_index[i].boson;
 			list_of_recs[list_count-1] = name_index[i].rec;
 		}
@@ -563,9 +683,7 @@ printf("head->buffer_start_index = %d\n", head->buffer_start_index);
 				   so that we know it is a list */
 				_DtShmProtoAddInttab(indexList,
 						last_boson, -index);
-				list_count = 0;
-				list_of_recs = (int *)realloc(list_of_recs, 
-						++list_count*sizeof(int));
+				list_count = 1;
 			}
 			if ( i != next )
 			{
@@ -608,7 +726,33 @@ printf("head->buffer_start_index = %d\n", head->buffer_start_index);
 }
 
 static int
-write_db(DtDtsMMHeader *header, void *index, int size, const char *CacheFile)
+write_all(int fd, const void *data, size_t size)
+{
+	const char	*p = data;
+
+	while (size > 0)
+	{
+		ssize_t	n = write(fd, p, size);
+
+		if (n == -1 && errno == EINTR)
+			continue;
+		if (n <= 0)
+			return 0;
+		p += n;
+		size -= n;
+	}
+	return 1;
+}
+
+/*
+ * Writes the cache file under a temporary name, then renames it to
+ * CacheFile (so readers never see a partial file), or, if CacheFile is
+ * NULL, unlinks it (a private cache).  Returns the file, open, or -1.
+ * Errors are not reported when quiet is set.
+ */
+static int
+write_db(DtDtsMMHeader *header, void *index, int size, const char *CacheFile,
+	 int quiet)
 {
 	int	fd;
 	mode_t	cmask = umask((mode_t)077);
@@ -616,8 +760,10 @@ write_db(DtDtsMMHeader *header, void *index, int size, const char *CacheFile)
 
 	if ((tmpfile = malloc(sizeof(_DTDTSMMTEMPDIR) +
 	    sizeof(_DTDTSMMTEMPFILE) + 7)) == NULL) {
-		_DtSimpleError(DtProgName, DtError, NULL, tmpfile, NULL);
-		return 0;
+		umask(cmask);
+		_DtSimpleError(DtProgName, DtError, NULL, "out of memory",
+			       NULL);
+		return -1;
 	}
 
 	sprintf(tmpfile, "%s/%sXXXXXX", _DTDTSMMTEMPDIR, _DTDTSMMTEMPFILE);
@@ -627,39 +773,43 @@ write_db(DtDtsMMHeader *header, void *index, int size, const char *CacheFile)
 
 	if(fd ==  -1)
 	{
-		_DtSimpleError(
-			DtProgName, DtError, NULL,
-			(char*) tmpfile, NULL);
+		if (!quiet)
+			_DtSimpleError(
+				DtProgName, DtError, NULL,
+				(char*) tmpfile, NULL);
 		free(tmpfile);
-		return(0);
+		return(-1);
 	}
+	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 
 	/* Remove file on write failure - we don't */
 	/* want a partial dtdbcache file. */
-	if ((write(fd, header, sizeof(DtDtsMMHeader))
-	     != sizeof(DtDtsMMHeader)) ||
-	    (write(fd, index, size) != size))
+	if (!write_all(fd, header, sizeof(DtDtsMMHeader)) ||
+	    !write_all(fd, index, size))
 	{
 		close(fd);
 		unlink(tmpfile);
 		free(tmpfile);
-		return(0);
+		return(-1);
 	}
 
-	close(fd);
-
-	if(rename((const char *)tmpfile, CacheFile) == -1)
+	if (!CacheFile)
 	{
-		_DtSimpleError(
-			DtProgName, DtError, NULL,
-			(char*) CacheFile, NULL);
-		unlink(CacheFile); /* Just in case? */
+		unlink(tmpfile);
+	}
+	else if(rename((const char *)tmpfile, CacheFile) == -1)
+	{
+		if (!quiet)
+			_DtSimpleError(
+				DtProgName, DtError, NULL,
+				(char*) CacheFile, NULL);
+		close(fd);
 		unlink(tmpfile);
 		free(tmpfile);
-		return(0);
+		return(-1);
 	}
 	free(tmpfile);
-	return(1);
+	return(fd);
 }
 
 

@@ -61,16 +61,160 @@
 #include "DtSvcLock.h"
 
 extern int _MMWriteDb(DtDirPaths *dirs, int num_db, DtDtsDbDatabase **db_list,
-                      const char *CacheFile);
+                      const char *CacheFile, int fallback);
 
 
-
-#define PADMEM 10
 
 typedef	int	(*genfunc)(const void *, const void *);
 
 static	DtDtsDbDatabase	**db_list;
 static	int	num_db = 0;
+
+/*
+ * Room for n+1 entries in a record or field list holding n entries.
+ * The lists grow geometrically: they are reallocated when n is 0 (to 8
+ * entries) and when n is a power of two of at least 8 (to 2n), so the
+ * capacity never needs to be stored, and deleting entries (which only
+ * lowers n) keeps it valid.
+ */
+static void *
+grow_list(void *list, int n, size_t size)
+{
+	size_t	cap;
+	void	*newlist;
+
+	if (n == 0)
+		cap = 8;
+	else if (n >= 8 && (n & (n - 1)) == 0)
+		cap = 2 * (size_t)n;
+	else
+		return list;
+	newlist = realloc(list, cap * size);
+	if (!newlist)
+	{
+		_DtSimpleError(DtProgName, DtError, NULL,
+			       "out of memory", NULL);
+		abort();
+	}
+	return newlist;
+}
+
+/*
+ * Record name -> first record of that name, for unsorted databases
+ * (see DtDtsDbDatabase.nameIndex).  Open addressing; quarks are never 0
+ * for a real name, so 0 marks a free slot.
+ */
+struct _DtDtsDbNameIndex
+{
+	unsigned int	mask;		/* slot count - 1 (power of two) */
+	unsigned int	used;
+	struct
+	{
+		XrmQuark	name;
+		DtDtsDbRecord	*rec;
+	}		*slot;
+};
+
+static void
+name_index_drop(DtDtsDbDatabase *db)
+{
+	if (db->nameIndex)
+	{
+		free(db->nameIndex->slot);
+		free(db->nameIndex);
+		db->nameIndex = NULL;
+	}
+	db->nameIndexed = 0;
+}
+
+static unsigned int
+name_hash(XrmQuark q)
+{
+	return (unsigned int)q * 2654435761u;
+}
+
+/*
+ * Returns 0 if out of memory, or for a record that has no name yet (it
+ * may get one later); the caller then searches linearly.
+ */
+static int
+name_index_add(struct _DtDtsDbNameIndex *ix, DtDtsDbRecord *rec)
+{
+	unsigned int	i;
+
+	if (rec->recordName == NULLQUARK)
+		return 0;
+	if (2 * (ix->used + 1) > ix->mask + 1)
+	{
+		struct _DtDtsDbNameIndex	big;
+		unsigned int			j;
+
+		big.mask = 2 * (ix->mask + 1) - 1;
+		big.used = 0;
+		big.slot = calloc(big.mask + 1, sizeof(*big.slot));
+		if (!big.slot)
+			return 0;
+		for (j = 0; j <= ix->mask; j++)
+		{
+			if (ix->slot[j].name == NULLQUARK)
+				continue;
+			i = name_hash(ix->slot[j].name) & big.mask;
+			while (big.slot[i].name != NULLQUARK)
+				i = (i + 1) & big.mask;
+			big.slot[i] = ix->slot[j];
+			big.used++;
+		}
+		free(ix->slot);
+		*ix = big;
+	}
+	i = name_hash(rec->recordName) & ix->mask;
+	while (ix->slot[i].name != NULLQUARK)
+	{
+		if (ix->slot[i].name == rec->recordName)
+			return 1;	/* keep the first record of this name */
+		i = (i + 1) & ix->mask;
+	}
+	ix->slot[i].name = rec->recordName;
+	ix->slot[i].rec = rec;
+	ix->used++;
+	return 1;
+}
+
+/*
+ * Brings the index of db up to date.  Returns it, or NULL when it cannot
+ * be used.
+ */
+static struct _DtDtsDbNameIndex *
+name_index_update(DtDtsDbDatabase *db)
+{
+	struct _DtDtsDbNameIndex	*ix = db->nameIndex;
+
+	if (!ix)
+	{
+		ix = malloc(sizeof(*ix));
+		if (!ix)
+			return NULL;
+		ix->mask = 63;
+		ix->used = 0;
+		ix->slot = calloc(ix->mask + 1, sizeof(*ix->slot));
+		if (!ix->slot)
+		{
+			free(ix);
+			return NULL;
+		}
+		db->nameIndex = ix;
+		db->nameIndexed = 0;
+	}
+	for (; db->nameIndexed < db->recordCount; db->nameIndexed++)
+	{
+		if (!name_index_add(ix, db->recordList[db->nameIndexed]))
+		{
+			name_index_drop(db);
+			return NULL;
+		}
+	}
+	return ix;
+}
 
 void
 _DtDtsDbPrintFields(DtDtsDbRecord  *rec_ptr, FILE *fd)
@@ -258,6 +402,7 @@ _DtDtsDbDeleteDb(DtDtsDbDatabase *db)
 
 	_DtSvcProcessLock();
 	_DtDtsDbDeleteRecords(db);
+	name_index_drop(db);
 	free(db->databaseName);
 	free(db);
 
@@ -334,6 +479,8 @@ _DtDtsDbRecordSort(DtDtsDbDatabase *db, _DtDtsDbRecordCompare compare)
 		sizeof(DtDtsDbRecord *),
 		(genfunc)compare);
 	db->compare = compare;
+	/* "First record of a name" has changed. */
+	name_index_drop(db);
 }
 
 DtDtsDbField *
@@ -385,11 +532,29 @@ _DtDtsDbGetRecordByName(DtDtsDbDatabase *db, char *name)
 
 	/*
 	 * If the fields are not sorted in alphanumeric order
-	 * by name a binary search will fail.  So do the slow but
-	 * sure linear search.
+	 * by name a binary search will fail.  So find the first record
+	 * of that name, through the name index (the converters do this
+	 * for every record they add, which used to make building the
+	 * database quadratic), or, failing that, by a linear search.
 	 */
 	if(db->compare != _DtDtsDbCompareRecordNames)
 	{
+		struct _DtDtsDbNameIndex	*ix;
+
+		if (name_quark == NULLQUARK)
+			return NULL;	/* no record has this name */
+		if ((ix = name_index_update(db)))
+		{
+			unsigned int	j = name_hash(name_quark) & ix->mask;
+
+			while (ix->slot[j].name != NULLQUARK)
+			{
+				if (ix->slot[j].name == name_quark)
+					return ix->slot[j].rec;
+				j = (j + 1) & ix->mask;
+			}
+			return NULL;
+		}
 
 		for (i = 0; i < db->recordCount; i++)
 		{
@@ -430,22 +595,16 @@ _DtDtsDbGetRecordByName(DtDtsDbDatabase *db, char *name)
 DtDtsDbRecord *
 _DtDtsDbAddRecord(DtDtsDbDatabase *db)
 {
-	DtDtsDbRecord	**newlist;
 	int		rec = db->recordCount;
 
-	db->compare = (_DtDtsDbRecordCompare)NULL;
-	if(rec%PADMEM == 0)
+	if (db->compare != (_DtDtsDbRecordCompare)NULL)
 	{
-		newlist = (DtDtsDbRecord **)calloc(rec+PADMEM,
-				sizeof(DtDtsDbRecord *));
-		if(db->recordList)
-		{
-			memmove(newlist, db->recordList,
-				rec*sizeof(DtDtsDbRecord *));
-			free(db->recordList);
-		}
-		db->recordList = newlist;
+		/* Sorted until now: the name index was not kept. */
+		name_index_drop(db);
 	}
+	db->compare = (_DtDtsDbRecordCompare)NULL;
+	db->recordList = grow_list(db->recordList, rec,
+				   sizeof(DtDtsDbRecord *));
 	db->recordList[rec] = (DtDtsDbRecord *)calloc(1, sizeof(DtDtsDbRecord));
 	db->recordCount++;
 
@@ -457,6 +616,8 @@ _DtDtsDbDeleteRecord(DtDtsDbRecord *rec, DtDtsDbDatabase *db)
 {
 	int	i;
 
+	/* Records after it move, and the first record of its name may change. */
+	name_index_drop(db);
 	_DtDtsDbDeleteFields(rec);
 	free(rec);
 
@@ -488,27 +649,18 @@ _DtDtsDbDeleteRecords(DtDtsDbDatabase *db)
 	}
 	free(db->recordList);
 	db->recordList = 0;
+	db->recordCount = 0;
+	name_index_drop(db);
 	return(0);
 }
 
 DtDtsDbField *
 _DtDtsDbAddField(DtDtsDbRecord *rec)
 {
-	DtDtsDbField	**newlist;
 	int		flds = rec->fieldCount;
 
-	if(flds%PADMEM == 0)
-	{
-		newlist = (DtDtsDbField **)calloc(flds+PADMEM,
-				sizeof(DtDtsDbField *));
-		if(rec->fieldList)
-		{
-			memmove(newlist, rec->fieldList,
-				flds*sizeof(DtDtsDbField *));
-			free(rec->fieldList);
-		}
-		rec->fieldList = newlist;
-	}
+	rec->fieldList = grow_list(rec->fieldList, flds,
+				   sizeof(DtDtsDbField *));
 	rec->fieldList[flds] = (DtDtsDbField *)calloc(1, sizeof(DtDtsDbField));
 	rec->fieldCount++;
 
@@ -549,11 +701,17 @@ _DtDtsDbDeleteFields(DtDtsDbRecord *rec)
 	}
 	free(rec->fieldList);
 	rec->fieldList = 0;
+	rec->fieldCount = 0;
 	return(0);
 }
 
+/*
+ * Writes the database built in memory to a cache file: CacheFile, or a
+ * private (unlinked) file if CacheFile is NULL or, with fallback set, if
+ * CacheFile cannot be replaced.  Returns the file, open, or -1.
+ */
 int
-_DtDtsMMCreateFile(DtDirPaths *dirs, const char *CacheFile)
+_DtDtsMMCreateFile(DtDirPaths *dirs, const char *CacheFile, int fallback)
 {
-	return _MMWriteDb(dirs, num_db, db_list, CacheFile);
+	return _MMWriteDb(dirs, num_db, db_list, CacheFile, fallback);
 }

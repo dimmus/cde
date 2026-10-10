@@ -38,17 +38,25 @@
 #include "DtHash.h"
 #include "DtShmDb.h"
 
+/*
+  The table as stored (in the dtdbcache file, see DTDTSMM_VERSION in
+  DtsMM.h): this header, the strings (a boson is the offset of a string
+  from the start of the strings), the entries (one per string), and the
+  buckets.  A bucket holds the index of the first entry whose string
+  hashes to it, an entry the index of the next one.
+  */
 typedef struct strtab {
   unsigned int st_size;		/* size in bytes						*/
   unsigned int st_stroffset;	/* offset (bytes) from this structure to contained strings 	*/
-  unsigned int st_taboffset;	/* offset (bytes) from this structure to table offset           */
+  unsigned int st_taboffset;	/* offset (bytes) from this structure to the entries            */
   unsigned int st_count;	/* number of elements in this string table			*/
+  unsigned int st_bucketoffset;	/* offset (bytes) from this structure to the buckets		*/
+  unsigned int st_nbuckets;	/* number of buckets, a power of two				*/
 } strtab_t;
 
 typedef struct strtab_entry {
   unsigned int key;		/* offset into contained strings				*/
-  unsigned short first;		/* offset in table to first string to hash to this spot		*/
-  unsigned short next;		/* offset in table to next item to hash to this spot		*/
+  unsigned int next;		/* index of next entry to hash to the same bucket		*/
 } strtab_entry_t;
 
 typedef struct strlist {
@@ -64,7 +72,40 @@ struct strtab_build {
   strtab_t * 		strtab;			/* pointer to head        	*/
 };
 
-#define NOT_AN_INDEX ((unsigned short) 0xffff)
+#define NOT_AN_INDEX ((unsigned int) 0xffffffff)
+
+/* FNV-1a */
+static unsigned int
+strtab_hash(const unsigned char * s)
+{
+  unsigned int h = 2166136261u;
+
+  while(*s)
+    h = (h ^ *s++) * 16777619u;
+  return(h);
+}
+
+/* Buckets for count strings: a power of two, at least twice count. */
+static unsigned int
+strtab_nbuckets(unsigned int count)
+{
+  unsigned int n = 1;
+
+  while(n < 2 * count)
+    n *= 2;
+  return(n);
+}
+
+struct strtab_layout {
+  unsigned int count;		/* number of strings		*/
+  unsigned int stroffset;
+  unsigned int taboffset;
+  unsigned int bucketoffset;
+  unsigned int nbuckets;
+  unsigned int size;
+};
+
+static void strtab_layout(DtShmProtoStrtab strlist, struct strtab_layout * l);
 
 static void inc_it  (int * a, int * b, unsigned char * key);
 static void build_it(int a, struct strtab_build * ptr, unsigned char * key);
@@ -89,42 +130,23 @@ const char *    _DtShmBosonToString(DtShmStrtab strtab, int boson)
 
 DtShmBoson _DtShmStringToBoson(DtShmStrtab strtab, const char * string)
 {
-  unsigned int i,j;
-  unsigned const char * s;
-  strtab_entry_t * ptr = (strtab_entry_t *) ((unsigned char *) strtab  +
-						      ((strtab_t *) strtab) -> st_taboffset);
- 
-  /*
-    hash the input string
-    */
-  i = 1;
-  j = 0;
-  s = (unsigned const char *) string;
+  const strtab_t * head = (const strtab_t *) strtab;
+  const strtab_entry_t * ptr = (const strtab_entry_t *)
+    ((const unsigned char *) strtab + head->st_taboffset);
+  const unsigned int * bucket = (const unsigned int *)
+    ((const unsigned char *) strtab + head->st_bucketoffset);
+  const char * s = (const char *) strtab + head->st_stroffset;
+  unsigned int i;
 
-  while(*s!=0)
-    j += (*s++ << i++); 
-  
-  i = j % ((strtab_t *) strtab)->st_count;
-  
-  /*
-    check bucket first pointer....
-    */
+  i = bucket[strtab_hash((const unsigned char *) string) &
+	     (head->st_nbuckets - 1)];
 
-  if((i=(ptr+i)->first) == NOT_AN_INDEX)	
-    return(-1);
-  
-  /*
-    loop through other buckets on hash table, looking for
-    our string.  Note that we reused s.
-    */
-
-  s = (unsigned const char *) strtab + ((strtab_t *) strtab)->st_stroffset;
-  
-  while(strcmp( (char *) (s +  ptr[i].key), string))
-    if((i= ptr[i].next) == NOT_AN_INDEX)
-      return(-1);
-
-  return(ptr[i].key);
+  while(i != NOT_AN_INDEX) {
+    if(strcmp(s + ptr[i].key, string) == 0)
+      return(ptr[i].key);
+    i = ptr[i].next;
+  }
+  return(-1);
 }
 
 
@@ -200,27 +222,31 @@ _DtShmProtoLookUpStrtab (DtShmProtoStrtab prototab, DtShmBoson boson)
 }
 
 
+static void
+strtab_layout(DtShmProtoStrtab in, struct strtab_layout * l)
+{
+  strlist_t * strlist = (strlist_t *) in;
+  int foo[2];
+
+  foo[1] = foo[0] = 0;
+  _DtUtilOperateHash(strlist->sl_hash, inc_it, &foo);
+
+  /* The strings take sl_charcount bytes: offset 0 is not a boson. */
+  l->count = foo[0];
+  l->stroffset = sizeof(strtab_t);
+  l->taboffset = (l->stroffset + strlist->sl_charcount + 3) & ~3u;
+  l->bucketoffset = l->taboffset + l->count * sizeof(strtab_entry_t);
+  l->nbuckets = strtab_nbuckets(l->count);
+  l->size = l->bucketoffset + l->nbuckets * sizeof(unsigned int);
+}
+
 int 
 _DtShmProtoSizeStrtab(DtShmProtoStrtab strlist)
 {
-  int foo[2];
-  int size;
-  strlist_t * ptr = (strlist_t * ) strlist;
+  struct strtab_layout l;
 
-  foo[1] = foo[0] = 0;
-
-  _DtUtilOperateHash(ptr->sl_hash, inc_it, &foo);
-
-  size = sizeof(strtab_t) + (foo[0]) * sizeof(strtab_entry_t) + foo[0] + foo[1] + 3 ;
-         /* header */      /* table */  /* for string + terminator */	     /* padding */
-
-  /*
-    fix size so that it is always a multiple of 4 for ease of programming
-    */
-  size = (~3) & (size+3);
-
-  return(size);
-  
+  strtab_layout(strlist, &l);
+  return(l.size);		/* a multiple of 4 */
 }
 
 DtShmStrtab 
@@ -228,26 +254,20 @@ _DtShmProtoCopyStrtab(DtShmProtoStrtab in, void * destination)
 {
   strlist_t * 	strlist = (strlist_t *) in;
   strtab_t * 	ptr = (strtab_t *) destination;
-
-  int foo[2];
-  int size;
+  struct strtab_layout l;
   struct strtab_build building;
 
-  
-  foo[0] = foo[1] = 0;
+  strtab_layout(in, &l);
 
-  _DtUtilOperateHash(strlist->sl_hash, inc_it, &foo);
+  memset((char *) ptr, 0, l.taboffset);
+  memset((char *) ptr + l.taboffset, 255, l.size - l.taboffset);
 
-  size = (sizeof(strtab_t) + (foo[0]) * sizeof(strtab_entry_t) + (foo[0] + foo[1] + 3)) & ~3 ;
-         /* header */      /* table */  /* for string + terminator */
-
-  memset((char *) ptr, 255, size);
-  
-
-  ptr-> st_size= size;
-  ptr-> st_stroffset = sizeof(*ptr);
-  ptr-> st_taboffset = (sizeof(*ptr) + (foo[0] + foo[1] + 3)) & ~3;
-  ptr-> st_count = foo[0];			/* patch alignment */
+  ptr-> st_size = l.size;
+  ptr-> st_stroffset = l.stroffset;
+  ptr-> st_taboffset = l.taboffset;
+  ptr-> st_count = l.count;
+  ptr-> st_bucketoffset = l.bucketoffset;
+  ptr-> st_nbuckets = l.nbuckets;
 
   building.index = 0;
   building.strstart = (unsigned char *) ptr  + ptr->st_stroffset;
@@ -260,40 +280,20 @@ _DtShmProtoCopyStrtab(DtShmProtoStrtab in, void * destination)
 
 static void build_it(int a, struct strtab_build * ptr, unsigned char * key)
 {
-  unsigned int i,j;
-  unsigned char * s;
+  strtab_t * head = ptr->strtab;
+  unsigned int * bucket = (unsigned int *)
+    ((unsigned char *) head + head->st_bucketoffset);
+  unsigned int b;
   strtab_entry_t * e;
-  unsigned short * add_ptr;
 
   strcpy((char *) ptr->strstart + a, (const char *)key);
 
-  i = 1;
-  j = 0;
-  s = key;
+  b = strtab_hash(key) & (head->st_nbuckets - 1);
 
-  while(*s!=0)
-    j += (*s++ << i++); 
-  
-  i = j % ((strtab_t *) ptr->strtab)->st_count;
-  
   e = ptr->tabstart + ptr->index;
-
   e -> key = a; /* save key value in our block */
-  e -> next = NOT_AN_INDEX;
-
-  e = ptr->tabstart + i;
-
-  if(e->first == NOT_AN_INDEX)
-    add_ptr = & e->first;
-  else {
-    e = ptr->tabstart + e->first;
-    while( e->next != NOT_AN_INDEX)
-      e = ptr->tabstart + e->next;
-    add_ptr = & e->next;
-  }
-
-  *add_ptr = ptr->index++;
-  
+  e -> next = bucket[b];
+  bucket[b] = ptr->index++;
 }
 
 /* ARGSUSED */
@@ -302,4 +302,3 @@ static void inc_it(int * a, int * b, unsigned char * key)
   b[0]++;
   b[1] += strlen((const char *)key) + 1;
 }
-

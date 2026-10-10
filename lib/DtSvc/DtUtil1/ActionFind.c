@@ -217,26 +217,41 @@ DtActionDescription (
 	return actionDesc;
 }
 
-static char *
-_DtActionDbDescription (  char *s )
+/*
+ * Returns the last action record named tmpq, or NULL.  The records are
+ * expected to be in name (quark) order, so the scan stops at the first
+ * larger name; once _DtSortActionDb() has sorted them they are, and the
+ * record is found by a binary search instead.
+ */
+static DtDtsDbRecord **
+_DtActDbFindLast( DtDtsDbDatabase *act_db, XrmQuark tmpq )
 {
-	int n;
-	XrmQuark	 tmpq;
 	DtDtsDbRecord	**act_rec;
 	DtDtsDbRecord	**last_rec_found = NULL;
-	DtDtsDbDatabase	*act_db;
+	int		n;
 
-	_DtSvcProcessLock();     
-	act_db = _DtDtsDbGet(_DtACTION_NAME);
-	myassert(s);
-	if ( !s ) {
-		_DtSvcProcessUnlock();
+	if ( act_db->compare ==
+	     (_DtDtsDbRecordCompare) _DtActionCompareRecordQuarks )
+	{
+		int	lo = 0;
+		int	hi = act_db->recordCount;
+
+		while ( lo < hi )
+		{
+			int	mid = lo + (hi - lo) / 2;
+
+			if ( act_db->recordList[mid]->recordName <= (long) tmpq )
+				lo = mid + 1;
+			else
+				hi = mid;
+		}
+		if ( lo > 0 &&
+		     act_db->recordList[lo - 1]->recordName == (long) tmpq )
+			return &act_db->recordList[lo - 1];
 		return NULL;
 	}
 
-	tmpq = XrmStringToQuark(s);
 	n = act_db->recordCount;
-
 	for ( act_rec = act_db->recordList; 
 		n && act_rec && *act_rec ;
 		 act_rec++, n--)
@@ -252,6 +267,26 @@ _DtActionDbDescription (  char *s )
 		if ( (*act_rec)->recordName > (long) tmpq )
 			break;
 	}
+	return last_rec_found;
+}
+
+static char *
+_DtActionDbDescription (  char *s )
+{
+	XrmQuark	 tmpq;
+	DtDtsDbRecord	**last_rec_found = NULL;
+	DtDtsDbDatabase	*act_db;
+
+	_DtSvcProcessLock();     
+	act_db = _DtDtsDbGet(_DtACTION_NAME);
+	myassert(s);
+	if ( !s ) {
+		_DtSvcProcessUnlock();
+		return NULL;
+	}
+
+	tmpq = XrmStringToQuark(s);
+	last_rec_found = _DtActDbFindLast(act_db, tmpq);
 
 	if ( last_rec_found ) {
 	        _DtSvcProcessUnlock();
@@ -428,9 +463,7 @@ DtActionLabel( char *s)
 static char *
 _DtActionDbLabel (  char *s )
 {
-	int		n;
 	XrmQuark 	tmpq;
-	DtDtsDbRecord	**act_rec;
 	DtDtsDbRecord	**last_rec_found = NULL;
 	DtDtsDbDatabase	*act_db;
 
@@ -443,22 +476,7 @@ _DtActionDbLabel (  char *s )
 	}
 
 	tmpq = XrmStringToQuark(s);
-	n = act_db->recordCount;
-
-	for ( act_rec = act_db->recordList;
-		 n && act_rec && *act_rec;
-		 act_rec++, n--)
-	{
-		if ( (*act_rec)->recordName == (long) tmpq )
-			last_rec_found = act_rec;
-		/* 
-		 * Since actions are in name "quark" order, there is
-		 * no sense searching past the desired quark value.
-		 */
-
-		if ( (*act_rec)->recordName > (long) tmpq )
-			break;
-	}
+	last_rec_found = _DtActDbFindLast(act_db, tmpq);
 
 	if ( last_rec_found )
 	{
@@ -563,10 +581,8 @@ DtActionIcon( char *s)
 static char *
 _DtActionDbIcon (  char *s )
 {
-	int		n;
 	XrmQuark 	tmpq;
 	char		*iconString;
-	DtDtsDbRecord	**act_rec;
 	DtDtsDbRecord	**last_rec_found = NULL;
 	DtDtsDbDatabase	*act_db;
 
@@ -579,22 +595,7 @@ _DtActionDbIcon (  char *s )
 	}
 
 	tmpq = XrmStringToQuark(s);
-	n = act_db->recordCount;
-
-	for ( act_rec = act_db->recordList;
-		 n && act_rec && *act_rec;
-		 act_rec++, n--)
-	{
-		if ( (*act_rec)->recordName == (long) tmpq )
-			last_rec_found = act_rec;
-		/* 
-		 * Since actions are in name "quark" order, there is
-		 * no sense searching past the desired quark value.
-		 */
-
-		if ( (*act_rec)->recordName > (long) tmpq )
-			break;
-	}
+	last_rec_found = _DtActDbFindLast(act_db, tmpq);
 
 	if ( last_rec_found )
 	{
@@ -712,13 +713,21 @@ _DtActionMMIcon (  char *s )
  ******************************************************************************/
 
 static char *
+_DtActDbFieldDefault ( char *name );
+
+static char *
 _DtActGetDtsDbField ( DtDtsDbRecord *actRecp, char *name )
 {
 	char *val = _DtDtsDbGetFieldByName( actRecp, name );
 
 	if ( val )
 		return val;
+	return _DtActDbFieldDefault( name );
+}
 
+static char *
+_DtActDbFieldDefault ( char *name )
+{
 	/*
 	 * Return defaults for certain necessary fields.
 	 */
@@ -968,9 +977,28 @@ static void
  ******************************************************************************/
 /* used for building only */
 
+/* Like _DtActGetDtsDbField(), with the field name already quarked. */
+static char *
+_DtActGetDtsDbFieldQ( DtDtsDbRecord *actRecp, XrmQuark nameQ, char *name )
+{
+	int	i;
+
+	for ( i = 0; i < actRecp->fieldCount; i++ )
+	{
+		if ( actRecp->fieldList[i]->fieldName == nameQ )
+		{
+			if ( actRecp->fieldList[i]->fieldValue )
+				return actRecp->fieldList[i]->fieldValue;
+			break;
+		}
+	}
+	return _DtActDbFieldDefault( name );
+}
+
 static void
 _DtCheckForDuplicateRecord( DtDtsDbRecord *rec, DtDtsDbRecord *duprec)
 {
+	static XrmQuark	classQ, typeQ, modeQ, countQ;
 	char *field1, *field2;
 
 	/*
@@ -981,11 +1009,20 @@ _DtCheckForDuplicateRecord( DtDtsDbRecord *rec, DtDtsDbRecord *duprec)
 	if (rec->recordName != duprec->recordName)
 		return;	/* action names differ */
 
+	/* The caller (_DtSortActionDb()) holds the process lock. */
+	if ( !classQ )
+	{
+		typeQ = XrmStringToQuark(_DtACTION_ARG_TYPE);
+		modeQ = XrmStringToQuark(_DtACTION_ARG_MODE);
+		countQ = XrmStringToQuark(_DtACTION_ARG_COUNT);
+		classQ = XrmStringToQuark(_DtACTION_ARG_CLASS);
+	}
+
 	/*
 	 * Compare class fields
 	 */
-	field1 = _DtActGetDtsDbField(rec,_DtACTION_ARG_CLASS);
-	field2 = _DtActGetDtsDbField(duprec,_DtACTION_ARG_CLASS);
+	field1 = _DtActGetDtsDbFieldQ(rec,classQ,_DtACTION_ARG_CLASS);
+	field2 = _DtActGetDtsDbFieldQ(duprec,classQ,_DtACTION_ARG_CLASS);
 
 	if ( strcmp(field1,field2) )
 		return;	/* arg_class fields differ */
@@ -993,8 +1030,8 @@ _DtCheckForDuplicateRecord( DtDtsDbRecord *rec, DtDtsDbRecord *duprec)
 	/*
 	 * Compare type fields
 	 */
-	field1 = _DtActGetDtsDbField(rec,_DtACTION_ARG_TYPE);
-	field2 = _DtActGetDtsDbField(duprec,_DtACTION_ARG_TYPE);
+	field1 = _DtActGetDtsDbFieldQ(rec,typeQ,_DtACTION_ARG_TYPE);
+	field2 = _DtActGetDtsDbFieldQ(duprec,typeQ,_DtACTION_ARG_TYPE);
 
 	if ( strcmp(field1,field2) )
 		return;	/* arg_type fields differ */
@@ -1002,8 +1039,8 @@ _DtCheckForDuplicateRecord( DtDtsDbRecord *rec, DtDtsDbRecord *duprec)
 	/*
 	 * Compare mode fields
 	 */
-	field1 = _DtActGetDtsDbField(rec,_DtACTION_ARG_MODE);
-	field2 = _DtActGetDtsDbField(duprec,_DtACTION_ARG_MODE);
+	field1 = _DtActGetDtsDbFieldQ(rec,modeQ,_DtACTION_ARG_MODE);
+	field2 = _DtActGetDtsDbFieldQ(duprec,modeQ,_DtACTION_ARG_MODE);
 
 	if ( strcmp(field1,field2) )
 		return;	/* arg_mode fields differ */
@@ -1011,8 +1048,8 @@ _DtCheckForDuplicateRecord( DtDtsDbRecord *rec, DtDtsDbRecord *duprec)
 	/*
 	 * Compare arg_count fields
 	 */
-	field1 = _DtActGetDtsDbField(rec,_DtACTION_ARG_COUNT);
-	field2 = _DtActGetDtsDbField(duprec,_DtACTION_ARG_COUNT);
+	field1 = _DtActGetDtsDbFieldQ(rec,countQ,_DtACTION_ARG_COUNT);
+	field2 = _DtActGetDtsDbFieldQ(duprec,countQ,_DtACTION_ARG_COUNT);
 
 	if ( strcmp(field1,field2) )
 		return;	/* arg_count fields differ */

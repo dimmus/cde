@@ -98,6 +98,14 @@ extern DtDirPaths * _DtGetDatabaseDirPaths( void );
  ****************************************************************************/
 extern void _DtFreeDatabaseDirPaths( DtDirPaths * dirs );
 
+/*
+ * Whether the entry name (d_type from readdir(), DT_UNKNOWN if not known)
+ * of the directory open as dirfd ends in suffix and is not a directory:
+ * the test _DtFindMatchingFiles() applies to each entry.
+ */
+extern Boolean _DtDbFileMatches( int dirfd, const char * name,
+				 unsigned char d_type, const char * suffix );
+
 #endif /* _Dt_DbUtil_h */
 
 /* DON'T ADD ANYTHING AFTER THIS #endif */

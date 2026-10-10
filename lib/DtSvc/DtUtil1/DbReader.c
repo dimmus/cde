@@ -611,13 +611,21 @@ clean_line (
    /*
     * Don't search \ by "byte by byte"
     * \ may be in the 2nd of IBM-932 char.
+    *
+    * Escapes are only removed when not building the cache (the cache
+    * keeps them; they are removed when a value is looked up), and only
+    * a line holding a '\' byte can have one, so skip the character
+    * scan unless both hold.  The scan still ignores a '\' that is the
+    * second byte of a character.
     */
+   _found = 0;
+   if (!use_in_memory_db && strchr(ret_string, '\\') != NULL)
    {
       int _i;
       int _clen;
+      int _len = strlen( ret_string );
 
-      _found = 0;
-      for( _i = 0; _i < strlen( ret_string ); _i += _clen ) {
+      for( _i = 0; _i < _len; _i += _clen ) {
           _clen = mblen( &(ret_string[_i]), MB_CUR_MAX );
           /*
 	   * If found invalid char, go ahead.
