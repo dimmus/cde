@@ -164,7 +164,7 @@ int remove_logfile_local_channel_object(SPC_Channel_Ptr channel)
     return(SPC_ERROR);
   }
 
-  /* This is malloc'ed memory from open_noio_channel_object() and tempnam() */
+  /* This is malloc'ed memory from open_noio_channel_object() (make_logfile()) */
   XeFree(channel->logfile);
   
   return(TRUE);

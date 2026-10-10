@@ -883,7 +883,7 @@ GetTmpPath( char *path )
 {
 	char	*p=NULL, *sp, *buf ;
 	int	len ;
-	struct	stat	statbuf ;
+	int	fd ;
 
 	/* Get directory of temporary file */
 	if( !(p = (char *)getenv( "TMPDIR" )) ){
@@ -905,8 +905,15 @@ GetTmpPath( char *path )
 	sp = buf + strlen(buf) -1 ;
 	if( *sp == '/' )	*sp-- = '\0' ;
 	sprintf( sp+1, "/%s", TEMPFILEKEY ) ;
-	/* Get temporary file name */
-	return mktemp( buf );
+	/* Create the temporary file: mkstemp() makes it (empty, mode
+	   0600), so nobody can create or link the name first.  Every
+	   caller writes it through open/fopen, which keeps the file. */
+	if( (fd = mkstemp( buf )) == -1 ){
+	    free( buf ) ;
+	    return NULL ;
+	}
+	close( fd ) ;
+	return buf ;
 }
 
 

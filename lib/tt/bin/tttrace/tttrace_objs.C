@@ -34,6 +34,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
+#include <sys/param.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -222,12 +225,43 @@ _Tt_trace_optobj::getopts(int argc, char** argv)
 		// We need to set up a FIFO to stuff the output
 		// into, and give the FIFO name to the command/session
 				
-		_pipenm = tempnam(NULL, "trace");
-		if (mkfifo(_pipenm, S_IWUSR|S_IRUSR) == -1) {
-			fprintf(stderr, "tttrace: mkfifo(\"%s\"): %s\n",
-				(char *)_pipenm, strerror(errno));
-			exit(2);
+		// The FIFO goes where tempnam(3) put it.  mkstemp()
+		// picks a name no file has; mkfifo() never follows or
+		// reuses anything created there in between (it fails
+		// with EEXIST), so try again in that case.
+
+		char		fifo_name[MAXPATHLEN];
+		const char     *tmpdir = getenv("TMPDIR");
+		struct stat	st;
+		int		tries;
+
+		if ((tmpdir == NULL) || (*tmpdir == '\0')
+		    || (stat(tmpdir, &st) != 0) || !S_ISDIR(st.st_mode)) {
+			tmpdir = P_tmpdir;
 		}
+		for (tries = 0; ; ++tries) {
+			int fd;
+
+			snprintf(fifo_name, sizeof(fifo_name),
+				 "%s/traceXXXXXX", tmpdir);
+			fd = mkstemp(fifo_name);
+			if (fd == -1) {
+				fprintf(stderr, "tttrace: mkstemp(\"%s\"): %s\n",
+					fifo_name, strerror(errno));
+				exit(2);
+			}
+			close(fd);
+			unlink(fifo_name);
+			if (mkfifo(fifo_name, S_IWUSR|S_IRUSR) == 0) {
+				break;
+			}
+			if ((errno != EEXIST) || (tries >= 100)) {
+				fprintf(stderr, "tttrace: mkfifo(\"%s\"): %s\n",
+					fifo_name, strerror(errno));
+				exit(2);
+			}
+		}
+		_pipenm = fifo_name;
        	}
 
 	mkenvstr();

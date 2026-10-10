@@ -339,6 +339,7 @@ MakeServerAuthFile (struct display *d)
 #endif
     char    cleanname[NAMELEN];
     int r;
+    int fd;
     struct stat	statb;
 
     if (d->clientAuthFile && *d->clientAuthFile)
@@ -391,7 +392,15 @@ MakeServerAuthFile (struct display *d)
 	}
     	sprintf (d->authFile, "%s/%s/%s/A%s-XXXXXX",
 		 authDir, authdir1, authdir2, cleanname);
-    	(void) mktemp (d->authFile);
+	/* as xdm does: mkstemp() reserves the name (the caller then
+	   replaces the file), mktemp() only picked one */
+	fd = mkstemp (d->authFile);
+	if (fd < 0) {
+	    free (d->authFile);
+	    d->authFile = NULL;
+	    return FALSE;
+	}
+	close (fd);
     }
     return TRUE;
 }
@@ -1110,19 +1119,31 @@ SetUserAuthorization (struct display *d, struct verify_info *verify)
 	    }
 	}
 	if (lockStatus != LOCK_SUCCESS) {
+	    int fd;
+
+	    /*
+	     * mkstemp() creates the (empty) backup file, so nobody can
+	     * plant a link under its name in a shared userAuthDir; it is
+	     * read as the old file and replaced below.
+	     */
 	    sprintf (backup_name, "%s/.XauthXXXXXX", d->userAuthDir);
-	    (void) mktemp (backup_name);
-	    Debug ("XauLockAuth %s\n", backup_name);
-	    lockStatus = XauLockAuth (backup_name, 1, 2, 10);
-	    Debug ("backup lock is %d\n", lockStatus);
-	    if (lockStatus == LOCK_SUCCESS) {
-		if (openFiles (backup_name, new_name, &old, &new)) {
-		    name = backup_name;
-		    setenv = 1;
-		} else {
-		    XauUnlockAuth (backup_name);
-		    lockStatus = LOCK_ERROR;
-		}	
+	    fd = mkstemp (backup_name);
+	    if (fd >= 0) {
+		close (fd);
+		Debug ("XauLockAuth %s\n", backup_name);
+		lockStatus = XauLockAuth (backup_name, 1, 2, 10);
+		Debug ("backup lock is %d\n", lockStatus);
+		if (lockStatus == LOCK_SUCCESS) {
+		    if (openFiles (backup_name, new_name, &old, &new)) {
+			name = backup_name;
+			setenv = 1;
+		    } else {
+			XauUnlockAuth (backup_name);
+			lockStatus = LOCK_ERROR;
+		    }	
+		}
+		if (lockStatus != LOCK_SUCCESS)
+		    (void) unlink (backup_name);
 	    }
 	    /*
 	     * Won't be using this file so unlock it.

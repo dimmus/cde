@@ -25,6 +25,7 @@
 //%%  (c) Copyright 1993, 1994 Sun Microsystems, Inc.
 //%%  (c) Copyright 1993, 1994 Novell, Inc.
 //%%  $XConsortium: DtTt.C /main/4 1996/03/19 10:47:59 barstow $
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -624,11 +625,68 @@ _DtTtChoices(
         return 0;
 }
 
-#if defined(aix)
-#define AIX_CONST_STRING	(char *)
-#else
-#define AIX_CONST_STRING
-#endif
+//
+// Create a new file <dir>/<prefix>XXXXXX, in the directory tempnam(3)
+// chose ($TMPDIR if it is a directory, else P_tmpdir), and return its
+// descriptor (mode 0600) and its malloc'ed name; -1 and 0 on failure.
+// mkstemp() creates it, so nobody can create or link the name first.
+//
+int
+_DtTempFile(
+	const char *	prefix,
+	char **		path
+)
+{
+    const char *dir = getenv( "TMPDIR" );
+    struct stat st;
+    if ((dir == 0) || (*dir == '\0') || (stat( dir, &st ) != 0)
+	|| !S_ISDIR( st.st_mode ))
+    {
+	    dir = P_tmpdir;
+    }
+    *path = (char *)malloc( strlen( dir ) + strlen( prefix )
+			    + sizeof( "/XXXXXX" ));
+    if (*path == 0) {
+	    return -1;
+    }
+    sprintf( *path, "%s/%sXXXXXX", dir, prefix );
+    int fd = mkstemp( *path );
+    if (fd < 0) {
+	    free( *path );
+	    *path = 0;
+    }
+    return fd;
+}
+
+//
+// Make a FIFO <dir>/<prefix>XXXXXX as _DtTempFile() names it: mkfifo()
+// fails (EEXIST) rather than reuse anything made there in between.
+// Returns the malloc'ed name, or 0 with errno set.
+//
+char *
+_DtTempFifo(
+	const char *	prefix
+)
+{
+    for (int tries = 0; ; tries++) {
+	    char *path;
+	    int fd = _DtTempFile( prefix, &path );
+	    if (fd < 0) {
+		    return 0;
+	    }
+	    close( fd );
+	    unlink( path );
+	    if (mkfifo( path, S_IWUSR | S_IRUSR ) == 0) {
+		    return path;
+	    }
+	    int err = errno;
+	    free( path );
+	    errno = err;
+	    if ((err != EEXIST) || (tries >= 100)) {
+		    return 0;
+	    }
+    }
+}
 
 void
 _DtOpen(
@@ -637,7 +695,14 @@ _DtOpen(
 	const char *	tempnamTemplate
 )
 {
-    char *file = tempnam( 0, AIX_CONST_STRING tempnamTemplate );
+    // The command's output replaces the empty file made here.
+    char *file;
+    int fd = _DtTempFile( tempnamTemplate, &file );
+    if (fd < 0) {
+	    DtTtSetLabel( label, tempnamTemplate, errno );
+	    return;
+    }
+    close( fd );
     std::ostringstream cmdStream;
     cmdStream << cmd << " > " << file << ends;
     int sysStat = system( cmdStream.str().c_str() );
@@ -679,8 +744,12 @@ _DtOpen(
 	const char *	tempnamTemplate
 )
 {
-    char *file = tempnam( 0, AIX_CONST_STRING tempnamTemplate );
-    int fd = open( file, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR );
+    char *file;
+    int fd = _DtTempFile( tempnamTemplate, &file );
+    if (fd < 0) {
+	    DtTtSetLabel( label, tempnamTemplate, errno );
+	    return;
+    }
     if (write( fd, buf, len ) < 0) {
 	    DtTtSetLabel( label, file, errno );
 	    return;

@@ -116,6 +116,8 @@ _DtCvRunInterp(
     char        *ptr;
     char        *fileName;
     char        *newData;
+    const char  *tmpDir;
+    int          i;
     char         readBuf[BUFSIZ];
     BufFilePtr   myBufFile;
 
@@ -127,11 +129,29 @@ _DtCvRunInterp(
 	return -1;
 
     /*
-     * open a temporary file to write the data to.
+     * create a temporary file to write the data to: in $TMPDIR, as
+     * tempnam() chose, else in P_tmpdir.  mkstemp() creates the file,
+     * so nobody can create or link the name first.
      */
-    fileName = tempnam(NULL, NULL);
-    if (fileName == NULL)
+    myFd = -1;
+    fileName = NULL;
+    tmpDir = getenv("TMPDIR");
+    for (i = 0; myFd == -1 && i < 2; i++)
       {
+	if (i == 1 || tmpDir == NULL || *tmpDir == '\0')
+	    tmpDir = P_tmpdir;
+	free(fileName);
+	fileName = (char *) malloc(strlen(tmpDir) + sizeof("/dthelpXXXXXX"));
+	if (fileName == NULL)
+	    break;
+	strcpy(fileName, tmpDir);
+	strcat(fileName, "/dthelpXXXXXX");
+	myFd = mkstemp(fileName);
+      }
+
+    if (myFd == -1)
+      {
+	free(fileName);
 	if (newData != data)
 	    free(newData);
 	return -1;
@@ -141,11 +161,6 @@ _DtCvRunInterp(
      * write the data to file.
      */
     result = -1;
-#if defined(__linux__)
-    myFd   = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO);
-#else
-    myFd   = open(fileName, O_WRONLY | O_CREAT | O_TRUNC);
-#endif
     if (myFd != -1)
       {
 	/*
@@ -181,7 +196,7 @@ _DtCvRunInterp(
     /*
      * create the system command string with its parameters
      */
-    ptr = (char *) malloc(sizeof(interp) + strlen(fileName) + 1);
+    ptr = (char *) malloc(strlen(interp) + strlen(fileName) + 2);
     if (!ptr)
       {
 	unlink(fileName);

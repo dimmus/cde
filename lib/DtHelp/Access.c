@@ -785,6 +785,60 @@ GetTopicTitleAndAbbrev (
 }
 
 /*****************************************************************************
+ * Function: static int UncompressToTemp (char *name, char *tmpName)
+ *
+ * Parameters:	name	Specifies the file whose ".Z" form is uncompressed.
+ *		tmpName	Returns the name of the temporary file
+ *			(MAXPATHLEN + 1 bytes).
+ *
+ * Return Value: 0 if successful, -1 if the temporary file could not be
+ *		created or the uncompress failed (the file is then removed),
+ *		1 if out of memory.
+ *
+ * Purpose:	Uncompress name.Z into a new temporary file.  mkstemp()
+ *		creates the file, so unlike tmpnam() there is no window in
+ *		which another user can create or link the name first.
+ *****************************************************************************/
+static int
+UncompressToTemp (
+    char	*name,
+    char	*tmpName )
+{
+    char *inFile;
+    int   fd;
+    int   result;
+
+    inFile = (char *) malloc (strlen (name) + 3);
+    if (inFile == NULL)
+	return 1;
+
+    snprintf (tmpName, MAXPATHLEN + 1, "%s/dthelpXXXXXX", P_tmpdir);
+    fd = mkstemp (tmpName);
+    if (fd == -1)
+      {
+	free (inFile);
+	return -1;
+      }
+    close (fd);
+
+    /*
+     * make the dot Z file name and do the uncompress
+     */
+    strcpy (inFile, name);
+    strcat (inFile, ".Z");
+    result = _DtHelpCeUncompressFile (inFile, tmpName);
+    free (inFile);
+
+    if (result != 0)
+      {
+	unlink (tmpName);
+	return -1;
+      }
+
+    return 0;
+}
+
+/*****************************************************************************
  * Function: static int FileOpenRtnFd (char *name, int *ret_fd)
  *
  * Parameters:	name		Specifies the file to open.
@@ -808,7 +862,6 @@ FileOpenRtnFd (
     char	*name,
     int		*ret_fd )
 {
-    char *inFile = NULL;
     char  tmpName[MAXPATHLEN + 1];
     int   result = 1;
 
@@ -818,49 +871,26 @@ FileOpenRtnFd (
     *ret_fd = open(name, O_RDONLY);
     if (*ret_fd == -1)
       {
-	/*
-	 * get a temporary name
-	 */
-	(void) tmpnam (tmpName);
-
-	/*
-	 * malloc memory for the dot Z file name.
-	 */
-	inFile = (char *) malloc (strlen (name) + 3);
-	if (inFile != NULL)
-	  {
-	    /*
-	     * make the dot Z file
-	     */
-	    strcpy (inFile, name);
-	    strcat (inFile, ".Z");
-
-	    /*
-	     * do the uncompress
-	     */
-	    result = _DtHelpCeUncompressFile (inFile, tmpName);
-	    free (inFile);
-
-	    if (result != 0)
-	      {
-		errno = ENOENT;
-		return -1;
-	      }
-
-	    /*
-	     * now open the uncompressed file
-	     */
-	    *ret_fd = open(tmpName, O_RDONLY);
-	    if (*ret_fd == -1)
-		result = -1;
-	    else
-		unlink(tmpName);
-	  }
-	else
+	result = UncompressToTemp (name, tmpName);
+	if (result == 1)
 	  {
 	    errno = CEErrorMalloc;
 	    return -1;
 	  }
+	if (result != 0)
+	  {
+	    errno = ENOENT;
+	    return -1;
+	  }
+
+	/*
+	 * now open the uncompressed file; it is not needed by name
+	 * afterwards, so remove it even if the open failed
+	 */
+	*ret_fd = open(tmpName, O_RDONLY);
+	if (*ret_fd == -1)
+	    result = -1;
+	unlink(tmpName);
       }
 
     return result;
@@ -1307,7 +1337,6 @@ _DtHelpCeGetUncompressedFileName (
 	char	 *name,
 	char		**ret_name )
 {
-    char *inFile = NULL;
     char  tmpName[MAXPATHLEN + 1];
     int   result = 1;
 
@@ -1317,44 +1346,22 @@ _DtHelpCeGetUncompressedFileName (
     *ret_name = name;
     if (access (name, F_OK) == -1)
       {
-	/*
-	 * get a temporary name
-	 */
-	(void) tmpnam (tmpName);
-
-	/*
-	 * malloc memory for the dot Z file name.
-	 */
-	inFile = (char *) malloc (strlen (name) + 3);
-	if (inFile != NULL)
+	result = UncompressToTemp (name, tmpName);
+	if (result == 1)
 	  {
-	    /*
-	     * make the dot Z file
-	     */
-	    strcpy (inFile, name);
-	    strcat (inFile, ".Z");
-
-	    /*
-	     * do the uncompress
-	     */
-	    result = _DtHelpCeUncompressFile (inFile, tmpName);
-	    free (inFile);
-
-	    if (result != 0)
-	      {
-		errno = ENOENT;
-		return -1;
-	      }
-
-	    *ret_name = strdup (tmpName);
-	    if (*ret_name == NULL)
-	      {
-		errno = CEErrorMalloc;
-		return -1;
-	      }
+	    errno = CEErrorMalloc;
+	    return -1;
 	  }
-	else
+	if (result != 0)
 	  {
+	    errno = ENOENT;
+	    return -1;
+	  }
+
+	*ret_name = strdup (tmpName);
+	if (*ret_name == NULL)
+	  {
+	    unlink (tmpName);
 	    errno = CEErrorMalloc;
 	    return -1;
 	  }

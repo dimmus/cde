@@ -1835,24 +1835,26 @@ PrintCmd::printit( int silent )
     
     // Create tmp file.
     snprintf(tmpdir, MAXPATHLEN+1, "%s/%s", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY);
-    if ((p = tempnam(tmpdir, "dtmail")) == NULL) {
-	delete [] tmpdir;
-	return;
-    }
+    // The file is created empty; copySelected() opens it as a mailbox.
+    int fd = SafeMkstemp(tmpdir, "dtmail", &p);
     delete [] tmpdir;
+    if (fd < 0)
+	return;
+    SafeClose(fd);
     
     mail_error.clear();
     list = _parent->list();
     
     // Copy selected messages to a temp file
     int status = list->copySelected(mail_error, p, FALSE, TRUE);
-    if (mail_error.isSet())
+    if (mail_error.isSet() || 0 != status)
     {
-	_parent->postErrorDialog(mail_error);
+	if (mail_error.isSet())
+	    _parent->postErrorDialog(mail_error);
+	unlink(p);
 	free(p);
 	return;
     }
-    if (0 != status) return;
     
 
     DmxPrintJob *pjob = new DmxPrintJob(p,
@@ -2454,7 +2456,9 @@ SaveAsTextCmd::writeTextFromScrolledList(int fd)
     //
     char *tmpdir = new char[MAXPATHLEN+1];
     snprintf(tmpdir, MAXPATHLEN+1, "%s/%s", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY);
-    if ((tmppath = tempnam(tmpdir, "dtmail")) == NULL) {
+    // The file is created empty; copySelected() opens it as a mailbox.
+    int tmpfd = SafeMkstemp(tmpdir, "dtmail", &tmppath);
+    if (tmpfd < 0) {
 	snprintf(buf, sizeof(buf), CATGETS(DT_catd, 3, 51, "Unable to create %s."), tmpdir);
 	_genDialog->setToErrorDialog(CATGETS(DT_catd, 3, 52, "Mailer"), buf);
         helpId = DTMAILHELPNOCREATE;        
@@ -2462,6 +2466,7 @@ SaveAsTextCmd::writeTextFromScrolledList(int fd)
 	delete [] tmpdir;
 	return;
     }
+    SafeClose(tmpfd);
     delete [] tmpdir;
 
     mail_error.clear();
@@ -2471,12 +2476,13 @@ SaveAsTextCmd::writeTextFromScrolledList(int fd)
     // Copy the selected messages to a temp file.
     //
     int status = list->copySelected(mail_error, tmppath, FALSE, TRUE);
-    if (mail_error.isSet()) {
-        _roam_menu_window->postErrorDialog(mail_error);
+    if (mail_error.isSet() || 0 != status) {
+        if (mail_error.isSet())
+            _roam_menu_window->postErrorDialog(mail_error);
+        unlink(tmppath);
         free(tmppath);
         return;
     }
-    if (0 != status) return;
 
     mailbox = new DmxMailbox(tmppath);
     mailbox->loadMessages();

@@ -4339,23 +4339,21 @@ CheckDeletePermission(
     /* nothing - always check if root */
 #endif
     {
+       /*
+        * Create a temporary file in parentdir and delete it again.
+        * mkstemp(), unlike tempnam(), always uses parentdir (tempnam
+        * preferred $TMPDIR) and cannot follow a planted link.
+        */
        int fd = -1;
-       char *tmpfile;
-       tmpfile = tempnam(parentdir,"dtfile");
-       if (!tmpfile)
+       char tmpfile[PATH_MAX];
+       if (snprintf(tmpfile, sizeof(tmpfile), "%s/dtfileXXXXXX", parentdir)
+           >= (int) sizeof(tmpfile))
            return -1;
-       if ((fd = creat(tmpfile,O_RDONLY)) < 0)  /* Create a temporary file */
-       {
-           free(tmpfile);
+       if ((fd = mkstemp(tmpfile)) < 0)        /* Create a temporary file */
            return -1;
-       }
        close(fd);
        if (remove(tmpfile) < 0)                /* Delete the created file */
-       {
-           free(tmpfile);
            return -1;
-       }
-       free(tmpfile);
     }
 
     /* root user can delete anything */

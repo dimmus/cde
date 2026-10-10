@@ -152,6 +152,24 @@ extern "C" {
 
 #endif
 
+// Fill name with <path>XXXXXX made unique by mkstemp().  The file is
+// created and closed; the callers remove it (with the privileges the
+// directory needs) and then create the lock file with O_EXCL, as they
+// did with the name mktemp() returned.
+//
+static int
+makeTempLockName(char *name, const char *path)
+{
+  int fd;
+
+  sprintf(name, "%sXXXXXX", path);
+  fd = mkstemp(name);
+  if (fd == -1)
+    return -1;
+  (void) close(fd);
+  return 0;
+}
+
 #define GET_DUMPFILE_NAME(dfn) \
     snprintf(dfn, sizeof(dfn), "%s/%s/dtmail.dump", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY)
 
@@ -4120,12 +4138,11 @@ RFCMailBox::lockFile(DtMailEnv & error)
   
   // Create the temporary mail lock file name
   // It has the form <_lockfilename><XXXXXX> or mailbox.lockXXXXXX
-  // mktemp then creates a unique temporary file for the template
+  // makeTempLockName then creates a unique temporary file for the template
   //
   assert(_lockFileName != NULL);
   char *tempLockFileName = new char[MAXPATHLEN];
-  sprintf(tempLockFileName, "%sXXXXXX", _real_path);
-  mktemp(tempLockFileName);
+  PRIV_ENABLED(return_status,makeTempLockName(tempLockFileName, _real_path));
   PRIV_ENABLED(return_status,SafeRemove(tempLockFileName));
 
   // loop through attempting to create the temporary lock file,
@@ -4348,8 +4365,7 @@ RFCMailBox::dotDtmailLock(DtMailEnv & error)
   // operating on the same mailbox.
   
   // Create the temporary mail lock file name.
-  sprintf(tempLockFileName, "%sXXXXXX", _real_path);
-  mktemp(tempLockFileName);
+  PRIV_ENABLED(return_status,makeTempLockName(tempLockFileName, _real_path));
   PRIV_ENABLED(return_status,SafeRemove(tempLockFileName));
 
   // Attempt to create the temporary file.

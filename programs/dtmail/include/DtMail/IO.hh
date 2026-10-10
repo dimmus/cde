@@ -77,6 +77,7 @@ int	SafeLStat(const char * path, struct stat * buf);
 int	SafeLink(const char * existingPath, const char * newPath);
 int	SafeLockf(int fd, int func, long size);
 int	SafeOpen(const char * path, int oflag, mode_t mode = 0644);
+int	SafeMkstemp(const char * dir, const char * prefix, char ** path);
 void    SafePathIsAccessible(DtMailEnv &error, const char * path);
 ssize_t	SafeRead(int	fd, void * buf, size_t bytes);
 int	SafeRename(const char * oldPath, const char * newPath);

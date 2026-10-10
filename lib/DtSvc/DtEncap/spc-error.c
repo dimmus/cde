@@ -51,7 +51,7 @@
  * Log file information (routines near bottom of file)
  */
 
-#define TEMPLATE_EXTENSION	  (XeString)".XXXXXX" /* For mktemp(3c) */
+#define TEMPLATE_EXTENSION	  (XeString)".XXXXXX" /* For mkstemp(3) */
 
 XeChar spc_logfile[MAXPATHLEN+1];
 XeChar spc_logging = FALSE;
@@ -251,7 +251,7 @@ SPC_Make_Log_Filename(XeString name,
 /*----------------------------------------------------------------------+*/
 {
   /* Make a log filename based on the passed name (and perhaps process id) */
-  XeString cp;
+  int fd;
   XeString log_file_path = NULL;
 
   _DtSvcProcessLock();
@@ -272,8 +272,12 @@ SPC_Make_Log_Filename(XeString name,
     /* Add the extension.  No strlen checking is done */
     strcat(spc_logfile, TEMPLATE_EXTENSION);
 
-    cp = (XeString) mktemp(spc_logfile);
-    if (!cp || !*cp) {
+    /* mkstemp() creates the (empty) file, so the name stays unique
+       until SPC_Open_Log() opens it for appending */
+    fd = mkstemp(spc_logfile);
+    if (fd != -1)
+      close(fd);
+    else {
       /* Sorry, but this is the best we can do */
       strcpy(spc_logfile, (log_file_path) ? log_file_path : name);
     }

@@ -246,7 +246,6 @@ WillingMsg( void )
     static char retbuf[LINEBUFSIZE];
     char	tmpbuf[LINEBUFSIZE * 8];
     char	*cp;
-    char	tmpfilename[L_tmpnam + 1];
     FILE	*f;
 
 
@@ -258,28 +257,29 @@ WillingMsg( void )
     
     strcpy(tmpbuf,"uptime | ");
     strcat(tmpbuf,"awk '{printf(\"%s %-.5s  load: %.3s, %.3s, %.3s\",$(NF-6),$(NF-5),$(NF-2),$(NF-1),$NF)}'");
-    strcat(tmpbuf," > ");
 
-    if ( tmpnam(tmpfilename) != (char *)NULL ) {
-
-	strcat(tmpbuf,tmpfilename);
-
-	if(-1 == system(tmpbuf)) {
-            perror(strerror(errno));
-        }
-
-	if ((f = fopen(tmpfilename,"r")) != (FILE *) NULL) {
-	    fgets(tmpbuf,LINEBUFSIZE,f);
+    /*
+     * Read the line through a pipe.  It used to be redirected into a
+     * tmpnam() file, which this root process wrote through any link
+     * planted under that name.  If nothing is read, keep the default
+     * (fgets() left the command line in tmpbuf, which was returned).
+     */
+    if ((f = popen(tmpbuf, "r")) != (FILE *) NULL) {
+	if (fgets(tmpbuf,LINEBUFSIZE,f) != NULL) {
 	    if ( (cp = strchr(tmpbuf,'\n')) != NULL) 
 		*cp = '\0';
 
 	    if (strlen(tmpbuf) > 10) 	/* seems reasonable? */
     		strcpy(retbuf, tmpbuf);
-
-	    fclose(f);
 	}
-	
-	unlink(tmpfilename);
+
+	/* read the rest, so the pipeline is not killed by SIGPIPE */
+	while (fgets(tmpbuf,sizeof(tmpbuf),f) != NULL)
+	    ;
+	pclose(f);
+    }
+    else {
+	perror(strerror(errno));
     }
 
     return (retbuf);

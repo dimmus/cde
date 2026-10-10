@@ -940,8 +940,7 @@ load_cb(
 				 */
 				
 				strcpy(filename, "/tmp/cmXXXXXX");
-				mktemp(filename);
-				if ((fp = fopen(filename, "w")) == 0) {
+				if ((fp = mkstemp_fopen(filename)) == 0) {
 					tttk_message_fail( msg, TT_DESKTOP_ENODATA, 0, 1 );
 					return 0;
 				}
@@ -1026,9 +1025,8 @@ handle_drop_cb(
 			 * Save data to a file so we can pass it to drag_load_proc().
 			 */
 			strcpy(filename, "/tmp/cmXXXXXX");
-			mktemp(filename);
 	
-			if ((fp = fopen(filename, "w")) == 0) {
+			if ((fp = mkstemp_fopen(filename)) == 0) {
 				transfer_info->status = DtDND_FAILURE;
 				return;
 			}

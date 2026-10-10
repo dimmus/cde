@@ -510,18 +510,10 @@ static char *tooltalk_save_buffer_to_file(
 
     // 1. Get buffer content into file.
     snprintf(tmpdir, MAXPATHLEN+1, "%s/%s", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY);
-    p = tempnam(tmpdir, "mail");
-    if (p == NULL)
-    {
-	delete [] tmpdir;
-	return NULL;
-    }
-
-    int fd = SafeOpen(p, O_RDWR | O_CREAT);
+    int fd = SafeMkstemp(tmpdir, "mail", &p);
     if (fd < 0)
     {
 	delete [] tmpdir;
-	free(p);
 	return NULL;
     }
     if (SafeWrite(fd, contents, len) != len)

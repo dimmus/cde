@@ -79,15 +79,27 @@ main(int argc, char **argv)
 	verbosity = tttar->verbosity();
 
 	if (tttar->should_tar()) {
-		char *tempnam_result;
+		char		dir_template[MAXPATHLEN];
+		const char     *tmpdir = getenv( "TMPDIR" );
+		struct stat	st;
+		bool_t		made_dir;
 		/*
 		 * Create a temporary directory to which we can
 		 * chdir() in order to create or extract the
-		 * tttarfile for or from the tarfile.
+		 * tttarfile for or from the tarfile.  It goes where
+		 * tempnam(3) put it; mkdtemp() creates it (mode 0700)
+		 * under a name nobody else can have taken first.
 		 */
-		tttardir = tempnam_result = tempnam(NULL, "tttardir");
-		free(tempnam_result);
-		if (mkdir( (char *)tttardir, S_IRWXU ) == 0) {
+		if (    (tmpdir == NULL) || (*tmpdir == '\0')
+		     || (stat( tmpdir, &st ) != 0) || !S_ISDIR( st.st_mode ))
+		{
+			tmpdir = P_tmpdir;
+		}
+		snprintf( dir_template, sizeof(dir_template),
+			  "%s/tttardirXXXXXX", tmpdir );
+		made_dir = (mkdtemp( dir_template ) != NULL);
+		tttardir = dir_template;
+		if (made_dir) {
 			tttarfile_name = tttardir.cat( "/tttarfile" );
 			should_tttar = TRUE;
 			if (    (tttar->mode() == EXTRACT)

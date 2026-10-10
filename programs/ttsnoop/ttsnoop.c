@@ -513,10 +513,11 @@ main(int argc, char **argv)
 	    //
 	    // Set up fifo for trace output
 	    //
-	    traceFile = tempnam( 0, "ttsnt" );
-	    if (mkfifo( traceFile, S_IWUSR | S_IRUSR ) == -1) {
-		    clog << "ttsnoop: mkfifo( \"" << traceFile << "\" ) = ";
+	    traceFile = _DtTempFifo( "ttsnt" );
+	    if (traceFile == 0) {
+		    clog << "ttsnoop: mkfifo( \"ttsnt\" ) = ";
 		    clog << strerror( errno ) << endl;
+		    exit( 2 );
 	    }
     }
     apiTracerArgv[ 0 ] = "tail";
@@ -528,10 +529,11 @@ main(int argc, char **argv)
 	    //
 	    // Set up fifo for snoop output
 	    //
-	    snoopFile = tempnam( 0, "ttsnp" );
-	    if (mkfifo( snoopFile, S_IWUSR | S_IRUSR ) == -1) {
-		    clog << "ttsnoop: mkfifo( \"" << snoopFile << "\" ) = ";
+	    snoopFile = _DtTempFifo( "ttsnp" );
+	    if (snoopFile == 0) {
+		    clog << "ttsnoop: mkfifo( \"ttsnp\" ) = ";
 		    clog << strerror( errno ) << endl;
+		    exit( 2 );
 	    }
     }
     snooperArgv[ 0 ] = "tail";

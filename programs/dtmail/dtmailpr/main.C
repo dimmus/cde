@@ -38,6 +38,7 @@ extern "C" {
 #endif
 #include <Dt/EnvControlP.h>
 #include <Dt/DtPStrings.h>
+#include <DtMail/IO.hh>
 
 /*
  * globals
@@ -168,8 +169,8 @@ main (int argc, char **argv)
 			getenv("HOME"),
 			DtPERSONAL_TMP_DIRECTORY);
 
-	        name = tempnam(tmpdir, "dtmpr");
-		if ((msgFile = fopen (name, "w+")) == NULL)
+		int fd = SafeMkstemp(tmpdir, "dtmpr", &name);
+		if (fd < 0 || (msgFile = fdopen (fd, "w+")) == NULL)
 		{
 			perror ("tmpfile");
 			exit (1);

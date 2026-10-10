@@ -38,6 +38,7 @@
  ************************************<+>*************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/param.h>
@@ -757,15 +758,18 @@ fileStoreBuffer(
         sprintf(path, "%s/%s", dir, name);
 
 	if (stat(path, &statInfo) == 0) {
-		char	*tPath;
-		
-		if ((tPath = tempnam(dir, name)) == NULL)
-			return (char *)NULL;
-		strcpy(path, tPath);
-		free(tPath);
-	}
+		int	fd;
 
-        if ((fp = fopen(path, "w")) == NULL) {
+		/* a new file: mkstemp() creates it under a unique name */
+		snprintf(path, sizeof(path), "%s/%sXXXXXX", dir, name);
+		if ((fd = mkstemp(path)) < 0)
+			return (char *)NULL;
+		if ((fp = fdopen(fd, "w")) == NULL)
+			close(fd);
+	} else
+		fp = fopen(path, "w");
+
+        if (fp == NULL) {
                 printf("Cannot create file \"%s\"\n", path);
 		return (char *)NULL;
         }

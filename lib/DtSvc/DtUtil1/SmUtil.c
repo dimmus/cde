@@ -41,6 +41,8 @@
 #include <sys/types.h>
 #endif
 
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -219,9 +221,20 @@ getSessionPath(
       * No saveFile name was provided, so generate a new one.
       */
       int len = strlen(tmpPath);
+      int fd;
 
+      /*
+       * mkstemp() finds a name no file has; the file is removed again
+       * because the caller creates it (with its own mode), as it did
+       * when mktemp() only returned the name.  The directory is the
+       * user's own session directory, so the name cannot be taken
+       * over by somebody else in between.
+       */
       (void)strcat(tmpPath, "dtXXXXXX");
-      (void)mktemp(tmpPath);
+      fd = mkstemp(tmpPath);
+      if (fd == -1) goto abort;
+      (void)close(fd);
+      (void)unlink(tmpPath);
 
       *saveFile = (char *) XtMalloc(15 * sizeof(char));
       if(*saveFile == NULL) goto abort;
