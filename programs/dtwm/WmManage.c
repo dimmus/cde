@@ -98,6 +98,25 @@ static void CheckPushRecallClient (ClientData *pCD);
  */
 
 
+/*
+ * True if the icon frame of workspace i of the client is the icon frame
+ * of an earlier workspace: a root icon (not in an icon box) is one window
+ * shared by all the workspaces the client is in.
+ */
+static Boolean IconFrameSeen (ClientData *pCD, int i)
+{
+    int j;
+
+    for (j = 0; j < i; j++)
+    {
+	if (pCD->pWsList[j].iconFrameWin == pCD->pWsList[i].iconFrameWin)
+	{
+	    return (True);
+	}
+    }
+    return (False);
+}
+
 static void ApplyPrematureClientMessages (ClientData *pCD)
 {
     unsigned long i, nitems, leftover;
@@ -613,7 +632,8 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 			  pCD->clientFrameWin, GrabModeSync, F_CONTEXT_ALL);
 	for (i = 0; i < pCD->numInhabited; i++)
 	{
-	    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin)
+	    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin &&
+		!IconFrameSeen (pCD, i))
 	    {
 		SetupKeyBindings (pCD->systemMenuSpec->accelKeySpecs,
 			      pCD->pWsList[i].iconFrameWin, GrabModeSync, 
@@ -624,7 +644,8 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 
   for (i = 0; i < pCD->numInhabited; i++)
   {
-    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin)
+    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin &&
+	!IconFrameSeen (pCD, i))
     {
 	static int iconKeySpec = 1;
 	static int iconAccelSpec = 1;

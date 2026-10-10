@@ -756,14 +756,17 @@ void
 ProcessDtWmHints (ClientData *pCD)
 {
     DtWmHints *pHints;
-    Atom	property;
+    static Atom	property = None;
     long	saveFunctions;
 
     /*
      * Retrieve the _DT_WM_HINTS property if it exists.
      */
 
-    property = XmInternAtom(DISPLAY, _XA_DT_WM_HINTS, False);
+    if (property == None)
+    {
+	property = XmInternAtom(DISPLAY, _XA_DT_WM_HINTS, False);
+    }
 
     if (
 	(HasProperty (pCD, property)) 
@@ -983,7 +986,8 @@ WorkspaceIsInCommand(
     {
 	if (pCD->pSD->remainingSessionItems)
 	{
-	    if(!(XGetWMClientMachine(dpy, pCD->client, &clientMachineProp)))
+	    if (!HasProperty (pCD, XA_WM_CLIENT_MACHINE) ||
+		!(XGetWMClientMachine(dpy, pCD->client, &clientMachineProp)))
 	    {
 		clientMachineProp.value = NULL;
 	    }

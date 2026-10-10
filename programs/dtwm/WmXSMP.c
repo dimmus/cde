@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 #include <sys/param.h>
 #include <X11/Intrinsic.h>
 #include <X11/Shell.h>
@@ -42,6 +43,7 @@
 #include "WmGlobal.h"
 #include "WmXSMP.h"
 #include "WmWrkspace.h"
+#include "WmProperty.h"
 #include <Dt/Session.h>
 
 extern XtPointer _XmStringUngenerate(XmString, XmStringTag,
@@ -129,7 +131,6 @@ static Boolean getProxyClientInfo(ClientData *, ProxyClientInfo *);
 static Bool fillClientIDProc(XrmDatabase *, XrmBindingList,
 			       XrmQuarkList, XrmRepresentation *,
 			       XrmValue *, XPointer);
-static Bool cmpProxyClient(char *clientID, ProxyClientInfo *proxyClientInfo);
 static char *findProxyClientID(ClientData *);
 static Boolean findXSMPClientDBMatch(ClientData *, char **);
 static Boolean findProxyClientDBMatch(ClientData *, char **);
@@ -461,7 +462,8 @@ getProxyClientInfo(ClientData *pCD, ProxyClientInfo *proxyClientInfo)
     unsigned long i;
 
     /* WM_COMMAND is required; WM_CLIENT_MACHINE is optional. */
-    if (!XGetTextProperty(wmGD.display, pCD->client, &textProperty,
+    if (!HasProperty(pCD, XA_WM_COMMAND) ||
+	!XGetTextProperty(wmGD.display, pCD->client, &textProperty,
 			  XA_WM_COMMAND))
 	return False;
 
@@ -487,7 +489,8 @@ getProxyClientInfo(ClientData *pCD, ProxyClientInfo *proxyClientInfo)
     proxyClientInfo->wmCommand = (char *)textProperty.value;
 
     /* Since WM_CLIENT_MACHINE is optional, don't fail if not found. */
-    if (XGetWMClientMachine(wmGD.display, pCD->client, &textProperty))
+    if (HasProperty(pCD, XA_WM_CLIENT_MACHINE) &&
+	XGetWMClientMachine(wmGD.display, pCD->client, &textProperty))
 	proxyClientInfo->wmClientMachine = (char *)textProperty.value;
     else proxyClientInfo->wmClientMachine = (char *)NULL;
 
@@ -524,27 +527,98 @@ fillClientIDProc(XrmDatabase *clientDB, XrmBindingList bindingList,
     return FALSE;
 }
 
-static Bool
-cmpProxyClient(char *clientID, ProxyClientInfo *proxyClientInfo)
+/*
+ *  The proxy clients of the client database, with the resources they
+ *  are matched on, listed once: a window that is managed is compared
+ *  with each of them, in memory.  The strings belong to the database.
+ */
+typedef struct _ProxyClientEntry
 {
-    char *clientScreen;
-    char *wmCommand;
-    char *wmClientMachine;
+    char *clientID;
+    char *wmCommand;		/* NULL once the entry has been used */
+    char *wmClientMachine;	/* may be NULL */
+    int screen;
+} ProxyClientEntry;
 
-    if (((wmCommand =
-	  getClientResource(clientID, wmCommandStr)) == (char *)NULL) ||
-	(strcmp(wmCommand, proxyClientInfo->wmCommand) != 0) ||
-	((clientScreen =
-	  getClientResource(clientID, screenStr)) == (char *)NULL) ||
-	(atoi(clientScreen) != proxyClientInfo->screen))
+static ProxyClientEntry *proxyClients = NULL;
+static int numProxyClients = 0;
+static XrmDatabase proxyClientsDB = (XrmDatabase)NULL;
+
+/*
+ *  The client a window was last matched with: the window is matched
+ *  twice while it is managed (workspaces and geometry, then icon
+ *  positions), with the same properties.
+ */
+static WmScreenData *lastProxyScreen = NULL;
+static int lastProxyClient = 0;
+static char *lastProxyClientID = NULL;
+
+static void
+listProxyClients(void)
+{
+    char **clientIDList = NULL;
+    char *clientScreen;
+    int i, n;
+    static XrmName proxyName[2] = {NULLQUARK, NULLQUARK};
+    static XrmClass proxyClass[2] = {NULLQUARK, NULLQUARK};
+
+    if (proxyClientsDB == wmGD.clientResourceDB)
+	return;
+
+    free(proxyClients);
+    proxyClients = NULL;
+    numProxyClients = 0;
+    proxyClientsDB = wmGD.clientResourceDB;
+    lastProxyScreen = NULL;
+    lastProxyClient = 0;
+    lastProxyClientID = NULL;
+
+    if (proxyName[0] == NULLQUARK)
+    {
+	proxyName[0] = XrmStringToName(proxyClientStr);
+	proxyClass[0] = XrmStringToClass(proxyClientStr);
+    }
+
+    XrmEnumerateDatabase(wmGD.clientResourceDB, proxyName, proxyClass,
+		    XrmEnumOneLevel, fillClientIDProc, (XPointer)&clientIDList);
+
+    for (n = 0; clientIDList && clientIDList[n]; ++n)
+	;
+    if (n && (proxyClients = malloc(n * sizeof(ProxyClientEntry))))
+    {
+	for (i = 0; i < n; ++i)
+	{
+	    ProxyClientEntry *pPCE = &proxyClients[numProxyClients];
+
+	    /* An entry without a command or screen never matches. */
+	    pPCE->clientID = clientIDList[i];
+	    if (((pPCE->wmCommand =
+		  getClientResource(pPCE->clientID, wmCommandStr)) == NULL) ||
+		((clientScreen =
+		  getClientResource(pPCE->clientID, screenStr)) == NULL))
+		continue;
+	    pPCE->screen = atoi(clientScreen);
+	    pPCE->wmClientMachine =
+		getClientResource(pPCE->clientID, wmClientMachineStr);
+	    numProxyClients++;
+	}
+    }
+    free(clientIDList);
+}
+
+static Bool
+cmpProxyClient(ProxyClientEntry *pPCE, ProxyClientInfo *proxyClientInfo)
+{
+    if ((pPCE->wmCommand == (char *)NULL) ||
+	(strcmp(pPCE->wmCommand, proxyClientInfo->wmCommand) != 0) ||
+	(pPCE->screen != proxyClientInfo->screen))
 	return FALSE;
 
     /* So far so good.  If WM_CLIENT_MACHINE missing from either, */
     /* or if it is set in both and it's the same, we've got a match! */
     if (!proxyClientInfo->wmClientMachine ||
-	((wmClientMachine =
-	  getClientResource(clientID, wmClientMachineStr)) == (char *)NULL) ||
-	(strcmp(proxyClientInfo->wmClientMachine, wmClientMachine) == 0))
+	(pPCE->wmClientMachine == (char *)NULL) ||
+	(strcmp(proxyClientInfo->wmClientMachine, pPCE->wmClientMachine) == 0))
 	return TRUE;
 
     return FALSE;
@@ -556,37 +630,40 @@ findProxyClientID(ClientData *pCD)
     ProxyClientInfo proxyClientInfo;
     int i;
     char *clientID = NULL;
-    char **clientIDList = NULL;
-    static XrmName proxyName[2] = {NULLQUARK, NULLQUARK};
-    static XrmClass proxyClass[2] = {NULLQUARK, NULLQUARK};
 
-    if (proxyName[0] == NULLQUARK)
-    {
-	proxyName[0] = XrmStringToName(proxyClientStr);
-	proxyClass[0] = XrmStringToClass(proxyClientStr);
-    }
+    listProxyClients();
+
+    if ((pCD->pSD == lastProxyScreen) && (pCD->clientID == lastProxyClient))
+	return lastProxyClientID;
 
     /*
      *  We need to match the screen and
      *  the WM_COMMAND and WM_CLIENT_MACHINE properties.
+     *  Without proxy clients to match, do not read them.
      */
-    if (!getProxyClientInfo(pCD, &proxyClientInfo)) return clientID;
+    if (!numProxyClients)
+	return clientID;
 
-    XrmEnumerateDatabase(wmGD.clientResourceDB, proxyName, proxyClass,
-		    XrmEnumOneLevel, fillClientIDProc, (XPointer)&clientIDList);
-
-    for (i = 0; clientIDList && clientIDList[i]; ++i)
+    if (getProxyClientInfo(pCD, &proxyClientInfo))
     {
-	if (cmpProxyClient(clientIDList[i], &proxyClientInfo))
+	for (i = 0; i < numProxyClients; ++i)
 	{
-	    clientID = clientIDList[i];
-	    break;
+	    if (cmpProxyClient(&proxyClients[i], &proxyClientInfo))
+	    {
+		clientID = proxyClients[i].clientID;
+		break;
+	    }
 	}
+
+	if (proxyClientInfo.wmCommand)
+	    free(proxyClientInfo.wmCommand);
+	if (proxyClientInfo.wmClientMachine)
+	    free(proxyClientInfo.wmClientMachine);
     }
 
-    if (proxyClientInfo.wmCommand) free(proxyClientInfo.wmCommand);
-    if (proxyClientInfo.wmClientMachine) free(proxyClientInfo.wmClientMachine);
-    if (clientIDList) free(clientIDList);
+    lastProxyScreen = pCD->pSD;
+    lastProxyClient = pCD->clientID;
+    lastProxyClientID = clientID;
 
     return clientID;
 }
@@ -888,6 +965,20 @@ static void
 dbRemoveProxyClientEntry(char *proxyClientID)
 {
     char resourceBuf[MAX_RESOURCE_LEN];
+    int i;
+
+    /* Forget it in the list of proxy clients, and as a match. */
+    for (i = 0; i < numProxyClients; ++i)
+    {
+	if (proxyClients[i].clientID == proxyClientID)
+	    proxyClients[i].wmCommand = (char *)NULL;
+    }
+    if (lastProxyClientID == proxyClientID)
+    {
+	lastProxyScreen = NULL;
+	lastProxyClient = 0;
+	lastProxyClientID = NULL;
+    }
 
     /* Remove entry from DB.  Since Xrm does not provide a means */
     /* of removing something from the DB, we blank out key info. */
