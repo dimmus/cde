@@ -61,6 +61,8 @@ class _Tt_desktop : public _Tt_object {
 	int			get_prop(_Tt_string pname, _Tt_string &val);
 	_Tt_string		session_name(_Tt_string dt_handle);
 	void			set_error_handler(_Tt_dt_errfn efn);
+	void			release();
+	int			connected() const;
       private:
 	int			close();
 	void			restore_user_handler();

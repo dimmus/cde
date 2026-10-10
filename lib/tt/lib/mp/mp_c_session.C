@@ -108,8 +108,23 @@ c_init()
 					// Fatal error or TT_OK
 					return status;
 				}
+				if (! _rpc_client.is_null() &&
+				    _rpc_client->stale_port()) {
+					break;	// see below
+				}
 			} while (_tt_backoff(&ping_delay, 250, ping_deadline));
 		    }
+
+			// The advertised address named a TCP port, and
+			// another RPC program owns it now, while the
+			// portmapper knows nothing of the session: it is
+			// gone.  Carry on as if the portmapper had said so
+			// at once (as it did when clients always asked it).
+			if (! _rpc_client.is_null() &&
+			    _rpc_client->stale_port()) {
+				if (tried > 0) _address_string = (char *) 0;
+				break;
+			}
 
 			// Session could not be pinged.  If this is an
 			// X11 session, handle the case where there is

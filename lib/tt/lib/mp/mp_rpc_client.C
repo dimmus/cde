@@ -77,6 +77,9 @@ _Tt_rpc_client::
 _Tt_rpc_client(int conn_socket)
 {
 	_socket = conn_socket;
+	_own_socket = 0;
+	_port = 0;
+	_stale_port = 0;
 	_client = (CLIENT *)0;
 	_program = 0;
 	_version = 0;
@@ -120,22 +123,33 @@ socket()
  */
 int _Tt_rpc_client::
 init(_Tt_host_ptr &host, int program, int version,
-     uid_t servuid, _Tt_auth &auth)
+     uid_t servuid, _Tt_auth &auth, int port)
 {
 	int		optval;
 
-	optval = (_socket == RPC_ANYSOCK);
 	_auth = auth;
 	_host = host;
 	_program = program;
 	_version = version;
 	_server_uid = servuid;
+	_port = _stale_port ? 0 : port;
 	if (_client != (CLIENT *)0) {
 		if (_auth.auth_level() == _TT_AUTH_UNIX) {
 			auth_destroy(_client->cl_auth);
 		}
 		clnt_destroy(_client);
+		_client = (CLIENT *)0;
+		if (_own_socket) {
+			// clnt_destroy() closed the socket the RPC
+			// library opened for us.  Rebinding used to hand
+			// that stale descriptor number back to
+			// clnttcp_create(), which then talked RPC over
+			// whatever the number had been reused for.
+			_socket = RPC_ANYSOCK;
+		}
 	}
+	optval = (_socket == RPC_ANYSOCK);
+	_own_socket = optval;
 #if defined(OPT_SECURE_RPC)
 	if (_auth.auth_level() == _TT_AUTH_DES) {
 		if (_server_uid == 0) {
@@ -149,16 +163,29 @@ init(_Tt_host_ptr &host, int program, int version,
 
 	memset(&_server_addr, 0, sizeof(_server_addr));
 	_server_addr.sin_family = AF_INET;
-	_server_addr.sin_port = htons((optval) ? 0 : 4000);
+	// Port 0 makes clnttcp_create() ask the portmapper.  When the
+	// session address names the port, connect to it directly; if
+	// that fails (a stale address), fall back to the portmapper.
+	_server_addr.sin_port = htons((optval) ? _port : 4000);
 
 	if (!inet_aton((char *)(_host->stringaddr()), &_server_addr.sin_addr))
 		return 0;
 
 	_client = clnttcp_create(&_server_addr, _program,
 			         _version, &_socket, 4000, 4000);
+	if (_client == 0 && optval && _port != 0) {
+		_port = 0;
+		_socket = RPC_ANYSOCK;
+		_server_addr.sin_port = 0;
+		_client = clnttcp_create(&_server_addr, _program,
+					 _version, &_socket, 4000, 4000);
+	}
 	if (_client == 0) {
 		// XXX only when in some kind of debug mode
 		//clnt_pcreateerror("_Tt_rpc_client::init(): clnttcp_create()");
+		if (optval) {
+			_socket = RPC_ANYSOCK;
+		}
 		return 0;
 	}
 	if (_auth.auth_level() == _TT_AUTH_UNIX) {
@@ -342,6 +369,21 @@ call(int procnum, xdrproc_t inproc, char *in,
 #endif	
 	if (_auth.auth_level() == _TT_AUTH_DES) {
 		auth_destroy(_client->cl_auth);
+	}
+
+	if (_clnt_stat == RPC_PROGUNAVAIL && _port != 0 && _own_socket) {
+		// We connected straight to the advertised port, and
+		// whoever listens there now is not our session (the
+		// session died and the port was reused).  Ask the
+		// portmapper instead, as clients always used to.
+		_Tt_host_ptr	host = _host;
+		_Tt_auth	auth = _auth;
+
+		_stale_port = 1;
+		if (! init(host, _program, _version, _server_uid, auth, 0)) {
+			return(RPC_CANTRECV);
+		}
+		return call(procnum, inproc, in, outproc, out, timeout);
 	}
 
 	return(_clnt_stat);

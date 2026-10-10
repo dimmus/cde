@@ -271,6 +271,29 @@ init(void (*service_fn)(struct svc_req *, SVCXPRT *))
 }
 
 
+/*
+ * Returns the TCP port the server listens on (0 if unknown, e.g. for
+ * a TLI transport or a server on a connected descriptor).  It is
+ * advertised in the session address so that clients can connect
+ * without a portmapper query.
+ */
+int _Tt_rpc_server::
+port()
+{
+#ifndef OPT_TLI
+	sockaddr_in	addr;
+	socklen_t	len = sizeof(addr);
+
+	if (_transp != (SVCXPRT *)0 &&
+	    getsockname(_socket, (sockaddr *)&addr, &len) == 0 &&
+	    addr.sin_family == AF_INET) {
+		return ntohs(addr.sin_port);
+	}
+#endif
+	return 0;
+}
+
+
 /* 
  * Runs an rpc server. If a non-negative timeout is given then this
  * function will return if the timeout expired before any rpc requests

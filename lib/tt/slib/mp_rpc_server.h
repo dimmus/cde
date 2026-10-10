@@ -51,6 +51,7 @@ class _Tt_rpc_server : public _Tt_object {
 				    _Tt_int_rec_list_ptr &efds);
 	int			program() { return _program; };
 	int			version() { return _version; };
+	int			port();
       private:
 	_Tt_auth		_auth;
 	int			_program;

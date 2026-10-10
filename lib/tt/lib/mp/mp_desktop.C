@@ -75,6 +75,9 @@ sigjmp_buf _Tt_desktop::io_exception;
 
 struct _Tt_desktop_private {
 	Display				*xd;
+	// dt_handle given to init(), kept so that get_prop() can
+	// reconnect after release().
+	char				*handle;
 };					 
 
 _Tt_desktop::
@@ -82,6 +85,7 @@ _Tt_desktop()
 {
 	priv = (_Tt_desktop_private *)malloc(sizeof(_Tt_desktop_private));
 	priv->xd = (Display *)0;
+	priv->handle = (char *)0;
 	user_io_handler = NULL;
 }
 
@@ -93,6 +97,7 @@ _Tt_desktop::
 	// interrupted us during a grab.
 	unlock();
 	close();
+	free(priv->handle);
 	free((MALLOCTYPE *)priv);
 }
 
@@ -114,6 +119,9 @@ init(_Tt_string dt_handle, _Tt_dt_type /* t */)
 
 	if (priv->xd != (Display *)0) {
 		return(1);
+	}
+	if (priv->handle == (char *)0 && dt_handle.len() > 0) {
+		priv->handle = strdup((char *)dt_handle);
 	}
 	
 	// initialize our access to Xlib
@@ -226,8 +234,32 @@ close()
 	} else {
 		ret_val = 0;
 	}
+	priv->xd = (Display *)0;
 	restore_user_handler();
 	return(ret_val);
+}
+
+
+//
+// Drops the connection to the X11 server.  A client needs the
+// connection only to read the session address property; keeping it
+// open for the life of the process costs every ToolTalk client a
+// second X connection (and the X server a client slot).  get_prop()
+// reconnects if it is called again.
+//
+int _Tt_desktop::
+connected() const
+{
+	return priv->xd != (Display *)0;
+}
+
+
+void _Tt_desktop::
+release()
+{
+	if (priv->xd != (Display *)0) {
+		(void)close();
+	}
 }
 
 
@@ -376,20 +408,33 @@ get_prop(_Tt_string pname, _Tt_string &pval)
 	unsigned long           left_to_read;
 	unsigned char		*val = (unsigned char *)0;
 	Atom			tt_xatom;
+	int			reconnected = 0;
 	
 	if (priv->xd == (Display *)0) {
-		return(0);
+		// Released after an earlier read: connect again just
+		// for this read.
+		if (priv->handle == (char *)0 ||
+		    ! init(priv->handle, _TT_DESKTOP_X11)) {
+			return(0);
+		}
+		reconnected = 1;
 	}
 
-	tt_xatom = CALLX11(XInternAtom)(priv->xd, (char *)pname, False);
-	if (tt_xatom == None) {
-		return(0);
+	// Ask for the atom only if it exists: a client looking for a
+	// session that has never been advertised should not create
+	// the atom in the server.
+	tt_xatom = CALLX11(XInternAtom)(priv->xd, (char *)pname, True);
+	if (tt_xatom != None) {
+		CALLX11(XGetWindowProperty)(priv->xd,
+					    DefaultRootWindow(priv->xd),
+					    tt_xatom,
+					    0, 20, False, XA_STRING,
+					    &anatom, &format, &items,
+					    &left_to_read, &val);
 	}
-	CALLX11(XGetWindowProperty)(priv->xd,  DefaultRootWindow(priv->xd),
-				    tt_xatom,
-				    0, 20, False, XA_STRING,
-				    &anatom, &format, &items, &left_to_read,
-				    &val);	
+	if (reconnected) {
+		release();
+	}
 	if (val == (unsigned char *)0) {
 		return(0);
 	}
