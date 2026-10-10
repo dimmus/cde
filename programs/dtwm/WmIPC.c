@@ -827,10 +827,11 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	/*
 	 * 1st arg: string, user-visible title of the workspace
 	 */
-	pch = tt_message_arg_val(m, 0);
+	pch = MessageArgString (m, 0);
 
+	/* a missing title gets a generated one */
 	F_CreateWorkspace( pch, NULL, NULL );
-	tt_free( pch );
+	if (pch) tt_free( pch );
 
 	tt_message_reply(m);
 	tt_message_destroy(m);
@@ -839,7 +840,14 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	/*
 	 * 1st arg: string, atom of workspace name
 	 */
-	pch = tt_message_arg_val(m, 0);
+	pch = MessageArgString (m, 0);
+
+	if (!pch) {
+	    tt_message_fail(m);
+	    tt_message_destroy(m);
+	    tt_free(op);
+	    return TT_CALLBACK_PROCESSED;
+	}
 
 	/* retrieve the selected workspace */
 	aWs = strtoul (pch, (char **) NULL, 0);

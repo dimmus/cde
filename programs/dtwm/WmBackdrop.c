@@ -178,7 +178,12 @@ ShareBackdropPixmap (
     if (!(callFlags & BACKDROP_RESOURCE_PASS) || !pWS->backdrop.image)
 	return (False);
 
-    for (i = 0; i < pSD->numWorkspaces; i++)
+    /*
+     * Only the workspaces before this one: the startup pass runs in
+     * workspace order, and the data of the later ones is not set up yet
+     * (a workspace created later is added at the end).
+     */
+    for (i = 0; (i < pSD->numWorkspaces) && (&pSD->pWS[i] < pWS); i++)
     {
 	WmWorkspaceData *pOther = &pSD->pWS[i];
 	unsigned int ow, oh, junk;

@@ -575,7 +575,7 @@ CreateWorkspace(
      */
     if (pSD->numWsDataAllocated <= pSD->numWorkspaces)
     {
-	iActiveWS = (pSD->pActiveWS - pSD->pWS) / sizeof (WmWorkspaceData);
+	iActiveWS = pSD->pActiveWS - pSD->pWS;	/* an index, not bytes */
 	pSD->numWsDataAllocated += WS_ALLOC_AMOUNT;
 	pSD->pWS = (WmWorkspaceData *) XtRealloc ((char *)pSD->pWS,
 		    pSD->numWsDataAllocated * sizeof(WmWorkspaceData));

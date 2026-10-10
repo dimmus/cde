@@ -1492,6 +1492,9 @@ void InitWmWorkspace (WmWorkspaceData *pWS, WmScreenData *pSD)
     pWS->backdrop.window = 0;
     pWS->backdrop.nameAtom = 0;
     pWS->backdrop.image = NULL;
+    pWS->backdrop.imagePixmap = None;
+    pWS->backdrop.imagePixmapOwned = False;
+    pWS->backdrop.imagePixmapShareable = False;
     pWS->numClients = 0;
     pWS->sizeClientList = 0;
     pWS->ppClients = 0;
