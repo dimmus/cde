@@ -419,9 +419,12 @@ _tt_db_results *_tt_move_file_1 (_tt_move_file_args *args,
 	  while ((results == TT_DB_OK) && children_cursor.next()) {
 	    // Construct the new file name by replacing the part
 	    // that equals the "real_file" with the "real_new_file".
+	    // The remainder already starts with the '/' (it is empty
+	    // for real_file itself); adding another one renamed the
+	    // file to "new_file/" and its children to "new_file//child".
 	    int length = (*children_cursor).len() - real_file.len();
-	    _Tt_string new_child = real_new_file.cat("/");
-	    new_child = new_child.cat((*children_cursor).right(length));
+	    _Tt_string new_child =
+	      real_new_file.cat((*children_cursor).right(length));
 
 	    // Change the file name in the database
 	    db->setFileFile(*children_cursor, new_child, accessPtr);
