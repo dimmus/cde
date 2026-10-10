@@ -245,12 +245,48 @@ AC_ARG_ENABLE([misc-fixed],
 )
 AM_CONDITIONAL([MISC_FIXED], [test "x$enable_misc_fixed" != xno])
 
-dnl Build the help and dtinfo docs?
+dnl Documentation: the help volumes, the man pages and the dtinfo
+dnl information library.  --disable-docs changes the default of the three
+dnl switches below it, which can still turn a part back on.
 AC_ARG_ENABLE([docs],
-        AS_HELP_STRING([--disable-docs], [Do not build the help/dtinfo docs (default=build them)]),
+        AS_HELP_STRING([--disable-docs], [Do not build the help volumes, the man pages or the dtinfo library (default=build them)]),
         [], [enable_docs=yes]
 )
-AM_CONDITIONAL([BUILD_DOCS], [test "x$enable_docs" != xno])
+AC_ARG_ENABLE([help-docs],
+        AS_HELP_STRING([--disable-help-docs], [Do not build the help volumes (default=as --enable-docs)]),
+        [], [enable_help_docs=$enable_docs]
+)
+AC_ARG_ENABLE([man-pages],
+        AS_HELP_STRING([--disable-man-pages], [Do not build the man pages (default=as --enable-docs)]),
+        [], [enable_man_pages=$enable_docs]
+)
+AC_ARG_ENABLE([infolib],
+        AS_HELP_STRING([--disable-infolib], [Do not build the dtinfo information library (default=as --enable-docs)]),
+        [], [enable_infolib=$enable_docs]
+)
+AM_CONDITIONAL([BUILD_HELP_DOCS], [test "x$enable_help_docs" != xno])
+AM_CONDITIONAL([BUILD_MAN_PAGES], [test "x$enable_man_pages" != xno])
+AM_CONDITIONAL([BUILD_INFOLIB], [test "x$enable_infolib" != xno])
+build_any_docs=no
+if test "x$enable_help_docs" != xno || test "x$enable_man_pages" != xno ||
+   test "x$enable_infolib" != xno; then
+   build_any_docs=yes
+fi
+AM_CONDITIONAL([BUILD_DOCS], [test "x$build_any_docs" = xyes])
+
+dnl The tools that build the documentation, which are also installed for
+dnl writing new help volumes and information libraries: the help tag
+dnl compilers (dthelptag), the DocBook tools (instant, dtdocbook2sdl,
+dnl dtdocbook2man, dtdocbook2infolib) and the DtSearch index tools
+dnl (dtsrcreate, dtsrload, dtsrindex, ...).  They need Tcl and onsgmls.
+AC_ARG_ENABLE([doc-tools],
+        AS_HELP_STRING([--enable-doc-tools], [Build and install the documentation tools (default=only when building documentation)]),
+        [], [enable_doc_tools=$build_any_docs]
+)
+if test "x$build_any_docs" = xyes && test "x$enable_doc_tools" = xno; then
+   AC_MSG_ERROR([building documentation needs the documentation tools; drop --disable-doc-tools or add --disable-docs])
+fi
+AM_CONDITIONAL([BUILD_DOC_TOOLS], [test "x$enable_doc_tools" != xno])
 
 dnl Xrender usage
 AC_ARG_ENABLE([xrender],
@@ -567,9 +603,11 @@ AC_CHECK_PROGS(GENCAT, gencat)
 if test -z "$ac_cv_prog_GENCAT"; then
    MISSING_PROGS="gencat ${MISSING_PROGS}"
 fi
-AC_CHECK_PROGS(ONSGMLS, onsgmls)
-if test -z "$ac_cv_prog_ONSGMLS"; then
-   MISSING_PROGS="ONSGMLS ${MISSING_PROGS}"
+if test "x$enable_doc_tools" != xno; then
+   AC_CHECK_PROGS(ONSGMLS, onsgmls)
+   if test -z "$ac_cv_prog_ONSGMLS"; then
+      MISSING_PROGS="onsgmls ${MISSING_PROGS}"
+   fi
 fi
 AC_CHECK_PROGS(SESSREG, sessreg)
 if test -z "$ac_cv_prog_SESSREG"; then
@@ -778,10 +816,12 @@ AC_CHECK_LIB(utempter, utempter_add_record,
 
 AM_CONDITIONAL([HAS_UTEMPTER_LIBRARY], [test "x$ac_cv_lib_utempter_utempter_add_record" = "xyes"])
 
-dnl Figure out TCL
+dnl Figure out TCL (only instant, one of the documentation tools, uses it)
 
-SC_PATH_TCLCONFIG
-SC_LOAD_TCLCONFIG
+if test "x$enable_doc_tools" != xno; then
+   SC_PATH_TCLCONFIG
+   SC_LOAD_TCLCONFIG
+fi
 
 dnl check MISSING_PROGS - error out here if there's stuff in it.
 
@@ -1128,7 +1168,6 @@ programs/localized/ja_JP.UTF-8/appmanager/Makefile
 
 doc/Makefile
 
-doc/en_US.UTF-8/Makefile
 doc/en_US.UTF-8/help/Makefile
 doc/en_US.UTF-8/help/common/Desktop.hf
 doc/en_US.UTF-8/help/common/DesktopIntro.hf
@@ -1136,31 +1175,26 @@ doc/en_US.UTF-8/man/Makefile
 doc/en_US.UTF-8/guides/Makefile
 doc/en_US.UTF-8/m-guides/Makefile
 
-doc/de_DE.UTF-8/Makefile
 doc/de_DE.UTF-8/guides/Makefile
 doc/de_DE.UTF-8/help/Makefile
 doc/de_DE.UTF-8/help/common/Desktop.hf
 doc/de_DE.UTF-8/help/common/DesktopIntro.hf
 
-doc/es_ES.UTF-8/Makefile
 doc/es_ES.UTF-8/guides/Makefile
 doc/es_ES.UTF-8/help/Makefile
 doc/es_ES.UTF-8/help/common/Desktop.hf
 doc/es_ES.UTF-8/help/common/DesktopIntro.hf
 
-doc/fr_FR.UTF-8/Makefile
 doc/fr_FR.UTF-8/guides/Makefile
 doc/fr_FR.UTF-8/help/Makefile
 doc/fr_FR.UTF-8/help/common/Desktop.hf
 doc/fr_FR.UTF-8/help/common/DesktopIntro.hf
 
-doc/it_IT.UTF-8/Makefile
 doc/it_IT.UTF-8/guides/Makefile
 doc/it_IT.UTF-8/help/Makefile
 doc/it_IT.UTF-8/help/common/Desktop.hf
 doc/it_IT.UTF-8/help/common/DesktopIntro.hf
 
-doc/ja_JP.UTF-8/Makefile
 doc/ja_JP.UTF-8/guides/Makefile
 doc/ja_JP.UTF-8/help/Makefile
 doc/ja_JP.UTF-8/help/common/Desktop.hf

@@ -5,8 +5,13 @@ SUBDIRS = backdrops icons dsdm dtmail dtpad dtfile dtwm dtlogin		\
         dtcalc dtaction dtspcd dtscreen dtksh dtcm dtsearchpath		\
         dtappbuilder palettes dtappintegrate dtprintegrate dtconfig	\
         dtcreate dtprintinfo fontaliases dtdspmsg ttsnoop dtimsstart	\
-        dtpdm dtsr dtpdmd dtinfo types tttypes util dtopen localized	\
-        dthelp dtdocbook
+        dtpdm dtpdmd dtinfo types tttypes util dtopen localized	\
+        dthelp
+
+# The documentation tools (dthelp/parser is the other part of them)
+if BUILD_DOC_TOOLS
+SUBDIRS += dtsr dtdocbook
+endif
 
 install-data-hook:
 	-if [ $(CDE_INSTALLATION_TOP)/bin != $(bindir) ];then \
