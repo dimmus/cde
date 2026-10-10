@@ -404,6 +404,9 @@ static void MessageDialogPopupCB(Widget w, XtPointer client_data,
 				break;
 			}
 		}
+		/* both were leaked on every message dialog popup */
+		XFree(dt_xi->ScreenInfo);
+		free(dt_xi);
 	}
 	#endif /* USE_XINERAMA */
 

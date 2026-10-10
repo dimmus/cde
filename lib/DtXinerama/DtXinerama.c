@@ -37,6 +37,14 @@
 #include <Dt/DtXinerama.h>
 
 /* return a DtXineramaInfo_t (or NULL if no Xinerama) available */
+/*
+ * The caller owns the result: release it with XFree(info->ScreenInfo)
+ * and free(info).  Each call queries the server (one round trip); the
+ * result is not cached here because the library cannot see the RandR or
+ * root ConfigureNotify events that would invalidate a cache.  Callers
+ * that place many windows should keep the result and drop it on those
+ * events, as dtwm does (WmMultiHead.c, InvalidateHeadInfo).
+ */
 
 DtXineramaInfo_t *_DtXineramaInit(Display *dpy)
 {
@@ -59,7 +67,7 @@ DtXineramaInfo_t *_DtXineramaInit(Display *dpy)
       fprintf(stderr, "_DtXineramaInit: malloc failed\n");
 #endif
       
-      free(XinerScrnInfo);
+      XFree(XinerScrnInfo);
       return(NULL);
     }
 

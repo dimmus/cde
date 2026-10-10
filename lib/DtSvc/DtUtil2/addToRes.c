@@ -91,6 +91,7 @@ typedef struct _Entry {
     char *tag, *value;
     int lineno;
     Bool usable;
+    int seq;		/* order of appearance, for _DtSortEntries */
 } Entry;
 typedef struct _Buffer {
     char *buff;
@@ -124,15 +125,16 @@ static void _DtAddEntry(
                         Entries *e,
                         Entry entry) ;
 static int _DtCompareEntries( 
-                        Entry *e1,
-                        Entry *e2) ;
+                        const void *p1,
+                        const void *p2) ;
+static void _DtSortEntries(
+                        Entries *e) ;
 static char * _DtFindFirst( 
                         char *string,
                         char dest) ;
 static void _DtGetEntries( 
                         Entries *entries,
-                        Buffer *buff,
-                        int dosort) ;
+                        Buffer *buff) ;
 static void _DtMergeEntries( 
                         Buffer *buffer,
                         Entries new,
@@ -214,38 +216,62 @@ _DtFreeEntries(
     free(e);
 }
 
+/*
+ * Append an entry.  Duplicate tags are removed afterwards by
+ * _DtSortEntries; this used to compare each new tag with every entry so
+ * far, which was quadratic in the size of RESOURCE_MANAGER.
+ */
 static void 
 _DtAddEntry(
         Entries *e,
         Entry entry )
 {
-    int n;
-
-    for (n = 0; n < e->used; n++)
-    {
-        if (strcmp(e->entry[n].tag, entry.tag) == 0)
-	{ /* overwrite old entry  - free its memory first*/
-	    free(e->entry[n].tag);
-	    free(e->entry[n].value);
-            e->entry[n] = entry;
-            return ;  /* ok to leave, now there's only one of each tag in db */
-        }
-    }
-
     if (e->used == e->room) {
         e->entry = (Entry *)realloc(e->entry, 2*e->room*(sizeof(Entry)));
         e->room *= 2;
     }
     entry.usable = True;
+    entry.seq = e->used;
     e->entry[e->used++] = entry;
 }
 
 static int 
 _DtCompareEntries(
-        Entry *e1,
-        Entry *e2 )
+        const void *p1,
+        const void *p2 )
 {
-    return strcmp(e1->tag, e2->tag);
+    const Entry *e1 = p1, *e2 = p2;
+    int cmp = strcmp(e1->tag, e2->tag);
+
+    if (cmp == 0)
+        cmp = (e1->seq > e2->seq) - (e1->seq < e2->seq);
+    return cmp;
+}
+
+/*
+ * Sort by tag and keep only the last value given for each tag, which is
+ * what the old overwrite-in-place _DtAddEntry produced once sorted.
+ */
+static void
+_DtSortEntries(
+        Entries *e )
+{
+    int i, out;
+
+    if (e->used <= 0)
+        return;
+    qsort(e->entry, e->used, sizeof(Entry), _DtCompareEntries);
+    for (i = 0, out = 0; i < e->used; i++)
+    {
+        if (i + 1 < e->used && strcmp(e->entry[i].tag, e->entry[i+1].tag) == 0)
+        {   /* superseded by a later value for the same tag */
+            free(e->entry[i].tag);
+            free(e->entry[i].value);
+            continue;
+        }
+        e->entry[out++] = e->entry[i];
+    }
+    e->used = out;
 }
 
 static void 
@@ -286,8 +312,7 @@ _DtFindFirst(
 static void 
 _DtGetEntries(
         Entries *entries,
-        Buffer *buff,
-        int dosort )
+        Buffer *buff )
 {
     char *line, *colon, *temp, *str, *temp2;
     Entry entry = { NULL, NULL, 0, False };
@@ -337,7 +362,8 @@ _DtGetEntries(
         temp = (char *)malloc((length = colon - temp2) + 1);
         strncpy(temp, temp2, length);
         temp[length] = '\0';
-        while (temp[length-1] == ' ' || temp[length-1] == '\t')
+        while (length > 0 &&
+               (temp[length-1] == ' ' || temp[length-1] == '\t'))
             temp[--length] = '\0';
         entry.tag = temp;
 	
@@ -356,9 +382,8 @@ _DtGetEntries(
         _DtAddEntry(entries, entry);
     }
     
-    if (dosort && (entries->used > 0))
-      qsort(entries->entry, entries->used, sizeof(Entry), 
-	    (int (*)(const void *, const void *))_DtCompareEntries);
+    /* sort, and drop all but the last value of each tag */
+    _DtSortEntries(entries);
 }
 
 static void 
@@ -478,7 +503,7 @@ _DtAddToResProp(
    /*
     * Convert oldBuffer to oldDB.
     */
-    _DtGetEntries(oldDB, oldBuffer, 1);
+    _DtGetEntries(oldDB, oldBuffer);
 
    /*
     * Init empty newBuffer, then populate by merging db into oldDB.
@@ -493,7 +518,7 @@ _DtAddToResProp(
 		     XA_STRING, 8, PropModeReplace,
 		     (unsigned char *)newBuffer->buff, newBuffer->used);
 
-    XSync(dpy, False);
+    /* _DtAddResString syncs once after the last property */
 
    /*
     * Free buffer memory
@@ -568,7 +593,7 @@ _DtAddResString(
     * Init, then populate, newDB from buffer
     */
     newDB = _DtAllocEntries();
-    _DtGetEntries(newDB, buffer, 1);
+    _DtGetEntries(newDB, buffer);
 
     if (flags & _DT_ATR_RESMGR)
     {
@@ -585,6 +610,14 @@ _DtAddResString(
       */
       _DtAddToResProp(dpy, _DT_ATR_PREFS, *newDB);
     }
+
+   /*
+    * Make sure the server has the new values before returning (the
+    * callers go on to tell other clients to reread them).  One XSync for
+    * both properties instead of one each.
+    */
+    if (flags & (_DT_ATR_RESMGR | _DT_ATR_PREFS))
+      XSync(dpy, False);
 
    /*
     * Free objects
