@@ -114,6 +114,7 @@ express or implied warranty.
 #include <Xm/List.h>
 #include <Xm/ComboBox.h>	/* for redirecting utility functions */
 #include "DtWidgetI.h"		/* for _Dt thread-safety macros */
+#include "ItemExtentI.h"
 /* some unpublished Motif interfaces */
 #include <Xm/XmPrivate.h>
 
@@ -164,7 +165,8 @@ static void	ClearShadow (DtComboBoxWidget w, Boolean all);
 static void	DrawShadow (DtComboBoxWidget w);
 static char*	GetTextString (XmString xm_string);
 static void	SetTextFieldData (DtComboBoxPart *combo_p, XmString item);
-static void	SetMaximumLabelSize (DtComboBoxPart *combo_p);
+static void	SetMaximumLabelSize (DtComboBoxPart *combo_p,
+				     const _DtItemChange *change);
 static void	SetLabelData (DtComboBoxPart *combo_p, XmString item,
 				 Boolean force_label_string);
 static void	select_cb (Widget w, XtPointer client_data, 
@@ -878,7 +880,7 @@ Initialize(	DtComboBoxWidget request,
      * Set initial value in text or label if items was specified
      */
     if (Type(new) == DtDROP_DOWN_LIST) {
-	SetMaximumLabelSize(combo_p);
+	SetMaximumLabelSize(combo_p, NULL);
 	SetLabelData(combo_p, NULL, force_label_string);
     }
     else
@@ -1099,6 +1101,7 @@ CheckResources(	DtComboBoxWidget combo)
 static void 
 Destroy(DtComboBoxWidget combo)
 {
+    _DtItemExtentsDestroy((Widget)combo);
     if (LabelString(combo))
 	XmStringFree(LabelString(combo));
     if (SelectedItem(combo))
@@ -1694,7 +1697,7 @@ SetValues(	DtComboBoxWidget current,
     if (Label(new) && ((Items(new) != ListItems(current)) || 
 			 (ItemCount(new) != ItemCount(current)) ||
 			 (Label(new) != Label(current)))) {
-	SetMaximumLabelSize(new_p);
+	SetMaximumLabelSize(new_p, NULL);
 	label_size_changed = TRUE;
     }
 
@@ -1971,15 +1974,15 @@ SetTextFieldData(DtComboBoxPart *combo_p, XmString item)
  * characteristics of the list of items.
  */
 static void
-SetMaximumLabelSize(DtComboBoxPart *combo_p)
+SetMaximumLabelSize(DtComboBoxPart *combo_p, const _DtItemChange *change)
 {
     XmListWidget list = (XmListWidget)combo_p->list;
     XmFontList font_list;
-    Dimension width, height, border_width;
+    Dimension border_width;
     Dimension longest = 0;
     Dimension highest = 0;
     Arg args[5];
-    int i, item_count;
+    int item_count;
     XmStringTable list_items;
     unsigned char unit_type = XmPIXELS;
 
@@ -2004,15 +2007,16 @@ SetMaximumLabelSize(DtComboBoxPart *combo_p)
     if ( item_count && item_count >= combo_p->item_count &&
 	 list_items && combo_p->update_label) {
 	/*
-	 * Loop through all the items to find the biggest dimensions
+	 * The biggest dimensions of all the items.  Kept up to date
+	 * as items are added and deleted, instead of measuring every
+	 * item each time.
 	 */
-	for (i = 0; i < combo_p->item_count; i++) {
-	    XmStringExtent(font_list, list_items[i], &width, &height);
-	    longest = (width > longest) ? width : longest;
-	    highest = (height > highest) ? height : highest;
-	 }
+	_DtItemExtentsMax(XtParent(combo_p->label), font_list,
+			  list_items, combo_p->item_count, change,
+			  &longest, &highest);
     }
     else {
+	_DtItemExtentsReset(XtParent(combo_p->label));
 	XmStringExtent(font_list, combo_p->label_string, &longest, &highest);
     }
 	
@@ -2980,11 +2984,12 @@ DtComboBoxAddItem(	Widget combow,
     XtSetArg(arg, XmNitems, &list_items);
     XtGetValues(((Widget)List(combo)), &arg, 1);
 
-    if (item && list_items) {
+    /* (only a unique add needs the search) */
+    if (unique && item && list_items) {
 	for (i = 0; i < ItemCount(combo); i++)
 	    if (XmStringCompare(item, list_items[i]))
 		break;
-	if ((i < ItemCount(combo)) && unique)
+	if (i < ItemCount(combo))
 	  {
 	    _DtAppUnlock(app);
 	    return;
@@ -2995,7 +3000,11 @@ DtComboBoxAddItem(	Widget combow,
     SyncWithList(combo_p);
 
     if (Label(combo)) {
-	SetMaximumLabelSize(combo_p);
+	_DtItemChange change;
+
+	change.type = _DtITEMS_ADDED;
+	change.item = item;
+	SetMaximumLabelSize(combo_p, &change);
 	if (Type(combo) == DtDROP_DOWN_LIST) {
 	    ClearShadow(combo, TRUE);
 	    if (RecomputeSize(combo))
@@ -3022,6 +3031,7 @@ DtComboBoxDeletePos(	Widget combow,
     DtComboBoxPart *combo_p = (DtComboBoxPart*)
 	&(XmField(combo,ipot,DtComboBox,arrow,Widget));
     int selection_changed = 0;
+    _DtItemChange change;
     _DtWidgetToAppContext(combow);
     _DtAppLock(app);
 
@@ -3037,6 +3047,26 @@ DtComboBoxDeletePos(	Widget combow,
 	XtWarning(CB_DEL_POS);
 	_DtAppUnlock(app);
 	return;
+    }
+
+    change.type = _DtITEMS_RESET;
+    if (Label(combo)) {
+	/* measure the item while it is there, in the label's font */
+	XmFontList font_list;
+	XmStringTable list_items = NULL;
+	int item_count = 0;
+	Arg args[3];
+
+	XtSetArg(args[0], XmNfontList, &font_list);
+	XtGetValues(Label(combo), args, 1);
+	XtSetArg(args[0], XmNitems, &list_items);
+	XtSetArg(args[1], XmNitemCount, &item_count);
+	XtGetValues(List(combo), args, 2);
+	if (list_items && pos <= item_count) {
+	    XmStringExtent(font_list, list_items[pos - 1],
+			   &change.width, &change.height);
+	    change.type = _DtITEMS_REMOVED;
+	}
     }
 
     XmListDeletePos(List(combo), pos);
@@ -3063,7 +3093,7 @@ DtComboBoxDeletePos(	Widget combow,
     }
 
     if (Label(combo)) {
-	SetMaximumLabelSize(combo_p);
+	SetMaximumLabelSize(combo_p, &change);
 	if (Type(combo) == DtDROP_DOWN_LIST) {
 	    ClearShadow(combo, TRUE);
 	    if (RecomputeSize(combo))

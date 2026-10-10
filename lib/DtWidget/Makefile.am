@@ -25,6 +25,7 @@ libDtWidget_la_SOURCES = ComboBox.c      Control.c       DialogBox.c \
 			 DtMsgs.c        DtStrDefs.c     EditAreaData.c \
 			 EditCalls.c     Editor.c        Icon.c \
 			 MenuButton.c    NewCvt.c        SearchCalls.c \
+			 ItemExtent.c \
 			 SearchDlg.c     SpinBox.c       TitleBox.c \
 			 View.c
 

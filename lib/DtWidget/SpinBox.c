@@ -99,6 +99,7 @@ express or implied warranty.
 #include <Xm/RepType.h>
 #include "SpinBoxP.h"
 #include "DtWidgetI.h"
+#include "ItemExtentI.h"
 
 #include <Xm/XmPrivate.h>    /* _XmShellIsExclusive */
 
@@ -172,12 +173,14 @@ static Boolean	SetValues (DtSpinBoxWidget current,
 			      DtSpinBoxWidget new);
 static void	ClearShadow (DtSpinBoxWidget w, Boolean all);
 static void	DrawShadow (DtSpinBoxWidget w);
-static void	StoreResourceInfo (DtSpinBoxPart *spin_p,
+static void	StoreResourceInfo (Widget w,
+				      DtSpinBoxPart *spin_p,
 				      DtSpinBoxPart *old_p,
 				      Boolean do_items);
 static char*	GetTextString (XmString xm_string);
 static void	SetTextFieldData (DtSpinBoxWidget spin);
-static void	SetMaximumLabelSize (DtSpinBoxPart *spin_p);
+static void	SetMaximumLabelSize (DtSpinBoxPart *spin_p,
+				     const _DtItemChange *change);
 static void	SetLabelData (DtSpinBoxWidget spin);
 static void	timer_dispatch (XtPointer client_data, XtIntervalId *id);
 static void	TextFieldActivate (DtSpinBoxPart *spin_p);
@@ -719,14 +722,14 @@ Initialize(	DtSpinBoxWidget request,
 		      grab_leave_cb, (XtPointer)new);
 
     /* Initialize everything based on what the resource values are */
-    StoreResourceInfo(spin_p, NULL, TRUE);
+    StoreResourceInfo((Widget)new, spin_p, NULL, TRUE);
 
     /*
      * Set initial value in text or label if items was specified
      */
     if (Editable(new) == FALSE) {
 	SetLabelData(new);
-	SetMaximumLabelSize(spin_p);
+	SetMaximumLabelSize(spin_p, NULL);
     }
     else
     {
@@ -1125,6 +1128,7 @@ Destroy(DtSpinBoxWidget spin)
 	    }
 	XtFree((char*)(Items(spin)));
     }
+    _DtItemExtentsDestroy((Widget)spin);
 
     /*
      * Don't remove callbacks and event handlers set on the children,
@@ -1682,12 +1686,13 @@ SetValues(	DtSpinBoxWidget current,
 		  ((ChildType(new) == DtNUMERIC) &&
 		   (Position(new) != Position(current))));
     if (store_info)
-	StoreResourceInfo(new_p, cur_p, (Items(new) != Items(current)));
+	StoreResourceInfo((Widget)new, new_p, cur_p,
+			  (Items(new) != Items(current)));
     
     if (Label(new) && (store_info || 
 			 (Label(new) != Label(current)) ||
 			 (ChildType(new) != ChildType(current)))) {
-	SetMaximumLabelSize(new_p);
+	SetMaximumLabelSize(new_p, NULL);
 	label_size_changed = TRUE;
     }
     
@@ -1812,7 +1817,8 @@ DrawShadow(DtSpinBoxWidget w)
  * well as variables needed for child_type.
  */
 static void
-StoreResourceInfo(	DtSpinBoxPart *spin_p,
+StoreResourceInfo(	Widget w,
+			DtSpinBoxPart *spin_p,
 			DtSpinBoxPart *old_p,
 			Boolean do_items)
 {
@@ -1836,8 +1842,7 @@ StoreResourceInfo(	DtSpinBoxPart *spin_p,
 	    table[i] = XmStringCopy(spin_p->items[i]);
 	}
 	spin_p->items = table;
-	for (i = 0; i < spin_p->item_count; i++)
-	    spin_p->items[i] = table[i];
+	_DtItemArraySet(w, table, spin_p->item_count);
     }
 
     /*
@@ -1943,7 +1948,7 @@ SetTextFieldData(DtSpinBoxWidget spin)
  * if switching from numeric to non-numeric.
  */
 static void
-SetMaximumLabelSize(DtSpinBoxPart *spin_p)
+SetMaximumLabelSize(DtSpinBoxPart *spin_p, const _DtItemChange *change)
 {
     XmString xm_string;
     XmFontList font_list;
@@ -1952,7 +1957,6 @@ SetMaximumLabelSize(DtSpinBoxPart *spin_p)
     Dimension longest = 0;
     Dimension highest = 0;
     Arg args[5];
-    int i;
     /* Resolution Independent */
     unsigned char unit_type;
     
@@ -1981,17 +1985,19 @@ SetMaximumLabelSize(DtSpinBoxPart *spin_p)
     }
     else if (spin_p->items) {
 	/*
-	 * Loop through all the items to find the biggest dimensions
+	 * The biggest dimensions of all the items.  Kept up to date
+	 * as items are added and deleted, instead of measuring every
+	 * item each time.
 	 */
-	for (i = 0; i < spin_p->item_count; i++) {
-	    XmStringExtent(font_list, spin_p->items[i], &width, &height);
-	    longest = (width > longest) ? width : longest;
-	    highest = (height > highest) ? height : highest;
-	}
+	_DtItemExtentsMax(XtParent(spin_p->label), font_list,
+			  spin_p->items, spin_p->item_count, change,
+			  &longest, &highest);
     }
     else {
 	XmStringExtent(font_list, InitLabel, &longest, &highest);
     }
+    if (spin_p->child_type == DtNUMERIC || !spin_p->items)
+	_DtItemExtentsReset(XtParent(spin_p->label));
 
     spin_p->label_max_length = 
 	( (Dimension)(longest + ( (LABEL_PADDING + TEXT_CONTEXT_MARGIN) *2) ) >
@@ -2530,8 +2536,8 @@ DtSpinBoxAddItem(	Widget spinw,
     spin_p = (DtSpinBoxPart*) &(XmField(spin,ipot,DtSpinBox,label,Widget));
 
     total_items = ItemCount(spin) + 1;
-    Items(spin) = (XmString *)XtRealloc((char*)Items(spin), 
-					  (sizeof(XmString) * total_items));
+    /* grown geometrically: it used to grow by one item per add */
+    Items(spin) = _DtItemArrayGrow(spinw, Items(spin), total_items);
     new_str = XmStringCopy(item);
 
     pos--;  /* User gives pos starting at 1 (0 means end of list) */
@@ -2553,7 +2559,11 @@ DtSpinBoxAddItem(	Widget spinw,
     ItemCount(spin) = total_items;
 
     if (Label(spin)) {
-	SetMaximumLabelSize(spin_p);
+	_DtItemChange change;
+
+	change.type = _DtITEMS_ADDED;
+	change.item = new_str;
+	SetMaximumLabelSize(spin_p, &change);
 	if (Editable(spin) == FALSE) {
 	    ClearShadow(spin, TRUE);
 	    if (RecomputeSize(spin))
@@ -2581,6 +2591,7 @@ DtSpinBoxDeletePos(	Widget spinw,
     DtSpinBoxWidget spin = (DtSpinBoxWidget)spinw;
     DtSpinBoxPart *spin_p;
     int total_items;
+    _DtItemChange change;
     _DtWidgetToAppContext(spinw);
     _DtAppLock(app);
 
@@ -2593,10 +2604,24 @@ DtSpinBoxDeletePos(	Widget spinw,
     spin_p = (DtSpinBoxPart*) &(XmField(spin,ipot,DtSpinBox,label,Widget));
 
     pos--;
-    if ((pos < 0) || (pos > ItemCount(spin)))
+    /* (pos == ItemCount used to index one past the end) */
+    if ((pos < 0) || (pos >= ItemCount(spin)))
 	pos = ItemCount(spin) - 1;
 
     total_items = ItemCount(spin) - 1;
+
+    change.type = _DtITEMS_RESET;
+    if (Label(spin) && spin_p->child_type != DtNUMERIC) {
+	/* measure the item while it is there, in the label's font */
+	XmFontList font_list;
+	Arg arg;
+
+	XtSetArg(arg, XmNfontList, &font_list);
+	XtGetValues(Label(spin), &arg, 1);
+	XmStringExtent(font_list, (Items(spin))[pos],
+		       &change.width, &change.height);
+	change.type = _DtITEMS_REMOVED;
+    }
     XmStringFree((Items(spin))[pos]);
 
     /* To keep Position of SpinBox up to date */
@@ -2608,17 +2633,11 @@ DtSpinBoxDeletePos(	Widget spinw,
 	for (; pos < total_items; pos++)
 	    (Items(spin))[pos] = (Items(spin))[pos+1];
     }
-    if (total_items > 0)
-        Items(spin) = (XmString *)XtRealloc((char*)Items(spin),
-					  (sizeof(XmString) * total_items));
-    else {
-	XtFree((char *)Items(spin));
-	Items(spin) = (XmString *)NULL;
-    }
+    Items(spin) = _DtItemArrayShrink(spinw, Items(spin), total_items);
     ItemCount(spin) = total_items;
 
     if (Label(spin)) {
-	SetMaximumLabelSize(spin_p);
+	SetMaximumLabelSize(spin_p, &change);
 	if (Editable(spin) == FALSE) {
 	    ClearShadow(spin, TRUE);
 	    if (RecomputeSize(spin))
