@@ -417,7 +417,7 @@ externaldef(vtclassrec) DtTermClassRec dtTermClassRec =
 	/* num_resources	*/	XtNumber(resources),
 	/* xrm_class		*/	NULLQUARK,
 	/* compress_motion	*/	TRUE,
-	/* compress_exposure	*/	FALSE,
+	/* compress_exposure	*/	XtExposeCompressMultiple,
 	/* compress_enterlv	*/	TRUE,
 	/* visible_interest	*/	TRUE,
 	/* destroy		*/	Destroy,

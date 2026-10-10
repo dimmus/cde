@@ -73,41 +73,32 @@ XmTextScanType defaultScanArray[] =
 static void RegisterDropSite( Widget w );
 static void doExtendedSelection (Widget  w,Time  eventTime);
 
-/* 
-** Get the current server time (I ripped this off from Xm/TextIn.c).
+/*
+** A timestamp to disown the primary selection with.  We used to get the
+** current server time, which is a blocking round trip (a zero length
+** property change, waiting for its PropertyNotify).  The time of the
+** last event we processed will do: it is no later than the server's
+** current time, and no earlier than the time we acquired the selection
+** with (which came from an event, or was this time when we took it),
+** which is what Xt and the server check.  If somebody else has taken
+** the selection since (at a later time), the server now leaves their
+** selection alone, rather than clearing it...
 */
 static Time
-getServerTime
+disownTime
 (
-     Widget w
+     Widget w,
+     TermSelectInfo selectInfo
 )
 {
-    XEvent    event;
-    EventMask shellMask;
-    
-    while(!XtIsShell(w))
-    {
-        w = XtParent(w);
+    Time time = XtLastTimestampProcessed(XtDisplay(w));
+
+    /* (server times wrap around after 49 days; compare the difference) */
+    if ((time == CurrentTime) ||
+	    ((long) (time - selectInfo->primaryTime) < 0)) {
+	time = selectInfo->primaryTime;
     }
-
-    shellMask = XtBuildEventMask(w);
-
-    if (!(shellMask & PropertyChangeMask))
-    {
-       XSelectInput(XtDisplay(w), XtWindow(w), shellMask | PropertyChangeMask);
-    }
-
-    XChangeProperty(XtDisplay(w), XtWindow(w), XA_WM_HINTS, XA_WM_HINTS,
-                    32, PropModeAppend, (unsigned char *)NULL, 0);
-
-    XWindowEvent(XtDisplay(w), XtWindow(w), PropertyChangeMask, &event);
-
-    if (!(shellMask & PropertyChangeMask))
-    {
-       XSelectInput(XtDisplay(w), XtWindow(w), shellMask);
-    }
-
-    return(event.xproperty.time);
+    return(time);
 }
 
 
@@ -1031,7 +1022,7 @@ _DtTermPrimSelectDisown
 
     if (selectInfo->ownPrimary == True)
     {
-        XtDisownSelection(w, XA_PRIMARY, getServerTime(w));
+        XtDisownSelection(w, XA_PRIMARY, disownTime(w, selectInfo));
         selectInfo->ownPrimary = False ;
     }
 }
@@ -1048,7 +1039,7 @@ _DtTermPrimSelectDestroy
 
     if (selectInfo->ownPrimary == True)
     {
-        XtDisownSelection(w, XA_PRIMARY, getServerTime(w));
+        XtDisownSelection(w, XA_PRIMARY, disownTime(w, selectInfo));
     }
     selectInfo->ownPrimary = False ;
     XtFree((char *) selectInfo->scanArray);

@@ -55,6 +55,79 @@ ParseTrap(void)
 }
 
 /*
+** Finding a byte's entry in a state's tables is a linear scan, for every
+** byte of every escape sequence (and, through the pre-parse table, for
+** every control character).  So the first time a state is used, we
+** build a table that maps each byte straight to its entry.  The entries
+** are matched in order, first match wins, and the tables end with a
+** catch-all 0x00..0xff entry; for the pre-parse table, reaching that
+** entry means "no pre-parse entry"...
+*/
+#define	NO_PRE_PARSE_ENTRY	0xff
+#define	MAX_INDEXED_ENTRIES	0xfe
+
+static unsigned char *
+buildStateIndex(StateTable table)
+{
+    unsigned char *index;
+    StateEntry entry;
+    int c;
+    int i;
+
+    _DtTermProcessLock();
+    if (table->index) {
+	/* somebody beat us to it... */
+	_DtTermProcessUnlock();
+	return(table->index);
+    }
+
+    index = (unsigned char *) XtMalloc(512);
+    for (c = 0; c < 256; c++) {
+	for (i = 0, entry = table->stateEntry;
+		(c < entry->lower) || (c > entry->upper);
+		i++, entry++)
+	    ;
+	if (i > MAX_INDEXED_ENTRIES) {
+	    /* too big to index.  Keep scanning (we will look again
+	     * next time, but there are no such tables)...
+	     */
+	    XtFree((char *) index);
+	    _DtTermProcessUnlock();
+	    return((unsigned char *) 0);
+	}
+	index[c] = i;
+
+	index[256 + c] = NO_PRE_PARSE_ENTRY;
+	if (table->statePreParseEntry) {
+	    for (i = 0, entry = table->statePreParseEntry;
+		    (c < entry->lower) || (c > entry->upper);
+		    i++, entry++)
+		;
+	    if (i > MAX_INDEXED_ENTRIES) {
+		XtFree((char *) index);
+		_DtTermProcessUnlock();
+		return((unsigned char *) 0);
+	    }
+	    /* the catch-all entry means no pre-parse entry... */
+	    if (!((0x00 == entry->lower) && (0xff == entry->upper))) {
+		index[256 + c] = i;
+	    }
+	}
+    }
+    table->index = index;
+    _DtTermProcessUnlock();
+    return(index);
+}
+
+/* is the 'p' debug flag 1 set (without the lock isDebugFSet() takes:
+ * the flags are only set at startup, and this is checked for every
+ * character the parser sees)...
+ */
+#define	PARSE_DEBUG_SET() \
+	(debugLevel['p'] && \
+	(debugLevel['p'][__TERM_DEBUG_BYTE(1)] & __TERM_DEBUG_BIT(1)))
+
+/*
 ** Parse the character, tell the calling routine if we are not
 ** in the start state.
 */
@@ -69,6 +142,7 @@ _DtTermPrimParse
     ParserContext   context = GetParserContext(w);
     StateEntry      thisEntry;
     StateEntry      thisPreParseEntry;
+    unsigned char  *index;
 
 #ifdef    NOCODE
     /*
@@ -88,7 +162,7 @@ _DtTermPrimParse
     }
     context->inputCharLen = parseCharLen;
 
-    if (isDebugFSet('p', 1)) {
+    if (PARSE_DEBUG_SET()) {
 #ifdef	BBA
 #pragma	BBA_IGNORE
 #endif	/*BBA*/
@@ -119,9 +193,18 @@ _DtTermPrimParse
     */
     thisPreParseEntry = context->stateTable->statePreParseEntry;
     thisEntry = context->stateTable->stateEntry;
+    if (!(index = context->stateTable->index)) {
+	index = buildStateIndex(context->stateTable);
+    }
 
     /* first run through the preParse entry... */
-    if (thisPreParseEntry && (parseCharLen == 1)) {
+    if (thisPreParseEntry && (parseCharLen == 1) && index) {
+	if (NO_PRE_PARSE_ENTRY == index[256 + *parseChar]) {
+	    thisPreParseEntry = (StateEntry) 0;
+	} else {
+	    thisPreParseEntry += index[256 + *parseChar];
+	}
+    } else if (thisPreParseEntry && (parseCharLen == 1)) {
 	while ((*parseChar < thisPreParseEntry->lower) ||
 		(*parseChar > thisPreParseEntry->upper)) {
 	    thisPreParseEntry++;
@@ -167,7 +250,9 @@ _DtTermPrimParse
      * the parse entry that covers 0..255.  If we find that this will
      * not work for everything, we may need to rethink this.
      */
-    if (parseCharLen == 1) {
+    if ((parseCharLen == 1) && index) {
+	thisEntry += index[*parseChar];
+    } else if (parseCharLen == 1) {
 	while ((*parseChar < thisEntry->lower) ||
 		(*parseChar > thisEntry->upper))
 	{
