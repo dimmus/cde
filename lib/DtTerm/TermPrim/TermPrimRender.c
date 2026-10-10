@@ -179,12 +179,11 @@ _DtTermPrimBell(Widget w)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    long now;
+    unsigned long now;
 
     /* rate limit... */
     now = _DtTermPrimMonotonicMs();
-    if (tpd->bellMs && (now - tpd->bellMs >= 0) &&
-	    (now - tpd->bellMs < BELL_SUPPRESS_MS)) {
+    if (tpd->bellMs && (now - tpd->bellMs < BELL_SUPPRESS_MS)) {
 	return;
     }
     tpd->bellMs = now;

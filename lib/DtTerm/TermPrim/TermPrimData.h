@@ -387,11 +387,11 @@ typedef struct termData {
      * TermPrimCursor.c), and the bell (see TermPrimRender.c).  Times
      * are _DtTermPrimMonotonicMs() values...
      */
-    long cursorOnMs;			/* cursor last turned on	*/
-    long cursorActiveMs;		/* last output, key or focus in	*/
-    long imSpotSentMs;			/* IM spot location last set	*/
+    unsigned long cursorOnMs;			/* cursor last turned on	*/
+    unsigned long cursorActiveMs;		/* last output, key or focus in	*/
+    unsigned long imSpotSentMs;			/* IM spot location last set	*/
     XtIntervalId imSpotTimerId;		/* deferred IM spot update	*/
-    long bellMs;			/* last bell rung		*/
+    unsigned long bellMs;			/* last bell rung		*/
     XtIntervalId bellTimerId;		/* undo of the visual bell	*/
 
 } DtTermPrimDataRec, *DtTermPrimData;

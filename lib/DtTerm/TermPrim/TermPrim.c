@@ -3118,6 +3118,10 @@ elapsedNs(struct timespec *start)
     struct timespec now;
 
     (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    if (now.tv_sec - start->tv_sec > 1) {
+	/* long enough (and no overflow where a long is 32 bits)... */
+	return(2L * 1000000000L);
+    }
     return((now.tv_sec - start->tv_sec) * 1000000000L +
 	    (now.tv_nsec - start->tv_nsec));
 }

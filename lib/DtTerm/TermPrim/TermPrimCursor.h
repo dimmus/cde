@@ -43,6 +43,6 @@ extern void _DtTermPrimSetCursorVisible(Widget w, Boolean visible);
 extern Boolean _DtTermPrimGetCursorVisible(Widget w);
 extern void _DtTermPrimCursorKeyActivity(Widget w);
 extern void _DtTermPrimCursorDestroy(Widget w);
-extern long _DtTermPrimMonotonicMs(void);
+extern unsigned long _DtTermPrimMonotonicMs(void);
 #endif	/* _Dt_TermPrimCursor_h */
 /* DON'T ADD ANYTHING AFTER THIS #endif... */

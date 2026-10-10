@@ -59,13 +59,18 @@ static void timeoutCallback(XtPointer client_data, XtIntervalId *id);
  */
 #define	IM_SPOT_INTERVAL_MS	50
 
-long
+/* milliseconds on the monotonic clock.  The value wraps around (it is
+ * unsigned, so that this is well defined even where a long is 32 bits),
+ * so compare two of them by their unsigned difference...
+ */
+unsigned long
 _DtTermPrimMonotonicMs(void)
 {
     struct timespec now;
 
     (void) clock_gettime(CLOCK_MONOTONIC, &now);
-    return(now.tv_sec * 1000L + now.tv_nsec / 1000000L);
+    return((unsigned long) now.tv_sec * 1000UL +
+	    (unsigned long) (now.tv_nsec / 1000000L));
 }
 
 /*
@@ -94,7 +99,7 @@ timeoutCallback(XtPointer client_data, XtIntervalId *id)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) client_data;
     struct termData *tpd = tw->term.tpd;
-    long now;
+    unsigned long now;
 
     tpd->cursorTimeoutId = (XtIntervalId) 0;
 
@@ -116,10 +121,10 @@ timeoutCallback(XtPointer client_data, XtIntervalId *id)
 	return;
     }
 
-    if (now - tpd->cursorOnMs < tw->term.blinkRate) {
+    if (now - tpd->cursorOnMs < (unsigned long) tw->term.blinkRate) {
 	/* the cursor was turned on less than a period ago... */
 	(void) addBlinkTimeout((Widget) tw,
-		tw->term.blinkRate - (now - tpd->cursorOnMs));
+		tw->term.blinkRate - (long) (now - tpd->cursorOnMs));
 	return;
     }
 
@@ -201,7 +206,7 @@ static void
 updateIMSpot(Widget w)
 {
     struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
-    long elapsed;
+    unsigned long elapsed;
 
     if (((tpd->IMCursorColumn == tpd->cursorColumn) &&
 	    (tpd->IMCursorRow == tpd->cursorRow)) || tpd->imSpotTimerId) {
@@ -210,11 +215,11 @@ updateIMSpot(Widget w)
     }
 
     elapsed = _DtTermPrimMonotonicMs() - tpd->imSpotSentMs;
-    if ((elapsed >= IM_SPOT_INTERVAL_MS) || (elapsed < 0)) {
+    if (elapsed >= IM_SPOT_INTERVAL_MS) {
 	(void) setIMSpot(w);
     } else {
 	tpd->imSpotTimerId = XtAppAddTimeOut(XtWidgetToApplicationContext(w),
-		(unsigned long) (IM_SPOT_INTERVAL_MS - elapsed),
+		IM_SPOT_INTERVAL_MS - elapsed,
 		imSpotTimeout, (XtPointer) w);
     }
 }
