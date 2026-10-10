@@ -47,6 +47,8 @@ _Tt_object_list()
 	first = 0;
 	last =  0;
 	_count = 0;
+	_idx_elem = 0;
+	_idx = 0;
 }
 
 /*
@@ -60,6 +62,8 @@ _Tt_object_list(const _Tt_object_list &t)
 
 	first = 0;
 	last = 0;
+	_idx_elem = 0;
+	_idx = 0;
 	p = t.first;
 	while (p != 0) {
 		n = new _Tt_object_list_element;
@@ -109,6 +113,7 @@ flush()
 	first = 0;
 	last =  0;
 	_count = 0;
+	forget_index();
 }
 
 /*
@@ -119,6 +124,7 @@ push(const _Tt_object_ptr &e)
 {
 	_Tt_object_list_element *n = new _Tt_object_list_element;
 
+	forget_index();
 	_count++;
 	n->data = e;
 	n->next = first;	/* n->prev is nulled in constructor */
@@ -139,6 +145,7 @@ pop()
 	_Tt_object_list_element *n;
 
 	ASSERT(first,"Pop of empty list");
+	forget_index();
 	_count--;
 	n = first->next;
 	if (0==n) {
@@ -190,6 +197,8 @@ append(_Tt_object_list_ptr l)
 _Tt_object_list& _Tt_object_list::
 append_destructive(_Tt_object_list_ptr l)
 {
+	// (Appending leaves the indices of our own elements alone.)
+	l->forget_index();
 	if (0==l->first) {
 		/* second list is empty, append does nothing */
 		return *this;
@@ -221,6 +230,7 @@ dequeue()
 
 	ASSERT(last,"Dequeue from empty list");
 
+	forget_index();
 	_count--;
 	n = last->prev;
 	if (0==n) {
@@ -256,19 +266,42 @@ bot() const
 /*
  * Return a pointer to the contents of the n-th element on the list
  *
- * Note: this implementation could be very slow for large lists.
- * The API routines use it heavily.  It's likely the API accesses would be
- * sequential, so an improvment would be to have a "cache pointer" to the
- * last retrieved element along with its index; then sequential accesses
- * could be very fast.
+ * The API routines use this heavily, mostly walking a list in order,
+ * so the element returned last is remembered along with its index and
+ * the walk starts from it, or from the nearer end of the list.
  */
 _Tt_object_ptr &_Tt_object_list::
 operator[](int n) const
 {
 	ASSERT(0<=n && n<=count(),"subscript out of range");
-	_Tt_object_list_element *p;
-	p = first;
-	while(n--) p = p->next;
+	_Tt_object_list_element *p = first;
+	int i = 0;
+
+	if (n >= 0 && n < _count) {
+		int best = n;
+		if (_count - 1 - n < best) {
+			best = _count - 1 - n;
+			p = last;
+			i = _count - 1;
+		}
+		if (_idx_elem != 0) {
+			int d = (n > _idx) ? n - _idx : _idx - n;
+			if (d < best) {
+				p = _idx_elem;
+				i = _idx;
+			}
+		}
+	}
+	while (i < n) {
+		p = p->next;
+		i++;
+	}
+	while (i > n) {
+		p = p->prev;
+		i--;
+	}
+	_idx_elem = p;
+	_idx = n;
 	return p->data;
 }
 
@@ -580,6 +613,7 @@ _Tt_object_list_cursor& _Tt_object_list_cursor::
 insert(const _Tt_object_ptr &p)
 {
 	flags &= ~(1<<DELETED);
+	listhdr->forget_index();
 	if (current == 0) {	/* reset cursor */
 		listhdr->push(p);
 		current = listhdr->first;
@@ -610,6 +644,7 @@ remove()
 {
 	ASSERT(current,"No current element to delete");
 	_Tt_object_list_element *p = current;
+	listhdr->forget_index();
 	listhdr->_count--;
 	if (p->next != 0)
 	  p->next->prev = p->prev;

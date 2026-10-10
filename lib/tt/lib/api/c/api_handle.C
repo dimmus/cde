@@ -55,7 +55,50 @@ _Tt_api_handle_table::
 _Tt_api_handle_table()
 {	
 	content = new _Tt_api_handle_list;
+	mbucket_count = 64;
+	mbuckets = new _Tt_api_handle_list_ptr[mbucket_count];
+	mcount = 0;
 	last_phandle = NULL;
+}
+
+
+/*
+ * Adds a message handle to its hash bucket, growing the table when the
+ * buckets get long.
+ */
+void _Tt_api_handle_table::
+madd(_Tt_api_handle_ptr &h, int id)
+{
+	if (mcount >= 2 * mbucket_count) {
+		int			old_count = mbucket_count;
+		_Tt_api_handle_list_ptr	*old = mbuckets;
+
+		mbucket_count *= 4;
+		mbuckets = new _Tt_api_handle_list_ptr[mbucket_count];
+		for (int i = old_count - 1; i >= 0; i--) {
+			if (old[i].is_null()) {
+				continue;
+			}
+			// Walk from the end so each bucket keeps its order
+			// (newest first, like the list it replaces).
+			_Tt_api_handle_list_cursor c(old[i]);
+			while (c.prev()) {
+				_Tt_api_handle_list_ptr &b =
+					mbucket(c->mptr()->id());
+				if (b.is_null()) {
+					b = new _Tt_api_handle_list;
+				}
+				b->push(*c);
+			}
+		}
+		delete [] old;
+	}
+	_Tt_api_handle_list_ptr &b = mbucket(id);
+	if (b.is_null()) {
+		b = new _Tt_api_handle_list;
+	}
+	b->push(h);
+	mcount++;
 }
 
 /*
@@ -156,7 +199,9 @@ lookup_mhandle(_Tt_c_message_ptr m)
 		}
 	}
 
-	_Tt_api_handle_list_cursor c(content);
+	// Equal messages have equal ids (see _Tt_message::is_equal), and
+	// a message's id is set before it gets a handle and never changes.
+	_Tt_api_handle_list_cursor c(mbucket(m->id()));
 	_Tt_c_message_ptr x;
 
 	while (c.next()) {
@@ -175,7 +220,7 @@ lookup_mhandle(_Tt_c_message_ptr m)
 	}
 	_Tt_api_handle_ptr n = new _Tt_api_handle;
 	n->ptr_set(m);
-	content->push(n);
+	madd(n, m->id());
 	last_mhandle = n;
 
 	return (Tt_message)last_mhandle.c_pointer();
@@ -221,7 +266,7 @@ lookup_phandle(_Tt_pattern_ptr p)
 void _Tt_api_handle_table::
 clear(_Tt_c_message_ptr m)
 {
-	_Tt_api_handle_list_cursor	c(content);
+	_Tt_api_handle_list_cursor	c(mbucket(m->id()));
 	_Tt_c_message_ptr			x;
 
 	while (c.next()) {
@@ -229,6 +274,7 @@ clear(_Tt_c_message_ptr m)
 		if (!x.is_null()) {
 			if (x->is_equal(m)) {
 				c.remove();
+				mcount--;
 			}
 		}
 	}
@@ -267,7 +313,14 @@ clear(_Tt_pattern_ptr p)
 void _Tt_api_handle_table::
 clear(Tt_message p)
 {
-	_Tt_api_handle_list_cursor c(content);
+	if ((Tt_message)0 == p) {
+		return;
+	}
+	_Tt_c_message_ptr m = ((_Tt_api_handle *)p)->mptr();
+	if (m.is_null()) {
+		return;
+	}
+	_Tt_api_handle_list_cursor c(mbucket(m->id()));
 	
 	while (c.next()) {
 		if ((void *)((*c).c_pointer()) == (void *)p) {
@@ -275,6 +328,7 @@ clear(Tt_message p)
 				last_mhandle = (_Tt_api_handle *)0;
 			}
 			c.remove();
+			mcount--;
 		}
 	}
 }
@@ -628,6 +682,7 @@ _Tt_api_callback::
 _Tt_api_handle_table::
 ~_Tt_api_handle_table()
 {
+	delete [] mbuckets;
 }
 
 _Tt_api_userdata::

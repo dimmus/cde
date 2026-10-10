@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <unistd.h>
 #include "tt_options.h"
 #include "mp/mp_auth.h"
@@ -263,10 +264,9 @@ clnt_stat _Tt_rpc_client::
 call(int procnum, xdrproc_t inproc, char *in,
      xdrproc_t outproc, char *out, int timeout)
 {
-	fd_set		bogus;
-	timeval		tmout;
 	timeval		total_timeout;
-	struct sigaction curr_action;
+	struct sigaction ign_action;
+	struct sigaction prev_action;
 	int		need2reset_sigpipe = 0;
 	_Tt_auth_iceauth_args  args;
 
@@ -312,13 +312,15 @@ call(int procnum, xdrproc_t inproc, char *in,
 	}
 	
 	if (timeout == 0) {
-		FD_ZERO(&bogus);
-		FD_SET(_socket, &bogus);
-		tmout.tv_sec = 0;
-		tmout.tv_usec = 0;
-		select(FD_SETSIZE, &bogus, 0, 0, &tmout);
+		// A one-way call: don't send if the connection already
+		// shows input (EOF or an error: the server went away).
+		// (This used an fd_set, which _socket can be beyond.)
+		pollfd	p;
 
-		if (FD_ISSET(_socket, &bogus)) {
+		p.fd = _socket;
+		p.events = POLLIN;
+		p.revents = 0;
+		if (poll(&p, 1, 0) > 0 && p.revents != 0) {
 			return(RPC_CANTSEND);
 		}
 	}
@@ -326,19 +328,24 @@ call(int procnum, xdrproc_t inproc, char *in,
 	//
 	// tcp write errors (when the rpc_server on the other end dies)
 	// cause a SIGPIPE.  We need to make sure the SIGPIPE is caught,
-	// or the process dies.
+	// or the process dies.  Ignore it for the call if its action
+	// is the default.  One sigaction() both installs SIG_IGN and
+	// fetches the previous action (this used to take a query plus
+	// two signal() calls per RPC); an application's own handler is
+	// put straight back and stays in charge during the call, as
+	// before.
 	//
-	if (sigaction(SIGPIPE, 0, &curr_action) != 0) {
+	memset(&ign_action, 0, sizeof(ign_action));
+	ign_action.sa_handler = SIG_IGN;
+	sigemptyset(&ign_action.sa_mask);
+	if (sigaction(SIGPIPE, &ign_action, &prev_action) != 0) {
 		_tt_syslog( 0, LOG_ERR, "sigaction(): %m" );
-	}
-#if defined(OPT_BUG_SUNOS_5)
-	if ((SIG_TYP)curr_action.sa_handler == SIG_DFL)
-#else
-	if (curr_action.sa_handler == SIG_DFL)
-#endif
-	{
+	} else if (prev_action.sa_flags & SA_SIGINFO) {
+		sigaction(SIGPIPE, &prev_action, 0);
+	} else if (prev_action.sa_handler == SIG_DFL) {
 		need2reset_sigpipe = 1;
-		signal(SIGPIPE, SIG_IGN);
+	} else if (prev_action.sa_handler != SIG_IGN) {
+		sigaction(SIGPIPE, &prev_action, 0);
 	}
 
 	if (_TT_AUTH_ICEAUTH == _auth.auth_level()) {
@@ -360,7 +367,7 @@ call(int procnum, xdrproc_t inproc, char *in,
 			           total_timeout);
 	}
 	if (need2reset_sigpipe) {
-		signal(SIGPIPE, SIG_DFL);
+		sigaction(SIGPIPE, &prev_action, 0);
 	}
 #if !defined(OPT_BUG_RPCINTR)
 	if (_clnt_stat == RPC_INTR) {
