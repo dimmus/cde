@@ -46,6 +46,9 @@ extern "C" {
 #endif
 extern int _DtEnvControl(
                         int mode) ;
+extern void _DtEnvSessionManager(void);
+extern void _DtEnvSessionManagerDisplay(
+                        Display *display) ;
 extern int _DtWsmSetBackdropSearchPath(
                         Screen *screen,
                         char   *backdropDir,

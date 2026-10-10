@@ -239,12 +239,92 @@ makeDefaultIconBmPath(void)
 
 /*****************************<->*************************************
  *
+ *  SetSessionManager (display)
+ *
+ *  Description:
+ *  -----------
+ *  Sets the SESSION_MANAGER environment variable, if it is not already
+ *  set, from the SESSION_MANAGER property on the root window.  Uses
+ *  'display' when it is not NULL, else opens (and closes) a connection
+ *  of its own.  Done at most once per process.
+ *
+ *  Opening a second connection to read one property costs a full
+ *  connection setup on every application start, so _DtEnvControl
+ *  (DT_ENV_SET) only marks the lookup pending.  DtInitialize and
+ *  DtAppInitialize then do it on the application's own connection, and
+ *  the restore modes of _DtEnvControl (used around fork/exec of child
+ *  processes) fall back to a private connection when no display was
+ *  ever handed to us, so children still inherit the variable.
+ *
+ *****************************<->***********************************/
+#define SESSION_MANAGER	"SESSION_MANAGER"
+
+enum { SM_IDLE, SM_PENDING, SM_DONE };
+static int smLookupState = SM_IDLE;
+
+static void
+SetSessionManager(Display *display)
+{
+    Display *own = NULL;
+    Atom sm_atom;
+
+    if (smLookupState == SM_DONE)
+	return;
+    smLookupState = SM_DONE;
+
+    if (NULL != getenv(SESSION_MANAGER))
+	return;
+
+    if (NULL == display)
+    {
+	display = own = XOpenDisplay(NULL);
+	if (NULL == display)
+	    return;
+    }
+
+    sm_atom = XInternAtom(display, SESSION_MANAGER, True);
+    if (None != sm_atom)
+    {
+	Atom actual_type;
+	unsigned long nitems, leftover;
+	int actual_format;
+	unsigned char *value = NULL;
+
+	if (Success == XGetWindowProperty(
+			    display, XDefaultRootWindow(display),
+			    sm_atom, 0L, 256, False, XA_STRING,
+			    &actual_type, &actual_format,
+			    &nitems, &leftover, &value))
+	{
+	    if (NULL != value && None != actual_type)
+	    {
+		char *envstr = malloc(strlen(SESSION_MANAGER) +
+				      strlen((char *) value) + 2);
+
+		if (envstr)
+		{
+		    sprintf(envstr, "%s=%s", SESSION_MANAGER, (char *) value);
+		    putenv(envstr);
+		}
+	    }
+	    if (value)
+		XFree(value);
+	}
+    }
+
+    if (own)
+	XCloseDisplay(own);
+}
+
+/*****************************<->*************************************
+ *
  *  _DtEnvSessionManager ()
  *
  *
  *  Description:
  *  -----------
- *  Sets the SESSION_MANAGER environment variable if not already set.
+ *  Sets the SESSION_MANAGER environment variable if not already set,
+ *  opening a connection of its own when needed.
  *
  *  Inputs:
  *  ------
@@ -258,48 +338,29 @@ makeDefaultIconBmPath(void)
 void
 _DtEnvSessionManager(void)
 {
-#define SESSION_MANAGER	"SESSION_MANAGER"
-    char *session_manager = getenv(SESSION_MANAGER);
-    if (NULL == session_manager)
-    {
-	Display	*display;
-        Atom sm_atom;
+    _DtSvcProcessLock();
+    SetSessionManager(NULL);
+    _DtSvcProcessUnlock();
+}
 
-	display = XOpenDisplay(NULL);
-	if (NULL != display)
-	{
-            sm_atom = XInternAtom(display, SESSION_MANAGER, True);
-	    if (None != sm_atom)
-	    {
-    	        Atom actual_type;
-    	        unsigned long nitems, leftover;
-    	        int actual_format;
-
-	        if (Success == XGetWindowProperty(
-				display, XDefaultRootWindow(display),
-				sm_atom, 0L, 256, False, XA_STRING,
-				&actual_type, &actual_format,
-				&nitems, &leftover,
-				(unsigned char **) &session_manager))
-	        {
-	            if (NULL != session_manager && None != actual_format)
-		    {
-		        char *envstr;
-			envstr = (char*) malloc(
-						strlen(SESSION_MANAGER) +
-						strlen(session_manager) + 2);
-			sprintf(
-				envstr, "%s=%s",
-				SESSION_MANAGER,
-				session_manager);
-	                putenv(envstr);
-	                XtFree(session_manager);
-		    }
-	        }
-	    }
-	    XCloseDisplay(display);
-	}
-    }
+/*****************************<->*************************************
+ *
+ *  _DtEnvSessionManagerDisplay (display)
+ *
+ *  Description:
+ *  -----------
+ *  Does the SESSION_MANAGER lookup that _DtEnvControl(DT_ENV_SET) left
+ *  pending, on the caller's connection.  Called by DtInitialize and
+ *  DtAppInitialize.
+ *
+ *****************************<->***********************************/
+void
+_DtEnvSessionManagerDisplay(Display *display)
+{
+    _DtSvcProcessLock();
+    if (smLookupState == SM_PENDING)
+	SetSessionManager(display);
+    _DtSvcProcessUnlock();
 }
 
 /*****************************<->*************************************
@@ -340,9 +401,12 @@ _DtEnvControl(
 	    if (!environSetup)  /* first time through */
 	    {
 		/*
-		 * Make sure the SESSION_MANAGER variable is set.
+		 * Make sure the SESSION_MANAGER variable gets set: on the
+		 * application's display in DtInitialize, or on a private
+		 * connection before the first child process is started.
 		 */
-		_DtEnvSessionManager();
+		if (smLookupState == SM_IDLE)
+		    smLookupState = SM_PENDING;
 
 		/*
 		 * Set up DT environment in the application 
@@ -664,6 +728,10 @@ _DtEnvControl(
 	case  DT_ENV_RESTORE_PRE_DT:
        	    if (environSetup) 
             {
+		/* A child process is about to be started. */
+		if (smLookupState == SM_PENDING)
+		    SetSessionManager(NULL);
+
 		if (_preDtEnvironment.nlsPath) {
 		    _EnvAdd (NLS_PATH_ENVIRON, 
 			       _preDtEnvironment.nlsPath,
@@ -715,6 +783,8 @@ _DtEnvControl(
 	case DT_ENV_RESTORE_POST_DT:
        	    if (environSetup) 
             {
+		if (smLookupState == SM_PENDING)
+		    SetSessionManager(NULL);
 
 		if (_postDtEnvironment.nlsPath) {
 		    _EnvAdd (NLS_PATH_ENVIRON, 
