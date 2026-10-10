@@ -383,6 +383,17 @@ typedef struct termData {
 					 * or -1 if the row is clean	*/
     short *dirtyEndCol;			/* per row: last dirty column	*/
 
+    /* cursor blinking and input method spot updates (see
+     * TermPrimCursor.c), and the bell (see TermPrimRender.c).  Times
+     * are _DtTermPrimMonotonicMs() values...
+     */
+    long cursorOnMs;			/* cursor last turned on	*/
+    long cursorActiveMs;		/* last output, key or focus in	*/
+    long imSpotSentMs;			/* IM spot location last set	*/
+    XtIntervalId imSpotTimerId;		/* deferred IM spot update	*/
+    long bellMs;			/* last bell rung		*/
+    XtIntervalId bellTimerId;		/* undo of the visual bell	*/
+
 } DtTermPrimDataRec, *DtTermPrimData;
 
 

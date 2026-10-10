@@ -52,6 +52,7 @@ extern void _DtTermPrimDestroyFont(
 );
 
 extern void _DtTermPrimBell(Widget w);
+extern void _DtTermPrimBellDestroy(Widget w);
 extern void _termSetRenderFont(Widget w, TermFont *termFont);
 extern void _termSetBufferSize(Widget w, int width, int height,
 	int xOffset, int yOffset);

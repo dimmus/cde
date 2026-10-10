@@ -2712,11 +2712,9 @@ Destroy(Widget w)
     /* remove the termData structure contents, followed by the structure...
      */
     if (tw->term.tpd) {
-	/* remove the cursor timeout... */
-	if (tw->term.tpd->cursorTimeoutId) {
-	    (void) XtRemoveTimeOut(tw->term.tpd->cursorTimeoutId);
-	    tw->term.tpd->cursorTimeoutId = (XtIntervalId) 0;
-	}
+	/* remove the cursor blink, IM spot and visual bell timeouts... */
+	(void) _DtTermPrimCursorDestroy(w);
+	(void) _DtTermPrimBellDestroy(w);
 
 	/* free up all our GC's...
 	 */
@@ -3368,6 +3366,9 @@ _DtTermPrimActionKeyInput(Widget w, XEvent *event, String *params,
 		keyEvent->type);
 	return;
     }
+    /* we are not idle (restart cursor blinking if it has stopped)... */
+    (void) _DtTermPrimCursorKeyActivity(w);
+
     if (KEYBOARD_LOCKED(tpd->keyboardLocked)) {
         /* keyboard locked -- ring the bell...
          */

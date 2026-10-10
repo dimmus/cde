@@ -108,45 +108,117 @@ _termSetRenderFont(Widget w, TermFont *termFont)
 }
 #endif	/* DKS */
 
+/* rings closer together than this are ignored (a "yes ^G" or a binary
+ * catted by mistake would otherwise keep the server busy beeping or
+ * flashing).  This is xterm's default bellSuppressTime...
+ */
+#define	BELL_SUPPRESS_MS	200
+/* how long the visual bell keeps the screen flashed... */
+#define	VISUAL_BELL_MS		100
+
+/* XOR the text area with fg ^ bg, which swaps the foreground and
+ * background colours...
+ */
+static void
+flashTextArea(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+
+    /* the speed of this operation is not critical, so we will just
+     * use the standard text rendering GC and restore it after we
+     * are done...
+     */
+    if (tpd->renderGC.foreground !=
+	    (tw->primitive.foreground ^ tw->core.background_pixel)) {
+	tpd->renderGC.foreground =
+		tw->primitive.foreground ^ tw->core.background_pixel;
+	(void) XSetForeground(XtDisplay(w), tpd->renderGC.gc,
+		tpd->renderGC.foreground);
+    }
+    (void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXxor);
+    (void) XFillRectangle(XtDisplay(w),		/* Display		*/
+	    XtWindow(w),			/* Drawable		*/
+	    tpd->renderGC.gc,			/* GC			*/
+	    tpd->offsetX,			/* x			*/
+	    tpd->offsetY,			/* y			*/
+	    tw->term.columns * tpd->cellWidth,	/* width		*/
+	    tw->term.rows * tpd->cellHeight);	/* height		*/
+    /* restore the GC... */
+    (void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXcopy);
+}
+
+/* the visual bell has been showing for VISUAL_BELL_MS.  Repaint the text
+ * area from the buffer (rather than XOR it back: text may have been
+ * painted or scrolled in the meantime), the way an expose would...
+ */
+/*ARGSUSED*/
+static void
+visualBellTimeout(XtPointer client_data, XtIntervalId *id)
+{
+    Widget w = (Widget) client_data;
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    Boolean cursorWasOn = (CURSORoff != tpd->cursorState);
+
+    tpd->bellTimerId = (XtIntervalId) 0;
+    if (!XtIsRealized(w) || !tpd->termBuffer) {
+	return;
+    }
+    (void) _DtTermPrimCursorOff(w);
+    (void) _DtTermPrimExposeText(w, tpd->offsetX, tpd->offsetY,
+	    tw->term.columns * tpd->cellWidth,
+	    tw->term.rows * tpd->cellHeight, False);
+    if (cursorWasOn) {
+	(void) _DtTermPrimCursorOn(w);
+    }
+}
+
 void
 _DtTermPrimBell(Widget w)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    int i;
+    long now;
+
+    /* rate limit... */
+    now = _DtTermPrimMonotonicMs();
+    if (tpd->bellMs && (now - tpd->bellMs >= 0) &&
+	    (now - tpd->bellMs < BELL_SUPPRESS_MS)) {
+	return;
+    }
+    tpd->bellMs = now;
 
     if (tw->term.visualBell) {
+	if (tpd->bellTimerId || !XtIsRealized(w) || !tpd->renderGC.gc) {
+	    /* still flashing, or nothing to flash yet... */
+	    return;
+	}
+
 	/* flash what is really in the buffer... */
 	(void) _DtTermPrimRenderFlushDirty(w);
 
-	/* the speed of this operation is not critical, so we will just
-	 * use the standard text rendering GC and restore it after we
-	 * are done...
+	/* flash the screen now and repaint it when the flash is over (we
+	 * used to flash it twice with an XSync after each, which is two
+	 * round trips and too quick to see on a local server)...
 	 */
-	if (tpd->renderGC.foreground !=
-		(tw->primitive.foreground ^ tw->core.background_pixel)) {
-	    tpd->renderGC.foreground = 
-		    tw->primitive.foreground ^ tw->core.background_pixel;
-	    (void) XSetForeground(XtDisplay(w), tpd->renderGC.gc,
-		    tpd->renderGC.foreground);
-	}
-	(void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXxor);
-	for (i = 0; i < 2; i++) {
-	    (void) XFillRectangle(XtDisplay(w),	/* Display		*/
-		    XtWindow(w),		/* Drawable		*/
-		    tpd->renderGC.gc,		/* GC			*/
-		    tpd->offsetX,		/* x			*/
-		    tpd->offsetY,		/* y			*/
-		    tw->term.columns * tpd->cellWidth,
-						/* width		*/
-		    tw->term.rows * tpd->cellHeight);
-						/* height		*/
-	    (void) XSync(XtDisplay(w), 0);
-	}
-	/* restore the GC... */
-	(void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXcopy);
+	(void) flashTextArea(w);
+	tpd->bellTimerId = XtAppAddTimeOut(XtWidgetToApplicationContext(w),
+		VISUAL_BELL_MS, visualBellTimeout, (XtPointer) w);
     } else {
 	(void) XBell(XtDisplay(w), 0);
+    }
+}
+
+/* the widget is being destroyed... */
+void
+_DtTermPrimBellDestroy(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    if (tpd->bellTimerId) {
+	(void) XtRemoveTimeOut(tpd->bellTimerId);
+	tpd->bellTimerId = (XtIntervalId) 0;
     }
 }
 
