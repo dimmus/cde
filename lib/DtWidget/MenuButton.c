@@ -630,14 +630,14 @@ static void
 CalculateMenuGlyphSize(
     DtMenuButtonWidget menubtn )
 {
-	Window rootwin;
-	int x,y; /* must be int */
-	unsigned int width, height, border, depth; /* must be int */
+	unsigned int width = 0, height = 0; /* must be int */
 	
 	if (MB_PIXMAP(menubtn) != XmUNSPECIFIED_PIXMAP) {
-	   XGetGeometry(XtDisplay(menubtn), MB_PIXMAP(menubtn),
-			&rootwin, &x, &y, &width, &height,
-			&border, &depth);
+	   /* No round trip when the pixmap came from the Motif pixmap
+	    * cache (a resource or XmGetPixmap()); any other pixmap is
+	    * measured once and cached, as XmLabel does. */
+	   XmeGetPixmapData(XtScreen(menubtn), MB_PIXMAP(menubtn),
+			NULL, NULL, NULL, NULL, NULL, NULL, &width, &height);
 	
 	   MB_GLYPH_WIDTH(menubtn) = (Dimension) width;
 	   MB_GLYPH_HEIGHT(menubtn) = (Dimension) height;

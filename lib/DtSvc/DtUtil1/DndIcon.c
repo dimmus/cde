@@ -150,20 +150,35 @@ calcStateIconOffset(
 	int		*stateOffsetX,
 	int		*stateOffsetY)
 {
-	Display		*dpy 	= XtDisplayOfObject(sourceIcon);
 	Pixmap		pixmap;
-	Window		root;
-	int		pixmapX, pixmapY;
-	unsigned int	pixmapW, pixmapH, junk;
+	Dimension	iconHeight = 0;
+	unsigned int	pixmapH;
 
-	XtVaGetValues(sourceIcon, XmNpixmap, &pixmap, NULL);
+	XtVaGetValues(sourceIcon, XmNpixmap, &pixmap,
+		XmNheight, &iconHeight, NULL);
 
 	if (pixmap == None)
 		return;
 
-	XGetGeometry(dpy, pixmap, &root,
-		&pixmapX, &pixmapY, &pixmapW, &pixmapH,
-		&junk, &junk);
+	/*
+	 * The drag icon's height is that of its pixmap: callers set it
+	 * from the pixmap (see DtDndCreateSourceIcon) or XmDragIcon fills
+	 * it in.  Ask the server only if it is unset; this used to be an
+	 * XGetGeometry round trip on every drag start.
+	 */
+	if (iconHeight != 0) {
+		pixmapH = iconHeight;
+	} else {
+		Window		root;
+		int		pixmapX, pixmapY;
+		unsigned int	pixmapW, junk;
+
+		if (pixmap == XmUNSPECIFIED_PIXMAP)
+			return;
+		XGetGeometry(XtDisplayOfObject(sourceIcon), pixmap, &root,
+			&pixmapX, &pixmapY, &pixmapW, &pixmapH,
+			&junk, &junk);
+	}
 
 	if (pixmapH == 16) {
 		*stateOffsetX = *stateOffsetY = 8;
