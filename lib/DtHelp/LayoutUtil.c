@@ -133,6 +133,13 @@ IsTrueMultiByte (wchar_t wc_char)
     char buf[MB_LEN_MAX];
 
     /*
+     * ASCII is a single byte in every locale whose encoding is a
+     * stateless ASCII superset.
+     */
+    if (wc_char > 0 && wc_char < 0x80 && _DtHelpCeAsciiIsSingleByte())
+	return False;
+
+    /*
      * check to see if this is a one byte character
      * There might not be a multibyte list for this locale.
      * Can't break on single byte characters.
@@ -141,6 +148,32 @@ IsTrueMultiByte (wchar_t wc_char)
 	return True;
 
     return False;
+}
+
+/******************************************************************************
+ * Function:	BoundedStrLen
+ *
+ * Returns:	The length of the string (in bytes or wide characters),
+ *		but at most 'limit' + 1.  A negative 'limit' gives the
+ *		whole length.
+ *****************************************************************************/
+static int
+BoundedStrLen (const void *p_char, int wc_flag, int limit)
+{
+    const wchar_t *wcs = (const wchar_t *) p_char;
+    int            max = INT_MAX;
+    int            len = 0;
+
+    if (limit >= 0 && limit < INT_MAX)
+	max = limit + 1;
+
+    if (0 == wc_flag)
+	return (int) strnlen((const char *) p_char, (size_t) max);
+
+    while (len < max && 0 != wcs[len])
+	len++;
+
+    return len;
 }
 
 /******************************************************************************
@@ -427,7 +460,12 @@ _DtCvCheckLineSyntax (
       {
         wcFlag   = _DtCvIsSegWideChar(pSeg);
         pChar    = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg), wcFlag, start);
-        myStrLen = _DtCvStrLen (pChar, wcFlag);
+        /*
+         * only whether the string is shorter than, as long as or longer
+         * than 'str_len' matters below; don't scan the rest of a long
+         * paragraph to find out (this is called for every word).
+         */
+        myStrLen = BoundedStrLen (pChar, wcFlag, str_len);
       }
 
     /*
@@ -669,7 +707,6 @@ _DtCvGetNextWidth (
     int      tLen;
     int      wcFlag;
     int      curWidth;
-    int      myLength;
     int      nextLen = 0;
     void    *pChar;
     char    *tChar;
@@ -739,7 +776,6 @@ _DtCvGetNextWidth (
 	 */
 	wcFlag   = _DtCvIsSegWideChar (pSeg);
 	pChar    = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg), wcFlag, start);
-	myLength = _DtCvStrLen (pChar, wcFlag);
     
 	    /*
 	 * if a single byte string, zoom through it looking for
@@ -816,13 +852,31 @@ _DtCvGetNextWidth (
 	 */
 	else
 	  {
+	    /*
+	     * (the rest of the segment can be a long paragraph: find its
+	     * end as the characters are stepped over, not up front.)
+	     */
+	    int ascii = _DtHelpCeAsciiIsSingleByte();
+
 	    len = 0;
-	    while (len < myLength)
+	    while (1)
 	      {
-		if (wcFlag) len++;
+		if (wcFlag)
+		  {
+		    if (0 == ((wchar_t *) pChar)[len])
+			break;
+		    len++;
+		  }
 		else
 		  {
-		    mbl = mblen(pChar + len, MB_CUR_MAX);
+		    unsigned char c = ((unsigned char *) pChar)[len];
+
+		    if ('\0' == c)
+			break;
+		    if (ascii && c < 0x80)
+			mbl = 1;
+		    else
+			mbl = mblen(((char *) pChar) + len, MB_CUR_MAX);
 
 		    if (mbl == -1)
 		      {
@@ -1207,6 +1261,95 @@ _DtCvCheckAddHyperToTravList (
 }
 
 /******************************************************************************
+ * Function:	WidthUpTo
+ *
+ * Returns:	The width of the 'len' units at 'p_char' when that width is
+ *		not more than 'limit'.  Otherwise some value greater than
+ *		'limit' (the width of a prefix that is already too wide).
+ *
+ * Purpose:	The layout asks "does the rest of this segment fit on the
+ *		line?" for every line of a segment.  Measuring all of the
+ *		rest each time makes a long paragraph O(N*L).  Character
+ *		widths are never negative, so a prefix that is wider than
+ *		the limit proves the whole is too; measure growing prefixes
+ *		and stop as soon as one is.
+ *****************************************************************************/
+static _DtCvUnit
+WidthUpTo (
+    _DtCanvasStruct	*canvas,
+    _DtCvSegmentI	*p_seg,
+    void		*p_char,
+    int			 len,
+    _DtCvUnit		 limit)
+{
+    int		 wcFlag = _DtCvIsSegWideChar(p_seg);
+    int		 count;
+    int		 mbl;
+    _DtCvUnit	 maxWidth = 0;
+    _DtCvUnit	 width;
+    char	*str = (char *) p_char;
+    int		 ascii = _DtHelpCeAsciiIsSingleByte();
+
+    /*
+     * every string is at least one unit wide.
+     */
+    if (limit < 1)
+	return 1;
+
+    _DtCvFontMetrics(canvas, _DtCvFontOfStringSeg(p_seg),
+					NULL, NULL, &maxWidth, NULL, NULL);
+    if (maxWidth < 1)
+	maxWidth = 1;
+
+    /*
+     * start with a prefix of about four times the characters
+     * guaranteed to fit.
+     */
+    count = 16;
+    if (limit / maxWidth < (INT_MAX - 16) / 4)
+	count += 4 * (limit / maxWidth);
+
+    while (count < len)
+      {
+	/*
+	 * a multi-byte string must be cut at a character boundary.
+	 */
+	if (0 == wcFlag && canvas->mb_length > 1)
+	  {
+	    int bytes = 0;
+	    int chars = 0;
+
+	    while (bytes < len && chars < count)
+	      {
+		if (ascii && ((unsigned char) str[bytes]) < 0x80
+						&& '\0' != str[bytes])
+		    mbl = 1;
+		else
+		    mbl = mblen(str + bytes, MB_CUR_MAX);
+		if (0 == mbl)
+		    break;
+		bytes += (mbl < 0 ? 1 : mbl);
+		chars++;
+	      }
+	    if (bytes >= len)
+		break;
+	    width = _DtCvGetStringWidth(canvas, p_seg, p_char, bytes);
+	  }
+	else
+	    width = _DtCvGetStringWidth(canvas, p_seg, p_char, count);
+
+	if (width > limit)
+	    return width;
+
+	if (count > INT_MAX / 2)
+	    break;
+	count *= 2;
+      }
+
+    return _DtCvGetStringWidth(canvas, p_seg, p_char, len);
+}
+
+/******************************************************************************
  * Function: ProcessStringSegment
  *
  * chops a string segment up until its completely used.
@@ -1387,11 +1530,19 @@ _DtCvProcessStringSegment(
 	    stringLen = _DtCvStrLen (pChar, _DtCvIsSegWideChar(cur_seg));
     
 	    /*
-	     * get the pixel width of the text string.
+	     * get the pixel width of the text string.  Unless the whole
+	     * string is wanted, stop measuring once it is known not to
+	     * fit (textWidth is then only known to exceed workWidth,
+	     * which is all the code below uses it for).
 	     */
-	    textWidth = _DtCvGetStringWidth(canvas,cur_seg,pChar,stringLen)
-			+ _DtCvGetTraversalWidth(canvas, cur_seg,
+	    nWidth = _DtCvGetTraversalWidth(canvas, cur_seg,
 					lay_info->lst_hyper);
+	    if (stat_flag == True)
+		textWidth = _DtCvGetStringWidth(canvas,cur_seg,pChar,stringLen);
+	    else
+		textWidth = WidthUpTo(canvas, cur_seg, pChar, stringLen,
+							workWidth - nWidth);
+	    textWidth += nWidth;
 	    /*
 	     * Will it fit in the current width?
 	     */

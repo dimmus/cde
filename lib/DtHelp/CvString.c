@@ -58,6 +58,7 @@
  * private includes
  */
 #include "CvStringI.h"
+#include "StringFuncsI.h"
 
 /******************************************************************************
  *
@@ -165,20 +166,25 @@ _DtCvChar (
     if (0 == type) {
 	ptr = (char *) p1 + count;
 
-	if (MB_CUR_MAX > 1) {
+	if (MB_CUR_MAX > 1 &&
+		!(((unsigned char) *ptr) < 0x80 && _DtHelpCeAsciiIsSingleByte())) {
 	    len = mbtowc(&value, ptr, MB_CUR_MAX);
 
+	    /*
+	     * 'count' is not at the start of a character: find the
+	     * character that contains it.
+	     */
 	    if (len == -1) {
 		for (i = 1; i < MB_CUR_MAX; ++i) {
-		    ptr -= i;
+		    ptr = (char *) p1 + count - i;
 
-		    if (ptr < (char *) p1) {
-			len = -1;
+		    if (ptr < (char *) p1)
 			break;
-		    }
 
 		    len = mbtowc(&value, ptr, MB_CUR_MAX);
-		    if (len == -1) continue;
+		    if (len > i)
+			break;
+		    len = -1;
 		}
 
 		if (len == -1) value = (wchar_t) -1;
