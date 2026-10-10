@@ -102,8 +102,8 @@ Specifies ``false'' as the value for the \fBdaemonMode\fP
 resource.
 .IP "\fB-resources\fP \fIresource_file\fP"
 Specifies the value for the \fBresources\fP resource.  This file
-is loaded using \fIxrdb (1)\fP to specify configuration parameters for the
-authentication screen.
+is loaded into the RESOURCE_MANAGER property to specify configuration
+parameters for the authentication screen.
 .IP "\fB-server\fP \fIserver_entry\fP"
 Specifies the value for the \fBservers\fP resource.
 See \fBservers\fP below for more detail.
@@ -556,6 +556,7 @@ kept in a write-protected directory to prevent its erasure, which would
 disable the authorization mechanism in the server.
 .IP "\fBcpp\fP"
 This specifies the name of the C preprocessor that is used by xrdb.
+It is not used: the resource files are not preprocessed.
 .IP "\fBenvironment\fP"
 This resource can contain a set of <name>=<value> pairs separated by a space
 or tab.
@@ -651,8 +652,11 @@ This resource specifies the signal
 sends to reset the server.
 See the section \fBControlling The Server\fP
 .IP "\fBresources\fP"
-This resource specifies the name of the file to be loaded by \fIxrdb (1)\fP
-as the resource data-base onto the root window of screen 0 of the display.
+This resource specifies the name of the file to be loaded
+as the resource data-base onto the root window of screen 0 of the display
+(the RESOURCE_MANAGER property, as with "\fIxrdb (1)\fP -load").
+The file, and the files in the Xresources.d directories, are read by
+\fIdtlogin\fP itself; they are not run through the C preprocessor.
 This resource data base is loaded just before the authentication procedure
 is started, so it can control the appearance of the "login" window.  See the
 section below on the authentication screen, which describes the various
@@ -724,7 +728,9 @@ Setting this resource to "True" restricts the display to only allowing
 fail-safe or DT Lite sessions.
 The "HP DT Session" selection is disabled.
 .IP "\fBxrdb\fP"
-Specifies the program used to load the resources.
+Specifies the program used to load the resources when \fIdtlogin\fP
+cannot open the display itself.  Normally \fIdtlogin\fP sets the
+RESOURCE_MANAGER property directly.
 .sp 1
 .SH "AUTHENTICATION SCREEN RESOURCES"
 The authentication screen reads a name-password pair
@@ -1013,7 +1019,7 @@ has any clues to the trouble.
 can become quite large and should be trimmed periodically.
 .PP
 The next configuration entry, \fI/usr/dt/config/Xresources\fP, is loaded onto
-the display as a resource database using \fIxrdb (1)\fP.  As the authentication
+the display as a resource database (as by \fIxrdb (1)\fP).  As the authentication
 screen reads this database before starting up, it usually contains
 parameters for that screen.
 .sp 3
