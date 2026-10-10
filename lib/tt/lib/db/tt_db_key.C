@@ -47,6 +47,10 @@ _Tt_db_key::_Tt_db_key (short version_number)
   static unsigned int last_time_sec = 0;
   static long counter = 0;
 
+  // Clear the alignment padding after "padding" (4 bytes where long is
+  // 8): binary() copies the whole struct, and garbage there made the
+  // key of the same object differ from one call to the next.
+  memset((char *)&key, 0, sizeof(key));
   key.version  = version_number;
   key.padding  = 0;
   key.hostid   = _tt_gethostid();
@@ -61,6 +65,8 @@ _Tt_db_key::_Tt_db_key (short version_number)
 
 _Tt_db_key::_Tt_db_key (const _Tt_string &string)
 {
+  memset((char *)&key, 0, sizeof(key));
+
   // If this is an actual key...
   if ((string.len() == TT_DB_KEY_LENGTH) && (string[0] < '0')) {
     (void)memcpy((char *)&key, (char *)string, TT_DB_KEY_LENGTH);

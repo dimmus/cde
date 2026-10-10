@@ -581,7 +581,10 @@ _amstart(Bytearray *isfhandle, char *record, int *reclen,
     _isdisk_commit();			     /* This will only check
 					      * that we unfixed all fixed
 					      * buffers */
-    _isdisk_inval();
+    /*
+     * Nothing was changed, so the buffers stay valid for the next call
+     * (see _check_changestamps() in isfcb.c).
+     */
 
     _isam_exithook();
     return (ISOK);
@@ -610,7 +613,7 @@ _amstart(Bytearray *isfhandle, char *record, int *reclen,
 
     if (newcrp != NULL)
 	free((char *)newcrp);
-    _isdisk_inval();
+    /* Read only: nothing to invalidate. */
 
     _isam_exithook();
     return (ISERROR);

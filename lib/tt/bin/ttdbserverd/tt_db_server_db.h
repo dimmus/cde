@@ -185,6 +185,24 @@ public:
 			      const _Tt_string        &new_file,
 			      const _Tt_db_access_ptr &access);
 
+  // Cache level bookkeeping: each takes one key lookup and one access
+  // check and reads (and, to increment, rewrites in place) the single
+  // cache level record.  A missing file cache level is created at 0
+  // by both file functions; a missing object cache level is an error
+  // for getObjectCacheLevel().
+  _Tt_db_results getFileCacheLevel (const _Tt_string        &file,
+				    const _Tt_db_access_ptr &access,
+				    int                     &cache_level);
+  _Tt_db_results incrementFileCacheLevel (const _Tt_string        &file,
+					  const _Tt_db_access_ptr &access,
+					  int                     &cache_level);
+  _Tt_db_results getObjectCacheLevel (const _Tt_string        &objid,
+				      const _Tt_db_access_ptr &access,
+				      int                     &cache_level);
+  _Tt_db_results incrementObjectCacheLevel (const _Tt_string        &objid,
+					    const _Tt_db_access_ptr &access,
+					    int                     &cache_level);
+
   // If the specified file is a directory, this returns all of the
   // file names stored in the database that are in the directory.
   // The file itself is also in the return list.
@@ -293,6 +311,7 @@ public:
 			       bool_t=FALSE,
 			       bool_t=FALSE);
   _Tt_db_results getFileKey (const _Tt_string&, _Tt_string&);
+  _Tt_db_results cacheLevel (const _Tt_string&, int, int&);
   _Tt_string getObjectKey (const _Tt_string&);
 
   _Tt_db_results setProperty (const _Tt_string&, const _Tt_db_property_ptr&);

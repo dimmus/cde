@@ -287,6 +287,12 @@ _isfcb_close(Fcb *fcb)
     (void) close(fcb->indfd);
     (void) close(fcb->varfd);
 
+    /*
+     * Buffers are found by FCB address and descriptor, both of which
+     * a later open may reuse for another file.
+     */
+    _isdisk_inval();
+
     _isfreestring(fcb->isfname);
     free((char *)fcb->keys);
     free((char *)fcb);
@@ -441,6 +447,28 @@ _isfcb_cntlpg_w2(Fcb *fcb)
 }
 
 /*
+ * _check_changestamps(fcb, cntl_page)
+ *
+ * The disk buffers are kept from one ISAM call to the next (they used
+ * to be thrown away on every return).  Every call that reads pages
+ * first reads the control page through _isfcb_cntlpg_r() or
+ * _isfcb_cntlpg_r2(), and every change to a file bumps a change stamp
+ * on that page (_isfcb_cntlpg_w() and _isfcb_cntlpg_w2()).  If the
+ * stamps on disk are not the ones this FCB last saw or wrote, someone
+ * else (another process, or another FCB on the same file) changed the
+ * file, so drop the buffers.
+ */
+
+Static void
+_check_changestamps(Fcb *fcb, char *cntl_page)
+{
+    if (ldlong(cntl_page + CP_CHANGESTAMP1_OFF) != fcb->changestamp1 ||
+	ldlong(cntl_page + CP_CHANGESTAMP2_OFF) != fcb->changestamp2) {
+	_isdisk_inval();
+    }
+}
+
+/*
  * _isfcb_cntlpg_r(fcb)
  *
  * Read information from control page and store it in the FCB.
@@ -462,6 +490,8 @@ _isfcb_cntlpg_r(Fcb *fcb)
     _isseekpg(dat_fd, ISCNTLPGOFF);
     _isreadpg(dat_fd, cntl_page);
     _isreadpg(dat_fd, cntl_page + ISPAGESIZE);
+
+    _check_changestamps(fcb, cntl_page);
 
     /* block size */
     fcb->blocksize = ldshort(cntl_page + CP_BLOCKSIZE_OFF);
@@ -560,6 +590,8 @@ _isfcb_cntlpg_r2(Fcb *fcb)
      */
     _isseekpg(dat_fd, ISCNTLPGOFF);
     (void)read(dat_fd, cntl_page, sizeof(cntl_page));
+
+    _check_changestamps(fcb, cntl_page);
 
     /*
      * Check changestamp1. If the stamp has changed, we must read the entire

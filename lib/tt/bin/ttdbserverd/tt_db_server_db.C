@@ -1236,6 +1236,144 @@ _Tt_db_server_db::verifyAccess (const _Tt_string        &key,
   return dbResults;
 }
 
+// The cache level of a file or object is a property with a single
+// sizeof(int) value in the property table.
+enum { CACHE_LEVEL_READ, CACHE_LEVEL_READ_OR_CREATE, CACHE_LEVEL_INCREMENT };
+
+_Tt_db_results
+_Tt_db_server_db::getFileCacheLevel (const _Tt_string        &file,
+				     const _Tt_db_access_ptr &access,
+				     int                     &cache_level)
+{
+  cache_level = -1;
+
+  _Tt_string file_key;
+  if ((getFileKey(file, file_key) != TT_DB_OK) ||
+      (verifyAccess(file_key, access) != TT_DB_OK)) {
+    return dbResults;
+  }
+  return cacheLevel(file_key, CACHE_LEVEL_READ_OR_CREATE, cache_level);
+}
+
+_Tt_db_results
+_Tt_db_server_db::incrementFileCacheLevel (const _Tt_string        &file,
+					   const _Tt_db_access_ptr &access,
+					   int                     &cache_level)
+{
+  cache_level = -1;
+
+  // A read check is enough: the separate get and set this replaces
+  // checked read and then write access, and verifyAccess() grants
+  // write access wherever it grants read access.
+  _Tt_string file_key;
+  if ((getFileKey(file, file_key) != TT_DB_OK) ||
+      (verifyAccess(file_key, access) != TT_DB_OK)) {
+    return dbResults;
+  }
+  return cacheLevel(file_key, CACHE_LEVEL_INCREMENT, cache_level);
+}
+
+_Tt_db_results
+_Tt_db_server_db::getObjectCacheLevel (const _Tt_string        &objid,
+				       const _Tt_db_access_ptr &access,
+				       int                     &cache_level)
+{
+  cache_level = -1;
+
+  _Tt_string object_key = getObjectKey(objid);
+  if (verifyObjectAccess(object_key, access) != TT_DB_OK) {
+    return dbResults;
+  }
+  return cacheLevel(object_key, CACHE_LEVEL_READ, cache_level);
+}
+
+_Tt_db_results
+_Tt_db_server_db::incrementObjectCacheLevel (const _Tt_string        &objid,
+					     const _Tt_db_access_ptr &access,
+					     int                     &cache_level)
+{
+  cache_level = -1;
+
+  _Tt_string object_key = getObjectKey(objid);
+  if (verifyObjectAccess(object_key, access) != TT_DB_OK) {
+    return dbResults;
+  }
+  return cacheLevel(object_key, CACHE_LEVEL_INCREMENT, cache_level);
+}
+
+//
+// Reads the cache level stored under key.  CACHE_LEVEL_INCREMENT adds
+// one and rewrites the record in place; a missing level is created at
+// 0 by CACHE_LEVEL_INCREMENT and CACHE_LEVEL_READ_OR_CREATE and is
+// TT_DB_ERR_NO_SUCH_PROPERTY for CACHE_LEVEL_READ.
+//
+_Tt_db_results _Tt_db_server_db::cacheLevel (const _Tt_string &key,
+					     int               mode,
+					     int              &cache_level)
+{
+  dbResults = TT_DB_OK;
+  cache_level = -1;
+
+  _Tt_isam_record_ptr record_ptr = propertyTable->getEmptyRecord();
+  record_ptr->setKeyPartValue(0, 0, key);
+  record_ptr->setKeyPartValue(0, 1, TT_DB_PROPS_CACHE_LEVEL_PROPERTY);
+
+  int results = propertyTable->findStartRecord(propertyTablePropertyKey,
+					       0,
+					       record_ptr,
+					       ISEQUAL);
+  dbLastFileAccessed = propertyTable->getName();
+
+  if (results == ENOREC) {
+    if (mode == CACHE_LEVEL_READ) {
+      return (dbResults = TT_DB_ERR_NO_SUCH_PROPERTY);
+    }
+    int level = 0;
+    _Tt_string value(sizeof(int));
+    memcpy((char *)value, (char *)&level, sizeof(int));
+    if (addPropertyValue(key, TT_DB_PROPS_CACHE_LEVEL_PROPERTY, value) ==
+	TT_DB_OK) {
+      cache_level = level;
+    }
+    return dbResults;
+  }
+  else if (results) {
+    return (dbResults = TT_DB_ERR_CORRUPT_DB);
+  }
+
+  record_ptr = propertyTable->readRecord(ISNEXT);
+  if (propertyTable->getErrorStatus()) {
+    return (dbResults = TT_DB_ERR_CORRUPT_DB);
+  }
+
+  // The value is sizeof(int) bytes; read a shorter one as if padded
+  // with zeros, as the old get/set pair effectively did.
+  char *buffer = (char *)record_ptr->getRecord();
+  int value_length = record_ptr->getLength() - TT_DB_PROPERTY_VALUE_OFFSET;
+  if (value_length < 0) {
+    value_length = 0;
+  }
+  else if (value_length > (int)sizeof(int)) {
+    value_length = sizeof(int);
+  }
+  int level = 0;
+  memcpy((char *)&level, buffer + TT_DB_PROPERTY_VALUE_OFFSET, value_length);
+
+  if (mode == CACHE_LEVEL_INCREMENT) {
+    level++;
+    memcpy(buffer + TT_DB_PROPERTY_VALUE_OFFSET, (char *)&level, sizeof(int));
+    if (record_ptr->getLength() < TT_DB_PROPERTY_VALUE_OFFSET+(int)sizeof(int)) {
+      record_ptr->setLength(TT_DB_PROPERTY_VALUE_OFFSET+sizeof(int));
+    }
+    if (propertyTable->updateCurrentRecord(record_ptr)) {
+      return (dbResults = TT_DB_ERR_CORRUPT_DB);
+    }
+  }
+
+  cache_level = level;
+  return dbResults;
+}
+
 _Tt_db_results _Tt_db_server_db::getFileKey (const _Tt_string &file,
 					     _Tt_string       &file_key)
 {

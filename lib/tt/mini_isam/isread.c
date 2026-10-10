@@ -776,7 +776,10 @@ _amread(Bytearray *isfhandle, char *record, int *reclen,
     _isdisk_commit();			     /* This will only check
 					      * that we unfixed all fixed
 					      * buffers */
-    _isdisk_inval();
+    /*
+     * Nothing was changed, so the buffers stay valid for the next call
+     * (see _check_changestamps() in isfcb.c).
+     */
     _bytearr_free(&oldcurpos);
 
     _isam_exithook();
@@ -786,7 +789,7 @@ _amread(Bytearray *isfhandle, char *record, int *reclen,
 
     *reclen = 0;
 
-    _isdisk_inval();
+    /* Read only: nothing to invalidate. */
 
     _bytearr_free(&oldcurpos);
 

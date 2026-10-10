@@ -40,7 +40,6 @@
  */
 
 #include "isam_impl.h"
-extern struct dlink  *pavail;
 /*
  * _isam_entryhook()
  *
@@ -61,5 +60,11 @@ _isam_entryhook(void)
 void
 _isam_exithook(void)
 {
-    _isdisk_inval();			     /* Invalidate all buffers */
+    /*
+     * The disk buffers used to be invalidated here, after every call,
+     * so each call re-read every page it touched.  They are now kept
+     * while the file's change stamps are unchanged; see
+     * _check_changestamps() in isfcb.c.  Calls that change a file
+     * still invalidate after they commit, and on rollback.
+     */
 }

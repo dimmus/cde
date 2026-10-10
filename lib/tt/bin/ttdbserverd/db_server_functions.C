@@ -86,6 +86,13 @@ static	const char		* sesProp = _TT_FILEJOIN_PROPNAME;
 static	const char		* modDate = _MP_NODE_MOD_PROP;
 static	const char		* propTable = "property_table";
 
+// A property table record holds the object or file key, the property
+// name and the value.  Table_oid_prop hardcodes a 16-byte key, but the
+// key is TT_DB_KEY_LENGTH bytes: 16 where long has 4 bytes, 32 where it
+// has 8, so the session garbage collection matched nothing there.
+#define PROP_NAME(r)	((char *)&(r) + TT_DB_PROPERTY_NAME_OFFSET)
+#define PROP_VALUE(r)	((char *)&(r) + TT_DB_PROPERTY_VALUE_OFFSET)
+
 extern _Tt_db_info	_tt_db_table[_TT_MAX_ISFD];
 
 static bool_t _tt_is_file_a_directory (const _Tt_string&);
@@ -912,7 +919,7 @@ _tt_obj_props_results *_tt_set_obj_props_1 (_tt_set_obj_props_args *args,
 							  accessPtr,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -981,7 +988,7 @@ _tt_obj_props_results *_tt_set_obj_prop_1 (_tt_set_obj_prop_args *args,
 							  accessPtr,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -1047,7 +1054,7 @@ _tt_obj_props_results *_tt_add_obj_prop_1 (_tt_add_obj_prop_args *args,
 							  accessPtr,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -1143,7 +1150,7 @@ _tt_obj_props_results *_tt_delete_obj_prop_1 (_tt_del_obj_prop_args *args,
 							  accessPtr,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -1919,26 +1926,34 @@ _tt_delete_session_1(_tt_delete_session_args	*args,
 			
 			// Get the FD and process the file.
 			isfd=cached_isopen(pathName, ISINOUT);
+			if (isfd == -1) {
+			    continue;
+			}
+			bool_t deleted = FALSE;
 			
 			//
 			// Get the 1st record.
 			//
 			LOCK_RPC();
-			isread(isfd, (char *)&record, ISFIRST);
+			if (isread(isfd, (char *)&record, ISFIRST) != 0) {
+			    UNLOCK_RPC();
+			    cached_isclose(isfd);
+			    continue;
+			}
 			((char *)(&record))[isreclen] = '\0';
 
 			// Delte the named session.
-			if (strcmp(sesProp, record.propname) == 0) {
-			  if (strcmp(args->session.value, record.propval) == 0) {
+			if (strcmp(sesProp, PROP_NAME(record)) == 0) {
+			  if (strcmp(args->session.value, PROP_VALUE(record)) == 0) {
 			    isdelcurr(isfd);
-			    isfsync(isfd);
+			    deleted = TRUE;
 			  }
 			}
 
 			// Unconditionally delete ALL _MODIFICATION_DATE's
-			if (strcmp(modDate, record.propname) == 0) {
+			if (strcmp(modDate, PROP_NAME(record)) == 0) {
 			  isdelcurr(isfd);
-			  isfsync(isfd);
+			  deleted = TRUE;
 			}
 			
 			UNLOCK_RPC();
@@ -1950,22 +1965,30 @@ _tt_delete_session_1(_tt_delete_session_args	*args,
 				break;
 			    }
 			    ((char *)(&record))[isreclen] = '\0';
-			    if (strcmp(sesProp, record.propname) == 0) {
+			    if (strcmp(sesProp, PROP_NAME(record)) == 0) {
 				if(strcmp(args->session.value,
-					  record.propval) == 0) {
+					  PROP_VALUE(record)) == 0) {
 				    isdelcurr(isfd);
-				    isfsync(isfd);
+				    deleted = TRUE;
 				}
 			    }
 
 			    // Unconditionally delete ALL
 			    // 	_MODIFICATION_DATE's
-			    if (strcmp(modDate, record.propname) == 0) {
+			    if (strcmp(modDate, PROP_NAME(record)) == 0) {
 			      isdelcurr(isfd);
-			      isfsync(isfd);
+			      deleted = TRUE;
 			    }
 			    UNLOCK_RPC();
 			} while(TRUE);
+
+			// One fsync for the whole table, not one per
+			// deleted row.
+			if (deleted) {
+			    LOCK_RPC();
+			    isfsync(isfd);
+			    UNLOCK_RPC();
+			}
 			cached_isclose(isfd);
 		    }
 		}
@@ -2057,8 +2080,8 @@ _tt_get_all_sessions_1(_tt_get_all_sessions_args * args,
 			    //
 			    isread(isfd, (char *)&record, ISFIRST);
 			    ((char *)(&record))[isreclen] = '\0';
-			    if (strcmp(sesProp, record.propname) == 0) {
-				propValue = record.propval;
+			    if (strcmp(sesProp, PROP_NAME(record)) == 0) {
+				propValue = PROP_VALUE(record);
 				
 				// Append it to the list to send back.
 				recordCount++;
@@ -2068,8 +2091,8 @@ _tt_get_all_sessions_1(_tt_get_all_sessions_args * args,
 			    
 			    while(isread(isfd, (char *)&record,ISNEXT) != -1) {
 			      ((char *)(&record))[isreclen] = '\0';
-				if (strcmp(sesProp, record.propname) == 0) {
-				    propValue = record.propval;
+				if (strcmp(sesProp, PROP_NAME(record)) == 0) {
+				    propValue = PROP_VALUE(record);
 				    list->append(propValue);
 				    if (++recordCount > OPT_MAX_GET_SESSIONS-1) {
 					results.oidkey.oidkey_val = NULL;
@@ -2263,54 +2286,13 @@ _tt_increment_file_properties_cache_level
    const _Tt_db_access_ptr    &accessPtr,
    int                        &cache_level)
 {
-  cache_level = -1;
-
-  _Tt_db_property_ptr property;
-  _Tt_db_results results =
-    db->getFileProperty(file,
-			TT_DB_PROPS_CACHE_LEVEL_PROPERTY,
-			accessPtr,
-			property);
-
-  if (results == TT_DB_OK) {
-    _Tt_string cache_level_bytes = (*property->values) [0];
-    memcpy ((char *)&cache_level, (char *)cache_level_bytes, sizeof(int));
-
-    cache_level++;
-    memcpy ((char *)cache_level_bytes, (char *)&cache_level, sizeof(int));
-    (*property->values) [0] = cache_level_bytes;
-
-    results = db->setFileProperty(file,
-				  property,
-				  accessPtr);
-    if (results != TT_DB_OK) {
-      cache_level = -1;
-      results = TT_DB_ERR_PROPS_CACHE_ERROR;
-    }
+  // One lookup and an in-place rewrite, instead of a full property
+  // get followed by a property set (delete and re-add)
+  if (db->incrementFileCacheLevel(file, accessPtr, cache_level) != TT_DB_OK) {
+    cache_level = -1;
+    return TT_DB_ERR_PROPS_CACHE_ERROR;
   }
-  else if (results == TT_DB_ERR_NO_SUCH_PROPERTY) {
-    cache_level = 0;
-
-    _Tt_string value(sizeof(int));
-    memcpy((char *)value, (char *)&cache_level, sizeof(int));
-
-    _Tt_db_property_ptr property = new _Tt_db_property;
-    property->name = TT_DB_PROPS_CACHE_LEVEL_PROPERTY;
-    property->values->append(value);
-
-    results = db->setFileProperty(file,
-				  property,
-				  accessPtr);
-    if (results != TT_DB_OK) {
-      cache_level = -1;
-      results = TT_DB_ERR_PROPS_CACHE_ERROR;
-    }
-  }
-  else {
-    results = TT_DB_ERR_PROPS_CACHE_ERROR;
-  }
-
-  return results;
+  return TT_DB_OK;
 }
 
 static _Tt_db_results 
@@ -2319,31 +2301,13 @@ _tt_get_file_properties_cache_level (const _Tt_db_server_db_ptr &db,
 				     const _Tt_db_access_ptr    &accessPtr,
 				     int                        &cache_level)
 {
-  cache_level = -1;
-
-  _Tt_db_property_ptr property;
-  _Tt_db_results results =
-    db->getFileProperty(file,
-			TT_DB_PROPS_CACHE_LEVEL_PROPERTY,
-			accessPtr,
-			property);
-  if (results == TT_DB_OK) {
-    _Tt_string cache_level_bytes = (*property->values) [0];
-    memcpy ((char *)&cache_level, (char *)cache_level_bytes, sizeof(int));
+  // A file created for an object never had its cache level stored;
+  // getFileCacheLevel() creates it at 0.
+  if (db->getFileCacheLevel(file, accessPtr, cache_level) != TT_DB_OK) {
+    cache_level = -1;
+    return TT_DB_ERR_PROPS_CACHE_ERROR;
   }
-  // The file was probably created for an object.  The cache level
-  // was never stored as a property...
-  else if (results == TT_DB_ERR_NO_SUCH_PROPERTY) {
-    results = _tt_increment_file_properties_cache_level(db,
-						        file,
-							accessPtr,
-							cache_level);
-  }
-  else {
-    results = TT_DB_ERR_PROPS_CACHE_ERROR;
-  }
-
-  return results;
+  return TT_DB_OK;
 }
 
 static _Tt_string _tt_get_object_partition (const _Tt_string &objid)
@@ -2367,54 +2331,11 @@ _tt_increment_object_properties_cache_level
    const _Tt_db_access_ptr    &accessPtr,
    int                        &cache_level)
 {
-  cache_level = -1;
-
-  _Tt_db_property_ptr property;
-  _Tt_db_results results =
-    db->getObjectProperty(objid,
-			  TT_DB_PROPS_CACHE_LEVEL_PROPERTY,
-			  accessPtr,
-			  property);
-
-  if (results == TT_DB_OK) {
-    _Tt_string cache_level_bytes = (*property->values) [0];
-    memcpy ((char *)&cache_level, (char *)cache_level_bytes, sizeof(int));
-
-    cache_level++;
-    memcpy ((char *)cache_level_bytes, (char *)&cache_level, sizeof(int));
-    (*property->values) [0] = cache_level_bytes;
-
-    results = db->setObjectProperty(objid,
-				    property,
-				    accessPtr);
-    if (results != TT_DB_OK) {
-      cache_level = -1;
-      results = TT_DB_ERR_PROPS_CACHE_ERROR;
-    }
+  if (db->incrementObjectCacheLevel(objid, accessPtr, cache_level) != TT_DB_OK) {
+    cache_level = -1;
+    return TT_DB_ERR_PROPS_CACHE_ERROR;
   }
-  else if (results == TT_DB_ERR_NO_SUCH_PROPERTY) {
-    cache_level = 0;
-
-    _Tt_string value(sizeof(int));
-    memcpy((char *)value, (char *)&cache_level, sizeof(int));
-
-    _Tt_db_property_ptr property = new _Tt_db_property;
-    property->name = TT_DB_PROPS_CACHE_LEVEL_PROPERTY;
-    property->values->append(value);
-
-    results = db->setObjectProperty(objid,
-				    property,
-				    accessPtr);
-    if (results != TT_DB_OK) {
-      cache_level = -1;
-      results = TT_DB_ERR_PROPS_CACHE_ERROR;
-    }
-  }
-  else {
-    results = TT_DB_ERR_PROPS_CACHE_ERROR;
-  }
-
-  return results;
+  return TT_DB_OK;
 }
 
 static _Tt_db_results 
@@ -2423,24 +2344,11 @@ _tt_get_object_properties_cache_level (const _Tt_db_server_db_ptr &db,
 				       const _Tt_db_access_ptr    &accessPtr,
 				       int                        &cache_level)
 {
-  cache_level = -1;
-
-  _Tt_db_property_ptr property;
-  _Tt_db_results results = 
-    db->getObjectProperty(objid,
-			  TT_DB_PROPS_CACHE_LEVEL_PROPERTY,
-			  accessPtr,
-			  property);
-
-  if (results == TT_DB_OK) {
-    _Tt_string cache_level_bytes = (*property->values) [0];
-    memcpy ((char *)&cache_level, (char *)cache_level_bytes, sizeof(int));
+  if (db->getObjectCacheLevel(objid, accessPtr, cache_level) != TT_DB_OK) {
+    cache_level = -1;
+    return TT_DB_ERR_PROPS_CACHE_ERROR;
   }
-  else {
-    results = TT_DB_ERR_PROPS_CACHE_ERROR;
-  }
-
-  return results;
+  return TT_DB_OK;
 }
 
 static void
