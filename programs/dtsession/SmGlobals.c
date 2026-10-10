@@ -66,6 +66,12 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <dirent.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#endif
 #include <X11/Intrinsic.h>
 #include <X11/Xutil.h>
 #include <X11/StringDefs.h>
@@ -104,6 +110,7 @@ static char savedTmpDir [MAXPATHLEN];
 static int SetSysDefaults( void ) ;
 static int SetResSet( void ) ;
 static void RemoveFiles( char *) ;
+static void RunFileCommand( const char *, char *, char *) ;
 static void TrimErrorlog(void);
 
 static void _SmWaitClientTimeoutDefault (
@@ -1307,33 +1314,32 @@ SetFontSavePath(char *langPtr)
  *  --------
  * 
  *************************************<->***********************************/
-static void 
-RemoveFiles(
-        char *path )
+/*
+ * RunFileCommand - fork and exec "rm -rf path" or "mv from to" and wait
+ * for it.  Only used when the in-process rename()/unlink() could not do
+ * the job, so that the command reports the error as it always did.
+ */
+static void
+RunFileCommand(
+        const char *cmd,
+        char *arg1,
+        char *arg2 )
 {
     pid_t  clientFork;
-    int    execStatus, statLoc;
+    int    statLoc;
     String tmpString;
 
-    /*
-     * Fork and exec the client process
-     */
     sigaction(SIGCHLD, &smGD.defvec, (struct sigaction *) NULL);
 
-    clientFork = vfork();
-    
-    /*
-     * If the fork fails - Send out an error and return
-     */
+    clientFork = fork();
+
     if(clientFork < 0)
     {
         PrintErrnoError(DtError, smNLS.cantForkClientString);
+        sigaction(SIGCHLD, &smGD.childvec, (struct sigaction *) NULL);
         return;
     }
-    
-    /*
-     * Fork succeeded - now do the exec
-     */
+
     if(clientFork == 0)
     {
         SetSIGPIPEToDefault ();
@@ -1349,29 +1355,102 @@ RemoveFiles(
 #endif
 
         _DtEnvControl(DT_ENV_RESTORE_PRE_DT);
-        
+
 #if defined(CSRG_BASED)
         setsid();
 #else
         (void) setpgrp();
 #endif /* CSRG_BASED */
-         
-        execStatus = execlp("rm","rm", "-rf", path, (char *) 0);
-        if(execStatus != 0)
-        {
-            tmpString = ((char *)GETMESSAGE(4, 4, "Unable to remove session directory.  Make sure write permissions exist on $HOME/.dt directory.  Invalid session files will not be removed.")) ;
-            PrintErrnoError(DtError, tmpString);
-            SM_FREE(tmpString);
-            SM_EXIT(-1);
-        }
+
+        SmMarkCloseOnExec(3);
+
+        if (arg2 == NULL)
+            execlp(cmd, cmd, "-rf", arg1, (char *) 0);
+        else
+            execlp(cmd, cmd, arg1, arg2, (char *) 0);
+
+        tmpString = ((char *)GETMESSAGE(4, 4, "Unable to remove session directory.  Make sure write permissions exist on $HOME/.dt directory.  Invalid session files will not be removed.")) ;
+        PrintErrnoError(DtError, tmpString);
+        /* never SM_EXIT() here: that would run the parent's XSMP shutdown */
+        _exit(255);
     }
 
-    while(wait(&statLoc) != clientFork);
-    
+    while(waitpid(clientFork, &statLoc, 0) == -1 && errno == EINTR)
+        ;
+
     sigaction(SIGCHLD, &smGD.childvec, (struct sigaction *) NULL);
 }
+
+
+/*
+ * RemoveTree - remove 'path' and, if it is a directory (not a symlink to
+ * one), everything below it.  Like rm -rf it keeps going after an error;
+ * the return value says whether anything could not be removed.
+ */
+static int
+RemoveTree(
+        const char *path )
+{
+    struct stat buf;
+    DIR *dirp;
+    struct dirent *dp;
+    char *child;
+    size_t len;
+    int failed = 0;
+
+    if (lstat(path, &buf) != 0)
+        return (errno != ENOENT);
+
+    if (!S_ISDIR(buf.st_mode))
+        return (unlink(path) != 0 && errno != ENOENT);
+
+    if ((dirp = opendir(path)) != NULL)
+    {
+        while ((dp = readdir(dirp)) != NULL)
+        {
+            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+                continue;
+            len = strlen(path) + strlen(dp->d_name) + 2;
+            if ((child = malloc(len)) == NULL)
+            {
+                failed = 1;
+                continue;
+            }
+            snprintf(child, len, "%s/%s", path, dp->d_name);
+            failed |= RemoveTree(child);
+            free(child);
+        }
+        closedir(dirp);
+    }
+    else
+    {
+        failed = 1;
+    }
+
+    if (rmdir(path) != 0 && errno != ENOENT)
+        failed = 1;
+
+    return failed;
+}
+
+
+/*
+ * RemoveFiles - the equivalent of "rm -rf path", done in-process with
+ * opendir()/unlink()/rmdir() instead of forking rm and waiting for it at save and logout.
+ * If anything could not be removed, rm -rf runs as before so that the
+ * failure is reported the same way.
+ */
+static void 
+RemoveFiles(
+        char *path )
+{
+    if (RemoveTree(path) == 0)
+        return;
+
+    RunFileCommand("rm", path, NULL);
+}
                       
-
+
 /*************************************<->*************************************
  *
  *  MoveDirectory()
@@ -1402,9 +1481,9 @@ MoveDirectory(
 	Boolean		removeDestDir)
 {
     struct stat buf;
-    pid_t  clientFork;
-    int    status, execStatus, statLoc;
-    String tmpString;
+    int    status;
+    char   *dest, *base;
+    size_t len;
 
     /*
      * If the pathTo directory exists - remove it
@@ -1417,61 +1496,39 @@ MoveDirectory(
             RemoveFiles(pathTo);
         }
     }
-           
-    /*
-     * Fork and exec the client process
-     */
-    sigaction(SIGCHLD, &smGD.defvec, (struct sigaction *) NULL);
 
-    clientFork = vfork();
-    
     /*
-     * If the fork fails - Send out an error and return
+     * "mv from to" moves 'from' into 'to' when 'to' is a directory.
+     * Do the same with rename(2); anything rename() cannot do (another
+     * file system, a non-empty target, ...) is left to mv, which also
+     * reports the error as before.
      */
-    if(clientFork < 0)
+    base = strrchr(pathFrom, '/');
+    base = (base != NULL) ? base + 1 : pathFrom;
+    dest = NULL;
+    if (stat(pathTo, &buf) == 0 && S_ISDIR(buf.st_mode))
     {
-        PrintErrnoError(DtError, smNLS.cantForkClientString);
-        return;
-    }
-    
-    /*
-     * Fork succeeded - now do the exec
-     */
-    if(clientFork == 0)
-    {
-        SetSIGPIPEToDefault ();
-
-        /*
-         * Set the gid of the process back from bin
-         */
-#ifndef SVR4
-        setregid(smGD.runningGID, smGD.runningGID);
-#else
-        setgid(smGD.runningGID);
-        setegid(smGD.runningGID);
-#endif
-
-        _DtEnvControl(DT_ENV_RESTORE_PRE_DT);
-        
-#if defined(CSRG_BASED)
-        setsid();
-#else
-        (void) setpgrp();
-#endif /* CSRG_BASED */
-        
-        execStatus = execlp("mv","mv", pathFrom, pathTo, (char *) 0);
-        if(execStatus != 0)
+        if (*base != '\0')
         {
-            tmpString = ((char *)GETMESSAGE(4, 4, "Unable to remove session directory.  Make sure write permissions exist on $HOME/.dt directory.  Invalid session files will not be removed.")) ;
-            PrintErrnoError(DtError, tmpString);
-            SM_FREE(tmpString);
-            SM_EXIT(-1);
+            len = strlen(pathTo) + strlen(base) + 2;
+            if ((dest = malloc(len)) != NULL)
+                snprintf(dest, len, "%s/%s", pathTo, base);
         }
     }
+    else
+    {
+        dest = strdup(pathTo);
+    }
 
-    while(wait(&statLoc) != clientFork);
-    
-    sigaction(SIGCHLD, &smGD.childvec, (struct sigaction *) NULL);
+    if (dest != NULL)
+    {
+        status = rename(pathFrom, dest);
+        free(dest);
+        if (status == 0)
+            return;
+    }
+
+    RunFileCommand("mv", pathFrom, pathTo);
 }
 
                                       
@@ -2584,6 +2641,54 @@ SmExit (
     }
   else
     return;
+}
+
+/*
+ * SmMarkCloseOnExec - in a forked child, mark every descriptor from
+ * start_fd up close-on-exec.  close_range(2) does it in one call; the
+ * fallbacks walk /proc/self/fd (only the open descriptors) and, last,
+ * every possible descriptor up to _SC_OPEN_MAX.
+ */
+#ifndef CLOSE_RANGE_CLOEXEC
+#define CLOSE_RANGE_CLOEXEC	(1U << 2)
+#endif
+
+void
+SmMarkCloseOnExec (
+	int		start_fd)
+{
+	long		fd, open_max;
+	DIR		*dirp;
+	struct dirent	*dp;
+
+#if defined(__linux__) && defined(SYS_close_range)
+	if (syscall(SYS_close_range, (unsigned int) start_fd, ~0U,
+		    CLOSE_RANGE_CLOEXEC) == 0)
+		return;
+#endif
+
+	if ((dirp = opendir("/proc/self/fd")) != NULL) {
+		int	dfd = dirfd(dirp);
+
+		while ((dp = readdir(dirp)) != NULL) {
+			char	*end;
+
+			fd = strtol(dp->d_name, &end, 10);
+			if (*end != '\0' || end == dp->d_name ||
+			    fd < start_fd || fd == dfd)
+				continue;
+			(void) fcntl ((int) fd, F_SETFD, FD_CLOEXEC);
+		}
+		closedir(dirp);
+		return;
+	}
+
+	open_max = sysconf(_SC_OPEN_MAX);
+	if (open_max <= 0)
+		open_max = FD_SETSIZE;
+
+	for (fd = start_fd; fd < open_max; fd++)
+		(void) fcntl ((int) fd, F_SETFD, FD_CLOEXEC);
 }
 
 void

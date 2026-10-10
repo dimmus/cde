@@ -482,8 +482,10 @@ AllocateColors(
 #undef BlackColorSet
 #undef WhiteColorSet
        }
-     XSync(dpy, 0);
    } /* for screen_number=0 ; screen_number < NumOfScreens; screen_number++ */
+
+   /* one round trip for all screens, not one per screen */
+   XSync(dpy, 0);
 
    return(True);
 }
@@ -1231,48 +1233,160 @@ AllocReadWrite(
 **        Therefore there is no error recorded.
 **
 ************************************************************************/
+/*
+ * On the usual TrueColor visual (each of the red, green and blue masks
+ * has bits_per_rgb contiguous bits and together they fill the depth),
+ * XAllocColor() allocates nothing: the server turns each 16-bit value v
+ * into k = v >> (16 - bits) and answers with the pixel built from the k's
+ * and the values k * 65535 / (2^bits - 1).  Doing that here saves one
+ * round trip per color (about 40 per screen).  The first color of each
+ * screen still goes to the server, and the shortcut is used only if the
+ * server's answer agrees with it.
+ */
+typedef struct {
+    int		state;		/* TC_UNKNOWN, TC_LOCAL or TC_SERVER */
+    int		bits;
+    int		shift[3];
+} TrueColorInfo;
+
+#define TC_UNKNOWN	0
+#define TC_LOCAL	1
+#define TC_SERVER	2
+
+static int
+MaskShift(
+        unsigned long mask,
+        int *bits )
+{
+    int shift = 0, n = 0;
+
+    if (mask == 0)
+        return -1;
+    while ((mask & 1) == 0)
+    {
+        mask >>= 1;
+        shift++;
+    }
+    while (mask & 1)
+    {
+        mask >>= 1;
+        n++;
+    }
+    if (mask != 0)		/* not contiguous */
+        return -1;
+    *bits = n;
+    return shift;
+}
+
+static void
+TrueColorInit(
+        Display *dpy,
+        int screen_number,
+        TrueColorInfo *tc )
+{
+    Visual *v = DefaultVisual(dpy, screen_number);
+    unsigned long masks[3];
+    int i, bits[3];
+
+    tc->state = TC_SERVER;
+    if (v->class != TrueColor)
+        return;
+    masks[0] = v->red_mask;
+    masks[1] = v->green_mask;
+    masks[2] = v->blue_mask;
+    for (i = 0; i < 3; i++)
+    {
+        if ((tc->shift[i] = MaskShift(masks[i], &bits[i])) < 0 ||
+            bits[i] != v->bits_per_rgb)
+            return;
+    }
+    if (v->bits_per_rgb < 1 || v->bits_per_rgb > 16 ||
+        bits[0] + bits[1] + bits[2] != DefaultDepth(dpy, screen_number))
+        return;
+    tc->bits = v->bits_per_rgb;
+    tc->state = TC_UNKNOWN;
+}
+
+static void
+TrueColorCompute(
+        TrueColorInfo *tc,
+        XColor *c )
+{
+    unsigned long lim = (1UL << tc->bits) - 1;
+    unsigned long kr = c->red >> (16 - tc->bits);
+    unsigned long kg = c->green >> (16 - tc->bits);
+    unsigned long kb = c->blue >> (16 - tc->bits);
+
+    c->pixel = (kr << tc->shift[0]) | (kg << tc->shift[1]) |
+               (kb << tc->shift[2]);
+    c->red = (unsigned short) ((kr * 65535) / lim);
+    c->green = (unsigned short) ((kg * 65535) / lim);
+    c->blue = (unsigned short) ((kb * 65535) / lim);
+}
+
+static void
+AllocOne(
+        Display *dpy,
+        int screen_number,
+        TrueColorInfo *tc,
+        XColor *c )
+{
+    XColor local;
+
+    if (tc->state == TC_LOCAL)
+    {
+        TrueColorCompute(tc, c);
+        return;
+    }
+
+    local = *c;
+    if (XAllocColor(dpy, DefaultColormap(dpy, screen_number), c) &&
+        tc->state == TC_UNKNOWN)
+    {
+        TrueColorCompute(tc, &local);
+        tc->state = (local.pixel == c->pixel && local.red == c->red &&
+                     local.green == c->green && local.blue == c->blue)
+                    ? TC_LOCAL : TC_SERVER;
+    }
+}
+
 static void
 AllocReadOnly(
         Display *dpy,
         int screen_number )
 {
    int i;
+   TrueColorInfo tc;
+   ColorSet *color = colorSrv.pCurrentPalette[screen_number]->color;
+
+   TrueColorInit(dpy, screen_number, &tc);
 
    for(i=0; i < colorSrv.pCurrentPalette[screen_number]->num_of_colors; i++)
    {
-      XAllocColor(dpy, DefaultColormap(dpy, screen_number),
-                &(colorSrv.pCurrentPalette[screen_number]->color[i].bg));
-      XAllocColor(dpy, DefaultColormap(dpy, screen_number),
-                &(colorSrv.pCurrentPalette[screen_number]->color[i].sc));
+      AllocOne(dpy, screen_number, &tc, &(color[i].bg));
+      AllocOne(dpy, screen_number, &tc, &(color[i].sc));
 
     /* Check UsePixmaps varible */
       if(colorSrv.UsePixmaps[screen_number] == FALSE)
       {
-         XAllocColor(dpy, DefaultColormap(dpy, screen_number),
-                     &(colorSrv.pCurrentPalette[screen_number]->color[i].ts));
-         XAllocColor(dpy, DefaultColormap(dpy, screen_number),
-                     &(colorSrv.pCurrentPalette[screen_number]->color[i].bs));
+         AllocOne(dpy, screen_number, &tc, &(color[i].ts));
+         AllocOne(dpy, screen_number, &tc, &(color[i].bs));
       }
       else /* colorSrv.UsePixmaps[screen_number] == True */
       {
-         colorSrv.pCurrentPalette[screen_number]->color[i].ts.pixel =
-                                          WhitePixel(dpy,screen_number);
-         colorSrv.pCurrentPalette[screen_number]->color[i].bs.pixel =
-                                          BlackPixel(dpy,screen_number);
+         color[i].ts.pixel = WhitePixel(dpy,screen_number);
+         color[i].bs.pixel = BlackPixel(dpy,screen_number);
       }
 
     /* Check FgColor varible */
       if(colorSrv.FgColor[screen_number] == DYNAMIC)
-         XAllocColor(dpy, DefaultColormap(dpy, screen_number),
-                     &(colorSrv.pCurrentPalette[screen_number]->color[i].fg));
+         AllocOne(dpy, screen_number, &tc, &(color[i].fg));
 
       else if(colorSrv.FgColor[screen_number] == BLACK)
-         colorSrv.pCurrentPalette[screen_number]->color[i].fg.pixel =
-                                          BlackPixel(dpy,screen_number);
+         color[i].fg.pixel = BlackPixel(dpy,screen_number);
 
       else
-         colorSrv.pCurrentPalette[screen_number]->color[i].fg.pixel =
-                                          WhitePixel(dpy,screen_number);
+         color[i].fg.pixel = WhitePixel(dpy,screen_number);
    }
 }
 

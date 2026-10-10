@@ -441,7 +441,6 @@ FinishLocking(Widget		wid,
         lockTimeId = (XtIntervalId)0;
         XtRemoveEventHandler(wid, VisibilityChangeMask,
                              False, FinishLocking, NULL);
-        XSync(smGD.display, 0);
 
         i = 0;
         XtSetArg(uiArgs[i], XmNy, &visibleY);i++;
@@ -454,10 +453,10 @@ FinishLocking(Widget		wid,
 	 */
 	RecolorCursor();
 
-        XSync(smGD.display, 0);
-
 	/*
-	 * grab control of the keyboard for the entire display
+	 * grab control of the keyboard for the entire display.  No XSync()
+	 * first: the grab requests wait for their replies, and the server
+	 * handles them after everything queued before.
 	 */
         rc = XtGrabKeyboard(grabWidget, False,
 				     GrabModeAsync, GrabModeAsync,
@@ -482,14 +481,6 @@ FinishLocking(Widget		wid,
 					GrabModeAsync, GrabModeAsync,
 					None, smGD.lockCursor, CurrentTime)
 			  == GrabSuccess);
-
-        {
-          pointerGrabbed = (XtGrabPointer(grabWidget, False,
-                                        ButtonPressMask|PointerMotionMask,
-                                        GrabModeAsync, GrabModeAsync,
-                                        None, smGD.lockCursor, CurrentTime)
-                            == GrabSuccess);
-        }
 
 
 	/*

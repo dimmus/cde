@@ -261,6 +261,25 @@ static Boolean	wmTimeout;
 char   tmpExecWmFile[MAXPATHSM+1];
 static Boolean  localWmLaunched = False;
 
+/*
+ * True when the window manager just started is dtwm, which announces
+ * itself with _DT_WM_READY.  Any other window manager is also taken as
+ * ready once it owns the ICCCM WM_S<screen> selection.
+ */
+#define WAIT_OTHER_WM_TIMEOUT	10000	/* ms, unless waitWmTimeout is set */
+
+/*
+ * Root window property set when dtsession stops waiting for the window
+ * manager; dthello takes it down its "starting" cover on that.
+ */
+#define _XA_DT_SM_WM_READY	"_DT_SM_WM_READY"
+
+static Boolean  wmIsDtwm = True;
+static Boolean  wmSelectionOwned = False;
+static Atom     wmSelectionAtom = None;
+static Atom     wmManagerAtom = None;
+static XtEventDispatchProc wmPrevDispatcher = NULL;
+
 /* 
  *     ^^^^^  ^^^^^  ^^^^^  ^^^^^  ^^^^^  ^^^^^  
  * End of  lines were added to support the builtin
@@ -381,10 +400,6 @@ static void LogCWDMessage (
 static char ** RemoveEnvironmentVars (
 	char			**envp);
 
-static void MarkFileDescriptors (
-	int			start_fd,
-	int			cmd,
-	int			data);
 
 
 /*************************************<->*************************************
@@ -649,6 +664,7 @@ StartWM( void )
     Boolean goodWmStartup = True;
     int status;
   
+    wmIsDtwm = True;
     if((smGD.wmStartup == NULL) || (*smGD.wmStartup == 0))
     {
 	ForkWM();
@@ -670,6 +686,11 @@ StartWM( void )
 	
 	if(smExecArray[0] != NULL)
 	{
+	    char *base = strrchr(smExecArray[0], '/');
+
+	    base = (base != NULL) ? base + 1 : smExecArray[0];
+	    wmIsDtwm = (strcmp(base, "dtwm") == 0);
+
 	    (void) StartClient(smExecArray[0], smExecArray, NULL, NULL, 
 				NULL, False, False, -1);
 	}
@@ -724,6 +745,7 @@ StartWM( void )
 	    (void) StartClient(smExecArray[0], smExecArray, NULL, 
 				NULL, NULL, False, False, -1);
 	}
+	wmIsDtwm = True;
 	WaitForWM();
 	sprintf(localWmErrorString, GETMESSAGE(16, 9,
           "The following window manager did not start:\n\n"
@@ -867,7 +889,7 @@ RestoreResources( Boolean errorHandlerInstalled, ... )
      * session termination.
      */
 
-    for(i = 0;(i < 10) && ((forkrc = vfork()) < 0);i++)
+    for(i = 0;(i < 10) && ((forkrc = fork()) < 0);i++)
     {
 	if(errno != EAGAIN)
 	{
@@ -905,7 +927,7 @@ RestoreResources( Boolean errorHandlerInstalled, ... )
 	(void) setpgrp();
 #endif /* CSRG_BASED */
 
-	MarkFileDescriptors (3, F_SETFD, 1);
+	SmMarkCloseOnExec (3);
 
         execStatus = execv(pgrm, argv);
 
@@ -917,11 +939,12 @@ RestoreResources( Boolean errorHandlerInstalled, ... )
 	    snprintf(clientMessage, (MAXPATHLEN + 256) - 1,
                      ((char *)GETMESSAGE(16, 1, "Unable to exec process %s.  No session resources will be restored.")), pgrm);
 	    PrintErrnoError(DtError, clientMessage);
-	    SM_EXIT(-1);
+	    _exit(255);
 	}
     }
 
-    while(wait(&childStatus) != forkrc);
+    while(waitpid(forkrc, &childStatus, 0) == -1 && errno == EINTR)
+	;
 
     /*
      * if an error handler is installed - remove it
@@ -1041,6 +1064,69 @@ RestorePreferences(
 
 
 
+/*
+ * KeyboardMappingIs - True when the server's core keyboard mapping for
+ * the 'numCodes' keycodes from min_keycode is exactly 'syms' with
+ * 'perCode' keysyms per keycode, so that XChangeKeyboardMapping() would
+ * change nothing (it would still send MappingNotify to every client and
+ * make the server rebuild its XKB keymap from the core one).
+ */
+static Boolean
+KeyboardMappingIs(
+	KeySym	*syms,
+	int	perCode,
+	int	numCodes)
+{
+    KeySym	*cur;
+    int		curPerCode = 0;
+    Boolean	same;
+
+    if((numCodes <= 0) || (perCode <= 0) ||
+       (smGD.display->min_keycode + numCodes - 1 > smGD.display->max_keycode))
+    {
+	return(False);
+    }
+
+    cur = XGetKeyboardMapping(smGD.display,
+			      (KeyCode) smGD.display->min_keycode,
+			      numCodes, &curPerCode);
+    if(cur == NULL)
+    {
+	return(False);
+    }
+
+    same = (curPerCode == perCode) &&
+	   (memcmp(cur, syms, (size_t) numCodes * perCode * sizeof(KeySym)) == 0);
+    XFree(cur);
+
+    return(same);
+}
+
+/*
+ * ModifierMappingIs - True when the server's modifier mapping is exactly
+ * 'map', so that XSetModifierMapping() would change nothing.
+ */
+static Boolean
+ModifierMappingIs(
+	XModifierKeymap	*map)
+{
+    XModifierKeymap	*cur;
+    Boolean		same;
+
+    if((cur = XGetModifierMapping(smGD.display)) == NULL)
+    {
+	return(False);
+    }
+
+    same = (cur->max_keypermod == map->max_keypermod) &&
+	   (memcmp(cur->modifiermap, map->modifiermap,
+		   (size_t) 8 * map->max_keypermod) == 0);
+    XFreeModifiermap(cur);
+
+    return(same);
+}
+
+
 /*************************************<->*************************************
  *
  *  RestoreSettings ()
@@ -1471,7 +1557,20 @@ RestoreSettings( void )
     
     if(numArgs > 0)
     {
-	XSetPointerMapping(smGD.display, (unsigned char *)restoreCharArray, numArgs);
+	/*
+	 * Setting the map, even to the one the server already has, sends
+	 * MappingNotify to every client.  Skip it when nothing changes.
+	 */
+	unsigned char	curMap[256];
+	int		numCur;
+
+	numCur = XGetPointerMapping(smGD.display, curMap, sizeof(curMap));
+	if((numCur != numArgs) || (numCur > (int) sizeof(curMap)) ||
+	   (memcmp(curMap, restoreCharArray, numArgs) != 0))
+	{
+	    XSetPointerMapping(smGD.display, (unsigned char *)restoreCharArray,
+			       numArgs);
+	}
 
 	/*
 	 * Copy the pointer map into the saved map for logout
@@ -1512,10 +1611,13 @@ RestoreSettings( void )
 	    }
 	}
 	numArgs /= smSettings.keySymPerCode;
-	XChangeKeyboardMapping(smGD.display, (KeyCode)
-			       smGD.display->min_keycode,
-			       smSettings.keySymPerCode, tmpSyms,
-			       numArgs);
+	if(!KeyboardMappingIs(tmpSyms, smSettings.keySymPerCode, numArgs))
+	{
+	    XChangeKeyboardMapping(smGD.display, (KeyCode)
+				   smGD.display->min_keycode,
+				   smSettings.keySymPerCode, tmpSyms,
+				   numArgs);
+	}
     }
     
     /*
@@ -1547,7 +1649,10 @@ RestoreSettings( void )
 	}
 	restoreMod.max_keypermod = smSettings.maxKeyPerMod;
 	restoreMod.modifiermap = tmpCode;
-	XSetModifierMapping(smGD.display, &restoreMod);
+	if(!ModifierMappingIs(&restoreMod))
+	{
+	    XSetModifierMapping(smGD.display, &restoreMod);
+	}
     }
 
     SM_FREE((char *) restorePtrArray);
@@ -3600,7 +3705,7 @@ StartLocalClient (
     /*
      * Fork and exec the client process
      */
-    clientFork = vfork();
+    clientFork = fork();
     
     /*
      * If the fork fails - Send out an error and return
@@ -3666,14 +3771,14 @@ StartLocalClient (
 	(void)setpgrp();
 #endif /* CSRG_BASED */
 	
-	MarkFileDescriptors (3, F_SETFD, 1);
+	SmMarkCloseOnExec (3);
 
 	execStatus = execvp(program, execArray);
 	if(execStatus != 0)
 	{
 	    sprintf(clientMessage, ((char *)GETMESSAGE(16, 3, "Unable to exec %s.")), execArray[0]);
 	    PrintErrnoError(DtError, clientMessage);
-	    SM_EXIT(-1);
+	    _exit(255);
 	}
     }
 
@@ -3805,7 +3910,7 @@ ForkWM( void )
     /*
      * Fork and exec the client process
      */
-    clientFork = vfork();
+    clientFork = fork();
     
     /*
      * If the fork fails - Send out an error and return
@@ -3840,7 +3945,7 @@ ForkWM( void )
         (void)setpgrp();
 #endif /* CSRG_BASED */
 
-	MarkFileDescriptors (3, F_SETFD, 1);
+	SmMarkCloseOnExec (3);
 
 	/* 
 	 * These lines were added to support the builtin
@@ -3860,8 +3965,8 @@ ForkWM( void )
 	if(execStatus != 0 && (!localWmLaunched))
 	{
 	    PrintErrnoError(DtError, GETMESSAGE(16, 4, "Unable to exec process /usr/dt/bin/dtwm.  No window manager will be started."));
-	    SM_EXIT(-1);
 	}
+	_exit(255);
     }
 }
 				      
@@ -3953,10 +4058,62 @@ KillParent( void )
  *  --------
  * 
  *************************************<->***********************************/
+/*
+ * WMDispatcher - ClientMessage dispatcher chained in while WaitForWM()
+ * waits for a window manager other than dtwm: notes the ICCCM MANAGER
+ * announcement for WM_S<screen> on the root window, and passes every
+ * event on to the previous dispatcher.
+ */
+/*
+ * Not every such window manager announces itself (mwm takes WM_S<n>
+ * without sending MANAGER), so also look at the owner now and then.
+ */
+#define WM_SELECTION_POLL	200	/* ms */
+
+static void
+WMSelectionPoll(
+        XtPointer client_data,
+        XtIntervalId *id)
+{
+    XtIntervalId *pollId = (XtIntervalId *) client_data;
+
+    *pollId = (XtIntervalId) 0;
+    if (XGetSelectionOwner(smGD.display, wmSelectionAtom) != None)
+    {
+        wmSelectionOwned = True;
+        return;
+    }
+    *pollId = XtAppAddTimeOut(smGD.appCon, WM_SELECTION_POLL,
+                              WMSelectionPoll, client_data);
+}
+
+static Boolean
+WMDispatcher(
+        XEvent *event)
+{
+    if ((event->type == ClientMessage) &&
+        (event->xclient.window == RootWindow(smGD.display, smGD.screen)) &&
+        (event->xclient.message_type == wmManagerAtom) &&
+        (event->xclient.format == 32) &&
+        ((Atom) event->xclient.data.l[1] == wmSelectionAtom))
+    {
+        wmSelectionOwned = True;
+    }
+
+    return (*wmPrevDispatcher)(event);
+}
+
 static void 
 WaitForWM( void )
 {
     XtIntervalId	wmTimerId;
+    XtIntervalId	pollId = (XtIntervalId) 0;
+    Window		root = RootWindow(smGD.display, smGD.screen);
+    XWindowAttributes	rootAttr;
+    long		rootMask = 0;
+    Boolean		watchSelection = False;
+    unsigned long	timeout = smRes.waitWmTimeout;
+    long		ready = 1;
     
     XtAddEventHandler(smGD.topLevelWid,
                       0,
@@ -3965,25 +4122,80 @@ WaitForWM( void )
                       (XtPointer) NULL);
 
     /*
+     * A window manager other than dtwm never sends _DT_WM_READY.  Take
+     * it as ready once it owns WM_S<screen> (ICCCM 2.0), and do not wait
+     * the full dtwm timeout for one that does neither.
+     */
+    wmSelectionOwned = False;
+    if (!wmIsDtwm)
+    {
+        char	selName[32];
+
+        snprintf(selName, sizeof(selName), "WM_S%d", smGD.screen);
+        wmSelectionAtom = XInternAtom(smGD.display, selName, False);
+        wmManagerAtom = XInternAtom(smGD.display, "MANAGER", False);
+
+        if (XGetWindowAttributes(smGD.display, root, &rootAttr))
+        {
+            rootMask = rootAttr.your_event_mask;
+            XSelectInput(smGD.display, root, rootMask | StructureNotifyMask);
+            wmPrevDispatcher = XtSetEventDispatcher(smGD.display,
+                                                    ClientMessage,
+                                                    WMDispatcher);
+            watchSelection = True;
+        }
+
+        /* it may own the selection already */
+        if (XGetSelectionOwner(smGD.display, wmSelectionAtom) != None)
+            wmSelectionOwned = True;
+        else
+            pollId = XtAppAddTimeOut(smGD.appCon, WM_SELECTION_POLL,
+                                     WMSelectionPoll, (XtPointer) &pollId);
+
+        if (!smGD.userSetWaitWmTimeout && timeout > WAIT_OTHER_WM_TIMEOUT)
+            timeout = WAIT_OTHER_WM_TIMEOUT;
+    }
+
+    /*
      * Set a timer which stops the block on waiting for the
      * window manager to start
      */
     wmTimeout = False;
     wmTimerId = XtAppAddTimeOut(smGD.appCon, 
-				smRes.waitWmTimeout,
+				timeout,
 				WaitWMTimeout, NULL);
     
-    while((smGD.dtwmRunning == False) && (wmTimeout == False))
+    while((smGD.dtwmRunning == False) && (wmTimeout == False) &&
+          (wmSelectionOwned == False))
     {
 	XtAppProcessEvent(smGD.appCon, XtIMAll);
     }
     
     XtRemoveTimeOut(wmTimerId);
+    if (pollId != (XtIntervalId) 0)
+        XtRemoveTimeOut(pollId);
     XtRemoveEventHandler(smGD.topLevelWid,
                       0,
                       True,
                       (XtEventHandler)HandleWMClientMessage,
                       (XtPointer) NULL);
+
+    if (watchSelection)
+    {
+        (void) XtSetEventDispatcher(smGD.display, ClientMessage,
+                                    wmPrevDispatcher);
+        XSelectInput(smGD.display, root, rootMask);
+    }
+
+    /*
+     * Tell dthello (and anyone else watching) that the session is done
+     * waiting for the window manager.
+     */
+    XChangeProperty(smGD.display, root,
+                    XInternAtom(smGD.display, _XA_DT_SM_WM_READY, False),
+                    XA_CARDINAL, 32, PropModeReplace,
+                    (unsigned char *) &ready, 1);
+    XFlush(smGD.display);
 
     return;
 } /* END OF FUNCTION WaitForWM */
@@ -4782,35 +4994,3 @@ char ** RemoveEnvironmentVars (
 	return (retEnv);
 }
 
-/*
- * MarkFileDescriptors - mark file descriptiors start_fd through open_max
- *    with the given "cmd" and "data".
- *
- * The code for calculating open_max was taken from DtSvc/DtUtil1/CmdMain.c
- */
-static void 
-MarkFileDescriptors (
-	int			start_fd,
-	int			cmd,
-	int			data)
-{
-	int			i;
-	long			open_max;
-
-	open_max = sysconf(_SC_OPEN_MAX);
-
-	if (open_max == -1) {
-#ifdef _SUN_OS
-		open_max = NOFILE;
-#else
-#if defined(_AIX)
-		open_max = FOPEN_MAX;
-#else
-		open_max = FD_SETSIZE;
-#endif
-#endif /* _SUN_OS */
-	}
-
-	for (i = start_fd; i < open_max; i++)
-		(void) fcntl (i, cmd, data);
-}

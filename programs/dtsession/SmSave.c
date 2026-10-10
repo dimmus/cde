@@ -1540,6 +1540,73 @@ SaveCustomizeSettings( void )
 
 
 
+/*
+ * Resource batch: OutputResource() used to call _DtAddToResource() up to
+ * four times, and each call fetches, re-parses and rewrites both
+ * RESOURCE_MANAGER and _DT_SM_PREFERENCES and then waits for an XSync().
+ * The parts are now merged and sent in one call.  A part joins the batch
+ * only when it ends in an unescaped newline, so that each of its lines
+ * is parsed exactly as it was when the part was sent alone; any other
+ * part is sent by itself, in order, after the batch so far.
+ */
+typedef struct {
+    char	*buf;
+    size_t	len;
+    size_t	size;
+} ResBatch;
+
+static void
+ResBatchFlush(
+	ResBatch	*b)
+{
+    if (b->len > 0)
+    {
+	_DtAddToResource(smGD.display, b->buf);
+	b->len = 0;
+	b->buf[0] = '\0';
+    }
+}
+
+static void
+ResBatchAdd(
+	ResBatch	*b,
+	const char	*part)
+{
+    size_t	n;
+
+    if ((part == NULL) || (*part == '\0'))
+	return;			/* _DtAddToResource() ignores these too */
+
+    n = strlen(part);
+    if ((part[n - 1] != '\n') || ((n >= 2) && (part[n - 2] == '\\')))
+    {
+	ResBatchFlush(b);
+	_DtAddToResource(smGD.display, part);
+	return;
+    }
+
+    if (b->len + n + 1 > b->size)
+    {
+	size_t	size = (b->size == 0) ? 1024 : b->size;
+	char	*buf;
+
+	while (b->len + n + 1 > size)
+	    size *= 2;
+	if ((buf = realloc(b->buf, size)) == NULL)
+	{
+	    ResBatchFlush(b);
+	    _DtAddToResource(smGD.display, part);
+	    return;
+	}
+	b->buf = buf;
+	b->size = size;
+    }
+
+    memcpy(b->buf + b->len, part, n + 1);
+    b->len += n;
+}
+
+
 /*************************************<->*************************************
  *
  *  OutputResource ()
@@ -1577,6 +1644,7 @@ OutputResource( void )
     float		fltYRes;
     int			intYRes;
     char                *preeditBuf = NULL;
+    ResBatch		batch = { NULL, 0, 0 };
 
     /*
      * Add anything to the Resource Manager property that needs to be added
@@ -1615,7 +1683,7 @@ OutputResource( void )
     sprintf(tmpChar, "%d",intYRes);
     strcat(resSpec, tmpChar);
     strcat(resSpec, "\n");
-    _DtAddToResource(smGD.display, resSpec);
+    ResBatchAdd(&batch, resSpec);
     
     if(smCust.fontChange == True)
     {
@@ -1659,7 +1727,7 @@ OutputResource( void )
 	    /*
 	     * Now add this to the resource manager property to be saved
 	     */
-	    _DtAddToResource(smGD.display, fontBuf);
+	    ResBatchAdd(&batch, fontBuf);
 	}
         if (fontBuf) XFree(fontBuf);
     }
@@ -1670,15 +1738,18 @@ OutputResource( void )
 				  XaDtSmPreeditInfo, &preeditBuf);
 	if(newStat == Success)
 	{
-	    _DtAddToResource(smGD.display, preeditBuf);
+	    ResBatchAdd(&batch, preeditBuf);
 	}
 	if (preeditBuf) XFree(preeditBuf);
     }
 
     if((smCust.dClickChange == True) && (smToSet.dClickBuf[0] != 0))
     {
-	_DtAddToResource(smGD.display, (char *)smToSet.dClickBuf);
+	ResBatchAdd(&batch, (char *)smToSet.dClickBuf);
     }
+
+    ResBatchFlush(&batch);
+    free(batch.buf);
 
     /*
      * Get the contents of the _DT_SM_PREFERENCES property

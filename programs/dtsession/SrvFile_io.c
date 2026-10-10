@@ -177,14 +177,27 @@ char    *palette)
         p = path;
         while (*p != '\0')
         {
+            /*
+             * Skip the separating blanks (the old loop never stepped
+             * over them and spun forever on a second directory), and
+             * never write past the end of dir[].
+             */
+            while (*p == ' ')
+                p++;
+            if (*p == '\0')
+                break;
             d = dir;
             while (*p != ' ' && *p != '\0')
-                *d++ = *p++;
+            {
+                if (d < dir + sizeof(dir) - 1)
+                    *d++ = *p;
+                p++;
+            }
             *d = '\0';
             if (FindPalette (palette, dir))
             {
-                palettePath = (char *)SRV_REALLOC(palettePath, 
-                                                strlen(SYSTEM_PALETTE_DIR) + 1);
+                palettePath = (char *)SRV_REALLOC(palettePath,
+                                                strlen(dir) + 1);
                 strcpy(palettePath, dir);
                 match = True;
                 break;
@@ -249,37 +262,32 @@ char *palette,
 char *directory)
 
 {
-    DIR  *dirp;
-    struct dirent *file_descpt;
+    struct stat buf;
+    char *path;
+    size_t len;
+    int rc;
 
-    /* Open the directory */
-    if( (dirp = opendir(directory)) == NULL)
+    /*
+     * The palette is a plain file name; a directory entry can never
+     * contain a '/', and "." / ".." are not palettes.  Test the one
+     * name with lstat() instead of reading the whole directory.
+     */
+    if (palette == NULL || *palette == '\0' || strchr(palette, '/') != NULL ||
+        strcmp(palette, ".") == 0 || strcmp(palette, "..") == 0)
     {
-       return(False);
+        return(False);
     }
-    else
+
+    len = strlen(directory) + strlen(palette) + 2;
+    if ((path = (char *) SRV_MALLOC(len)) == NULL)
     {
-        file_descpt = readdir(dirp);
+        return(False);
     }
+    snprintf(path, len, "%s/%s", directory, palette);
+    rc = lstat(path, &buf);
+    SRV_FREE(path);
 
-    /* cycle through the files in the directory until found a match */
-    while( file_descpt != NULL)
-    {
-        /* check for a palette filename match */
-        if (strcmp(palette, file_descpt->d_name) == 0)
-        {
-            closedir(dirp);
-            return(True);
-        }
-        else 
-        {
-            /* read the next file */
-            file_descpt = readdir(dirp);
-        }
-    } /* while( file_descpt != NULL) */
-
-    closedir(dirp);
-    return (False);
+    return (rc == 0) ? True : False;
 }
 
 /***************************************************************************
