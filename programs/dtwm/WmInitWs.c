@@ -404,9 +404,6 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
     wmGD.dtSD = NULL;
     wmGD.iSlideUpsInProgress = 0;
 
-    SetupWmSignalHandlers (0); /* dummy paramater */
-
-
     /*
      * Do (pre-toolkit) initialization:
      */
@@ -457,6 +454,7 @@ void InitWmGlobal (int argc, char *argv [], char *environ [])
     XtToolkitInitialize();
 
     wmGD.mwmAppContext = XtCreateApplicationContext();
+    SetupWmSignalHandlers (0); /* dummy paramater */
     AddWmResourceConverters ();
     wmGD.display = XtOpenDisplay (wmGD.mwmAppContext,
 				  NULL,

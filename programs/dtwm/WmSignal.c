@@ -58,6 +58,16 @@
  * Global Variables:
  */
 
+/*
+ * The termination signals are only noted in the signal handler; the
+ * work (a confirmation dialog or the shutdown) is done by
+ * QuitWmSignalCallback from the event loop, because Xlib and Xt are
+ * not async-signal-safe.
+ */
+static XtSignalId quitSignalId;
+
+static void QuitWmSignalCallback (XtPointer client_data, XtSignalId *id);
+
 
 
 /*************************************<->*************************************
@@ -155,6 +165,7 @@ RestoreDefaultSignalHandlers (void)
  *  Description:
  *  -----------
  *  This function sets up the signal handlers for the window manager.
+ *  It must be called after wmGD.mwmAppContext has been created.
  *
  *************************************<->***********************************/
 
@@ -162,6 +173,9 @@ void SetupWmSignalHandlers (int dummy)
 {
     struct sigaction 	sa;
     struct sigaction 	osa;
+
+    quitSignalId = XtAppAddSignal (wmGD.mwmAppContext, QuitWmSignalCallback,
+				   NULL);
 
     /*
      * Catch software signals that we ask the user about
@@ -224,11 +238,33 @@ void SetupWmSignalHandlers (int dummy)
  *  Description:
  *  -----------
  *  This function is called on receipt of a signal that is to terminate the
- *  window manager.
+ *  window manager.  It only tells Xt about the signal (XtNoticeSignal is
+ *  the one Xt function that may be called from a signal handler); the
+ *  event loop then calls QuitWmSignalCallback.
  *
  *************************************<->***********************************/
 
 void QuitWmSignalHandler (int dummy)
+{
+    XtNoticeSignal (quitSignalId);
+
+} /* END OF FUNCTION QuitWmSignalHandler */
+
+
+/*************************************<->*************************************
+ *
+ *  QuitWmSignalCallback ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Called from the event loop after a signal that is to terminate the
+ *  window manager: asks for confirmation if the "kill" feedback is on,
+ *  otherwise quits.
+ *
+ *************************************<->***********************************/
+
+static void QuitWmSignalCallback (XtPointer client_data, XtSignalId *id)
 {
     if (wmGD.showFeedback & WM_SHOW_FB_KILL)
     {
@@ -240,4 +276,4 @@ void QuitWmSignalHandler (int dummy)
 	Do_Quit_Mwm(False);
     }
 
-} /* END OF FUNCTION QuitWmSignalHandler */
+} /* END OF FUNCTION QuitWmSignalCallback */

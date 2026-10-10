@@ -71,6 +71,9 @@
 
 #include <Xm/XmP.h>             /* for XmeGetHomeDirName */
 #include <signal.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 /* maximum string lengths */
 
@@ -256,7 +259,6 @@ static EventTableEntry keyEvents[] = {
 
 typedef struct _ConfigFileStackEntry {
     char		*fileName;
-    char 		*tempName;
     char 		*cppName;
     char		*wmgdConfigFile;
     long		offset;
@@ -1840,11 +1842,6 @@ FILE *FopenConfigFile (void)
      * Use the LANG variable if set and .mwmrc is in $HOME/$LANG/.mwmrc  
      */
 
-    if (pConfigStackTop && pConfigStackTop->tempName)
-    {
-	fileP = fopen (pConfigStackTop->tempName, "r");
-	return (fileP);
-    }
     stackPushed = (pConfigStackTop && (pConfigStackTop != pConfigStack));
     fileP = NULL;
     cfileName[0] = '\0';
@@ -5407,51 +5404,6 @@ ParseWmFunctionArg (
 
 /*************************************<->*************************************
  *
- *  SystemCmd (pchCmd)
- *
- *
- *  Description:
- *  -----------
- *  This function fiddles with our signal handling and calls the
- *  system() function to invoke a unix command.
- *
- *
- *  Inputs:
- *  ------
- *  pchCmd = string with the command we want to exec.
- *
- *  Outputs:
- *  -------
- *
- *
- *  Comments:
- *  --------
- *  The system() command is touchy about the SIGCLD behavior. Restore
- *  the default SIGCLD handler during the time we run system().
- * 
- *************************************<->***********************************/
-
-void
-SystemCmd (char *pchCmd)
-{
-    struct sigaction sa;
-    struct sigaction osa;
-
-    (void) sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sa.sa_handler = SIG_DFL;
-
-    (void) sigaction (SIGCHLD, &sa, &osa);
-
-    system (pchCmd);
-
-    (void) sigaction (SIGCHLD, &osa, (struct sigaction *) 0);
-}
-
-
-
-/*************************************<->*************************************
- *
  *  DeleteTempConfigFileIfAny ()
  *
  *
@@ -5477,21 +5429,9 @@ SystemCmd (char *pchCmd)
 void
 DeleteTempConfigFileIfAny (void)
 {
-    char pchCmd[MAXWMPATH+1];
-
-    if (pConfigStackTop->tempName)
+    if (pConfigStackTop && pConfigStackTop->cppName)
     {
-	strcpy (pchCmd, "/bin/rm ");
-	strcat (pchCmd, pConfigStackTop->tempName);
-	SystemCmd (pchCmd);
-	XtFree ((char *) pConfigStackTop->tempName);
-	pConfigStackTop->tempName = NULL;
-    }
-    if (pConfigStackTop->cppName)
-    {
-	strcpy (pchCmd, "/bin/rm ");
-	strcat (pchCmd, pConfigStackTop->cppName);
-	SystemCmd (pchCmd);
+	(void) unlink (pConfigStackTop->cppName);
 	XtFree ((char *) pConfigStackTop->cppName);
 	pConfigStackTop->cppName = NULL;
     }
@@ -5619,7 +5559,6 @@ static void ConfigStackInit (char *pchFileName)
     {
 	pConfigStackTop = pConfigStack;
 	pConfigStackTop->fileName = XtNewString (pchFileName);
-	pConfigStackTop->tempName = NULL;
 	pConfigStackTop->cppName = NULL;
 	pConfigStackTop->offset = 0;
 	pConfigStackTop->pWmPB = wmGD.pWmPB;
@@ -5678,7 +5617,6 @@ ConfigStackPush (unsigned char *pchFileName)
 
 	/* set up state of new config file */
 	pEntry->fileName = XtNewString ((char *)pchFileName);
-	pEntry->tempName = NULL;
 	pEntry->cppName = NULL;
 	pEntry->wmgdConfigFile = (String) pEntry->fileName;
 
@@ -5740,22 +5678,15 @@ ConfigStackPush (unsigned char *pchFileName)
 static void ConfigStackPop (void)
 {
     ConfigFileStackEntry *pPrev;
-    char pchCmd[MAXWMPATH+1];
 
     if (pConfigStackTop != pConfigStack)
     {
 	pPrev = pConfigStackTop->pIncluder;
 
 	_DtWmParseDestroyBuf (wmGD.pWmPB);
-	if (pConfigStackTop->tempName)
-	{
-	    XtFree (pConfigStackTop->tempName);
-	}
 	if (pConfigStackTop->cppName)
 	{
-	    strcpy (pchCmd, "/bin/rm "); 
-	    strcat (pchCmd, pConfigStackTop->cppName); 
-	    SystemCmd (pchCmd);
+	    (void) unlink (pConfigStackTop->cppName);
 	    XtFree ((char *) pConfigStackTop->cppName);
 	    pConfigStackTop->cppName = NULL;
 	}
@@ -5766,11 +5697,7 @@ static void ConfigStackPop (void)
 
 	wmGD.pWmPB = pPrev->pWmPB;
 	wmGD.configFile = pPrev->wmgdConfigFile;
-	if (pPrev->tempName)
-	{
-	    cfileP = fopen (pPrev->tempName, "r");
-	}
-	else if (pPrev->cppName)
+	if (pPrev->cppName)
 	{
 	    cfileP = fopen (pPrev->cppName, "r");
 	}
@@ -5948,34 +5875,87 @@ Boolean ParseWmFuncActionArg (unsigned char **linePP,
 static void
 PreprocessConfigFile (void)
 {
-#define CPP_NAME_SIZE	((L_tmpnam)+1)
-    char pchCmd[MAXWMPATH+1];
+    const char *tmpdir;
+    char *script;
+    size_t len;
+    int fd;
+    pid_t pid;
+    int status = -1;
+    struct sigaction sa;
+    struct sigaction osa;
+    struct stat st;
 
-    if (wmGD.cppCommand && *wmGD.cppCommand)
+    if (!wmGD.cppCommand || !*wmGD.cppCommand ||
+	!pConfigStackTop || !pConfigStackTop->fileName)
     {
-	/*
-	 * Generate a temp file name.
-	 */
-	pConfigStackTop->cppName = XtMalloc (CPP_NAME_SIZE * sizeof(char));
-	if (pConfigStackTop->cppName)
-	{
-	    (void) tmpnam (pConfigStackTop->cppName);
+	return;
+    }
 
-	    /*
-	     * Build up the command line.
-	     */
-	    strcpy (pchCmd, wmGD.cppCommand);
-	    strcat (pchCmd, " ");
-	    strcat (pchCmd, pConfigStackTop->fileName);
-	    strcat (pchCmd, " ");
-	    strcat (pchCmd, pConfigStackTop->cppName);
+    /*
+     * Create the output file: mkstemp, not a predictable tmpnam name
+     * that someone else could create first.
+     */
+    if (!(tmpdir = getenv ("TMPDIR")) || !*tmpdir)
+    {
+	tmpdir = P_tmpdir;
+    }
+    len = strlen (tmpdir) + sizeof ("/dtwmcppXXXXXX");
+    if (!(pConfigStackTop->cppName = XtMalloc (len)))
+    {
+	return;
+    }
+    snprintf (pConfigStackTop->cppName, len, "%s/dtwmcppXXXXXX", tmpdir);
+    if ((fd = mkstemp (pConfigStackTop->cppName)) < 0)
+    {
+	/* as before when the output could not be made: no config file */
+	strcpy (pConfigStackTop->cppName, "");
+	return;
+    }
+    close (fd);
 
-	    /*
-	     * Run the config file through the converter program
-	     * and send the output to a temp file. 
-	     */
-	    SystemCmd (pchCmd);
-	}
+    /*
+     * Run "<cppCommand> <config file> <output file>".  The command is
+     * interpreted by the shell as before, but the two file names are
+     * passed as positional parameters, never parsed by the shell.
+     */
+    len = strlen (wmGD.cppCommand) + sizeof (" \"$1\" \"$2\"");
+    if (!(script = XtMalloc (len)))
+    {
+	return;
+    }
+    snprintf (script, len, "%s \"$1\" \"$2\"", wmGD.cppCommand);
+
+    /* waitpid needs SIGCHLD not to be ignored */
+    (void) sigemptyset (&sa.sa_mask);
+    sa.sa_flags = 0;
+    sa.sa_handler = SIG_DFL;
+    (void) sigaction (SIGCHLD, &sa, &osa);
+
+    if ((pid = fork ()) == 0)
+    {
+	execl ("/bin/sh", "sh", "-c", script, "sh",
+	       pConfigStackTop->fileName, pConfigStackTop->cppName,
+	       (char *) NULL);
+	_exit (127);
+    }
+    if (pid > 0)
+    {
+	while (waitpid (pid, &status, 0) < 0 && errno == EINTR)
+	    ;
+    }
+
+    (void) sigaction (SIGCHLD, &osa, (struct sigaction *) 0);
+    XtFree (script);
+
+    /*
+     * When the command failed and wrote nothing, there is no
+     * preprocessed file, as there was none before when it had to be
+     * created by the command.
+     */
+    if ((pid < 0 || !WIFEXITED (status) || WEXITSTATUS (status) != 0) &&
+	stat (pConfigStackTop->cppName, &st) == 0 && st.st_size == 0)
+    {
+	(void) unlink (pConfigStackTop->cppName);
     }
 }
 

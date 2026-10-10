@@ -55,7 +55,6 @@ extern Boolean GetSessionHintsInfo (WmScreenData *pSD, long numItems);
 extern FILE          * FopenConfigFile (void);
 extern void            FreeMenuItem (MenuItem *menuItem);
 extern unsigned char * GetStringC (unsigned char **linePP, Boolean SmBehavior);
-extern void SystemCmd (char *pchCmd);
 extern Boolean ParseBtnEvent (unsigned char  **linePP,
                               unsigned int *eventType,
                               unsigned int *button,
