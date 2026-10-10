@@ -1003,7 +1003,14 @@ Tt_callback_action IconEdit_tt_handler( Tt_message m, Tt_pattern p )
 #ifdef DEBUG
               printf("Mask file name = '%s'\n", tmpbuf); /* debug */
 #endif
-              tmpfd = open(tmpbuf, O_CREAT | O_WRONLY | O_NDELAY, 0666);
+              /* A new mask next to a new mkstemp() file must not exist   */
+              /* yet (no symlink race); an old one is rewritten in full.  */
+              if (bIsNewFile)
+                 tmpfd = open(tmpbuf, O_CREAT | O_EXCL | O_WRONLY | O_NDELAY,
+                              0600);
+              else
+                 tmpfd = open(tmpbuf, O_CREAT | O_TRUNC | O_WRONLY | O_NDELAY,
+                              0666);
               if (tmpfd == -1) {
 		 msgPtr =
 		     GETMESSAGE(5, 60, "Could not open the following file:");

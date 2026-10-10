@@ -104,6 +104,7 @@ void MotifThread::CreateThread(MotifUI *_obj, const char *cmd, int _pid,
       else if (pid == -1)
        {
          close(m_stdout[0]);
+         close(m_stdout[1]);
          output = strdup(strerror(errno));
          status = -1;
          Halt();

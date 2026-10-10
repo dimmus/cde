@@ -712,7 +712,7 @@ void DtApp::OpenClose(BaseUI *obj)
       queue = printer_icon->QueueObj();
       char *s = new char[strlen(queue->Name()) + STRLEN(old_dbsearchpath) + 90];
       sprintf(s, "env DTDATABASESEARCHPATH=%s /usr/dt/bin/dtaction %s_Print &",
-	      (old_dbsearchpath ? "" : old_dbsearchpath), queue->Name());
+	      (old_dbsearchpath ? old_dbsearchpath : ""), queue->Name());
       window->WorkingCursor(true);
       window->AddTimeOut(TurnOffHourGlass, NULL, 5000);
       Invoke *_thread = new Invoke(s, NULL, NULL, old_uid);
