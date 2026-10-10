@@ -2098,8 +2098,9 @@ StartNextGrep(
          memset (g, 0, sizeof (glob_t));
          if (glob (pattern, 0, NULL, g) != 0)
          {
+            /* no match (or an error): an empty list, safe to globfree */
             globfree (g);
-            g->gl_pathc = 0;
+            memset (g, 0, sizeof (glob_t));
          }
          XtFree (pattern);
          find_rec->grepGlob = (void *) g;
