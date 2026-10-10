@@ -28,7 +28,14 @@
 class page;
 class page_storage;
 
-#define MMDB_CACHED_PAGES 100
+/*
+ * Pages (PAGSIZ, 8 KB) kept in memory for all stores, allocated as they
+ * are first used.  100 pages (800 KB) made dtinfo re-read the same pages
+ * of an infolib over and over: opening four sections of the CDE infolib
+ * read 398 pages with 100 and 82 (each once) with 512.  The environment
+ * variable MMDB_CACHED_PAGES still overrides this.
+ */
+#define MMDB_CACHED_PAGES 1024
 #define MIN_MMDB_CACHED_PAGES 10
 
 #include "dstr/bset.h"
