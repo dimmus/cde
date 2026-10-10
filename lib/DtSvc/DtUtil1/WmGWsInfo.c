@@ -244,6 +244,9 @@ DtWsmGetWorkspaceInfo(
 		/* pass back ptr to filled in structure */
 		*ppWsInfo = pWsInfo;
 
+		/* (a positive count of unconvertible characters is Success) */
+		rcode = Success;
+
 		/* free the converted data */
 		XFreeStringList (ppchList);
 	    }
@@ -258,7 +261,12 @@ DtWsmGetWorkspaceInfo(
 	}
     }
 	
-    if (rcode >= Success) rcode=Success;
+    /*
+     * Success only with *ppWsInfo filled in.  (This used to map every
+     * rcode >= Success to Success, so BadAtom for a missing property,
+     * or BadWindow with no window manager, returned Success with a NULL
+     * *ppWsInfo, which callers then dereference.)
+     */
 
     _DtSvcAppUnlock(app);
     return(rcode);

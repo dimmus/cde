@@ -652,7 +652,20 @@ get_fd(type_info_t *info)
 			flags |= O_NOATIME;
 		}
 #endif
-		if((info->file_fd = open(info->file_path, flags, 0)) == -1)
+		info->file_fd = open(info->file_path, flags, 0);
+#ifdef O_NOATIME
+		/*
+		 * The ownership test can be wrong (a stat buffer from the
+		 * caller that is stale or describes something else, root
+		 * without CAP_FOWNER): then the kernel refuses O_NOATIME.
+		 */
+		if(info->file_fd == -1 && errno == EPERM && (flags & O_NOATIME))
+		{
+			info->file_fd = open(info->file_path,
+					     flags & ~O_NOATIME, 0);
+		}
+#endif
+		if(info->file_fd == -1)
 		{
 			info->error = errno;
 			return(-1);
@@ -1869,19 +1882,23 @@ expand_keyword(const char *attr_in, const char *in_pathname)
 			}
 			else if ( !strncmp(c,"%dir%",5) )
 			{
+				/* (a name without '/' used to crash here) */
 				tmp = strrchr(netPath, '/');
-				*tmp = '\0';
-				n += strlen(netPath) - 5;
+				if (tmp)
+					*tmp = '\0';
+				p = tmp ? netPath : ".";
+				n += strlen(p) - 5;
 				buf = (char *)realloc(buf, n);
-				strcpy((buf+i),netPath);
-				i += strlen(netPath);
-				*tmp = '/';
+				strcpy((buf+i),p);
+				i += strlen(p);
+				if (tmp)
+					*tmp = '/';
 				c += 4;
 			}
 			else if ( !strncmp(c,"%name%",6) )
 			{
 				tmp = strrchr(netPath, '/');
-				tmp ++;
+				tmp = tmp ? tmp + 1 : netPath;
 				n += strlen(tmp) - 6;
 				buf = (char *)realloc(buf, n);
 				strcpy((buf+i),tmp);
@@ -1903,7 +1920,7 @@ expand_keyword(const char *attr_in, const char *in_pathname)
 			else if ( !strncmp(c,"%base%",6) )
 			{
 				tmp = strrchr(netPath, '/');
-				tmp ++;
+				tmp = tmp ? tmp + 1 : netPath;
 				if ((p = strrchr(tmp,'.')) != NULL)
 				{
 					n += p-tmp - 6;

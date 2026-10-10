@@ -306,7 +306,7 @@ _DtDtsMMCreateDb(DtDirPaths *dirs, const char *CacheFile, int override)
          */
 	fd = _DtDtsMMCreateFile(dirs, override ? CacheFile : NULL,
 				override == DTDTSMM_SHARED_OR_PRIVATE);
-	if (fd == -1 || !_DtDtsMMapFd(fd))
+	if (fd == -1 || !_DtDtsMMapNewFd(fd))
 	{
 		_DtSvcProcessUnlock();
 		return(0);

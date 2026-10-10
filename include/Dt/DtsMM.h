@@ -167,6 +167,7 @@ int			_DtDtsMMCreateFile(DtDirPaths *dirs, const char *CacheFile, int fallback);
 char *			_DtDtsMMCacheName(int);
 int			_DtDtsMMapDB(const char *CacheFile);
 int			_DtDtsMMapFd(int fd);
+int			_DtDtsMMapNewFd(int fd);
 void			_DtDtsMMStampDirs(DtDirPaths *dirs);
 
 const char *		_DtDtsMMBosonToString(DtShmBoson boson);

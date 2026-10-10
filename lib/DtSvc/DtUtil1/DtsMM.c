@@ -639,11 +639,13 @@ _DtDtsMMCacheName(int override)
 /*
  * Maps the cache file open as fd (and takes over fd: it is closed when
  * the database is unloaded, or now on failure), first unloading the
- * database mapped before.  The file must be a plain file of ours, and a
+ * database mapped before.  The file must be a plain file, owned by our
+ * real user unless we have just written it ourselves (written, it is
+ * owned by the effective user: a setuid client's private cache), and a
  * cache file of this version.  Returns an MM_* status.
  */
 static int
-mm_map_fd(int fd)
+mm_map_fd(int fd, int written)
 {
 	struct	stat	buf;
 	int	status = MM_FOREIGN;
@@ -651,14 +653,18 @@ mm_map_fd(int fd)
 
 	_DtSvcProcessLock();
 
-	if (mmaped_fd > 0)
+	if (mmaped_db)
 	{
-		/* Already have a file memory-mapped.  Unload it. */
+		/*
+		 * Already have a file memory-mapped.  Unload it.  (This
+		 * tested mmaped_fd > 0, but the fd can be 0 when stdin is
+		 * closed, and the old mapping was then leaked.)
+		 */
 		_DtDtsMMUnLoad();
 	}
 
 	if(fstat(fd, &buf) == 0 && S_ISREG(buf.st_mode) &&
-	   buf.st_uid == getuid())
+	   (written || buf.st_uid == getuid()))
 	{
 		status = MM_UNUSABLE;
 		if(buf.st_size < (off_t)sizeof(DtDtsMMHeader))
@@ -715,7 +721,14 @@ mm_map_fd(int fd)
 int
 _DtDtsMMapFd(int fd)
 {
-	return(mm_map_fd(fd) == MM_MAPPED);
+	return(mm_map_fd(fd, 0) == MM_MAPPED);
+}
+
+/* Like _DtDtsMMapFd(), for a cache file we have just written. */
+int
+_DtDtsMMapNewFd(int fd)
+{
+	return(mm_map_fd(fd, 1) == MM_MAPPED);
 }
 
 static int
@@ -729,7 +742,7 @@ mm_map_file(const char *CacheFile)
 	{
 		return(errno == ENOENT ? MM_ABSENT : MM_FOREIGN);
 	}
-	return(mm_map_fd(fd));
+	return(mm_map_fd(fd, 0));
 }
 
 int
