@@ -1123,7 +1123,18 @@ static int HitListAddFound (
    /* recall that position is 1-based */
    newKey = _DtHelpCeStrHashToKey(indexEntry);
    prev = next = NULL;
-   if ( insertSorted )     /* find position and check for duplicates */
+   if (   insertSorted
+       && NULL != vol->hitListTail
+       && (*strcollfn)(vol->hitListTail->indexEntry,indexEntry) < 0 )
+   {
+      /* The list is sorted and the new entry goes after its last one:
+         that is where the walk below would end, without a duplicate.
+         Index entries come in sorted order, so this is the usual case
+         and it keeps building the list linear rather than quadratic. */
+      prev = vol->hitListTail;
+      next = NULL;
+   }
+   else if ( insertSorted ) /* find position and check for duplicates */
    {
       /* walk along list */
       for( next = vol->hitListHead;
@@ -2431,17 +2442,36 @@ static Boolean SearchForPattern(
        return (NULL != hit);                    /* RETURN True or False */
 #else /* if NO_REGEX */
 # ifndef NO_REGCOMP
-        regex_t    re;
-        int        ret = -1;
+        /* This runs for every index entry and topic title searched:
+           compile the pattern once, and again only when the pattern
+           or the character set locale (a volume can install its own,
+           and REG_ICASE depends on it) changes. */
+        static regex_t re;
+        static char *  rePattern = NULL;
+        static char *  reLocale = NULL;
+        static Boolean reValid = False;
+        const char *   locale = setlocale(LC_CTYPE, NULL);
+        int            ret = -1;
+
+        _DtHelpProcessLock();
+        if (   NULL == rePattern || strcmp(rePattern, pattern) != 0
+            || NULL == locale || NULL == reLocale
+            || strcmp(reLocale, locale) != 0 )
+        {
+           if (reValid) regfree(&re);
+           free(rePattern);
+           free(reLocale);
+           rePattern = strdup(pattern);
+           reLocale = (NULL != locale) ? strdup(locale) : NULL;
+           /* a 0 return value indicates success */
+           reValid = (regcomp(&re,pattern,REG_NOSUB|REG_ICASE|REG_EXTENDED) == 0);
+        }
 
         /* use regexec to pattern match */
         /* a 0 return value indicates success */
-        if ( regcomp(&re,pattern,REG_NOSUB|REG_ICASE|REG_EXTENDED) == 0 )
-        {
-           /* a 0 return value indicates success */
+        if (reValid)
            ret = regexec(&re,string,0,NULL,0);
-           regfree(&re);
-        }
+        _DtHelpProcessUnlock();
         return (ret == 0);                      /* RETURN True or False */
 # else  /* NO_REGCOMP */
         char *compiledRE;

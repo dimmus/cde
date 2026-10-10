@@ -124,6 +124,48 @@ static _DtHelpVolume volChain = NULL;	/* Pointer to the head of the chain */
 static const char *Slash  = "/";
 static const char *Period = ".";
 
+/*
+ * Volumes closed for the last time stay loaded for a while, so opening
+ * the same volume again (help dialogs and quick help that come and go,
+ * the index search that opens a volume it has just scanned) does not
+ * parse it again.  A cached volume is reused only if its file still has
+ * the device, inode, size and modification time it had when it was
+ * closed (and its data were then up to date with the file); otherwise
+ * it is unloaded and the file loaded afresh, exactly as before.
+ * Closed volumes are not in volChain, so their handles are not valid.
+ */
+#define	CLOSED_VOL_MAX	12
+
+typedef struct {
+	_DtHelpVolume	vol;
+	dev_t		dev;
+	ino_t		ino;
+	off_t		size;
+	time_t		mtime_sec;
+	long		mtime_nsec;
+} ClosedVolume;
+
+static ClosedVolume ClosedVols[CLOSED_VOL_MAX];	/* [0] = most recent */
+static int          ClosedCnt = 0;
+
+/*
+ * The index of the keyword list of one volume, so that looking up the
+ * topics of each of its keywords in turn (the index display) does not
+ * compare against every keyword before it.  It is built on demand for
+ * the volume being looked at and dropped whenever that volume's
+ * keyword list is freed.
+ */
+#define	KEYWORD_INDEX_MIN	32
+
+static struct {
+	_DtHelpVolume	  vol;
+	char		**keywords;	/* the list it indexes */
+	char		***topics;
+	unsigned int	  mask;		/* buckets - 1 (a power of 2) */
+	int		 *head;		/* first keyword in each bucket */
+	int		 *next;		/* next keyword in the same bucket */
+} KeywordIndex = { NULL, NULL, NULL, 0, NULL, NULL };
+
 /******************************************************************************
  *                             Private Functions
  ******************************************************************************/
@@ -169,6 +211,181 @@ CheckVolList (
 
     _DtHelpProcessUnlock();
     return 0;
+}
+
+/******************************************************************************
+ * Keyword index (call with the process lock held).
+ ******************************************************************************/
+static unsigned int
+KeywordHash (const char *str)
+{
+    unsigned int h = 2166136261u;
+
+    while ('\0' != *str)
+      {
+	h ^= (unsigned char) *str++;
+	h *= 16777619u;
+      }
+    return h;
+}
+
+static void
+DropKeywordIndex (_DtHelpVolume vol)
+{
+    if (NULL != vol && KeywordIndex.vol != vol)
+	return;
+
+    free(KeywordIndex.head);
+    free(KeywordIndex.next);
+    KeywordIndex.vol      = NULL;
+    KeywordIndex.keywords = NULL;
+    KeywordIndex.topics   = NULL;
+    KeywordIndex.mask     = 0;
+    KeywordIndex.head     = NULL;
+    KeywordIndex.next     = NULL;
+}
+
+/*
+ * Returns the index of the first keyword equal to 'keyword', -1 if there
+ * is none, or -2 if the list is not indexed (search it).
+ */
+static int
+FindKeywordIndex (_DtHelpVolume vol, char **keywords, const char *keyword)
+{
+    int		 i;
+    int		 count;
+    unsigned int size;
+
+    if (KeywordIndex.vol != vol || KeywordIndex.keywords != keywords ||
+				KeywordIndex.topics != vol->keywordTopics)
+      {
+	DropKeywordIndex(NULL);
+
+	for (count = 0; NULL != keywords[count]; count++)
+	    ;
+	if (count < KEYWORD_INDEX_MIN)
+	    return -2;
+
+	for (size = 64; size < (unsigned int) count && size < (1u << 30);)
+	    size *= 2;
+
+	KeywordIndex.head = (int *) malloc(sizeof(int) * size);
+	KeywordIndex.next = (int *) malloc(sizeof(int) * count);
+	if (NULL == KeywordIndex.head || NULL == KeywordIndex.next)
+	  {
+	    DropKeywordIndex(NULL);
+	    return -2;
+	  }
+
+	KeywordIndex.mask = size - 1;
+	for (i = 0; i < (int) size; i++)
+	    KeywordIndex.head[i] = -1;
+
+	/*
+	 * insert from the end, so each chain is in list order and its
+	 * first match is the first equal keyword of the list.
+	 */
+	for (i = count - 1; i >= 0; i--)
+	  {
+	    unsigned int b = KeywordHash(keywords[i]) & KeywordIndex.mask;
+
+	    KeywordIndex.next[i] = KeywordIndex.head[b];
+	    KeywordIndex.head[b] = i;
+	  }
+
+	KeywordIndex.vol      = vol;
+	KeywordIndex.keywords = keywords;
+	KeywordIndex.topics   = vol->keywordTopics;
+      }
+
+    for (i = KeywordIndex.head[KeywordHash(keyword) & KeywordIndex.mask];
+				i != -1; i = KeywordIndex.next[i])
+	if (0 == strcmp(keywords[i], keyword))
+	    return i;
+
+    return -1;
+}
+
+/******************************************************************************
+ * Closed volume cache (call with the process lock held).
+ ******************************************************************************/
+static void
+DropClosedVolume (int i)
+{
+    _DtHelpVolume vol = ClosedVols[i].vol;
+
+    ClosedCnt--;
+    memmove(&ClosedVols[i], &ClosedVols[i + 1],
+				sizeof(ClosedVolume) * (ClosedCnt - i));
+    VolumeUnload(vol);
+}
+
+/*
+ * keep 'vol' (whose last close this is) loaded, or unload it.
+ */
+static void
+KeepClosedVolume (_DtHelpVolume vol)
+{
+    struct stat buf;
+
+    if (stat(vol->volFile, &buf) != 0 || buf.st_mtime != vol->check_time)
+      {
+	VolumeUnload(vol);
+	return;
+      }
+
+    if (CLOSED_VOL_MAX == ClosedCnt)
+	DropClosedVolume(ClosedCnt - 1);
+
+    memmove(&ClosedVols[1], &ClosedVols[0], sizeof(ClosedVolume) * ClosedCnt);
+    ClosedCnt++;
+
+    vol->nextVol             = NULL;
+    ClosedVols[0].vol        = vol;
+    ClosedVols[0].dev        = buf.st_dev;
+    ClosedVols[0].ino        = buf.st_ino;
+    ClosedVols[0].size       = buf.st_size;
+    ClosedVols[0].mtime_sec  = buf.st_mtim.tv_sec;
+    ClosedVols[0].mtime_nsec = buf.st_mtim.tv_nsec;
+}
+
+/*
+ * a cached volume for 'vol_file' whose file has not changed, taken out
+ * of the cache; or NULL.
+ */
+static _DtHelpVolume
+ReuseClosedVolume (const char *vol_file)
+{
+    int		  i;
+    struct stat	  buf;
+    _DtHelpVolume vol;
+
+    for (i = 0; i < ClosedCnt; i++)
+	if (0 == strcmp(ClosedVols[i].vol->volFile, vol_file))
+	    break;
+
+    if (i == ClosedCnt)
+	return NULL;
+
+    if (stat(vol_file, &buf) != 0 ||
+		ClosedVols[i].dev        != buf.st_dev ||
+		ClosedVols[i].ino        != buf.st_ino ||
+		ClosedVols[i].size       != buf.st_size ||
+		ClosedVols[i].mtime_sec  != buf.st_mtim.tv_sec ||
+		ClosedVols[i].mtime_nsec != buf.st_mtim.tv_nsec)
+      {
+	DropClosedVolume(i);
+	return NULL;
+      }
+
+    vol = ClosedVols[i].vol;
+    ClosedCnt--;
+    memmove(&ClosedVols[i], &ClosedVols[i + 1],
+				sizeof(ClosedVolume) * (ClosedCnt - i));
+
+    vol->openCount = 1;
+    vol->nextVol   = NULL;
+    return vol;
 }
 
 /******************************************************************************
@@ -253,6 +470,7 @@ VolumeUnload (
     
     if (vol != NULL)
       {
+	DropKeywordIndex(vol);
 
 	if (vol->sdl_flag == True)
 	    _DtHelpCeCloseSdlVolume((_DtHelpVolumeHdl) vol);
@@ -300,7 +518,9 @@ RereadVolume (
 {
     int            result;
     char	***topicList;
-    
+
+    DropKeywordIndex(vol);
+
     if (vol->keywords != NULL)
       {
         _DtHelpCeFreeStringArray (vol->keywords);
@@ -384,18 +604,22 @@ GetKeywordTopics (
       }
 
     /* Search the list of keywords for the current one. */
-    nextKey = keywords;
-    while (*nextKey != NULL && strcmp (*nextKey, keyword))
-	nextKey++;
+    index = FindKeywordIndex (vol, keywords, keyword);
+    if (-2 == index)
+      {
+        nextKey = keywords;
+        while (*nextKey != NULL && strcmp (*nextKey, keyword))
+	    nextKey++;
+        index = (*nextKey == NULL) ? -1 : nextKey - keywords;
+      }
 
-    if (*nextKey == NULL)
+    if (-1 == index)
       {
 	errno = CEErrorIllegalKeyword;
 	_DtHelpProcessUnlock();
 	return -1;
       }
 
-    index = nextKey - keywords;
     *retTopics = *(vol->keywordTopics + index);
 
     _DtHelpProcessUnlock();
@@ -2158,6 +2382,15 @@ _DtHelpOpenVolume (
 	vol->openCount++;
         free(volFile);
       }
+    else if (NULL != (vol = ReuseClosedVolume (volFile)))
+      {
+	/* It was closed recently and has not changed: reuse it. */
+	if (prevVol == NULL)
+	    volChain = vol;
+	else
+	    prevVol->nextVol = vol;
+        free(volFile);
+      }
     else /* if (vol == NULL) */
       {
     	/* If it isn't open, open it and insert it in the chain. */
@@ -2294,7 +2527,7 @@ _DtHelpCloseVolume (
 	else
 	    prevVol->nextVol = vol->nextVol;
 
-	VolumeUnload (vol);
+	KeepClosedVolume (vol);
       }
 
     _DtHelpProcessUnlock();
