@@ -1,7 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
-
 noinst_LIBRARIES = libutil.a
 
 noinst_PROGRAMS = context fclndir

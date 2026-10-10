@@ -2,11 +2,6 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dthelp_htag1
 
-# Due to the wierd interdepencencies between helptag and parser,
-# disable parallel builds here.  This is some really horrible code and
-# design - not surprising since it dates to 1989.
-.NOTPARALLEL:
-
 HELPTAG       = ..
 HELPTAGSRC    = $(HELPTAG)/helptag
 HELPPARSERSRC = $(HELPTAG)/parser
@@ -40,6 +35,10 @@ BUILT_SOURCES = $(CPRODS)
 CLEANFILES = $(BUILT_SOURCES) $(CTRASH) CDONE
 
 $(CPRODS): CDONE
+
+# The parser includes the CPRODS (case.c, context.h, delim.h): make them
+# first.
+$(dthelp_htag1_OBJECTS): CDONE
 
 CDONE:  $(HELPUTILSRC)/context $(HELPTAGSRC)/delim.par context.dat
 	$(RM) $(CPRODS) $(CTRASH)

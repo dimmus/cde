@@ -1,7 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
-
 noinst_PROGRAMS = eltdef
 
 HELPTAG       = ..
@@ -40,6 +38,9 @@ CLEANFILES = $(BUILT_SOURCES) $(TRASH) CDONE EDONE
 $(CPRODS): CDONE
 
 $(EPRODS): EDONE
+
+# eltdef includes the CPRODS (case.c, context.h, delim.h): make them first.
+$(eltdef_OBJECTS): CDONE
 
 
 EDONE: eltdef  $(HELPIFFILE) $(HELPTSSFILE)

@@ -1,7 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
-
 noinst_PROGRAMS = build
 
 HELPTAG       = ..
@@ -42,6 +40,9 @@ CLEANFILES = $(BUILT_SOURCES) $(TRASH) BDONE CDONE
 $(BPRODS): BDONE
 
 $(CPRODS): CDONE
+
+# build includes the CPRODS (case.c, context.h, delim.h): make them first.
+$(build_OBJECTS): CDONE
 
 # build the BRPODS
 BDONE: ./build $(HELPDTDFILE)
