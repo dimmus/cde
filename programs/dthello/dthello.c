@@ -228,6 +228,10 @@ main (int argc, char **argv)
     XColor	colorDef;	/* for parsing/allocating colors */
     Colormap	colormap;	/* color map of screen */
     Atom	xaMwmHints;	/* mwm hints atom */
+    Atom	xaWmSel;	/* ICCCM WM_S<screen> selection */
+    Atom	xaManager;	/* ICCCM MANAGER client message */
+    Atom	xaSmWmReady;	/* set by dtsession when the WM is up */
+    char	wmSelName[32];
     PropMotifWmHints  mwmHints;	/* mwm hints structure */
     Visual *pdv;		/* X visual structure */
     FILE 	*fp;		/* file pointer */
@@ -584,6 +588,19 @@ main (int argc, char **argv)
 
     XSelectInput (dpy, wmwin, StructureNotifyMask);
 
+    /*
+     * Not every window manager reparents.  Also leave when one takes the
+     * ICCCM WM_S<screen> selection (it announces that with a MANAGER
+     * message on the root window), or when dtsession says it has stopped
+     * waiting for the window manager (_DT_SM_WM_READY on the root).
+     */
+    snprintf(wmSelName, sizeof(wmSelName), "WM_S%d", XDefaultScreen(dpy));
+    xaWmSel = XInternAtom (dpy, wmSelName, False);
+    xaManager = XInternAtom (dpy, "MANAGER", False);
+    xaSmWmReady = XInternAtom (dpy, _XA_DT_SM_WM_READY, False);
+    XSelectInput (dpy, DefaultRootWindow(dpy),
+		  StructureNotifyMask | PropertyChangeMask);
+
     XMapWindow(dpy, wmwin);
 
     /* 
@@ -653,6 +670,14 @@ main (int argc, char **argv)
     alarm (atoi(timeArg));
 
     /*
+     * A window manager that does not reparent may be running already.
+     */
+    if (XGetSelectionOwner (dpy, xaWmSel) != None)
+    {
+	exit(0);
+    }
+
+    /*
      * Event loop
      */
     while (True) 
@@ -664,8 +689,17 @@ main (int argc, char **argv)
 
 	XtAppNextEvent(appcontext, &event);
 
-	if (event.type == ReparentNotify &&
-	    event.xany.window == wmwin)
+	if ((event.type == ReparentNotify &&
+	     event.xany.window == wmwin) ||
+	    (event.type == ClientMessage &&
+	     event.xclient.window == DefaultRootWindow(dpy) &&
+	     event.xclient.message_type == xaManager &&
+	     event.xclient.format == 32 &&
+	     (Atom) event.xclient.data.l[1] == xaWmSel) ||
+	    (event.type == PropertyNotify &&
+	     event.xproperty.window == DefaultRootWindow(dpy) &&
+	     event.xproperty.atom == xaSmWmReady &&
+	     event.xproperty.state == PropertyNewValue))
 	{
 	    /*
 	     * this is our cue...exit, stage left
