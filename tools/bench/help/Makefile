@@ -1,6 +1,6 @@
 # CDE benchmarks, help: a standalone Makefile, not part of the automake
-# build (like ../Makefile).  Links helpbench against libDtHelp of this
-# configured and built tree.
+# build (like ../Makefile).  Links helpbench against libDtHelp, and
+# mmdbbench against libDtMmdb, of this configured and built tree.
 #
 #   make -C tools/bench/help          (also builds ../libcdebench_preload.so)
 #   tools/bench/help/run.sh           see README.md
@@ -19,7 +19,15 @@ RPATH    := $(foreach d,$(LIBDIRS),-L$(d) -Wl,-rpath,$(d))
 INCS     := -I$(ABSTOP)/include
 XTLIBS   := -lXm $(shell $(PKG) --libs xt xext x11)
 
-all: helpbench libhelpbench_preload.so ../libcdebench_preload.so
+CXX      ?= c++
+MMDBINC  := -I$(ABSTOP)/lib/DtMmdb -I$(ABSTOP)/include -DNO_DB_LOCK
+MMDBLIB  := -L$(ABSTOP)/lib/DtMmdb/.libs -Wl,-rpath,$(ABSTOP)/lib/DtMmdb/.libs
+
+all: helpbench libhelpbench_preload.so mmdbbench ../libcdebench_preload.so
+
+mmdbbench: mmdbbench.C
+	$(CXX) $(CFLAGS) -Wall $(MMDBINC) -o $@ mmdbbench.C $(MMDBLIB) \
+		-lDtMmdb
 
 helpbench: helpbench.c helpbench.h ../benchutil.c ../benchutil.h
 	$(CC) -std=gnu11 $(CFLAGS) $(WARN) $(INCS) -rdynamic -o $@ helpbench.c \
@@ -33,6 +41,6 @@ libhelpbench_preload.so: helppreload.c helpbench.h
 	$(MAKE) -C .. libcdebench_preload.so
 
 clean:
-	rm -f helpbench libhelpbench_preload.so
+	rm -f helpbench libhelpbench_preload.so mmdbbench
 
 .PHONY: all clean

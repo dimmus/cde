@@ -6,7 +6,8 @@
 #
 """Run the help benchmarks of TODO.md Phase 0 on a private Xvfb.
 
-  run.py [-o FILE] [-r REPEAT] [-d HELPDIR] [--quick] [GROUP...]
+  run.py [-o FILE] [-r REPEAT] [-d HELPDIR] [--infolib DIR] [--quick]
+         [GROUP...]
 
 Groups (all by default):
 
@@ -23,6 +24,11 @@ Groups (all by default):
   view       dthelpview on a volume and on the ksh(1) man page: time to
              the first window and to idle (../apptime.py), with the same
              counts
+  mmdb       ./mmdbbench: every section and graphic of a dtinfo infolib
+             (default /usr/dt/infolib/C/cde.dti) read through libDtMmdb
+             as dtinfo's node views read them, three times in one
+             process; time per object per run, bytes, and the syscalls
+             of the whole (strace -c)
 
 The man page is formatted by ./man (nroff), which is put first on PATH.
 The programs are the uninstalled ones of this build tree.  Compare two
@@ -276,6 +282,47 @@ def run_view(env, args, work):
     return out
 
 
+def run_mmdb(env, args, work):
+    exe = os.path.join(HERE, "mmdbbench")
+    if not os.path.exists(exe) or not os.path.isdir(args.infolib):
+        log("mmdb: no mmdbbench or no infolib %s; skipped" % args.infolib)
+        return None
+    log("mmdb")
+    cmd = args.pin + [exe, "-r", "1" if args.quick else "3", "-l",
+                      args.infolib]
+    out = subprocess.run(cmd, env=env, capture_output=True,
+                         text=True).stdout
+    res = {"infolib": args.infolib, "runs": []}
+    for line in out.splitlines():
+        m = re.match(r"(\w+)\s+run (\d+): (\d+) objects, (\d+) bytes, "
+                     r"(\d+) ns/object, cpu (\d+) ns/object", line)
+        if m:
+            res["runs"].append({"case": m.group(1), "run": int(m.group(2)),
+                                "objects": int(m.group(3)),
+                                "bytes": int(m.group(4)),
+                                "ns_per_object": int(m.group(5)),
+                                "cpu_ns_per_object": int(m.group(6))})
+        elif line.startswith("open "):
+            res["open_ms"] = float(line.split()[1])
+    if shutil.which("strace"):
+        sfile = os.path.join(work, "mmdb.strace")
+        subprocess.run(["strace", "-f", "-c", "-o", sfile] + cmd, env=env,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        calls = {}
+        with open(sfile) as f:
+            for line in f:
+                p = line.split()
+                if len(p) >= 5 and p[0][0].isdigit() and p[-1] != "total":
+                    try:
+                        calls[p[-1]] = int(p[3])
+                    except ValueError:
+                        pass
+        res["syscalls_total"] = sum(calls.values())
+        res["syscalls_top"] = dict(sorted(calls.items(),
+                                          key=lambda kv: -kv[1])[:8])
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -283,13 +330,14 @@ def main():
     ap.add_argument("-r", "--repeat", type=int, default=5)
     ap.add_argument("-d", "--helpdir", default="/usr/dt/appconfig/help/C")
     ap.add_argument("-V", "--volumes", help="helpbench volumes (-V)")
+    ap.add_argument("--infolib", default="/usr/dt/infolib/C/cde.dti")
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--no-pin", action="store_true")
     ap.add_argument("groups", nargs="*")
     args = ap.parse_args()
-    groups = args.groups or ["helpbench", "print", "view"]
+    groups = args.groups or ["helpbench", "print", "view", "mmdb"]
     for g in groups:
-        if g not in ("helpbench", "print", "view"):
+        if g not in ("helpbench", "print", "view", "mmdb"):
             ap.error("unknown group " + g)
     args.pin = [] if args.no_pin or not shutil.which("taskset") else \
         ["taskset", "-c", "0"]
@@ -314,6 +362,8 @@ def main():
             doc["print"] = run_print(env, args, work)
         if "view" in groups:
             doc["view"] = run_view(env, args, work)
+        if "mmdb" in groups:
+            doc["mmdb"] = run_mmdb(env, args, work)
     finally:
         xvfb.terminate()
         try:

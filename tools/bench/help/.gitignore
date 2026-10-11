@@ -4,3 +4,4 @@
 *.json
 # The top-level .gitignore ignores generated Makefiles; this one is not.
 !/Makefile
+/mmdbbench
