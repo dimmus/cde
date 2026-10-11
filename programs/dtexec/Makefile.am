@@ -7,6 +7,7 @@ bin_PROGRAMS = dtexec
 dtexec_CFLAGS = $(CDE_CFLAGS) -DMSGLOG_CLIENT_ONLY	\
 	-I../../lib/DtSvc/include
 
-dtexec_LDADD = $(LIBSVC) $(LIBTT)
+# libDtSvc is loaded only to log a message (LogStderr in Main.c).
+dtexec_LDADD = $(LIBTT)
 
 dtexec_SOURCES = Main.c

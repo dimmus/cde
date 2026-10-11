@@ -66,6 +66,8 @@
 #include <sys/syscall.h>
 #endif
 
+#include <dlfcn.h>
+#include <time.h>
 #include <Dt/MsgLog.h>
 
 /*
@@ -939,6 +941,55 @@ input_handler(
 
 /******************************************************************************
  *
+ * LogStderr - DtMsgLogMessage(prog, DtMsgLogStderr, fmt, arg).
+ *
+ * dtexec runs for every command action, and linking it with libDtSvc for
+ * this one function mapped about twenty more shared objects (libXm and
+ * its image and font libraries) into each of those processes.  The
+ * library is loaded only when there is something to log; if it cannot
+ * be, the message goes to stderr in the same form.
+ *
+ *****************************************************************************/
+typedef void (*MsgLogProc)(const char *, DtMsgLogType, const char *, ...);
+
+static void
+LogStderr(const char *prog, const char *fmt, const char *arg)
+{
+    static const char * const names[] = {
+#ifdef DTSVC_SONAME
+	DTSVC_SONAME,
+#endif
+	"libDtSvc.so.2",
+	"libDtSvc.so"
+    };
+    static MsgLogProc msglog;
+    static int tried;
+    unsigned int i;
+    time_t now;
+    int n;
+
+    if (!tried) {
+	tried = 1;
+	for (i = 0; !msglog && i < sizeof names / sizeof names[0]; i++) {
+	    void *handle = dlopen(names[i], RTLD_LAZY | RTLD_LOCAL);
+
+	    if (handle)
+		*(void **) &msglog = dlsym(handle, "DtMsgLogMessage");
+	}
+    }
+    if (msglog) {
+	(*msglog)(prog, DtMsgLogStderr, fmt, arg);
+	return;
+    }
+    now = time(NULL);
+    n = fprintf(stderr, "*** STDERR(%d): %s: PID %ld: %s", (int) DtMsgLogStderr,
+		prog ? prog : "", (long) getpid(), ctime(&now));
+    n += fprintf(stderr, fmt, arg);
+    fprintf(stderr, "[%d bytes]\n\n", n);
+}
+
+/******************************************************************************
+ *
  * Initiallize Tooltalk world.
  *
  *****************************************************************************/
@@ -950,7 +1001,42 @@ ToolTalkError(char *errfmt, Tt_status status)
     if (! tt_is_err(status)) return;
 
     statmsg = tt_status_message(status);
-    DtMsgLogMessage( "Dtexec", DtMsgLogStderr, errfmt, statmsg );
+    LogStderr( "Dtexec", errfmt, statmsg );
+}
+
+/*
+ * tt_open() in the session of our caller.
+ *
+ * The caller's ToolTalk procid, which libDtSvc passes with -ttprocid,
+ * is "<key> <session address>".  Without TT_SESSION in the environment
+ * libtt finds the session through the TT_SESSION property on the root
+ * window of $DISPLAY, which costs an X connection (connection setup,
+ * authorization, a GetProperty round trip) for one string that we
+ * already hold.  So when the environment names no session, name the
+ * caller's for the length of tt_open(): that is the session in which
+ * the caller listens for our messages, and the one the root window
+ * names whenever the caller runs on our display.  The child command was
+ * forked before this point, so it does not see the variable.  There is
+ * no fallback to the root window: libtt cannot tt_open() again after a
+ * failed tt_open(), and a session the caller's procid cannot be reached
+ * in is no use to us anyway, since every message we send is addressed
+ * to that procid.
+ */
+static char *
+OpenCallersSession(void)
+{
+    const char *addr;
+    char *procid;
+
+    addr = dtSvcProcIdG ? strchr(dtSvcProcIdG, ' ') : NULL;
+    if (!addr || !addr[1] ||
+	getenv("TT_SESSION") || getenv("_SUN_TT_SESSION") ||
+	setenv("TT_SESSION", addr + 1, 1) != 0)
+	return tt_open();
+
+    procid = tt_open();
+    unsetenv("TT_SESSION");
+    return procid;
 }
 
 int InitializeTooltalk(void)
@@ -965,7 +1051,7 @@ int InitializeTooltalk(void)
 	/*
 	 * We need to try to establish a connection
 	 */
-	procid = tt_open();
+	procid = OpenCallersSession();
 	status = tt_ptr_error(procid);
 	if (status != TT_OK) {
 	    ToolTalkError("Could not connect to ToolTalk:\n%s\n", status);
@@ -1505,8 +1591,7 @@ main (
 				(void) strcat (tmpProgName, cmdLine[0]);
 			    }
 			}
-			DtMsgLogMessage( tmpProgName, DtMsgLogStderr, "%s", 
-					 tmpBuffer );
+			LogStderr( tmpProgName, "%s", tmpBuffer );
 			free( tmpBuffer );
 		    }
 
