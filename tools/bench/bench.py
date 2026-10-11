@@ -8,17 +8,36 @@
 """Run the CDE benchmarks reproducibly and compare runs.
 
   bench.py run [-o OUT.json] [-r ROUNDS] [--script-rounds N] [--quick]
-               [--no-pin] [GROUP...]
-  bench.py compare [-t PCT] BASE.json HEAD.json
+               [--no-pin] [--syscalls] [GROUP...]
+  bench.py compare [-t PCT] [--syscall-threshold PCT] BASE.json HEAD.json
+  bench.py profile [-o DIR] GROUP [CASE...]
 
-Groups (default: all):
-  dtsvc   dtsvcbench   libDtSvc/libDtWidget micro-benchmarks
-  tt      ttbench      ToolTalk, under a private "ttsession -s -c"
-  dtwm    dtwmbench    dtwm macro-benchmarks (XTest)
-  dtterm  dtterm-throughput.sh
-  dtfile  dtfile-time.sh
-  dtmail  dtmail-time.sh
-  loader  loader-cost.sh (dsos, relocations; counted, not timed)
+Groups (default: all but dtfile-perf):
+  dtsvc       dtsvcbench   libDtSvc/libDtWidget micro-benchmarks
+  tt          ttbench      ToolTalk, under a private "ttsession -s -c"
+  dtwm        dtwmbench    dtwm macro-benchmarks (XTest)
+  dtterm      dtterm-throughput.sh
+  dtterm-vte  dtterm-vtebench.sh   vtebench-style streams, per screen
+  dtterm-less dtterm-less.py       less page-down, 2 ms added delay
+  dtfile      dtfile-time.sh
+  dtfile-copy dtfile-copy.sh       dtfile_copy against cp
+  dtfile-perf dtfile-perf.sh       dtfile's DT_PERFORMANCE phase timers
+                                   (builds a dtfile; not in the default)
+  dtmail      dtmail-time.sh       open, sort, delete all, idle
+  loader      loader-cost.sh (dsos, relocations; counted, not timed)
+
+--syscalls adds a second pass that counts system calls with strace
+(syscount.py), whose counts are merged into the rows of the timed pass:
+the C benchmarks (one round, with CDEBENCH_MARKERS) get
+syscalls_per_op, per process and per call, and the X server's
+(server_syscalls_per_op, its Xvfb traced too); dtfile, dtmail and
+dtfile-copy run with -S (syscalls to idle, the forked children's, the
+idle window's).  strace slows everything down: the times of that pass
+are thrown away.
+
+"profile" runs one group (the C benchmarks: the given cases, one round)
+under perf-profile.sh on its own Xvfb and leaves perf.data, report.txt
+and stacks.folded in DIR (default ./profile-GROUP).
 
 Every X group runs on its own Xvfb (1920x1080x24 +RENDER, Unix socket
 only), started with -displayfd.  Unless --no-pin, the Xvfb, the benchmark
@@ -30,12 +49,22 @@ The C benchmarks report, per case, the median over ROUNDS runs (default
 5; their -r).  The script groups run ROUNDS times and report the median
 of every number.  --quick runs one round with smaller inputs.
 
+The tt group also gets libtt's RPCs per operation (ttbench-rpcs.py,
+with TT_STATS) when the tree's libtt counts them: rpcs_per_op,
+rpcs_sync_per_op, rpcs_oneway_per_op, rpcs_top_per_op.
+
 "compare" exits with status 1 when a case of HEAD is more than PCT % (default
 5) slower than in BASE (ns_per_op, seconds, map_s, idle_s) or makes more
-X round trips (round_trips_per_op, round_trips), and when a case or one
-of those numbers that BASE has is missing from a group HEAD ran (the
+X round trips (round_trips_per_op, round_trips, output_round_trips,
+round_trips_per_page, round_trips_per_burst), when it makes more than
+--syscall-threshold % (default 10) more system calls or ToolTalk RPCs
+(syscalls_per_op, syscalls, rpcs_per_op; both runs must have counted
+them), when a program loads more
+shared objects or has more unused direct dependencies (loader: dsos,
+unused) or more than PCT % more startup relocations, and when a case or
+one of those numbers that BASE has is missing from a group HEAD ran (the
 benchmark failed, timed out or skipped it), or was run at another size
-(n, bytes: --quick against a full run, say).
+(n, bytes, screens, pages: --quick against a full run, say).
 
 Every Xvfb display's /tmp/dtdbcache_:N is removed before and after the
 group: the CDE clients build that shared database cache when it is
@@ -55,10 +84,20 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.environ.get("CDE_TOP", os.path.abspath(os.path.join(HERE, "..", "..")))
-GROUPS = ("dtsvc", "tt", "dtwm", "dtterm", "dtfile", "dtmail", "loader")
+sys.path.insert(0, HERE)
+import syscount  # noqa: E402
+
+GROUPS = ("dtsvc", "tt", "dtwm", "dtterm", "dtterm-vte", "dtterm-less",
+          "dtfile", "dtfile-copy", "dtfile-perf", "dtmail", "loader")
+DEFAULT_GROUPS = tuple(g for g in GROUPS if g != "dtfile-perf")
+C_GROUPS = ("dtsvc", "tt", "dtwm")
 TIME_FIELDS = ("ns_per_op", "seconds", "map_s", "idle_s")
-COUNT_FIELDS = ("round_trips_per_op", "round_trips")
-SIZE_FIELDS = ("n", "bytes")
+COUNT_FIELDS = ("round_trips_per_op", "round_trips", "output_round_trips",
+                "round_trips_per_page", "round_trips_per_burst")
+SYSCALL_FIELDS = ("syscalls_per_op", "syscalls", "rpcs_per_op")
+LOADER_STRICT = ("dsos", "unused")
+LOADER_PCT = ("relocations",)
+SIZE_FIELDS = ("n", "bytes", "screens", "pages")
 
 
 def log(msg):
@@ -74,10 +113,11 @@ def remove_dtdbcache(display):
 
 
 class Xvfb:
-    def __init__(self, pin):
+    def __init__(self, pin, trace=None):
         rd, wr = os.pipe()
+        st = syscount.strace_cmd(trace) + ["--"] if trace else []
         self.proc = subprocess.Popen(
-            pin + ["Xvfb", "-displayfd", str(wr), "-screen", "0",
+            pin + st + ["Xvfb", "-displayfd", str(wr), "-screen", "0",
                    "1920x1080x24", "+extension", "RENDER", "-nolisten", "tcp",
                    "-noreset"], pass_fds=(wr,), stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -188,8 +228,130 @@ def git_describe():
         return ""
 
 
+def group_cmd(g, a, pin, env, rounds):
+    """The command of group g, or None to skip it; may set env."""
+    quick = a.quick
+    if g == "dtsvc":
+        return pin + [os.path.join(HERE, "dtsvcbench"), "-r", str(rounds)] + \
+            (["-s", "0.2"] if quick else [])
+    if g == "tt":
+        tts = os.path.join(TOP, "lib", "tt", "bin", "ttsession", ".libs",
+                           "ttsession")
+        if not os.access(tts, os.X_OK):
+            tts = shutil.which("ttsession")
+        if not tts:
+            log("no ttsession; skipping the tt group")
+            return None
+        env["LD_LIBRARY_PATH"] = os.path.join(TOP, "lib", "tt", "lib", ".libs")
+        return pin + [tts, "-s", "-c", os.path.join(HERE, "ttbench"),
+                      "-r", str(rounds)] + (["-s", "0.2"] if quick else [])
+    if g == "dtwm":
+        return pin + [os.path.join(HERE, "dtwmbench"), "-r", str(rounds)] + \
+            (["-s", "0.2"] if quick else [])
+    if g == "dtterm":
+        return pin + [os.path.join(HERE, "dtterm-throughput.sh")] + \
+            (["-s", "8", "-y", "2"] if quick else [])
+    if g == "dtterm-vte":
+        return pin + [os.path.join(HERE, "dtterm-vtebench.sh")] + \
+            (["-s", "50"] if quick else [])
+    if g == "dtterm-less":
+        return pin + [os.path.join(HERE, "dtterm-less.py")] + \
+            (["-p", "10"] if quick else [])
+    if g == "dtfile":
+        return pin + [os.path.join(HERE, "dtfile-time.sh")] + \
+            (["-n", "1000"] if quick else ["-w", str(a.idle_window)])
+    if g == "dtfile-copy":
+        return pin + [os.path.join(HERE, "dtfile-copy.sh")] + \
+            (["-s", "64", "-f", "1000"] if quick else [])
+    if g == "dtfile-perf":
+        return pin + [os.path.join(HERE, "dtfile-perf.sh")] + \
+            (["-n", "1000"] if quick else [])
+    if g == "dtmail":
+        return pin + [os.path.join(HERE, "dtmail-time.sh")] + \
+            (["-n", "1000", "-w", "5"] if quick else
+             ["-w", str(a.idle_window)])
+    if g == "loader":
+        return [os.path.join(HERE, "loader-cost.sh")]
+    return None
+
+
+# The script groups that count system calls with -S.
+STRACE_FLAG = {"dtfile": "-S", "dtmail": "-S", "dtfile-copy": "-S"}
+SYSCALL_KEYS = ("syscalls", "top_syscalls", "children_syscalls",
+                "children_top_syscalls", "idle_syscalls", "idle_top_syscalls")
+
+
+def merge(rows, extra, keys=None):
+    """Add the fields of extra's rows (all, or those in keys) to the rows
+    of the same name."""
+    by = {r["name"]: r for r in rows}
+    for e in extra:
+        r = by.get(e.get("name"))
+        if r is None:
+            continue
+        for k, v in e.items():
+            if (keys is None and k != "name") or (keys and k in keys):
+                r[k] = v
+
+
+def run_group(g, a, pin, env0, work, rounds, srounds, syscalls=False):
+    """One pass over group g: its rows."""
+    trace = os.path.join(work, g + ".strace") if syscalls else None
+    xtrace = os.path.join(work, g + ".xstrace") if syscalls else None
+    xvfb = Xvfb(pin, xtrace if g in C_GROUPS else None) \
+        if g != "loader" else None
+    env = dict(env0)
+    if xvfb:
+        env["DISPLAY"] = xvfb.display
+    try:
+        cmd = group_cmd(g, a, pin, env, 1 if syscalls else rounds)
+        if cmd is None:
+            return None
+        if g in C_GROUPS:
+            if syscalls:
+                env["CDEBENCH_MARKERS"] = "1"
+                cmd = cmd[:len(pin)] + syscount.strace_cmd(trace) + \
+                    ["--"] + cmd[len(pin):]
+                c_bench(cmd, env, work, g + "-syscalls")
+                return syscount.cases(trace, xtrace)
+            return c_bench(cmd, env, work, g)
+        if g == "loader":
+            return jsonl(run_cmd(cmd, env).stdout)
+        if syscalls:
+            if g not in STRACE_FLAG:
+                return None
+            return jsonl(run_cmd(cmd + [STRACE_FLAG[g]], env).stdout)
+        return script_bench(cmd, env, srounds)
+    finally:
+        if xvfb:
+            xvfb.stop()
+
+
+def tt_stats_supported():
+    """Whether the tree's libtt counts RPCs (TT_STATS)."""
+    lib = os.path.join(TOP, "lib", "tt", "lib", ".libs", "libtt.so")
+    try:
+        with open(lib, "rb") as f:
+            return b"tt_stats: " in f.read()
+    except OSError:
+        return False
+
+
+def tt_rpcs(pin, env0, quick):
+    """libtt's RPCs per operation of each ttbench case (ttbench-rpcs.py),
+    on an Xvfb of their own."""
+    xvfb = Xvfb(pin)
+    try:
+        env = dict(env0, DISPLAY=xvfb.display)
+        cmd = pin + [os.path.join(HERE, "ttbench-rpcs.py")] + \
+            (["-s", "0.05,0.1"] if quick else [])
+        return jsonl(run_cmd(cmd, env).stdout)
+    finally:
+        xvfb.stop()
+
+
 def cmd_run(a):
-    groups = a.groups or list(GROUPS)
+    groups = a.groups or list(DEFAULT_GROUPS)
     for g in groups:
         if g not in GROUPS:
             raise SystemExit("bench.py: unknown group %s" % g)
@@ -203,61 +365,26 @@ def cmd_run(a):
     env0 = dict(os.environ, CDE_TOP=TOP)
     try:
         for g in groups:
-            xvfb = Xvfb(pin) if g != "loader" else None
-            env = dict(env0)
-            if xvfb:
-                env["DISPLAY"] = xvfb.display
-            try:
-                if g == "dtsvc":
-                    results[g] = c_bench(pin + [os.path.join(HERE, "dtsvcbench"),
-                                                "-r", str(rounds)] +
-                                         (["-s", "0.2"] if a.quick else []),
-                                         env, work, g)
-                elif g == "tt":
-                    tts = os.path.join(TOP, "lib", "tt", "bin", "ttsession",
-                                       ".libs", "ttsession")
-                    if not os.access(tts, os.X_OK):
-                        tts = shutil.which("ttsession")
-                    if not tts:
-                        log("no ttsession; skipping the tt group")
-                        continue
-                    env["LD_LIBRARY_PATH"] = os.path.join(TOP, "lib", "tt", "lib", ".libs")
-                    results[g] = c_bench(pin + [tts, "-s", "-c",
-                                                os.path.join(HERE, "ttbench"),
-                                                "-r", str(rounds)] +
-                                         (["-s", "0.2"] if a.quick else []),
-                                         env, work, g)
-                elif g == "dtwm":
-                    results[g] = c_bench(pin + [os.path.join(HERE, "dtwmbench"),
-                                                "-r", str(rounds)] +
-                                         (["-s", "0.2"] if a.quick else []),
-                                         env, work, g)
-                elif g == "dtterm":
-                    size = ["-s", "8", "-y", "2"] if a.quick else []
-                    results[g] = script_bench(
-                        pin + [os.path.join(HERE, "dtterm-throughput.sh")] + size,
-                        env, srounds)
-                elif g == "dtfile":
-                    sizes = ["-n", "1000"] if a.quick else []
-                    results[g] = script_bench(
-                        pin + [os.path.join(HERE, "dtfile-time.sh")] + sizes,
-                        env, srounds)
-                elif g == "dtmail":
-                    sizes = ["-n", "1000"] if a.quick else []
-                    results[g] = script_bench(
-                        pin + [os.path.join(HERE, "dtmail-time.sh")] + sizes,
-                        env, srounds)
-                elif g == "loader":
-                    results[g] = jsonl(run_cmd(
-                        [os.path.join(HERE, "loader-cost.sh")], env).stdout)
-            finally:
-                if xvfb:
-                    xvfb.stop()
+            rows = run_group(g, a, pin, env0, work, rounds, srounds)
+            if rows is None:
+                continue
+            results[g] = rows
+            if g == "tt" and tt_stats_supported():
+                merge(rows, tt_rpcs(pin, env0, a.quick))
+            if a.syscalls and (g in C_GROUPS or g in STRACE_FLAG):
+                if not shutil.which("strace"):
+                    log("no strace; no system call counts")
+                    continue
+                extra = run_group(g, a, pin, env0, work, rounds, srounds,
+                                  syscalls=True) or []
+                merge(rows, extra,
+                      None if g in C_GROUPS else SYSCALL_KEYS)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     doc = {"bench": "cde", "version": 1, "tree": git_describe(),
            "date": datetime.datetime.now().isoformat(timespec="seconds"),
-           "rounds": rounds, "script_rounds": srounds, "pinned": bool(pin), "results": results}
+           "rounds": rounds, "script_rounds": srounds, "pinned": bool(pin),
+           "syscalls": bool(a.syscalls), "results": results}
     text = json.dumps(doc, indent=1)
     if a.output:
         with open(a.output, "w") as f:
@@ -265,6 +392,25 @@ def cmd_run(a):
     else:
         print(text)
     return 0
+
+
+def cmd_profile(a):
+    if a.group not in GROUPS or a.group == "loader":
+        raise SystemExit("bench.py: cannot profile %s" % a.group)
+    out = os.path.abspath(a.output or "profile-" + a.group)
+    a.quick = False
+    xvfb = Xvfb([])
+    env = dict(os.environ, CDE_TOP=TOP, DISPLAY=xvfb.display)
+    try:
+        cmd = group_cmd(a.group, a, [], env, 1)
+        if cmd is None:
+            return 1
+        cmd = cmd + list(a.cases)
+        comm = {"dtwm": ["-c", "dtwm"]}.get(a.group, [])
+        return subprocess.call([os.path.join(HERE, "perf-profile.sh"), "-o",
+                                out] + comm + ["--"] + cmd, env=env)
+    finally:
+        xvfb.stop()
 
 
 def cmd_compare(a):
@@ -317,6 +463,28 @@ def cmd_compare(a):
                     bad += 1
                     print("%-8s %-28s %-10s %12.4g -> %12.4g  MORE ROUND TRIPS"
                           % (g, c["name"], k, b[k], c[k]))
+            for k in SYSCALL_FIELDS:
+                if isinstance(c.get(k), (int, float)) and \
+                        isinstance(b.get(k), (int, float)) and b[k] > 0:
+                    pct = (c[k] - b[k]) * 100.0 / b[k]
+                    flag = pct > a.syscall_threshold
+                    bad += flag
+                    print("%-8s %-28s %-10s %12.4g -> %12.4g %+7.1f%%%s" %
+                          (g, c["name"], k, b[k], c[k], pct,
+                           "  MORE CALLS" if flag else ""))
+            for k in LOADER_STRICT:
+                if isinstance(c.get(k), int) and isinstance(b.get(k), int) \
+                        and c[k] > b[k]:
+                    bad += 1
+                    print("%-8s %-28s %-10s %12d -> %12d  LOADER" %
+                          (g, c["name"], k, b[k], c[k]))
+            for k in LOADER_PCT:
+                if isinstance(c.get(k), int) and isinstance(b.get(k), int) \
+                        and b[k] > 0 and \
+                        (c[k] - b[k]) * 100.0 / b[k] > a.threshold:
+                    bad += 1
+                    print("%-8s %-28s %-10s %12d -> %12d  LOADER" %
+                          (g, c["name"], k, b[k], c[k]))
     return 1 if bad else 0
 
 
@@ -331,13 +499,27 @@ def main():
                    help="rounds of the script groups (default ROUNDS)")
     r.add_argument("--quick", action="store_true")
     r.add_argument("--no-pin", action="store_true")
+    r.add_argument("--syscalls", action="store_true",
+                   help="also count system calls (strace pass)")
+    r.add_argument("--idle-window", type=float, default=60,
+                   help="seconds dtfile and dtmail are watched once idle")
     r.add_argument("groups", nargs="*")
     c = sub.add_parser("compare")
     c.add_argument("-t", "--threshold", type=float, default=5.0)
+    c.add_argument("--syscall-threshold", type=float, default=10.0)
     c.add_argument("base")
     c.add_argument("head")
+    p = sub.add_parser("profile")
+    p.add_argument("-o", "--output")
+    p.add_argument("--idle-window", type=float, default=0)
+    p.add_argument("group")
+    p.add_argument("cases", nargs="*")
     a = ap.parse_args()
-    return cmd_run(a) if a.cmd == "run" else cmd_compare(a)
+    if a.cmd == "run":
+        return cmd_run(a)
+    if a.cmd == "profile":
+        return cmd_profile(a)
+    return cmd_compare(a)
 
 
 if __name__ == "__main__":

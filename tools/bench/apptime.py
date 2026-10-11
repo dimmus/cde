@@ -210,7 +210,9 @@ def type_keys(keys):
     comes in the same burst as the key (xdotool key alt+v)."""
     def xdo(*a):
         subprocess.run(["xdotool"] + list(a), timeout=30)
-    for tok in keys.split():
+    for i, tok in enumerate(keys.split()):
+        if i:
+            time.sleep(0.15)
         parts = tok.split("+")
         mods, key = parts[:-1], parts[-1]
         if mods:
@@ -220,7 +222,6 @@ def type_keys(keys):
         if mods:
             time.sleep(0.05)
             xdo("keyup", *mods)
-        time.sleep(0.15)
 
 
 def free_proxy_display(first=60):

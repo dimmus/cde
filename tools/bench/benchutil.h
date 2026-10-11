@@ -50,6 +50,12 @@ struct bench_result {
  */
 void bench_preload(char **argv);
 
+/*
+ * The path of this program (/proc/self/exe resolved), for re-executing
+ * itself under its own name ("exe" otherwise, in ps and strace logs).
+ */
+const char *bench_self_path(void);
+
 /* The counters, or NULL when the preload library is not loaded. */
 const struct cdebench_counters *bench_counters(void);
 

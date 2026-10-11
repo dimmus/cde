@@ -323,6 +323,9 @@ static int child_main(char **argv)
 		for (;;)
 			pause();
 	}
+	/* libtt reports TT_STATS from an atexit handler (ttbench-rpcs.py). */
+	if (getenv("TT_STATS"))
+		exit(0);
 	_exit(0);
 }
 
@@ -346,7 +349,7 @@ static pid_t start_child(const char *mode, long n, struct bench_result *res)
 				 nbuf, fdbuf, NULL };
 
 		close(fds[0]);
-		execv("/proc/self/exe", args);
+		execv(bench_self_path(), args);
 		_exit(127);
 	}
 	close(fds[1]);

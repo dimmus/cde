@@ -68,6 +68,20 @@ void bench_preload(char **argv)
 	execv(path, argv);
 }
 
+const char *bench_self_path(void)
+{
+	static char path[PATH_MAX];
+	ssize_t len;
+
+	if (!*path) {
+		len = readlink("/proc/self/exe", path, sizeof path - 1);
+		if (len <= 0)
+			return "/proc/self/exe";
+		path[len] = '\0';
+	}
+	return path;
+}
+
 const struct cdebench_counters *bench_counters(void)
 {
 	static const struct cdebench_counters *c;
