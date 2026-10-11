@@ -1099,6 +1099,8 @@ int main(int argc, char **argv)
 	int repeat = 5, opt, i, k, ran = 0, first;
 	FILE *jf = NULL;
 	char *spec, *tok, *save;
+	int xargc;
+	char *xargv[2];
 
 	preload(argv);
 	while ((opt = getopt(argc, argv, "r:j:V:w:m:n:S:vlh")) != -1) {
@@ -1160,7 +1162,12 @@ int main(int argc, char **argv)
 		alarm(atoi(getenv("HELPBENCH_WATCHDOG")));
 	}
 	XtSetLanguageProc(NULL, NULL, NULL);
-	top = XtVaOpenApplication(&app, "Helpbench", NULL, 0, &argc, argv,
+	/* only argv[0] for Xt: it would take "-n 30" for "-name 30" (an
+	 * unambiguous abbreviation) and drop the case names after it */
+	xargc = 1;
+	xargv[0] = argv[0];
+	xargv[1] = NULL;
+	top = XtVaOpenApplication(&app, "Helpbench", NULL, 0, &xargc, xargv,
 				  NULL, applicationShellWidgetClass,
 				  XmNmappedWhenManaged, False,
 				  XmNwidth, 10, XmNheight, 10, NULL);

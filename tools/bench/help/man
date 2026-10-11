@@ -1,6 +1,6 @@
 #!/bin/sh
 # CDE benchmarks, help: a man(1) for hosts without one.  DtHelp shows a
-# man page by reading "man [SECTION] NAME" through popen(); run.sh puts
+# man page by reading "man [SECTION] NAME" through popen(); run.py puts
 # this directory first on PATH, so that the man page case formats the
 # page with nroff (overstrike output, as man(1) gives to a pipe).
 for name; do :; done

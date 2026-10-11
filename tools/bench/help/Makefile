@@ -4,7 +4,7 @@
 # configured and built tree.
 #
 #   make -C tools/bench/help          (also builds ../libcdebench_preload.so)
-#   tools/bench/help/run.sh           see README.md
+#   tools/bench/help/run.py           see README.md
 
 TOP      ?= ../../..
 CC       ?= cc
