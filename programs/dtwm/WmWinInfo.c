@@ -228,6 +228,8 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->netDirty = 0;
     pCD->netDesktopWritten = NET_DESKTOP_NOT_WRITTEN;
     pCD->netStateWritten = NET_STATE_NOT_WRITTEN;
+    pCD->netActionsWritten = NET_ACTIONS_NOT_WRITTEN;
+    pCD->netExtentsWritten[0] = -1;
     pCD->maxAxes = MAX_AXES_BOTH;
     pCD->netType = NETTYPE_NORMAL;
     pCD->layer = LAYER_NORMAL;
@@ -4168,6 +4170,8 @@ ProcessMwmHints (ClientData *pCD)
     }
     
     pCD->decor = pCD->clientDecoration;  /* !!! combine decor ... !!! */
+
+    EwmhMarkClient (pCD, NET_CD_ACTIONS);
 
 
 } /* END OF ProcessMwmHints */

@@ -127,6 +127,13 @@ extern Pixel		FPselectcolor;
 #define _NET_WM_STATE_ADD 1
 #define _NET_WM_STATE_TOGGLE 2
 
+/* _NET_WM_MOVERESIZE directions */
+#define _NET_WM_MOVERESIZE_SIZE_TOPLEFT		0
+#define _NET_WM_MOVERESIZE_MOVE			8
+#define _NET_WM_MOVERESIZE_SIZE_KEYBOARD	9
+#define _NET_WM_MOVERESIZE_MOVE_KEYBOARD	10
+#define _NET_WM_MOVERESIZE_CANCEL		11
+
 #define _XA__NET_ACTIVE_WINDOW "_NET_ACTIVE_WINDOW"
 #define _XA__NET_SUPPORTED "_NET_SUPPORTED"
 #define _XA__NET_SUPPORTING_WM_CHECK "_NET_SUPPORTING_WM_CHECK"
@@ -1394,6 +1401,10 @@ typedef struct _WmScreenData
     int			numStrutClients;	/* clients with hasStrut */
     long		*workAreaWritten;	/* _NET_WORKAREA, 4 per */
     int			numWorkAreaWritten;	/* desktop, or -1 */
+    Boolean		showingDesktop;		/* _NET_SHOWING_DESKTOP */
+    long		netShowingWritten;	/* or -1 */
+    struct _ClientData	**pShowHidden;		/* iconified for it */
+    int			numShowHidden;
 } WmScreenData;
 
 typedef struct _WmScreenData *PtrScreenData;
@@ -1764,6 +1775,8 @@ struct _ClientData
     unsigned char layer;			/* LAYER_* of its type */
     long	strut[12];			/* _NET_WM_STRUT_PARTIAL */
     Boolean	hasStrut;			/* strut[] is set */
+    unsigned int netActionsWritten;		/* _NET_WM_ALLOWED_ACTIONS */
+    long	netExtentsWritten[4];		/* _NET_FRAME_EXTENTS */
 
     /* client window frame graphic data: */
 
@@ -2088,6 +2101,7 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_DESKTOP;
     Atom	xa__NET_WM_STRUT;
     Atom	xa__NET_WM_STRUT_PARTIAL;
+    Atom	xa__NET_WM_MOVERESIZE;
 
     /* EWMH property writer (WmEwmh.c): */
 

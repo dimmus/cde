@@ -194,6 +194,7 @@ void SetClientStateWithEventMask (ClientData *pCD, int newState, Time setTime, u
 	    XMapWindow (DISPLAY, pCD->client);
 	    XMapWindow (DISPLAY, pCD->clientFrameWin);
             WmStopWaiting();   /* in WmIPC.c */
+	    EwmhClientShown (pCD);
 	    break;
 	}
 

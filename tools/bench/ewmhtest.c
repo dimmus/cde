@@ -59,6 +59,25 @@
  *               edge of the left head limits only that head
  *   panel       with -f, the front panel takes part of the work area if
  *               and only if -x 'Dtwm*frontPanelStrut: True' is given
+ *   actions     _NET_WM_ALLOWED_ACTIONS of plain windows, windows whose
+ *               _MOTIF_WM_HINTS limit their functions (also changed while
+ *               mapped), transients, docks, desktop windows and
+ *               notifications; _NET_FRAME_EXTENTS as the frame shows them,
+ *               decorated or not, full screen or not, and answering
+ *               _NET_REQUEST_FRAME_EXTENTS before the window is mapped
+ *   requests    _NET_CLOSE_WINDOW (WM_DELETE_WINDOW, or the client is
+ *               killed; xdotool windowquit and windowclose),
+ *               _NET_MOVERESIZE_WINDOW with each kind of gravity and
+ *               partial values (and xdotool windowsize, windowmove),
+ *               _NET_RESTACK_WINDOW with and without a sibling, within
+ *               the layers, and _NET_SHOWING_DESKTOP: on, off, and ended
+ *               by a workspace change, a new window or an activation
+ *   moveresize  _NET_WM_MOVERESIZE through XTest, as a client drawing its
+ *               own frame asks for it: moving and resizing (two corners)
+ *               with the pointer, a button released before dtwm grabs it,
+ *               moving and resizing with the keyboard, cancelling, and a
+ *               window that may not move (skipped without XTEST); run it
+ *               with -x 'Dtwm*moveOpaque: True' too
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -83,6 +102,8 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <X11/extensions/XTest.h>
 
 #include "benchutil.h"
 
@@ -554,16 +575,22 @@ static Window create_window(const char *title, Window transient_for)
 	return win;
 }
 
-static void destroy_window(Window w)
+/* A window that is gone (destroyed by someone else). */
+static void forget_window(Window w)
 {
 	int i;
 
-	XDestroyWindow(dpy, w);
 	for (i = 0; i < nours; i++)
 		if (ours[i] == w) {
 			ours[i] = ours[--nours];
 			break;
 		}
+}
+
+static void destroy_window(Window w)
+{
+	XDestroyWindow(dpy, w);
+	forget_window(w);
 }
 
 static void destroy_all(void)
@@ -2099,6 +2126,944 @@ static void test_panel(void)
 	printf("panel: ok (strut %ld)\n", sh - area[3]);
 }
 
+/* ------------------------------------------------------------------ */
+/* Allowed actions and frame extents                                   */
+/* ------------------------------------------------------------------ */
+
+#define MWM_HINTS_FUNCTIONS	(1L << 0)
+#define MWM_HINTS_DECORATIONS	(1L << 1)
+#define MWM_FUNC_ALL		(1L << 0)
+#define MWM_FUNC_RESIZE		(1L << 1)
+#define MWM_FUNC_MOVE		(1L << 2)
+#define MWM_FUNC_MINIMIZE	(1L << 3)
+#define MWM_FUNC_MAXIMIZE	(1L << 4)
+#define MWM_FUNC_CLOSE		(1L << 5)
+
+static Atom net_atom(const char *name)
+{
+	return XInternAtom(dpy, name, False);
+}
+
+/* Fail unless _NET_SUPPORTED lists (or, with yes 0, lacks) the atom. */
+static void expect_supported(const char *name, int yes)
+{
+	unsigned long *v;
+	int i, n, found = 0;
+	Atom a = net_atom(name);
+
+	v = get_prop(a_supported, XA_ATOM, &n);
+	for (i = 0; i < n; i++)
+		if (v[i] == a)
+			found = 1;
+	if (v)
+		XFree(v);
+	if (found != yes)
+		fail("_NET_SUPPORTED %s %s", yes ? "lacks" : "has", name);
+}
+
+static void set_mwm_hints(Window w, long flags, long functions,
+			  long decorations)
+{
+	Atom a = net_atom("_MOTIF_WM_HINTS");
+	long hints[5] = { flags, functions, decorations, 0, 0 };
+
+	XChangeProperty(dpy, w, a, a, 32, PropModeReplace,
+			(unsigned char *)hints, 5);
+}
+
+/* An expected _NET_WM_ALLOWED_ACTIONS: exactly these actions. */
+struct actions_expect {
+	Atom a[16];
+	int n;
+};
+
+static int actions_are(Window w, Atom prop, const void *arg)
+{
+	const struct actions_expect *e = arg;
+	unsigned char *data = NULL;
+	unsigned long *v, n, after;
+	Atom type;
+	int format, i, ok;
+	unsigned long j;
+
+	/* (it may be there and empty) */
+	if (XGetWindowProperty(dpy, w, prop, 0, 64, False, XA_ATOM, &type,
+			       &format, &n, &after, &data) != Success)
+		return 0;
+	v = (unsigned long *)data;
+	ok = type == XA_ATOM && format == 32 && (int)n == e->n;
+	for (i = 0; ok && i < e->n; i++) {
+		for (j = 0; j < n && v[j] != e->a[i]; j++)
+			;
+		ok = j < n;
+	}
+	if (data)
+		XFree(data);
+	return ok;
+}
+
+/* The allowed actions of w are these (a NULL terminated list). */
+static void expect_actions(Window w, const char *what, ...)
+{
+	struct actions_expect e;
+	char text[512], full[64];
+	const char *name;
+	int len;
+	va_list ap;
+
+	e.n = 0;
+	len = snprintf(text, sizeof text, "_NET_WM_ALLOWED_ACTIONS of %s =",
+		       what);
+	va_start(ap, what);
+	while ((name = va_arg(ap, const char *)) && e.n < 16) {
+		snprintf(full, sizeof full, "_NET_WM_ACTION_%s", name);
+		e.a[e.n++] = net_atom(full);
+		if (len < (int)sizeof text - 32)
+			len += snprintf(text + len, sizeof text - len, " %s",
+					name);
+	}
+	va_end(ap);
+	wait_for_on(w, net_atom("_NET_WM_ALLOWED_ACTIONS"), actions_are, &e,
+		    text);
+}
+
+#define ALL_ACTIONS "MOVE", "RESIZE", "MINIMIZE", "MAXIMIZE_HORZ", \
+	"MAXIMIZE_VERT", "FULLSCREEN", "CLOSE", "CHANGE_DESKTOP", "STICK", \
+	"ABOVE", "BELOW"
+
+static int extents_are(Window w, Atom prop, const void *arg)
+{
+	const long *want = arg;
+	unsigned long *v;
+	int i, n, ok;
+
+	v = get_prop_on(w, prop, XA_CARDINAL, &n);
+	ok = n == 4;
+	for (i = 0; ok && i < 4; i++)
+		ok = (long)v[i] == want[i];
+	if (v)
+		XFree(v);
+	return ok;
+}
+
+static void expect_extents(Window w, const long ext[4], const char *what)
+{
+	char text[160];
+
+	snprintf(text, sizeof text, "_NET_FRAME_EXTENTS of %s = %ld,%ld,%ld,%ld",
+		 what, ext[0], ext[1], ext[2], ext[3]);
+	wait_for_on(w, net_atom("_NET_FRAME_EXTENTS"), extents_are, ext,
+		    text);
+}
+
+/* The frame extents (left, right, top, bottom) that the geometry shows. */
+static void real_extents(Window w, long ext[4])
+{
+	int x, y, wd, ht, fx, fy, fw, fh;
+
+	root_geometry(w, &x, &y, &wd, &ht);
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	ext[0] = x - fx;
+	ext[1] = fx + fw - (x + wd);
+	ext[2] = y - fy;
+	ext[3] = fy + fh - (y + ht);
+}
+
+/* _NET_FRAME_EXTENTS is what the frame shows. */
+static void expect_real_extents(Window w, const char *what)
+{
+	long ext[4];
+
+	real_extents(w, ext);
+	expect_extents(w, ext, what);
+}
+
+/* Ask for the frame extents of a window that is not mapped yet. */
+static void request_extents(Window w, const long ext[4], const char *what)
+{
+	XDeleteProperty(dpy, w, net_atom("_NET_FRAME_EXTENTS"));
+	send_msg(w, net_atom("_NET_REQUEST_FRAME_EXTENTS"), 0);
+	expect_extents(w, ext, what);
+}
+
+static const long no_extents[4] = { 0, 0, 0, 0 };
+
+/*
+ * Functions given as those that do not apply: dtwm adds those given as
+ * applying to its own (mwm keeps only them).
+ */
+#define NOT_MOVE_CLOSE (MWM_FUNC_ALL | MWM_FUNC_RESIZE | MWM_FUNC_MINIMIZE | \
+			MWM_FUNC_MAXIMIZE)
+
+static void test_actions(void)
+{
+	static const char *const supported[] = {
+		"_NET_WM_ALLOWED_ACTIONS", "_NET_WM_ACTION_MOVE",
+		"_NET_WM_ACTION_RESIZE", "_NET_WM_ACTION_MINIMIZE",
+		"_NET_WM_ACTION_STICK", "_NET_WM_ACTION_MAXIMIZE_HORZ",
+		"_NET_WM_ACTION_MAXIMIZE_VERT", "_NET_WM_ACTION_FULLSCREEN",
+		"_NET_WM_ACTION_CHANGE_DESKTOP", "_NET_WM_ACTION_CLOSE",
+		"_NET_WM_ACTION_ABOVE", "_NET_WM_ACTION_BELOW",
+		"_NET_FRAME_EXTENTS", "_NET_REQUEST_FRAME_EXTENTS",
+	};
+	long ext[4], plain[4], fixed[4], dialog[4];
+	Window w, m, d, k, u, f, t, p;
+	size_t i;
+
+	for (i = 0; i < sizeof supported / sizeof supported[0]; i++)
+		expect_supported(supported[i], 1);
+	expect_supported("_NET_WM_ACTION_SHADE", 0);
+
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	/* a plain window may do everything */
+	w = map_managed(create_window("ewmhtest actions plain", None));
+	expect_actions(w, "a plain window", ALL_ACTIONS, NULL);
+	expect_real_extents(w, "a plain window");
+	real_extents(w, plain);
+	if (plain[0] <= 0 || plain[2] <= plain[0] || plain[1] != plain[0] ||
+	    plain[3] != plain[0])
+		fail("odd frame extents %ld,%ld,%ld,%ld", plain[0], plain[1],
+		     plain[2], plain[3]);
+
+	/* functions given by _MOTIF_WM_HINTS: move and close only */
+	m = create_window("ewmhtest actions move close", None);
+	set_mwm_hints(m, MWM_HINTS_FUNCTIONS, NOT_MOVE_CLOSE, 0);
+	map_managed(m);
+	expect_actions(m, "a window that may move and close", "MOVE", "CLOSE",
+		       "CHANGE_DESKTOP", "STICK", "ABOVE", "BELOW", NULL);
+	expect_real_extents(m, "a window without resize handles");
+	real_extents(m, fixed);
+
+	/* and when the client changes them */
+	set_mwm_hints(w, MWM_HINTS_FUNCTIONS, MWM_FUNC_ALL | MWM_FUNC_RESIZE |
+		      MWM_FUNC_MAXIMIZE, 0);
+	expect_actions(w, "a window that no longer resizes", "MOVE",
+		       "MINIMIZE", "CLOSE", "CHANGE_DESKTOP", "STICK",
+		       "ABOVE", "BELOW", NULL);
+
+	/* a dialog: dtwm's transient functions */
+	d = create_window("ewmhtest actions dialog", w);
+	map_managed(d);
+	expect_actions(d, "a transient", "MOVE", "RESIZE", "CLOSE",
+		       "CHANGE_DESKTOP", "STICK", "ABOVE", "BELOW", NULL);
+	expect_real_extents(d, "a transient");
+	real_extents(d, dialog);
+
+	/* docks and desktop windows: nothing, not even layers or desktops */
+	k = map_managed(create_typed("ewmhtest actions dock", "DOCK", NULL,
+				     0, 0, 200, 30, None));
+	expect_actions(k, "a dock", NULL);
+	expect_extents(k, no_extents, "a dock");
+	t = map_managed(create_typed("ewmhtest actions desktop", "DESKTOP",
+				     NULL, 0, 0, 200, 30, None));
+	expect_actions(t, "a desktop window", NULL);
+	t = map_managed(create_typed("ewmhtest actions notification",
+				     "NOTIFICATION", NULL, 500, 0, 200, 30,
+				     None));
+	expect_actions(t, "a notification", "CLOSE", "CHANGE_DESKTOP",
+		       "STICK", "ABOVE", "BELOW", NULL);
+
+	/* no decorations */
+	u = create_window("ewmhtest actions undecorated", None);
+	set_mwm_hints(u, MWM_HINTS_DECORATIONS, 0, 0);
+	map_managed(u);
+	expect_extents(u, no_extents, "an undecorated window");
+	expect_real_extents(u, "an undecorated window");
+	expect_actions(u, "an undecorated window", ALL_ACTIONS, NULL);
+
+	/* full screen has no frame, until it is left */
+	f = map_managed(create_window("ewmhtest actions full screen", None));
+	expect_extents(f, plain, "a plain window");
+	send_state(f, ADD, "FULLSCREEN", NULL);
+	expect_extents(f, no_extents, "a full screen window");
+	expect_real_extents(f, "a full screen window");
+	send_state(f, REMOVE, "FULLSCREEN", NULL);
+	expect_extents(f, plain, "a window that left full screen");
+	expect_real_extents(f, "a window that left full screen");
+
+	/* asked before the window is mapped: what it gets once mapped */
+	p = create_window("ewmhtest actions request", None);
+	request_extents(p, plain, "a plain window not mapped yet");
+	map_managed(p);
+	expect_real_extents(p, "the plain window, mapped");
+	real_extents(p, ext);
+	if (memcmp(ext, plain, sizeof ext))
+		fail("the frame extents of a window differ once mapped");
+
+	p = create_window("ewmhtest actions request move close", None);
+	set_mwm_hints(p, MWM_HINTS_FUNCTIONS, NOT_MOVE_CLOSE, 0);
+	request_extents(p, fixed, "a window without resize, not mapped yet");
+	p = create_window("ewmhtest actions request undecorated", None);
+	set_mwm_hints(p, MWM_HINTS_DECORATIONS, 0, 0);
+	request_extents(p, no_extents, "an undecorated window not mapped yet");
+	p = create_window("ewmhtest actions request dialog", w);
+	request_extents(p, dialog, "a transient not mapped yet");
+	p = create_typed("ewmhtest actions request dock", "DOCK", NULL,
+			 0, 0, 100, 20, None);
+	request_extents(p, no_extents, "a dock not mapped yet");
+
+	/* a request about a managed window answers too */
+	request_extents(m, fixed, "a managed window");
+
+	destroy_all();
+	printf("actions: ok\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* Window requests                                                     */
+/* ------------------------------------------------------------------ */
+
+/* Send a client message about w with five values. */
+static void send_msg5(Window w, Atom type, long l0, long l1, long l2,
+		      long l3, long l4)
+{
+	XEvent ev;
+
+	memset(&ev, 0, sizeof ev);
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = w;
+	ev.xclient.message_type = type;
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = l0;
+	ev.xclient.data.l[1] = l1;
+	ev.xclient.data.l[2] = l2;
+	ev.xclient.data.l[3] = l3;
+	ev.xclient.data.l[4] = l4;
+	XSendEvent(dpy, rootw, False,
+		   SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+	XFlush(dpy);
+}
+
+/* An event that wait_event looks for. */
+struct event_match {
+	Window window;
+	int type;
+	int mode;		/* of crossing and focus events, or -1 */
+	Atom message;		/* of a client message: data.l[0] */
+};
+
+static Bool event_matches(Display *d, XEvent *ev, XPointer arg)
+{
+	const struct event_match *m = (const struct event_match *)arg;
+
+	(void)d;
+	if (ev->type != m->type || ev->xany.window != m->window)
+		return False;
+	switch (ev->type) {
+	case EnterNotify:
+	case LeaveNotify:
+		return m->mode < 0 || ev->xcrossing.mode == m->mode;
+	case FocusIn:
+	case FocusOut:
+		return m->mode < 0 || ev->xfocus.mode == m->mode;
+	case ClientMessage:
+		return ev->xclient.format == 32 &&
+		       (Atom)ev->xclient.data.l[0] == m->message;
+	default:
+		return True;
+	}
+}
+
+/*
+ * Wait for an event (leaving the others queued), or fail.  Nothing that
+ * calls wait_notify, which drops events, may run between the action and
+ * this.
+ */
+static void wait_event(Window w, int type, int mode, Atom message,
+		       XEvent *out, const char *what)
+{
+	struct event_match m = { w, type, mode, message };
+	struct pollfd pfd = { ConnectionNumber(dpy), POLLIN, 0 };
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	XEvent ev;
+
+	XFlush(dpy);
+	while (!XCheckIfEvent(dpy, &ev, event_matches, (XPointer)&m)) {
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("timed out waiting for %s", what);
+		poll(&pfd, 1, 50);
+	}
+	if (out)
+		*out = ev;
+}
+
+#define ANY (-100000)
+
+/*
+ * Wait until the frame of w is at fx,fy and w is cw x ch (ANY: any), as
+ * dtwm configures windows without telling the client in every case.
+ */
+static void expect_geometry(Window w, int fx, int fy, int cw, int ch,
+			    const char *what)
+{
+	struct pollfd pfd = { ConnectionNumber(dpy), POLLIN, 0 };
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	int x, y, wd, ht, gx, gy, gw, gh;
+
+	for (;;) {
+		root_geometry(frame_of(w), &x, &y, &wd, &ht);
+		root_geometry(w, &gx, &gy, &gw, &gh);
+		if ((fx == ANY || x == fx) && (fy == ANY || y == fy) &&
+		    (cw == ANY || gw == cw) && (ch == ANY || gh == ch))
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("%s: the frame is at %d,%d and the window %dx%d, "
+			     "not %d,%d and %dx%d", what, x, y, gw, gh, fx, fy,
+			     cw, ch);
+		poll(&pfd, 1, 20);
+	}
+}
+
+/* Wait until the client window of w is at cx,cy. */
+static void expect_client_at(Window w, int cx, int cy, const char *what)
+{
+	struct pollfd pfd = { ConnectionNumber(dpy), POLLIN, 0 };
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	int x, y, wd, ht;
+
+	for (;;) {
+		root_geometry(w, &x, &y, &wd, &ht);
+		if (x == cx && y == cy)
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("%s: the window is at %d,%d, not %d,%d", what, x,
+			     y, cx, cy);
+		poll(&pfd, 1, 20);
+	}
+}
+
+#define MR_X		(1L << 8)
+#define MR_Y		(1L << 9)
+#define MR_W		(1L << 10)
+#define MR_H		(1L << 11)
+#define MR_PAGER	(2L << 12)
+
+static void moveresize_window(Window w, long flags, int x, int y, int wd,
+			      int ht)
+{
+	send_msg5(w, net_atom("_NET_MOVERESIZE_WINDOW"), flags | MR_PAGER,
+		  x, y, wd, ht);
+}
+
+static void restack(Window w, Window sibling, int detail)
+{
+	send_msg5(w, net_atom("_NET_RESTACK_WINDOW"), 2, (long)sibling,
+		  detail, 0, 0);
+}
+
+static int listed_in(Window w, Atom prop, const void *arg)
+{
+	return !not_listed(w, prop, arg);
+}
+
+static void test_close(void)
+{
+	Atom close = net_atom("_NET_CLOSE_WINDOW");
+	Atom del = net_atom("WM_DELETE_WINDOW");
+	Display *other;
+	Window w, k;
+	int have_xdotool = !system("xdotool version >/dev/null 2>&1");
+
+	/* a client that takes WM_DELETE_WINDOW is asked to close */
+	w = create_window("ewmhtest close politely", None);
+	XSetWMProtocols(dpy, w, &del, 1);
+	map_managed(w);
+	send_msg(w, close, CurrentTime);
+	wait_event(w, ClientMessage, -1, del, NULL,
+		   "WM_DELETE_WINDOW after _NET_CLOSE_WINDOW");
+	if (have_xdotool) {
+		xdotool("windowquit 0x%lx", w);
+		wait_event(w, ClientMessage, -1, del, NULL,
+			   "WM_DELETE_WINDOW after xdotool windowquit");
+	}
+
+	/* one that does not is killed: its own connection */
+	if (!(other = XOpenDisplay(NULL)))
+		fail("cannot open a second connection");
+	k = XCreateSimpleWindow(other, DefaultRootWindow(other), 50, 50, 200,
+				100, 0, 0, 0);
+	XStoreName(other, k, "ewmhtest close by force");
+	XMapWindow(other, k);
+	XSync(other, False);
+	wait_for(a_client_list, listed_in, &k, "the window to kill listed");
+	send_msg(k, close, CurrentTime);
+	wait_for(a_client_list, not_listed, &k,
+		 "the window without WM_DELETE_WINDOW killed");
+	/* (the connection is gone: never use it again) */
+
+	if (have_xdotool) {
+		if (!(other = XOpenDisplay(NULL)))
+			fail("cannot open a second connection");
+		k = XCreateSimpleWindow(other, DefaultRootWindow(other), 50, 50,
+					200, 100, 0, 0, 0);
+		XMapWindow(other, k);
+		XSync(other, False);
+		wait_for(a_client_list, listed_in, &k,
+			 "the window to kill listed");
+		xdotool("windowquit 0x%lx", k);
+		wait_for(a_client_list, not_listed, &k,
+			 "the window killed by xdotool windowquit");
+
+		/* windowclose destroys the window */
+		xdotool("windowclose 0x%lx", w);
+		wait_for(a_client_list, not_listed, &w,
+			 "the window closed by xdotool windowclose");
+		forget_window(w);
+	}
+	destroy_all();
+}
+
+static void test_moveresize_window(void)
+{
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	long e[4];
+	int x, y, fx, fy, fw, fh, fx2, fy2;
+	Window w;
+
+	w = map_managed(create_window("ewmhtest moveresize window", None));
+	expect_real_extents(w, "the window to move");
+	real_extents(w, e);
+
+	/* north-west gravity: the frame's corner */
+	moveresize_window(w, NorthWestGravity | MR_X | MR_Y | MR_W | MR_H,
+			  200, 150, 320, 180);
+	expect_geometry(w, 200, 150, 320, 180, "north-west gravity");
+
+	/* one value only */
+	moveresize_window(w, NorthWestGravity | MR_X, 260, 0, 0, 0);
+	expect_geometry(w, 260, 150, 320, 180, "x alone");
+	moveresize_window(w, NorthWestGravity | MR_H, 0, 0, 0, 220);
+	expect_geometry(w, 260, 150, 320, 220, "height alone");
+
+	/* static gravity: the client */
+	moveresize_window(w, StaticGravity | MR_X | MR_Y, 300, 250, 0, 0);
+	expect_client_at(w, 300, 250, "static gravity");
+	expect_geometry(w, 300 - (int)e[0], 250 - (int)e[2], 320, 220,
+			"static gravity");
+
+	/* south-east gravity: the bottom right corner stays */
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	moveresize_window(w, SouthEastGravity | MR_W | MR_H, 0, 0, 200, 100);
+	expect_geometry(w, fx + fw - (200 + (int)(e[0] + e[1])),
+			fy + fh - (100 + (int)(e[2] + e[3])), 200, 100,
+			"south-east gravity, size only");
+
+	/* and placed by its corner */
+	moveresize_window(w, SouthEastGravity | MR_X | MR_Y, 700, 500, 0, 0);
+	expect_geometry(w, 700 + 200 - (200 + (int)(e[0] + e[1])),
+			500 + 100 - (100 + (int)(e[2] + e[3])), 200, 100,
+			"south-east gravity, position");
+
+	/* center gravity: the centre stays */
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	moveresize_window(w, CenterGravity | MR_W | MR_H, 0, 0, 300, 160);
+	root_geometry(frame_of(w), &fx2, &fy2, &x, &y);
+	expect_geometry(w, ANY, ANY, 300, 160, "center gravity");
+	root_geometry(frame_of(w), &fx2, &fy2, &x, &y);
+	if (abs((fx2 + x / 2) - (fx + fw / 2)) > 1 ||
+	    abs((fy2 + y / 2) - (fy + fh / 2)) > 1)
+		fail("center gravity: the centre moved from %d,%d to %d,%d",
+		     fx + fw / 2, fy + fh / 2, fx2 + x / 2, fy2 + y / 2);
+
+	/* no gravity: as a ConfigureRequest (positionIsFrame) */
+	moveresize_window(w, MR_X | MR_Y, 100, 120, 0, 0);
+	expect_geometry(w, 100, 120, 300, 160, "no gravity");
+
+	/* xdotool: ConfigureRequests */
+	if (!system("xdotool version >/dev/null 2>&1")) {
+		xdotool("windowsize 0x%lx 410 230", w);
+		expect_geometry(w, 100, 120, 410, 230, "xdotool windowsize");
+		xdotool("windowmove 0x%lx 150 %d", w, sh / 2);
+		expect_geometry(w, 150, sh / 2, 410, 230,
+				"xdotool windowmove");
+	}
+	destroy_all();
+}
+
+static void test_restack(void)
+{
+	Window a, b, c, d;
+
+	a = map_managed(create_window("ewmhtest restack A", None));
+	b = map_managed(create_window("ewmhtest restack B", None));
+	c = map_managed(create_window("ewmhtest restack C", None));
+	expect_stack(3, a, b, c);
+
+	restack(a, c, Above);
+	expect_stack(3, b, c, a);
+	restack(a, b, Below);
+	expect_stack(3, a, b, c);
+	restack(b, c, Above);
+	expect_stack(3, a, c, b);
+	restack(c, a, Below);
+	expect_stack(3, c, a, b);
+	restack(c, None, Above);
+	expect_stack(3, a, b, c);
+	restack(c, None, Below);
+	expect_stack(3, c, a, b);
+
+	/* a window above the others stays there */
+	d = map_managed(create_window("ewmhtest restack D, above", None));
+	send_state(d, ADD, "ABOVE", NULL);
+	expect_state(d, "ABOVE", 1);
+	expect_stack(4, c, a, b, d);
+	restack(c, d, Above);
+	expect_stack(4, a, b, c, d);
+	restack(d, a, Below);
+	expect_stack(4, a, b, c, d);
+
+	destroy_all();
+}
+
+static void test_showing(void)
+{
+	Atom showing = net_atom("_NET_SHOWING_DESKTOP");
+	Window a, b, c, k, e;
+
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+
+	a = map_managed(create_window("ewmhtest showing A", None));
+	b = map_managed(create_window("ewmhtest showing B", None));
+	c = create_window("ewmhtest showing C, no minimize", None);
+	set_mwm_hints(c, MWM_HINTS_FUNCTIONS,
+		      MWM_FUNC_ALL | MWM_FUNC_MINIMIZE, 0);
+	map_managed(c);
+	k = map_managed(create_typed("ewmhtest showing dock", "DOCK", NULL,
+				     0, 0, 300, 30, None));
+	expect_card(k, a_wm_desktop, ALL_DESKTOPS, "_NET_WM_DESKTOP of the "
+		    "dock");
+
+	/* on: the windows that can be iconified are */
+	send_msg(rootw, showing, 1);
+	expect_card(rootw, showing, 1, "_NET_SHOWING_DESKTOP");
+	expect_state(a, "HIDDEN", 1);
+	expect_state(b, "HIDDEN", 1);
+	expect_state(c, "HIDDEN", 0);
+	if (has_state(k, state_atom("HIDDEN")))
+		fail("the dock is hidden");
+
+	/* off: they come back */
+	send_msg(rootw, showing, 0);
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+	expect_state(a, "HIDDEN", 0);
+	expect_state(b, "HIDDEN", 0);
+	expect_viewable(a, 1, "A");
+
+	/* a workspace change ends it: the windows stay iconified */
+	send_msg(rootw, showing, 1);
+	expect_card(rootw, showing, 1, "_NET_SHOWING_DESKTOP");
+	expect_state(a, "HIDDEN", 1);
+	send_msg(rootw, a_current, 1);
+	expect_card(rootw, a_current, 1, "_NET_CURRENT_DESKTOP");
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	expect_state(a, "HIDDEN", 1);
+	expect_state(b, "HIDDEN", 1);
+	send_msg(rootw, showing, 0);	/* nothing to restore */
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+	expect_state(a, "HIDDEN", 1);
+
+	/* so does a window that is mapped */
+	send_active(a);
+	wait_for(a_active, active_is, &a, "_NET_ACTIVE_WINDOW = A");
+	expect_state(a, "HIDDEN", 0);
+	send_msg(rootw, showing, 1);
+	expect_card(rootw, showing, 1, "_NET_SHOWING_DESKTOP");
+	expect_state(a, "HIDDEN", 1);
+	e = map_managed(create_window("ewmhtest showing E", None));
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+	expect_state(e, "HIDDEN", 0);
+	expect_state(a, "HIDDEN", 1);
+
+	/* or activated */
+	send_msg(rootw, showing, 1);
+	expect_card(rootw, showing, 1, "_NET_SHOWING_DESKTOP");
+	expect_state(e, "HIDDEN", 1);
+	send_active(c);
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+	expect_state(e, "HIDDEN", 1);
+
+	destroy_all();
+	expect_card(rootw, showing, 0, "_NET_SHOWING_DESKTOP");
+}
+
+static void test_requests(void)
+{
+	static const char *const supported[] = {
+		"_NET_CLOSE_WINDOW", "_NET_MOVERESIZE_WINDOW",
+		"_NET_RESTACK_WINDOW", "_NET_WM_MOVERESIZE",
+		"_NET_SHOWING_DESKTOP",
+	};
+	size_t i;
+
+	for (i = 0; i < sizeof supported / sizeof supported[0]; i++)
+		expect_supported(supported[i], 1);
+
+	test_close();
+	test_moveresize_window();
+	test_restack();
+	test_showing();
+	printf("requests: ok\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* _NET_WM_MOVERESIZE                                                  */
+/* ------------------------------------------------------------------ */
+
+#define MR_SIZE_TOPLEFT		0
+#define MR_SIZE_BOTTOMRIGHT	4
+#define MR_MOVE			8
+#define MR_SIZE_KEYBOARD	9
+#define MR_MOVE_KEYBOARD	10
+#define MR_CANCEL		11
+
+static void wm_moveresize(Window w, int x, int y, int direction)
+{
+	send_msg5(w, net_atom("_NET_WM_MOVERESIZE"), x, y, direction, 1, 1);
+}
+
+static void pointer_to(int x, int y)
+{
+	XTestFakeMotionEvent(dpy, -1, x, y, CurrentTime);
+	XSync(dpy, False);
+}
+
+static void pointer_at(int *x, int *y)
+{
+	Window r, c;
+	int wx, wy;
+	unsigned int mask;
+
+	XQueryPointer(dpy, rootw, &r, &c, x, y, &wx, &wy, &mask);
+}
+
+/* Wait until the pointer is at x,y (dtwm warps it). */
+static void expect_pointer(int x, int y, const char *what)
+{
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	int px, py;
+
+	for (;;) {
+		pointer_at(&px, &py);
+		if (px == x && py == y)
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("%s: the pointer is at %d,%d, not %d,%d", what,
+			     px, py, x, y);
+		usleep(5000);
+	}
+}
+
+/*
+ * Type a key that makes dtwm warp the pointer, and wait until it did:
+ * one key at a time, so that dtwm handles each on its own.
+ */
+static void key_warping(KeySym sym)
+{
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	KeyCode code = XKeysymToKeycode(dpy, sym);
+	int x, y, px, py;
+
+	pointer_at(&x, &y);
+	XTestFakeKeyEvent(dpy, code, True, CurrentTime);
+	XTestFakeKeyEvent(dpy, code, False, CurrentTime);
+	XSync(dpy, False);
+	for (;;) {
+		pointer_at(&px, &py);
+		if (px != x || py != y)
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("dtwm did not take key %s", XKeysymToString(sym));
+		usleep(5000);
+	}
+}
+
+static void key(KeySym sym)
+{
+	KeyCode code = XKeysymToKeycode(dpy, sym);
+
+	XTestFakeKeyEvent(dpy, code, True, CurrentTime);
+	XTestFakeKeyEvent(dpy, code, False, CurrentTime);
+	XSync(dpy, False);
+}
+
+/* dtwm grabbed the keyboard (and pointer) for a move or resize ... */
+static void wait_grab(Window w, const char *what)
+{
+	wait_event(w, FocusOut, NotifyGrab, None, NULL, what);
+}
+
+/* ... and let it go */
+static void wait_ungrab(Window w, const char *what)
+{
+	wait_event(w, FocusIn, NotifyUngrab, None, NULL, what);
+}
+
+/*
+ * Drag with the pointer from px,py by dx,dy, as a client that draws its
+ * own title bar and border does: it gets the button press, lets its grab
+ * go and asks dtwm to take over.
+ */
+static void drag(Window w, int px, int py, int dx, int dy, int direction,
+		 const char *what)
+{
+	char text[128];
+
+	pointer_to(px, py);
+	drain();
+	XTestFakeButtonEvent(dpy, 1, True, CurrentTime);
+	wait_event(w, ButtonPress, -1, None, NULL, "the button press");
+	XUngrabPointer(dpy, CurrentTime);
+	wm_moveresize(w, px, py, direction);
+	snprintf(text, sizeof text, "%s: dtwm's grab", what);
+	wait_grab(w, text);
+	pointer_to(px + dx / 2, py + dy / 2);
+	pointer_to(px + dx, py + dy);
+	XTestFakeButtonEvent(dpy, 1, False, CurrentTime);
+	XSync(dpy, False);
+	snprintf(text, sizeof text, "%s: the end of dtwm's grab", what);
+	wait_ungrab(w, text);
+}
+
+static void test_moveresize(void)
+{
+	int ev, er, maj, min, fx, fy, fw, fh, x, wd, ht, cx, cy;
+	XSetWindowAttributes swa;
+	Window w;
+
+	if (!XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
+		printf("moveresize: skipped (no XTEST)\n");
+		return;
+	}
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	w = create_window("ewmhtest moveresize", None);
+	swa.event_mask = StructureNotifyMask | PropertyChangeMask |
+			 ButtonPressMask | ButtonReleaseMask | FocusChangeMask;
+	XChangeWindowAttributes(dpy, w, CWEventMask, &swa);
+	map_managed(w);
+	moveresize_window(w, NorthWestGravity | MR_X | MR_Y | MR_W | MR_H,
+			  400, 300, 300, 200);
+	expect_geometry(w, 400, 300, 300, 200, "the window to drag");
+	send_active(w);
+	wait_for(a_active, active_is, &w, "_NET_ACTIVE_WINDOW = the window");
+	root_geometry(w, &cx, &cy, &wd, &ht);
+
+	/* move with the pointer */
+	drag(w, cx + 150, cy + 100, 80, 50, MR_MOVE, "move");
+	expect_geometry(w, 480, 350, 300, 200, "moved with the pointer");
+
+	/* resize from the bottom right and the top left corners */
+	root_geometry(w, &cx, &cy, &wd, &ht);
+	drag(w, cx + 200, cy + 150, 60, 40, MR_SIZE_BOTTOMRIGHT,
+	     "resize bottom right");
+	expect_geometry(w, 480, 350, 360, 240, "resized bottom right");
+	drag(w, cx + 20, cy + 30, -30, -20, MR_SIZE_TOPLEFT,
+	     "resize top left");
+	expect_geometry(w, 450, 330, 390, 260, "resized top left");
+
+	/* the button was released before dtwm grabbed the pointer */
+	root_geometry(w, &cx, &cy, &wd, &ht);
+	pointer_to(cx + 100, cy + 100);
+	drain();
+	XTestFakeButtonEvent(dpy, 1, True, CurrentTime);
+	wait_event(w, ButtonPress, -1, None, NULL, "the button press");
+	XUngrabPointer(dpy, CurrentTime);
+	pointer_to(cx + 130, cy + 120);
+	XTestFakeButtonEvent(dpy, 1, False, CurrentTime);
+	XSync(dpy, False);
+	wm_moveresize(w, cx + 100, cy + 100, MR_MOVE);
+	wait_grab(w, "a move after the release: dtwm's grab");
+	wait_ungrab(w, "a move after the release: its end");
+	expect_geometry(w, 480, 350, 390, 260, "moved after the release");
+	if (XGrabPointer(dpy, rootw, False, ButtonPressMask, GrabModeAsync,
+			 GrabModeAsync, None, None, CurrentTime) !=
+	    GrabSuccess)
+		fail("dtwm still holds the pointer after a move whose button "
+		     "was released");
+	XUngrabPointer(dpy, CurrentTime);
+
+	/* with the keyboard, then cancelled */
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	wm_moveresize(w, -1, -1, MR_MOVE_KEYBOARD);
+	wait_grab(w, "a keyboard move: dtwm's grab");
+	expect_pointer(fx + fw / 2, fy + fh / 2, "a keyboard move");
+	for (x = 0; x < 5; x++)
+		key_warping(XK_Right);
+	key_warping(XK_Down);
+	wm_moveresize(w, 0, 0, MR_CANCEL);
+	wait_ungrab(w, "a cancelled keyboard move: its end");
+	expect_geometry(w, fx, fy, 390, 260, "the cancelled keyboard move");
+
+	/* with the keyboard, done */
+	wm_moveresize(w, -1, -1, MR_MOVE_KEYBOARD);
+	wait_grab(w, "a keyboard move: dtwm's grab");
+	expect_pointer(fx + fw / 2, fy + fh / 2, "a keyboard move");
+	for (x = 0; x < 5; x++)
+		key_warping(XK_Right);
+	key_warping(XK_Down);
+	key(XK_Return);
+	wait_ungrab(w, "a keyboard move: its end");
+	expect_geometry(w, fx + 5, fy + 1, 390, 260, "the keyboard move");
+
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	wm_moveresize(w, -1, -1, MR_SIZE_KEYBOARD);
+	wait_grab(w, "a keyboard resize: dtwm's grab");
+	expect_pointer(fx + fw / 2, fy + fh / 2, "a keyboard resize");
+	for (x = 0; x < 4; x++)
+		key_warping(XK_Right);
+	key_warping(XK_Down);
+	key_warping(XK_Down);
+	key(XK_Return);
+	wait_ungrab(w, "a keyboard resize: its end");
+	expect_geometry(w, fx, fy, 394, 262, "the keyboard resize");
+
+	/* a resize cancelled while the button is down */
+	root_geometry(w, &cx, &cy, &wd, &ht);
+	pointer_to(cx + 100, cy + 100);
+	drain();
+	XTestFakeButtonEvent(dpy, 1, True, CurrentTime);
+	wait_event(w, ButtonPress, -1, None, NULL, "the button press");
+	XUngrabPointer(dpy, CurrentTime);
+	wm_moveresize(w, cx + 100, cy + 100, MR_SIZE_BOTTOMRIGHT);
+	wait_grab(w, "a resize to cancel: dtwm's grab");
+	pointer_to(cx + 150, cy + 170);
+	wm_moveresize(w, 0, 0, MR_CANCEL);
+	wait_ungrab(w, "a cancelled resize: its end");
+	XTestFakeButtonEvent(dpy, 1, False, CurrentTime);
+	XSync(dpy, False);
+	expect_geometry(w, fx, fy, 394, 262, "the cancelled resize");
+
+	/* nothing for a window that may not move */
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	set_mwm_hints(w, MWM_HINTS_FUNCTIONS, MWM_FUNC_ALL | MWM_FUNC_MOVE |
+		      MWM_FUNC_RESIZE, 0);
+	expect_actions(w, "the window that may not move", "MINIMIZE",
+		       "MAXIMIZE_HORZ", "MAXIMIZE_VERT", "FULLSCREEN", "CLOSE",
+		       "CHANGE_DESKTOP", "STICK", "ABOVE", "BELOW", NULL);
+	wm_moveresize(w, -1, -1, MR_MOVE_KEYBOARD);
+	key(XK_Right);
+	key(XK_Return);
+	/* a fence: dtwm handles the messages in turn */
+	send_state(w, ADD, "SKIP_PAGER", NULL);
+	expect_state(w, "SKIP_PAGER", 1);
+	expect_geometry(w, fx, fy, 394, 262, "a window that may not move");
+
+	destroy_all();
+	printf("moveresize: ok\n");
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
@@ -2113,6 +3078,9 @@ static const struct {
 	{ "struts", test_struts },
 	{ "xinerama", test_xinerama },
 	{ "panel", test_panel },
+	{ "actions", test_actions },
+	{ "requests", test_requests },
+	{ "moveresize", test_moveresize },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))

@@ -36,8 +36,11 @@
 #include "WmIconBox.h"
 #include "WmMultiHead.h"
 #include "WmProperty.h"
+#include "WmWinConf.h"
+#include "WmWinInfo.h"
 #include "WmWinState.h"
 #include "WmWrkspace.h"
+#include "WmCDInfo.h"
 
 /*
  * The window manager's EWMH state is published without reading the
@@ -60,6 +63,31 @@ static Atom xa__NET_CURRENT_DESKTOP;
 static Atom xa__NET_DESKTOP_NAMES;
 static Atom xa__NET_WM_WINDOW_TYPE;
 static Atom xa__NET_WORKAREA;
+static Atom xa__NET_WM_ALLOWED_ACTIONS;
+static Atom xa__NET_FRAME_EXTENTS;
+static Atom xa__NET_REQUEST_FRAME_EXTENTS;
+static Atom xa__NET_CLOSE_WINDOW;
+static Atom xa__NET_MOVERESIZE_WINDOW;
+static Atom xa__NET_RESTACK_WINDOW;
+static Atom xa__NET_SHOWING_DESKTOP;
+
+/* the _NET_WM_ALLOWED_ACTIONS atoms (shading is not supported) */
+enum {
+    NETACT_MOVE,
+    NETACT_RESIZE,
+    NETACT_MINIMIZE,
+    NETACT_STICK,
+    NETACT_MAXIMIZE_HORZ,
+    NETACT_MAXIMIZE_VERT,
+    NETACT_FULLSCREEN,
+    NETACT_CHANGE_DESKTOP,
+    NETACT_CLOSE,
+    NETACT_ABOVE,
+    NETACT_BELOW,
+    NETACT_COUNT
+};
+
+static Atom netActions[NETACT_COUNT];
 
 /*
  * The atoms, interned together by SetupWmEwmh.  _NET_SUPPORTED lists
@@ -131,6 +159,28 @@ static const struct
     NETTYPE (COMBO),
     NETTYPE (DND),
 #undef NETTYPE
+    { "_NET_WM_ALLOWED_ACTIONS",	&xa__NET_WM_ALLOWED_ACTIONS,	True },
+#define NETACT(a) \
+    { "_NET_WM_ACTION_" #a, &netActions[NETACT_ ## a],			True }
+    NETACT (MOVE),
+    NETACT (RESIZE),
+    NETACT (MINIMIZE),
+    NETACT (STICK),
+    NETACT (MAXIMIZE_HORZ),
+    NETACT (MAXIMIZE_VERT),
+    NETACT (FULLSCREEN),
+    NETACT (CHANGE_DESKTOP),
+    NETACT (CLOSE),
+    NETACT (ABOVE),
+    NETACT (BELOW),
+#undef NETACT
+    { "_NET_FRAME_EXTENTS",		&xa__NET_FRAME_EXTENTS,		True },
+    { "_NET_REQUEST_FRAME_EXTENTS",	&xa__NET_REQUEST_FRAME_EXTENTS,	True },
+    { "_NET_CLOSE_WINDOW",		&xa__NET_CLOSE_WINDOW,		True },
+    { "_NET_MOVERESIZE_WINDOW",		&xa__NET_MOVERESIZE_WINDOW,	True },
+    { "_NET_RESTACK_WINDOW",		&xa__NET_RESTACK_WINDOW,	True },
+    { "_NET_WM_MOVERESIZE",		&wmGD.xa__NET_WM_MOVERESIZE,	True },
+    { "_NET_SHOWING_DESKTOP",		&xa__NET_SHOWING_DESKTOP,	True },
 };
 
 /*
@@ -203,6 +253,11 @@ static const struct
 };
 
 #define NETSTATE_BIT(s)		(1u << NETSTATE_ ## s)
+#define NETACT_BIT(a)		(1u << NETACT_ ## a)
+
+/* Desktop windows and docks: not moved between desktops or layers. */
+#define IS_DESKTOP_OR_DOCK(pCD) \
+    ((pCD)->netType == NETTYPE_DESKTOP || (pCD)->netType == NETTYPE_DOCK)
 
 /* The client whose _NET_WM_STATE_FOCUSED was last marked. */
 static ClientData *netFocusClient;
@@ -326,7 +381,8 @@ void EwmhAddClient (ClientData *pCD)
     pCD->netFlags |= NET_FLAG_LISTED;
 
     EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING);
-    EwmhMarkClient (pCD, NET_CD_DESKTOP | NET_CD_STATE);
+    EwmhMarkClient (pCD, NET_CD_DESKTOP | NET_CD_STATE | NET_CD_ACTIONS |
+			 NET_CD_EXTENTS);
 
     /* (while the initial property list is known) */
     ProcessNetWmStrut (pCD, True);
@@ -372,6 +428,18 @@ void EwmhRemoveClient (ClientData *pCD)
 
     if (netFocusClient == pCD)
 	netFocusClient = NULL;
+
+    /* not to be restored when the desktop is no longer shown */
+    for (i = 0; i < pSD->numShowHidden; ++i)
+    {
+	if (pSD->pShowHidden[i] == pCD)
+	{
+	    memmove (&pSD->pShowHidden[i], &pSD->pShowHidden[i + 1],
+		     (pSD->numShowHidden - i - 1) * sizeof (ClientData *));
+	    --pSD->numShowHidden;
+	    break;
+	}
+    }
 
     if (!(pCD->netFlags & NET_FLAG_LISTED)) return;
     pCD->netFlags &= ~NET_FLAG_LISTED;
@@ -623,12 +691,63 @@ static unsigned int NetWmState (ClientData *pCD)
 }
 
 
-/* Client window properties: _NET_WM_DESKTOP, _NET_WM_STATE. */
+/*
+ * _NET_WM_ALLOWED_ACTIONS, as NETACT bits: what the client's functions
+ * allow, and changing desktops and layers except for desktop windows and
+ * docks (and desktops in mwm mode).  Maximizing allows full screen too.
+ */
+static unsigned int NetWmAllowedActions (ClientData *pCD)
+{
+    long functions = pCD->clientFunctions;
+    unsigned int actions = 0;
+
+    if (functions & MWM_FUNC_MOVE) actions |= NETACT_BIT (MOVE);
+    if (functions & MWM_FUNC_RESIZE) actions |= NETACT_BIT (RESIZE);
+    if (functions & MWM_FUNC_MINIMIZE) actions |= NETACT_BIT (MINIMIZE);
+    if (functions & MWM_FUNC_MAXIMIZE)
+	actions |= NETACT_BIT (MAXIMIZE_HORZ) | NETACT_BIT (MAXIMIZE_VERT) |
+		   NETACT_BIT (FULLSCREEN);
+    if (functions & MWM_FUNC_CLOSE) actions |= NETACT_BIT (CLOSE);
+
+    if (IS_DESKTOP_OR_DOCK (pCD)) return actions;
+
+    if (!wmGD.useStandardBehavior &&
+	(pCD->dtwmFunctions & DtWM_FUNCTION_OCCUPY_WS))
+	actions |= NETACT_BIT (CHANGE_DESKTOP) | NETACT_BIT (STICK);
+    actions |= NETACT_BIT (ABOVE) | NETACT_BIT (BELOW);
+
+    return actions;
+}
+
+
+/*
+ * _NET_FRAME_EXTENTS (left, right, top, bottom): the offsets of the
+ * client in its frame, the same on the sides and at the bottom; none for
+ * a full screen window, which is shown without its frame.
+ */
+static void NetFrameExtents (ClientData *pCD, long extents[4])
+{
+    if (pCD->fullscreen && pCD->maxConfig)
+    {
+	extents[0] = extents[1] = extents[2] = extents[3] = 0;
+    }
+    else
+    {
+	extents[0] = extents[1] = extents[3] = pCD->clientOffset.x;
+	extents[2] = pCD->clientOffset.y;
+    }
+}
+
+
+/*
+ * Client window properties: _NET_WM_DESKTOP, _NET_WM_STATE,
+ * _NET_WM_ALLOWED_ACTIONS, _NET_FRAME_EXTENTS.
+ */
 static void FlushClient (ClientData *pCD)
 {
-    Atom atoms[NETSTATE_COUNT];
-    unsigned int state;
-    long desktop;
+    Atom atoms[NETSTATE_COUNT], actionAtoms[NETACT_COUNT];
+    unsigned int state, actions;
+    long desktop, extents[4];
     int i, num = 0;
 
     if (pCD->netDirty & NET_CD_DESKTOP)
@@ -655,6 +774,33 @@ static void FlushClient (ClientData *pCD)
 	    XChangeProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_STATE,
 		XA_ATOM, 32, PropModeReplace, (unsigned char *)atoms, num);
 	    pCD->netStateWritten = state;
+	}
+    }
+
+    if (pCD->netDirty & NET_CD_ACTIONS)
+    {
+	actions = NetWmAllowedActions (pCD);
+	if (actions != pCD->netActionsWritten)
+	{
+	    for (i = num = 0; i < NETACT_COUNT; ++i)
+		if (actions & (1u << i))
+		    actionAtoms[num++] = netActions[i];
+	    XChangeProperty (DISPLAY, pCD->client, xa__NET_WM_ALLOWED_ACTIONS,
+		XA_ATOM, 32, PropModeReplace, (unsigned char *)actionAtoms,
+		num);
+	    pCD->netActionsWritten = actions;
+	}
+    }
+
+    /* (going full screen and back is a change of state) */
+    if (pCD->netDirty & (NET_CD_EXTENTS | NET_CD_STATE))
+    {
+	NetFrameExtents (pCD, extents);
+	if (memcmp (extents, pCD->netExtentsWritten, sizeof (extents)))
+	{
+	    XChangeProperty (DISPLAY, pCD->client, xa__NET_FRAME_EXTENTS,
+		XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
+	    memcpy (pCD->netExtentsWritten, extents, sizeof (extents));
 	}
     }
 
@@ -1202,15 +1348,19 @@ Boolean GetNetWmTypeWorkspaces (ClientData *pCD, WorkspaceID **ppIDs,
  *
  *************************************<->***********************************/
 
-void ProcessNetWmWindowType (ClientData *pCD)
+/*
+ * The type of a window: the first type in its _NET_WM_WINDOW_TYPE that
+ * dtwm knows, else a dialog for a transient window and a normal window
+ * for the others.
+ */
+static int ReadNetWmWindowType (Window window, Boolean transient)
 {
     Atom actualType;
     int actualFormat, type = -1, t;
     unsigned long nitems, leftover, i;
     Atom *types = NULL;
 
-    if (HasProperty (pCD, xa__NET_WM_WINDOW_TYPE) &&
-	XGetWindowProperty (DISPLAY, pCD->client, xa__NET_WM_WINDOW_TYPE,
+    if (XGetWindowProperty (DISPLAY, window, xa__NET_WM_WINDOW_TYPE,
 	    0L, 32L, False, XA_ATOM, &actualType, &actualFormat, &nitems,
 	    &leftover, (unsigned char **)&types) == Success &&
 	actualType == XA_ATOM && actualFormat == 32)
@@ -1226,8 +1376,19 @@ void ProcessNetWmWindowType (ClientData *pCD)
     if (types) XFree (types);
 
     if (type < 0)
-	type = (pCD->clientFlags & CLIENT_TRANSIENT) ?
-	    NETTYPE_DIALOG : NETTYPE_NORMAL;
+	type = transient ? NETTYPE_DIALOG : NETTYPE_NORMAL;
+    return type;
+}
+
+void ProcessNetWmWindowType (ClientData *pCD)
+{
+    Boolean transient = (pCD->clientFlags & CLIENT_TRANSIENT) != 0;
+    int type;
+
+    if (HasProperty (pCD, xa__NET_WM_WINDOW_TYPE))
+	type = ReadNetWmWindowType (pCD->client, transient);
+    else
+	type = transient ? NETTYPE_DIALOG : NETTYPE_NORMAL;
 
     pCD->netType = type;
     pCD->layer = netTypes[type].layer;
@@ -1393,7 +1554,7 @@ void ProcessNetWmDesktop (ClientData *pCD, unsigned long desktop)
     WorkspaceID id;
     int i, numOthers = 0;
 
-    if (wmGD.useStandardBehavior ||
+    if (wmGD.useStandardBehavior || IS_DESKTOP_OR_DOCK (pCD) ||
 	!(pCD->dtwmFunctions & DtWM_FUNCTION_OCCUPY_WS))
 	return;
 
@@ -1422,6 +1583,501 @@ void ProcessNetWmDesktop (ClientData *pCD, unsigned long desktop)
     pcdLeader->putInAll = pCD->putInAll = False;
     EwmhMarkClient (pCD, NET_CD_DESKTOP);
     EwmhMarkClient (pcdLeader, NET_CD_DESKTOP);
+}
+
+
+/*
+ * _NET_SHOWING_DESKTOP: dtwm shows the desktop the CDE way, by
+ * iconifying the windows of the current workspace.
+ */
+static void FlushNetShowingDesktop (WmScreenData *pSD)
+{
+    long showing = pSD->showingDesktop ? 1 : 0;
+
+    if (showing == pSD->netShowingWritten) return;
+
+    XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_SHOWING_DESKTOP,
+	XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&showing, 1);
+    pSD->netShowingWritten = showing;
+}
+
+
+/*
+ * Show the desktop: iconify the listed windows shown in the current
+ * workspace that may be iconified (their transients go with them), not
+ * desktop windows or docks, and note them.  Stop showing it: restore
+ * those that are still iconified.
+ */
+static void ProcessNetShowingDesktop (WmScreenData *pSD, Boolean show)
+{
+    WmWorkspaceData *pWS = pSD->pActiveWS;
+    ClientData **ppHidden, **ppClients, *pCD;
+    int i, num;
+    Time now;
+
+    if (!show == !pSD->showingDesktop) return;
+    now = GetTimestamp ();
+
+    if (show)
+    {
+	/* (the workspace's list may change as windows are iconified) */
+	num = pWS->numClients;
+	ppClients = (ClientData **) XtMalloc ((num + 1) * sizeof (ClientData *));
+	memcpy (ppClients, pWS->ppClients, num * sizeof (ClientData *));
+	pSD->pShowHidden = (ClientData **) XtMalloc ((num + 1) *
+						     sizeof (ClientData *));
+	pSD->numShowHidden = 0;
+
+	for (i = 0; i < num; ++i)
+	{
+	    pCD = ppClients[i];
+	    if (pCD->transientLeader || IS_DESKTOP_OR_DOCK (pCD) ||
+		!(pCD->netFlags & NET_FLAG_LISTED) ||
+		!(pCD->clientFunctions & MWM_FUNC_MINIMIZE) ||
+		(pCD->clientState != NORMAL_STATE &&
+		 pCD->clientState != MAXIMIZED_STATE))
+		continue;
+
+	    SetClientState (pCD, MINIMIZED_STATE, now);
+	    if (pCD->clientState == MINIMIZED_STATE)
+		pSD->pShowHidden[pSD->numShowHidden++] = pCD;
+	}
+	XtFree ((char *)ppClients);
+	pSD->showingDesktop = True;
+    }
+    else
+    {
+	ppHidden = pSD->pShowHidden;
+	num = pSD->numShowHidden;
+	pSD->pShowHidden = NULL;
+	pSD->numShowHidden = 0;
+	pSD->showingDesktop = False;
+
+	for (i = 0; i < num; ++i)
+	{
+	    pCD = ppHidden[i];
+	    if (pCD->clientState == MINIMIZED_STATE)
+		SetClientState (pCD,
+		    pCD->maxConfig ? MAXIMIZED_STATE : NORMAL_STATE, now);
+	}
+	XtFree ((char *)ppHidden);
+    }
+
+    EwmhMarkScreen (pSD, NET_SD_SHOWING);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  EwmhLeaveShowingDesktop (pSD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  The desktop is no longer shown once the workspace changes or a window
+ *  is shown or activated: the windows iconified to show it stay so.
+ *
+ *************************************<->***********************************/
+
+void EwmhLeaveShowingDesktop (WmScreenData *pSD)
+{
+    if (!pSD->showingDesktop) return;
+
+    XtFree ((char *)pSD->pShowHidden);
+    pSD->pShowHidden = NULL;
+    pSD->numShowHidden = 0;
+    pSD->showingDesktop = False;
+    EwmhMarkScreen (pSD, NET_SD_SHOWING);
+}
+
+
+/*
+ * A client is shown (SetClientState, normal or maximized): that ends
+ * showing the desktop, unless it is a desktop window or a dock.
+ */
+void EwmhClientShown (ClientData *pCD)
+{
+    if (pCD->pSD->showingDesktop && (pCD->netFlags & NET_FLAG_LISTED) &&
+	!IS_DESKTOP_OR_DOCK (pCD))
+	EwmhLeaveShowingDesktop (pCD->pSD);
+}
+
+
+/*
+ * Estimate the decorations of a window that is not managed yet, for
+ * _NET_REQUEST_FRAME_EXTENTS: those that ProcessMwmHints would give it
+ * from its type, transient or not, and _MOTIF_WM_HINTS, without the
+ * client resources (their default).
+ */
+static void EstimateDecoration (ClientData *pCD)
+{
+    long functions, decoration;
+    PropMwmHints *pHints;
+
+    if (pCD->clientFlags & CLIENT_TRANSIENT)
+    {
+	functions = TRANSIENT_FUNCTIONS (pCD);
+	decoration = TRANSIENT_DECORATION (pCD);
+    }
+    else
+    {
+	functions = WM_FUNC_ALL;
+	decoration = WM_DECOR_ALL;
+    }
+    functions = NetTypeFunctions (pCD, functions);
+    decoration = NetTypeDecoration (pCD, decoration);
+
+    /* (the initial property list is not known: GetMwmHints reads it) */
+    if ((pHints = GetMwmHints (pCD)) != NULL)
+    {
+	if (pHints->flags & MWM_HINTS_FUNCTIONS)
+	{
+	    if (pHints->functions == WM_FUNC_NONE)
+		functions = WM_FUNC_NONE;
+	    else if (pHints->functions == WM_FUNC_DEFAULT)
+		functions = WM_FUNC_ALL;
+	    else if (pHints->functions & WM_FUNC_DEFAULT)
+		functions &= ~(pHints->functions);
+	    else
+		functions |= pHints->functions;
+	}
+	if (pHints->flags & MWM_HINTS_DECORATIONS)
+	{
+	    if (pHints->decorations == WM_DECOR_NONE)
+		decoration = WM_DECOR_NONE;
+	    else if (pHints->decorations == WM_DECOR_DEFAULT)
+		decoration = WM_DECOR_ALL;
+	    else if (pHints->decorations & WM_DECOR_DEFAULT)
+		decoration &= ~(pHints->decorations);
+	    else
+		decoration |= pHints->decorations;
+
+	    if (decoration &
+		(MWM_DECOR_MENU | MWM_DECOR_MINIMIZE | MWM_DECOR_MAXIMIZE))
+		decoration |= MWM_DECOR_TITLE;
+	    if (decoration & MWM_DECOR_RESIZEH)
+		decoration |= MWM_DECOR_BORDER;
+	}
+	XFree ((char *)pHints);
+    }
+
+    if (!(functions & MWM_FUNC_RESIZE))
+	decoration &= ~MWM_DECOR_RESIZEH;
+
+    pCD->clientFunctions = functions;
+    pCD->clientDecoration = pCD->decor = decoration;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  HandleNetPrematureMessage (clientEvent)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Handles an EWMH message about a window that is not managed yet, which
+ *  other messages wait for (HandleEventsOnSpecialWindows keeps them):
+ *  answers _NET_REQUEST_FRAME_EXTENTS with the _NET_FRAME_EXTENTS that
+ *  the window would have, as far as can be told before managing it (one
+ *  about a managed window is handled by HandleNetClientMessage), and
+ *  drops _NET_WM_MOVERESIZE, which cannot be about a button pressed on
+ *  the window.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  clientEvent = a client message on a window that dtwm does not manage
+ *
+ *  Outputs:
+ *  -------
+ *  RETURN = True if it was handled, False if it is to wait
+ *
+ *************************************<->***********************************/
+
+Boolean HandleNetPrematureMessage (XClientMessageEvent *clientEvent)
+{
+    WmScreenData *pSD;
+    ClientData *pCD;
+    Window root, leader;
+    int x, y;
+    unsigned int width, height, border, depth;
+    long extents[4];
+
+    if (clientEvent->message_type == wmGD.xa__NET_WM_MOVERESIZE)
+	return True;
+    if (clientEvent->message_type != xa__NET_REQUEST_FRAME_EXTENTS)
+	return False;
+
+    if (!XGetGeometry (DISPLAY, clientEvent->window, &root, &x, &y,
+		       &width, &height, &border, &depth) ||
+	XFindContext (DISPLAY, root, wmGD.screenContextType,
+		      (caddr_t *)&pSD) ||
+	!pSD->managed)
+	return True;
+
+    /* a client of which only what SetClientOffset uses is set */
+    pCD = (ClientData *) XtCalloc (1, sizeof (ClientData));
+    pCD->pSD = pSD;
+    pCD->client = clientEvent->window;
+    pCD->xBorderWidth = border;
+    pCD->internalBevel = (wmGD.frameStyle == WmSLAB) ? 0 :
+					    FRAME_INTERNAL_SHADOW_WIDTH;
+    if (XGetTransientForHint (DISPLAY, pCD->client, &leader))
+	pCD->clientFlags |= CLIENT_TRANSIENT;
+    pCD->netType = ReadNetWmWindowType (pCD->client,
+	(pCD->clientFlags & CLIENT_TRANSIENT) != 0);
+
+    EstimateDecoration (pCD);
+    SetClientOffset (pCD);
+    NetFrameExtents (pCD, extents);
+    XtFree ((char *)pCD);
+
+    XChangeProperty (DISPLAY, clientEvent->window, xa__NET_FRAME_EXTENTS,
+	XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
+    return True;
+}
+
+
+/* Gravity along an axis: where the reference point is. */
+enum { GRAVITY_START, GRAVITY_CENTER, GRAVITY_END, GRAVITY_STATIC };
+
+static int GravityAlongX (int gravity)
+{
+    switch (gravity)
+    {
+	case NorthGravity: case CenterGravity: case SouthGravity:
+	    return GRAVITY_CENTER;
+	case NorthEastGravity: case EastGravity: case SouthEastGravity:
+	    return GRAVITY_END;
+	case StaticGravity:
+	    return GRAVITY_STATIC;
+	default:
+	    return GRAVITY_START;
+    }
+}
+
+static int GravityAlongY (int gravity)
+{
+    switch (gravity)
+    {
+	case WestGravity: case CenterGravity: case EastGravity:
+	    return GRAVITY_CENTER;
+	case SouthWestGravity: case SouthGravity: case SouthEastGravity:
+	    return GRAVITY_END;
+	case StaticGravity:
+	    return GRAVITY_STATIC;
+	default:
+	    return GRAVITY_START;
+    }
+}
+
+/*
+ * ICCCM window gravity along an axis: the frame is placed so that its
+ * reference point is where that of the window (its size plus its border,
+ * at pos) would be; with static gravity the client is where the inside
+ * of the window would be.  The reference point of a window, that of the
+ * frame of a client (at client in it, with offsets before and after),
+ * and where the client goes for a reference point.
+ */
+static int WindowReference (int along, int pos, int size, int border)
+{
+    int outside = size + 2 * border;
+
+    switch (along)
+    {
+	case GRAVITY_CENTER:	return pos + outside / 2;
+	case GRAVITY_END:	return pos + outside;
+	case GRAVITY_STATIC:	return pos + border;
+	default:		return pos;
+    }
+}
+
+static int FrameReference (int along, int client, int size, int before,
+    int after)
+{
+    int start = client - before, frame = size + before + after;
+
+    switch (along)
+    {
+	case GRAVITY_CENTER:	return start + frame / 2;
+	case GRAVITY_END:	return start + frame;
+	case GRAVITY_STATIC:	return client;
+	default:		return start;
+    }
+}
+
+static int ReferenceToClient (int along, int ref, int size, int before,
+    int after)
+{
+    int frame = size + before + after;
+
+    switch (along)
+    {
+	case GRAVITY_CENTER:	return ref - frame / 2 + before;
+	case GRAVITY_END:	return ref - frame + before;
+	case GRAVITY_STATIC:	return ref;
+	default:		return ref + before;
+    }
+}
+
+
+/*
+ * _NET_MOVERESIZE_WINDOW: a ConfigureRequest of the values that the
+ * flags give (bits 8 to 11: x, y, width, height).  With a gravity (bits
+ * 0 to 7) the window is placed by it as ICCCM says, and a new size
+ * without a position keeps the frame's reference point (a window with
+ * south-east gravity grows to the left and up); without a gravity, the
+ * values are taken as in a ConfigureRequest (positionIsFrame).
+ */
+static void ProcessNetMoveResizeWindow (ClientData *pCD, long *data)
+{
+    XConfigureRequestEvent request;
+    long flags = data[0];
+    int gravity = flags & 0xFF;
+    int refX, refY, width, height, clientX, clientY, xOff, yOff;
+    int left = pCD->clientOffset.x, top = pCD->clientOffset.y;
+    int border = pCD->xBorderWidth;
+
+    memset ((char *)&request, 0, sizeof (request));
+    request.type = ConfigureRequest;
+    request.display = DISPLAY;
+    request.parent = pCD->clientBaseWin;
+    request.window = pCD->client;
+    if (flags & (1L << 8)) request.value_mask |= CWX;
+    if (flags & (1L << 9)) request.value_mask |= CWY;
+    if (flags & (1L << 10)) request.value_mask |= CWWidth;
+    if (flags & (1L << 11)) request.value_mask |= CWHeight;
+    request.x = data[1];
+    request.y = data[2];
+    request.width = data[3];
+    request.height = data[4];
+
+    if (!request.value_mask || gravity > StaticGravity) return;
+
+    if (gravity)
+    {
+	int along = GravityAlongX (gravity), down = GravityAlongY (gravity);
+
+	clientX = pCD->maxConfig ? pCD->maxX : pCD->clientX;
+	clientY = pCD->maxConfig ? pCD->maxY : pCD->clientY;
+	width = pCD->maxConfig ? pCD->maxWidth : pCD->clientWidth;
+	height = pCD->maxConfig ? pCD->maxHeight : pCD->clientHeight;
+
+	/* a position not given keeps the reference point of the frame */
+	refX = FrameReference (along, clientX, width, left, left);
+	refY = FrameReference (down, clientY, height, top, left);
+	if (request.value_mask & (CWWidth | CWHeight))
+	{
+	    /* the size it will get */
+	    unsigned int fixedWidth, fixedHeight;
+
+	    fixedWidth = (request.value_mask & CWWidth) ? request.width : width;
+	    fixedHeight = (request.value_mask & CWHeight) ?
+		request.height : height;
+	    FixWindowConfiguration (pCD, &fixedWidth, &fixedHeight,
+		(unsigned int) pCD->widthInc, (unsigned int) pCD->heightInc);
+	    width = fixedWidth;
+	    height = fixedHeight;
+	}
+	if (request.value_mask & CWX)
+	    refX = WindowReference (along, request.x, width, border);
+	if (request.value_mask & CWY)
+	    refY = WindowReference (down, request.y, height, border);
+
+	clientX = ReferenceToClient (along, refX, width, left, left);
+	clientY = ReferenceToClient (down, refY, height, top, left);
+
+	/* in ConfigureRequest terms */
+	xOff = wmGD.positionIsFrame ? left : 0;
+	yOff = wmGD.positionIsFrame ? top : 0;
+	request.x = clientX - xOff;
+	request.y = clientY - yOff;
+	request.value_mask |= CWX | CWY;
+    }
+
+    HandleCConfigureRequest (pCD, &request);
+}
+
+
+/* _NET_RESTACK_WINDOW: a ConfigureRequest to restack (in its layer). */
+static void ProcessNetRestackWindow (ClientData *pCD, Window sibling,
+    int detail)
+{
+    XConfigureRequestEvent request;
+
+    if (detail < Above || detail > Opposite) return;
+
+    memset ((char *)&request, 0, sizeof (request));
+    request.type = ConfigureRequest;
+    request.display = DISPLAY;
+    request.parent = pCD->clientBaseWin;
+    request.window = pCD->client;
+    request.value_mask = CWStackMode | (sibling ? CWSibling : 0);
+    request.above = sibling;
+    request.detail = detail;
+
+    HandleCConfigureRequest (pCD, &request);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  HandleNetClientMessage (pCD, clientEvent)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Handles the EWMH requests about a listed client that
+ *  HandleClientMessage does not: _NET_CLOSE_WINDOW (as f.kill),
+ *  _NET_MOVERESIZE_WINDOW, _NET_RESTACK_WINDOW, _NET_WM_MOVERESIZE and
+ *  _NET_REQUEST_FRAME_EXTENTS.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = client
+ *
+ *  clientEvent = the client message
+ *
+ *************************************<->***********************************/
+
+void HandleNetClientMessage (ClientData *pCD, XClientMessageEvent *clientEvent)
+{
+    Atom type = clientEvent->message_type;
+    long *data = clientEvent->data.l;
+    long extents[4];
+
+    if (clientEvent->format != 32 || !(pCD->netFlags & NET_FLAG_LISTED))
+	return;
+
+    if (type == xa__NET_CLOSE_WINDOW)
+    {
+	F_Kill (NULL, pCD, NULL);
+    }
+    else if (type == xa__NET_MOVERESIZE_WINDOW)
+    {
+	ProcessNetMoveResizeWindow (pCD, data);
+    }
+    else if (type == xa__NET_RESTACK_WINDOW)
+    {
+	ProcessNetRestackWindow (pCD, (Window)data[1], (int)data[2]);
+    }
+    else if (type == wmGD.xa__NET_WM_MOVERESIZE)
+    {
+	/* (a cancel comes while the move or resize goes on) */
+	if (data[2] != _NET_WM_MOVERESIZE_CANCEL)
+	    HandleNetMoveResize (pCD, data[2], (int)data[0], (int)data[1],
+				 (unsigned int)data[3]);
+    }
+    else if (type == xa__NET_REQUEST_FRAME_EXTENTS)
+    {
+	/* written again, for the client to see it */
+	NetFrameExtents (pCD, extents);
+	XChangeProperty (DISPLAY, pCD->client, xa__NET_FRAME_EXTENTS,
+	    XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
+	memcpy (pCD->netExtentsWritten, extents, sizeof (extents));
+    }
 }
 
 
@@ -1470,6 +2126,7 @@ static Boolean EwmhFlushProc (XtPointer clientData)
 	if (bits & NET_SD_DESKTOPS) FlushNetDesktops (pSD);
 	if (bits & NET_SD_NAMES) FlushNetDesktopNames (pSD);
 	if (bits & NET_SD_WORKAREA) FlushNetWorkArea (pSD);
+	if (bits & NET_SD_SHOWING) FlushNetShowingDesktop (pSD);
     }
 
     return True;
@@ -1644,8 +2301,16 @@ void HandleNetRootMessage (WmScreenData *pSD, XClientMessageEvent *clientEvent)
     long value = clientEvent->data.l[0];
     int num;
 
+    if (clientEvent->format != 32) return;
+
+    if (type == xa__NET_SHOWING_DESKTOP)
+    {
+	ProcessNetShowingDesktop (pSD, value != 0);
+	return;
+    }
+
     /* in mwm mode, there is one desktop */
-    if (clientEvent->format != 32 || wmGD.useStandardBehavior) return;
+    if (wmGD.useStandardBehavior) return;
 
     if (type == xa__NET_CURRENT_DESKTOP)
     {
@@ -1693,6 +2358,7 @@ void ProcessNetActiveWindow (ClientData *pCD, Time timestamp)
 
     SetActiveScreen (pCD->pSD);
     if (pWS != pCD->pSD->pActiveWS) ChangeToWorkspace (pWS);
+    if (!IS_DESKTOP_OR_DOCK (pCD)) EwmhLeaveShowingDesktop (pCD->pSD);
     if (timestamp == CurrentTime) timestamp = GetTimestamp ();
 
     if (pLeader->clientState == MINIMIZED_STATE)
@@ -2022,6 +2688,7 @@ void SetupWmEwmh (void)
 			(unsigned char *)supported, numSupported);
 
 	EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING | NET_SD_ACTIVE |
-			     NET_SD_DESKTOPS | NET_SD_NAMES | NET_SD_WORKAREA);
+			     NET_SD_DESKTOPS | NET_SD_NAMES | NET_SD_WORKAREA |
+			     NET_SD_SHOWING);
     }
 }

@@ -61,7 +61,7 @@ ewmhtest: ewmhtest.c benchutil.c benchutil.h
 	$(CC) $(CFLAGS) $(WARN) \
 		-DEWMHTEST_WM='"$(ABSTOP)/programs/dtwm/.libs/dtwm"' \
 		-DEWMHTEST_LIBPATH='"$(LIBPATH)"' \
-		-o $@ ewmhtest.c benchutil.c $(XLIBS) -ldl
+		-o $@ ewmhtest.c benchutil.c $(XTST) $(XLIBS) -ldl
 
 cdebench-proxy: proxy.c
 	$(CC) $(CFLAGS) $(WARN) -o $@ proxy.c

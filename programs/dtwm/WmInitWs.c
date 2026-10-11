@@ -1290,6 +1290,10 @@ InitWmScreen (WmScreenData *pSD, int sNum)
     pSD->numStrutClients = 0;
     pSD->workAreaWritten = NULL;
     pSD->numWorkAreaWritten = -1;
+    pSD->showingDesktop = False;
+    pSD->netShowingWritten = -1;
+    pSD->pShowHidden = NULL;
+    pSD->numShowHidden = 0;
 
     /*
      *  We've got display resolution type--now, let's get color

@@ -620,7 +620,14 @@ Boolean HandleEventsOnSpecialWindows (XEvent *pEvent)
 
 	    case ClientMessage:
 	    {
-		AcceptPrematureClientMessage ((XClientMessageEvent *)pEvent);
+		/*
+		 * A request for frame extents is answered now, other
+		 * messages once the window is managed (see
+		 * HandleNetPrematureMessage).
+		 */
+		if (!HandleNetPrematureMessage ((XClientMessageEvent *)pEvent))
+		    AcceptPrematureClientMessage (
+			(XClientMessageEvent *)pEvent);
 		break;
 	    }
 	}
@@ -2721,6 +2728,10 @@ void HandleClientMessage (ClientData *pCD, XClientMessageEvent *clientEvent)
     {
 	if (clientEvent->format == 32)
 	    ProcessNetWmDesktop (pCD, (unsigned long)clientEvent->data.l[0]);
+    }
+    else
+    {
+	HandleNetClientMessage (pCD, clientEvent);
     }
 } /* END OF FUNCTION HandleClientMessage */
 

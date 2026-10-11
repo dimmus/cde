@@ -63,6 +63,8 @@ extern Window GrabWin (ClientData *pcd, XEvent *pev);
 extern void HandleClientFrameMove (ClientData *pcd, XEvent *pev);
 extern void HandleClientFrameResize (ClientData *pcd, XEvent *pev);
 extern Boolean HandleResizeKeyPress (ClientData *pcd, XEvent *pev);
+extern void HandleNetMoveResize (ClientData *pcd, long direction, int xRoot,
+				 int yRoot, unsigned int button);
 extern void    MoveOpaque (ClientData *pcd, int x, int y,
 		 unsigned int width, unsigned int height);
 extern void MoveOutline (int x, int y, unsigned int width, 

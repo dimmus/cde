@@ -57,6 +57,9 @@
 /* An empty _NET_WM_STATE cache (not a set of NETSTATE bits). */
 #define NET_STATE_NOT_WRITTEN	(~0u)
 
+/* An empty _NET_WM_ALLOWED_ACTIONS cache (not a set of actions). */
+#define NET_ACTIONS_NOT_WRITTEN	(~0u)
+
 /* pCD->netFlags: */
 #define NET_FLAG_LISTED		(1u << 0)	/* in pSD->netClients */
 #define NET_FLAG_SKIP_TASKBAR	(1u << 1)	/* _NET_WM_STATE flags kept */
@@ -83,6 +86,11 @@ void EwmhAddClient (ClientData *pCD);
 void EwmhRemoveClient (ClientData *pCD);
 void HandleNetRootMessage (WmScreenData *pSD,
     XClientMessageEvent *clientEvent);
+void HandleNetClientMessage (ClientData *pCD,
+    XClientMessageEvent *clientEvent);
+Boolean HandleNetPrematureMessage (XClientMessageEvent *clientEvent);
+void EwmhLeaveShowingDesktop (WmScreenData *pSD);
+void EwmhClientShown (ClientData *pCD);
 void UpdateNetCurrentDesktop (WmScreenData *pSD);
 void EwmhWorkspacesChanged (WmScreenData *pSD);
 void EwmhRootResized (WmScreenData *pSD, int width, int height);

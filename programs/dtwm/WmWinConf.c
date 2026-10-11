@@ -145,6 +145,92 @@ static int moveLastPointerY= 0;
 static Boolean anyMotion = FALSE;
 static Boolean configGrab = FALSE;
 
+/*
+ * A move or resize that a client asked for (_NET_WM_MOVERESIZE), while
+ * it lasts: the client may cancel it with another message, which is
+ * then looked for with the input.  The server is not grabbed for it
+ * (freezeOnConfig), so that the client can still send that message.
+ * A client draws its own border, so the pointer is somewhere inside the
+ * window: the resize moves the edges by as much as it moves.
+ */
+static ClientData *netConfigClient = NULL;
+static int resizeBiasX = 0;		/* from the pointer to the edges */
+static int resizeBiasY = 0;
+
+#define FREEZE_ON_CONFIG	(wmGD.freezeOnConfig && !netConfigClient)
+
+/*
+ * The input of a configuration: the events of a mask on the grab window,
+ * as XWindowEvent selects them, and the cancel message of the client
+ * that asked for it.
+ */
+typedef struct
+{
+    Window	window;
+    long	mask;
+} ConfigEventMatch;
+
+static Bool IsConfigEvent (Display *display, XEvent *pev, XPointer arg)
+{
+    ConfigEventMatch *pMatch = (ConfigEventMatch *) arg;
+    long mask;
+
+    if (pev->type == ClientMessage)
+	return (netConfigClient &&
+		pev->xclient.window == netConfigClient->client &&
+		pev->xclient.message_type == wmGD.xa__NET_WM_MOVERESIZE &&
+		pev->xclient.format == 32 &&
+		pev->xclient.data.l[2] == _NET_WM_MOVERESIZE_CANCEL);
+
+    if (pev->xany.window != pMatch->window) return (False);
+
+    switch (pev->type)
+    {
+	case KeyPress:		mask = KeyPressMask; break;
+	case KeyRelease:	mask = KeyReleaseMask; break;
+	case ButtonPress:	mask = ButtonPressMask; break;
+	case ButtonRelease:	mask = ButtonReleaseMask; break;
+	case MotionNotify:	mask = PointerMotionMask | ButtonMotionMask |
+				       Button1MotionMask | Button2MotionMask |
+				       Button3MotionMask | Button4MotionMask |
+				       Button5MotionMask;
+				break;
+	default:		return (False);
+    }
+    return ((mask & pMatch->mask) != 0);
+}
+
+/* XCheckWindowEvent, and the cancel message (IsConfigEvent) */
+static Bool CheckConfigEvent (Display *display, Window window, long mask,
+			      XEvent *pev)
+{
+    ConfigEventMatch match;
+
+    if (!netConfigClient)
+	return (XCheckWindowEvent (display, window, mask, pev));
+
+    match.window = window;
+    match.mask = mask;
+    return (XCheckIfEvent (display, pev, IsConfigEvent, (XPointer) &match));
+}
+
+/* XWindowEvent, and the cancel message (IsConfigEvent) */
+static void NextConfigEvent (Display *display, Window window, long mask,
+			     XEvent *pev)
+{
+    ConfigEventMatch match;
+
+    if (!netConfigClient)
+    {
+	XWindowEvent (display, window, mask, pev);
+	return;
+    }
+
+    match.window = window;
+    match.mask = mask;
+    XIfEvent (display, pev, IsConfigEvent, (XPointer) &match);
+}
+
 Dimension clipWidth = 0;
 Dimension clipHeight = 0;
 Position clipX = 0;
@@ -284,7 +370,13 @@ void HandleClientFrameMove (ClientData *pcd, XEvent *pev)
 		moveWidth, moveHeight, &event);
 	}
 
-	if (pev->type == KeyPress) 
+	if (pev->type == ClientMessage)
+	{
+	    /* _NET_WM_MOVERESIZE_CANCEL */
+	    CancelFrameConfig (pcd);
+	    return;
+	}
+	else if (pev->type == KeyPress) 
 	{
 	    keyMultiplier = 1;
 	    while (keyMultiplier <= big_inc && 
@@ -612,8 +704,8 @@ void HandleClientFrameResize (ClientData *pcd, XEvent *pev)
 
 	if (pev->type == MotionNotify)
 	{
-	    pointerX = pev->xmotion.x_root;
-	    pointerY = pev->xmotion.y_root;
+	    pointerX = pev->xmotion.x_root + resizeBiasX;
+	    pointerY = pev->xmotion.y_root + resizeBiasY;
 	    anyMotion = TRUE;
 
 	    /*
@@ -637,11 +729,17 @@ void HandleClientFrameResize (ClientData *pcd, XEvent *pev)
 	    /*
 	     *  Update (x,y) to the location of the button release
 	     */
-	    pointerX = pev->xbutton.x_root;
-	    pointerY = pev->xbutton.y_root;
+	    pointerX = pev->xbutton.x_root + resizeBiasX;
+	    pointerY = pev->xbutton.y_root + resizeBiasY;
 	    UpdateAndDrawResize(pcd);
 
 	    CompleteFrameConfig (pcd, pev);
+	    resizeDone = True;
+	}
+	else if (pev->type == ClientMessage) {
+
+	    /* _NET_WM_MOVERESIZE_CANCEL */
+	    CancelFrameConfig (pcd);
 	    resizeDone = True;
 	}
 	else  {
@@ -879,10 +977,12 @@ Boolean HandleResizeKeyPress (ClientData *pcd, XEvent *pev)
 
     /*
      * Make sure the new pointer position is on screen before doing
-     * the warp. Warp only if the pointer position changes.
+     * the warp. Warp only if the pointer position changes.  The pointer
+     * is then where the edges are.
      */
     pointerX = warpX;
     pointerY = warpY;
+    resizeBiasX = resizeBiasY = 0;
 
     ForceOnScreen(SCREEN_FOR_CLIENT(pcd), &warpX, &warpY);
 
@@ -1491,7 +1591,7 @@ DrawSegments (Display *dpy, Window win, GC gc, XSegment *outline, int nsegs)
  *************************************<->***********************************/
 void MoveOutline (int x, int y, unsigned int width, unsigned int height)
 {
-    if (wmGD.freezeOnConfig)
+    if (FREEZE_ON_CONFIG)
     {
 	DrawOutline (x, y, width, height);
     }
@@ -1594,7 +1694,7 @@ WaitForConfigEvent (Display *display, Window window, unsigned long mask,
 
     if (x == 0 && y == 0 && width == 0 && height == 0)
     {
-	XWindowEvent (display, window, mask, pev);
+	NextConfigEvent (display, window, mask, pev);
 	return;
     }
 
@@ -1608,7 +1708,7 @@ WaitForConfigEvent (Display *display, Window window, unsigned long mask,
      * flashing.  Events for other windows stay queued and do not wake
      * us up again.
      */
-    while (!XCheckWindowEvent (display, window, mask, pev))
+    while (!CheckConfigEvent (display, window, mask, pev))
     {
 	DrawSegments (display, ACTIVE_ROOT, ACTIVE_PSD->xorGC,
 		      outline, SEGS_PER_DRAW);
@@ -1619,7 +1719,7 @@ WaitForConfigEvent (Display *display, Window window, unsigned long mask,
 		      outline, SEGS_PER_DRAW);
 	XFlush (display);
 
-	if (XCheckWindowEvent (display, window, mask, pev))
+	if (CheckConfigEvent (display, window, mask, pev))
 	    break;
 	(void) poll (&pfd, 1, FLASH_OFF_MS);
     }
@@ -1672,10 +1772,10 @@ WaitForConfigEventExposing (Display *display, Window window,
      * the server has sent, so poll() only has to wake us up for new
      * input.  Other events stay queued for the main loop.
      */
-    while (!XCheckWindowEvent (display, window, mask, pev))
+    while (!CheckConfigEvent (display, window, mask, pev))
     {
 	PullQueuedExposureEvents ();
-	if (XCheckWindowEvent (display, window, mask, pev))
+	if (CheckConfigEvent (display, window, mask, pev))
 	    break;
 	(void) poll (pfd, 2, -1);
     }
@@ -2792,8 +2892,7 @@ Boolean DoGrabs (Window grab_win, Cursor cursor, unsigned int pmask, Time grabTi
     }
     
     
-    if (wmGD.freezeOnConfig) 
-	
+    if (FREEZE_ON_CONFIG)
     {
 	if (!pCD || ((pCD->pSD->moveOpaque && alwaysGrab) ||
 	           (!(pCD->pSD->moveOpaque))))
@@ -2841,7 +2940,7 @@ void UndoGrabs (void)
     configExposePending = False;	/* the main loop handles the rest */
 
     /* give up grabs */
-    if (wmGD.freezeOnConfig) {
+    if (FREEZE_ON_CONFIG) {
 	XUngrabServer(DISPLAY);
     }
 
@@ -2949,6 +3048,160 @@ void CancelFrameConfig (ClientData *pcd)
     /* set the focus back to a reasonable window */
     RepairFocus ();	
 } /* END OF FUNCTION  CancelFrameConfig */
+
+
+
+/*************************************<->*************************************
+ *
+ *  HandleNetMoveResize (pcd, direction, xRoot, yRoot, button)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Moves or resizes a window as a _NET_WM_MOVERESIZE message asks: with
+ *  the pointer, from where the client got a button press on its own
+ *  title bar or border, as if it had been on the frame; or with the
+ *  keyboard, as f.move and f.resize do from a key binding.  The client
+ *  may cancel it (_NET_WM_MOVERESIZE_CANCEL).  When the button was
+ *  released before the pointer was grabbed, the move or resize ends at
+ *  once, where the pointer is.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pcd		- pointer to client data
+ *  direction	- _NET_WM_MOVERESIZE_SIZE_TOPLEFT ... _MOVE_KEYBOARD
+ *  xRoot, yRoot - where the button was pressed
+ *  button	- the button, or 0 for any
+ *
+ *************************************<->***********************************/
+
+void HandleNetMoveResize (ClientData *pcd, long direction, int xRoot,
+			  int yRoot, unsigned int button)
+{
+    /* the sizing directions, from top left clockwise */
+    static const int parts[] =
+    {
+	FRAME_RESIZE_NW, FRAME_RESIZE_N, FRAME_RESIZE_NE, FRAME_RESIZE_E,
+	FRAME_RESIZE_SE, FRAME_RESIZE_S, FRAME_RESIZE_SW, FRAME_RESIZE_W
+    };
+    Boolean moving = (direction == _NET_WM_MOVERESIZE_MOVE ||
+		      direction == _NET_WM_MOVERESIZE_MOVE_KEYBOARD);
+    Boolean started;
+    Window junk_win;
+    int junk, rootX, rootY;
+    unsigned int state;
+    XEvent event;
+
+    if (configGrab || wmGD.menuActive ||
+	direction < _NET_WM_MOVERESIZE_SIZE_TOPLEFT ||
+	direction > _NET_WM_MOVERESIZE_MOVE_KEYBOARD ||
+	((pcd->clientState != NORMAL_STATE) &&
+	 (pcd->clientState != MAXIMIZED_STATE)) ||
+	!(pcd->clientFunctions & (moving ? MWM_FUNC_MOVE : MWM_FUNC_RESIZE)))
+    {
+	return;
+    }
+
+    wmGD.preMove = False;
+    netConfigClient = pcd;
+
+    if (direction == _NET_WM_MOVERESIZE_MOVE_KEYBOARD)
+    {
+	F_Move (NULL, pcd, NULL);
+    }
+    else if (direction == _NET_WM_MOVERESIZE_SIZE_KEYBOARD)
+    {
+	F_Resize (NULL, pcd, NULL);
+    }
+    else
+    {
+	/* the button press that the client got, as if on the frame */
+	memset ((char *)&event, 0, sizeof (event));
+	event.xbutton.type = ButtonPress;
+	event.xbutton.display = DISPLAY;
+	event.xbutton.window = pcd->clientFrameWin;
+	event.xbutton.root = ROOT_FOR_CLIENT(pcd);
+	event.xbutton.time = CurrentTime;
+	event.xbutton.x_root = xRoot;
+	event.xbutton.y_root = yRoot;
+	event.xbutton.button = button;
+
+	if (moving)
+	{
+	    started = StartClientMove (pcd, &event);
+	}
+	else
+	{
+	    wmGD.configPart = parts[direction];
+	    wmGD.configSet = True;
+	    started = StartResizeConfig (pcd, &event);
+	    if (!started)
+	    {
+		wmGD.configPart = FRAME_NONE;
+		wmGD.configSet = False;
+	    }
+	}
+
+	if (started)
+	{
+	    if (!moving)
+	    {
+		switch (wmGD.configPart)
+		{
+		    case FRAME_RESIZE_NW: case FRAME_RESIZE_W:
+		    case FRAME_RESIZE_SW:
+			resizeBiasX = startX - xRoot;
+			break;
+		    case FRAME_RESIZE_NE: case FRAME_RESIZE_E:
+		    case FRAME_RESIZE_SE:
+			resizeBiasX = startX + (int)startWidth - 1 - xRoot;
+			break;
+		}
+		switch (wmGD.configPart)
+		{
+		    case FRAME_RESIZE_NW: case FRAME_RESIZE_N:
+		    case FRAME_RESIZE_NE:
+			resizeBiasY = startY - yRoot;
+			break;
+		    case FRAME_RESIZE_SW: case FRAME_RESIZE_S:
+		    case FRAME_RESIZE_SE:
+			resizeBiasY = startY + (int)startHeight - 1 - yRoot;
+			break;
+		}
+	    }
+
+	    /*
+	     * Now that the pointer is grabbed, a release of the button
+	     * comes here; if it is already up, finish where it is.
+	     */
+	    if (!XQueryPointer (DISPLAY, ROOT_FOR_CLIENT(pcd), &junk_win,
+				&junk_win, &rootX, &rootY, &junk, &junk,
+				&state))
+	    {
+		state = 0;
+		rootX = xRoot;
+		rootY = yRoot;
+	    }
+	    if (!(state & (button ? ButtonStateBit (button) : ButtonMask)))
+	    {
+		event.xbutton.type = ButtonRelease;
+		event.xbutton.x_root = rootX;
+		event.xbutton.y_root = rootY;
+		event.xbutton.state = state;
+	    }
+
+	    if (moving)
+		HandleClientFrameMove (pcd, &event);
+	    else
+		HandleClientFrameResize (pcd, &event);
+	}
+    }
+
+    netConfigClient = NULL;
+    resizeBiasX = resizeBiasY = 0;
+
+} /* END OF FUNCTION HandleNetMoveResize */
 
 
 
@@ -3743,7 +3996,7 @@ void GetConfigEvent (Display *display, Window window, unsigned long mask, int cu
 	 * Suck up pointer motion events 
 	 */
 	gotEvent = False;
-	while (XCheckWindowEvent(display, window, mask, pev))
+	while (CheckConfigEvent (display, window, mask, pev))
 	{
 	    gotEvent = True;
 	    if (pev->type != MotionNotify)
@@ -3762,7 +4015,7 @@ void GetConfigEvent (Display *display, Window window, unsigned long mask, int cu
 	     * always use the outline).
 	     */
 
-	    if (!wmGD.freezeOnConfig && !wmGD.useWindowOutline &&
+	    if (!FREEZE_ON_CONFIG && !wmGD.useWindowOutline &&
 		!(wmGD.pActiveSD->moveOpaque &&
 		  wmGD.configAction == MOVE_CLIENT))
 		WaitForConfigEvent (display, window, mask,
@@ -3770,7 +4023,7 @@ void GetConfigEvent (Display *display, Window window, unsigned long mask, int cu
 	    else if (configExposePending)
 		WaitForConfigEventExposing (display, window, mask, pev);
 	    else
-		XWindowEvent (display, window, mask, pev);
+		NextConfigEvent (display, window, mask, pev);
 	}
 
 	eventToReturn = True;

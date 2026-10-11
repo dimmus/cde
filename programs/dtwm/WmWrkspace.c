@@ -352,6 +352,9 @@ ChangeToWorkspace(
     MarkNetWmDesktop (pOldWS, True);
     MarkNetWmDesktop (pNewWS, True);
 
+    /* the desktop shown was the old workspace's */
+    EwmhLeaveShowingDesktop (pSD);
+
     /* maximized windows in both workspaces fit the struts of this one */
     if (pSD->numStrutClients)
 	EwmhMarkScreen (pSD, NET_SD_WORKAREA);
@@ -948,6 +951,8 @@ ProcessDtWmHints (ClientData *pCD)
 	pCD->dtwmFunctions = saveFunctions;
 	pCD->clientFlags |= FRONT_PANEL_BOX ;
     }
+
+    EwmhMarkClient (pCD, NET_CD_ACTIONS);
 } /* END OF ProcessDtWmHints */
 
 

@@ -36,6 +36,7 @@
 
 #include "WmGlobal.h"
 #include "WmCDInfo.h"
+#include "WmEwmh.h"
 
 
 
@@ -1498,6 +1499,8 @@ void SetClientOffset (ClientData *pcd)
 				   pcd->frameInfo.titleBarHeight + 
 				   pcd->matteWidth;
     }
+
+    EwmhMarkClient (pcd, NET_CD_EXTENTS);
 }
 
 
