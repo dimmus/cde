@@ -93,6 +93,12 @@ static Pixmap WmXmGetPixmap2(
 
 static int	   xa_NO_BACKDROP;
 
+/*
+ * A backdrop window whose background was changed in place while it was
+ * the one shown: ChangeBackdrop clears it to show the new background.
+ */
+static Window	   backdropToClear;
+
 
 
 
@@ -121,8 +127,13 @@ ChangeBackdrop(
     {
 	if (pWS->backdrop.window == pWS->pSD->lastBackdropWin)
 	{
-	    /* re-expose the window */
-	    XClearWindow (DISPLAY, pWS->backdrop.window);
+	    /*
+	     * re-expose the window if its background changed; otherwise
+	     * it is a workspace that shares the backdrop window of the
+	     * one shown (UpdateBackdropWindow), and is already right
+	     */
+	    if (pWS->backdrop.window == backdropToClear)
+		XClearWindow (DISPLAY, pWS->backdrop.window);
 	}
 	else
 	{
@@ -143,6 +154,7 @@ ChangeBackdrop(
     }
 
     pWS->pSD->lastBackdropWin = pWS->backdrop.window;
+    backdropToClear = None;
 
 }
 
@@ -217,6 +229,191 @@ ShareBackdropPixmap (
 
 /******************************<->*************************************
  *
+ *  BackdropWindowShared (pWS)
+ *
+ *  Description:
+ *  -----------
+ *  True if another workspace of the screen uses the backdrop window of
+ *  pWS.
+ *
+ *************************************<->***********************************/
+static Boolean
+BackdropWindowShared (WmWorkspaceData *pWS)
+{
+    WmScreenData *pSD = pWS->pSD;
+    int i;
+
+    if (!pWS->backdrop.window)
+	return (False);
+
+    for (i = 0; i < pSD->numWorkspaces; i++)
+    {
+	if ((&pSD->pWS[i] != pWS) &&
+	    (pSD->pWS[i].backdrop.window == pWS->backdrop.window))
+	    return (True);
+    }
+    return (False);
+}
+
+
+/******************************<->*************************************
+ *
+ *  ReleaseBackdropWindow (pWS)
+ *
+ *  Description:
+ *  -----------
+ *  pWS gives up its backdrop window (and is left with none): the window
+ *  is destroyed unless another workspace shares it or it is the one
+ *  shown (which ChangeBackdrop unmaps when it shows the next one; it is
+ *  then left unmapped, as the windows of deleted workspaces always were).
+ *
+ *************************************<->***********************************/
+static void
+ReleaseBackdropWindow (WmWorkspaceData *pWS)
+{
+    if (pWS->backdrop.window &&
+	!BackdropWindowShared (pWS) &&
+	(pWS->backdrop.window != pWS->pSD->lastBackdropWin))
+    {
+	XDestroyWindow (DISPLAY, pWS->backdrop.window);
+    }
+    pWS->backdrop.window = None;
+}
+
+
+/******************************<->*************************************
+ *
+ *  FreeBackdropWindow (pWS)
+ *
+ *  Description:
+ *  -----------
+ *  Called for a workspace being deleted, while it is still in the list
+ *  of workspaces of its screen.
+ *
+ *************************************<->***********************************/
+void
+FreeBackdropWindow (WmWorkspaceData *pWS)
+{
+    ReleaseBackdropWindow (pWS);
+}
+
+
+/******************************<->*************************************
+ *
+ *  UpdateBackdropWindow (pWS)
+ *
+ *  Description:
+ *  -----------
+ *  Gives pWS a backdrop window showing its backdrop: its image pixmap
+ *  (pWS->backdrop.imagePixmap), or its background color if it has none.
+ *
+ *  Workspaces with the same backdrop share one window: a window has the
+ *  same background as each workspace that uses it, so when another
+ *  workspace of the screen shows the same pixmap (the Xm pixmap cache
+ *  and ShareBackdropPixmap give workspaces with the same image, colors
+ *  and type the same one) or the same color, pWS uses its window.
+ *  Switching between such workspaces then neither maps nor unmaps nor
+ *  repaints a full-screen window (ChangeBackdrop).  The window id stays
+ *  in _DT_WORKSPACE_INFO of each of them, where DtWsmGetCurrentBackdropWindow,
+ *  _DtWsmIsBackdropWindow and drag and drop compare window ids.
+ *
+ *  Otherwise a window that only pWS uses is given the new background in
+ *  place; a shared one is left to the others and pWS gets a new window.
+ *
+ *************************************<->***********************************/
+static void
+UpdateBackdropWindow (WmWorkspaceData *pWS)
+{
+    WmScreenData *pSD = pWS->pSD;
+    Pixmap pixmap = pWS->backdrop.imagePixmap;
+    XSetWindowAttributes xswa;
+    unsigned int xswamask;
+    int i;
+
+    for (i = 0; i < pSD->numWorkspaces; i++)
+    {
+	WmWorkspaceData *pOther = &pSD->pWS[i];
+
+	if ((pOther == pWS) || !pOther->backdrop.window ||
+	    (pOther->backdrop.imagePixmap != pixmap) ||
+	    ((pixmap == XmUNSPECIFIED_PIXMAP) &&
+	     (pOther->backdrop.background != pWS->backdrop.background)))
+	    continue;
+
+	if (pOther->backdrop.window != pWS->backdrop.window)
+	{
+	    ReleaseBackdropWindow (pWS);
+	    pWS->backdrop.window = pOther->backdrop.window;
+	}
+	return;
+    }
+
+    if (pWS->backdrop.window && !BackdropWindowShared (pWS))
+    {
+	if (pixmap != XmUNSPECIFIED_PIXMAP)
+	{
+	    XSetWindowBackgroundPixmap (DISPLAY, pWS->backdrop.window, pixmap);
+	}
+	else
+	{
+	    /*
+	     * Failed to find bitmap
+	     * set background to "background"
+	     */
+	    XSetWindowBackground (DISPLAY, pWS->backdrop.window,
+				  pWS->backdrop.background);
+	}
+	if (pWS->backdrop.window == pSD->lastBackdropWin)
+	    backdropToClear = pWS->backdrop.window;
+	return;
+    }
+
+    if (pixmap != XmUNSPECIFIED_PIXMAP)
+    {
+	xswa.override_redirect = True;
+	xswa.background_pixmap = pixmap;
+	xswamask = CWOverrideRedirect | CWBackPixmap;
+    }
+    else
+    {
+	xswa.override_redirect = True;    
+	xswa.background_pixel = pWS->backdrop.background;
+	xswamask = CWOverrideRedirect | CWBackPixel;
+    }
+
+    if ((wmGD.keyboardFocusPolicy == KEYBOARD_FOCUS_POINTER) ||
+	(wmGD.colormapFocusPolicy == CMAP_FOCUS_POINTER))
+    {
+	/*
+	 * Listen for enter/levae events if we
+	 * have a pointer tracking focus policy
+	 */
+	xswamask |= CWEventMask;
+	xswa.event_mask = EnterWindowMask | LeaveWindowMask;
+    }
+
+    xswa.backing_store = NotUseful;
+    xswa.save_under = False;
+    xswamask |= (CWBackingStore | CWSaveUnder);
+
+    /* (a shared window stays with the other workspaces) */
+    pWS->backdrop.window = XCreateWindow (DISPLAY, 
+       pSD->rootWindow, 
+       0, 0, 
+       DisplayWidth (DISPLAY, pSD->screen), 
+       DisplayHeight (DISPLAY, pSD->screen),
+       0, 
+       XDefaultDepth (DISPLAY, pSD->screen), 
+       CopyFromParent,
+       CopyFromParent, 
+       xswamask, 
+       &xswa);
+}
+
+
+
+/******************************<->*************************************
+ *
  *  ProcessBackdropResources (pWS, callFlags)
  *
  *  Description:
@@ -245,8 +442,6 @@ ProcessBackdropResources(
         WmWorkspaceData *pWS,
         unsigned long callFlags )
 {
-    XSetWindowAttributes xswa;
-    unsigned int xswamask;
     unsigned char *pchImageName = NULL;
     unsigned char *pchL = NULL;
     unsigned char *pch, *pLine;
@@ -542,76 +737,7 @@ ProcessBackdropResources(
 				 pWS->backdrop.background);
 		}
 
-		if ((callFlags & CHANGE_BACKDROP) &&
-		    (pWS->backdrop.window))
-		{
-		    if (pWS->backdrop.imagePixmap !=
-			    XmUNSPECIFIED_PIXMAP)
-		    {
-			XSetWindowBackgroundPixmap (DISPLAY,
-			    pWS->backdrop.window,
-			    pWS->backdrop.imagePixmap);
-		    }
-		    else
-		    {
-			/*
-			 * Failed to find bitmap
-			 * set background to "background"
-			 */
-			XSetWindowBackground (DISPLAY, 
-			    pWS->backdrop.window, 
-			    pWS->backdrop.background);
-		    }
-		}
-		else
-		{
-		    if (pWS->backdrop.imagePixmap !=
-			    XmUNSPECIFIED_PIXMAP)
-		    {
-			xswa.override_redirect = True;
-			xswa.background_pixmap = 
-			    pWS->backdrop.imagePixmap; 
-			xswamask = CWOverrideRedirect | CWBackPixmap;
-		    }
-		    else
-		    {
-			xswa.override_redirect = True;    
-			xswa.background_pixel = 
-			    pWS->backdrop.background; 
-			xswamask = CWOverrideRedirect | CWBackPixel;
-		    }
-
-		    if ((wmGD.keyboardFocusPolicy == 
-					KEYBOARD_FOCUS_POINTER) ||
-			(wmGD.colormapFocusPolicy == 
-					CMAP_FOCUS_POINTER))
-		    {
-			/*
-			 * Listen for enter/levae events if we
-			 * have a pointer tracking focus policy
-			 */
-			xswamask |= CWEventMask;
-			xswa.event_mask = EnterWindowMask | 
-						LeaveWindowMask;
-		    }
-
-		    xswa.backing_store = NotUseful;
-		    xswa.save_under = False;
-		    xswamask |= (CWBackingStore | CWSaveUnder);
-
-		    pWS->backdrop.window = XCreateWindow(DISPLAY, 
-		       pWS->pSD->rootWindow, 
-		       0, 0, 
-		       DisplayWidth(DISPLAY, pWS->pSD->screen), 
-		       DisplayHeight(DISPLAY, pWS->pSD->screen),
-		       0, 
-		       XDefaultDepth(DISPLAY,pWS->pSD->screen), 
-		       CopyFromParent,
-		       CopyFromParent, 
-		       xswamask, 
-		       &xswa);
-
-		}
+		UpdateBackdropWindow (pWS);
 
 		if (pch &&
 		    (pWS->backdrop.imagePixmap != XmUNSPECIFIED_PIXMAP) &&

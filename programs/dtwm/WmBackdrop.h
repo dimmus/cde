@@ -44,6 +44,8 @@ extern String FullBitmapFilePath(
                         String pch) ;
 extern void FreeBackdropPixmap(
                         WmWorkspaceData *pWS) ;
+extern void FreeBackdropWindow(
+                        WmWorkspaceData *pWS) ;
 extern void SetNewBackdrop( 
                         WmWorkspaceData *pWS,
                         Pixmap pixmap,

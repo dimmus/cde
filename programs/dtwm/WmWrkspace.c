@@ -785,6 +785,7 @@ DeleteWorkspace(
 	 * Delete the workspace data structures
 	 */
 	FreeBackdropPixmap (pWS);
+	FreeBackdropWindow (pWS);
 
 	/* free pWS->backdrop.image */
 	if ((pWS->backdrop.flags & BACKDROP_IMAGE_ALLOCED) &&
