@@ -185,20 +185,28 @@ _gif_message( char *format, ... )
 
 /*********************/
 static pixel **
-_gif_allocarray( int cols, int rows, int size )
+_gif_allocarray( int cols, int rows )
 {
-    char** its;
+    pixel **its;
     int i;
 
-    its = (char**) malloc( rows * sizeof(char*) );
-    if ( its == (char**) 0 )
+    /* The row pointers are pixel * objects: storing them through a
+       char ** and reading them back through the returned pixel **
+       is not allowed under the C aliasing rules. */
+    its = (pixel **) malloc( rows * sizeof(pixel *) );
+    if ( its == NULL ) {
         _gif_error( "out of memory allocating an array", 0 );
-    its[0] = (char*) malloc( rows * cols * size );
-    if ( its[0] == (char*) 0 )
+        return NULL;
+    }
+    its[0] = (pixel *) malloc( (size_t) rows * cols * sizeof(pixel) );
+    if ( its[0] == NULL ) {
         _gif_error( "out of memory allocating an array", 0 );
+        free( its );
+        return NULL;
+    }
     for ( i = 1; i < rows; ++i )
-        its[i] = &(its[0][i * cols * size]);
-    return (pixel **)its;
+        its[i] = its[0] + (size_t) i * cols;
+    return its;
 }
 
 /*********************/
@@ -474,8 +482,10 @@ ReadImage(byte **inbuf, int len, int height, unsigned char cmap[3][MAXCOLORMAPSI
         return NULL;
     }
 
-    if ((image = _gif_allocarray(len, height, sizeof(pixel))) == NULL)
+    if ((image = _gif_allocarray(len, height)) == NULL) {
         _gif_error("couldn't alloc space for image", 0 );
+        return NULL;
+    }
 
 #ifdef DEBUG
     _gif_message("reading %d by %d%s GIF image",
