@@ -33,53 +33,53 @@ UrlAgent \
 AddLibraryAgent
 
 
-Agents_SRCS=AgentMotif.C \
-MessageAgentMotif.C \
-IcccmAgent.C \
-AnchorCanvas.C \
-MarkIconMotif.C \
-MarkCanvas.C \
-NodePrintAgent.C \
-NodeWindowAgentMotif.C \
-NodeListAgentMotif.C \
-NodeHistoryAgentMotif.C \
-SearchResultsAgentMotif.C \
-ListViewMotif.C \
-SearchHistoryListViewMotif.C \
-MapAgentMotif.C \
-OutlineListViewMotif.C \
-SearchScopeList.C \
-SearchScopeAgentMotif.C \
-BookTabMotif.C \
-LibraryAgentMotif.C \
-BookmarkEditMotif.C \
-PrintPanelAgentMotif.C \
-PrefAgentMotif.C \
-GraphicAgentMotif.C \
-HelpAgent.C \
-MarkListView.C \
-MarkChooser.C \
-ScopeMenu.C \
-UrlAgentMotif.C \
-AddLibraryAgentMotif.C
+Agents_SRCS = %reldir%/AgentMotif.C \
+%reldir%/MessageAgentMotif.C \
+%reldir%/IcccmAgent.C \
+%reldir%/AnchorCanvas.C \
+%reldir%/MarkIconMotif.C \
+%reldir%/MarkCanvas.C \
+%reldir%/NodePrintAgent.C \
+%reldir%/NodeWindowAgentMotif.C \
+%reldir%/NodeListAgentMotif.C \
+%reldir%/NodeHistoryAgentMotif.C \
+%reldir%/SearchResultsAgentMotif.C \
+%reldir%/ListViewMotif.C \
+%reldir%/SearchHistoryListViewMotif.C \
+%reldir%/MapAgentMotif.C \
+%reldir%/OutlineListViewMotif.C \
+%reldir%/SearchScopeList.C \
+%reldir%/SearchScopeAgentMotif.C \
+%reldir%/BookTabMotif.C \
+%reldir%/LibraryAgentMotif.C \
+%reldir%/BookmarkEditMotif.C \
+%reldir%/PrintPanelAgentMotif.C \
+%reldir%/PrefAgentMotif.C \
+%reldir%/GraphicAgentMotif.C \
+%reldir%/HelpAgent.C \
+%reldir%/MarkListView.C \
+%reldir%/MarkChooser.C \
+%reldir%/ScopeMenu.C \
+%reldir%/UrlAgentMotif.C \
+%reldir%/AddLibraryAgentMotif.C
 
-Agents_MSGS= \
-Agent.msg \
-AddLibraryAgent.msg \
-BookmarkEdit.msg \
-GraphicAgent.msg \
-LibraryAgent.msg \
-MapAgent.msg \
-MarkList.msg \
-MarkChooser.msg \
-MessageAgent.msg \
-NodeHistoryAgent.msg \
-NodePrintAgent.msg \
-NodeWindowAgent.msg \
-PrefAgent.msg \
-PrintPanelAgent.msg \
-SearchHistoryList.msg \
-SearchResultsAgent.msg \
-SearchScopeAgent.msg \
-UrlAgent.msg
+Agents_MSGS = \
+%reldir%/Agent.msg \
+%reldir%/AddLibraryAgent.msg \
+%reldir%/BookmarkEdit.msg \
+%reldir%/GraphicAgent.msg \
+%reldir%/LibraryAgent.msg \
+%reldir%/MapAgent.msg \
+%reldir%/MarkList.msg \
+%reldir%/MarkChooser.msg \
+%reldir%/MessageAgent.msg \
+%reldir%/NodeHistoryAgent.msg \
+%reldir%/NodePrintAgent.msg \
+%reldir%/NodeWindowAgent.msg \
+%reldir%/PrefAgent.msg \
+%reldir%/PrintPanelAgent.msg \
+%reldir%/SearchHistoryList.msg \
+%reldir%/SearchResultsAgent.msg \
+%reldir%/SearchScopeAgent.msg \
+%reldir%/UrlAgent.msg
 

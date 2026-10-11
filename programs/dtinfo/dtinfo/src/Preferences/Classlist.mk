@@ -7,9 +7,9 @@ BooleanPref \
 StringPref \
 WindowGeometryPref
 
-Preferences_SRCS=\
-UserPreference.C \
-IntegerPref.C \
-BooleanPref.C \
-StringPref.C \
-WindowGeometryPref.C
+Preferences_SRCS = \
+%reldir%/UserPreference.C \
+%reldir%/IntegerPref.C \
+%reldir%/BooleanPref.C \
+%reldir%/StringPref.C \
+%reldir%/WindowGeometryPref.C

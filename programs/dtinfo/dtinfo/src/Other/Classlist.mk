@@ -4,10 +4,10 @@ Other_CLASSES= \
 AppPrintData \
 WindowSystem
 
-Other_SRCS= \
-AppPrintData.C \
-WindowSystemMotif.C 
+Other_SRCS = \
+%reldir%/AppPrintData.C \
+%reldir%/WindowSystemMotif.C
 
-Other_MSGS=\
-WindowSystem.msg
+Other_MSGS = \
+%reldir%/WindowSystem.msg
 

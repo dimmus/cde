@@ -26,19 +26,19 @@ ClientEventHandler \
 NodeDisplayData \
 NodeViewInfo
 
-Basic_SRCS= \
-FolioObject.C \
-BitField.C \
-OString.C \
-FString.C \
-OrderList.C \
-List.C \
-Atomizer.C \
-HashTbl.C \
-StringHash.C \
-OutlineElement.C \
-OutlineList.C \
-TOC_Element.C \
-Buffer.C \
-Long_Lived.C \
-NodeViewInfo.C
+Basic_SRCS = \
+%reldir%/FolioObject.C \
+%reldir%/BitField.C \
+%reldir%/OString.C \
+%reldir%/FString.C \
+%reldir%/OrderList.C \
+%reldir%/List.C \
+%reldir%/Atomizer.C \
+%reldir%/HashTbl.C \
+%reldir%/StringHash.C \
+%reldir%/OutlineElement.C \
+%reldir%/OutlineList.C \
+%reldir%/TOC_Element.C \
+%reldir%/Buffer.C \
+%reldir%/Long_Lived.C \
+%reldir%/NodeViewInfo.C

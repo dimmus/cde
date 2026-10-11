@@ -2,5 +2,5 @@
 Graphics_CLASSES= \
 PixmapGraphic 
 
-Graphics_SRCS= \
-PixmapGraphic.C 
+Graphics_SRCS = \
+%reldir%/PixmapGraphic.C

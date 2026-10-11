@@ -2,5 +2,5 @@
 OliasSearch_CLASSES=\
 ResultID
 
-OliasSearch_SRCS=\
-ResultID.C
+OliasSearch_SRCS = \
+%reldir%/ResultID.C

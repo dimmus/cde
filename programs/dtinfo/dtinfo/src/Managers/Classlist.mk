@@ -26,35 +26,35 @@ InputMgrX \
 UrlMgr \
 EnvMgr
 
-Managers_SRCS=MessageMgr.C \
-StyleSheetMgr.C \
-SearchMgr.C \
-NodeMgr.C \
-NodeListMgr.C \
-SearchResultsMgr.C \
-HistoryList.C \
-MapMgr.C \
-SearchScopeMgr.C \
-LibraryMgr.C \
-GraphicsMgr.C \
-PrefMgr.C \
-PrintMgr.C \
-ClientEventMgrX.C \
-ServiceMgrX.C \
-SessionMgr.C \
-WorkspaceMgr.C \
-TtIpcMgr.C \
-MarkMgr.C \
-LocalHistoryMgr.C \
-GlobalHistoryMgr.C \
-InputMgrX.C \
-UrlMgr.C \
-CatMgr.C \
-WString.C \
-EnvMgr.C
+Managers_SRCS = %reldir%/MessageMgr.C \
+%reldir%/StyleSheetMgr.C \
+%reldir%/SearchMgr.C \
+%reldir%/NodeMgr.C \
+%reldir%/NodeListMgr.C \
+%reldir%/SearchResultsMgr.C \
+%reldir%/HistoryList.C \
+%reldir%/MapMgr.C \
+%reldir%/SearchScopeMgr.C \
+%reldir%/LibraryMgr.C \
+%reldir%/GraphicsMgr.C \
+%reldir%/PrefMgr.C \
+%reldir%/PrintMgr.C \
+%reldir%/ClientEventMgrX.C \
+%reldir%/ServiceMgrX.C \
+%reldir%/SessionMgr.C \
+%reldir%/WorkspaceMgr.C \
+%reldir%/TtIpcMgr.C \
+%reldir%/MarkMgr.C \
+%reldir%/LocalHistoryMgr.C \
+%reldir%/GlobalHistoryMgr.C \
+%reldir%/InputMgrX.C \
+%reldir%/UrlMgr.C \
+%reldir%/CatMgr.C \
+%reldir%/WString.C \
+%reldir%/EnvMgr.C
 
-Managers_MSGS= \
-CatMgr.msg \
-EnvMgr.msg \
-TtIpcMgr.msg
+Managers_MSGS = \
+%reldir%/CatMgr.msg \
+%reldir%/EnvMgr.msg \
+%reldir%/TtIpcMgr.msg
 

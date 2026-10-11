@@ -9,11 +9,55 @@ include $(top_srcdir)/build-aux/cde-libs.am
 # get our env variables
 include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 
-# get the toplevel Classlist
+# get the toplevel Classlist (CLASSLIBS, MSGS)
 include Classlist.mk
 
-# CLASSLIST is defined in the top (dtinfo) level Classlist.mk file
-SUBDIRS = Widgets $(CLASSLIBS) Messages cgm
+# dtinfo is linked from one partially linked object ("libX.a", made with
+# ld -r) per directory.  They are all built from this one Makefile (each
+# directory's Makefile.inc, included below) rather than by a make per
+# directory, so that make sees all of dtinfo at once: the directories no
+# longer wait for one another, and a no-op build reads one Makefile
+# instead of eighteen.  Paths in the Makefile.inc files are relative to
+# this directory (%reldir%).
+#
+# The objects of each directory are compiled with the include path that
+# the make in that directory gave them: the directory itself first, then
+# include/, then this directory.  nostdinc turns off automake's own
+# -I. -I$(top_builddir)/include, which would put this directory (and its
+# config.h) ahead of include/.
+AUTOMAKE_OPTIONS = nostdinc
+
+DTINFO_DIR_CPPFLAGS = -I$(top_builddir)/include $(CDE_CPPFLAGS)
+DTINFO_OTHER_INCLUDES = $(UAS_INCLUDES) $(MMDB_INCLUDES) $(WWL_INCLUDES)
+DTINFO_LIB_INCLUDES = -I. -I$(srcdir) $(DTINFO_OTHER_INCLUDES)
+DTINFO_LIB_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_LIB_INCLUDES)
+
+noinst_LIBRARIES =
+noinst_PROGRAMS =
+BUILT_SOURCES = Prelude.h Dtinfo
+CLEANFILES = $(BUILT_SOURCES)
+
+# The libraries are relocatable objects, not archives.
+RANLIB = echo
+
+PMAKER = $(top_builddir)/programs/dtinfo/tools/misc/pmaker
+DFILES = $(abs_top_builddir)/programs/dtinfo/tools/misc/dfiles
+
+include Widgets/Makefile.inc
+include Support/Makefile.inc
+include UAS/Makefile.inc
+include Basic/Makefile.inc
+include OliasSearch/Makefile.inc
+include Marks/Makefile.inc
+include Graphics/Makefile.inc
+include Preferences/Makefile.inc
+include Managers/Makefile.inc
+include Other/Makefile.inc
+include Query/Makefile.inc
+include Agents/Makefile.inc
+include OnlineRender/Makefile.inc
+include Messages/Makefile.inc
+include cgm/Makefile.inc
 
 RESFILES = Macros.res Strings.res Messages.res Query/QueryEditor.res	\
 	Agents/BookmarkEdit.res Agents/MapAgent.res			\
@@ -22,31 +66,11 @@ RESFILES = Macros.res Strings.res Messages.res Query/QueryEditor.res	\
 	Agents/NodeHistoryAgent.res Agents/NodeWindowAgent.res		\
 	Agents/GraphicAgent.res Query/QueryTermView.res
 
-
-BUILT_SOURCES = Prelude.h Support/Support.d Support/Support.h		\
-	UAS/UAS.d UAS/UAS.h Basic/Basic.d Basic/Basic.h			\
-	OliasSearch/OliasSearch.d OliasSearch/OliasSearch.h		\
-	Marks/Marks.d Marks/Marks.h Graphics/Graphics.d			\
-	Graphics/Graphics.h Preferences/Preferences.d			\
-	Preferences/Preferences.h Managers/Managers.d			\
-	Managers/Managers.h Other/Other.d Other/Other.h Query/Query.d	\
-	Query/Query.h Agents/Agents.d Agents/Agents.h			\
-	OnlineRender/OnlineRender.d OnlineRender/OnlineRender.h		\
-									\
-	Dtinfo
-
-CLEANFILES = $(BUILT_SOURCES)
-
-PMAKER = $(top_builddir)/programs/dtinfo/tools/misc/pmaker
-
 Prelude.h: Classlist.mk $(PMAKER)
 	$(PMAKER) $(CLASSLIBS)
 
 Dtinfo: Dtinfo.res $(RESFILES)
-	$(CPP_PROGRAM) -traditional -nostdinc -C Dtinfo.res | $(TREERES) > $@
-
-# dtinfo class dfile and hfile building for the modules
-include $(top_srcdir)/programs/dtinfo/dtinfo/src/dtinfo_dfiles_hfiles.mk
+	$(CPP_PROGRAM) -traditional -nostdinc -C $(srcdir)/Dtinfo.res | $(TREERES) > $@
 
 # gather up the messages and generate the file. MSGS comes from the
 # dtinfo/src/Classlist.mk file.
@@ -56,7 +80,7 @@ noinst_DATA = dtinfo.msg.updated
 dtinfo.msg.updated: $(foreach i,$(MSGS),$(i)/$(i).msg) dtinfo_msg.tmpl $(MSGSETS)
 	msgs=; for i in $(MSGS) ; do msgs="$$msgs $$i/$$i.msg"; done; \
 	cat $$msgs >dtinfo.cpp && \
-	$(CPP_PROGRAM) -traditional -nostdinc -P -C dtinfo_msg.tmpl | $(MSGSETS) > $@.tmp && \
+	$(CPP_PROGRAM) -traditional -nostdinc -P -C -I. $(srcdir)/dtinfo_msg.tmpl | $(MSGSETS) > $@.tmp && \
 	mv -f $@.tmp $@; \
 	status=$$?; $(RM) dtinfo.cpp; exit $$status
 
@@ -73,6 +97,7 @@ OLIASNORMALLIBS= Agents/libAgents.a Other/libOther.a			\
 
 bin_PROGRAMS = dtinfo
 
+dtinfo_CPPFLAGS = -I. -I$(srcdir) $(DTINFO_DIR_CPPFLAGS)
 dtinfo_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_INCLUDES)
 
 dtinfo_LDADD = $(OLIASNORMALLIBS) $(WWL_LIBS) $(LIBMMDB) $(LIBSEARCH) \

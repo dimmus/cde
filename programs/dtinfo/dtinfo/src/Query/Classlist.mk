@@ -7,12 +7,12 @@ QueryGroupView \
 QueryGroup \
 QueryEditor
 
-Query_SRCS= \
-QueryEditor.C \
-QueryTermView.C \
-QueryGroupView.C \
-QueryTerm.C  \
-QueryGroup.C
+Query_SRCS = \
+%reldir%/QueryEditor.C \
+%reldir%/QueryTermView.C \
+%reldir%/QueryGroupView.C \
+%reldir%/QueryTerm.C \
+%reldir%/QueryGroup.C
 
-Query_MSGS= \
-QueryEditor.msg
+Query_MSGS = \
+%reldir%/QueryEditor.msg

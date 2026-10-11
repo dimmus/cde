@@ -3,6 +3,6 @@ Support_CLASSES=\
 xList \
 InputNotifier
 
-Support_SRCS= \
-List_base.C \
-UtilityFunctions.C
+Support_SRCS = \
+%reldir%/List_base.C \
+%reldir%/UtilityFunctions.C
