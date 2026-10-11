@@ -112,7 +112,6 @@
 #include "SmDB.h"
 #include "SmProp.h"
 #include "../dtlogin/startup-trace.h"
-#include "../dtlogin/startup-trace.h"
 
 #include <X11/Xlibint.h>
 

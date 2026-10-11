@@ -430,18 +430,29 @@ XCOMM ##########################################################################
       *" 93"*|*"A 20"*) ;;
       *) syntax_errors=`$1 -n $2 2>&1`; return ;;
     esac
+    HASH The first line of the cache is the file the shell resolved to
+    HASH when it was written: the shell named may be a link that has been
+    HASH pointed at another shell since (sh from bash to dash, say), whose
+    HASH own time stamp does not change.
     cs_file=${2##*/}
     cs_cache=$LOGDIR/cache/syntax-ok.${cs_file#.}
-    cs_text="$1
-$(<"$2")"
-    if [ -f "$cs_cache" -a -O "$cs_cache" ] && \
-       [ "${1#/}" = "$1" -o "$1" -ot "$cs_cache" ] && \
-       [[ $(<"$cs_cache") == "$cs_text" ]]; then
-      return 0
+    cs_nl=$'\n'
+    cs_text="$1$cs_nl$(<"$2")"
+    HASH (The shell must be named by its full path.)
+    if [[ ${1#/} != "$1" && -f $cs_cache && -O $cs_cache &&
+          $1 -ot $cs_cache ]]; then
+      cs_old=$(<"$cs_cache")
+      cs_real=${cs_old%%"$cs_nl"*}
+      if [[ ${cs_old#*"$cs_nl"} == "$cs_text" && $1 -ef $cs_real ]]; then
+        return 0
+      fi
     fi
     syntax_errors=`$1 -n $2 2>&1` || return
+    [[ ${1#/} != "$1" ]] || return 0
+    cs_real=$(readlink -f "$1" 2>/dev/null)
+    [ -n "$cs_real" ] || cs_real=$1
     [ -d $LOGDIR/cache ] || mkdir -m 700 $LOGDIR/cache 2>/dev/null
-    { print -r -- "$cs_text" > "$cs_cache.$$"; } 2>/dev/null && \
+    { print -r -- "$cs_real$cs_nl$cs_text" > "$cs_cache.$$"; } 2>/dev/null && \
       mv -f "$cs_cache.$$" "$cs_cache" 2>/dev/null
     return 0
   }
@@ -587,19 +598,27 @@ StartFirst()
     HASH the same: the exported variables it reads and the results of
     HASH its directory tests.  The cache is used instead of running
     HASH dtsearchpath if it holds and dtsearchpath has not been replaced
-    HASH since it was written.
+    HASH since it was written.  Only for the default dtstart_searchpath
+    HASH (a site or a user may set another, or none), and only for a
+    HASH cache path that StartFirst's eval passes on as one word.
     HASH
     dtsp_out=
-    case "$KSH_VERSION" in
-      *" 93"*|*"A 20"*)
-        dtsp_cache=$LOGDIR/cache/dtsearchpath
-        if [ -f "$dtsp_cache" -a -O "$dtsp_cache" ] && \
-           [ "$DT_BINPATH/dtsearchpath" -ot "$dtsp_cache" ]; then
-          command . "$dtsp_cache"
-        fi
-        dtstart_searchpath="$dtstart_searchpath -cache $dtsp_cache"
-        ;;
+    dtsp_cache=$LOGDIR/cache/dtsearchpath
+    case "$dtsp_cache" in
+      *[![:alnum:]_./+,:@%=-]*) dtsp_cache= ;;
     esac
+    [ "$dtstart_searchpath" = "$DT_BINPATH/dtsearchpath -ksh" ] || dtsp_cache=
+    case "$KSH_VERSION" in
+      *" 93"*|*"A 20"*) ;;
+      *) dtsp_cache= ;;
+    esac
+    if [ -n "$dtsp_cache" ]; then
+      if [ -f "$dtsp_cache" -a -O "$dtsp_cache" ] && \
+         [ "$DT_BINPATH/dtsearchpath" -ot "$dtsp_cache" ]; then
+        command . "$dtsp_cache"
+      fi
+      dtstart_searchpath="$dtstart_searchpath -cache $dtsp_cache"
+    fi
     if [ -n "$dtsp_out" ]; then
       Log "setting search paths from $dtsp_cache"
       eval $dtsp_out                        # what StartFirst would eval

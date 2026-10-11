@@ -211,11 +211,12 @@ static void WriteCache(const char * file, const std::string & out)
     unlink(tmp.c_str());
 }
 
-static void EndCapture()
+static void EndCapture(char ** argv)
 {
   std::string out;
   char buf[4096];
   size_t n;
+  int failed;
 
   if (!capture)
     return;
@@ -223,14 +224,36 @@ static void EndCapture()
 #ifdef IOSTREAMSWORKS
   std::cout.flush();
 #endif
-  fflush(stdout);
+  failed = fflush(stdout) != 0 || ferror(stdout);
   dup2(savedStdout, 1);
   close(savedStdout);
+  clearerr(stdout);
   rewind(capture);
-  while ((n = fread(buf, 1, sizeof(buf), capture)) > 0)
+  while (!failed && (n = fread(buf, 1, sizeof(buf), capture)) > 0)
     out.append(buf, n);
+  failed = failed || ferror(capture);
   fclose(capture);
   capture = 0;
+  if (failed) {
+    // The temporary file could not hold the output (a full /tmp, say):
+    // run again without -cache, writing straight to stdout.
+    char ** args;
+    int i, j;
+
+    for (i = 0; argv[i]; i++)
+      ;
+    args = new char * [i + 1];
+    for (i = j = 0; argv[i]; i++)
+      if (strcmp(argv[i], "-cache") == 0 && argv[i + 1])
+	i++;
+      else
+	args[j++] = argv[i];
+    args[j] = 0;
+    execv(args[0], args);
+    execvp(args[0], args);
+    perror(args[0]);
+    exit(1);
+  }
   if (!out.empty() && write(1, out.data(), out.size()) != (ssize_t) out.size())
     return;
   if (!recorder.spoiled() && !out.empty())
@@ -329,6 +352,6 @@ int main (int argc, char **argv)
 
   }
 
-  EndCapture();
+  EndCapture(argv);
   return 0;
 }
