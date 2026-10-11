@@ -894,8 +894,16 @@ int DoStrColsWidth(
    len = strlen(str);
    wcstr = malloc(sizeof(wchar_t) * (len+1));
 
-   /* convert str to wchar_t and get width in chars */
-   mbstowcs(wcstr,str,len+1);
+   /* convert str to wchar_t and get width in chars; a string that is
+      not valid in the locale (mbstowcs leaves it unterminated) is
+      measured and truncated as single-byte */
+   if (NULL == wcstr || mbstowcs(wcstr,str,len+1) == (size_t) -1)
+   {
+      free(wcstr);
+      while (len > maxWidth && truncateStr == True)
+         str[--len] = EOS;
+      return len;
+   }
    wclen = wcslen(wcstr);
 
    /* get col width of the string and truncate if necessary */
@@ -1992,11 +2000,17 @@ int ProcessToc(
        lhsWidth = strlen(sectNumStr) + 1;   /* 1=blank after sect num */
        titlelen = strlen(title);
        wctitle = malloc(sizeof(wchar_t) * (titlelen+1));
+       /* a title that is not valid in the locale (mbstowcs leaves it
+          unterminated) is truncated as single-byte, below */
+       if (wctitle && mbstowcs(wctitle,title,titlelen+1) == (size_t) -1)
+       {
+          free(wctitle);
+          wctitle = NULL;
+       }
        /* truncate the title using wchar_t */
        if(wctitle)
        {
-          /* convert title to wchar_t and get num chars */
-          mbstowcs(wctitle,title,titlelen+1);
+          /* get num chars */
           titlelen = wcslen(wctitle);
           /* truncate the title to fit on the line */
           if (titlelen > options->colsTextWidth - lhsWidth)
