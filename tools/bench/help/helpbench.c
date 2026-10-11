@@ -32,6 +32,8 @@
  *   backtrack   visit 20 topics, then Backtrack 19 times [one Backtrack]
  *   manpage     show the man page PAGE (default ksh) [one load]
  *   pagedown    page down through it to the end [one page]
+ *   selresize   all of the man page selected, the window made wider and
+ *               narrower again [one width change]
  *   index_open  a new help dialog, Index...: the dialog opens on the
  *               complete index of the current volume [one dialog]
  *   index_all   a new help dialog, Index..., "Complete Index" of "All
@@ -564,6 +566,43 @@ static long run_pagedown(long n)
 	return pages;
 }
 
+/*
+ * The man page all selected, then the window made narrower and wider:
+ * each width change lays the page out again and carries the selection
+ * over (_DtCanvasResize gets the selected segments before and sets the
+ * selection again after).
+ */
+static int setup_selresize(long n)
+{
+	Widget da;
+
+	(void)n;
+	dialog_destroy();
+	dialog_create(vols[0], NULL);
+	show_manpage();
+	da = display_area(NULL);
+	XtCallActionProc(da, "SelectAll", NULL, NULL, 0);
+	settle();
+	return 0;
+}
+
+static long run_selresize(long n)
+{
+	Widget shell = XtParent(dlg);
+	Dimension w;
+	long i;
+
+	XtVaGetValues(shell, XmNwidth, &w, NULL);
+	for (i = 0; i < n; i++) {
+		XtVaSetValues(shell, XmNwidth, (Dimension)(w + (i & 1 ? 0 : 60)),
+			      NULL);
+		settle();
+	}
+	if (shotdir)
+		shot(shell, "selresize");
+	return n;
+}
+
 /* The index dialog of the current help dialog, opened if need be. */
 static Widget index_dialog(void)
 {
@@ -709,6 +748,8 @@ static const struct hcase cases[] = {
 	  setup_manpage, run_manpage, teardown_dialog },
 	{ "pagedown", "page down through the man page", 1,
 	  setup_pagedown, run_pagedown, teardown_dialog },
+	{ "selresize", "resize with the whole man page selected", 10,
+	  setup_selresize, run_selresize, teardown_dialog },
 	{ "index_open", "Index... in a new dialog (current volume)", 1,
 	  setup_none, run_index_open, teardown_dialog },
 	{ "index_all", "complete index of all volumes, new dialog", 1,
@@ -879,7 +920,17 @@ int main(int argc, char **argv)
 		add_volume(tok);
 	free(spec);
 	if (shotdir) {
-		mkdir(shotdir, 0755);
+		char *dir = strdup(shotdir), *p;
+
+		for (p = dir + 1; *p; p++)
+			if (*p == '/') {
+				*p = '\0';
+				mkdir(dir, 0755);
+				*p = '/';
+			}
+		if (mkdir(dir, 0755) && errno != EEXIST)
+			bench_die("helpbench: %s: %s", dir, strerror(errno));
+		free(dir);
 		repeat = 1;
 	}
 
@@ -895,6 +946,8 @@ int main(int argc, char **argv)
 	dpy = XtDisplay(top);
 	XtRealizeWidget(top);
 	load_topics();
+	if (verbose)
+		fprintf(stderr, "helpbench: %ld topics\n", ntopics);
 
 	if (json) {
 		jf = strcmp(json, "-") ? fopen(json, "w") : stdout;

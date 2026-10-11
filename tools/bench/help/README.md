@@ -38,6 +38,7 @@ Needs at run time: `Xvfb`, `xdotool` (for `../apptime.py`), `python3`,
 | `backtrack` | one Backtrack, after visiting 20 topics |
 | `manpage` | load the man page (ksh) |
 | `pagedown` | one page down through it, to the end |
+| `selresize` | one change of the window width with all of the man page selected (the page is laid out again and the selection carried over) |
 | `index_open` | Index... in a new help dialog: it opens on the complete index of the current volume |
 | `index_all` | Index... in a new dialog, then "Complete Index" of "All Volumes": the dialog's first scan of the volumes and the search |
 | `index_again` | the same search again in the same dialog |
