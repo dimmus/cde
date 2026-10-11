@@ -4230,11 +4230,14 @@ struct LockWatch {
 
 // Wait before the next attempt to take the mailbox .lock file: 10 ms
 // the first time, then twice as long each time, up to 1 s; but stop
-// waiting as soon as a file is removed from the lock file's directory
-// (watch_fd, when there is one).
+// waiting as soon as the lock file has been removed (seen through
+// watch_fd, when there is one). Other files come and go in that
+// directory too (our own temporary lock file, other mailboxes' locks in
+// a spool directory): an event only ends the wait if the lock file is
+// gone, so they do not turn the wait into a busy loop of lock attempts.
 //
 static void
-lockWait(long & delayMs, int watch_fd)
+lockWait(long & delayMs, int watch_fd, const char *lockFileName)
 {
   delayMs = delayMs <= 0 ? 10 : delayMs * 2;
   if (delayMs > 1000) {
@@ -4242,19 +4245,33 @@ lockWait(long & delayMs, int watch_fd)
   }
 
   if (watch_fd >= 0) {
-    struct pollfd pfd;
-    pfd.fd = watch_fd;
-    pfd.events = POLLIN;
-    pfd.revents = 0;
-    if (poll(&pfd, 1, (int) delayMs) > 0) {
-      // Drain the events; which file went does not matter, the
-      // caller simply tries again.
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    for (;;) {
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      long left = delayMs - ((now.tv_sec - start.tv_sec) * 1000 +
+			     (now.tv_nsec - start.tv_nsec) / 1000000);
+      if (left <= 0) {
+	return;
+      }
+
+      struct pollfd pfd;
+      pfd.fd = watch_fd;
+      pfd.events = POLLIN;
+      pfd.revents = 0;
+      if (poll(&pfd, 1, (int) left) <= 0) {
+	continue;		// timed out (or EINTR): check the time
+      }
+
       char buf[4096];
       while (read(watch_fd, buf, sizeof(buf)) > 0) {
 	continue;
       }
+      struct stat sbuf;
+      if (SafeStat(lockFileName, &sbuf) < 0 && errno == ENOENT) {
+	return;
+      }
     }
-    return;
   }
 
   struct timespec req;
@@ -4449,7 +4466,7 @@ RFCMailBox::lockFile(DtMailEnv & error)
       if (watch.fd == -2) {
 	watch.fd = lockWatchOpen(_lockFileName);
       }
-      lockWait(backoffMs, watch.fd);
+      lockWait(backoffMs, watch.fd, _lockFileName);
       continue;
     }
 
@@ -4465,7 +4482,7 @@ RFCMailBox::lockFile(DtMailEnv & error)
       if (watch.fd == -2) {
 	watch.fd = lockWatchOpen(_lockFileName);
       }
-      lockWait(backoffMs, watch.fd);
+      lockWait(backoffMs, watch.fd, _lockFileName);
       continue;
     }
 
