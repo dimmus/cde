@@ -73,8 +73,9 @@ _iskeycmp(const void *lkey, const void *rkey)
     long	     llong, rlong;
     double		     ldouble, rdouble;
 
-    const char* charLkey = (const char*)lkey;
-    const char* charRkey = (const char*)rkey;
+    /* ldlong() and friends take char * but only read through it */
+    char *charLkey = (char *)lkey;
+    char *charRkey = (char *)rkey;
 
     ret = 0;
     for (i = 0, p = _curtab; ret == 0 && i < _ncurtab;i++, p++) {
