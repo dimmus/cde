@@ -405,6 +405,9 @@ static void TrashLookupDone(
                         TrashLookup *tl) ;
 static void TrashIndexAdd(
                         int i) ;
+static unsigned int TrashHash(
+                        const char *s,
+                        Boolean path) ;
 static void GrowTrashList( void ) ;
 static void AddToDeleteList(
                         TrashLookup *tl,
@@ -600,6 +603,95 @@ TrashCreateDialog(
 
 /************************************************************************
  *
+ * TrashDirSet
+ *   The names in the trash directory, read with one directory scan:
+ *   ReadTrashList checks that each listed object still exists in it,
+ *   which was one lstat per entry (10000 entries: 11-14 ms, against
+ *   1.7 ms to read the directory).
+ *
+ ************************************************************************/
+
+typedef struct
+{
+   char         **names;     /* hash slots, NULL if empty */
+   unsigned int   mask;
+} TrashDirSet;
+
+/* False if the directory cannot be read (the caller then uses lstat) */
+static Boolean
+TrashDirSetRead(
+   TrashDirSet *set,
+   const char *dir)
+{
+   DIR *dirp = opendir(dir);
+   struct dirent *dp;
+   char **names = NULL;
+   int count = 0, size = 0;
+   unsigned int h;
+   int i;
+
+   set->names = NULL;
+   set->mask = 0;
+   if (dirp == NULL)
+      return False;
+   while ((dp = readdir(dirp)) != NULL)
+   {
+      if (count == size)
+      {
+         size = size ? 2 * size : 256;
+         names = (char **)XtRealloc((char *)names, size * sizeof(char *));
+      }
+      names[count++] = XtNewString(dp->d_name);
+   }
+   closedir(dirp);
+
+   for (set->mask = 15; set->mask + 1 < 2 * (unsigned int)count; )
+      set->mask = 2 * set->mask + 1;
+   set->names = (char **)XtCalloc(set->mask + 1, sizeof(char *));
+   for (i = 0; i < count; i++)
+   {
+      h = TrashHash(names[i], False) & set->mask;
+      while (set->names[h] != NULL)
+         h = (h + 1) & set->mask;
+      set->names[h] = names[i];
+   }
+   XtFree((char *)names);
+   return True;
+}
+
+static Boolean
+TrashDirSetHas(
+   TrashDirSet *set,
+   const char *name)
+{
+   unsigned int h = TrashHash(name, False) & set->mask;
+
+   while (set->names[h] != NULL)
+   {
+      if (strcmp(set->names[h], name) == 0)
+         return True;
+      h = (h + 1) & set->mask;
+   }
+   return False;
+}
+
+static void
+TrashDirSetFree(
+   TrashDirSet *set)
+{
+   unsigned int h;
+
+   if (set->names == NULL)
+      return;
+   for (h = 0; h <= set->mask; h++)
+      XtFree(set->names[h]);
+   XtFree((char *)set->names);
+}
+
+
+
+/************************************************************************
+ *
  * ReadTrashList
  *   At startup time, we need to read in the trash information file, to
  *   find out what, if any, files were left in the trash the last time
@@ -619,6 +711,9 @@ ReadTrashList( void )
    String external, intName, internal;
    char * trashEntry;
    struct stat statbuf;
+   TrashDirSet inTrash;
+   Boolean haveSet;
+   char * trashDirName;
 
    trashInfoFileId = fopen(TrashInfoFileName, "a+");
    if (trashInfoFileId == 0)
@@ -643,6 +738,15 @@ ReadTrashList( void )
 
    bufSize = MAX_PATH * 2;
    trashEntry = (char *)XtCalloc( 1, bufSize );
+
+   trashDirName = XtMalloc(strlen(users_home_dir) + strlen(TRASH_DIR) + 1);
+   sprintf(trashDirName, "%s%s", users_home_dir, TRASH_DIR);
+   /* (without search permission lstat fails where readdir does not) */
+   haveSet = access(trashDirName, X_OK) == 0 &&
+             TrashDirSetRead(&inTrash, trashDirName);
+   if (!haveSet)
+      inTrash.names = NULL;
+   XtFree(trashDirName);
 
    /* Extract the size of the two path strings */
    while( fgets( trashEntry, bufSize, trashInfoFileId ) != NULL )
@@ -689,8 +793,12 @@ ReadTrashList( void )
                                      + strlen(intName) + 2);
          sprintf(internal, "%s%s/%s", users_home_dir, TRASH_DIR, intName);
 
-         /* Make sure the file still exists */
-         if (lstat(internal, &statbuf) < 0)
+         /* Make sure the file still exists (a plain name is looked up
+            in the directory as read; anything else is checked) */
+         if (haveSet && *intName != '\0' && strchr(intName, '/') == NULL &&
+             strcmp(intName, ".") != 0 && strcmp(intName, "..") != 0 ?
+             ! TrashDirSetHas(&inTrash, intName) :
+             lstat(internal, &statbuf) < 0)
          {
            /* File no longer exists; ignore it */
            XtFree(internal);
@@ -720,6 +828,7 @@ ReadTrashList( void )
    } /* end while */
    fclose(trashInfoFileId);
    XtFree(trashEntry);
+   TrashDirSetFree(&inTrash);
 
    /* rewrite the file only if it lists objects no longer in the trash */
    if (dropped == 0)
