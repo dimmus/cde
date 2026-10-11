@@ -370,10 +370,11 @@ call(int procnum, xdrproc_t inproc, char *in,
 			           total_timeout);
 	}
 	if (_tt_stats_on()) {
-		// A one-way call "times out" by design.
-		_tt_stats_call(_TT_STATS_SESSION, procnum, timeout == 0,
+		// A one-way call (a timeout of 0, or -1 from
+		// _Tt_session::call) "times out" by design.
+		_tt_stats_call(_TT_STATS_SESSION, procnum, timeout <= 0,
 			       stats_t0,
-			       (timeout == 0 && _clnt_stat == RPC_TIMEDOUT) ?
+			       (timeout <= 0 && _clnt_stat == RPC_TIMEDOUT) ?
 			       0 : (int)_clnt_stat);
 	}
 	if (need2reset_sigpipe) {

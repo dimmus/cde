@@ -51,7 +51,7 @@ _tt_stats_on()
 long long _tt_stats_start();
 
 // Count one call of procedure proc, started at t0 (from _tt_stats_start).
-// A timeout of 0 means one-way (no reply awaited).  status is the
+// oneway is non-zero for a call that awaits no reply.  status is the
 // clnt_stat the call returned (non-zero counts as a failure).
 void _tt_stats_call(int iface, unsigned long proc, int oneway,
 		    long long t0, int status);
