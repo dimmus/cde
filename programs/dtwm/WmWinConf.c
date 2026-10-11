@@ -1300,7 +1300,7 @@ void CompleteFrameConfig (ClientData *pcd, XEvent *pev)
 				     ICON_ACTIVE_LABEL_PART) &&
 				    (wmGD.keyboardFocus == pcd))
 				{
-				    MoveActiveIconText(pcd);
+				    /* ShowActiveIconText moves the label too */
 				    ShowActiveIconText(pcd);
 				}
 			    }
@@ -1358,7 +1358,7 @@ void CompleteFrameConfig (ClientData *pcd, XEvent *pev)
 				 ICON_ACTIVE_LABEL_PART) &&
 				(wmGD.keyboardFocus == pcd))
 			    {
-				MoveActiveIconText(pcd);
+				/* ShowActiveIconText moves the label too */
 				ShowActiveIconText(pcd);
 			    }
 			}
@@ -1376,7 +1376,7 @@ void CompleteFrameConfig (ClientData *pcd, XEvent *pev)
 			 ICON_ACTIVE_LABEL_PART) &&
 			(wmGD.keyboardFocus == pcd))
 		    {
-			MoveActiveIconText(pcd);
+			/* ShowActiveIconText moves the label too */
 			ShowActiveIconText(pcd);
 		    }
                 }

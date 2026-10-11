@@ -1802,7 +1802,6 @@ void ShowActiveIconText (ClientData *pcd)
     XWindowChanges windowChanges;
     unsigned int mask;
     int x, y; 
-    unsigned int junk;
     Window root;
     Dimension dWidth, dHeight;
 
@@ -1811,7 +1810,11 @@ void ShowActiveIconText (ClientData *pcd)
      * put up a big icon text label
      */
     if (pcd->pSD->activeIconTextWin) {
-	/* copy event mask from icon frame window */
+	/*
+	 * copy event mask from icon frame window; the same query gives
+	 * the position of the frame (in its parent: the root, or the
+	 * icon box)
+	 */
 	XGetWindowAttributes (DISPLAY, ICON_FRAME_WIN(pcd), &iconFrameAttribs);
 
 	/* set attributes of window */
@@ -1837,10 +1840,9 @@ void ShowActiveIconText (ClientData *pcd)
 
 	activeIconTextWidth += 2*ICON_EXTERNAL_SHADOW_WIDTH;
 
-	XGetGeometry (DISPLAY, 
-			(Drawable) ICON_FRAME_WIN(pcd), 
-			&root, &x, &y, 
-		        &junk, &junk, &junk, &junk);
+	root = iconFrameAttribs.root;
+	x = iconFrameAttribs.x;
+	y = iconFrameAttribs.y;
 
 
 	y += ICON_IMAGE_HEIGHT(pcd);
