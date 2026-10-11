@@ -68,6 +68,7 @@ DtVirtArrayImpl::~DtVirtArrayImpl(void)
     }
 }
 
+#if defined(POSIX_THREADS)
 int
 DtVirtArrayImpl::length(void)
 {
@@ -86,6 +87,8 @@ DtVirtArrayImpl::operator[](const int at)
 
     return(_elements[at]);
 }
+
+#endif
 
 int
 DtVirtArrayImpl::indexof(void * handle)

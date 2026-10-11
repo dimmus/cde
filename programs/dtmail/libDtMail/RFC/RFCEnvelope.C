@@ -69,6 +69,22 @@ static const int INITIAL_HEADER_COUNT = 32;
 static const int NAME_MASK = 0x1;
 static const int VALUE_MASK = 0x2;
 
+// A hash of a header name, the same for names that strncasecmp()
+// finds equal: the length and the case folded first and last bytes.
+//
+unsigned long long
+RFCEnvelope::nameBit(const char * name, int len)
+{
+    if (len <= 0) {
+	return(0);
+    }
+
+    unsigned int h = (unsigned int) len * 5 +
+		     ((unsigned char) name[0] | 0x20) * 3 +
+		     ((unsigned char) name[len - 1] | 0x20);
+    return(1ULL << (h & 63));
+}
+
 RFCEnvelope::RFCEnvelope(DtMailEnv & error,
 			 DtMail::Message * parent,
 			 const char * start,
@@ -460,6 +476,9 @@ RFCEnvelope::storeHeader(DtMailEnv & error,
     _header_len += hdr->value_len + 1;
     hdr->alloc_mask |= VALUE_MASK;
 
+    _name_bits |= nameBit(hdr->name_start, hdr->name_len);
+    _generation += 1;
+
     // Only a real change dirties the message: setting a header to the
     // value it already has must not force the mailbox to be rewritten.
     //
@@ -491,6 +510,7 @@ RFCEnvelope::removeHeader(DtMailEnv & error, const char * name)
 	delete hdr;
 	slot = lookupHeader(name);
     }
+    _generation += 1;
 
     RFCMessage * msg = (RFCMessage *)_parent;
     if (msg) {
@@ -522,6 +542,8 @@ RFCEnvelope::adjustHeaderLocation(char * headerStart, int headerLength)
       // parse headers from scratch
       _header_text = headerStart;
       _header_len = headerLength;
+      _name_bits = 0;
+      _generation += 1;
       parseHeaders();
     }
     else {
@@ -637,6 +659,7 @@ RFCEnvelope::parseHeaders(void)
 	    }
 
 	    scan += 1;
+	    _name_bits |= nameBit(hdr->name_start, hdr->name_len);
 	    _parsed_headers.append(hdr);
 	    hdr = new ParsedHeader;
 	    continue;
@@ -675,6 +698,7 @@ RFCEnvelope::parseHeaders(void)
 	    // Null value!
 	    hdr->value_start = scan;
 	    hdr->value_len = 0;
+	    _name_bits |= nameBit(hdr->name_start, hdr->name_len);
 	    _parsed_headers.append(hdr);
 	    hdr = new ParsedHeader;
 	    scan += 1;
@@ -698,6 +722,7 @@ RFCEnvelope::parseHeaders(void)
 	}
 
 	scan += 1;
+	_name_bits |= nameBit(hdr->name_start, hdr->name_len);
 	_parsed_headers.append(hdr);
 	hdr = new ParsedHeader;
     }
@@ -723,6 +748,12 @@ RFCEnvelope::getTransportHeader(DtMailEnv & error,
     // The caller holds _header_lock, which covers the headers too.
     //
     const int name_len = strlen(name);
+
+    if ((_name_bits & nameBit(name, name_len)) == 0) {
+	error.setError(DTME_NoObjectValue);
+	return;
+    }
+
     const int count = _parsed_headers.length();
     enum { MAX_FOUND = 64 };
     ParsedHeader * found[MAX_FOUND];

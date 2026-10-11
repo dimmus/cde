@@ -50,8 +50,16 @@ class DtVirtArrayImpl : public DtCPlusPlusAllocator {
     DtVirtArrayImpl(const int size);
     ~DtVirtArrayImpl(void);
     
+#if defined(POSIX_THREADS)
     int length(void);
     void * operator[](const int at);
+#else
+    // Without threads the mutex is a no-op, so the two accessors that
+    // every scan of a list calls per element can be inline.
+    int length(void) { return(_count); }
+    void * operator[](const int at)
+	{ return((at < 0 || at >= _count) ? (void *)0 : _elements[at]); }
+#endif
     
     int indexof(void * handle);
     int append(void * handle);

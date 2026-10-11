@@ -431,6 +431,33 @@ RFCMessage::flagIsSet(DtMailEnv & error, const DtMailMessageState flag)
     DtMailValueSeq	 value;
     DtMailBoolean	answer = DTM_FALSE;
 
+    // The flags that only depend on a header are remembered until the
+    // headers change (the envelope's generation moves on).
+    //
+    unsigned int bit = 0;
+    switch (flag) {
+      case DtMailMessageNew:		bit = 0x1; break;
+      case DtMailMessageDeletePending:	bit = 0x2; break;
+      case DtMailMessageMultipart:	bit = 0x4; break;
+      case DtMailMessagePartial:	bit = 0x8; break;
+      default:				break;
+    }
+
+    RFCEnvelope * env = (RFCEnvelope *)_envelope;
+    if (bit && env) {
+	if (_flag_envelope != (const void *)env ||
+	    _flag_generation != env->generation()) {
+	    _flag_envelope = (const void *)env;
+	    _flag_generation = env->generation();
+	    _flag_known = 0;
+	    _flag_value = 0;
+	}
+	if (_flag_known & bit) {
+	    error.clear();
+	    return((_flag_value & bit) ? DTM_TRUE : DTM_FALSE);
+	}
+    }
+
     switch (flag) {
       case DtMailMessageNew:
 	_envelope->getHeader(error, "Status", DTM_FALSE, value);
@@ -493,6 +520,13 @@ RFCMessage::flagIsSet(DtMailEnv & error, const DtMailMessageState flag)
     }
 
     error.clear();
+
+    if (bit && env && _flag_generation == env->generation()) {
+	_flag_known |= bit;
+	if (answer == DTM_TRUE) {
+	    _flag_value |= bit;
+	}
+    }
 
     return(answer);
 }

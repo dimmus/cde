@@ -227,6 +227,14 @@ class RFCMessage : public DtMail::Message {
     //   
     DtMailBoolean	_alternativeMultipart;
 
+    // Flag bits (DtMailMessageNew, ...) computed by flagIsSet(), valid
+    // while the envelope's generation is _flag_generation. The list
+    // asks for them several times per row, each time a header lookup.
+    unsigned long	_flag_generation = 0;
+    unsigned int	_flag_known = 0;
+    unsigned int	_flag_value = 0;
+    const void *	_flag_envelope = NULL;
+
     // _alternativeMessage -- is this message an alternative message?
     // If DTM_FALSE: this is not an alternative message but rather a real
     //   message -- _msg_start, _msg_end, _body_start, etc. are valid.
@@ -362,10 +370,22 @@ class RFCEnvelope : public DtMail::Envelope {
     void unsetUseReplyTo(void) {  _use_reply_to = DTM_FALSE; }
     DtMailBoolean getUseReplyTo(void) { return _use_reply_to; }
 
+    // Bumped by every change to the headers, so that what is derived
+    // from them (RFCMessage's flag bits) can be cached.
+    unsigned long generation(void) { return _generation; }
+
 
   protected:
 
     DtMailBoolean       _use_reply_to;
+
+    // One bit per hash of the header names present (see nameBit()):
+    // most lookups are for headers a message does not have, and those
+    // are answered without walking the headers. Bits are only added;
+    // a stale one just means a walk.
+    unsigned long long	_name_bits = 0;
+    unsigned long	_generation = 0;
+    static unsigned long long nameBit(const char * name, int len);
     unsigned long	_object_signature;
     SafeScalar<int>	_dirty;
 
