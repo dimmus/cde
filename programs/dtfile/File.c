@@ -170,6 +170,7 @@
 
 #include <Xm/DrawingA.h>
 #include <Xm/DrawingAP.h>
+#include <Xm/DropTrans.h>
 #include <Xm/RowColumn.h>
 #include <Xm/LabelG.h>
 #include <Xm/PushBG.h>
@@ -4242,7 +4243,8 @@ static void SetHotRectsInternal(
    FileViewData  * file_view_data,
    XtCallbackProc callback,
    XtPointer callback_data,
-   Boolean skip_unchanged);
+   Boolean skip_unchanged,
+   Boolean plain_noop);
 
 typedef struct _IconState IconState;
 static void RecordDropSite(
@@ -4255,6 +4257,12 @@ static Boolean DropSiteUnchanged(
    unsigned char operations,
    XRectangle *rects,
    int num_rects);
+static void PlainDropSiteRegister(
+   Widget w);
+static Boolean PlainDropSiteForget(
+   Widget w);
+static Boolean HasPlainDropSite(
+   Widget w);
 
 void
 SetHotRects (
@@ -4262,15 +4270,22 @@ SetHotRects (
    XtCallbackProc callback,
    XtPointer callback_data)
 {
-   SetHotRectsInternal(file_view_data, callback, callback_data, False);
+   SetHotRectsInternal(file_view_data, callback, callback_data, False, False);
 }
 
+/*
+ * plain_noop: an icon whose type takes no drops gets a plain Motif drop
+ * site that refuses them (see PlainDropSiteRegister), instead of a DtDnd
+ * drop site for move/copy/link that is then made inactive.  It looks and
+ * behaves the same, and costs 2-4 instead of 8-12 us per icon.
+ */
 static void
 SetHotRectsInternal (
    FileViewData  * file_view_data,
    XtCallbackProc callback,
    XtPointer callback_data,
-   Boolean skip_unchanged)
+   Boolean skip_unchanged,
+   Boolean plain_noop)
 
 {
    Arg args[3];
@@ -4291,12 +4306,32 @@ SetHotRectsInternal (
       /* if icon gadget not yet registered as a drop site, do so now */
       if (!file_view_data->registered)
       {
+         /* (a plain drop site left by a previous file of the gadget) */
+         PlainDropSiteForget(file_view_data->widget);
+
+         if (!operations && plain_noop)
+         {
+            PlainDropSiteRegister(file_view_data->widget);
+            RecordDropSite(file_view_data->widget, XmDROP_NOOP, NULL, 0);
+            XtRemoveAllCallbacks(file_view_data->widget, XmNdropCallback);
+            file_view_data->registered = True;
+            return;
+         }
+
          /* register drop site for MCL but make drop site inactive */
          XtSetArg (args[0], XmNdropSiteOperations,
                    XmDROP_COPY | XmDROP_MOVE | XmDROP_LINK);
          XtSetValues (file_view_data->widget, args, 1);
 
          file_view_data->registered = True;
+      }
+      else if (operations && PlainDropSiteForget(file_view_data->widget))
+      {
+         /* the type now takes drops: a DtDnd drop site instead */
+         XtSetArg (args[0], XmNdropSiteOperations,
+                   XmDROP_COPY | XmDROP_MOVE | XmDROP_LINK);
+         XtSetValues (file_view_data->widget, args, 1);
+         was_registered = False;
       }
 
       if (operations)
@@ -4380,8 +4415,10 @@ SetHotRectsInternal (
          /*********************************************/
          /* file does not have associated MCL actions */
          /*********************************************/
-         /* make drop site inactive */
-         if (!(skip_unchanged && was_registered &&
+         /* make drop site inactive (a plain one is) */
+         if (HasPlainDropSite(file_view_data->widget))
+            RecordDropSite(file_view_data->widget, XmDROP_NOOP, NULL, 0);
+         else if (!(skip_unchanged && was_registered &&
                DropSiteUnchanged(file_view_data->widget, XmDROP_NOOP,
                                  NULL, 0)))
          {
@@ -4402,9 +4439,12 @@ SetHotRectsInternal (
          /***************************************/
          /* icon gadget registered as drop site */
          /***************************************/
-         /* make drop site inactive */
-         XtSetArg (args[0], XmNdropSiteOperations, XmDROP_NOOP);
-         XmDropSiteUpdate (file_view_data->widget, args, 1);
+         /* make drop site inactive (a plain one is) */
+         if (!HasPlainDropSite(file_view_data->widget))
+         {
+            XtSetArg (args[0], XmNdropSiteOperations, XmDROP_NOOP);
+            XmDropSiteUpdate (file_view_data->widget, args, 1);
+         }
          RecordDropSite(file_view_data->widget, XmDROP_NOOP, NULL, 0);
          XtRemoveAllCallbacks(file_view_data->widget, XmNdropCallback);
       }
@@ -5763,6 +5803,7 @@ struct _IconState
    Boolean  valid;
 
    /* last drop site update made by SetHotRects */
+   Boolean  plain_site;    /* registered by PlainDropSiteRegister */
    Boolean  ds_valid;
    unsigned char ds_operations;
    int      ds_num_rects;
@@ -5847,6 +5888,91 @@ DropSiteUnchanged(
           st->ds_y == w->core.y &&
           st->ds_width == w->core.width &&
           st->ds_height == w->core.height;
+}
+
+/*
+ * A drop site for an icon whose type takes no drops: what DtIcon and
+ * DtDnd register for move/copy/link (the pixmap and label rectangles)
+ * with the operations then set to none, without the DtDnd part, which
+ * an inactive site never uses.  Motif refuses a drop on it alike
+ * (XmINVALID_DROP_SITE, also for drags from other clients), and drops
+ * it when the gadget is destroyed.
+ */
+static void
+PlainDropProc(
+        Widget w,
+        XtPointer client_data,
+        XtPointer call_data)
+{
+   XmDropProcCallbackStruct *cb = (XmDropProcCallbackStruct *)call_data;
+   Arg args[2];
+
+   /* (as DtDnd does with a drop it does not take) */
+   XtSetArg(args[0], XmNtransferStatus, XmTRANSFER_FAILURE);
+   XtSetArg(args[1], XmNnumDropTransfers, 0);
+   XmDropTransferStart(cb->dragContext, args, 2);
+}
+
+static void
+PlainDropSiteRegister(
+        Widget w)
+{
+   DtIconGadget g = (DtIconGadget) w;
+   IconState *st = GetIconState(w, True);
+   XRectangle rects[2];
+   unsigned char flags;
+   int num_rects = 0;
+   Arg args[4];
+   Cardinal n = 0;
+
+   _DtIconGetIconRects(g, &flags, &rects[0], &rects[1]);
+   if (flags & XmPIXMAP_RECT)
+   {
+      rects[0].x -= g->rectangle.x;
+      rects[0].y -= g->rectangle.y;
+      num_rects++;
+   }
+   if (flags & XmLABEL_RECT)
+   {
+      rects[1].x -= g->rectangle.x;
+      rects[1].y -= g->rectangle.y;
+      if (!num_rects)
+         rects[0] = rects[1];
+      num_rects++;
+   }
+   if (num_rects)
+   {
+      XtSetArg(args[n], XmNdropRectangles, rects);        n++;
+      XtSetArg(args[n], XmNnumDropRectangles, num_rects); n++;
+   }
+   XtSetArg(args[n], XmNdropSiteOperations, XmDROP_NOOP); n++;
+   XtSetArg(args[n], XmNdropProc, PlainDropProc);         n++;
+   XmDropSiteRegister(w, args, n);
+   st->plain_site = True;
+}
+
+static Boolean
+HasPlainDropSite(
+        Widget w)
+{
+   IconState *st = GetIconState(w, False);
+
+   return st != NULL && st->plain_site;
+}
+
+/* unregister a plain drop site of the gadget; was there one? */
+static Boolean
+PlainDropSiteForget(
+        Widget w)
+{
+   IconState *st = GetIconState(w, False);
+
+   if (st == NULL || !st->plain_site)
+      return False;
+   XmDropSiteUnregister(w);
+   st->plain_site = False;
+   st->ds_valid = False;
+   return True;
 }
 
 /* The label or image of this icon gadget was changed by other code. */
@@ -6197,6 +6323,7 @@ UpdateOneFileIcon(
          {
             XtSetArg (args[n], XmNdropSiteOperations, XmDROP_NOOP);n++;
             XtRemoveAllCallbacks(icon_widget, XmNdropCallback);
+            PlainDropSiteForget(icon_widget);
             file_view_data->registered = False;
          }
          XtRemoveAllCallbacks (icon_widget, XmNcallback);
@@ -6328,6 +6455,7 @@ UpdateOneFileIcon(
          }
          XtAddCallback(icon_widget, XmNhelpCallback,
                        (XtCallbackProc)HelpRequestCB, NULL);
+         PlainDropSiteForget(icon_widget);
          file_view_data->registered = False;
       }
 
@@ -7391,6 +7519,11 @@ DisplaySomeIcons(
                   workCount1++;
                   file_view_data->registered = False;
                }
+               else if (PlainDropSiteForget(child))
+               {
+                  workCount1++;
+                  file_view_data->registered = False;
+               }
                continue;
             }
 
@@ -7647,7 +7780,7 @@ do_this_entry:
          SetHotRectsInternal(change[k],
                              (XtCallbackProc) DropOnObject,
                              (XtPointer) change[k],
-                             True);
+                             True, True);
       }
    }
 
