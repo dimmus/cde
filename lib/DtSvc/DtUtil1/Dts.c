@@ -55,6 +55,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <time.h>
 #if defined(CSRG_BASED)
 #define MAXINT INT_MAX
 #else
@@ -72,6 +73,7 @@
 #include <Dt/DtNlUtils.h>
 #include "Dt/DtsMM.h"
 #include "Dt/Dts.h"
+#include "Dt/DtsI.h"
 #include "DtSvcLock.h"
 #include <Dt/UserMsg.h>
 
@@ -98,6 +100,10 @@ typedef	struct	type_info
 	char			*name;		/* last component, in file_path */
 	const struct stat	*file_stat;	/* caller's, or &stat_buf */
 	const struct stat	*file_lstat;	/* caller's, or &lstat_buf */
+	int			lstat_known;	/* file_lstat is a real lstat,
+						   not only "it is a link" */
+	int			dir_fd;		/* -1, or at_name's directory */
+	const char		*at_name;	/* file_path relative to dir_fd */
 	struct stat		stat_buf;
 	struct stat		lstat_buf;
 	int			file_fd;
@@ -469,6 +475,7 @@ set_vals(type_info_t		*linfo,
 	linfo->size_to_free = -1;
 	linfo->mb = linfo->mb_local;
 	linfo->mb_size = sizeof(linfo->mb_local);
+	linfo->dir_fd = -1;
 
 	if(fn)
 	{
@@ -652,7 +659,9 @@ get_fd(type_info_t *info)
 			flags |= O_NOATIME;
 		}
 #endif
-		info->file_fd = open(info->file_path, flags, 0);
+		info->file_fd = info->at_name ?
+			openat(info->dir_fd, info->at_name, flags, 0) :
+			open(info->file_path, flags, 0);
 #ifdef O_NOATIME
 		/*
 		 * The ownership test can be wrong (a stat buffer from the
@@ -661,8 +670,10 @@ get_fd(type_info_t *info)
 		 */
 		if(info->file_fd == -1 && errno == EPERM && (flags & O_NOATIME))
 		{
-			info->file_fd = open(info->file_path,
-					     flags & ~O_NOATIME, 0);
+			info->file_fd = info->at_name ?
+				openat(info->dir_fd, info->at_name,
+				       flags & ~O_NOATIME, 0) :
+				open(info->file_path, flags & ~O_NOATIME, 0);
 		}
 #endif
 		if(info->file_fd == -1)
@@ -685,7 +696,10 @@ get_lstat(type_info_t *info)
 			info->file_lstat = 0;
 			return(0);
 		}
-		else if(lstat(info->file_path, &info->lstat_buf) == -1)
+		else if((info->at_name ?
+			 fstatat(info->dir_fd, info->at_name, &info->lstat_buf,
+				 AT_SYMLINK_NOFOLLOW) :
+			 lstat(info->file_path, &info->lstat_buf)) == -1)
 		{
 			info->error = errno;
 			info->file_lstat = 0;
@@ -694,6 +708,7 @@ get_lstat(type_info_t *info)
 		else
 		{
 			info->file_lstat = &info->lstat_buf;
+			info->lstat_known = 1;
 		}
 	}
 	return(info->file_lstat);
@@ -709,7 +724,9 @@ get_stat(type_info_t *info)
 			info->error = ENOENT;
 			info->file_stat = 0;
 		}
-		else if(stat(get_file_path(info), &info->stat_buf) == -1)
+		else if((info->at_name ?
+			 fstatat(info->dir_fd, info->at_name, &info->stat_buf, 0) :
+			 stat(get_file_path(info), &info->stat_buf)) == -1)
 		{
 			if(errno == ENOENT)
 			{
@@ -730,12 +747,23 @@ get_stat(type_info_t *info)
 	return(info->file_stat);
 }
 
+/*
+ * A link target, or an lstat buffer passed through the public API,
+ * means "this is a link".  An lstat this file made itself, or one passed
+ * to _DtDtsDataToDataTypeAt, says so itself: this used to answer yes for
+ * any file once a MODE l test had lstat'ed it.
+ */
 static int
 islink(type_info_t *info)
 {
-	if(info->file_lstat || info->link_path || info->link_name)
+	if(info->link_path || info->link_name)
 	{
 		return(1);
+	}
+	if(info->file_lstat)
+	{
+		return(info->lstat_known ?
+			S_ISLNK(info->file_lstat->st_mode) : 1);
 	}
 	return(0);
 }
@@ -750,6 +778,17 @@ get_link_info(type_info_t *info)
 	int		n;
 	int		hops = 0;
 
+	if(info->link_path == 0 && info->lstat_known && info->file_path &&
+	   !S_ISLNK(info->file_lstat->st_mode))
+	{
+		/*
+		 * Not a link: readlink() would fail with EINVAL, which makes
+		 * the file its own link path.
+		 */
+		info->link_path = info->file_path;
+		info->link_name = info->name;
+		return;
+	}
 	if(info->link_path == 0)
 	{
 		if((name = get_file_path(info)) == 0)
@@ -1369,15 +1408,12 @@ type_content(char *attr, type_info_t *info)
 }
 
 /*
- * Returns the data type named in the directory's .DtDirDataType file,
- * or NULL.
+ * Returns the data type named in an open .DtDirDataType file, or NULL.
+ * Closes FD.
  */
 static char *
-_DtDtsGetDataType(const char *file)
+read_dir_data_type(int fd)
 {
-	int		fd;
-	char		*name;
-	size_t		name_len;
 	struct stat	file_stat;
 	char		*buff;
 	char		*dt = 0;
@@ -1385,16 +1421,6 @@ _DtDtsGetDataType(const char *file)
 	size_t		end;
 	ssize_t		got;
 
-	name_len = strlen(file) + sizeof(DtDTS_DT_DIR) + 1;
-	name = malloc(name_len);
-	snprintf(name, name_len, "%s/%s", file, DtDTS_DT_DIR);
-	/* O_NONBLOCK: do not hang on a FIFO of that name */
-	fd = open(name, O_RDONLY|O_NOCTTY|O_NONBLOCK|O_CLOEXEC);
-	free(name);
-	if(fd == -1)
-	{
-		return(0);
-	}
 	if(fstat(fd, &file_stat) == 0 && S_ISREG(file_stat.st_mode) &&
 	   file_stat.st_size > 0 &&
 	   (buff = malloc((size_t)file_stat.st_size + 1)) != NULL)
@@ -1418,6 +1444,246 @@ _DtDtsGetDataType(const char *file)
 		free(buff);
 	}
 	close(fd);
+	return(dt);
+}
+
+/* O_NONBLOCK: do not hang on a FIFO of that name */
+#define	DIR_DT_FLAGS	(O_RDONLY|O_NOCTTY|O_NONBLOCK|O_CLOEXEC)
+
+/*
+ * Returns the data type named in the directory's .DtDirDataType file,
+ * or NULL.
+ */
+static char *
+_DtDtsGetDataType(const char *file)
+{
+	int		fd;
+	char		*name;
+	size_t		name_len;
+
+	name_len = strlen(file) + sizeof(DtDTS_DT_DIR) + 1;
+	name = malloc(name_len);
+	snprintf(name, name_len, "%s/%s", file, DtDTS_DT_DIR);
+	fd = open(name, DIR_DT_FLAGS);
+	free(name);
+	if(fd == -1)
+	{
+		return(0);
+	}
+	return(read_dir_data_type(fd));
+}
+
+/*
+ * Directories seen without a .DtDirDataType file.  Almost none has one,
+ * and dtfile types every subdirectory again on each reread, so this
+ * saves an open() per directory and reread.  An entry is keyed on the
+ * directory's device and inode and holds while its mtime is unchanged:
+ * creating, removing or renaming an entry in a directory updates it.
+ * A directory modified less than DIR_DT_RACY seconds ago is not cached,
+ * so that a file created within the same tick of a coarse file system
+ * clock is still found.
+ */
+#define	DIR_DT_RACY		2
+#define	DIR_DT_MIN		256		/* powers of 2 */
+#define	DIR_DT_MAX		65536
+
+static struct dir_dt_entry
+{
+	dev_t		dev;
+	ino_t		ino;
+	struct timespec	mtim;
+	int		valid;
+} *dir_dt_cache;
+static size_t	dir_dt_size;	/* slots */
+static size_t	dir_dt_used;
+
+static size_t
+dir_dt_hash(dev_t dev, ino_t ino)
+{
+	unsigned long long	h = (unsigned long long)ino ^
+				    ((unsigned long long)dev << 32);
+
+	h *= 0x9E3779B97F4A7C15ULL;
+	return((size_t)(h ^ (h >> 29)));
+}
+
+/* The slot of DEV/INO, or the free slot to put it in (NULL: no table). */
+static struct dir_dt_entry *
+dir_dt_find(dev_t dev, ino_t ino)
+{
+	size_t	i;
+
+	if(dir_dt_size == 0)
+	{
+		return(0);
+	}
+	for(i = dir_dt_hash(dev, ino) & (dir_dt_size - 1);
+	    dir_dt_cache[i].valid;
+	    i = (i + 1) & (dir_dt_size - 1))
+	{
+		if(dir_dt_cache[i].dev == dev && dir_dt_cache[i].ino == ino)
+		{
+			break;
+		}
+	}
+	return(&dir_dt_cache[i]);
+}
+
+static void
+dir_dt_forget(void)
+{
+	if(dir_dt_cache)
+	{
+		memset(dir_dt_cache, 0, dir_dt_size * sizeof(*dir_dt_cache));
+	}
+	dir_dt_used = 0;
+}
+
+/* Remembers that the directory ST describes has no .DtDirDataType. */
+static void
+dir_dt_add(const struct stat *st)
+{
+	struct dir_dt_entry	*e;
+
+	/* at most half full */
+	if((dir_dt_used + 1) * 2 > dir_dt_size)
+	{
+		struct dir_dt_entry	*old = dir_dt_cache;
+		size_t			old_size = dir_dt_size;
+		size_t			new_size = old_size ? old_size * 2 : DIR_DT_MIN;
+		size_t			i;
+
+		if(new_size > DIR_DT_MAX)
+		{
+			dir_dt_forget();	/* full: start over */
+		}
+		else if((dir_dt_cache = calloc(new_size, sizeof(*dir_dt_cache))))
+		{
+			dir_dt_size = new_size;
+			dir_dt_used = 0;
+			for(i = 0; i < old_size; i++)
+			{
+				if(old[i].valid)
+				{
+					*dir_dt_find(old[i].dev, old[i].ino) = old[i];
+					dir_dt_used++;
+				}
+			}
+			free(old);
+		}
+		else
+		{
+			dir_dt_cache = old;
+			if(old_size == 0)
+			{
+				return;
+			}
+			dir_dt_forget();
+		}
+	}
+	e = dir_dt_find(st->st_dev, st->st_ino);
+	if(!e->valid)
+	{
+		dir_dt_used++;
+	}
+	e->dev = st->st_dev;
+	e->ino = st->st_ino;
+	e->mtim = st->st_mtim;
+	e->valid = 1;
+}
+
+/* lstat()s the .DtDirDataType of the directory being typed. */
+static int
+dir_dt_lstat(type_info_t *info, struct stat *lst)
+{
+	char	rel[MAXPATHLEN];
+
+	if(info->at_name)
+	{
+		if(snprintf(rel, sizeof(rel), "%s/%s", info->at_name,
+			    DtDTS_DT_DIR) >= (int)sizeof(rel))
+		{
+			errno = ENAMETOOLONG;
+			return(-1);
+		}
+		return(fstatat(info->dir_fd, rel, lst, AT_SYMLINK_NOFOLLOW));
+	}
+	if(snprintf(rel, sizeof(rel), "%s/%s", get_file_path(info),
+		    DtDTS_DT_DIR) >= (int)sizeof(rel))
+	{
+		errno = ENAMETOOLONG;
+		return(-1);
+	}
+	return(lstat(rel, lst));
+}
+
+/*
+ * The data type the .DtDirDataType file of the directory being typed
+ * names, or NULL.  ST is the directory's stat.
+ */
+static char *
+dir_data_type(type_info_t *info, const struct stat *st)
+{
+	struct dir_dt_entry	*slot = dir_dt_find(st->st_dev, st->st_ino);
+	int			fd;
+	char			*dt;
+
+	if(slot && slot->valid &&
+	   slot->mtim.tv_sec == st->st_mtim.tv_sec &&
+	   slot->mtim.tv_nsec == st->st_mtim.tv_nsec)
+	{
+		return(0);
+	}
+
+	if(info->at_name)
+	{
+		char	rel[MAXPATHLEN];
+
+		if(snprintf(rel, sizeof(rel), "%s/%s", info->at_name,
+			    DtDTS_DT_DIR) >= (int)sizeof(rel))
+		{
+			return(0);
+		}
+		fd = openat(info->dir_fd, rel, DIR_DT_FLAGS);
+	}
+	else
+	{
+		const char	*path = get_file_path(info);
+		char		*name;
+		size_t		name_len;
+
+		if(path == 0)
+		{
+			return(0);
+		}
+		name_len = strlen(path) + sizeof(DtDTS_DT_DIR) + 1;
+		name = malloc(name_len);
+		snprintf(name, name_len, "%s/%s", path, DtDTS_DT_DIR);
+		fd = open(name, DIR_DT_FLAGS);
+		free(name);
+	}
+
+	if(fd != -1)
+	{
+		dt = read_dir_data_type(fd);
+	}
+	else
+	{
+		struct stat	lst;
+
+		dt = 0;
+		/*
+		 * Cache only a missing name: not a dangling link of that
+		 * name, whose target can appear without the directory
+		 * changing.
+		 */
+		if(errno == ENOENT &&
+		   (long long)st->st_mtim.tv_sec < (long long)time(NULL) - DIR_DT_RACY &&
+		   dir_dt_lstat(info, &lst) == -1 && errno == ENOENT)
+		{
+			dir_dt_add(st);
+		}
+	}
 	return(dt);
 }
 
@@ -1455,8 +1721,7 @@ type_mode(char *attr, type_info_t *info)
 				if(!info->set_datatype)
 				{
 					info->set_datatype = 1;
-					info->ot = 
-					      _DtDtsGetDataType(get_file_path(info));
+					info->ot = dir_data_type(info, buf);
 					if(info->ot) return(match);
 				}
 			}
@@ -1602,20 +1867,15 @@ next_sep(char *str, char *sep, int ascii)
 	return((char *)0);
 }
 
-char	*
-DtDtsDataToDataType(const char *fp,
-	const void		*buf,
-	const int		bs,
-	const struct stat	*fs,
-	const char		*ln,
-	const struct stat	*ls,
-	const char		*on)
+/*
+ * Types the file INFO describes against the criteria database DB.
+ * Called with the locks held.
+ */
+static char *
+data_to_type(DtDtsMMDatabase *db, type_info_t *info)
 {
-	DtDtsMMDatabase	*db;
 	DtDtsMMRecord	*rec_ptr = 0;
 	DtDtsMMField	*fld_ptr_list;
-	type_info_t	info_store;
-	type_info_t	*info = &info_store;
 	int	j;
 	int	rec_m = 0;
 	int	fld_m = 0;
@@ -1624,17 +1884,6 @@ DtDtsDataToDataType(const char *fp,
 	int	c_atr_m = 1;
 	char	*attr;
 
-	_DtSvcAppLockDefault();
-	_DtSvcProcessLock();
-	db = get_dc_db();
-	if(!db)
-	{
-		_DtSvcProcessUnlock();
-		_DtSvcAppUnlockDefault();
-		return(strdup("UNKNOWN"));
-	}
-
-	set_vals(info, fp, buf, bs, fs, ln, ls, on);
 	if(dtdts_bosons_gen != _DtDtsMMGeneration())
 	{
 		dtdts_path_pattern = _DtDtsMMStringToBoson(DtDTS_PATH_PATTERN);
@@ -1761,16 +2010,12 @@ DtDtsDataToDataType(const char *fp,
 
 				if(info->error == ELOOP)
 				{
-				        _DtSvcProcessUnlock();
-					_DtSvcAppUnlockDefault();
 					return(
 					   cleanup(DtDTS_DT_RECURSIVE_LINK, info)
 						);
 				}
 				if(info->ot)
 				{
-				        _DtSvcProcessUnlock();
-					_DtSvcAppUnlockDefault();
 					return(cleanup(0, info));
 				}
 
@@ -1820,9 +2065,81 @@ DtDtsDataToDataType(const char *fp,
 			rec_m = 1;
 		}
 	}
+	return(cleanup(0, info));
+}
+
+char	*
+DtDtsDataToDataType(const char *fp,
+	const void		*buf,
+	const int		bs,
+	const struct stat	*fs,
+	const char		*ln,
+	const struct stat	*ls,
+	const char		*on)
+{
+	DtDtsMMDatabase	*db;
+	type_info_t	info;
+	char		*type;
+
+	_DtSvcAppLockDefault();
+	_DtSvcProcessLock();
+	db = get_dc_db();
+	if(!db)
+	{
+		_DtSvcProcessUnlock();
+		_DtSvcAppUnlockDefault();
+		return(strdup("UNKNOWN"));
+	}
+	set_vals(&info, fp, buf, bs, fs, ln, ls, on);
+	type = data_to_type(db, &info);
 	_DtSvcProcessUnlock();
 	_DtSvcAppUnlockDefault();
-	return(cleanup(0, info));
+	return(type);
+}
+
+/*
+ * Internal (Dt/DtsI.h): DtDtsDataToDataType for a caller that has
+ * already looked at the file, see DtsI.h.
+ */
+char *
+_DtDtsDataToDataTypeAt(int dirfd,
+	const char		*name,
+	const char		*path,
+	const struct stat	*st,
+	const struct stat	*lst,
+	const char		*link_target)
+{
+	DtDtsMMDatabase	*db;
+	type_info_t	info;
+	char		*type;
+
+	if(path == 0)
+	{
+		return(strdup(DtDTS_DT_UNKNOWN));
+	}
+	_DtSvcAppLockDefault();
+	_DtSvcProcessLock();
+	db = get_dc_db();
+	if(!db)
+	{
+		_DtSvcProcessUnlock();
+		_DtSvcAppUnlockDefault();
+		return(strdup("UNKNOWN"));
+	}
+	set_vals(&info, path, NULL, 0, st, link_target, lst, NULL);
+	if(lst)
+	{
+		info.lstat_known = 1;
+	}
+	if(name && *name && dirfd >= 0)
+	{
+		info.dir_fd = dirfd;
+		info.at_name = name;
+	}
+	type = data_to_type(db, &info);
+	_DtSvcProcessUnlock();
+	_DtSvcAppUnlockDefault();
+	return(type);
 }
 
 char	*
@@ -2377,6 +2694,11 @@ DtDtsSetDataType(const char *filename, const char *datatype_in, const int overid
 	u_char		*buff = NULL;
 	struct stat	file_stat;
 	char		*datatype = 0;
+
+	/* this may create the file: forget the directories seen without */
+	_DtSvcProcessLock();
+	dir_dt_forget();
+	_DtSvcProcessUnlock();
 
 	fsize = strlen(filename)+strlen(DtDTS_DT_DIR)+2;
 	file = (char *)calloc(1,fsize);
