@@ -331,19 +331,22 @@ _DtTermBufferResize
 		if (lines[i])
 		{
 		    DT_ENH(lines[i])    = NULL;
-		    BUFFER(lines[i]) = (termChar *) malloc((unsigned) COLS(tb) *
+		    BUFFER(lines[i]) = (termChar *) malloc((unsigned) MAX_COLS(tb) *
 							   BYTES_PER_CHAR(tb));
 		    if (BUFFER(lines[i]))
 		    {
 			LENGTH(lines[i])  = 0;
 			WIDTH(lines[i])   = 0;
 			WRAPPED(lines[i]) = False;
+			START_SELECTION(lines[i]) = NON_SELECTION_COL;
+			END_SELECTION(lines[i]) = NON_SELECTION_COL;
 		    }
 		    else 
 		    {
 			/*
 			** the line buffer malloc failed...
 			*/
+			free(lines[i]);
 			*newRows = i;
 			break;
 		    }

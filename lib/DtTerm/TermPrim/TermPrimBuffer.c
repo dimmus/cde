@@ -402,7 +402,8 @@ _DtTermPrimBufferResizeBuffer
 		    *newRows = MIN(*newRows, MAX_ROWS(*oldTB));
 		    break;
 		}
-		memcpy(newLineBuffer, BUFFER(newTL[i]), LENGTH(newTL[i]));
+		memcpy(newLineBuffer, BUFFER(newTL[i]), LENGTH(newTL[i]) *
+		       BYTES_PER_CHAR(*oldTB));
 		free(BUFFER(newTL[i]));
 		BUFFER(newTL[i])  = newLineBuffer;
 		WRAPPED(newTL[i]) = False;
@@ -424,10 +425,11 @@ _DtTermPrimBufferResizeBuffer
 	    if (newTL != NULL)
 	    {
 		/*
-		** the malloc succeeded, copy the old information, and
-		** then free it...
+		** the malloc succeeded, copy the old information (all
+		** MAX_ROWS lines of the ring, in row order), and then
+		** free it...
 		*/
-		for (i = 0; i < ROWS(*oldTB); i++)
+		for (i = 0; i < MAX_ROWS(*oldTB); i++)
 		{
 		    newTL[i] = LINE_OF_TBUF(*oldTB, i);
 		}
@@ -439,19 +441,20 @@ _DtTermPrimBufferResizeBuffer
 		/*
 		** now initialize the new lines...
 		*/
-		for (i = ROWS(*oldTB); i < *newRows; i++)
+		for (i = MAX_ROWS(*oldTB); i < *newRows; i++)
 		{
 		    newTL[i] = (TermLine) malloc(SIZE_OF_LINE(*oldTB));
 		    if (newTL[i])
 		    {
 			BUFFER(newTL[i]) = (termChar *) 
-			    malloc((unsigned) COLS(*oldTB) * 
+			    malloc((unsigned) MAX_COLS(*oldTB) * 
 				   BYTES_PER_CHAR(*oldTB));
 			if (BUFFER(newTL[i]) == NULL)
 			{
 			    /*
 			    ** line buffer malloc failed...
 			    */
+			    free(newTL[i]);
 			    *newRows = i;
 			    break;
 			}
@@ -472,10 +475,11 @@ _DtTermPrimBufferResizeBuffer
 		    }
 		}
 		/*
-		** its conceivable that MAX_ROWS could actually decrease if
-		** we are low on memory...
+		** the ring (see LINES_BASE()) is now the *newRows lines
+		** we have (fewer than asked for if we are low on
+		** memory)...
 		*/
-		MAX_ROWS(*oldTB) = MIN(MAX_ROWS(*oldTB), *newRows);
+		MAX_ROWS(*oldTB) = *newRows;
 	    }
 	    else
 	    {
