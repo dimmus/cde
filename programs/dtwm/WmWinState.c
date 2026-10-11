@@ -67,7 +67,7 @@
 
 #include "WmMultiHead.h"
 #include "WmWinState.h"
-#include "../../tools/bench/startup-trace.h"
+#include "../dtlogin/startup-trace.h"	/* the copy the programs build with */
 static void SlideWindowOut (ClientData *pCD);
 static void UnmapClients (ClientData *pCD, unsigned int event_mask);
 static void SetupWindowStateWithEventMask (ClientData *pCD, int newState, Time setTime, unsigned int event_mask);

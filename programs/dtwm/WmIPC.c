@@ -50,7 +50,7 @@
 #include "WmXSMP.h"
 #include "WmPanelP.h"
 #include "DataBaseLoad.h"
-#include "../../tools/bench/startup-trace.h"
+#include "../dtlogin/startup-trace.h"	/* the copy the programs build with */
 
 
 /*

@@ -49,7 +49,7 @@
 #include "WmError.h"
 #include "WmIPC.h"
 #include "WmBackdrop.h"
-#include "../../tools/bench/startup-trace.h"
+#include "../dtlogin/startup-trace.h"	/* the copy the programs build with */
 
 
 /*

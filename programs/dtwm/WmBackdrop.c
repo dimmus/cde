@@ -150,7 +150,19 @@ ChangeBackdrop(
     if (pWS->pSD->lastBackdropWin &&
 	(pWS->backdrop.window != pWS->pSD->lastBackdropWin))
     {
-	XUnmapWindow(DISPLAY, pWS->pSD->lastBackdropWin);
+	if (IsBackdropWindow (pWS->pSD, pWS->pSD->lastBackdropWin))
+	{
+	    XUnmapWindow(DISPLAY, pWS->pSD->lastBackdropWin);
+	}
+	else
+	{
+	    /*
+	     * No workspace uses it any more (ReleaseBackdropWindow
+	     * left it to us since it was shown): it would stay
+	     * unmapped forever, holding on to its background pixmap.
+	     */
+	    XDestroyWindow(DISPLAY, pWS->pSD->lastBackdropWin);
+	}
     }
 
     pWS->pSD->lastBackdropWin = pWS->backdrop.window;
@@ -264,8 +276,7 @@ BackdropWindowShared (WmWorkspaceData *pWS)
  *  -----------
  *  pWS gives up its backdrop window (and is left with none): the window
  *  is destroyed unless another workspace shares it or it is the one
- *  shown (which ChangeBackdrop unmaps when it shows the next one; it is
- *  then left unmapped, as the windows of deleted workspaces always were).
+ *  shown (which ChangeBackdrop destroys when it shows the next one).
  *
  *************************************<->***********************************/
 static void
@@ -519,7 +530,7 @@ ProcessBackdropResources(
 		/*
 		 * No backdrop (root window shows through)
 		 */
-		pWS->backdrop.window = None;
+		ReleaseBackdropWindow (pWS);
 		pWS->backdrop.nameAtom = xa_NO_BACKDROP;
 		bNone = True;
 	    }
