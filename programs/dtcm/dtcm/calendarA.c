@@ -265,7 +265,8 @@ fill_paint_cache(Calendar *c, time_t start, time_t stop)
 			 NULL);
 	free_range(&range_attrs, &ops, n);
 	allocate_paint_cache(list, a_total, &c->paint_cache);
-	c->paint_cache_size = a_total;
+	/* no cache (a query failed): nothing to compare or paint from */
+	c->paint_cache_size = c->paint_cache ? a_total : 0;
 	csa_free(list);
 }
 

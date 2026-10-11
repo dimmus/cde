@@ -1157,10 +1157,11 @@ attrs_to_attrliststr(
 			break;
 
 		case CSA_VALUE_OPAQUE_DATA:
+			/* a client may send a value without data */
 			opq = attrs[i].value->item.opaque_data_value;
-			sprintf(tmpbuf2, "%lu:", opq->size);
+			sprintf(tmpbuf2, "%lu:", opq ? opq->size : 0);
 
-			if (opq->size > 0) {
+			if (opq && opq->size > 0) {
 				if ((ptr = cr_to_str((char *)opq->data,
 				    opq->size)) == NULL) {
 					free(buf);

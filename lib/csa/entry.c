@@ -727,9 +727,10 @@ _MovableValue(cms_attribute_value *v)
 			(v->item.reminder_value->reminder_data.size > 0 ||
 			 v->item.reminder_value->reminder_data.data == NULL));
 	case CSA_VALUE_OPAQUE_DATA:
-		return (v->item.opaque_data_value == NULL ||
-			v->item.opaque_data_value->size > 0 ||
-			v->item.opaque_data_value->data == NULL);
+		/* the update leaves no value for a NULL one */
+		return (v->item.opaque_data_value != NULL &&
+			(v->item.opaque_data_value->size > 0 ||
+			 v->item.opaque_data_value->data == NULL));
 	default:
 		return (B_FALSE);
 	}
