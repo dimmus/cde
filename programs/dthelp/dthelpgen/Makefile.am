@@ -9,7 +9,7 @@ bin_SCRIPTS = dthelpgen.dtsh
 dthelpgen_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 		   -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
-		   -I ../../../lib/DtHelp
+		   -I$(srcdir)/../../../lib/DtHelp
 
 dthelpgen_LDADD = $(LIBHELP) $(LIBSVC) $(X11LIB)
 

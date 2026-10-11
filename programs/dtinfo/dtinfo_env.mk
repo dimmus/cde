@@ -29,7 +29,7 @@ OLIASSRC = $(top_srcdir)/programs/dtinfo
 WWL = $(OLIAS)/dtinfo/wwl
 WWLSRC = $(OLIASSRC)/dtinfo/wwl
 MMDB = $(top_builddir)/lib/DtMmdb
-MMDBSRC = $(top_builddir)/lib/DtMmdb
+MMDBSRC = $(top_srcdir)/lib/DtMmdb
 TOOLS = $(OLIAS)/tools
 UAS = $(OLIAS)/dtinfo/src/UAS
 UASSRC = $(OLIASSRC)/dtinfo/src/UAS
@@ -42,4 +42,4 @@ UAS_INCLUDES = -I$(UASSRC)/Base
 TREERES = $(TOOLS)/misc/treeres
 MSGSETS = $(TOOLS)/misc/msgsets
 
-DTINFO_INCLUDES = -I.. $(UAS_INCLUDES) $(MMDB_INCLUDES) $(WWL_INCLUDES)
+DTINFO_INCLUDES = -I$(srcdir)/.. $(UAS_INCLUDES) $(MMDB_INCLUDES) $(WWL_INCLUDES)

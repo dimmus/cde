@@ -9,7 +9,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 bin_PROGRAMS = dtstyle
 
 dtstyle_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"	\
-	-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" -I../dthelp	\
+	-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" -I$(srcdir)/../dthelp	\
 	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 	$(DT_INCDIR)
 

@@ -21,7 +21,7 @@ $(VSCRIPT_DIR)/libDtSvc-exports.ver: $(EXPORTS_DIR)/libDtSvc.sym
 
 
 # USe CPPFLAGS so it will apply to both C and C++ components
-libDtSvc_la_CPPFLAGS = $(CDE_CPPFLAGS) $(KEEP_ASSERTS) -I./include -DMULTIBYTE -DNLS16 -I../include \
+libDtSvc_la_CPPFLAGS = $(CDE_CPPFLAGS) $(KEEP_ASSERTS) -I$(srcdir)/include -DMULTIBYTE -DNLS16 -I$(srcdir)/../include \
 	@DT_INCDIR@ -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
        -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \

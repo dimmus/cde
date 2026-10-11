@@ -9,7 +9,7 @@ bin_SCRIPTS =  dthelpprint.sh
 # header or footer with a %n in a format string it builds at run time,
 # which _FORTIFY_SOURCE 2 and 3 abort on ("%n in writable segments
 # detected") every time dthelpprint prints a page.
-dthelpprint_CPPFLAGS = $(CDE_CPPFLAGS) $(FORTIFY_SOURCE_1) -I.. -I ../../../lib/DtHelp \
+dthelpprint_CPPFLAGS = $(CDE_CPPFLAGS) $(FORTIFY_SOURCE_1) -I$(srcdir)/.. -I$(srcdir)/../../../lib/DtHelp \
 	-DCDE_CONFIGURATION_TOP='"$(CDE_CONFIGURATION_TOP)"' \
 	-DCDE_INSTALLATION_TOP='"$(CDE_INSTALLATION_TOP)"' \
 	-DCDE_DATA_TOP='"$(CDE_DATA_TOP)"'

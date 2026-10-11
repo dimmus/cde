@@ -12,7 +12,7 @@ $(if $(filter grouped-target,$(.FEATURES)),,$(eval .NOTPARALLEL:))
 
 appdefaultsdir = $(CDE_DATA_TOP)/app-defaults/C
 
-ABINCLUDES = -I../include -I../include/ab_private -I../libABil
+ABINCLUDES = -I$(srcdir)/../include -I$(srcdir)/../include/ab_private -I$(srcdir)/../libABil
 
 AM_CPPFLAGS = $(CDE_CPPFLAGS) \
 	      -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \

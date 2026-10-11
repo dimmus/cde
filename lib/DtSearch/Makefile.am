@@ -10,7 +10,7 @@ BUILT_SOURCES = boolyac.h boolyac.c
 CLEANFILES = boolyac.h boolyac.c
 AM_YFLAGS = -d
 
-libDtSearch_la_CFLAGS = $(CDE_CFLAGS) -DI18N_MSG -DMULTIBYTE -I./raima \
+libDtSearch_la_CFLAGS = $(CDE_CFLAGS) -DI18N_MSG -DMULTIBYTE -I$(srcdir)/raima \
 			$(DT_INCDIR)
 
 

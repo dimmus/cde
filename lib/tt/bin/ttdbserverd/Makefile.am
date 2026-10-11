@@ -7,7 +7,7 @@ TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
 bin_PROGRAMS = rpc.ttdbserver
 
-rpc_ttdbserver_CXXFLAGS = $(CDE_CXXFLAGS) -I../../slib -I../../lib -I../../mini_isam \
+rpc_ttdbserver_CXXFLAGS = $(CDE_CXXFLAGS) -I$(srcdir)/../../slib -I$(srcdir)/../../lib -I$(srcdir)/../../mini_isam \
 			$(TT_VERSION_DEFINE)
 
 rpc_ttdbserver_LDADD = $(LIBTT) $(TIRPCLIB) ../../slib/libstt.a \

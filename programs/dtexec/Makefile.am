@@ -5,7 +5,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 bin_PROGRAMS = dtexec
 
 dtexec_CFLAGS = $(CDE_CFLAGS) -DMSGLOG_CLIENT_ONLY	\
-	-I../../lib/DtSvc/include
+	-I$(srcdir)/../../lib/DtSvc/include
 
 # libDtSvc is loaded only to log a message (LogStderr in Main.c).
 dtexec_LDADD = $(LIBTT)

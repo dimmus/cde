@@ -17,7 +17,7 @@ dist_config_DATA = dtfile.config
 
 dist_bin_SCRIPTS = dtfile_error dterror.ds
 
-dtfile_CPPFLAGS = $(CDE_CPPFLAGS) -I./dtcopy -DSHAPE -D_ILS_MACROS -DSUN_PERF \
+dtfile_CPPFLAGS = $(CDE_CPPFLAGS) -I$(srcdir)/dtcopy -DSHAPE -D_ILS_MACROS -DSUN_PERF \
 		-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 		-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 		-DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"

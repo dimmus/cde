@@ -22,7 +22,7 @@ bin_PROGRAMS = dtcodegen
 
 noinst_DATA = dtcodegen.cat
 
-dtcodegen_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES) -I../libABil
+dtcodegen_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES) -I$(srcdir)/../libABil
 
 dtcodegen_LDADD = ../libABil/libABil.a  \
 		  ../libABobjXm/libABobjXm.a  \

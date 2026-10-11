@@ -4,7 +4,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = tttrace
 
-tttrace_CXXFLAGS = $(CDE_CXXFLAGS) -I../../lib
+tttrace_CXXFLAGS = $(CDE_CXXFLAGS) -I$(srcdir)/../../lib
 
 tttrace_LDADD = $(LIBTT) $(TIRPCLIB)
 

@@ -6,9 +6,9 @@ bin_PROGRAMS = dtmail
 
 # FORTIFY_SOURCE_2: RoamApp.C formatPropPair() sizes its sprintf buffer
 # with int arithmetic, which _FORTIFY_SOURCE=3 reports (-Wformat-overflow)
-dtmail_CXXFLAGS = $(CDE_CXXFLAGS) $(FORTIFY_SOURCE_2) -I../include -I../include/MotifApp -I../include/utils \
-		  -I../include/DtMail -I../libDtMail/RFC -I$(x_includes) \
-		  -I$(srcdir)/lib -I../../dthelp -DRELEASE_NOTES \
+dtmail_CXXFLAGS = $(CDE_CXXFLAGS) $(FORTIFY_SOURCE_2) -I$(srcdir)/../include -I$(srcdir)/../include/MotifApp -I$(srcdir)/../include/utils \
+		  -I$(srcdir)/../include/DtMail -I$(srcdir)/../libDtMail/RFC -I$(x_includes) \
+		  -I$(srcdir)/lib -I$(srcdir)/../../dthelp -DRELEASE_NOTES \
 		  -DDTMAIL_TOOLTALK -DDTEDITOR
 
 dtmail_LDADD = ../libDtMail/libDtMail.a ../MotifApp/libMotifApp.a \

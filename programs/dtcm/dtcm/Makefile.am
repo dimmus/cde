@@ -4,7 +4,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = dtcm dtcm_delete dtcm_insert dtcm_lookup dtcm_editor
 
-AM_CFLAGS = $(CDE_CFLAGS) $(DT_INCDIR) $(CSA_INCDIR) -I../../../lib/csa	\
+AM_CFLAGS = $(CDE_CFLAGS) $(DT_INCDIR) $(CSA_INCDIR) -I$(srcdir)/../../../lib/csa	\
 -I../libDtCmP
 
 LDADD = ../libDtCmP/libDtCmP.a $(LIBCSA) $(LIBPRINT) $(LIBHELP) $(LIBWIDGET) $(LIBSVC) \

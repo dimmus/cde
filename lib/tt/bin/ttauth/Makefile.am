@@ -4,7 +4,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = ttauth
 
-ttauth_CFLAGS = $(CDE_CFLAGS) -I../../slib -I../../lib
+ttauth_CFLAGS = $(CDE_CFLAGS) -I$(srcdir)/../../slib -I$(srcdir)/../../lib
 
 ttauth_LDADD = $(LIBTT)
 

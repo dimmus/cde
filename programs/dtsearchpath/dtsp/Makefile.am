@@ -4,7 +4,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = dtsearchpath
 
-dtsearchpath_CPPFLAGS = $(CDE_CPPFLAGS) -I../libCliSrv $(DT_INCDIR) \
+dtsearchpath_CPPFLAGS = $(CDE_CPPFLAGS) -I$(srcdir)/../libCliSrv $(DT_INCDIR) \
 	-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 	-DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
