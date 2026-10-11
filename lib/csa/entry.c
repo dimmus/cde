@@ -693,21 +693,130 @@ _DtCm_free_entry_handles(uint num_entries, CSA_entry_handle *entries)
  * static functions used within in the file
  ******************************************************************************/
 
+/*
+ * Can the decoded value v be moved into a libentry as it is, rather than
+ * copied by _DtCmUpdateAttribute()?  Yes for the types whose copy is the
+ * same as what XDR decoded; the others (and the cases the copy would
+ * change or refuse) are copied.
+ */
+static boolean_t
+_MovableValue(cms_attribute_value *v)
+{
+	if (v == NULL)
+		return (B_FALSE);
+	switch (v->type) {
+	case CSA_VALUE_BOOLEAN:
+	case CSA_VALUE_ENUMERATED:
+	case CSA_VALUE_FLAGS:
+	case CSA_VALUE_SINT32:
+	case CSA_VALUE_UINT32:
+		return (B_TRUE);
+	case CSA_VALUE_STRING:
+	case CSA_VALUE_CALENDAR_USER:
+	case CSA_VALUE_DATE_TIME:
+	case CSA_VALUE_DATE_TIME_RANGE:
+	case CSA_VALUE_TIME_DURATION:
+		return (v->item.string_value != NULL);
+	case CSA_VALUE_REMINDER:
+		/* the copy refuses a NULL lead time, makes "" of a NULL
+		 * snooze time, and leaves no data when the size is 0
+		 */
+		return (v->item.reminder_value != NULL &&
+			v->item.reminder_value->lead_time != NULL &&
+			v->item.reminder_value->snooze_time != NULL &&
+			(v->item.reminder_value->reminder_data.size > 0 ||
+			 v->item.reminder_value->reminder_data.data == NULL));
+	case CSA_VALUE_OPAQUE_DATA:
+		return (v->item.opaque_data_value == NULL ||
+			v->item.opaque_data_value->size > 0 ||
+			v->item.opaque_data_value->data == NULL);
+	default:
+		return (B_FALSE);
+	}
+}
+
+/*
+ * The entries of a reply (a lookup, an insert, an update) become
+ * libentries: an attribute array as _DtCm_make_cms_entry() makes it, with
+ * the reply's values in it.  The values XDR decoded, and their names
+ * when they are the table's, are moved into the libentry when they can
+ * be, instead of being copied there and then freed with the reply: a
+ * month view of 900 entries made about 130,000 allocations.  What is
+ * moved is taken out of the reply (name and value NULL), so that
+ * _DtCmUpdateAttributes() skips it and xdr_free() leaves it alone.
+ */
 static CSA_return_code
 _CmsentryToLibentry(
 	_DtCmNameTable	**tbl,
 	cms_entry	*e,
 	_DtCm_libentry	**entry_r)
 {
+	_DtCmNameTable *names = _DtCm_entry_name_tbl;
 	_DtCm_libentry *entry;
-	CSA_return_code stat;
+	CSA_return_code stat = CSA_SUCCESS;
+	cms_attribute *src, *dst, *attrs;
+	int i, index;
 
-	if ((stat = _DtCm_make_libentry(NULL, &entry)) != CSA_SUCCESS)
-		return (stat); 
+	if ((entry = (_DtCm_libentry *)calloc(1, sizeof(_DtCm_libentry)))
+	    == NULL)
+		return (CSA_E_INSUFFICIENT_MEMORY);
+	if ((entry->e = (cms_entry *)calloc(1, sizeof(cms_entry))) == NULL ||
+	    (attrs = (cms_attribute *)calloc(names->size + 1,
+	    sizeof(cms_attribute))) == NULL) {
+		free(entry->e);
+		free(entry);
+		return (CSA_E_INSUFFICIENT_MEMORY);
+	}
+	entry->e->attrs = attrs;
+	entry->e->num_attrs = names->size;
+	entry->handle = (void *)entry;
 
-	if ((stat = _DtCmUpdateAttributes(e->num_attrs, e->attrs,
-	    &entry->e->num_attrs, &entry->e->attrs, tbl, B_FALSE,
-	    NULL, B_FALSE)) != CSA_SUCCESS) {
+	for (i = 0; i < e->num_attrs; i++) {
+		src = &e->attrs[i];
+		if (src->name.name == NULL || !_MovableValue(src->value))
+			continue;
+		if (src->name.num <= 0)
+			src->name.num = _DtCm_get_index_from_table(*tbl,
+					src->name.name);
+		index = src->name.num;
+		/* only what _DtCmUpdateAttribute() would get */
+		if (index <= 0 || index > (*tbl)->size ||
+		    (*tbl)->names[index] == NULL || index > names->size)
+			continue;
+		dst = &attrs[index];
+		if (dst->value != NULL)
+			continue;
+		dst->value = src->value;
+		src->value = NULL;
+		if (strcmp(src->name.name, names->names[index]) == 0)
+			dst->name.name = src->name.name;
+		else
+			free(src->name.name);
+		src->name.name = NULL;
+	}
+
+	/* the names _DtCm_make_cms_entry() gives every attribute */
+	for (i = 1; i <= names->size; i++) {
+		attrs[i].name.num = i;
+		if (attrs[i].name.name == NULL &&
+		    (attrs[i].name.name = strdup(names->names[i])) == NULL) {
+			stat = CSA_E_INSUFFICIENT_MEMORY;
+			break;
+		}
+	}
+
+	if (stat == CSA_SUCCESS)
+		stat = _DtCmUpdateAttributes(e->num_attrs, e->attrs,
+			&entry->e->num_attrs, &entry->e->attrs, tbl, B_FALSE,
+			NULL, B_FALSE);
+	if (stat != CSA_SUCCESS) {
+		/* values whose name is missing are not freed with the entry */
+		attrs = entry->e->attrs;
+		for (i = 1; i <= names->size; i++)
+			if (attrs[i].name.name == NULL && attrs[i].value) {
+				_DtCm_free_cms_attribute_value(attrs[i].value);
+				attrs[i].value = NULL;
+			}
 		_DtCm_free_libentries(entry);
 	} else {
 		entry->e->key = e->key;
