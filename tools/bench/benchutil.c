@@ -34,7 +34,7 @@ void bench_override(const struct bench_result *totals)
 
 void bench_preload(char **argv)
 {
-	char exe[PATH_MAX], lib[PATH_MAX + 32], *dir;
+	char exe[PATH_MAX], path[PATH_MAX], lib[PATH_MAX + 32], *dir;
 	const char *old;
 	ssize_t len;
 
@@ -45,6 +45,7 @@ void bench_preload(char **argv)
 	if (len <= 0)
 		return;
 	exe[len] = '\0';
+	memcpy(path, exe, (size_t)len + 1);
 	dir = dirname(exe);
 	snprintf(lib, sizeof lib, "%s/libcdebench_preload.so", dir);
 	if (access(lib, R_OK))
@@ -63,7 +64,8 @@ void bench_preload(char **argv)
 	}
 	/* Once only, should the library fail to load. */
 	setenv("CDEBENCH_PRELOAD_TRIED", "1", 1);
-	execv("/proc/self/exe", argv);
+	/* By its path, not /proc/self/exe: the process keeps its name. */
+	execv(path, argv);
 }
 
 const struct cdebench_counters *bench_counters(void)
@@ -109,6 +111,29 @@ double bench_median(double *v, int n)
 	return (n & 1) ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
 }
 
+void bench_marker(const char *fmt, ...)
+{
+	static int on = -1;
+	char buf[256];
+	va_list ap;
+	ssize_t n;
+	int len;
+
+	if (on < 0)
+		on = getenv("CDEBENCH_MARKERS") != NULL;
+	if (!on)
+		return;
+	va_start(ap, fmt);
+	len = vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
+	if (len < 0)
+		return;
+	if (len >= (int)sizeof buf)
+		len = sizeof buf - 1;
+	n = write(-1, buf, (size_t)len);
+	(void)n;
+}
+
 void bench_die(const char *fmt, ...)
 {
 	va_list ap;
@@ -142,7 +167,9 @@ static int run_case(const struct bench_case *bc, long n, int repeat,
 		override_set = 0;
 		p0 = bench_cpu_ns();
 		t0 = bench_now_ns();
+		bench_marker("cdebench:begin %s", bc->name);
 		ops = bc->run(n);
+		bench_marker("cdebench:end %s %ld", bc->name, ops < 1 ? 1 : ops);
 		t1 = bench_now_ns();
 		p1 = bench_cpu_ns();
 		if (c)

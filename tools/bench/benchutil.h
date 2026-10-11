@@ -64,6 +64,16 @@ double bench_median(double *v, int n);
  */
 void bench_override(const struct bench_result *totals);
 
+/*
+ * With CDEBENCH_MARKERS set in the environment, write the message to
+ * file descriptor -1: the write fails with EBADF and does nothing, but
+ * strace logs it, so that syscount.py can split a trace into cases.
+ * run_case() writes "cdebench:begin CASE" before and "cdebench:end CASE
+ * OPS" after each timed run.
+ */
+void bench_marker(const char *fmt, ...)
+	__attribute__((format(printf, 1, 2)));
+
 /* Print a message and exit with status 1. */
 void bench_die(const char *fmt, ...)
 	__attribute__((format(printf, 1, 2), noreturn));

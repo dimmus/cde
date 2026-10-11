@@ -41,6 +41,12 @@
  * then a SIGTERM that would kill the process with the default action
  * reports first (a handler of the program's own replaces ours).
  * Processes that leave with _exit() or another signal do not report.
+ * With CDEBENCH_REPORT_SIGNAL=N (a signal number, say 40 for SIGRTMIN+6),
+ * signal N makes the process append its current totals without
+ * stopping, so that a script can take the counts of one action as the
+ * difference of two snapshots; the line then says event=signal (the
+ * others event=exit or event=sigterm).  The handler is only installed
+ * where signal N has its default action.
  *
  * With CDEBENCH_REPLY_BACKTRACE set, every round trip prints a backtrace
  * to stderr, to find where they come from.
@@ -52,6 +58,7 @@
 #define _GNU_SOURCE
 #endif
 #include <dlfcn.h>
+#include <errno.h>
 #include <execinfo.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -105,11 +112,18 @@ void free(void *ptr)
 /* Requests were sent since the last round trip. */
 static int sent;
 
+static void report_event(const char *event);
+
 static void report(void) __attribute__((destructor));
 
-/* Only async-signal-safe calls (snprintf of integers aside): it also
- * runs from the SIGTERM handler. */
 static void report(void)
+{
+	report_event("exit");
+}
+
+/* Only async-signal-safe calls (snprintf of integers aside): it also
+ * runs from the signal handlers. */
+static void report_event(const char *event)
 {
 	const char *dest = getenv("CDEBENCH_REPORT");
 	char comm[64] = "?", line[320];
@@ -126,10 +140,10 @@ static void report(void)
 	}
 	len = snprintf(line, sizeof line,
 		       "cdebench pid=%d comm=%s mallocs=%lu frees=%lu "
-		       "requests=%lu rtrips=%lu ppid=%d\n", (int)getpid(),
-		       comm, cdebench_counters.mallocs,
+		       "requests=%lu rtrips=%lu ppid=%d event=%s\n",
+		       (int)getpid(), comm, cdebench_counters.mallocs,
 		       cdebench_counters.frees, cdebench_counters.requests,
-		       cdebench_counters.rtrips, (int)getppid());
+		       cdebench_counters.rtrips, (int)getppid(), event);
 	if (len <= 0)
 		return;
 	if (len >= (int)sizeof line)
@@ -149,9 +163,18 @@ static void report(void)
 
 static void on_sigterm(int sig)
 {
-	report();
+	report_event("sigterm");
 	signal(sig, SIG_DFL);
 	raise(sig);
+}
+
+static void on_snapshot(int sig)
+{
+	int saved = errno;
+
+	(void)sig;
+	report_event("signal");
+	errno = saved;
 }
 
 /* A forked child counts its own work from zero. */
@@ -166,11 +189,23 @@ static void preload_init(void) __attribute__((constructor));
 static void preload_init(void)
 {
 	struct sigaction old;
+	const char *snap = getenv("CDEBENCH_REPORT_SIGNAL");
 
 	pthread_atfork(NULL, NULL, forked_child);
 	if (getenv("CDEBENCH_REPORT_SIGTERM") &&
 	    sigaction(SIGTERM, NULL, &old) == 0 && old.sa_handler == SIG_DFL)
 		signal(SIGTERM, on_sigterm);
+	if (snap && atoi(snap) > 0 && atoi(snap) < NSIG &&
+	    sigaction(atoi(snap), NULL, &old) == 0 &&
+	    old.sa_handler == SIG_DFL) {
+		struct sigaction sa;
+
+		memset(&sa, 0, sizeof sa);
+		sa.sa_handler = on_snapshot;
+		sa.sa_flags = SA_RESTART;
+		sigemptyset(&sa.sa_mask);
+		sigaction(atoi(snap), &sa, NULL);
+	}
 }
 
 static void count_reply(void)
