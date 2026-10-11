@@ -62,6 +62,17 @@
 #include "DtSvcLock.h"
 
 /*
+ * Motif's pixmap cache lookup (ImageCachI.h, not installed): fills in
+ * the details of a pixmap in the cache and returns True, or returns
+ * False without touching the cache (XmeGetPixmapData would add one).
+ */
+extern Boolean _XmGetPixmapData(Screen *screen, Pixmap pixmap,
+				char **image_name, int *depth,
+				Pixel *foreground, Pixel *background,
+				int *hot_x, int *hot_y,
+				unsigned int *width, unsigned int *height);
+
+/*
  * Component types of a drag icon (source/state/operation)
  */
 
@@ -114,6 +125,9 @@ DtDndCreateSourceIcon(
 	Window	        rootWindow;
 	int		pixmapX, pixmapY;
 	unsigned int	pixmapWidth, pixmapHeight, pixmapBorder, pixmapDepth;
+	char		*imageName;
+	int		depth, hotX, hotY;
+	Pixel		fg, bg;
 	Arg		args[20];
 	Cardinal	nn = 0;
 	_DtSvcWidgetToAppContext(widget);
@@ -124,9 +138,20 @@ DtDndCreateSourceIcon(
 		widget = XtParent(widget);
 	}
  
-	XGetGeometry (XtDisplayOfObject(widget), pixmap, &rootWindow,
-		&pixmapX, &pixmapY, &pixmapWidth, &pixmapHeight,
-		&pixmapBorder, &pixmapDepth);
+	/*
+	 * Callers pass icons from XmGetPixmap, whose size and depth
+	 * Motif's pixmap cache knows; ask the server (a round trip on
+	 * every drag start) only for other pixmaps.
+	 */
+	if (_XmGetPixmapData(XtScreenOfObject(widget), pixmap, &imageName,
+			     &depth, &fg, &bg, &hotX, &hotY,
+			     &pixmapWidth, &pixmapHeight) && depth > 0) {
+		pixmapDepth = (unsigned int)depth;
+	} else {
+		XGetGeometry (XtDisplayOfObject(widget), pixmap, &rootWindow,
+			&pixmapX, &pixmapY, &pixmapWidth, &pixmapHeight,
+			&pixmapBorder, &pixmapDepth);
+	}
  
 	XtSetArg(args[nn], XmNwidth, pixmapWidth);  nn++;
 	XtSetArg(args[nn], XmNheight, pixmapHeight);  nn++;
