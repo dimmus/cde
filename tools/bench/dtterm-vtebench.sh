@@ -63,8 +63,11 @@ meta = json.loads(sys.argv[1])
 t0, t1 = map(int, open(sys.argv[2]).read().split())
 c = json.loads(sys.argv[3])
 s = (t1 - t0) / 1e9
-req = c.get("output_requests", 0)
-rt = c.get("output_round_trips", 0)
+# Without both snapshots (dtterm died, or never took the signal) the
+# output's counts are unknown: null, which compare reports as missing,
+# not 0 round trips.
+req = c.get("output_requests")
+rt = c.get("output_round_trips")
 bursts = -(-meta["bytes"] // meta["screen_bytes"])
 print(json.dumps({"bench": "dtterm-vte", "name": "vte-" + meta["case"],
                   "bytes": meta["bytes"], "screens": meta["screens"],
@@ -72,9 +75,11 @@ print(json.dumps({"bench": "dtterm-vte", "name": "vte-" + meta["case"],
                   "mb_per_s": round(meta["bytes"] / 1048576 / s, 2),
                   "screens_per_s": round(meta["screens"] / s, 1),
                   "requests": req, "round_trips": rt,
-                  "mallocs": c.get("output_mallocs", 0),
-                  "requests_per_screen": round(req / meta["screens"], 2),
+                  "mallocs": c.get("output_mallocs"),
+                  "requests_per_screen": None if req is None else
+                  round(req / meta["screens"], 2),
                   "bursts": bursts,
-                  "round_trips_per_burst": round(rt / bursts, 4)}))
+                  "round_trips_per_burst": None if rt is None else
+                  round(rt / bursts, 4)}))
 PY
 done

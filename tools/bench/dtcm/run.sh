@@ -149,7 +149,8 @@ if [ -n "$GUI" ] && command -v Xvfb >/dev/null &&
 	xdotool search --sync --onlyvisible --name Calendar >/dev/null
 	sleep 1.5
 	r3=$(rpcs)
-	DPID=$(pgrep -n -x dtcm || echo "$GPID")
+	# dtcm is strace's child, or $GPID itself: not just any dtcm
+	DPID=$(pgrep -n -x -P "$GPID" dtcm || echo "$GPID")
 	st0=0
 	[ -n "$ST" ] && st0=$(grep -c '"/etc/localtime"' "$WORK/st-dtcm")
 	c0=$(awk '{print $14 + $15}' "/proc/$DPID/stat")

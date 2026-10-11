@@ -90,7 +90,14 @@ that they can be aligned with the C stamps' `CLOCK_MONOTONIC`.
   up in the wall times: compare CPU times (`cpu_ns_per_op`) too.
 - System calls are counted with strace in a pass of their own
   (`--syscalls`): strace stops the traced process at every call, so the
-  counts are exact but the times of that pass are thrown away.  perf
+  counts are exact but the times of that pass are thrown away.  The
+  counts of one run are not stable, though: how often a process wakes
+  up and finds nothing to read depends on the scheduling (one run of
+  ttbench `burst` makes 9 calls per notice, the next 18), so the C
+  benchmarks run 5 times in that pass and the median run counts.  RPCs
+  per operation, as the difference of two runs, vary by an RPC per run
+  too: `compare` wants half an RPC per operation more before it fails.
+  perf
   works for profiles (`cpu-clock:u` sampling; no hardware counters in
   this VM, no kernel samples with `perf_event_paranoid=2`) but not for
   `perf trace` (no tracefs, no BPF).  Idle wakeups are context switches

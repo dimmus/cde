@@ -17,8 +17,8 @@
 bench_marker(), dtwmbench: with CDEBENCH_MARKERS=1 every timed run is
 framed by a failing write(-1, "cdebench:begin CASE") and write(-1,
 "cdebench:end CASE OPS")) and prints one JSON object per case with the
-system calls per operation of all the traced processes, per process name
-and per system call name.  With --server, the log of the X server
+system calls per operation of all the traced processes (the median of
+the runs), per process name and per system call name.  With --server, the log of the X server
 (traced separately, with the same -ttt timestamps) is split by the
 markers' times too.
 
@@ -39,8 +39,11 @@ import collections
 import json
 import os
 import re
+import shutil
+import statistics
 import subprocess
 import sys
+import tempfile
 
 LINE = re.compile(r'^(\d+)(?:<([^>]*)>)?\s+(\d+\.\d+)\s+(.*)$')
 CALL = re.compile(r'^([a-z_][a-z0-9_]*)\(')
@@ -104,7 +107,8 @@ def top(counter, n=8, div=1.0):
 
 def cases(path, server=None):
     """Per case: the system calls of every traced process between its
-    begin and end markers (summed over the runs), and the operations."""
+    begin and end markers, per operation of the median run (the calls by
+    process and by name: averaged over the runs), and the operations."""
     acc = collections.OrderedDict()
     cur = None
     for ts, _pid, comm, name, mark in events(path):
@@ -121,8 +125,11 @@ def cases(path, server=None):
                 a = acc.setdefault(case, {"ops": 0, "comm":
                                           collections.Counter(), "name":
                                           collections.Counter(),
-                                          "windows": []})
+                                          "windows": [], "runs": [],
+                                          "run_ops": []})
                 a["ops"] += ops
+                a["runs"].append(sum(cur["comm"].values()) / max(ops, 1))
+                a["run_ops"].append(max(ops, 1))
                 a["comm"].update(cur["comm"])
                 a["name"].update(cur["name"])
                 a["windows"].append((cur["t0"], ts))
@@ -134,16 +141,22 @@ def cases(path, server=None):
     res = []
     for case, a in acc.items():
         ops = max(a["ops"], 1)
+        # The median run: how often the processes wake up and find
+        # nothing (poll, EAGAIN) depends on the scheduling, so that one
+        # run of "burst" can make half the calls of the next.
         r = {"name": case, "syscall_ops": a["ops"],
-             "syscalls_per_op": round(sum(a["comm"].values()) / ops, 3),
+             "syscall_runs": len(a["runs"]),
+             "syscalls_per_op": round(statistics.median(a["runs"]), 3),
              "syscalls_by_process_per_op": top(a["comm"], 8, ops),
              "top_syscalls_per_op": top(a["name"], 8, ops)}
         if server:
             sc = collections.Counter()
-            for t0, t1 in a["windows"]:
+            runs = []
+            for (t0, t1), per in zip(a["windows"], a["run_ops"]):
                 _c, n = summary(server, t0, t1)
                 sc.update(n)
-            r["server_syscalls_per_op"] = round(sum(sc.values()) / ops, 3)
+                runs.append(sum(n.values()) / per)
+            r["server_syscalls_per_op"] = round(statistics.median(runs), 3)
             r["server_top_syscalls_per_op"] = top(sc, 5, ops)
         res.append(r)
     return res
@@ -185,11 +198,16 @@ def main():
         cmd = a.command[1:] if a.command[:1] == ["--"] else a.command
         if not cmd:
             ap.error("no command")
-        log = a.output or "syscount.%d.log" % os.getpid()
-        rc = subprocess.call(strace_cmd(log) + ["--"] + cmd)
-        print_summary(*summary(log), a.json)
-        if not a.output:
-            os.unlink(log)
+        # Not in the current directory, which may be read-only or the
+        # source tree; removed even if strace fails.
+        work = None if a.output else tempfile.mkdtemp(prefix="syscount.")
+        log = a.output or os.path.join(work, "strace.log")
+        try:
+            rc = subprocess.call(strace_cmd(log) + ["--"] + cmd)
+            print_summary(*summary(log), a.json)
+        finally:
+            if work:
+                shutil.rmtree(work, ignore_errors=True)
         return rc
     if a.cmd == "summary":
         print_summary(*summary(a.log, a.t0, a.t1), a.json)

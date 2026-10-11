@@ -546,6 +546,7 @@ int main(int argc, char **argv)
 	struct pollfd pfd[1 + 2 * MAX_CONNS];
 	struct conn *pc[1 + 2 * MAX_CONNS];
 	struct sigaction sa;
+	sigset_t block, unblocked;
 	int opt, lfd, display, quiet = 0, i;
 	char *end;
 
@@ -601,6 +602,19 @@ int main(int argc, char **argv)
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGUSR1, &sa, NULL);
 	signal(SIGPIPE, SIG_IGN);
+	/*
+	 * Delivered only inside ppoll(): one that came between the checks
+	 * of quit and snapshot and the ppoll would otherwise wait for the
+	 * next traffic (none, once the client is idle).
+	 */
+	sigemptyset(&block);
+	sigaddset(&block, SIGTERM);
+	sigaddset(&block, SIGINT);
+	sigaddset(&block, SIGUSR1);
+	sigprocmask(SIG_BLOCK, &block, &unblocked);
+	sigdelset(&unblocked, SIGTERM);
+	sigdelset(&unblocked, SIGINT);
+	sigdelset(&unblocked, SIGUSR1);
 
 	if (!quiet) {
 		printf("ready\n");
@@ -654,7 +668,7 @@ int main(int argc, char **argv)
 			ts.tv_nsec = (wake - now) % 1000000000;
 			tsp = &ts;
 		}
-		if (ppoll(pfd, n, tsp, NULL) < 0) {
+		if (ppoll(pfd, n, tsp, &unblocked) < 0) {
 			if (errno == EINTR)
 				continue;
 			perror("cdebench-proxy: ppoll");

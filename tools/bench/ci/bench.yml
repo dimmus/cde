@@ -6,7 +6,10 @@
 # the same settings, and fails when bench.py compare does:
 #   - any increase of X round trips (exact counts: round_trips_per_op,
 #     round_trips, output_round_trips, round_trips_per_page/_burst);
-#   - more than 10 % more system calls (strace pass, --syscalls);
+#   - more than SYSCALL_PCT % more system calls (strace pass,
+#     --syscalls): 25 here, not bench.py's 10, since the median of 5
+#     runs of a timing-dependent case (ttbench burst: poll and EAGAIN
+#     calls) still moves by 12 % between two runs of the same tree;
 #   - a program that loads more shared objects or has more unused
 #     direct dependencies, or more than TIME_PCT % more startup
 #     relocations (the loader group: LD_DEBUG=statistics, ldd -u -r);
@@ -30,6 +33,7 @@ on:
 env:
   MOTIF_REPO: https://github.com/dimmus/motif.git
   TIME_PCT: "25"
+  SYSCALL_PCT: "25"
   CCACHE_DIR: /github/home/.ccache
   CCACHE_BASEDIR: ${{ github.workspace }}
 
@@ -45,6 +49,9 @@ jobs:
       - name: Dependencies
         run: |
           pacman -Syu --noconfirm --needed git sudo
+          # The trees are chowned to bench below: root's git would
+          # otherwise refuse them ("dubious ownership").
+          git config --global --add safe.directory '*'
           useradd -m bench
           echo "bench ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/bench
 
@@ -87,6 +94,10 @@ jobs:
 
       - name: Build base and head
         run: |
+          # Restored (or created) by root: ccache fails every compile
+          # it cannot write its cache for.
+          mkdir -p "$CCACHE_DIR"
+          chown -R bench: "$CCACHE_DIR"
           for t in base head; do
             sudo -u bench --preserve-env=CCACHE_DIR,CCACHE_BASEDIR sh -c "
               cd '$GITHUB_WORKSPACE/$t' &&
@@ -115,7 +126,7 @@ jobs:
       - name: Compare
         run: |
           python3 head/tools/bench/bench.py compare -t "$TIME_PCT" \
-            bench-base.json bench-head.json
+            --syscall-threshold "$SYSCALL_PCT" bench-base.json bench-head.json
 
       - name: Keep the results
         if: always()

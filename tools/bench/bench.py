@@ -29,8 +29,9 @@ Groups (default: all but dtfile-perf):
 
 --syscalls adds a second pass that counts system calls with strace
 (syscount.py), whose counts are merged into the rows of the timed pass:
-the C benchmarks (one round, with CDEBENCH_MARKERS) get
-syscalls_per_op, per process and per call, and the X server's
+the C benchmarks (5 rounds, with CDEBENCH_MARKERS) get
+syscalls_per_op (of the median round), per process and per call, and
+the X server's
 (server_syscalls_per_op, its Xvfb traced too); dtfile, dtmail and
 dtfile-copy run with -S (syscalls to idle, the forked children's, the
 idle window's).  strace slows everything down: the times of that pass
@@ -78,6 +79,7 @@ import datetime
 import json
 import os
 import shutil
+import signal
 import statistics
 import subprocess
 import sys
@@ -113,10 +115,20 @@ def remove_dtdbcache(display):
         pass
 
 
+def proc_children(pid):
+    """The pids of the children of pid (strace's tracee)."""
+    try:
+        with open("/proc/%d/task/%d/children" % (pid, pid)) as f:
+            return [int(p) for p in f.read().split()]
+    except (OSError, ValueError):
+        return []
+
+
 class Xvfb:
     def __init__(self, pin, trace=None):
         rd, wr = os.pipe()
         st = syscount.strace_cmd(trace) + ["--"] if trace else []
+        self.traced = bool(trace)
         self.proc = subprocess.Popen(
             pin + st + ["Xvfb", "-displayfd", str(wr), "-screen", "0",
                    "1920x1080x24", "+extension", "RENDER", "-nolisten", "tcp",
@@ -138,10 +150,25 @@ class Xvfb:
 
     def stop(self):
         if self.proc.poll() is None:
-            self.proc.terminate()
-            try:
-                self.proc.wait(10)
-            except subprocess.TimeoutExpired:
+            # strace -o FILE PROG blocks SIGTERM (-I4), and SIGKILL leaves
+            # its Xvfb running, detached: signal the Xvfb, and strace
+            # exits with it.
+            kids = proc_children(self.proc.pid) if self.traced else []
+            sig = signal.SIGTERM
+            for _ in range(2):
+                for pid in kids:
+                    try:
+                        os.kill(pid, sig)
+                    except OSError:
+                        pass
+                if not kids:
+                    self.proc.send_signal(sig)
+                try:
+                    self.proc.wait(10)
+                    break
+                except subprocess.TimeoutExpired:
+                    sig = signal.SIGKILL
+            else:
                 self.proc.kill()
                 self.proc.wait()
         if hasattr(self, "display"):
@@ -160,6 +187,14 @@ def run_cmd(cmd, env, timeout=3600):
         # printed, and let the other groups run.
         log("%s timed out after %d s" % (cmd[0], timeout))
         proc.terminate()
+        if "strace" in cmd:
+            # strace -o blocks SIGTERM, and its SIGKILL would leave the
+            # benchmark running, detached: stop the benchmark itself.
+            for pid in proc_children(proc.pid):
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except OSError:
+                    pass
         try:
             out, err = proc.communicate(timeout=10)
         except subprocess.TimeoutExpired:
@@ -276,6 +311,10 @@ def group_cmd(g, a, pin, env, rounds):
     return None
 
 
+# Runs per case of the C benchmarks' strace pass: syscount.py takes the
+# median, since one run of a case can make twice the calls of another.
+SYSCALL_ROUNDS = 5
+
 # The script groups that count system calls with -S.
 STRACE_FLAG = {"dtfile": "-S", "dtmail": "-S", "dtfile-copy": "-S"}
 SYSCALL_KEYS = ("syscalls", "top_syscalls", "children_syscalls",
@@ -305,7 +344,8 @@ def run_group(g, a, pin, env0, work, rounds, srounds, syscalls=False):
     if xvfb:
         env["DISPLAY"] = xvfb.display
     try:
-        cmd = group_cmd(g, a, pin, env, 1 if syscalls else rounds)
+        cmd = group_cmd(g, a, pin, env, SYSCALL_ROUNDS if syscalls
+                        else rounds)
         if cmd is None:
             return None
         if g in C_GROUPS:
@@ -487,9 +527,15 @@ def cmd_profile(a):
 
 def cmd_compare(a):
     with open(a.base) as f:
-        base = json.load(f)["results"]
+        bdoc = json.load(f)
     with open(a.head) as f:
-        head = json.load(f)["results"]
+        hdoc = json.load(f)
+    base, head = bdoc["results"], hdoc["results"]
+    # When both runs counted system calls, a count HEAD lost (its strace
+    # pass failed) must not pass as no regression either.
+    must = TIME_FIELDS + COUNT_FIELDS + \
+        (("syscalls_per_op", "syscalls")
+         if bdoc.get("syscalls") and hdoc.get("syscalls") else ())
     bad = 0
     for g, cases in head.items():
         bcases = {c["name"]: c for c in base.get(g, [])}
@@ -513,7 +559,7 @@ def cmd_compare(a):
                 print("%-8s %-28s %-10s %12s -> %12s  NOT COMPARABLE" %
                       (g, c["name"], size[0], b[size[0]], c[size[0]]))
                 continue
-            for k in TIME_FIELDS + COUNT_FIELDS:
+            for k in must:
                 if isinstance(b.get(k), (int, float)) and \
                         not isinstance(c.get(k), (int, float)):
                     bad += 1
@@ -536,14 +582,28 @@ def cmd_compare(a):
                     print("%-8s %-28s %-10s %12.4g -> %12.4g  MORE ROUND TRIPS"
                           % (g, c["name"], k, b[k], c[k]))
             for k in SYSCALL_FIELDS:
-                if isinstance(c.get(k), (int, float)) and \
-                        isinstance(b.get(k), (int, float)) and b[k] > 0:
-                    pct = (c[k] - b[k]) * 100.0 / b[k]
-                    flag = pct > a.syscall_threshold
-                    bad += flag
-                    print("%-8s %-28s %-10s %12.4g -> %12.4g %+7.1f%%%s" %
-                          (g, c["name"], k, b[k], c[k], pct,
-                           "  MORE CALLS" if flag else ""))
+                if not isinstance(c.get(k), (int, float)) or \
+                        not isinstance(b.get(k), (int, float)):
+                    continue
+                # RPCs per operation are differences of two runs, whose
+                # fixed costs vary by an RPC or two (signal-driven
+                # NEXT_MESSAGE calls): +-1/(n2 - n1), 0.2 with --quick,
+                # netfile's -0.05 in a full run.  Half an RPC per
+                # operation more is the least that fails; from none (or
+                # such a negative) to some is no percentage.
+                floor = 0.5 if k == "rpcs_per_op" else 0.0
+                delta = c[k] - b[k]
+                if b[k] > 0:
+                    pct = delta * 100.0 / b[k]
+                    flag = pct > a.syscall_threshold and delta > floor
+                    rel = "%+7.1f%%" % pct
+                else:
+                    flag = delta > floor
+                    rel = "%8s" % ("new" if delta > 0 else "+0.0%")
+                bad += flag
+                print("%-8s %-28s %-10s %12.4g -> %12.4g %s%s" %
+                      (g, c["name"], k, b[k], c[k], rel,
+                       "  MORE CALLS" if flag else ""))
             for k in LOADER_STRICT:
                 if isinstance(c.get(k), int) and isinstance(b.get(k), int) \
                         and c[k] > b[k]:

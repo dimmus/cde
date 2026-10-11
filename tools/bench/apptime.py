@@ -60,6 +60,7 @@ import argparse
 import collections
 import json
 import os
+import select
 import shutil
 import signal
 import subprocess
@@ -377,10 +378,17 @@ def main():
                 os.environ.get("PATH", ""))
             if not tts:
                 raise SystemExit("apptime: no ttsession for --ttsession")
-            helpers.append(subprocess.Popen(
-                [tts, "-s", "-S", "-d", os.environ["DISPLAY"]],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-            time.sleep(0.5)
+            # -p prints the session id once it is set up and published
+            # on the display: a fixed wait was too short on a loaded
+            # machine, and the client then spent seconds auto-starting
+            # a ttsession of its own.
+            tt = subprocess.Popen(
+                [tts, "-s", "-S", "-p", "-d", os.environ["DISPLAY"]],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            helpers.append(tt)
+            if not select.select([tt.stdout], [], [], 30)[0] or \
+                    not tt.stdout.readline():
+                raise SystemExit("apptime: ttsession did not start")
         if args.wm:
             helpers.append(start_wm())
         if not args.no_preload:

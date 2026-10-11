@@ -242,9 +242,11 @@ static void die(const char *fmt, ...)
 	/*
 	 * No X requests from here (die may run inside the X error handler,
 	 * where Xlib must not be called): exit's closing of the connection
-	 * destroys the fence window anyway.
+	 * destroys the fence window anyway, and the ttsession property is
+	 * only cleared for a later dtwm of this run.
 	 */
 	fence = 0;
+	a_tt_session = None;
 	cleanup();
 	exit(1);
 }

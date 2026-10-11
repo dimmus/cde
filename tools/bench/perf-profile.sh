@@ -81,5 +81,7 @@ for k, v in stacks.most_common():
 ' > "$DIR/stacks.folded"
 fi
 grep -v '^#' "$DIR/report.txt" | grep -v '^$' | head -n "$TOP"
-echo "perf-profile: $DIR/{perf.data,report.txt${GRAPH:+,stacks.folded}}" >&2
+folded=,stacks.folded
+[ "$GRAPH" = none ] && folded=
+echo "perf-profile: $DIR/{perf.data,report.txt$folded}" >&2
 exit $rc
