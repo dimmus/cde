@@ -253,6 +253,8 @@ typedef struct
    char          ** modified_list;
    int              modified_size; /* allocated entries of modified_list */
    struct _NameIndex *modified_index; /* hash of modified_list, or NULL */
+   Boolean          update_path_types; /* update_all sends the path types */
+   Boolean          toolbox;       /* (a worker's request, without views) */
    int              numOfViews;
    DirectoryView  * directoryView;
 } Directory;
@@ -352,6 +354,14 @@ static void EventTimer(
 			XtPointer client_data,
 			XtIntervalId *id);
 static Boolean SomeWindowMapped(void);
+static Boolean DirectoryIsToolBox(
+                        Directory *directory);
+static Boolean UpdatePathTypesNeeded(
+                        Directory *directory);
+static void StickyProcIdle(
+                        ActivityStatus activity,
+                        StickyProcDesc *sticky_proc,
+                        int max_procs);
 static void FreeDirectory(
 			Directory *directory);
 static void SelectDesktopFile(FileMgrData *fmd);
@@ -404,14 +414,25 @@ static struct
 } ActivityTable[] =
 {
   { WritePosInfoProcess,  WritePosInfoPipeCallback, False,NULL },/* writing_posinfo*/
-  { ReadDirectoryProcess, ReaddirPipeCallback, False,NULL },     /* reading */
-  { UpdateAllProcess,     ReaddirPipeCallback, False,NULL },     /* update_all */
-  { UpdateSomeProcess,    ReaddirPipeCallback, False,NULL },     /* update_some */
+  { ReadDirectoryProcess, ReaddirPipeCallback, True, NULL },     /* reading */
+  { UpdateAllProcess,     ReaddirPipeCallback, True, NULL },     /* update_all */
+  { UpdateSomeProcess,    ReaddirPipeCallback, True, NULL },     /* update_some */
   { TimerEventProcess,    TimerPipeCallback, True, NULL },       /* checking_links */
   { CheckDesktopProcess,  CheckDesktopPipeCallback, True, NULL },/* checking_desktop */
   { TimerEventProcess,    TimerPipeCallback, True, NULL },  /* checking_dir */
   { NULL,                 NULL, False, NULL }               /* idle */
 };
+
+/*
+ * Reading and updating directories share one set of sticky processes
+ * (see "Directory workers"), kept on the list of activity_reading; at
+ * most DIR_WORKERS_IDLE of them wait for work.
+ */
+#define DIR_WORKERS_IDLE  2
+#define IsDirWorker(a)    ((a) == activity_reading ||    \
+                           (a) == activity_update_all || \
+                           (a) == activity_update_some)
+#define StickyClass(a)    (IsDirWorker(a) ? activity_reading : (a))
 
 
 /*====================================================================
@@ -1541,6 +1562,257 @@ StickyReadRequest(
    }
    return 0;
 }
+
+/*--------------------------------------------------------------------
+ *  Directory workers
+ *	A process that read or updated a directory stays, and does the
+ *	next read or update of any directory: forking the whole X,
+ *	Motif and ToolTalk process blocked the main loop for 0.5-1.5 ms
+ *	per read or update, and each process started with an empty
+ *	data typing folder cache.  A process forked for a request works
+ *	on its own copy of the Directory; a reused one gets what it
+ *	needs in its request, one framed message read in bulk:
+ *	  string "dir" (not NULL: NULL tells the process to exit),
+ *	  int length, then length bytes:
+ *	    int activity; strings host, directory, path, tt_path;
+ *	    int toolbox, int update_path_types; struct timespec mtim;
+ *	    int file_count; int n; n strings (modified list);
+ *	    int n; n * (string name, DirWorkerEntry)  (update_all only)
+ *	The entries are what EntryChanged compares.
+ *------------------------------------------------------------------*/
+
+typedef struct
+{
+   struct timespec mtim;
+   struct timespec ctim;
+   ino_t           ino;
+   dev_t           dev;
+   mode_t          mode;
+   off_t           size;
+   int             link_kind;    /* 0: not a link, else a LINK_* kind */
+} DirWorkerEntry;
+
+/* main process: a reused worker's request for directory/activity */
+static void
+DirWorkerAddRequest(
+        PipeBuf *pb,
+        Directory *directory,
+        ActivityStatus activity)
+{
+   FileData *file_data;
+   DirWorkerEntry e;
+   size_t len_at;
+   int act = activity;
+   int len, i, n;
+
+   PipeBufAddString(pb, "dir");
+   len_at = pb->len;
+   len = 0;
+   PipeBufAdd(pb, &len, sizeof(int));
+
+   PipeBufAdd(pb, &act, sizeof(int));
+   PipeBufAddString(pb, directory->host_name);
+   PipeBufAddString(pb, directory->directory_name);
+   PipeBufAddString(pb, directory->path_name);
+   PipeBufAddString(pb, directory->tt_path_name);
+   n = DirectoryIsToolBox(directory);
+   PipeBufAdd(pb, &n, sizeof(int));
+   n = directory->update_path_types;
+   PipeBufAdd(pb, &n, sizeof(int));
+   PipeBufAdd(pb, &directory->mtim, sizeof(struct timespec));
+   PipeBufAdd(pb, &directory->file_count, sizeof(int));
+
+   PipeBufAdd(pb, &directory->modified_count, sizeof(int));
+   for (i = 0; i < directory->modified_count; i++)
+      PipeBufAddString(pb, directory->modified_list[i]);
+
+   n = 0;
+   if (activity == activity_update_all)
+      for (file_data = directory->file_data; file_data;
+           file_data = file_data->next)
+         n++;
+   PipeBufAdd(pb, &n, sizeof(int));
+   if (n > 0)
+   {
+      memset(&e, 0, sizeof(e));
+      for (file_data = directory->file_data; file_data;
+           file_data = file_data->next)
+      {
+         e.mtim = file_data->stat.st_mtim;
+         e.ctim = file_data->stat.st_ctim;
+         e.ino = file_data->stat.st_ino;
+         e.dev = file_data->stat.st_dev;
+         e.mode = file_data->stat.st_mode;
+         e.size = file_data->stat.st_size;
+         e.link_kind = file_data->link ? LinkKind(file_data) : 0;
+         PipeBufAddString(pb, file_data->file_name);
+         PipeBufAdd(pb, &e, sizeof(e));
+      }
+   }
+
+   len = pb->len - len_at - sizeof(int);
+   memcpy(pb->data + len_at, &len, sizeof(int));
+}
+
+/* a request being parsed */
+typedef struct
+{
+   const char *p;
+   const char *end;
+   Boolean     bad;
+} PipeCur;
+
+static void
+PipeCurGet(
+        PipeCur *c,
+        void *dst,
+        size_t n)
+{
+   if (c->bad || (size_t)(c->end - c->p) < n)
+   {
+      c->bad = True;
+      memset(dst, 0, n);
+      return;
+   }
+   memcpy(dst, c->p, n);
+   c->p += n;
+}
+
+/* (an empty string comes through as NULL, as with PipeReadString) */
+static char *
+PipeCurGetString(
+        PipeCur *c)
+{
+   short len = 0;
+   char *s;
+
+   PipeCurGet(c, &len, sizeof(short));
+   if (c->bad || len <= 0)
+      return NULL;
+   if (c->end - c->p < len)
+   {
+      c->bad = True;
+      return NULL;
+   }
+   s = XtMalloc(len + 1);
+   memcpy(s, c->p, len);
+   s[len] = '\0';
+   c->p += len;
+   return s;
+}
+
+/* worker: the Directory of the current request */
+static Directory worker_dir;
+static char      worker_link_mark[] = "";   /* "is a link" */
+
+static void
+DirWorkerClear(
+        Directory *d)
+{
+   FileData *file_data;
+
+   XtFree(d->host_name);
+   XtFree(d->directory_name);
+   XtFree(d->path_name);
+   XtFree(d->tt_path_name);
+   FreeModifiedList(d);
+   while ((file_data = d->file_data) != NULL)
+   {
+      d->file_data = file_data->next;
+      XtFree(file_data->file_name);
+      XtFree((char *)file_data);
+   }
+   memset(d, 0, sizeof(*d));
+}
+
+/* worker: read a request (after its first string); 0 if it is good */
+static int
+DirWorkerReadRequest(
+        int fd,
+        Directory **directory,
+        ActivityStatus *activity)
+{
+   Directory *d = &worker_dir;
+   FileData *file_data, **nextp;
+   DirWorkerEntry e;
+   PipeCur c;
+   char *buf;
+   int len, act, n, i;
+
+   if (PipeRead(fd, &len, sizeof(int)) != sizeof(int) || len < 0)
+      return -1;
+   buf = XtMalloc(len + 1);
+   if (PipeRead(fd, buf, len) != len)
+   {
+      XtFree(buf);
+      return -1;
+   }
+   c.p = buf;
+   c.end = buf + len;
+   c.bad = False;
+
+   DirWorkerClear(d);
+   d->activity = activity_idle;
+   PipeCurGet(&c, &act, sizeof(int));
+   d->host_name = PipeCurGetString(&c);
+   d->directory_name = PipeCurGetString(&c);
+   d->path_name = PipeCurGetString(&c);
+   d->tt_path_name = PipeCurGetString(&c);
+   PipeCurGet(&c, &n, sizeof(int));
+   d->toolbox = (n != 0);
+   PipeCurGet(&c, &n, sizeof(int));
+   d->update_path_types = (n != 0);
+   PipeCurGet(&c, &d->mtim, sizeof(struct timespec));
+   PipeCurGet(&c, &d->file_count, sizeof(int));
+
+   PipeCurGet(&c, &n, sizeof(int));
+   if (n > 0 && n <= len)
+   {
+      d->modified_list = (char **) XtMalloc(n * sizeof(char *));
+      d->modified_size = n;
+      for (i = 0; i < n && !c.bad; i++)
+      {
+         d->modified_list[i] = PipeCurGetString(&c);
+         if (d->modified_list[i] == NULL)
+            d->modified_list[i] = XtNewString("");
+         d->modified_count = i + 1;
+      }
+   }
+
+   PipeCurGet(&c, &n, sizeof(int));
+   nextp = &d->file_data;
+   for (i = 0; i < n && n <= len && !c.bad; i++)
+   {
+      file_data = (FileData *) XtCalloc(1, sizeof(FileData));
+      file_data->file_name = PipeCurGetString(&c);
+      PipeCurGet(&c, &e, sizeof(e));
+      file_data->stat.st_mtim = e.mtim;
+      file_data->stat.st_ctim = e.ctim;
+      file_data->stat.st_ino = e.ino;
+      file_data->stat.st_dev = e.dev;
+      file_data->stat.st_mode = e.mode;
+      file_data->stat.st_size = e.size;
+      if (e.link_kind != 0)
+         file_data->link = worker_link_mark;
+      if (e.link_kind == LINK_BROKEN)
+         file_data->logical_type = LT_BROKEN_LINK;
+      else if (e.link_kind == LINK_RECURSIVE)
+         file_data->logical_type = LT_RECURSIVE_LINK;
+      *nextp = file_data;
+      nextp = &file_data->next;
+   }
+   XtFree(buf);
+
+   if (c.bad || !IsDirWorker(act) || d->host_name == NULL ||
+       d->directory_name == NULL)
+      return -1;
+   if (d->path_name == NULL)
+      d->path_name = XtNewString("");
+   *activity = act;
+   *directory = d;
+   return 0;
+}
+
 
 /* end a sticky process and forget it */
 static void
@@ -2898,7 +3170,7 @@ DirectoryIsToolBox(
 {
    if (directory->directoryView && directory->directoryView->file_mgr_data)
       return directory->directoryView->file_mgr_data->toolbox;
-   return False;
+   return directory->toolbox;   /* (a directory worker's request) */
 }
 
 
@@ -3286,25 +3558,9 @@ UpdateAllProcess(
    DPRINTF(("UpdateAllProcess(%d, \"%s\", \"%s\")\n",
             pipe_fd, host_name, directory_name));
 
-   /* if modified list contains "." or ".." arrange for the path_logical_types
-      to get updated */
-   if(directory->modified_count == 0 &&
-      FindDirectory(directory->host_name, directory_name))
-   {
-       rc = 1;
-   }
-   else
-   {
-       for (i = 0; i < directory->modified_count; i++)
-       {
-           if (strcmp(directory->modified_list[i],".") == 0 ||
-               strcmp(directory->modified_list[i],"..") == 0 )
-           {
-               rc = 1;
-               break;
-           }
-       }
-   }
+   /* (the main process decided whether the path_logical_types
+      need to be sent, see UpdatePathTypesNeeded) */
+   rc = directory->update_path_types;
 
    /* get the full name of the current directory */
    full_directory_name = ResolveLocalPathName( host_name,
@@ -3721,8 +3977,11 @@ ReaddirPipeCallback(
        * The directory is no longer present:
        * close the pipe and kill the reader.
        */
-      close(*fd);
       XtRemoveInput(*id);
+      if (pipe_data->sticky_proc)
+         StickyProcRemove(activity_reading, pipe_data->sticky_proc, False);
+      else
+         close(*fd);
       kill(pipe_data->child, SIGKILL);
       XtFree( client_data );
       ScheduleActivity(NULL);
@@ -3976,9 +4235,23 @@ ReaddirPipeCallback(
       DPRINTF(("ReaddirPipeCallback: done, errno %d, time %ld\n",
                directory->errnum, stamp.modify_time));
 
-      /* close the pipe and cancel the callback */
-      close(*fd);
+      /*
+       * Cancel the callback; a directory worker waits for the next
+       * request.  One that sent an error ends (and one that sent
+       * nonsense is ended).
+       */
       XtRemoveInput(*id);
+      if (pipe_data->sticky_proc && msg == PIPEMSG_DONE)
+         StickyProcIdle(activity_reading, pipe_data->sticky_proc,
+                        DIR_WORKERS_IDLE);
+      else if (pipe_data->sticky_proc)
+      {
+         if (msg != PIPEMSG_ERROR)
+            kill(pipe_data->child, SIGKILL);
+         StickyProcRemove(activity_reading, pipe_data->sticky_proc, False);
+      }
+      else
+         close(*fd);
 
       /*
        * @@@ what if a drag is active ???
@@ -6908,13 +7181,17 @@ ScheduleDirectoryActivity(
     * so it can be re-used the next time around.  A linked list of sticky
     * procs that are currently active is maintained in the ActivityTable.
     */
+   if (activity == activity_update_all)
+      directory->update_path_types = UpdatePathTypesNeeded(directory);
+
    sticky = ActivityTable[activity].sticky;
    if (sticky)
    {
       /* see if we can find an idle sticky proc that can do the work
          (one that types with the current database) */
       StickyProcsRetire();
-      for (p = ActivityTable[activity].sticky_procs; p; p = p->next)
+      for (p = ActivityTable[StickyClass(activity)].sticky_procs; p;
+           p = p->next)
          if (p->idle)
             break;
    }
@@ -6930,7 +7207,10 @@ ScheduleDirectoryActivity(
       DPRINTF2(("ScheduleActivity:  use sticky proc %ld\n", (long)p->child));
 
       /* Send the directory name (and data) to the sticky proc */
-      StickyAddRequest(&pb, directory, activity);
+      if (IsDirWorker(activity))
+         DirWorkerAddRequest(&pb, directory, activity);
+      else
+         StickyAddRequest(&pb, directory, activity);
       oldPipe = signal(SIGPIPE, SIG_IGN);
       rc = PipeBufFlush(p->pipe_m2s_fd, &pb);
       signal(SIGPIPE, oldPipe);
@@ -6939,7 +7219,7 @@ ScheduleDirectoryActivity(
       if (rc < 0)
       {
         /* the pipe is broken, remove the old proc then start a new one */
-        StickyProcRemove(activity, p, False);
+        StickyProcRemove(StickyClass(activity), p, False);
         p = NULL;
       }
       else
@@ -6947,6 +7227,10 @@ ScheduleDirectoryActivity(
         pipe_s2m_fd[0] = p->pipe_s2m_fd;
         pid = p->child;
         p->idle = False;
+
+        /* the worker has its own copy of the modified list now */
+        if (IsDirWorker(activity))
+           FreeModifiedList(directory);
       }
    }
 
@@ -6968,11 +7252,20 @@ ScheduleDirectoryActivity(
       {
          /* also need a pipe for sending msgs to the sticky proc */
          pipe(pipe_m2s_fd);
+#ifdef F_SETPIPE_SZ
+         /*
+          * A directory worker's update_all request holds the old
+          * entries (about 80 bytes each): let the main process write
+          * it without waiting for the worker to read it.
+          */
+         if (IsDirWorker(activity))
+            (void) fcntl(pipe_m2s_fd[1], F_SETPIPE_SZ, 1 << 20);
+#endif
 
          /* add entry to the list of sticky procs */
          p = (StickyProcDesc *) XtMalloc(sizeof(StickyProcDesc));
-         p->next = ActivityTable[activity].sticky_procs;
-         ActivityTable[activity].sticky_procs = p;
+         p->next = ActivityTable[StickyClass(activity)].sticky_procs;
+         ActivityTable[StickyClass(activity)].sticky_procs = p;
 
          p->pipe_s2m_fd = pipe_s2m_fd[0];
          p->pipe_m2s_fd = pipe_m2s_fd[1];
@@ -7003,7 +7296,7 @@ ScheduleDirectoryActivity(
              close(pipe_m2s_fd[1]); /* child won't write to this pipe */
              close(pipe_m2s_fd[0]); /* parent won't read from this pipe */
              /* forget the proc that was never started (it is first) */
-             ActivityTable[activity].sticky_procs = p->next;
+             ActivityTable[StickyClass(activity)].sticky_procs = p->next;
              XtFree((char *)p);
 	  }
 	  return;
@@ -7023,6 +7316,23 @@ ScheduleDirectoryActivity(
          if (inotify_fd >= 0)
             close(inotify_fd);
 
+         /*
+          * Nor the pipes of the other sticky procs: a proc must see
+          * the end of its request pipe when the main process closes it.
+          */
+         {
+            StickyProcDesc *q;
+            int a;
+
+            for (a = 0; a < activity_idle; a++)
+               for (q = ActivityTable[a].sticky_procs; q; q = q->next)
+                  if (q != p)
+                  {
+                     close(q->pipe_s2m_fd);
+                     close(q->pipe_m2s_fd);
+                  }
+         }
+
          /* run main routine for this activity from ActivityTable */
          for (;;)
          {
@@ -7035,6 +7345,18 @@ ScheduleDirectoryActivity(
             s = PipeReadString(pipe_m2s_fd[0]);
             if (s == NULL)
                break;
+
+            /* a directory worker: the next read or update, of any dir */
+            if (IsDirWorker(activity))
+            {
+               XtFree(s);
+               if (DirWorkerReadRequest(pipe_m2s_fd[0], &directory,
+                                        &activity) != 0)
+                  break;
+               DPRINTF2(("DirWorker:  activity %d, dir %s\n", activity,
+                         directory->path_name));
+               continue;
+            }
 
             if (directory == dummy_directory)
                XtFree(s);         /* (its names are not allocated) */
@@ -7097,6 +7419,30 @@ ScheduleDirectoryActivity(
    XtAppAddInput(XtWidgetToApplicationContext(toplevel),
                  pipe_s2m_fd[0], (XtPointer)XtInputReadMask,
                  ActivityTable[activity].callback, (XtPointer)pipe_data);
+}
+
+
+/*--------------------------------------------------------------------
+ *  UpdatePathTypesNeeded
+ *    Does an update_all of the directory send the logical types of
+ *    the path components?  Yes if the modified list is empty, or
+ *    names "." or "..".
+ *------------------------------------------------------------------*/
+
+static Boolean
+UpdatePathTypesNeeded(
+   Directory *directory)
+{
+   int i;
+
+   if (directory->modified_count == 0 &&
+       FindDirectory(directory->host_name, directory->directory_name))
+      return True;
+   for (i = 0; i < directory->modified_count; i++)
+      if (strcmp(directory->modified_list[i], ".") == 0 ||
+          strcmp(directory->modified_list[i], "..") == 0)
+         return True;
+   return False;
 }
 
 
