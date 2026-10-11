@@ -26,7 +26,11 @@ MAINTAINERCLEANFILES = Makefile.in \
             build-aux/ylwrap \
             *~
 
-SUBDIRS = util lib programs include
+# include first: its Makefile holds the rules that remake cde_config.h
+# (autoheader, config.status) when configure.ac changes, and everything
+# else includes it.  Built last, a plain "make" after such a change
+# compiled the whole tree against the stale header.
+SUBDIRS = include util lib programs
 
 # include/Dt/Dt.h is made by configure (see configure.ac) and remade here,
 # before the subdirectories, when Dt.h.in or the version changes.  It is
