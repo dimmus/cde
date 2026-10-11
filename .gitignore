@@ -2318,3 +2318,4 @@ contrib/rc/openbsd/dtlogin
 contrib/xinetd/cmsd
 contrib/xinetd/ttdbserver
 contrib/rc/systemd/dtlogin.service
+lib/tt/lib/dummy.cxx
