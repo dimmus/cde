@@ -1,0 +1,6 @@
+/helpbench
+/libhelpbench_preload.so
+/results/
+*.json
+# The top-level .gitignore ignores generated Makefiles; this one is not.
+!/Makefile

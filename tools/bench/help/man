@@ -1,0 +1,16 @@
+#!/bin/sh
+# CDE benchmarks, help: a man(1) for hosts without one.  DtHelp shows a
+# man page by reading "man [SECTION] NAME" through popen(); run.sh puts
+# this directory first on PATH, so that the man page case formats the
+# page with nroff (overstrike output, as man(1) gives to a pipe).
+for name; do :; done
+page=
+IFS=:
+for dir in ${MANPATH:-/usr/share/man:/usr/local/share/man}; do
+	for f in "$dir"/man*/"$name".*; do
+		[ -f "$f" ] && { page=$f; break 2; }
+	done
+done
+unset IFS
+[ -n "$page" ] || { echo "No manual entry for $name" >&2; exit 16; }
+zcat -f "$page" | GROFF_NO_SGR=1 nroff -man -Tascii 2>/dev/null
