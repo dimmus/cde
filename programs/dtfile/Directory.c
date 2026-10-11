@@ -228,7 +228,8 @@ typedef struct
    Boolean          local_fs;      /* the last read found a local file system */
    int              wd;            /* inotify watch (> 0), else polled */
    Boolean          ev_pending;    /* an entry changed since the last read began */
-   Boolean          ev_self;       /* the directory itself changed */
+   Boolean          ev_named;      /* every change since the last read or
+                                      update_all is on the modified list */
    Boolean          update_changed;/* this read/update changed something */
    long             last_ev_refresh; /* when an event last started a refresh */
    long             ev_interval;   /* the least time to the next one */
@@ -643,6 +644,65 @@ NameIndexAdd(
    ni->slots[h] = i;
 }
 
+/* add a file name to the modified_list of a directory (once) */
+static void
+DirectoryAddModified(
+	Directory *directory,
+	const char *file_name)
+{
+   int i;
+
+   /* see if the file is already on the list (hashed: a move or copy
+    * of K files calls this K times) */
+   if (directory->modified_index == NULL)
+   {
+      directory->modified_index = XtNew(NameIndex);
+      directory->modified_index->slots = NULL;
+   }
+   else if (NameIndexFind(directory->modified_index,
+                          directory->modified_list, file_name, NULL) >= 0)
+     return;
+
+   /* add the file to the modified_list */
+   i = directory->modified_count++;
+   if (i >= directory->modified_size)
+   {
+      directory->modified_size = i < 8 ? 16 : 2 * i;
+      directory->modified_list = (char **)
+        XtRealloc((char *)directory->modified_list,
+                  directory->modified_size * sizeof(char *));
+   }
+   directory->modified_list[i] = XtNewString(file_name);
+   NameIndexAdd(directory->modified_index, directory->modified_list, i);
+}
+
+/*
+ * Updating only the entries on the modified list (activity_update_some)
+ * is enough when inotify named every change since the last read or
+ * update_all (see DirectoryEventsHandle).  Past this many names, a full
+ * update is cheaper; the names are no longer collected.
+ */
+#define EV_NAMES_MAX(d)  (256 + (d)->file_count / 2)
+
+static Boolean
+UpdateSomeEnough(
+	Directory *directory)
+{
+   int i;
+
+   if (directory->wd <= 0 || !directory->ev_named ||
+       directory->errnum != 0 || directory->modified_count == 0 ||
+       directory->modified_count > EV_NAMES_MAX(directory))
+      return False;
+
+   /* a change of "." or ".." also changes the path icons */
+   for (i = 0; i < directory->modified_count; i++)
+      if (strcmp(directory->modified_list[i], ".") == 0 ||
+          strcmp(directory->modified_list[i], "..") == 0)
+         return False;
+   return True;
+}
+
 
 /*--------------------------------------------------------------------
  *  TypeAttr cache
@@ -995,6 +1055,7 @@ DirectoryWatchLost(
       {
          directory_set[i]->wd = 0;
          directory_set[i]->ev_pending = True;
+         directory_set[i]->ev_named = False;
       }
    }
    RestartTimer();
@@ -1023,7 +1084,10 @@ DirectoryEventsHandle(
          /* events were lost: everything may have changed */
          for (i = 0; i < directory_count; i++)
             if (directory_set[i]->wd > 0)
+            {
                directory_set[i]->ev_pending = True;
+               directory_set[i]->ev_named = False;
+            }
          continue;
       }
 
@@ -1047,8 +1111,26 @@ DirectoryEventsHandle(
       else
       {
          for (i = 0; i < directory_count; i++)
-            if (directory_set[i]->wd == ev->wd)
-               directory_set[i]->ev_pending = True;
+         {
+            Directory *directory = directory_set[i];
+
+            if (directory->wd != ev->wd)
+               continue;
+            directory->ev_pending = True;
+
+            /*
+             * Remember the name, so that an update can look at the
+             * entries that changed only (activity_update_some).  An
+             * event without a name is about the directory itself.
+             */
+            if (!directory->ev_named)
+               continue;
+            if (name == NULL ||
+                directory->modified_count >= EV_NAMES_MAX(directory))
+               directory->ev_named = False;
+            else
+               DirectoryAddModified(directory, name);
+         }
       }
    }
 
@@ -1110,6 +1192,14 @@ DirectoryWatch(
       return;
    directory->wd = wd;
    DPRINTF(("DirectoryWatch: %s wd %d\n", directory->path_name, wd));
+
+   /*
+    * An entry that changed after the read looked at it and before the
+    * watch was set has no event, and the directory's time stamps don't
+    * show a changed file: the first update after the watch is set is a
+    * full one (see UpdateSomeEnough).
+    */
+   directory->ev_named = False;
 
    if (stat(directory->path_name, &st) != 0 ||
        !TimespecEqual(&st.st_mtim, &directory->mtim) ||
@@ -1211,7 +1301,8 @@ EventTimer(
        * one that is running re-arms this timer when it is done.
        */
       if (directory->busy[activity_reading] ||
-          directory->busy[activity_update_all])
+          directory->busy[activity_update_all] ||
+          directory->busy[activity_update_some])
          continue;
 
       /* being modified, or not shown right now */
@@ -1250,9 +1341,14 @@ EventTimer(
       else
          directory->ev_interval = EVENT_INTERVAL_MS;
 
-      DPRINTF(("EventTimer: %s changed\n", directory->directory_name));
+      DPRINTF(("EventTimer: %s changed (%d named)\n",
+               directory->directory_name,
+               directory->ev_named ? directory->modified_count : -1));
       directory->last_ev_refresh = now;
-      directory->busy[activity_update_all] = True;
+      if (UpdateSomeEnough(directory))
+         directory->busy[activity_update_some] = True;
+      else
+         directory->busy[activity_update_all] = True;
       ScheduleActivity(directory);
    }
 
@@ -3365,6 +3461,8 @@ UpdateSomeProcess(
    int rc;
    int dir_fd;
    Boolean IsToolBox;
+   Boolean inDtDir;
+   char *ptr;
 
    DPRINTF(("UpdateSomeProcess(%d, \"%s\", \"%s\")\n",
             pipe_fd, host_name, directory_name));
@@ -3390,9 +3488,13 @@ UpdateSomeProcess(
    }
    (void) DtEliminateDots (full_directory_name);
 
-   /* stat the directory to get the timestamp */
-   if (stat(full_directory_name, &stat_buf) < 0 ||
-       ! (stat_buf.st_mode & S_IXUSR) )
+   /*
+    * Stat the directory to get the timestamp; check, as UpdateAllProcess
+    * does, that it can still be read and searched (this tested only the
+    * owner's search bit).
+    */
+   if (CheckAccess(full_directory_name, R_OK | X_OK) != 0 ||
+       stat(full_directory_name, &stat_buf) != 0)
    {
       /* send an error code back through the pipe */
       rc = errno;
@@ -3410,9 +3512,16 @@ UpdateSomeProcess(
    batch = FileDataBatchCreate(pipe_fd);
    TypeAttrCacheBegin();
 
+   /* ~/.dt/Desktop is never shown (see ReadDirectoryProcess) */
+   inDtDir = (ptr = strrchr(full_directory_name, '/')) != NULL &&
+             strcmp(ptr, "/.dt") == 0;
+
    /*  Loop through the list of modified files  */
    for (i = 0; i < directory->modified_count; i++)
    {
+      if (inDtDir && strcmp(directory->modified_list[i], "Desktop") == 0)
+         continue;
+
       /* get the info, and send it through the pipe */
       FileDataBatchAdd(batch,
                        ReadFileData2At(FileDataBatchNext(batch), dir_fd,
@@ -4650,21 +4759,11 @@ DirectoryModifyTime(
 
    DPRINTF(("DirectoryModifyTime(%s, %s)\n", host_name, directory_name));
 
-#ifdef SMART_DIR_UPDATE
-   Directory *directory;
-
-   /*  Find the directory set entry.  */
-   directory = FindDirectory(host_name, directory_name);
-
-   if (directory != NULL)
-   {
-      /* mark directory up-to-date if unchanged since last read */
-      if (modify_time <= directory->modify_time)
-         directory->was_up_to_date = True;
-      DPRINTF(("   modify_begin %d, up_to_date %d\n",
-               directory->modify_begin, directory->was_up_to_date));
-   }
-#endif
+   /*
+    * (Unused: whether an update of the modified files is enough is
+    * decided from the inotify events, see UpdateSomeEnough.  This
+    * time stamp has a resolution of one second.)
+    */
 }
 
 
@@ -4684,7 +4783,6 @@ DirectoryFileModified(
         char *file_name)
 {
    Directory *directory;
-   int i;
 
    DPRINTF(("DirectoryFileModified(%s, %s, %s)\n",
             host_name, directory_name, file_name));
@@ -4692,30 +4790,7 @@ DirectoryFileModified(
    /*  Find the directory set entry.  */
    directory = FindDirectory(host_name, directory_name);
    if (directory != NULL)
-   {
-      /* see if the file is already on the list (hashed: a move or copy
-       * of K files calls this K times) */
-      if (directory->modified_index == NULL)
-      {
-         directory->modified_index = XtNew(NameIndex);
-         directory->modified_index->slots = NULL;
-      }
-      else if (NameIndexFind(directory->modified_index,
-                             directory->modified_list, file_name, NULL) >= 0)
-        return;
-
-      /* add the file to the modified_list */
-      i = directory->modified_count++;
-      if (i >= directory->modified_size)
-      {
-         directory->modified_size = i < 8 ? 16 : 2 * i;
-         directory->modified_list = (char **)
-           XtRealloc((char *)directory->modified_list,
-                     directory->modified_size * sizeof(char *));
-      }
-      directory->modified_list[i] = XtNewString(file_name);
-      NameIndexAdd(directory->modified_index, directory->modified_list, i);
-   }
+      DirectoryAddModified(directory, file_name);
 }
 
 
@@ -4775,16 +4850,17 @@ DirectoryEndModify(
             }
          }
 
-#ifdef SMART_DIR_UPDATE
-         /* schedule a partial update of the modfied directory */
-         if (directory->was_up_to_date)
+         /*
+          * Schedule an update of the modified files only if inotify
+          * named every other change since the last full read (the
+          * modify time test that SMART_DIR_UPDATE used had a
+          * resolution of one second, and was never enabled); else a
+          * full update of the directory.
+          */
+         if (UpdateSomeEnough(directory))
             directory->busy[activity_update_some] = True;
          else
             directory->busy[activity_update_all] = True;
-#else
-         /* schedule a full update of the modfied directory */
-         directory->busy[activity_update_all] = True;
-#endif
          ScheduleActivity(directory);
       }
    }
@@ -6759,13 +6835,33 @@ ScheduleDirectoryActivity(
 
    /*
     * A read or update sees every change made before it starts: take in
-    * the queued change events, and clear the directory's mark.
+    * the queued change events, and clear the directory's mark.  An
+    * update of the modified entries only must still be enough with the
+    * events just taken in; else it becomes a full update.  A read or
+    * full update makes one of the modified entries redundant.
     */
+   if (activity == activity_update_some)
+   {
+      DirectoryEventsRead();
+      if (!UpdateSomeEnough(directory))
+      {
+         directory->busy[activity_update_some] = False;
+         directory->busy[activity_update_all] = True;
+         activity = activity_update_all;
+      }
+      else
+      {
+         directory->ev_pending = False;
+         directory->stale = False;
+      }
+   }
    if (activity == activity_reading || activity == activity_update_all)
    {
       DirectoryEventsRead();
       directory->ev_pending = False;
       directory->stale = False;
+      directory->ev_named = (directory->wd > 0);
+      directory->busy[activity_update_some] = False;
    }
    if (activity == activity_reading || activity == activity_update_all ||
        activity == activity_update_some)
