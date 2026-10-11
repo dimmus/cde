@@ -3002,6 +3002,174 @@ GetTTPath(char *path)
 
 
 /*--------------------------------------------------------------------
+ *  Path type cache
+ *	A directory worker types the components of each path it reads
+ *	(15-70 us each, with two access() checks), and finds the
+ *	ToolTalk name of the directory (40-90 us).  Going into a
+ *	subfolder, or reading a folder again, mostly asks for the same
+ *	components.  A worker remembers each component's type while the
+ *	component (lstat, and stat of what a link points to) and its
+ *	.DtDirDataType are unchanged, and the ToolTalk name of a
+ *	directory while none of its components changed or is a link.
+ *	Entries younger than PATH_TYPE_SETTLE seconds are not kept: on
+ *	a file system with coarse time stamps a change could go unseen.
+ *	(A database reload retires the workers, and with them the cache.)
+ *------------------------------------------------------------------*/
+
+#define PATH_TYPE_BUCKETS  64
+#define PATH_TYPE_MAX     512
+#define PATH_TYPE_SETTLE    2
+
+typedef struct _PathType
+{
+   struct _PathType *next;
+   char             *path;
+   struct stat       lst;        /* lstat of path */
+   struct stat       st;         /* stat of path (lst unless a link) */
+   int               dt_errno;   /* stat of path/.DtDirDataType */
+   struct stat       dt_st;
+   char             *type;
+   char             *tt_path;    /* ToolTalk name, or NULL */
+} PathType;
+
+typedef struct
+{
+   int         ok;               /* the stats succeeded */
+   struct stat lst;
+   struct stat st;
+   int         dt_errno;
+   struct stat dt_st;
+} PathStamp;
+
+static PathType *path_types[PATH_TYPE_BUCKETS];
+static int       path_type_count = 0;
+
+static Boolean SameFileStat(const struct stat *a, const struct stat *b);
+
+static void
+PathStampGet(
+        const char *path,
+        PathStamp *ps)
+{
+   char dt_path[MAX_PATH + sizeof("/.DtDirDataType")];
+
+   memset(ps, 0, sizeof(*ps));
+   if (lstat(path, &ps->lst) != 0)
+      return;
+   ps->st = ps->lst;
+   if (S_ISLNK(ps->lst.st_mode) && stat(path, &ps->st) != 0)
+      return;
+   ps->dt_errno = ENOTDIR;
+   if (S_ISDIR(ps->st.st_mode) && strlen(path) < MAX_PATH)
+   {
+      snprintf(dt_path, sizeof(dt_path), "%s/.DtDirDataType",
+               strcmp(path, "/") == 0 ? "" : path);
+      ps->dt_errno = (stat(dt_path, &ps->dt_st) == 0) ? 0 : errno;
+   }
+   ps->ok = 1;
+}
+
+static Boolean
+PathStampRecent(
+        const struct stat *st,
+        time_t now)
+{
+   return st->st_mtime > now - PATH_TYPE_SETTLE ||
+          st->st_ctime > now - PATH_TYPE_SETTLE;
+}
+
+static PathType *
+PathTypeFind(
+        const char *path,
+        const PathStamp *ps)
+{
+   PathType *pt;
+
+   if (!ps->ok)
+      return NULL;
+   for (pt = path_types[NameHash(path) % PATH_TYPE_BUCKETS]; pt; pt = pt->next)
+   {
+      if (strcmp(pt->path, path) != 0)
+         continue;
+      if (SameFileStat(&pt->lst, &ps->lst) &&
+          SameFileStat(&pt->st, &ps->st) &&
+          pt->dt_errno == ps->dt_errno &&
+          (ps->dt_errno != 0 || SameFileStat(&pt->dt_st, &ps->dt_st)))
+         return pt;
+      return NULL;
+   }
+   return NULL;
+}
+
+static void
+PathTypeFlush(void)
+{
+   PathType *pt, *next;
+   int i;
+
+   for (i = 0; i < PATH_TYPE_BUCKETS; i++)
+   {
+      for (pt = path_types[i]; pt; pt = next)
+      {
+         next = pt->next;
+         XtFree(pt->path);
+         XtFree(pt->type);
+         XtFree(pt->tt_path);
+         XtFree((char *)pt);
+      }
+      path_types[i] = NULL;
+   }
+   path_type_count = 0;
+}
+
+/* remember (or forget) the type of path, as stamped before typing it */
+static PathType *
+PathTypeStore(
+        const char *path,
+        const PathStamp *ps,
+        const char *type)
+{
+   PathType *pt, **ptp;
+   time_t now = time(NULL);
+   unsigned int b = NameHash(path) % PATH_TYPE_BUCKETS;
+
+   for (ptp = &path_types[b]; (pt = *ptp) != NULL; ptp = &pt->next)
+   {
+      if (strcmp(pt->path, path) == 0)
+      {
+         *ptp = pt->next;
+         XtFree(pt->path);
+         XtFree(pt->type);
+         XtFree(pt->tt_path);
+         XtFree((char *)pt);
+         path_type_count--;
+         break;
+      }
+   }
+
+   if (!ps->ok || PathStampRecent(&ps->lst, now) ||
+       PathStampRecent(&ps->st, now) ||
+       (ps->dt_errno == 0 && PathStampRecent(&ps->dt_st, now)))
+      return NULL;
+
+   if (path_type_count >= PATH_TYPE_MAX)
+      PathTypeFlush();
+   pt = (PathType *) XtMalloc(sizeof(PathType));
+   pt->path = XtNewString(path);
+   pt->lst = ps->lst;
+   pt->st = ps->st;
+   pt->dt_errno = ps->dt_errno;
+   pt->dt_st = ps->dt_st;
+   pt->type = XtNewString(type);
+   pt->tt_path = NULL;
+   pt->next = path_types[b];
+   path_types[b] = pt;
+   path_type_count++;
+   return pt;
+}
+
+
+/*--------------------------------------------------------------------
  *  AddPathLogicalTypes
  *    Append a PIPEMSG_PATH_LOGICAL_TYPES message to pb: the logical
  *    data type of every component of the directory's path, followed
@@ -3028,6 +3196,10 @@ AddPathLogicalTypes(
    char *ptrOrig;
    char *tt_path;
    int i;
+   PathStamp ps;
+   PathType *pt;
+   PathType *last_pt = NULL;     /* the last component's entry */
+   Boolean path_unchanged = True;/* every component was in the cache */
 
    path_count = 0;
    path_logical_types = NULL;
@@ -3059,6 +3231,19 @@ AddPathLogicalTypes(
       DtEliminateDots (component_name);
       path_logical_types = (char **) XtRealloc((char *)path_logical_types,
                                                (path_count + 1)*sizeof(char *));
+
+      PathStampGet(component_name, &ps);
+      if (S_ISLNK(ps.lst.st_mode))
+         path_unchanged = False;
+      pt = PathTypeFind(component_name, &ps);
+      if (pt != NULL)
+      {
+         path_logical_types[path_count] = XtNewString(pt->type);
+         last_pt = pt;
+      }
+      else
+      {
+      path_unchanged = False;
       path_logical_types[path_count] =
          (char *) DtDtsDataToDataType(component_name, NULL, 0, NULL, NULL,
                                       NULL, NULL);
@@ -3084,6 +3269,9 @@ AddPathLogicalTypes(
         }
       }
 #endif
+      last_pt = PathTypeStore(component_name, &ps,
+                              path_logical_types[path_count]);
+      }
       DPRINTF2(("AddPathLogicalTypes: path '%s', fullname '%s', type %s\n",
                 namePtr, component_name, path_logical_types[path_count]));
 
@@ -3119,11 +3307,26 @@ AddPathLogicalTypes(
       that was read before can send what the read found) */
    if (known_tt_path != NULL)
       PipeBufAddString(pb, known_tt_path);
+   else if (path_unchanged && last_pt != NULL && last_pt->tt_path != NULL &&
+            full_directory_name != NULL &&
+            strcmp(last_pt->path, full_directory_name) == 0)
+      PipeBufAddString(pb, last_pt->tt_path);
    else
    {
       tt_path = GetTTPath(full_directory_name);
       PipeBufAddString(pb, tt_path);
-      XtFree(tt_path);
+
+      /* (a path without links names the same file as long as none of
+         its components changed) */
+      if (last_pt != NULL && full_directory_name != NULL &&
+          strcmp(last_pt->path, full_directory_name) == 0 &&
+          (path_unchanged || last_pt->tt_path == NULL))
+      {
+         XtFree(last_pt->tt_path);
+         last_pt->tt_path = tt_path;
+      }
+      else
+         XtFree(tt_path);
    }
 }
 
