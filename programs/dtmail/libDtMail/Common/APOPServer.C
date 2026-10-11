@@ -75,7 +75,7 @@
 #include <stdlib.h>
  
 #include  <DtMail/DtMailServer.hh>
-#include  "md5.h"
+#include  "../../../dtcm/dtcm/md5.h"
 
 APOPServer::APOPServer(
 		char			*folder,

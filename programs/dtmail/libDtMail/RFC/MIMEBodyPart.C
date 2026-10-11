@@ -53,7 +53,6 @@
 #include "RFCImpl.hh"
 #include "RFCMIME.hh"
 #include <DtMail/Threads.hh>
-#include "md5.h"
 
 // For CHARSET
 #include <locale.h>

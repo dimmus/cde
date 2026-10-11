@@ -37,5 +37,10 @@ libCommon_a_SOURCES = APOPServer.C \
 		      Process.C \
 		      Session.C \
 		      Threads.C \
-		      md5.C \
 		      str_utils.C
+
+# The MD5 code is dtcm's (C, with C++ guards in md5.h).  The per-target
+# CFLAGS name its object libCommon_a-md5.o, apart from dtcm's md5.o in the
+# same directory.
+libCommon_a_SOURCES += ../../../dtcm/dtcm/md5.c
+libCommon_a_CFLAGS = $(CDE_CFLAGS)

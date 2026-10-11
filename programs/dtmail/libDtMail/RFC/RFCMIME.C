@@ -55,7 +55,7 @@
 
 #include <Dt/Dts.h>
 
-#include "md5.h"
+#include "../../../dtcm/dtcm/md5.h"
 #include "RFCMIME.hh"
 #include <DtMail/DtMailP.hh>
 #include <DtMail/IO.hh>
