@@ -235,6 +235,7 @@ InitializeDesktopWindows(
    char   *popup_name;
    Widget pu_shell, frame, drawA;
    static XtTranslations trans_table = NULL;
+   String menu_accel = NULL;
 
    if(desktop_data == NULL)
    {
@@ -318,7 +319,31 @@ InitializeDesktopWindows(
          sacredDesktop = desktop;
       }
       else
+      {
+         /*
+          * XmAddToPostFromList processes the whole menu again, and grabs
+          * the popup menu's accelerator on every widget already on the
+          * list: adding N widgets made O(N*N) XtGrabKey calls (82% of
+          * the time loading 200 desktop objects).  Leave the accelerator
+          * unset while the widgets are added; setting it back below
+          * grabs it once on each of them.
+          */
+         if (menu_accel == NULL)
+         {
+            String accel = NULL;
+
+            /* (Motif returns a copy of the accelerator string) */
+            XtSetArg(args[0], XmNmenuAccelerator, &accel);
+            XtGetValues(desktop_data->popupMenu->popup, args, 1);
+            menu_accel = accel ? accel : XtNewString("");
+            if (*menu_accel != '\0')
+            {
+               XtSetArg(args[0], XmNmenuAccelerator, "");
+               XtSetValues(desktop_data->popupMenu->popup, args, 1);
+            }
+         }
          XmAddToPostFromList(desktop_data->popupMenu->popup, drawA);
+      }
 
       /* set up translations in main edit widget (parsed once: a table
        * can be shared by all the desktop objects) */
@@ -392,6 +417,15 @@ InitializeDesktopWindows(
       desktop_data->desktopWindows[i] = desktop;
    }
 
+   if (menu_accel != NULL)
+   {
+      if (*menu_accel != '\0')
+      {
+         XtSetArg(args[0], XmNmenuAccelerator, menu_accel);
+         XtSetValues(desktop_data->popupMenu->popup, args, 1);
+      }
+      XtFree(menu_accel);
+   }
 }
 
 
@@ -642,6 +676,7 @@ MakeDesktopWindow(
    Dimension  gadgetWidth, gadgetHeight;
    Position gadgetX, gadgetY, drawAX, drawAY;
    WMShellWidget wm;
+   Boolean waitForWm = True;
 
 
    /* get the colors to use for the desktop window */
@@ -756,11 +791,22 @@ MakeDesktopWindow(
    desktopWindow->root_x = rX;
    desktopWindow->root_y = rY;
 
+   /*
+    * Xt would wait for the window manager to answer the configure
+    * request for each desktop object, scanning the event queue (which
+    * grows with every object) while it waited; its answer is handled
+    * when it comes, like any later ConfigureNotify.
+    */
+   XtSetArg (args[0], XmNwaitForWm, &waitForWm);
+   XtGetValues (desktopWindow->shell, args, 1);
    XtSetArg (args[0], XmNx, rX);
    XtSetArg (args[1], XmNy, rY);
    XtSetArg (args[2], XmNwidth, width);
    XtSetArg (args[3], XmNheight, height);
-   XtSetValues (desktopWindow->shell, args, 4);
+   XtSetArg (args[4], XmNwaitForWm, False);
+   XtSetValues (desktopWindow->shell, args, 5);
+   XtSetArg (args[0], XmNwaitForWm, waitForWm);
+   XtSetValues (desktopWindow->shell, args, 1);
 
    /* force the Window Manager to map it where I want it */
    if (XtWindow(desktopWindow->shell) != 0)
