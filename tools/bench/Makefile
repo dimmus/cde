@@ -55,6 +55,7 @@ dtwmbench: dtwmbench.c dtwmbench.h
 		-DDTWMBENCH_WM='"$(ABSTOP)/programs/dtwm/.libs/dtwm"' \
 		-DDTWMBENCH_LIBPATH='"$(LIBPATH)"' \
 		-DDTWMBENCH_PRELOAD='"$(abspath .)/libdtwmbench_preload.so"' \
+		-DDTWMBENCH_TTSESSION='"$(ABSTOP)/lib/tt/bin/ttsession/.libs/ttsession"' \
 		-o $@ dtwmbench.c $(XTST) $(XLIBS)
 
 ewmhtest: ewmhtest.c benchutil.c benchutil.h

@@ -15,8 +15,21 @@
  * retitles a window and toggles its urgency hint thousands of times, and
  * drags a window by its title bar and by its resize handle with XTest.
  *
+ * It also switches workspaces with 100 clients spread over 4 of them,
+ * through EWMH (_NET_CURRENT_DESKTOP) and by clicking the front panel's
+ * switch buttons (with and without a ttsession), changes the backdrop
+ * between fit and fill images, runs f.refresh over 200 clients (both
+ * ways: refreshByClearing True and False), and holds a window still in
+ * the middle of a drag for 3 s in each configuration of interactive
+ * moves (opaque, XOR outline, window outline, XOR outline with
+ * freezeOnConfig), to see what dtwm does while nothing happens.
+ *
  * dtwm runs without its front panel (Dtwm*useFrontPanel: False), which
- * would need the action database and ToolTalk, and with an empty HOME.
+ * needs the action database, except in the fp-switch cases, with an
+ * empty HOME, and without ToolTalk: TTSESSION_CMD keeps libtt from
+ * starting a ttsession of its own (the first one on PATH, which would
+ * outlive dtwm), except in fp-switch-tt, which runs the tree's
+ * ttsession.
  * By default it is the uninstalled binary of this tree (programs/dtwm/
  * .libs/dtwm) with the tree's libraries on LD_LIBRARY_PATH.
  *
@@ -30,10 +43,17 @@
  *   - mallocs  dtwm's calls to malloc/calloc/realloc
  *   - requests X requests dtwm issued
  *   - rtrips   round trips dtwm made (calls to _XReply)
+ *   - wakeups  dtwm's context switches (voluntary and not, from
+ *              /proc/PID/status): how often it was woken up
  * The "map" case also reports the time until every client is reparented
  * and mapped (mapped-ns, the rest of ns is dtwm settling), and, in KiB,
  * dtwm's resident set once the windows are managed (rss) and its growth
- * over the run (rss+).
+ * over the run (rss+); "backdrop" reports the X server's growth (xrss+),
+ * where the backdrop pixmaps live.
+ *
+ * With CDEBENCH_MARKERS set, every timed run is framed by markers that
+ * syscount.py uses to split an strace log of dtwmbench and dtwm by case
+ * (bench.py run --syscalls).
  *
  * The counters come from libdtwmbench_preload.so, which dtwmbench preloads
  * into dtwm (see dtwmpreload.c).  It also tells dtwmbench when dtwm has gone
@@ -100,6 +120,12 @@
 #ifndef DTWMBENCH_PRELOAD
 #define DTWMBENCH_PRELOAD "libdtwmbench_preload.so"
 #endif
+#ifndef DTWMBENCH_TTSESSION
+#define DTWMBENCH_TTSESSION "ttsession"
+#endif
+
+#define NWORKSPACES 4
+#define HOLD_MS 3000
 
 struct bench_case {
 	const char *name;
@@ -110,21 +136,26 @@ struct bench_case {
 	long (*run)(long n);       /* timed, returns the operations done */
 	void (*teardown)(void);    /* after each run, untimed */
 	int memory;                /* report the mapping time and dtwm's
-				      resident set */
+				      resident set (2: and the server's
+				      growth) */
+	int tt;                    /* run a ttsession for dtwm */
 };
 
 struct result {
-	double ns, cpu, xcpu, mallocs, requests, rtrips;
-	double phase, rss, rss_delta;
+	double ns, cpu, xcpu, mallocs, requests, rtrips, wakeups;
+	double phase, rss, rss_delta, xrss_delta;
 };
 
 static Display *dpy;
 static Window rootw;
-static Atom a_utf8, a_net_wm_name;
+static Atom a_utf8, a_net_wm_name, a_net_wm_desktop, a_net_current_desktop;
+static Atom a_motif_wm_info, a_dt_wm_request, a_tt_session;
 static const char *wm_path = DTWMBENCH_WM;
 static pid_t wm_pid;
 static pid_t server_pid;       /* the X server, when it is local */
 static const char *const *wm_xrm;
+static int wm_tt;
+static pid_t tt_pid;
 static struct dtwmbench_shm *shm;
 static int shm_fd = -1;
 static char workdir[PATH_MAX];
@@ -224,6 +255,10 @@ static void on_signal(int sig)
 		kill(wm_pid, SIGKILL);
 		waitpid(wm_pid, NULL, 0);
 	}
+	if (tt_pid > 0) {
+		kill(tt_pid, SIGKILL);
+		waitpid(tt_pid, NULL, 0);
+	}
 	/* No stdio, no X; opendir is not async-signal-safe, but the
 	 * alternative is a directory left in /tmp at every interruption. */
 	if (*logpath && !keep_log)
@@ -284,14 +319,16 @@ static pid_t peer_pid(int fd)
 	return cred.pid;
 }
 
-/* dtwm's resident set in KiB. */
-static long wm_rss_kib(void)
+/* The resident set of a process in KiB. */
+static long rss_kib(pid_t pid)
 {
 	char path[64], line[128];
 	long kib = 0;
 	FILE *f;
 
-	snprintf(path, sizeof path, "/proc/%d/status", (int)wm_pid);
+	if (pid <= 0)
+		return 0;
+	snprintf(path, sizeof path, "/proc/%d/status", (int)pid);
 	if ((f = fopen(path, "r"))) {
 		while (fgets(line, sizeof line, f))
 			if (sscanf(line, "VmRSS: %ld", &kib) == 1)
@@ -299,6 +336,69 @@ static long wm_rss_kib(void)
 		fclose(f);
 	}
 	return kib;
+}
+
+/* dtwm's resident set in KiB. */
+static long wm_rss_kib(void)
+{
+	return rss_kib(wm_pid);
+}
+
+/*
+ * The context switches of a process (its main thread: dtwm has no
+ * other), voluntary or not: the times it was woken up, give or take
+ * preemptions.
+ */
+static double ctxt_switches(pid_t pid)
+{
+	char path[64], line[128];
+	unsigned long v, total = 0;
+	FILE *f;
+
+	if (pid <= 0)
+		return 0;
+	snprintf(path, sizeof path, "/proc/%d/status", (int)pid);
+	if ((f = fopen(path, "r"))) {
+		while (fgets(line, sizeof line, f))
+			if (sscanf(line, "voluntary_ctxt_switches: %lu", &v) == 1 ||
+			    sscanf(line, "nonvoluntary_ctxt_switches: %lu",
+				   &v) == 1)
+				total += v;
+		fclose(f);
+	}
+	return (double)total;
+}
+
+/* A marker for syscount.py in an strace log (see benchutil.h). */
+static void marker(const char *fmt, ...)
+{
+	static int on = -1;
+	char buf[256];
+	va_list ap;
+	ssize_t n;
+	int len;
+
+	if (on < 0)
+		on = getenv("CDEBENCH_MARKERS") != NULL;
+	if (!on)
+		return;
+	va_start(ap, fmt);
+	len = vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
+	if (len < 0)
+		return;
+	if (len >= (int)sizeof buf)
+		len = sizeof buf - 1;
+	n = write(-1, buf, (size_t)len);
+	(void)n;
+}
+
+static void sleep_ms(int ms)
+{
+	struct timespec ts = { ms / 1000, (ms % 1000) * 1000000L };
+
+	while (nanosleep(&ts, &ts) < 0 && errno == EINTR)
+		;
 }
 
 /* Wait for *word to change from val, for at most ms. */
@@ -485,6 +585,97 @@ static void add_window(Window w)
 	wins[nwins++] = w;
 }
 
+static void stop_tt(void)
+{
+	if (tt_pid > 0) {
+		kill(tt_pid, SIGTERM);
+		waitpid(tt_pid, NULL, 0);
+	}
+	tt_pid = 0;
+	/* What a later dtwm would otherwise take for a live session. */
+	if (dpy && a_tt_session) {
+		XDeleteProperty(dpy, rootw, a_tt_session);
+		XSync(dpy, False);
+	}
+}
+
+/* Set the library path of this build tree, for its uninstalled programs. */
+static void set_libpath(void)
+{
+	const char *old = getenv("LD_LIBRARY_PATH");
+	char *lp;
+
+	if (!*DTWMBENCH_LIBPATH)
+		return;
+	lp = malloc(sizeof DTWMBENCH_LIBPATH + (old ? strlen(old) + 1 : 0));
+	if (!lp)
+		return;
+	strcpy(lp, DTWMBENCH_LIBPATH);
+	if (old && *old) {
+		strcat(lp, ":");
+		strcat(lp, old);
+	}
+	setenv("LD_LIBRARY_PATH", lp, 1);
+	free(lp);
+}
+
+/*
+ * Start "ttsession -s -S -d $DISPLAY" (the tree's, with an empty HOME)
+ * and wait until it has published itself on the root window.
+ */
+static void start_tt(void)
+{
+	double deadline;
+	Atom type;
+	int format;
+	unsigned long nitems, after;
+	unsigned char *data;
+
+	stop_tt();
+	fflush(NULL);
+	tt_pid = fork();
+	if (tt_pid < 0)
+		die("fork: %s", strerror(errno));
+	if (tt_pid == 0) {
+		int fd = open(logpath, O_WRONLY | O_CREAT | O_APPEND, 0600);
+
+		if (fd >= 0) {
+			dup2(fd, 1);
+			dup2(fd, 2);
+			close(fd);
+		}
+		close(ConnectionNumber(dpy));
+		setenv("HOME", workdir, 1);
+		set_libpath();
+		execlp(DTWMBENCH_TTSESSION, DTWMBENCH_TTSESSION, "-s", "-S",
+		       "-d", DisplayString(dpy), (char *)NULL);
+		fprintf(stderr, "exec %s: %s\n", DTWMBENCH_TTSESSION,
+			strerror(errno));
+		_exit(127);
+	}
+	deadline = now_ns() + TIMEOUT_MS * 1e6;
+	for (;;) {
+		data = NULL;
+		if (XGetWindowProperty(dpy, rootw, a_tt_session, 0, 1, False,
+				       AnyPropertyType, &type, &format,
+				       &nitems, &after, &data) == Success &&
+		    type != None) {
+			if (data)
+				XFree(data);
+			break;
+		}
+		if (data)
+			XFree(data);
+		if (waitpid(tt_pid, NULL, WNOHANG) == tt_pid) {
+			tt_pid = 0;
+			die("ttsession exited");
+		}
+		if (now_ns() > deadline)
+			die("timed out waiting for ttsession");
+		sleep_ms(20);
+	}
+}
+
 static void stop_wm(void)
 {
 	if (wm_pid > 0) {
@@ -493,6 +684,8 @@ static void stop_wm(void)
 	}
 	wm_pid = 0;
 	wm_xrm = NULL;
+	wm_tt = 0;
+	stop_tt();
 	if (dpy && fence) {
 		XDestroyWindow(dpy, fence);
 		XSync(dpy, True);
@@ -500,7 +693,7 @@ static void stop_wm(void)
 	fence = 0;
 }
 
-static void start_wm(const char *const *xrm)
+static void start_wm(const char *const *xrm, int tt)
 {
 	const char *argv[32];
 	char fdstr[16];
@@ -508,6 +701,8 @@ static void start_wm(const char *const *xrm)
 	long seen;
 
 	stop_wm();
+	if (tt)
+		start_tt();
 	memset(shm, 0, sizeof *shm);
 	argv[argc++] = wm_path;
 	for (i = 0; xrm_base[i]; i++) {
@@ -538,6 +733,15 @@ static void start_wm(const char *const *xrm)
 		setenv("HOME", workdir, 1);
 		unsetenv("XENVIRONMENT");
 		unsetenv("XAPPLRESDIR");
+		/*
+		 * Without a ttsession of ours, keep libtt from starting
+		 * one (the first "ttsession" on PATH, with -d) that
+		 * would outlive dtwm: its auto-start runs $TTSESSION_CMD
+		 * with system() when that is set, and gives up when the
+		 * command exits with a status other than 0, 1 or 2.
+		 */
+		if (!tt)
+			setenv("TTSESSION_CMD", "exit 3 #", 1);
 		snprintf(fdstr, sizeof fdstr, "%d", shm_fd);
 		setenv("DTWMBENCH_SHM_FD", fdstr, 1);
 		setenv("LD_PRELOAD", preload ? preload : DTWMBENCH_PRELOAD, 1);
@@ -546,31 +750,27 @@ static void start_wm(const char *const *xrm)
 		 * dtwm.  (Through the libtool wrapper script, dtwm never
 		 * reports itself idle to the probe; run the real binary.)
 		 */
-		if (*DTWMBENCH_LIBPATH) {
-			const char *old = getenv("LD_LIBRARY_PATH");
-			char *lp = malloc(sizeof DTWMBENCH_LIBPATH +
-					  (old ? strlen(old) + 1 : 0));
-
-			if (lp) {
-				strcpy(lp, DTWMBENCH_LIBPATH);
-				if (old && *old) {
-					strcat(lp, ":");
-					strcat(lp, old);
-				}
-				setenv("LD_LIBRARY_PATH", lp, 1);
-			}
-		}
+		set_libpath();
 		execvp(wm_path, (char *const *)argv);
 		fprintf(stderr, "exec %s: %s\n", wm_path, strerror(errno));
 		_exit(127);
 	}
 	wm_xrm = xrm;
+	wm_tt = tt;
 
 	/*
 	 * The fence window doubles as the check that dtwm is up: whether it
-	 * is mapped before or after dtwm starts, dtwm manages it.
+	 * is mapped before or after dtwm starts, dtwm manages it.  It is in
+	 * every workspace (_NET_WM_DESKTOP 0xFFFFFFFF), so that it stays
+	 * mapped and answers across workspace switches.
 	 */
 	fence = create_window("dtwmbench fence", 0, 0, 20, 20, 0);
+	{
+		long all = 0xFFFFFFFFL;
+
+		XChangeProperty(dpy, fence, a_net_wm_desktop, XA_CARDINAL, 32,
+				PropModeReplace, (unsigned char *)&all, 1);
+	}
 	seen = reparented;
 	nwins = 0;
 	add_window(fence);
@@ -851,6 +1051,354 @@ static long hints_urgency_run(long n)
 	return n;
 }
 
+/* ------------------------------------------------------------------ */
+/* Workspaces, front panel, backdrops, f.refresh                       */
+/* ------------------------------------------------------------------ */
+
+static long cardinal_property(Window w, Atom prop)
+{
+	Atom type;
+	int format;
+	unsigned long nitems, after;
+	unsigned char *data = NULL;
+	long value = -1;
+
+	if (XGetWindowProperty(dpy, w, prop, 0, 1, False, XA_CARDINAL, &type,
+			       &format, &nitems, &after, &data) == Success &&
+	    type == XA_CARDINAL && format == 32 && nitems == 1)
+		value = *(long *)data;
+	if (data)
+		XFree(data);
+	return value;
+}
+
+/* Ask the window manager to show workspace ws (EWMH). */
+static void request_desktop(long ws)
+{
+	XEvent ev;
+
+	memset(&ev, 0, sizeof ev);
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = rootw;
+	ev.xclient.message_type = a_net_current_desktop;
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = ws;
+	ev.xclient.data.l[1] = CurrentTime;
+	XSendEvent(dpy, rootw, False,
+		   SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+}
+
+static void check_desktop(long ws, const char *what)
+{
+	long cur = cardinal_property(rootw, a_net_current_desktop);
+
+	if (cur != ws)
+		die("%s: the current workspace is %ld, not %ld", what, cur, ws);
+}
+
+/*
+ * 100 small clients in a grid in the upper half of the screen (clear of
+ * the front panel), spread over the 4 workspaces with _NET_WM_DESKTOP
+ * set before they are mapped.  Only those of the current workspace get
+ * mapped, but dtwm reparents them all.
+ */
+#define WS_CLIENTS 100
+
+static void ws_setup(long n)
+{
+	char title[64];
+	long i;
+
+	(void)n;
+	nwins = 0;
+	reparented = mapped = 0;
+	for (i = 0; i < WS_CLIENTS; i++) {
+		long ws = i % NWORKSPACES;
+		Window w;
+
+		snprintf(title, sizeof title, "dtwmbench ws client %ld", i);
+		w = create_window(title, 10 + (int)(i % 10) * 150,
+				  10 + (int)(i / 10) * 45, 120, 20, 1);
+		XChangeProperty(dpy, w, a_net_wm_desktop, XA_CARDINAL, 32,
+				PropModeReplace, (unsigned char *)&ws, 1);
+		add_window(w);
+	}
+	for (i = 0; i < nwins; i++)
+		XMapWindow(dpy, wins[i]);
+	wait_count(&reparented, WS_CLIENTS, "dtwm to reparent the clients");
+	sync_wm();
+	check_desktop(0, "ws setup");
+}
+
+static long ws_switch_run(long n)
+{
+	long i;
+
+	for (i = 1; i <= n; i++) {
+		request_desktop(i % NWORKSPACES);
+		sync_wm();
+	}
+	check_desktop(n % NWORKSPACES, "ws-switch");
+	return n;
+}
+
+static void ws_teardown(void)
+{
+	request_desktop(0);
+	sync_wm();
+	destroy_windows();
+}
+
+/* Where to click the front panel's switch button of workspace ws. */
+static int fp_x[NWORKSPACES], fp_y[NWORKSPACES];
+
+static void fp_setup(long n)
+{
+	double deadline = now_ns() + TIMEOUT_MS * 1e6;
+	int i;
+
+	ws_setup(n);
+	while (shm->fp_count < NWORKSPACES) {
+		if (now_ns() > deadline)
+			die("dtwm has %u front panel switch buttons, not %d "
+			    "(is the front panel up?)", shm->fp_count,
+			    NWORKSPACES);
+		sync_wm();
+		sleep_ms(50);
+	}
+	for (i = 0; i < NWORKSPACES; i++) {
+		Window child;
+
+		if (!XTranslateCoordinates(dpy, (Window)shm->fp_window[i],
+					   rootw, shm->fp_x[i] +
+					   shm->fp_w[i] / 2, shm->fp_y[i] +
+					   shm->fp_h[i] / 2, &fp_x[i],
+					   &fp_y[i], &child))
+			die("front panel switch button %d: bad window", i);
+	}
+}
+
+static long fp_switch_run(long n)
+{
+	long i;
+
+	for (i = 1; i <= n; i++) {
+		int ws = (int)(i % NWORKSPACES);
+
+		XTestFakeMotionEvent(dpy, -1, fp_x[ws], fp_y[ws], CurrentTime);
+		XTestFakeButtonEvent(dpy, 1, True, CurrentTime);
+		XTestFakeButtonEvent(dpy, 1, False, CurrentTime);
+		sync_wm();
+	}
+	check_desktop(n % NWORKSPACES, "fp-switch");
+	return n;
+}
+
+/* The window dtwm reads requests from (_MOTIF_WM_INFO on the root). */
+static Window wm_window(void)
+{
+	Atom type;
+	int format;
+	unsigned long nitems, after;
+	unsigned char *data = NULL;
+	Window w = None;
+
+	if (XGetWindowProperty(dpy, rootw, a_motif_wm_info, 0, 2, False,
+			       a_motif_wm_info, &type, &format, &nitems,
+			       &after, &data) == Success &&
+	    format == 32 && nitems == 2)
+		w = (Window)((long *)data)[1];
+	if (data)
+		XFree(data);
+	if (w == None)
+		die("no _MOTIF_WM_INFO window");
+	return w;
+}
+
+/* Append a request ("f.refresh", ...) to dtwm's _DT_WM_REQUEST. */
+static void wm_request(Window w, const char *req)
+{
+	XChangeProperty(dpy, w, a_dt_wm_request, XA_STRING, 8, PropModeAppend,
+			(const unsigned char *)req, (int)strlen(req) + 1);
+}
+
+/*
+ * backdrop: what dtstyle does (DtWsmChangeBackdrop), alternating a fill
+ * and a fit backdrop of two different 64x64 bitmaps, each request
+ * waited for: dtwm scales the bitmap to the screen into a pixmap of its
+ * own each time.
+ */
+static Pixmap backdrop_bitmap[2];
+static Window backdrop_wm;
+
+static void backdrop_setup(long n)
+{
+	unsigned char bits[2][64 * 64 / 8];
+	int i, j;
+
+	(void)n;
+	for (i = 0; i < 2; i++) {
+		for (j = 0; j < (int)sizeof bits[i]; j++)
+			bits[i][j] = i ? (unsigned char)(j * 37) :
+				     ((j / 8) & 1 ? 0xaa : 0x55);
+		backdrop_bitmap[i] = XCreateBitmapFromData(dpy, rootw,
+							   (char *)bits[i],
+							   64, 64);
+	}
+	backdrop_wm = wm_window();
+	nwins = 0;
+}
+
+static long backdrop_run(long n)
+{
+	char req[256];
+	long i;
+
+	for (i = 0; i < n; i++) {
+		int k = (int)(i & 1);
+
+		/* imageType 3 is fill, 2 fit (DtWsmBackdropImageType) */
+		snprintf(req, sizeof req, "f.change_backdrop "
+			 "/dtwmbench/backdrop-%c %lx %d", k ? 'b' : 'a',
+			 (unsigned long)backdrop_bitmap[k], k ? 2 : 3);
+		wm_request(backdrop_wm, req);
+		sync_wm();
+	}
+	return n;
+}
+
+static void backdrop_teardown(void)
+{
+	XFreePixmap(dpy, backdrop_bitmap[0]);
+	XFreePixmap(dpy, backdrop_bitmap[1]);
+	XSync(dpy, False);
+}
+
+/* f.refresh over 200 managed clients, each refresh waited for. */
+#define REFRESH_CLIENTS 200
+
+static Window refresh_wm;
+
+static void refresh_setup(long n)
+{
+	(void)n;
+	create_windows(REFRESH_CLIENTS);
+	map_windows(REFRESH_CLIENTS);
+	sync_wm();
+	refresh_wm = wm_window();
+}
+
+static long refresh_run(long n)
+{
+	long i;
+
+	for (i = 0; i < n; i++) {
+		wm_request(refresh_wm, "f.refresh");
+		sync_wm();
+	}
+	return n;
+}
+
+/*
+ * hold-*: start a move by the title bar, hold the pointer still for
+ * HOLD_MS, then release; one operation.  What dtwm does in between is
+ * the point: an outline drawn with XOR flashes (FLASH_ON_MS/
+ * FLASH_OFF_MS), the other modes should sleep.  With freezeOnConfig
+ * dtwm grabs the server, so the button is released by the probe inside
+ * dtwm (release_req), and dtwmbench sends nothing until then.
+ */
+static int hold_freeze;
+
+static long hold_run(long n)
+{
+	unsigned int grabs = __atomic_load_n(&shm->grab_seq, __ATOMIC_ACQUIRE);
+
+	(void)n;
+	XTestFakeButtonEvent(dpy, 1, True, CurrentTime);
+	XTestFakeMotionEvent(dpy, -1, drag_x + DRAG_START, drag_y + DRAG_START,
+			     CurrentTime);
+	wait_grab(grabs, "the start of the drag");
+	sleep_ms(HOLD_MS);
+	if (hold_freeze) {
+		double deadline = now_ns() + TIMEOUT_MS * 1e6;
+		unsigned int seq = __atomic_load_n(&shm->release_seq,
+						   __ATOMIC_ACQUIRE);
+
+		__atomic_store_n(&shm->release_req, 1, __ATOMIC_RELEASE);
+		while (__atomic_load_n(&shm->release_seq, __ATOMIC_ACQUIRE) ==
+		       seq) {
+			/* dtwm may be blocked in poll() without a timeout */
+			kill(wm_pid, DTWMBENCH_WAKE_SIGNAL);
+			check_wm();
+			if (now_ns() > deadline)
+				die("timed out waiting for dtwm to release "
+				    "the button");
+			futex_wait(&shm->release_seq, seq, 100);
+		}
+	} else {
+		XTestFakeButtonEvent(dpy, 1, False, CurrentTime);
+	}
+	drag_steps = 0;
+	return 1;
+}
+
+static void hold_setup(long n)
+{
+	hold_freeze = 0;
+	move_setup(n);
+}
+
+static void hold_freeze_setup(long n)
+{
+	hold_freeze = 1;
+	__atomic_store_n(&shm->release_prep, 1, __ATOMIC_RELEASE);
+	move_setup(n);
+}
+
+static const char *const xrm_ws[] = {
+	"Dtwm*workspaceCount: 4",
+	NULL
+};
+
+static const char *const xrm_fp[] = {
+	"Dtwm*workspaceCount: 4",
+	"Dtwm*useFrontPanel: True",
+	NULL
+};
+
+static const char *const xrm_refresh_cover[] = {
+	"Dtwm*refreshByClearing: False",
+	NULL
+};
+
+static const char *const xrm_hold_opaque[] = {
+	"Dtwm*moveOpaque: True",
+	"Dtwm*freezeOnConfig: False",
+	"Dtwm*useWindowOutline: False",
+	NULL
+};
+
+static const char *const xrm_hold_xor[] = {
+	"Dtwm*moveOpaque: False",
+	"Dtwm*freezeOnConfig: False",
+	"Dtwm*useWindowOutline: False",
+	NULL
+};
+
+static const char *const xrm_hold_window[] = {
+	"Dtwm*moveOpaque: False",
+	"Dtwm*freezeOnConfig: False",
+	"Dtwm*useWindowOutline: True",
+	NULL
+};
+
+static const char *const xrm_hold_freeze[] = {
+	"Dtwm*moveOpaque: False",
+	"Dtwm*freezeOnConfig: True",
+	"Dtwm*useWindowOutline: False",
+	NULL
+};
+
 static const char *const xrm_opaque[] = {
 	"Dtwm*moveOpaque: True",
 	NULL
@@ -864,27 +1412,56 @@ static const char *const xrm_outline[] = {
 
 static const struct bench_case cases[] = {
 	{ "map", "map clients until all are managed and dtwm is idle",
-	  NULL, 500, create_windows, map_windows, destroy_windows, 1 },
+	  NULL, 500, create_windows, map_windows, destroy_windows, 1, 0 },
 	{ "map-dtterm", "map clients of WM_CLASS Dtterm (icon image lookup)",
-	  NULL, 500, create_dtterm_windows, map_windows, destroy_windows, 1 },
+	  NULL, 500, create_dtterm_windows, map_windows, destroy_windows,
+	  1, 0 },
 	{ "hints-urgency", "toggle the WM_HINTS urgency of a client",
 	  NULL, 10000, one_window_setup, hints_urgency_run, destroy_windows,
-	  0 },
+	  0, 0 },
 	{ "destroy", "destroy managed clients until dtwm is idle",
-	  NULL, 500, map_setup_destroy, destroy_run, NULL, 0 },
+	  NULL, 500, map_setup_destroy, destroy_run, NULL, 0, 0 },
 	{ "title", "change WM_NAME of a managed client, back to back",
-	  NULL, 10000, one_window_setup, title_wm_name_run, destroy_windows, 0 },
+	  NULL, 10000, one_window_setup, title_wm_name_run, destroy_windows,
+	  0, 0 },
 	{ "title-paced", "change WM_NAME, each time until dtwm is idle",
-	  NULL, 2000, one_window_setup, title_paced_run, destroy_windows, 0 },
+	  NULL, 2000, one_window_setup, title_paced_run, destroy_windows,
+	  0, 0 },
 	{ "title-net", "change _NET_WM_NAME (dtwm does not read it)",
 	  NULL, 10000, one_window_setup, title_net_wm_name_run,
-	  destroy_windows, 0 },
+	  destroy_windows, 0, 0 },
 	{ "drag-move", "drag a window by its title bar, opaque move, per step",
-	  xrm_opaque, 500, move_setup, drag_run, drag_teardown, 0 },
+	  xrm_opaque, 500, move_setup, drag_run, drag_teardown, 0, 0 },
 	{ "drag-move-outline", "drag a window by its title bar, outline, per step",
-	  xrm_outline, 500, move_setup, drag_run, drag_teardown, 0 },
+	  xrm_outline, 500, move_setup, drag_run, drag_teardown, 0, 0 },
 	{ "drag-resize", "resize a window by its corner, per step",
-	  xrm_outline, 500, resize_setup, drag_run, drag_teardown, 0 },
+	  xrm_outline, 500, resize_setup, drag_run, drag_teardown, 0, 0 },
+	{ "drag-move-xor", "drag a window by its title bar, XOR outline, "
+	  "per step", xrm_hold_xor, 500, move_setup, drag_run, drag_teardown,
+	  0, 0 },
+	{ "ws-switch", "switch workspaces (_NET_CURRENT_DESKTOP), 100 "
+	  "clients over 4", xrm_ws, 1000, ws_setup, ws_switch_run, ws_teardown,
+	  0, 0 },
+	{ "fp-switch", "click the front panel's switch buttons, no ttsession",
+	  xrm_fp, 1000, fp_setup, fp_switch_run, ws_teardown, 0, 0 },
+	{ "fp-switch-tt", "click the front panel's switch buttons, ttsession",
+	  xrm_fp, 1000, fp_setup, fp_switch_run, ws_teardown, 0, 1 },
+	{ "backdrop", "change the backdrop, fill and fit in turn",
+	  NULL, 100, backdrop_setup, backdrop_run, backdrop_teardown, 2, 0 },
+	{ "refresh", "f.refresh with 200 clients (refreshByClearing)",
+	  NULL, 50, refresh_setup, refresh_run, destroy_windows, 0, 0 },
+	{ "refresh-cover", "f.refresh with 200 clients (cover window)",
+	  xrm_refresh_cover, 50, refresh_setup, refresh_run, destroy_windows,
+	  0, 0 },
+	{ "hold-opaque", "hold still 3 s in an opaque move",
+	  xrm_hold_opaque, 1, hold_setup, hold_run, drag_teardown, 0, 0 },
+	{ "hold-xor", "hold still 3 s in an XOR outline move",
+	  xrm_hold_xor, 1, hold_setup, hold_run, drag_teardown, 0, 0 },
+	{ "hold-window-outline", "hold still 3 s in a window outline move",
+	  xrm_hold_window, 1, hold_setup, hold_run, drag_teardown, 0, 0 },
+	{ "hold-freeze", "hold still 3 s in an XOR outline move, "
+	  "freezeOnConfig", xrm_hold_freeze, 1, hold_freeze_setup, hold_run,
+	  drag_teardown, 0, 0 },
 };
 
 #define N_CASES (sizeof cases / sizeof cases[0])
@@ -912,19 +1489,22 @@ static void run_case(const struct bench_case *bc, long n, int repeat,
 	double ns[MAX_REPEAT], cpu[MAX_REPEAT], xcpu[MAX_REPEAT];
 	double ma[MAX_REPEAT], rq[MAX_REPEAT], rt[MAX_REPEAT];
 	double ph[MAX_REPEAT], rss[MAX_REPEAT], drss[MAX_REPEAT];
+	double wk[MAX_REPEAT], dxrss[MAX_REPEAT];
 	int r;
 
-	if (!wm_pid || wm_xrm != bc->xrm)
-		start_wm(bc->xrm);
+	if (!wm_pid || wm_xrm != bc->xrm || wm_tt != bc->tt)
+		start_wm(bc->xrm, bc->tt);
 	for (r = 0; r < repeat; r++) {
 		unsigned long m0, q0, p0;
-		double t0, t1, c0, c1, x0, x1;
-		long ops, rss0;
+		double t0, t1, c0, c1, x0, x1, w0;
+		long ops, rss0, xrss0;
 
 		if (bc->setup)
 			bc->setup(n);
 		sync_wm();
 		rss0 = wm_rss_kib();
+		xrss0 = rss_kib(server_pid);
+		w0 = ctxt_switches(wm_pid);
 		m0 = shm->mallocs;
 		p0 = shm->replies;
 		q0 = shm->requests;
@@ -932,13 +1512,17 @@ static void run_case(const struct bench_case *bc, long n, int repeat,
 		x0 = cpu_ns(server_pid);
 		phase_ns = 0;
 		t0 = now_ns();
+		marker("cdebench:begin %s", bc->name);
 		ops = bc->run(n);
 		sync_wm();
+		marker("cdebench:end %s %ld", bc->name, ops < 1 ? 1 : ops);
 		t1 = now_ns();
 		c1 = cpu_ns(wm_pid);
 		x1 = cpu_ns(server_pid);
 		if (ops < 1)
 			ops = 1;
+		wk[r] = (ctxt_switches(wm_pid) - w0) / ops;
+		dxrss[r] = (double)(rss_kib(server_pid) - xrss0);
 		/* This includes one restack of the fence window. */
 		ns[r] = (t1 - t0) / ops;
 		cpu[r] = (c1 - c0) / ops;
@@ -961,6 +1545,8 @@ static void run_case(const struct bench_case *bc, long n, int repeat,
 	res->rtrips = median(rt, repeat);
 	res->rss = median(rss, repeat);
 	res->rss_delta = median(drss, repeat);
+	res->wakeups = median(wk, repeat);
+	res->xrss_delta = median(dxrss, repeat);
 }
 
 static void usage(FILE *f)
@@ -1059,6 +1645,11 @@ int main(int argc, char **argv)
 	server_pid = peer_pid(ConnectionNumber(dpy));
 	a_utf8 = XInternAtom(dpy, "UTF8_STRING", False);
 	a_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
+	a_net_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+	a_net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	a_motif_wm_info = XInternAtom(dpy, "_MOTIF_WM_INFO", False);
+	a_dt_wm_request = XInternAtom(dpy, "_DT_WM_REQUEST", False);
+	a_tt_session = XInternAtom(dpy, "_SUN_TT_SESSION", False);
 
 	tmp = getenv("TMPDIR");
 	snprintf(workdir, sizeof workdir, "%s/dtwmbench.XXXXXX",
@@ -1103,9 +1694,9 @@ int main(int argc, char **argv)
 			"  \"counters\": true,\n  \"cases\": [", repeat, scale,
 			wm_path);
 	}
-	printf("%-18s %6s %11s %10s %10s %8s %8s %6s %11s %6s %5s\n",
+	printf("%-19s %6s %11s %10s %10s %8s %8s %6s %7s %11s %6s %5s\n",
 	       "case", "n", "ns/op", "cpu-ns/op", "xcpu-ns/op", "mallocs",
-	       "requests", "rtrips", "mapped-ns", "rss", "rss+");
+	       "requests", "rtrips", "wakeups", "mapped-ns", "rss", "rss+");
 	for (i = 0; i < N_CASES; i++) {
 		const struct bench_case *bc = &cases[i];
 		struct result res;
@@ -1117,12 +1708,14 @@ int main(int argc, char **argv)
 		if (n < 1)
 			n = 1;
 		run_case(bc, n, repeat, &res);
-		printf("%-18s %6ld %11.1f %10.1f %10.1f %8.3f %8.3f %6.3f",
+		printf("%-19s %6ld %11.1f %10.1f %10.1f %8.3f %8.3f %6.3f %7.2f",
 		       bc->name, n, res.ns, res.cpu, res.xcpu, res.mallocs,
-		       res.requests, res.rtrips);
+		       res.requests, res.rtrips, res.wakeups);
 		if (bc->memory)
 			printf(" %11.1f %6.0f %5.0f", res.phase, res.rss,
 			       res.rss_delta);
+		if (bc->memory > 1)
+			printf("  xrss+ %.0f", res.xrss_delta);
 		printf("\n");
 		fflush(stdout);
 		if (jf) {
@@ -1132,15 +1725,19 @@ int main(int argc, char **argv)
 				"\"server_cpu_ns_per_op\": %.2f, "
 				"\"mallocs_per_op\": %.4f, "
 				"\"requests_per_op\": %.4f, "
-				"\"round_trips_per_op\": %.4f",
+				"\"round_trips_per_op\": %.4f, "
+				"\"wakeups_per_op\": %.4f",
 				ran ? "," : "", bc->name, n, res.ns, res.cpu,
 				res.xcpu, res.mallocs, res.requests,
-				res.rtrips);
+				res.rtrips, res.wakeups);
 			if (bc->memory)
 				fprintf(jf, ", \"mapped_ns_per_op\": %.2f, "
 					"\"rss_kib\": %.0f, "
 					"\"rss_delta_kib\": %.0f",
 					res.phase, res.rss, res.rss_delta);
+			if (bc->memory > 1)
+				fprintf(jf, ", \"server_rss_delta_kib\": %.0f",
+					res.xrss_delta);
 			fprintf(jf, "}");
 		}
 		ran++;
