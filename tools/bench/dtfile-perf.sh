@@ -1,7 +1,7 @@
 #!/bin/bash
 # CDE benchmarks: dtfile's own -DDT_PERFORMANCE timers.
 #
-#   dtfile-perf.sh [-n "1000 10000"] [-o OUT.jsonl]
+#   dtfile-perf.sh [-n "1000 10000"] [-M] [-o OUT.jsonl]
 #
 # Builds a dtfile with -DDT_PERFORMANCE from the sources and flags of
 # this tree into a temporary directory (perfbuild.py; the tree is not
@@ -10,7 +10,9 @@
 # does, and prints one JSON object per size with the phases it times,
 # in seconds (repeated phases summed): XtInitialize, DtDbLoad, Setup
 # Desktop, Bring up View, the folder read, UpdateFileIcons,
-# LayoutFileIcons, DisplaySomeIcons...  The timers print "%ld.%ld" of
+# LayoutFileIcons, DisplaySomeIcons...  The tree's dtwm runs, as in
+# dtfile-time.sh; with -M it does not, and "Setting up Desktop" is then
+# the 2 s sleep of Desktop.c.  The timers print "%ld.%ld" of
 # seconds and microseconds (2.13719 is 2.013719 s); they are decoded so.
 # dtfile's output is line-buffered (stdbuf -oL): its forked children
 # would otherwise print again what was still in the buffer at the fork.
@@ -18,12 +20,13 @@
 set -u
 . "$(dirname "$0")/cdeenv.sh"
 
-SIZES="1000 10000" OUT=
-while getopts n:o: opt; do
+SIZES="1000 10000" OUT= WM=--wm
+while getopts n:Mo: opt; do
 	case $opt in
 	n) SIZES=$OPTARG ;;
+	M) WM= ;;
 	o) OUT=$OPTARG ;;
-	*) echo "usage: $0 [-n SIZES] [-o OUT.jsonl]" >&2; exit 2 ;;
+	*) echo "usage: $0 [-n SIZES] [-M] [-o OUT.jsonl]" >&2; exit 2 ;;
 	esac
 done
 
@@ -42,7 +45,7 @@ fi
 for n in $SIZES; do
 	dir=$WORK/folder$n
 	"$CDE_BENCH/dtfile-gendir.py" -n "$n" "$dir" >/dev/null
-	HOME=$WORK/home "$CDE_BENCH/apptime.py" --xvfb --ttsession --no-preload \
+	HOME=$WORK/home "$CDE_BENCH/apptime.py" --xvfb --ttsession $WM --no-preload \
 		--label "dtfile-perf-$n" --name "folder$n" --idle-ms 1500 \
 		--timeout 600 --log "$WORK/log$n" -- \
 		stdbuf -oL "$DTFILE" -xrm "*retryLoadDesktop: 0" -dir "$dir" > "$WORK/app$n"

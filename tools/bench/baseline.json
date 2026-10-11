@@ -1,152 +1,361 @@
 {
  "bench": "cde",
  "version": 1,
- "tree": "775b066d3-dirty",
- "date": "2026-10-10T05:04:13",
+ "tree": "2.5.2-369-g99a05633b-dirty",
+ "date": "2026-10-11T21:49:16",
  "rounds": 5,
  "script_rounds": 1,
  "pinned": true,
+ "syscalls": true,
  "results": {
   "dtsvc": [
    {
     "name": "mm-init-valid",
     "group": "mm",
     "n": 20,
-    "ns_per_op": 112512.75,
-    "cpu_ns_per_op": 111133.2,
-    "mallocs_per_op": 42.0,
+    "ns_per_op": 103896.35,
+    "cpu_ns_per_op": 101330.85,
+    "mallocs_per_op": 53.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 20,
+    "syscalls_per_op": 119.0,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 119.0
+    },
+    "top_syscalls_per_op": {
+     "newfstatat": 93.0,
+     "openat": 9.0,
+     "fstat": 7.0,
+     "close": 7.0,
+     "munmap": 1.0,
+     "getuid": 1.0,
+     "mmap": 1.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "mm-init-stale",
     "group": "mm",
     "n": 5,
-    "ns_per_op": 19246324.8,
-    "cpu_ns_per_op": 18472962.0,
-    "mallocs_per_op": 39850.0,
+    "ns_per_op": 10773015.8,
+    "cpu_ns_per_op": 10257351.8,
+    "mallocs_per_op": 39857.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 5,
+    "syscalls_per_op": 688.0,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 688.0
+    },
+    "top_syscalls_per_op": {
+     "read": 232.0,
+     "openat": 109.0,
+     "fstat": 109.0,
+     "close": 106.0,
+     "newfstatat": 95.0,
+     "getdents64": 12.0,
+     "fcntl": 7.0,
+     "write": 3.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "dts-type",
     "group": "dts",
     "n": 10000,
-    "ns_per_op": 7568.65,
-    "cpu_ns_per_op": 7297.03,
+    "ns_per_op": 9224.79,
+    "cpu_ns_per_op": 8494.99,
     "mallocs_per_op": 20.9336,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 10000,
+    "syscalls_per_op": 1.549,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 1.549
+    },
+    "top_syscalls_per_op": {
+     "openat": 0.65,
+     "pread64": 0.45,
+     "close": 0.45
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "dts-attr",
     "group": "dts",
     "n": 100000,
-    "ns_per_op": 208.76,
-    "cpu_ns_per_op": 200.6,
+    "ns_per_op": 99.5,
+    "cpu_ns_per_op": 96.12,
     "mallocs_per_op": 0.3588,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 100000,
+    "syscalls_per_op": 0.0,
+    "syscalls_by_process_per_op": {},
+    "top_syscalls_per_op": {},
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "action-label",
     "group": "action",
     "n": 100000,
-    "ns_per_op": 268.1,
-    "cpu_ns_per_op": 259.52,
+    "ns_per_op": 127.86,
+    "cpu_ns_per_op": 123.98,
     "mallocs_per_op": 1.6,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 100000,
+    "syscalls_per_op": 0.001,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 0.001
+    },
+    "top_syscalls_per_op": {
+     "newfstatat": 0.001,
+     "openat": 0.0,
+     "fstat": 0.0,
+     "close": 0.0,
+     "getuid": 0.0,
+     "mmap": 0.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "action-icon",
     "group": "action",
     "n": 100000,
-    "ns_per_op": 198.48,
-    "cpu_ns_per_op": 192.69,
+    "ns_per_op": 115.02,
+    "cpu_ns_per_op": 111.13,
     "mallocs_per_op": 0.8,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 100000,
+    "syscalls_per_op": 0.0,
+    "syscalls_by_process_per_op": {},
+    "top_syscalls_per_op": {},
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "action-exists",
     "group": "action",
     "n": 100000,
-    "ns_per_op": 89.48,
-    "cpu_ns_per_op": 85.42,
+    "ns_per_op": 35.6,
+    "cpu_ns_per_op": 35.11,
     "mallocs_per_op": 0.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 100000,
+    "syscalls_per_op": 0.0,
+    "syscalls_by_process_per_op": {},
+    "top_syscalls_per_op": {},
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "spc-spawn-nofile-1k",
     "group": "spc",
     "n": 100,
-    "ns_per_op": 3034843.47,
-    "cpu_ns_per_op": 3515.14,
+    "ns_per_op": 2098900.36,
+    "cpu_ns_per_op": 3343.58,
     "mallocs_per_op": 0.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 100,
+    "syscalls_per_op": 87.72,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 48.72,
+     "true": 39.0
+    },
+    "top_syscalls_per_op": {
+     "mmap": 15.08,
+     "openat": 12.05,
+     "rt_sigprocmask": 8.07,
+     "fstat": 8.06,
+     "close": 8.06,
+     "read": 6.06,
+     "mprotect": 4.02,
+     "newfstatat": 3.04
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "spc-spawn-nofile-max",
     "group": "spc",
     "n": 100,
-    "ns_per_op": 46157646.43,
-    "cpu_ns_per_op": 2523.82,
+    "ns_per_op": 2034774.07,
+    "cpu_ns_per_op": 2039.67,
     "mallocs_per_op": 0.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "syscall_ops": 100,
+    "syscalls_per_op": 87.72,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 48.72,
+     "true": 39.0
+    },
+    "top_syscalls_per_op": {
+     "mmap": 15.08,
+     "openat": 12.05,
+     "rt_sigprocmask": 8.07,
+     "fstat": 8.06,
+     "close": 8.06,
+     "read": 6.06,
+     "mprotect": 4.02,
+     "newfstatat": 3.04
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "combobox-additem",
     "group": "widget",
     "n": 1000,
-    "ns_per_op": 30363.02,
-    "cpu_ns_per_op": 24748.19,
-    "mallocs_per_op": 3.598,
+    "ns_per_op": 12497.43,
+    "cpu_ns_per_op": 8184.68,
+    "mallocs_per_op": 3.609,
     "requests_per_op": 12.468,
-    "round_trips_per_op": 0.001
+    "round_trips_per_op": 0.001,
+    "syscall_ops": 1000,
+    "syscalls_per_op": 0.193,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 0.193
+    },
+    "top_syscalls_per_op": {
+     "poll": 0.088,
+     "recvmsg": 0.073,
+     "writev": 0.031,
+     "recvfrom": 0.001
+    },
+    "server_syscalls_per_op": 0.219,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 0.069,
+     "writev": 0.063,
+     "setitimer": 0.058,
+     "epoll_wait": 0.029
+    }
    },
    {
     "name": "spinbox-additem",
     "group": "widget",
     "n": 1000,
-    "ns_per_op": 17803.04,
-    "cpu_ns_per_op": 11468.71,
-    "mallocs_per_op": 20.013,
+    "ns_per_op": 13219.68,
+    "cpu_ns_per_op": 8448.95,
+    "mallocs_per_op": 19.026,
     "requests_per_op": 28.004,
-    "round_trips_per_op": 0.002
+    "round_trips_per_op": 0.002,
+    "syscall_ops": 1000,
+    "syscalls_per_op": 0.153,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 0.153
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 0.075,
+     "poll": 0.041,
+     "writev": 0.037
+    },
+    "server_syscalls_per_op": 0.173,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 0.073,
+     "setitimer": 0.065,
+     "epoll_wait": 0.032,
+     "writev": 0.003
+    }
    },
    {
     "name": "editor-set-nul",
     "group": "widget",
     "n": 1,
-    "ns_per_op": 3336995351.0,
-    "cpu_ns_per_op": 3212781151.0,
+    "ns_per_op": 3867463.0,
+    "cpu_ns_per_op": 3635238.0,
     "mallocs_per_op": 8.0,
     "requests_per_op": 34.0,
-    "round_trips_per_op": 1.0
+    "round_trips_per_op": 1.0,
+    "syscall_ops": 1,
+    "syscalls_per_op": 27.0,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 27.0
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 12.0,
+     "poll": 6.0,
+     "mmap": 4.0,
+     "munmap": 3.0,
+     "writev": 2.0
+    },
+    "server_syscalls_per_op": 13.0,
+    "server_top_syscalls_per_op": {
+     "setitimer": 4.0,
+     "recvmsg": 4.0,
+     "writev": 3.0,
+     "epoll_wait": 2.0
+    }
    },
    {
     "name": "editor-replace-all",
     "group": "widget",
     "n": 10000,
-    "ns_per_op": 8171.1,
-    "cpu_ns_per_op": 6746.66,
-    "mallocs_per_op": 5.0007,
-    "requests_per_op": 9.0006,
-    "round_trips_per_op": 0.0002
+    "ns_per_op": 185.55,
+    "cpu_ns_per_op": 174.84,
+    "mallocs_per_op": 1.0025,
+    "requests_per_op": 0.0014,
+    "round_trips_per_op": 0.0001,
+    "syscall_ops": 10000,
+    "syscalls_per_op": 0.005,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 0.005
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 0.002,
+     "openat": 0.002,
+     "poll": 0.001,
+     "writev": 0.001,
+     "brk": 0.001,
+     "fstat": 0.0,
+     "read": 0.0,
+     "close": 0.0
+    },
+    "server_syscalls_per_op": 0.003,
+    "server_top_syscalls_per_op": {
+     "setitimer": 0.001,
+     "recvmsg": 0.001,
+     "epoll_wait": 0.001,
+     "writev": 0.0
+    }
    },
    {
     "name": "editor-cursor-status",
     "group": "widget",
     "n": 10000,
-    "ns_per_op": 386179.9,
-    "cpu_ns_per_op": 82314.09,
+    "ns_per_op": 327226.3,
+    "cpu_ns_per_op": 68956.69,
     "mallocs_per_op": 46.014,
     "requests_per_op": 400.9555,
-    "round_trips_per_op": 0.0062
+    "round_trips_per_op": 0.0062,
+    "syscall_ops": 10000,
+    "syscalls_per_op": 12.038,
+    "syscalls_by_process_per_op": {
+     "dtsvcbench": 12.038
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 8.019,
+     "poll": 3.013,
+     "writev": 1.006
+    },
+    "server_syscalls_per_op": 1.412,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 0.854,
+     "setitimer": 0.24,
+     "epoll_wait": 0.17,
+     "rt_sigreturn": 0.143,
+     "writev": 0.006
+    }
    }
   ],
   "tt": [
@@ -154,101 +363,353 @@
     "name": "open-close",
     "group": "tt",
     "n": 200,
-    "ns_per_op": 2281453.88,
-    "cpu_ns_per_op": 729173.23,
-    "mallocs_per_op": 360.625,
+    "ns_per_op": 360288.91,
+    "cpu_ns_per_op": 157489.85,
+    "mallocs_per_op": 199.38,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 4.0,
+    "rpcs_sync_per_op": 4.0,
+    "rpcs_oneway_per_op": 0.0,
+    "rpcs_top_per_op": {
+     "ttsession SET_FD_CHANNEL sync": 1.0,
+     "ttsession ALLOC_PROCID_KEY sync": 1.0,
+     "ttsession CLOSE_PROCID sync": 1.0,
+     "ttsession VRFY_SESSION sync": 1.0
+    },
+    "syscall_ops": 200,
+    "syscalls_per_op": 124.98,
+    "syscalls_by_process_per_op": {
+     "ttbench": 84.98,
+     "ttsession": 40.0
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 24.035,
+     "poll": 15.0,
+     "read": 12.25,
+     "close": 9.255,
+     "write": 8.015,
+     "lseek": 6.0,
+     "getsockname": 6.0,
+     "setsockopt": 6.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "ttdt-open-join",
     "group": "tt",
     "n": 50,
-    "ns_per_op": 4099492.9,
-    "cpu_ns_per_op": 1368144.92,
-    "mallocs_per_op": 1181.5,
+    "ns_per_op": 2222225.64,
+    "cpu_ns_per_op": 840623.34,
+    "mallocs_per_op": 1033.52,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 32.0,
+    "rpcs_sync_per_op": 30.0,
+    "rpcs_oneway_per_op": 2.0,
+    "rpcs_top_per_op": {
+     "ttsession ADD_PATTERN sync": 12.0,
+     "ttsession DEL_PATTERN sync": 12.0,
+     "ttsession DISPATCH_2 1way": 2.0,
+     "ttsession JOIN_SESSION sync": 1.0,
+     "ttsession QUIT_SESSION sync": 1.0,
+     "ttsession SET_FD_CHANNEL sync": 1.0
+    },
+    "syscall_ops": 50,
+    "syscalls_per_op": 463.92,
+    "syscalls_by_process_per_op": {
+     "ttbench": 313.92,
+     "ttsession": 150.0
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 136.14,
+     "poll": 97.0,
+     "read": 67.0,
+     "write": 62.04,
+     "rt_sigaction": 32.0,
+     "close": 10.02,
+     "lseek": 6.0,
+     "getsockname": 6.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "ping",
     "group": "tt",
     "n": 10000,
-    "ns_per_op": 202098.27,
-    "cpu_ns_per_op": 45466.78,
+    "ns_per_op": 183652.28,
+    "cpu_ns_per_op": 39766.2,
     "mallocs_per_op": 57.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 2.976,
+    "rpcs_sync_per_op": 1.976,
+    "rpcs_oneway_per_op": 1.0,
+    "rpcs_top_per_op": {
+     "ttsession NEXT_MESSAGE sync": 1.976,
+     "ttsession DISPATCH_2 1way": 1.0
+    },
+    "syscall_ops": 10000,
+    "syscalls_per_op": 73.795,
+    "syscalls_by_process_per_op": {
+     "ttbench": 49.95,
+     "ttsession": 23.846
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 23.978,
+     "poll": 19.873,
+     "write": 9.989,
+     "read": 9.961,
+     "rt_sigaction": 5.994,
+     "sendto": 2.0,
+     "recvfrom": 2.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "burst",
     "group": "tt",
     "n": 1000,
-    "ns_per_op": 60474.11,
-    "cpu_ns_per_op": 4773.02,
+    "ns_per_op": 23283.34,
+    "cpu_ns_per_op": 7277.85,
     "mallocs_per_op": 22.057,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 1.0,
+    "rpcs_sync_per_op": 0.0,
+    "rpcs_oneway_per_op": 1.0,
+    "rpcs_top_per_op": {
+     "ttsession DISPATCH_2 1way": 1.0
+    },
+    "syscall_ops": 1000,
+    "syscalls_per_op": 16.698,
+    "syscalls_by_process_per_op": {
+     "ttbench": 11.161,
+     "ttsession": 5.537
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 6.068,
+     "poll": 4.032,
+     "write": 2.032,
+     "read": 2.022,
+     "rt_sigaction": 1.517,
+     "sendto": 0.513,
+     "recvfrom": 0.513,
+     "brk": 0.001
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "patterns-1k",
     "group": "tt",
     "n": 1000,
-    "ns_per_op": 98590.88,
-    "cpu_ns_per_op": 52744.27,
-    "mallocs_per_op": 36.0,
+    "ns_per_op": 75711.43,
+    "cpu_ns_per_op": 29192.65,
+    "mallocs_per_op": 37.561,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 1.0,
+    "rpcs_sync_per_op": 1.0,
+    "rpcs_oneway_per_op": 0.0,
+    "rpcs_top_per_op": {
+     "ttsession ADD_PATTERN sync": 1.0
+    },
+    "syscall_ops": 1000,
+    "syscalls_per_op": 14.69,
+    "syscalls_by_process_per_op": {
+     "ttbench": 10.001,
+     "ttsession": 4.689
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 4.417,
+     "poll": 3.305,
+     "read": 2.256,
+     "write": 2.204,
+     "rt_sigaction": 1.101,
+     "mmap": 0.176,
+     "fcntl": 0.156,
+     "setsockopt": 0.153
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "patterns-10k",
     "group": "tt",
     "n": 10000,
-    "ns_per_op": 1059239.69,
-    "cpu_ns_per_op": 871989.08,
-    "mallocs_per_op": 36.0,
+    "ns_per_op": 70120.0,
+    "cpu_ns_per_op": 22443.56,
+    "mallocs_per_op": 38.313,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 1.0,
+    "rpcs_sync_per_op": 1.0,
+    "rpcs_oneway_per_op": 0.0,
+    "rpcs_top_per_op": {
+     "ttsession ADD_PATTERN sync": 1.0
+    },
+    "syscall_ops": 10000,
+    "syscalls_per_op": 12.3,
+    "syscalls_by_process_per_op": {
+     "ttbench": 8.212,
+     "ttsession": 4.088
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 4.042,
+     "poll": 3.031,
+     "read": 2.026,
+     "write": 2.02,
+     "rt_sigaction": 1.01,
+     "brk": 0.025,
+     "mmap": 0.018,
+     "fcntl": 0.016
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "ping-10k-patterns",
     "group": "tt",
     "n": 1000,
-    "ns_per_op": 222608.3,
-    "cpu_ns_per_op": 41996.33,
+    "ns_per_op": 247188.54,
+    "cpu_ns_per_op": 48916.24,
     "mallocs_per_op": 57.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 2.985,
+    "rpcs_sync_per_op": 1.985,
+    "rpcs_oneway_per_op": 1.0,
+    "rpcs_top_per_op": {
+     "ttsession NEXT_MESSAGE sync": 1.985,
+     "ttsession DISPATCH_2 1way": 1.0
+    },
+    "syscall_ops": 1000,
+    "syscalls_per_op": 73.751,
+    "syscalls_by_process_per_op": {
+     "ttbench": 49.966,
+     "ttsession": 23.785
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 23.984,
+     "poll": 19.836,
+     "write": 9.992,
+     "read": 9.941,
+     "rt_sigaction": 5.996,
+     "sendto": 2.0,
+     "recvfrom": 2.0,
+     "close": 0.001
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "netfile",
     "group": "file",
     "n": 100,
-    "ns_per_op": 5055.23,
-    "cpu_ns_per_op": 4737.53,
+    "ns_per_op": 5043.23,
+    "cpu_ns_per_op": 4648.61,
     "mallocs_per_op": 72.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": -0.05,
+    "rpcs_sync_per_op": -0.05,
+    "rpcs_oneway_per_op": 0.0,
+    "rpcs_top_per_op": {},
+    "syscall_ops": 100,
+    "syscalls_per_op": 5.54,
+    "syscalls_by_process_per_op": {
+     "ttbench": 5.06,
+     "ttsession": 0.48
+    },
+    "top_syscalls_per_op": {
+     "readlink": 2.0,
+     "getpid": 1.01,
+     "fstat": 1.01,
+     "poll": 1.0,
+     "close": 0.48,
+     "pread64": 0.02,
+     "brk": 0.01,
+     "openat": 0.01
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "message-file-set",
     "group": "file",
     "n": 100,
-    "ns_per_op": 3804.76,
-    "cpu_ns_per_op": 3816.63,
+    "ns_per_op": 3474.22,
+    "cpu_ns_per_op": 3491.76,
     "mallocs_per_op": 34.0,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 0.0,
+    "rpcs_sync_per_op": 0.0,
+    "rpcs_oneway_per_op": 0.0,
+    "rpcs_top_per_op": {},
+    "syscall_ops": 100,
+    "syscalls_per_op": 5.44,
+    "syscalls_by_process_per_op": {
+     "ttbench": 5.0,
+     "ttsession": 0.44
+    },
+    "top_syscalls_per_op": {
+     "readlink": 2.0,
+     "poll": 1.01,
+     "getpid": 1.0,
+     "fstat": 1.0,
+     "close": 0.43
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    },
    {
     "name": "file-notice",
     "group": "file",
     "n": 100,
-    "ns_per_op": 45880.98,
-    "cpu_ns_per_op": 8274.11,
+    "ns_per_op": 53963.11,
+    "cpu_ns_per_op": 10910.47,
     "mallocs_per_op": 34.57,
     "requests_per_op": 0.0,
-    "round_trips_per_op": 0.0
+    "round_trips_per_op": 0.0,
+    "bench": "ttbench-rpcs",
+    "rpcs_per_op": 1.0,
+    "rpcs_sync_per_op": 0.0,
+    "rpcs_oneway_per_op": 1.0,
+    "rpcs_top_per_op": {
+     "ttsession DISPATCH_2 1way": 1.0
+    },
+    "syscall_ops": 100,
+    "syscalls_per_op": 29.81,
+    "syscalls_by_process_per_op": {
+     "ttbench": 21.56,
+     "ttsession": 8.25
+    },
+    "top_syscalls_per_op": {
+     "rt_sigprocmask": 8.28,
+     "poll": 7.22,
+     "write": 3.12,
+     "read": 3.12,
+     "rt_sigaction": 2.07,
+     "readlink": 2.0,
+     "getpid": 1.0,
+     "fstat": 1.0
+    },
+    "server_syscalls_per_op": 0.0,
+    "server_top_syscalls_per_op": {}
    }
   ],
   "dtwm": [
@@ -256,117 +717,728 @@
     "name": "map",
     "group": "dtwm",
     "n": 500,
-    "ns_per_op": 1922516.58,
-    "cpu_ns_per_op": 583998.14,
-    "server_cpu_ns_per_op": 1227978.31,
-    "mallocs_per_op": 150.902,
-    "requests_per_op": 103.014,
-    "round_trips_per_op": 18.0,
-    "mapped_ns_per_op": 1232425.63,
-    "rss_kib": 20972,
-    "rss_delta_kib": 4
+    "ns_per_op": 1538597.98,
+    "cpu_ns_per_op": 258441.28,
+    "server_cpu_ns_per_op": 1104241.76,
+    "mallocs_per_op": 109.128,
+    "requests_per_op": 94.03,
+    "round_trips_per_op": 9.0,
+    "wakeups_per_op": 19.13,
+    "mapped_ns_per_op": 953470.12,
+    "rss_kib": 20268,
+    "rss_delta_kib": 12,
+    "syscall_ops": 500,
+    "syscalls_per_op": 106.758,
+    "syscalls_by_process_per_op": {
+     "dtwm": 93.134,
+     "dtwmbench": 13.624
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 62.748,
+     "poll": 27.834,
+     "writev": 9.208,
+     "recvfrom": 4.328,
+     "wait4": 2.604,
+     "brk": 0.032,
+     "futex": 0.004
+    },
+    "server_syscalls_per_op": 78.058,
+    "server_top_syscalls_per_op": {
+     "writev": 32.01,
+     "recvmsg": 18.166,
+     "setitimer": 17.826,
+     "epoll_wait": 9.192,
+     "brk": 0.574
+    }
    },
    {
     "name": "map-dtterm",
     "group": "dtwm",
     "n": 500,
-    "ns_per_op": 3134727.97,
-    "cpu_ns_per_op": 1200087.98,
-    "server_cpu_ns_per_op": 1706130.81,
-    "mallocs_per_op": 271.992,
-    "requests_per_op": 138.014,
-    "round_trips_per_op": 31.0,
-    "mapped_ns_per_op": 2433786.98,
-    "rss_kib": 20988,
-    "rss_delta_kib": 0
+    "ns_per_op": 1377378.46,
+    "cpu_ns_per_op": 187014.9,
+    "server_cpu_ns_per_op": 1025363.58,
+    "mallocs_per_op": 108.862,
+    "requests_per_op": 94.03,
+    "round_trips_per_op": 9.0,
+    "wakeups_per_op": 18.764,
+    "mapped_ns_per_op": 556491.73,
+    "rss_kib": 20304,
+    "rss_delta_kib": 0,
+    "syscall_ops": 500,
+    "syscalls_per_op": 126.53,
+    "syscalls_by_process_per_op": {
+     "dtwm": 112.558,
+     "dtwmbench": 13.972
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 81.838,
+     "poll": 28.37,
+     "writev": 9.24,
+     "recvfrom": 4.29,
+     "wait4": 2.716,
+     "access": 0.044,
+     "openat": 0.006,
+     "lseek": 0.006
+    },
+    "server_syscalls_per_op": 74.512,
+    "server_top_syscalls_per_op": {
+     "writev": 29.556,
+     "recvmsg": 17.964,
+     "setitimer": 17.352,
+     "epoll_wait": 9.088,
+     "rt_sigreturn": 0.542
+    }
    },
    {
     "name": "hints-urgency",
     "group": "dtwm",
     "n": 10000,
-    "ns_per_op": 15559.49,
-    "cpu_ns_per_op": 8268.66,
-    "server_cpu_ns_per_op": 6805.43,
-    "mallocs_per_op": 7.0006,
-    "requests_per_op": 1.0002,
-    "round_trips_per_op": 1.0
+    "ns_per_op": 12681.69,
+    "cpu_ns_per_op": 6512.0,
+    "server_cpu_ns_per_op": 5920.25,
+    "mallocs_per_op": 7.0013,
+    "requests_per_op": 1.0001,
+    "round_trips_per_op": 1.0,
+    "wakeups_per_op": 1.1007,
+    "syscall_ops": 10000,
+    "syscalls_per_op": 9.612,
+    "syscalls_by_process_per_op": {
+     "dtwm": 9.578,
+     "dtwmbench": 0.034
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 5.469,
+     "poll": 2.407,
+     "writev": 1.004,
+     "recvfrom": 0.725,
+     "wait4": 0.008,
+     "futex": 0.0
+    },
+    "server_syscalls_per_op": 7.886,
+    "server_top_syscalls_per_op": {
+     "writev": 3.0,
+     "recvmsg": 1.971,
+     "setitimer": 1.903,
+     "epoll_wait": 0.988,
+     "rt_sigreturn": 0.023
+    }
    },
    {
     "name": "destroy",
     "group": "dtwm",
     "n": 500,
-    "ns_per_op": 195261.06,
-    "cpu_ns_per_op": 42358.34,
-    "server_cpu_ns_per_op": 130527.66,
-    "mallocs_per_op": 14.958,
-    "requests_per_op": 7.106,
-    "round_trips_per_op": 0.006
+    "ns_per_op": 148910.55,
+    "cpu_ns_per_op": 28980.82,
+    "server_cpu_ns_per_op": 101732.19,
+    "mallocs_per_op": 8.472,
+    "requests_per_op": 5.344,
+    "round_trips_per_op": 0.006,
+    "wakeups_per_op": 2.422,
+    "syscall_ops": 500,
+    "syscalls_per_op": 12.646,
+    "syscalls_by_process_per_op": {
+     "dtwm": 8.904,
+     "dtwmbench": 3.742
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 8.886,
+     "poll": 1.88,
+     "writev": 1.21,
+     "wait4": 0.492,
+     "futex": 0.178
+    },
+    "server_syscalls_per_op": 6.59,
+    "server_top_syscalls_per_op": {
+     "writev": 4.536,
+     "recvmsg": 0.872,
+     "epoll_wait": 0.844,
+     "rt_sigreturn": 0.296,
+     "setitimer": 0.042
+    }
    },
    {
     "name": "title",
     "group": "dtwm",
     "n": 10000,
-    "ns_per_op": 42444.95,
-    "cpu_ns_per_op": 21423.46,
-    "server_cpu_ns_per_op": 19107.58,
-    "mallocs_per_op": 15.0003,
-    "requests_per_op": 6.0002,
-    "round_trips_per_op": 2.0
+    "ns_per_op": 1034.09,
+    "cpu_ns_per_op": 462.37,
+    "server_cpu_ns_per_op": 509.42,
+    "mallocs_per_op": 2.0049,
+    "requests_per_op": 0.0021,
+    "round_trips_per_op": 0.0004,
+    "wakeups_per_op": 0.0278,
+    "syscall_ops": 10000,
+    "syscalls_per_op": 0.557,
+    "syscalls_by_process_per_op": {
+     "dtwm": 0.548,
+     "dtwmbench": 0.009
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 0.352,
+     "poll": 0.177,
+     "writev": 0.015,
+     "recvfrom": 0.012,
+     "futex": 0.001,
+     "wait4": 0.0
+    },
+    "server_syscalls_per_op": 0.74,
+    "server_top_syscalls_per_op": {
+     "writev": 0.676,
+     "recvmsg": 0.025,
+     "epoll_wait": 0.023,
+     "rt_sigreturn": 0.012,
+     "setitimer": 0.002
+    }
    },
    {
     "name": "title-paced",
     "group": "dtwm",
     "n": 2000,
-    "ns_per_op": 85768.05,
-    "cpu_ns_per_op": 36965.31,
-    "server_cpu_ns_per_op": 35260.2,
-    "mallocs_per_op": 18.0015,
-    "requests_per_op": 7.001,
-    "round_trips_per_op": 2.0
+    "ns_per_op": 78016.74,
+    "cpu_ns_per_op": 31391.27,
+    "server_cpu_ns_per_op": 31870.61,
+    "mallocs_per_op": 15.0035,
+    "requests_per_op": 6.0005,
+    "round_trips_per_op": 1.0,
+    "wakeups_per_op": 2.131,
+    "syscall_ops": 2000,
+    "syscalls_per_op": 39.941,
+    "syscalls_by_process_per_op": {
+     "dtwm": 30.083,
+     "dtwmbench": 9.858
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 26.162,
+     "poll": 6.181,
+     "writev": 3.002,
+     "futex": 1.929,
+     "wait4": 1.928,
+     "recvfrom": 0.74
+    },
+    "server_syscalls_per_op": 19.913,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 5.972,
+     "setitimer": 5.935,
+     "writev": 5.001,
+     "epoll_wait": 2.983,
+     "rt_sigreturn": 0.021
+    }
    },
    {
     "name": "title-net",
     "group": "dtwm",
     "n": 10000,
-    "ns_per_op": 27140.99,
-    "cpu_ns_per_op": 13169.58,
-    "server_cpu_ns_per_op": 12334.44,
-    "mallocs_per_op": 8.0005,
-    "requests_per_op": 5.0002,
-    "round_trips_per_op": 1.0
+    "ns_per_op": 867.66,
+    "cpu_ns_per_op": 356.45,
+    "server_cpu_ns_per_op": 394.66,
+    "mallocs_per_op": 2.0039,
+    "requests_per_op": 0.0021,
+    "round_trips_per_op": 0.0004,
+    "wakeups_per_op": 0.0032,
+    "syscall_ops": 10000,
+    "syscalls_per_op": 0.856,
+    "syscalls_by_process_per_op": {
+     "dtwm": 0.847,
+     "dtwmbench": 0.009
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 0.559,
+     "poll": 0.272,
+     "writev": 0.013,
+     "recvfrom": 0.011,
+     "wait4": 0.0,
+     "futex": 0.0
+    },
+    "server_syscalls_per_op": 1.079,
+    "server_top_syscalls_per_op": {
+     "writev": 1.02,
+     "recvmsg": 0.023,
+     "epoll_wait": 0.023,
+     "rt_sigreturn": 0.013,
+     "setitimer": 0.001
+    }
    },
    {
     "name": "drag-move",
     "group": "dtwm",
     "n": 500,
-    "ns_per_op": 132122.54,
-    "cpu_ns_per_op": 31592.23,
-    "server_cpu_ns_per_op": 90073.4,
-    "mallocs_per_op": 5.21,
-    "requests_per_op": 6.454,
-    "round_trips_per_op": 1.006
+    "ns_per_op": 72635.83,
+    "cpu_ns_per_op": 20948.38,
+    "server_cpu_ns_per_op": 43460.89,
+    "mallocs_per_op": 5.202,
+    "requests_per_op": 6.452,
+    "round_trips_per_op": 1.006,
+    "wakeups_per_op": 2.736,
+    "syscall_ops": 500,
+    "syscalls_per_op": 27.4,
+    "syscalls_by_process_per_op": {
+     "dtwm": 22.372,
+     "dtwmbench": 5.028
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 15.306,
+     "poll": 5.052,
+     "writev": 4.028,
+     "futex": 2.006,
+     "wait4": 1.004,
+     "recvfrom": 0.004
+    },
+    "server_syscalls_per_op": 19.43,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 7.258,
+     "setitimer": 6.7,
+     "epoll_wait": 3.358,
+     "writev": 2.104,
+     "rt_sigreturn": 0.01
+    }
    },
    {
     "name": "drag-move-outline",
     "group": "dtwm",
     "n": 500,
-    "ns_per_op": 61779.07,
-    "cpu_ns_per_op": 18922.93,
-    "server_cpu_ns_per_op": 34229.56,
-    "mallocs_per_op": 5.052,
-    "requests_per_op": 7.286,
-    "round_trips_per_op": 1.006
+    "ns_per_op": 143919.23,
+    "cpu_ns_per_op": 32551.48,
+    "server_cpu_ns_per_op": 96664.61,
+    "mallocs_per_op": 6.458,
+    "requests_per_op": 20.262,
+    "round_trips_per_op": 1.006,
+    "wakeups_per_op": 2.926,
+    "syscall_ops": 500,
+    "syscalls_per_op": 27.314,
+    "syscalls_by_process_per_op": {
+     "dtwm": 22.284,
+     "dtwmbench": 5.03
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 15.128,
+     "poll": 5.106,
+     "writev": 4.07,
+     "futex": 2.006,
+     "wait4": 1.004
+    },
+    "server_syscalls_per_op": 19.206,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 7.056,
+     "setitimer": 6.284,
+     "epoll_wait": 3.16,
+     "writev": 2.682,
+     "rt_sigreturn": 0.024
+    }
    },
    {
     "name": "drag-resize",
     "group": "dtwm",
     "n": 500,
-    "ns_per_op": 91537.52,
-    "cpu_ns_per_op": 25377.7,
-    "server_cpu_ns_per_op": 52790.26,
-    "mallocs_per_op": 5.1,
-    "requests_per_op": 7.288,
-    "round_trips_per_op": 1.008
+    "ns_per_op": 156246.63,
+    "cpu_ns_per_op": 35067.2,
+    "server_cpu_ns_per_op": 104130.06,
+    "mallocs_per_op": 5.392,
+    "requests_per_op": 17.738,
+    "round_trips_per_op": 1.008,
+    "wakeups_per_op": 2.676,
+    "syscall_ops": 500,
+    "syscalls_per_op": 27.194,
+    "syscalls_by_process_per_op": {
+     "dtwm": 22.158,
+     "dtwmbench": 5.036
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 15.082,
+     "poll": 5.062,
+     "writev": 4.038,
+     "futex": 2.006,
+     "wait4": 1.006
+    },
+    "server_syscalls_per_op": 18.934,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 7.1,
+     "setitimer": 6.426,
+     "epoll_wait": 3.216,
+     "writev": 2.18,
+     "rt_sigreturn": 0.012
+    }
+   },
+   {
+    "name": "drag-move-xor",
+    "group": "dtwm",
+    "n": 500,
+    "ns_per_op": 56016.21,
+    "cpu_ns_per_op": 17920.31,
+    "server_cpu_ns_per_op": 30556.14,
+    "mallocs_per_op": 5.05,
+    "requests_per_op": 7.366,
+    "round_trips_per_op": 1.006,
+    "wakeups_per_op": 2.354,
+    "syscall_ops": 500,
+    "syscalls_per_op": 24.37,
+    "syscalls_by_process_per_op": {
+     "dtwm": 19.354,
+     "dtwmbench": 5.016
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 11.96,
+     "poll": 5.254,
+     "writev": 4.164,
+     "futex": 1.996,
+     "wait4": 0.996
+    },
+    "server_syscalls_per_op": 19.63,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 7.328,
+     "setitimer": 6.812,
+     "epoll_wait": 3.454,
+     "writev": 2.024,
+     "rt_sigreturn": 0.012
+    }
+   },
+   {
+    "name": "ws-switch",
+    "group": "dtwm",
+    "n": 1000,
+    "ns_per_op": 6424732.23,
+    "cpu_ns_per_op": 1031796.13,
+    "server_cpu_ns_per_op": 4431553.08,
+    "mallocs_per_op": 372.664,
+    "requests_per_op": 320.864,
+    "round_trips_per_op": 0.002,
+    "wakeups_per_op": 63.737,
+    "syscall_ops": 1000,
+    "syscalls_per_op": 344.864,
+    "syscalls_by_process_per_op": {
+     "dtwm": 221.292,
+     "dtwmbench": 123.572
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 295.18,
+     "poll": 23.841,
+     "wait4": 15.637,
+     "writev": 5.114,
+     "futex": 5.09,
+     "recvfrom": 0.002
+    },
+    "server_syscalls_per_op": 161.986,
+    "server_top_syscalls_per_op": {
+     "writev": 133.516,
+     "recvmsg": 9.781,
+     "setitimer": 8.26,
+     "epoll_wait": 7.201,
+     "rt_sigreturn": 3.228
+    }
+   },
+   {
+    "name": "fp-switch",
+    "group": "dtwm",
+    "n": 1000,
+    "ns_per_op": 5706887.51,
+    "cpu_ns_per_op": 1324896.85,
+    "server_cpu_ns_per_op": 3719496.09,
+    "mallocs_per_op": 752.99,
+    "requests_per_op": 381.311,
+    "round_trips_per_op": 0.0,
+    "wakeups_per_op": 61.622,
+    "syscall_ops": 1000,
+    "syscalls_per_op": 488.719,
+    "syscalls_by_process_per_op": {
+     "dtwm": 366.76,
+     "dtwmbench": 121.959
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 282.506,
+     "poll": 183.513,
+     "wait4": 15.034,
+     "writev": 4.968,
+     "futex": 2.697,
+     "recvfrom": 0.001
+    },
+    "server_syscalls_per_op": 167.588,
+    "server_top_syscalls_per_op": {
+     "writev": 139.525,
+     "recvmsg": 9.869,
+     "epoll_wait": 7.785,
+     "setitimer": 6.822,
+     "rt_sigreturn": 3.587
+    }
+   },
+   {
+    "name": "fp-switch-tt",
+    "group": "dtwm",
+    "n": 1000,
+    "ns_per_op": 6111390.49,
+    "cpu_ns_per_op": 1494488.34,
+    "server_cpu_ns_per_op": 3788450.43,
+    "mallocs_per_op": 1027.184,
+    "requests_per_op": 385.161,
+    "round_trips_per_op": 0.0,
+    "wakeups_per_op": 59.109,
+    "syscall_ops": 1000,
+    "syscalls_per_op": 489.793,
+    "syscalls_by_process_per_op": {
+     "dtwm": 374.601,
+     "dtwmbench": 107.212,
+     "ttsession": 7.98
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 267.206,
+     "poll": 182.971,
+     "wait4": 12.277,
+     "rt_sigprocmask": 7.984,
+     "writev": 4.718,
+     "rt_sigaction": 3.992,
+     "write": 2.992,
+     "read": 2.992
+    },
+    "server_syscalls_per_op": 170.018,
+    "server_top_syscalls_per_op": {
+     "writev": 139.581,
+     "recvmsg": 9.628,
+     "epoll_wait": 9.05,
+     "setitimer": 6.778,
+     "rt_sigreturn": 4.981
+    }
+   },
+   {
+    "name": "backdrop",
+    "group": "dtwm",
+    "n": 100,
+    "ns_per_op": 1772291.19,
+    "cpu_ns_per_op": 304591.61,
+    "server_cpu_ns_per_op": 1371307.59,
+    "mallocs_per_op": 126.1,
+    "requests_per_op": 29.01,
+    "round_trips_per_op": 9.0,
+    "wakeups_per_op": 20.41,
+    "mapped_ns_per_op": 0.0,
+    "rss_kib": 17680,
+    "rss_delta_kib": 0,
+    "server_rss_delta_kib": 0,
+    "syscall_ops": 100,
+    "syscalls_per_op": 91.19,
+    "syscalls_by_process_per_op": {
+     "dtwm": 84.17,
+     "dtwmbench": 7.02
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 45.01,
+     "poll": 28.98,
+     "writev": 10.56,
+     "recvfrom": 4.62,
+     "futex": 1.02,
+     "wait4": 1.0
+    },
+    "server_syscalls_per_op": 76.67,
+    "server_top_syscalls_per_op": {
+     "writev": 25.04,
+     "recvmsg": 18.98,
+     "setitimer": 16.89,
+     "epoll_wait": 15.53,
+     "rt_sigreturn": 0.23
+    }
+   },
+   {
+    "name": "refresh",
+    "group": "dtwm",
+    "n": 50,
+    "ns_per_op": 23881130.48,
+    "cpu_ns_per_op": 11135054.82,
+    "server_cpu_ns_per_op": 11804884.2,
+    "mallocs_per_op": 14864.0,
+    "requests_per_op": 5885.02,
+    "round_trips_per_op": 1.0,
+    "wakeups_per_op": 665.6,
+    "syscall_ops": 50,
+    "syscalls_per_op": 16930.48,
+    "syscalls_by_process_per_op": {
+     "dtwm": 16885.96,
+     "dtwmbench": 44.52
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 6223.2,
+     "poll": 5318.3,
+     "writev": 5286.04,
+     "recvfrom": 87.38,
+     "wait4": 13.48,
+     "futex": 2.04,
+     "brk": 0.04
+    },
+    "server_syscalls_per_op": 16868.96,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 5598.1,
+     "writev": 4981.04,
+     "epoll_wait": 3303.34,
+     "setitimer": 2964.92,
+     "rt_sigreturn": 21.56
+    }
+   },
+   {
+    "name": "refresh-cover",
+    "group": "dtwm",
+    "n": 50,
+    "ns_per_op": 5342139.84,
+    "cpu_ns_per_op": 967491.56,
+    "server_cpu_ns_per_op": 4123607.58,
+    "mallocs_per_op": 705.84,
+    "requests_per_op": 610.02,
+    "round_trips_per_op": 1.0,
+    "wakeups_per_op": 58.76,
+    "syscall_ops": 50,
+    "syscalls_per_op": 430.18,
+    "syscalls_by_process_per_op": {
+     "dtwm": 420.02,
+     "dtwmbench": 10.16
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 392.1,
+     "poll": 18.76,
+     "writev": 11.74,
+     "futex": 5.06,
+     "wait4": 2.02,
+     "recvfrom": 0.5
+    },
+    "server_syscalls_per_op": 162.88,
+    "server_top_syscalls_per_op": {
+     "writev": 121.04,
+     "recvmsg": 18.12,
+     "setitimer": 12.64,
+     "epoll_wait": 7.76,
+     "rt_sigreturn": 3.32
+    }
+   },
+   {
+    "name": "hold-opaque",
+    "group": "dtwm",
+    "n": 1,
+    "ns_per_op": 3003989010.0,
+    "cpu_ns_per_op": 1190867.0,
+    "server_cpu_ns_per_op": 1960765.0,
+    "mallocs_per_op": 25.0,
+    "requests_per_op": 36.0,
+    "round_trips_per_op": 3.0,
+    "wakeups_per_op": 9.0,
+    "syscall_ops": 1,
+    "syscalls_per_op": 83.0,
+    "syscalls_by_process_per_op": {
+     "dtwm": 69.0,
+     "dtwmbench": 14.0
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 50.0,
+     "poll": 17.0,
+     "writev": 10.0,
+     "futex": 3.0,
+     "wait4": 2.0,
+     "clock_nanosleep": 1.0
+    },
+    "server_syscalls_per_op": 58.0,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 19.0,
+     "setitimer": 18.0,
+     "writev": 12.0,
+     "epoll_wait": 9.0
+    }
+   },
+   {
+    "name": "hold-xor",
+    "group": "dtwm",
+    "n": 1,
+    "ns_per_op": 3001416308.0,
+    "cpu_ns_per_op": 19821204.0,
+    "server_cpu_ns_per_op": 21902339.0,
+    "mallocs_per_op": 27.0,
+    "requests_per_op": 153.0,
+    "round_trips_per_op": 3.0,
+    "wakeups_per_op": 146.0,
+    "syscall_ops": 1,
+    "syscalls_per_op": 715.0,
+    "syscalls_by_process_per_op": {
+     "dtwm": 700.0,
+     "dtwmbench": 15.0
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 362.0,
+     "poll": 230.0,
+     "writev": 117.0,
+     "futex": 3.0,
+     "wait4": 2.0,
+     "clock_nanosleep": 1.0
+    },
+    "server_syscalls_per_op": 595.0,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 233.0,
+     "setitimer": 232.0,
+     "epoll_wait": 116.0,
+     "writev": 13.0,
+     "rt_sigreturn": 1.0
+    }
+   },
+   {
+    "name": "hold-window-outline",
+    "group": "dtwm",
+    "n": 1,
+    "ns_per_op": 3001506371.0,
+    "cpu_ns_per_op": 259602.0,
+    "server_cpu_ns_per_op": 622958.0,
+    "mallocs_per_op": 34.0,
+    "requests_per_op": 61.0,
+    "round_trips_per_op": 3.0,
+    "wakeups_per_op": 10.0,
+    "syscall_ops": 1,
+    "syscalls_per_op": 102.0,
+    "syscalls_by_process_per_op": {
+     "dtwm": 88.0,
+     "dtwmbench": 14.0
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 65.0,
+     "poll": 21.0,
+     "writev": 10.0,
+     "futex": 3.0,
+     "wait4": 2.0,
+     "clock_nanosleep": 1.0
+    },
+    "server_syscalls_per_op": 65.0,
+    "server_top_syscalls_per_op": {
+     "recvmsg": 20.0,
+     "setitimer": 19.0,
+     "writev": 17.0,
+     "epoll_wait": 9.0
+    }
+   },
+   {
+    "name": "hold-freeze",
+    "group": "dtwm",
+    "n": 1,
+    "ns_per_op": 3001607050.0,
+    "cpu_ns_per_op": 274326.0,
+    "server_cpu_ns_per_op": 380364.0,
+    "mallocs_per_op": 33.0,
+    "requests_per_op": 43.0,
+    "round_trips_per_op": 5.0,
+    "wakeups_per_op": 11.0,
+    "syscall_ops": 1,
+    "syscalls_per_op": 111.0,
+    "syscalls_by_process_per_op": {
+     "dtwm": 91.0,
+     "dtwmbench": 20.0
+    },
+    "top_syscalls_per_op": {
+     "recvmsg": 67.0,
+     "poll": 20.0,
+     "writev": 11.0,
+     "futex": 6.0,
+     "wait4": 4.0,
+     "clock_nanosleep": 1.0,
+     "kill": 1.0,
+     "rt_sigreturn": 1.0
+    },
+    "server_syscalls_per_op": 76.0,
+    "server_top_syscalls_per_op": {
+     "setitimer": 22.0,
+     "recvmsg": 22.0,
+     "writev": 15.0,
+     "epoll_wait": 11.0,
+     "epoll_ctl": 6.0
+    }
    }
   ],
   "dtterm": [
@@ -376,10 +1448,14 @@
     "locale": "C",
     "save_lines": "4s",
     "bytes": 106237306,
-    "seconds": 18.851,
-    "mb_per_s": 5.37,
-    "requests": 2760954,
-    "round_trips": 89,
+    "seconds": 4.943,
+    "mb_per_s": 20.5,
+    "requests": 14960,
+    "round_trips": 72,
+    "lines": 1379706,
+    "output_requests": 14146,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.246,
     "rounds": 1
    },
    {
@@ -388,10 +1464,14 @@
     "locale": "C",
     "save_lines": "4s",
     "bytes": 16777216,
-    "seconds": 25.825,
-    "mb_per_s": 0.62,
-    "requests": 16770905,
-    "round_trips": 337,
+    "seconds": 10.786,
+    "mb_per_s": 1.48,
+    "requests": 31507,
+    "round_trips": 63,
+    "lines": 8388608,
+    "output_requests": 30717,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.088,
     "rounds": 1
    },
    {
@@ -400,10 +1480,14 @@
     "locale": "C",
     "save_lines": "10000",
     "bytes": 106237306,
-    "seconds": 25.531,
-    "mb_per_s": 3.97,
-    "requests": 2766209,
-    "round_trips": 81,
+    "seconds": 4.94,
+    "mb_per_s": 20.51,
+    "requests": 15169,
+    "round_trips": 63,
+    "lines": 1379706,
+    "output_requests": 14426,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.251,
     "rounds": 1
    },
    {
@@ -412,10 +1496,14 @@
     "locale": "C",
     "save_lines": "10000",
     "bytes": 16777216,
-    "seconds": 67.524,
-    "mb_per_s": 0.24,
-    "requests": 16774900,
-    "round_trips": 337,
+    "seconds": 11.36,
+    "mb_per_s": 1.41,
+    "requests": 33091,
+    "round_trips": 63,
+    "lines": 8388608,
+    "output_requests": 32301,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.092,
     "rounds": 1
    },
    {
@@ -424,10 +1512,14 @@
     "locale": "C.utf8",
     "save_lines": "4s",
     "bytes": 106237306,
-    "seconds": 18.86,
-    "mb_per_s": 5.37,
-    "requests": 2764523,
-    "round_trips": 82,
+    "seconds": 5.394,
+    "mb_per_s": 18.78,
+    "requests": 16413,
+    "round_trips": 65,
+    "lines": 1379706,
+    "output_requests": 15630,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.272,
     "rounds": 1
    },
    {
@@ -436,10 +1528,14 @@
     "locale": "C.utf8",
     "save_lines": "4s",
     "bytes": 16777216,
-    "seconds": 26.126,
-    "mb_per_s": 0.61,
-    "requests": 16778487,
-    "round_trips": 338,
+    "seconds": 9.257,
+    "mb_per_s": 1.73,
+    "requests": 26988,
+    "round_trips": 63,
+    "lines": 8388608,
+    "output_requests": 26210,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.075,
     "rounds": 1
    },
    {
@@ -448,10 +1544,14 @@
     "locale": "C.utf8",
     "save_lines": "10000",
     "bytes": 106237306,
-    "seconds": 24.437,
-    "mb_per_s": 4.15,
-    "requests": 2763879,
-    "round_trips": 84,
+    "seconds": 4.715,
+    "mb_per_s": 21.49,
+    "requests": 14599,
+    "round_trips": 63,
+    "lines": 1379706,
+    "output_requests": 13830,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.241,
     "rounds": 1
    },
    {
@@ -460,10 +1560,125 @@
     "locale": "C.utf8",
     "save_lines": "10000",
     "bytes": 16777216,
-    "seconds": 67.588,
-    "mb_per_s": 0.24,
-    "requests": 16770904,
-    "round_trips": 337,
+    "seconds": 9.394,
+    "mb_per_s": 1.7,
+    "requests": 27576,
+    "round_trips": 63,
+    "lines": 8388608,
+    "output_requests": 26855,
+    "output_round_trips": 0,
+    "requests_per_screen": 0.077,
+    "rounds": 1
+   }
+  ],
+  "dtterm-vte": [
+   {
+    "bench": "dtterm-vte",
+    "name": "vte-dense_cells",
+    "bytes": 8556952,
+    "screens": 200,
+    "seconds": 0.453,
+    "mb_per_s": 18.0,
+    "screens_per_s": 441.1,
+    "requests": 13575,
+    "round_trips": 26,
+    "mallocs": 197,
+    "requests_per_screen": 67.88,
+    "bursts": 194,
+    "round_trips_per_burst": 0.134,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm-vte",
+    "name": "vte-scrolling",
+    "bytes": 373450,
+    "screens": 200,
+    "seconds": 0.085,
+    "mb_per_s": 4.21,
+    "screens_per_s": 2366.7,
+    "requests": 218,
+    "round_trips": 0,
+    "mallocs": 783,
+    "requests_per_screen": 1.09,
+    "bursts": 200,
+    "round_trips_per_burst": 0.0,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm-vte",
+    "name": "vte-scrolling_in_region_top",
+    "bytes": 357906,
+    "screens": 200,
+    "seconds": 0.032,
+    "mb_per_s": 10.6,
+    "screens_per_s": 6212.5,
+    "requests": 53,
+    "round_trips": 0,
+    "mallocs": 260,
+    "requests_per_screen": 0.27,
+    "bursts": 199,
+    "round_trips_per_burst": 0.0,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm-vte",
+    "name": "vte-scrolling_in_region_bottom",
+    "bytes": 357906,
+    "screens": 200,
+    "seconds": 0.044,
+    "mb_per_s": 7.68,
+    "screens_per_s": 4497.3,
+    "requests": 140,
+    "round_trips": 0,
+    "mallocs": 676,
+    "requests_per_screen": 0.7,
+    "bursts": 199,
+    "round_trips_per_burst": 0.0,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm-vte",
+    "name": "vte-unicode",
+    "bytes": 768650,
+    "screens": 200,
+    "seconds": 0.049,
+    "mb_per_s": 14.83,
+    "screens_per_s": 4047.0,
+    "requests": 169,
+    "round_trips": 0,
+    "mallocs": 71,
+    "requests_per_screen": 0.84,
+    "bursts": 199,
+    "round_trips_per_burst": 0.0,
+    "rounds": 1
+   },
+   {
+    "bench": "dtterm-vte",
+    "name": "vte-cursor_motion",
+    "bytes": 3268971,
+    "screens": 200,
+    "seconds": 0.184,
+    "mb_per_s": 16.97,
+    "screens_per_s": 1088.5,
+    "requests": 242,
+    "round_trips": 0,
+    "mallocs": 48,
+    "requests_per_screen": 1.21,
+    "bursts": 200,
+    "round_trips_per_burst": 0.0,
+    "rounds": 1
+   }
+  ],
+  "dtterm-less": [
+   {
+    "bench": "dtterm-less",
+    "name": "less-pagedown-2ms",
+    "delay_ms": 2.0,
+    "pages": 50,
+    "requests_per_page": 38.4,
+    "round_trips_per_page": 0.08,
+    "seconds": 0.0448,
+    "median_page_s": 0.0565,
     "rounds": 1
    }
   ],
@@ -471,619 +1686,1094 @@
    {
     "bench": "apptime",
     "name": "dtfile-1000-by_name_and_icon-cold",
-    "map_s": 2.1779,
-    "idle_s": 2.268,
-    "cpu_s": 0.12,
-    "mallocs": 157011,
-    "requests": 6888,
-    "round_trips": 1565,
-    "children_mallocs": 18860,
-    "rounds": 1
+    "map_s": 0.1505,
+    "idle_s": 0.2119,
+    "cpu_s": 0.1,
+    "mallocs": 114847,
+    "requests": 5850,
+    "round_trips": 591,
+    "children_mallocs": 18874,
+    "rounds": 1,
+    "syscalls": 10642,
+    "top_syscalls": {
+     "recvmsg": 2008.0,
+     "newfstatat": 1450.0,
+     "poll": 1425.0,
+     "openat": 1408.0,
+     "read": 714.0,
+     "close": 641.0,
+     "writev": 607.0,
+     "readlink": 406.0
+    },
+    "children_syscalls": 3592,
+    "children_top_syscalls": {
+     "newfstatat": 1263.0,
+     "openat": 626.0,
+     "readlink": 406.0,
+     "close": 374.0,
+     "pread64": 362.0,
+     "access": 209.0,
+     "faccessat2": 201.0,
+     "mmap": 26.0
+    }
    },
    {
     "bench": "apptime",
     "name": "dtfile-1000-by_name_and_icon-warm",
-    "map_s": 2.1155,
-    "idle_s": 2.268,
-    "cpu_s": 0.13,
-    "mallocs": 156990,
-    "requests": 6888,
-    "round_trips": 1565,
-    "children_mallocs": 18860,
-    "rounds": 1
+    "map_s": 0.171,
+    "idle_s": 0.2256,
+    "cpu_s": 0.1,
+    "idle_window_s": 60.0,
+    "idle_wakeups": 1,
+    "idle_cpu_s": 0.0,
+    "idle_forks": 0,
+    "idle_wakeups_per_min": 1.0,
+    "mallocs": 114833,
+    "requests": 5850,
+    "round_trips": 591,
+    "children_mallocs": 18773,
+    "rounds": 1,
+    "idle_syscalls": 4,
+    "idle_top_syscalls": {
+     "poll": 2.0,
+     "recvmsg": 2.0
+    },
+    "syscalls": 11126,
+    "top_syscalls": {
+     "recvmsg": 2078.0,
+     "newfstatat": 1552.0,
+     "poll": 1473.0,
+     "openat": 1364.0,
+     "read": 794.0,
+     "close": 703.0,
+     "writev": 632.0,
+     "readlink": 406.0
+    },
+    "children_syscalls": 3590,
+    "children_top_syscalls": {
+     "newfstatat": 1364.0,
+     "openat": 523.0,
+     "readlink": 406.0,
+     "close": 374.0,
+     "pread64": 362.0,
+     "access": 209.0,
+     "faccessat2": 201.0,
+     "mmap": 26.0
+    }
    },
    {
     "bench": "apptime",
     "name": "dtfile-10000-by_name_and_icon-cold",
-    "map_s": 2.1156,
-    "idle_s": 3.3905,
-    "cpu_s": 0.89,
-    "mallocs": 3177277,
-    "requests": 44184,
-    "round_trips": 10845,
-    "children_mallocs": 178621,
-    "rounds": 1
+    "map_s": 0.1036,
+    "idle_s": 0.4388,
+    "cpu_s": 0.31,
+    "mallocs": 483457,
+    "requests": 33684,
+    "round_trips": 869,
+    "children_mallocs": 178632,
+    "rounds": 1,
+    "syscalls": 50820,
+    "top_syscalls": {
+     "newfstatat": 13118.0,
+     "openat": 7120.0,
+     "close": 4803.0,
+     "readlink": 4006.0,
+     "pread64": 3622.0,
+     "recvmsg": 3565.0,
+     "poll": 2714.0,
+     "access": 2649.0
+    },
+    "children_syscalls": 33363,
+    "children_top_syscalls": {
+     "newfstatat": 12311.0,
+     "openat": 5438.0,
+     "readlink": 4006.0,
+     "close": 3634.0,
+     "pread64": 3622.0,
+     "access": 2009.0,
+     "faccessat2": 2001.0,
+     "write": 206.0
+    }
    },
    {
     "bench": "apptime",
     "name": "dtfile-10000-by_name_and_icon-warm",
-    "map_s": 2.1279,
-    "idle_s": 3.4614,
-    "cpu_s": 0.93,
-    "mallocs": 3177303,
-    "requests": 44184,
-    "round_trips": 10845,
-    "children_mallocs": 178621,
-    "rounds": 1
+    "map_s": 0.1071,
+    "idle_s": 0.3746,
+    "cpu_s": 0.26,
+    "idle_window_s": 60.0,
+    "idle_wakeups": 1,
+    "idle_cpu_s": 0.0,
+    "idle_forks": 0,
+    "idle_wakeups_per_min": 1.0,
+    "mallocs": 483472,
+    "requests": 33684,
+    "round_trips": 869,
+    "children_mallocs": 177637,
+    "rounds": 1,
+    "idle_syscalls": 0,
+    "idle_top_syscalls": {},
+    "syscalls": 50874,
+    "top_syscalls": {
+     "newfstatat": 13872.0,
+     "openat": 6364.0,
+     "close": 4803.0,
+     "readlink": 4006.0,
+     "pread64": 3622.0,
+     "recvmsg": 3576.0,
+     "poll": 2757.0,
+     "access": 2649.0
+    },
+    "children_syscalls": 33362,
+    "children_top_syscalls": {
+     "newfstatat": 13064.0,
+     "openat": 4683.0,
+     "readlink": 4006.0,
+     "close": 3634.0,
+     "pread64": 3622.0,
+     "access": 2009.0,
+     "faccessat2": 2001.0,
+     "write": 207.0
+    }
+   }
+  ],
+  "dtfile-copy": [
+   {
+    "bench": "dtfile-copy",
+    "name": "copy-big-cp",
+    "bytes": 1073741824,
+    "user_s": 0.001,
+    "sys_s": 0.426,
+    "seconds": 0.441,
+    "mb_per_s": 2322.0,
+    "rounds": 1,
+    "syscalls": 164,
+    "top_syscalls": {
+     "openat": 57,
+     "newfstatat": 30,
+     "mmap": 20,
+     "close": 14,
+     "fstat": 11,
+     "read": 5,
+     "mprotect": 5,
+     "brk": 3
+    }
+   },
+   {
+    "bench": "dtfile-copy",
+    "name": "copy-big-dtfile_copy",
+    "bytes": 1073741824,
+    "user_s": 0.011,
+    "sys_s": 0.485,
+    "startup_s": 0.036,
+    "seconds": 0.485,
+    "mb_per_s": 2111.3,
+    "rounds": 1,
+    "syscalls": 2915,
+    "top_syscalls": {
+     "openat": 703,
+     "recvmsg": 556,
+     "read": 269,
+     "mmap": 254,
+     "poll": 203,
+     "newfstatat": 181,
+     "copy_file_range": 129,
+     "close": 103
+    }
+   },
+   {
+    "bench": "dtfile-copy",
+    "name": "copy-small-cp",
+    "bytes": 40960000,
+    "user_s": 0.01,
+    "sys_s": 0.103,
+    "seconds": 0.124,
+    "mb_per_s": 315.0,
+    "rounds": 1,
+    "syscalls": 100954,
+    "top_syscalls": {
+     "openat": 20155,
+     "close": 20112,
+     "fstat": 20109,
+     "copy_file_range": 20000,
+     "newfstatat": 10229,
+     "ioctl": 10000,
+     "getdents64": 202,
+     "mkdirat": 101
+    }
+   },
+   {
+    "bench": "dtfile-copy",
+    "name": "copy-small-dtfile_copy",
+    "bytes": 40960000,
+    "user_s": 0.025,
+    "sys_s": 0.118,
+    "startup_s": 0.036,
+    "seconds": 0.121,
+    "mb_per_s": 322.8,
+    "rounds": 1,
+    "syscalls": 105219,
+    "top_syscalls": {
+     "openat": 20901,
+     "close": 20301,
+     "newfstatat": 20279,
+     "copy_file_range": 20000,
+     "geteuid": 10005,
+     "utimensat": 10000,
+     "recvmsg": 1373,
+     "poll": 479
+    }
    }
   ],
   "dtmail": [
    {
     "bench": "apptime",
     "name": "dtmail-1000",
-    "map_s": 0.1015,
-    "idle_s": 0.1529,
+    "map_s": 0.1212,
+    "idle_s": 0.18,
     "cpu_s": 0.1,
-    "rounds": 1
+    "idle_window_s": 60.0,
+    "idle_wakeups": 39,
+    "idle_cpu_s": 0.0,
+    "idle_forks": 0,
+    "idle_wakeups_per_min": 39.0,
+    "mallocs": 180515,
+    "requests": 3724,
+    "round_trips": 143,
+    "rounds": 1,
+    "idle_syscalls": 295,
+    "idle_top_syscalls": {
+     "recvmsg": 130.0,
+     "poll": 66.0,
+     "setgid": 30.0,
+     "writev": 22.0,
+     "fstat": 7.0,
+     "newfstatat": 6.0,
+     "openat": 5.0,
+     "close": 5.0
+    },
+    "syscalls": 8698,
+    "top_syscalls": {
+     "newfstatat": 4571.0,
+     "openat": 754.0,
+     "recvmsg": 749.0,
+     "poll": 702.0,
+     "read": 492.0,
+     "mmap": 224.0,
+     "close": 207.0,
+     "fstat": 206.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-1000-sort-sender",
+    "keys": "alt+v s",
+    "seconds": 0.0123,
+    "cpu_s": 0.03,
+    "mallocs": 50743,
+    "requests": 2373,
+    "round_trips": 22,
+    "rounds": 1,
+    "syscalls": 3612,
+    "top_syscalls": {
+     "newfstatat": 3000.0,
+     "recvmsg": 327.0,
+     "poll": 204.0,
+     "writev": 65.0,
+     "recvfrom": 6.0,
+     "openat": 2.0,
+     "fstat": 2.0,
+     "read": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-1000-sort-size",
+    "keys": "alt+v z",
+    "seconds": 0.034,
+    "cpu_s": 0.03,
+    "mallocs": 43127,
+    "requests": 1859,
+    "round_trips": 17,
+    "rounds": 1,
+    "syscalls": 3458,
+    "top_syscalls": {
+     "newfstatat": 3000.0,
+     "recvmsg": 246.0,
+     "poll": 149.0,
+     "writev": 53.0,
+     "openat": 2.0,
+     "fstat": 2.0,
+     "read": 2.0,
+     "close": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-1000-sort-date",
+    "keys": "alt+v d",
+    "seconds": 0.0,
+    "cpu_s": 0.01,
+    "mallocs": 40378,
+    "requests": 2418,
+    "round_trips": 17,
+    "rounds": 1,
+    "syscalls": 3550,
+    "top_syscalls": {
+     "newfstatat": 3000.0,
+     "recvmsg": 299.0,
+     "poll": 180.0,
+     "writev": 61.0,
+     "openat": 2.0,
+     "fstat": 2.0,
+     "read": 2.0,
+     "close": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-1000-select-all",
+    "keys": "alt+m s",
+    "seconds": 0.0,
+    "cpu_s": 0.01,
+    "mallocs": 4784,
+    "requests": 9001,
+    "round_trips": 23,
+    "rounds": 1,
+    "syscalls": 586,
+    "top_syscalls": {
+     "recvmsg": 308.0,
+     "poll": 199.0,
+     "writev": 73.0,
+     "recvfrom": 4.0,
+     "newfstatat": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-1000-delete",
+    "keys": "alt+m d",
+    "seconds": 0.0,
+    "cpu_s": 0.0,
+    "mallocs": 5600,
+    "requests": 1877,
+    "round_trips": 19,
+    "rounds": 1,
+    "syscalls": 571,
+    "top_syscalls": {
+     "recvmsg": 321.0,
+     "poll": 183.0,
+     "writev": 67.0
+    }
    },
    {
     "bench": "apptime",
     "name": "dtmail-10000",
-    "map_s": 0.0954,
-    "idle_s": 0.7428,
-    "cpu_s": 0.58,
-    "rounds": 1
+    "map_s": 0.1599,
+    "idle_s": 0.9062,
+    "cpu_s": 0.56,
+    "idle_window_s": 60.0,
+    "idle_wakeups": 23,
+    "idle_cpu_s": 0.04,
+    "idle_forks": 0,
+    "idle_wakeups_per_min": 23.0,
+    "mallocs": 1175415,
+    "requests": 3724,
+    "round_trips": 143,
+    "rounds": 1,
+    "idle_syscalls": 260,
+    "idle_top_syscalls": {
+     "recvmsg": 113.0,
+     "poll": 45.0,
+     "setgid": 30.0,
+     "writev": 22.0,
+     "fstat": 7.0,
+     "newfstatat": 6.0,
+     "openat": 5.0,
+     "close": 5.0
+    },
+    "syscalls": 54414,
+    "top_syscalls": {
+     "newfstatat": 50174.0,
+     "recvmsg": 756.0,
+     "openat": 754.0,
+     "poll": 703.0,
+     "read": 492.0,
+     "mmap": 224.0,
+     "close": 207.0,
+     "fstat": 206.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-10000-sort-sender",
+    "keys": "alt+v s",
+    "seconds": 0.1733,
+    "cpu_s": 0.16,
+    "mallocs": 489210,
+    "requests": 2349,
+    "round_trips": 22,
+    "rounds": 1,
+    "syscalls": 30577,
+    "top_syscalls": {
+     "newfstatat": 30000.0,
+     "recvmsg": 312.0,
+     "poll": 183.0,
+     "writev": 65.0,
+     "recvfrom": 6.0,
+     "openat": 2.0,
+     "fstat": 2.0,
+     "read": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-10000-sort-size",
+    "keys": "alt+v z",
+    "seconds": 0.1638,
+    "cpu_s": 0.15,
+    "mallocs": 418606,
+    "requests": 1847,
+    "round_trips": 17,
+    "rounds": 1,
+    "syscalls": 30485,
+    "top_syscalls": {
+     "newfstatat": 30000.0,
+     "recvmsg": 257.0,
+     "poll": 161.0,
+     "writev": 53.0,
+     "recvfrom": 4.0,
+     "openat": 2.0,
+     "fstat": 2.0,
+     "read": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-10000-sort-date",
+    "keys": "alt+v d",
+    "seconds": 0.1953,
+    "cpu_s": 0.18,
+    "mallocs": 388858,
+    "requests": 2402,
+    "round_trips": 17,
+    "rounds": 1,
+    "syscalls": 30553,
+    "top_syscalls": {
+     "newfstatat": 30000.0,
+     "recvmsg": 301.0,
+     "poll": 179.0,
+     "writev": 61.0,
+     "recvfrom": 2.0,
+     "openat": 2.0,
+     "fstat": 2.0,
+     "read": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-10000-select-all",
+    "keys": "alt+m s",
+    "seconds": 0.8301,
+    "cpu_s": 0.07,
+    "mallocs": 31763,
+    "requests": 72192,
+    "round_trips": 22,
+    "rounds": 1,
+    "syscalls": 916,
+    "top_syscalls": {
+     "recvmsg": 461.0,
+     "poll": 292.0,
+     "writev": 151.0,
+     "recvfrom": 10.0,
+     "newfstatat": 2.0
+    }
+   },
+   {
+    "bench": "apptime",
+    "name": "dtmail-10000-delete",
+    "keys": "alt+m d",
+    "seconds": 0.0,
+    "cpu_s": 0.01,
+    "mallocs": 41483,
+    "requests": 2345,
+    "round_trips": 14,
+    "rounds": 1,
+    "syscalls": 486,
+    "top_syscalls": {
+     "recvmsg": 278.0,
+     "poll": 160.0,
+     "writev": 48.0
+    }
    }
   ],
   "loader": [
    {
     "bench": "loader",
     "name": "programs/dtaction/.libs/dtaction",
-    "dsos": 47,
-    "unused": 17,
+    "dsos": 41,
+    "unused": 0,
     "exported": 5,
-    "relocations": 11036,
-    "relocations_from_cache": 10574
+    "relocations": 11234,
+    "relocations_from_cache": 9547
    },
    {
     "bench": "loader",
     "name": "programs/dtcalc/.libs/dtcalc",
-    "dsos": 47,
-    "unused": 16,
+    "dsos": 41,
+    "unused": 0,
     "exported": 17,
-    "relocations": 11048,
-    "relocations_from_cache": 10578
+    "relocations": 11730,
+    "relocations_from_cache": 9718
    },
    {
     "bench": "loader",
     "name": "programs/dtcreate/.libs/dtcreate",
-    "dsos": 47,
-    "unused": 15,
+    "dsos": 42,
+    "unused": 0,
     "exported": 26,
-    "relocations": 11059,
-    "relocations_from_cache": 10567
+    "relocations": 12180,
+    "relocations_from_cache": 10485
    },
    {
     "bench": "loader",
     "name": "programs/dtdbcache/.libs/dtdbcache",
-    "dsos": 47,
-    "unused": 17,
-    "exported": 3,
-    "relocations": 11033,
-    "relocations_from_cache": 10567
+    "dsos": 40,
+    "unused": 0,
+    "exported": 4,
+    "relocations": 11185,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/.libs/dtdocbook2infolib",
-    "dsos": 47,
-    "unused": 21,
+    "dsos": 40,
+    "unused": 0,
     "exported": 2,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
+    "relocations": 11177,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtexec/.libs/dtexec",
-    "dsos": 47,
-    "unused": 20,
+    "dsos": 22,
+    "unused": 0,
     "exported": 1,
-    "relocations": 11031,
-    "relocations_from_cache": 10567
+    "relocations": 7699,
+    "relocations_from_cache": 2501
    },
    {
     "bench": "loader",
     "name": "programs/dtfile/.libs/dtfile",
-    "dsos": 47,
-    "unused": 13,
-    "exported": 28,
-    "relocations": 11071,
-    "relocations_from_cache": 10732
+    "dsos": 42,
+    "unused": 0,
+    "exported": 30,
+    "relocations": 12470,
+    "relocations_from_cache": 10650
    },
    {
     "bench": "loader",
     "name": "programs/dthello/.libs/dthello",
-    "dsos": 47,
-    "unused": 19,
+    "dsos": 40,
+    "unused": 0,
     "exported": 3,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
+    "relocations": 11200,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dticon/.libs/dticon",
-    "dsos": 47,
-    "unused": 14,
+    "dsos": 42,
+    "unused": 0,
     "exported": 28,
-    "relocations": 11060,
-    "relocations_from_cache": 10582
+    "relocations": 12160,
+    "relocations_from_cache": 10500
    },
    {
     "bench": "loader",
     "name": "programs/dtimsstart/.libs/dtimsstart",
-    "dsos": 47,
-    "unused": 18,
+    "dsos": 40,
+    "unused": 0,
     "exported": 6,
-    "relocations": 11036,
-    "relocations_from_cache": 10572
+    "relocations": 11294,
+    "relocations_from_cache": 9545
    },
    {
     "bench": "loader",
     "name": "programs/dtksh/.libs/dtksh",
-    "dsos": 47,
-    "unused": 14,
+    "dsos": 42,
+    "unused": 0,
     "exported": 64,
-    "relocations": 11313,
-    "relocations_from_cache": 10586
+    "relocations": 12334,
+    "relocations_from_cache": 9772
    },
    {
     "bench": "loader",
     "name": "programs/dtlogin/.libs/dtchooser",
-    "dsos": 47,
-    "unused": 16,
+    "dsos": 41,
+    "unused": 0,
     "exported": 8,
-    "relocations": 11039,
-    "relocations_from_cache": 10589
+    "relocations": 11697,
+    "relocations_from_cache": 10340
    },
    {
     "bench": "loader",
     "name": "programs/dtlogin/.libs/dtgreet",
-    "dsos": 47,
-    "unused": 16,
+    "dsos": 41,
+    "unused": 0,
     "exported": 8,
-    "relocations": 11040,
-    "relocations_from_cache": 10591
+    "relocations": 11689,
+    "relocations_from_cache": 10342
    },
    {
     "bench": "loader",
     "name": "programs/dtlogin/.libs/dtlogin",
-    "dsos": 47,
-    "unused": 18,
+    "dsos": 40,
+    "unused": 0,
     "exported": 2,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
+    "relocations": 11348,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtpad/.libs/dtpad",
-    "dsos": 47,
-    "unused": 14,
+    "dsos": 43,
+    "unused": 0,
     "exported": 13,
-    "relocations": 11045,
-    "relocations_from_cache": 10610
+    "relocations": 12347,
+    "relocations_from_cache": 10574
    },
    {
     "bench": "loader",
     "name": "programs/dtpdm/.libs/dtpdm",
-    "dsos": 47,
-    "unused": 16,
+    "dsos": 42,
+    "unused": 0,
     "exported": 18,
-    "relocations": 11049,
-    "relocations_from_cache": 10570
+    "relocations": 11785,
+    "relocations_from_cache": 9756
    },
    {
     "bench": "loader",
     "name": "programs/dtpdmd/.libs/dtpdmd",
-    "dsos": 47,
-    "unused": 18,
+    "dsos": 40,
+    "unused": 0,
     "exported": 1,
-    "relocations": 11031,
-    "relocations_from_cache": 10567
+    "relocations": 11211,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtprintinfo/.libs/dtprintinfo",
-    "dsos": 47,
-    "unused": 16,
+    "dsos": 56,
+    "unused": 0,
     "exported": 22,
-    "relocations": 11062,
-    "relocations_from_cache": 10774
+    "relocations": 18148,
+    "relocations_from_cache": 10637
    },
    {
     "bench": "loader",
     "name": "programs/dtscreen/.libs/dtscreen",
-    "dsos": 47,
-    "unused": 17,
+    "dsos": 40,
+    "unused": 0,
     "exported": 3,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
+    "relocations": 11217,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsession/.libs/dtsession",
-    "dsos": 48,
-    "unused": 12,
+    "dsos": 43,
+    "unused": 0,
     "exported": 11,
-    "relocations": 11062,
-    "relocations_from_cache": 10668
+    "relocations": 12349,
+    "relocations_from_cache": 10588
    },
    {
     "bench": "loader",
     "name": "programs/dtspcd/.libs/dtspcd",
-    "dsos": 47,
-    "unused": 20,
+    "dsos": 40,
+    "unused": 0,
     "exported": 18,
-    "relocations": 11048,
-    "relocations_from_cache": 10567
+    "relocations": 11244,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrclean",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 6,
-    "relocations": 274,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 7,
+    "relocations": 11360,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrcreate",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 7,
-    "relocations": 276,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 8,
+    "relocations": 11341,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrdbrec",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 8,
-    "relocations": 275,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 9,
+    "relocations": 11320,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrdelete",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 11,
-    "relocations": 280,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 12,
+    "relocations": 11342,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrhan",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 7,
-    "relocations": 274,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 8,
+    "relocations": 11353,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrindex",
-    "dsos": 5,
-    "unused": 1,
-    "exported": 10,
-    "relocations": 278,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 11,
+    "relocations": 11372,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrkdump",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 7,
-    "relocations": 275,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 8,
+    "relocations": 11336,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/dtsrload",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 11,
-    "relocations": 279,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 12,
+    "relocations": 11377,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtsr/.libs/huffcode",
-    "dsos": 5,
-    "unused": 2,
-    "exported": 5,
-    "relocations": 273,
-    "relocations_from_cache": 13
+    "dsos": 41,
+    "unused": 0,
+    "exported": 6,
+    "relocations": 11331,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtstyle/.libs/dtstyle",
-    "dsos": 47,
-    "unused": 16,
+    "dsos": 42,
+    "unused": 0,
     "exported": 10,
-    "relocations": 11042,
-    "relocations_from_cache": 10653
+    "relocations": 12209,
+    "relocations_from_cache": 10571
    },
    {
     "bench": "loader",
     "name": "programs/dtterm/.libs/dtterm",
-    "dsos": 49,
-    "unused": 18,
+    "dsos": 43,
+    "unused": 0,
     "exported": 7,
-    "relocations": 11271,
-    "relocations_from_cache": 11021
+    "relocations": 12068,
+    "relocations_from_cache": 10003
    },
    {
     "bench": "loader",
     "name": "programs/dtwm/.libs/dtfplist",
-    "dsos": 47,
-    "unused": 17,
+    "dsos": 41,
+    "unused": 0,
     "exported": 2,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
+    "relocations": 11604,
+    "relocations_from_cache": 10318
    },
    {
     "bench": "loader",
     "name": "programs/dtwm/.libs/dtwm",
-    "dsos": 47,
-    "unused": 11,
+    "dsos": 43,
+    "unused": 0,
     "exported": 25,
-    "relocations": 11064,
-    "relocations_from_cache": 10950
+    "relocations": 12484,
+    "relocations_from_cache": 10872
    },
    {
     "bench": "loader",
     "name": "programs/ttsnoop/.libs/ttsnoop",
-    "dsos": 49,
-    "unused": 16,
+    "dsos": 44,
+    "unused": 0,
     "exported": 45,
-    "relocations": 11312,
-    "relocations_from_cache": 11012
+    "relocations": 12664,
+    "relocations_from_cache": 10773
    },
    {
     "bench": "loader",
     "name": "programs/dtcm/dtcm/.libs/dtcm",
-    "dsos": 48,
-    "unused": 14,
+    "dsos": 44,
+    "unused": 0,
     "exported": 34,
-    "relocations": 11196,
-    "relocations_from_cache": 10696
+    "relocations": 12664,
+    "relocations_from_cache": 10660
    },
    {
     "bench": "loader",
     "name": "programs/dtcm/dtcm/.libs/dtcm_delete",
-    "dsos": 48,
-    "unused": 21,
+    "dsos": 41,
+    "unused": 0,
     "exported": 10,
-    "relocations": 11166,
-    "relocations_from_cache": 10567
+    "relocations": 11427,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtcm/dtcm/.libs/dtcm_editor",
-    "dsos": 48,
-    "unused": 15,
+    "dsos": 43,
+    "unused": 0,
     "exported": 28,
-    "relocations": 11185,
-    "relocations_from_cache": 10567
+    "relocations": 12341,
+    "relocations_from_cache": 10485
    },
    {
     "bench": "loader",
     "name": "programs/dtcm/dtcm/.libs/dtcm_insert",
-    "dsos": 48,
-    "unused": 21,
+    "dsos": 41,
+    "unused": 0,
     "exported": 10,
-    "relocations": 11166,
-    "relocations_from_cache": 10567
+    "relocations": 11428,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtcm/dtcm/.libs/dtcm_lookup",
-    "dsos": 48,
-    "unused": 21,
+    "dsos": 41,
+    "unused": 0,
     "exported": 10,
-    "relocations": 11166,
-    "relocations_from_cache": 10567
+    "relocations": 11427,
+    "relocations_from_cache": 9540
    },
    {
     "bench": "loader",
     "name": "programs/dtcm/server/.libs/rpc.cmsd",
-    "dsos": 48,
-    "unused": 21,
+    "dsos": 19,
+    "unused": 0,
     "exported": 12,
-    "relocations": 11223,
-    "relocations_from_cache": 10691
-   },
-   {
-    "bench": "loader",
-    "name": "programs/dtdocbook/doc_utils/.libs/dtdocbook2infolib",
-    "dsos": 47,
-    "unused": 21,
-    "exported": 2,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
-   },
-   {
-    "bench": "loader",
-    "name": "programs/dtdocbook/doc_utils/.libs/validator",
-    "dsos": 8,
-    "unused": 3,
-    "exported": 6,
-    "relocations": 5220,
-    "relocations_from_cache": 3431
+    "relocations": 4128,
+    "relocations_from_cache": 693
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/MixedGen",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 32,
-    "relocations": 13382,
-    "relocations_from_cache": 12270
+    "relocations": 3944,
+    "relocations_from_cache": 2680
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/NCFGen",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 40,
-    "relocations": 13386,
-    "relocations_from_cache": 12269
+    "relocations": 3943,
+    "relocations_from_cache": 2679
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/NodeParser",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 28,
-    "relocations": 13375,
-    "relocations_from_cache": 12295
+    "relocations": 3930,
+    "relocations_from_cache": 2705
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/StyleUpdate",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 33,
-    "relocations": 13379,
-    "relocations_from_cache": 12281
+    "relocations": 3930,
+    "relocations_from_cache": 2691
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/dbdrv",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 6,
-    "relocations": 13367,
-    "relocations_from_cache": 12263
+    "relocations": 3866,
+    "relocations_from_cache": 2673
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/restore",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 9,
-    "relocations": 13372,
-    "relocations_from_cache": 12263
+    "relocations": 3876,
+    "relocations_from_cache": 2673
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/valBase",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 12,
-    "relocations": 13372,
-    "relocations_from_cache": 12263
+    "relocations": 3883,
+    "relocations_from_cache": 2673
    },
    {
     "bench": "loader",
     "name": "programs/dtdocbook/infolib/.libs/validator",
-    "dsos": 49,
-    "unused": 23,
+    "dsos": 7,
+    "unused": 0,
     "exported": 6,
-    "relocations": 13369,
-    "relocations_from_cache": 12263
-   },
-   {
-    "bench": "loader",
-    "name": "programs/dtdocbook/instant/.libs/instant",
-    "dsos": 48,
-    "unused": 22,
-    "exported": 5,
-    "relocations": 12113,
-    "relocations_from_cache": 11273
+    "relocations": 3865,
+    "relocations_from_cache": 2673
    },
    {
     "bench": "loader",
     "name": "programs/dtfile/dtcopy/.libs/dtfile_copy",
-    "dsos": 47,
-    "unused": 17,
+    "dsos": 41,
+    "unused": 0,
     "exported": 11,
-    "relocations": 11042,
-    "relocations_from_cache": 10624
+    "relocations": 11681,
+    "relocations_from_cache": 9764
    },
    {
     "bench": "loader",
     "name": "programs/dthelp/dthelpgen/.libs/dthelpgen",
-    "dsos": 47,
-    "unused": 19,
+    "dsos": 41,
+    "unused": 0,
     "exported": 1,
-    "relocations": 11031,
-    "relocations_from_cache": 10567
+    "relocations": 11598,
+    "relocations_from_cache": 9707
    },
    {
     "bench": "loader",
     "name": "programs/dthelp/dthelpprint/.libs/dthelpprint",
-    "dsos": 47,
-    "unused": 19,
+    "dsos": 41,
+    "unused": 0,
     "exported": 2,
-    "relocations": 11032,
-    "relocations_from_cache": 10567
+    "relocations": 11628,
+    "relocations_from_cache": 9707
    },
    {
     "bench": "loader",
     "name": "programs/dthelp/dthelpview/.libs/dthelpview",
-    "dsos": 47,
-    "unused": 17,
+    "dsos": 41,
+    "unused": 0,
     "exported": 5,
-    "relocations": 11036,
-    "relocations_from_cache": 10576
+    "relocations": 11597,
+    "relocations_from_cache": 9716
    },
    {
     "bench": "loader",
     "name": "programs/dtmail/dtmail/.libs/dtmail",
-    "dsos": 47,
-    "unused": 14,
-    "exported": 35,
-    "relocations": 11074,
-    "relocations_from_cache": 10970
+    "dsos": 43,
+    "unused": 0,
+    "exported": 34,
+    "relocations": 12615,
+    "relocations_from_cache": 10934
    },
    {
     "bench": "loader",
     "name": "programs/dtmail/dtmailpr/.libs/dtmailpr",
-    "dsos": 47,
-    "unused": 20,
+    "dsos": 40,
+    "unused": 0,
     "exported": 4,
-    "relocations": 11039,
-    "relocations_from_cache": 10708
-   },
-   {
-    "bench": "loader",
-    "name": "programs/dtsearchpath/dtappg/.libs/dtappgather",
-    "dsos": 47,
-    "unused": 22,
-    "exported": 1,
-    "relocations": 11035,
-    "relocations_from_cache": 10583
+    "relocations": 11368,
+    "relocations_from_cache": 9681
    },
    {
     "bench": "loader",
     "name": "programs/dtsearchpath/dtsp/.libs/dtsearchpath",
-    "dsos": 47,
-    "unused": 21,
-    "exported": 2,
-    "relocations": 11035,
-    "relocations_from_cache": 10590
+    "dsos": 22,
+    "unused": 0,
+    "exported": 4,
+    "relocations": 7704,
+    "relocations_from_cache": 2524
    },
    {
     "bench": "loader",
     "name": "programs/util/dttypes/.libs/dttypes",
-    "dsos": 47,
-    "unused": 20,
+    "dsos": 40,
+    "unused": 0,
     "exported": 3,
-    "relocations": 11033,
-    "relocations_from_cache": 10567
+    "relocations": 11167,
+    "relocations_from_cache": 9540
+   }
+  ],
+  "dtfile-perf": [
+   {
+    "bench": "dtfile-perf",
+    "name": "dtfile-perf-1000",
+    "map_s": 0.2018,
+    "idle_s": 0.2018,
+    "cpu_s": 0.09,
+    "phases_s": {
+     "XtInitialize": 0.012762,
+     "Setting up Converters and got resources": 8.7e-05,
+     "DtDbLoad": 0.000114,
+     "InitializeToolTalkProcid": 0.001837,
+     "Setting Callbacks (messaging)": 0.000136,
+     "TrashCreateDialog": 0.025268,
+     "Setting up Desktop": 0.001722,
+     "Bringing up view": 0.022666,
+     "InitializeToolTalkSession": 0.000898,
+     "Finish": 0.086896,
+     "read directory": 0.022967,
+     "FilterFiles": 0.000157,
+     "UpdateFileIcons": 0.000116,
+     "LayoutFileIcons": 0.0063,
+     "part 1, DisplaySomeIcons": 0.018957,
+     "part 2 DisplaySomeIcons": 0.005356
+    },
+    "rounds": 1
+   },
+   {
+    "bench": "dtfile-perf",
+    "name": "dtfile-perf-10000",
+    "map_s": 0.1743,
+    "idle_s": 0.776,
+    "cpu_s": 0.57,
+    "phases_s": {
+     "XtInitialize": 0.034233,
+     "Setting up Converters and got resources": 0.000617,
+     "DtDbLoad": 0.000151,
+     "InitializeToolTalkProcid": 0.005569,
+     "Setting Callbacks (messaging)": 0.000702,
+     "TrashCreateDialog": 0.04091,
+     "Setting up Desktop": 0.002637,
+     "Bringing up view": 0.021664,
+     "InitializeToolTalkSession": 0.013627,
+     "Finish": 0.140185,
+     "read directory": 0.254291,
+     "FilterFiles": 0.003008,
+     "UpdateFileIcons": 0.003256,
+     "LayoutFileIcons": 0.005248,
+     "part 1, DisplaySomeIcons": 0.247024,
+     "part 2 DisplaySomeIcons": 0.079277
+    },
+    "rounds": 1
    }
   ]
  }
