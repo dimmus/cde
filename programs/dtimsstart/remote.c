@@ -720,7 +720,7 @@ static int	prepare_action(int act_typ, char **av, int ac)
 int	get_window_status(void)
 {
     long	*datap;
-    int		len = 0;
+    unsigned long len = 0;
     int		win_st;
 
     if (winEnv.atom_status == None || winEnv.atom_owner == None)
@@ -734,7 +734,7 @@ int	get_window_status(void)
 
     win_st = WIN_ST_NONE;
     if (read_property(winEnv.atom_status, XA_INTEGER, 32, False,
-	    (unsigned char **)&datap, (long *) &len) == True && len > 0) {
+	    (unsigned char **)&datap, &len) == True && len > 0) {
 	    win_st = datap[0];
 	    FREE(datap);
     }
