@@ -257,6 +257,7 @@ _CvtXmStringTableToString(
          strcat(buf, ",");
 
       XmStringInitContext(&context, stringtable[i]);
+      separator = FALSE;	/* each item stops at its own first separator */
       while (!separator) 
       {
          if (GetNextSegment(context, &text, &separator))

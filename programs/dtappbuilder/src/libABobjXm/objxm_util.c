@@ -518,7 +518,7 @@ objxm_xmstr_to_str(
 		}
 		break;
 	    case XmSTRING_COMPONENT_SEPARATOR:
-		if (has_text || has_tabs)
+		if ((has_text || has_tabs) && p < buf + sizeof(buf) - 1)
 		{
 		    *p++ = '\n';
 		    *p   = '\0';
@@ -531,7 +531,8 @@ objxm_xmstr_to_str(
 	    XtFree((char *)value);
 	    if (seg != NULL)
 	    {
-		snprintf(p, sizeof(buf), "%s", seg);
+		/* (the room left in buf, not all of it) */
+		snprintf(p, sizeof(buf) - (p - buf), "%s", seg);
 		p += (strlen(p));
 		XtFree(seg);
 	    }
