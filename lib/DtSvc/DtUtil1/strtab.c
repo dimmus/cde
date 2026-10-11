@@ -107,7 +107,7 @@ struct strtab_layout {
 
 static void strtab_layout(DtShmProtoStrtab strlist, struct strtab_layout * l);
 
-static void inc_it  (int * a, int * b, unsigned char * key);
+static void inc_it  (void * a, void * b, unsigned char * key);
 static void build_it(int a, struct strtab_build * ptr, unsigned char * key);
 #if !defined(__linux__)
 extern char * strdup(const char *);
@@ -302,8 +302,10 @@ static void build_it(int a, struct strtab_build * ptr, unsigned char * key)
 }
 
 /* ARGSUSED */
-static void inc_it(int * a, int * b, unsigned char * key)
+static void inc_it(void * a, void * b, unsigned char * key)
 {
-  b[0]++;
-  b[1] += strlen((const char *)key) + 1;
+  int * counts = b;
+
+  counts[0]++;
+  counts[1] += strlen((const char *)key) + 1;
 }

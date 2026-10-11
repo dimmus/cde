@@ -775,7 +775,7 @@ LoadXloginResourcesXrdb(struct display *d)
     char	cmd[1024];
     char	*authority = "";
     char	*auth_key = "";
-    char	tmpname[1024];
+    char	tmpname[256];
     int		fd;
     int		ret = 0;
 

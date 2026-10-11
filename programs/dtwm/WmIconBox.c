@@ -3494,7 +3494,7 @@ String WmXmStringToString (XmString xmString)
     XmStringContext       xmStrContext = NULL;
     XmStringComponentType xmStrComponentType = XmSTRING_COMPONENT_TEXT;
     XtPointer             xmStrValue = NULL;
-    int                   xmStrLen = 0;
+    unsigned int          xmStrLen = 0;
 
     if (!xmString) return NULL;
     if (!XmStringInitContext (&xmStrContext, xmString)) return NULL;

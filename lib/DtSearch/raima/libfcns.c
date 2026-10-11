@@ -199,7 +199,7 @@ const char *f2    /* pointer to field 2 */
 	    return ( bytecmp(f1, f2, len) );
 	 else if ( fld_ptr->fd_dim[0] )
 	 {
-	    if ( db_global.ctbl_activ ) return ( ctblcmp(f1, f2, len) );
+	    if ( db_global.ctbl_activ ) return ( ctblcmp((const unsigned char *)f1, (const unsigned char *)f2, len) );
 	    else return ( strncmp(f1, f2, len) );
 	 }
 	 else

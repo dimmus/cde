@@ -1884,7 +1884,7 @@ typedef struct {
 } MemBufInfo;
 
 static int
-MemBufRead (BufFilePtr f)
+MemBufRead (int ignored, BufFilePtr f)
 {
     MemBufInfo *info = (MemBufInfo *) f->hidden;
     int		c;
@@ -1894,7 +1894,7 @@ MemBufRead (BufFilePtr f)
       {
 	for (n = 0; n < BUFFILESIZE; n++)
 	  {
-	    c = BufFileGet(info->rest);
+	    c = BufFileGet(0, info->rest);
 	    if (c == BUFFILEEOF)
 		break;
 	    f->buffer[n] = (BufChar) c;
@@ -1917,7 +1917,7 @@ MemBufSkip (
 {
     int	n = count;
 
-    while (n > 0 && BufFileGet(f) != BUFFILEEOF)
+    while (n > 0 && BufFileGet(0, f) != BUFFILEEOF)
 	n--;
     return count - n;
 }
@@ -2084,7 +2084,7 @@ ReadCompressedBlock (
 
     while (len < TOPIC_CACHE_MAX_BLOCK)
       {
-	c = BufFileGet(z);
+	c = BufFileGet(0, z);
 	if (c == BUFFILEEOF)
 	    break;
 	if (len >= max)

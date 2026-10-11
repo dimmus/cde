@@ -14,8 +14,9 @@ appdefaultsdir = $(CDE_DATA_TOP)/app-defaults/C
 
 ABINCLUDES = -I../include -I../include/ab_private -I../libABil
 
-AM_CPPFLAGS = -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
--DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
+AM_CPPFLAGS = $(CDE_CPPFLAGS) \
+	      -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+	      -DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
               -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
               -DCDE_LOGFILES_TOP=\"$(CDE_LOGFILES_TOP)\"
 

@@ -83,8 +83,6 @@ extern char *fontset2[];
 extern int use_default_fonts;
 extern int use_octal;
 
-int is_comment(char *);
-int match_locale(char *, char *);
 
 extern int	cm_get_fonts(char *);
 extern int	is_comment(char[MAX_LINE_LEN]);
