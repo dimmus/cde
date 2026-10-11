@@ -785,6 +785,15 @@ DeleteWorkspace(
 	 * Delete the workspace data structures
 	 */
 	FreeBackdropPixmap (pWS);
+	if (pWS->backdrop.window)
+	{
+	    if (pWS->backdrop.window == pSD->lastBackdropWin)
+	    {
+		pSD->lastBackdropWin = None;
+	    }
+	    XDestroyWindow (DISPLAY, pWS->backdrop.window);
+	    pWS->backdrop.window = None;
+	}
 
 	/* free pWS->backdrop.image */
 	if ((pWS->backdrop.flags & BACKDROP_IMAGE_ALLOCED) &&
@@ -3456,9 +3465,16 @@ SaveResources( WmScreenData *pSD)
 	pPanelist = (WmPanelistObject) pSD->wPanelist;
 	if (pPanelist && O_Shell(pPanelist))
 	{
-	    /* This is the front panel for the screen */
-	    SaveWorkspaceResources(pSD->pActiveWS, 
-				   WM_RES_FP_POSITION);
+	    /*
+	     * This is the front panel for the screen.  Its position is
+	     * saved unless it is the default one, which follows the size
+	     * of the screen.
+	     */
+	    if (!WmPanelistPlacedByDefault ())
+	    {
+		SaveWorkspaceResources(pSD->pActiveWS, 
+				       WM_RES_FP_POSITION);
+	    }
 
 
             /*  Call the fronto panel function to save its resources  */

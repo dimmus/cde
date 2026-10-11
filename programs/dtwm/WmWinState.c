@@ -611,21 +611,34 @@ static void GetMaxGeometry (ClientData *pcd, int *pX, int *pY, int *pWidth,
  *
  *  Description:
  *  -----------
- *  Maximizes a maximized (not full screen) client again if its maximized
- *  geometry changed, when the work area changes (struts).
+ *  Maximizes a maximized or full screen client again if its maximized
+ *  geometry changed, when the work area changes (struts, or the screen
+ *  changed size).
  *
  *************************************<->***********************************/
 
 void RefitMaximizedClient (ClientData *pcd)
 {
     int x, y, width, height;
+    long decor = pcd->decor;
 
-    if (!pcd->maxConfig || pcd->fullscreen ||
+    if (!pcd->maxConfig ||
 	(pcd->clientState & ~UNSEEN_STATE) == WITHDRAWN_STATE)
 	return;
 
     pcd->maxConfig = FALSE;		/* not the current geometry */
+    if (pcd->fullscreen)
+    {
+	/* without decorations, as ConfigureNewState makes it */
+	pcd->decor = WM_DECOR_NONE;
+	SetClientOffset (pcd);
+    }
     GetMaxGeometry (pcd, &x, &y, &width, &height);
+    if (pcd->fullscreen)
+    {
+	pcd->decor = decor;
+	SetClientOffset (pcd);
+    }
     if (x == pcd->maxX && y == pcd->maxY &&
 	width == pcd->maxWidth && height == pcd->maxHeight)
     {

@@ -84,6 +84,8 @@ extern Boolean StartResizeConfig (ClientData *pcd, XEvent *pev);
 extern int ResizeType (ClientData *pcd, XEvent *pev);
 extern void UndoGrabs (void);
 extern void HandleMarqueeSelect (WmScreenData *pSD, XEvent *pev);
+extern void KeepClientsOnScreen (WmScreenData *pSD);
+extern void MoveClientFrame (ClientData *pCD, int frameX, int frameY);
 extern void StartMarqueeSelect(WmScreenData *pSD, XEvent *pev);
 extern void UpdateMarqueeSelectData (WmScreenData *pSD);
 extern Boolean HandleMarqueeKeyPress (WmScreenData *pSD, XEvent *pev);

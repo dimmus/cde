@@ -67,10 +67,13 @@
 
 #include "WmPanelP.h"
 #include "WmManage.h"
+#include "WmWinConf.h"
+#include "WmWinInfo.h"
 
 #include <pwd.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 
 
@@ -667,6 +670,61 @@ WmFrontPanelSetBusy (Boolean on)
 
 
 
+/*
+ *  How the front panel is placed, for when the screen changes size
+ *  (WmPanelistScreenResized): by the geometry it was given (resources,
+ *  session or panel definition), or, without one, centered along the
+ *  bottom of the screen; once the user has moved it, where it is.
+ */
+
+static String  panel_geometry = NULL;	/* NULL: centered along the bottom */
+static Boolean panel_moved = False;
+
+/*  How far from the default place a geometry may put the panel and   */
+/*  still count as the default place (the position saved for a        */
+/*  session is the frame's, a few pixels off).                        */
+
+#define PANEL_PLACE_SLACK 8
+
+
+
+/************************************************************************
+ *
+ *  GeometryPosition
+ *	The position that a geometry gives a window of the given size on
+ *	a screen of the given size.  *x and *y are left alone where the
+ *	geometry gives none.  Returns XParseGeometry's flags.
+ *
+ ************************************************************************/
+
+static int
+GeometryPosition (String geometry,
+                  int    screen_width,
+                  int    screen_height,
+                  int    width,
+                  int    height,
+                  int  * x,
+                  int  * y)
+
+{
+   int x_return, y_return;
+   unsigned int width_return, height_return;
+   int flags;
+
+   flags = XParseGeometry (geometry, &x_return, &y_return,
+                           &width_return, &height_return);
+
+   if (flags & XValue)
+      *x = (flags & XNegative) ? screen_width - width + x_return : x_return;
+
+   if (flags & YValue)
+      *y = (flags & YNegative) ? screen_height - height + y_return : y_return;
+
+   return (flags);
+}
+
+
+
 /************************************************************************
  *
  *  SetGeometry
@@ -678,37 +736,49 @@ static void
 SetGeometry (Widget w, String geometry, Position * x, Position * y)
 			
 {
-   int x_return, y_return;
-   unsigned int width_return, height_return;
-   long flags;
+   int new_x = *x;
+   int new_y = *y;
 
-   flags = XParseGeometry (geometry, &x_return, &y_return,
-                           &width_return, &height_return);
-
-   if (flags)
+   if (GeometryPosition (geometry, WidthOfScreen (XtScreen (w)),
+                         HeightOfScreen (XtScreen (w)), XtWidth (w),
+                         XtHeight (w), &new_x, &new_y) & (XValue | YValue))
    {
-      if (flags & XValue)
-         *x = (Position) x_return;
-
-      if (flags & XNegative)
-         *x = (Position) (WidthOfScreen (XtScreen (w)) - XtWidth(w))
-                         + x_return;
-
-      if (flags & YValue)
-         *y = (Position) y_return;
-
-      if (flags & YNegative)
-      {
-         *y = (Position) (HeightOfScreen (XtScreen (w)) - XtHeight(w))
-                         + y_return;
-      }
-
-      if (flags & XValue || flags & YValue || flags & XNegative ||
-          flags & YNegative)
-      {
-         XtMoveWidget (w, *x, *y);
-      }
+      *x = (Position) new_x;
+      *y = (Position) new_y;
+      XtMoveWidget (w, *x, *y);
    }
+}
+
+
+
+/************************************************************************
+ *
+ *  CenteredAlongBottom
+ *	Whether a geometry puts the panel about where the default one
+ *	does, centered along the bottom of the screen.  The position
+ *	saved for the session of a panel that was there does: such a
+ *	panel is placed by the default rule when the screen changes size.
+ *
+ ************************************************************************/
+
+static Boolean
+CenteredAlongBottom (Widget w, String geometry)
+
+{
+   int screen_width = WidthOfScreen (XtScreen (w));
+   int screen_height = HeightOfScreen (XtScreen (w));
+   int width = XtWidth (w);
+   int height = XtHeight (w);
+   int center_x = (screen_width > width) ? (screen_width - width) / 2 : 0;
+   int x = 0, y = 0;
+   int flags;
+
+   flags = GeometryPosition (geometry, screen_width, screen_height,
+                             width, height, &x, &y);
+
+   return ((flags & XValue) && (flags & YValue) &&
+           abs (x - center_x) <= PANEL_PLACE_SLACK &&
+           abs (screen_height - height - y) <= PANEL_PLACE_SLACK);
 }
 
 
@@ -738,6 +808,7 @@ WmPanelistShow (Widget w)
 
    String    shell_geometry = NULL;
    char      geometry_buffer[32];
+   Boolean   geometry_given = False;
 
    XSizeHints   hints;
    long	        supplied;
@@ -780,13 +851,16 @@ WmPanelistShow (Widget w)
    screen_width = WidthOfScreen (XtScreen (panel.shell));
    display = XtDisplay (panel.shell);
 
-   if (shell_geometry == NULL)
+   if (shell_geometry != NULL)
+      geometry_given = True;
+   else
    {
       Position  x;
 
       if (panel.element_values[PANEL_GEOMETRY].string_value != NULL)
       {
         shell_geometry = panel.element_values[PANEL_GEOMETRY].parsed_value;
+        geometry_given = True;
       }
       else
       {
@@ -831,6 +905,15 @@ WmPanelistShow (Widget w)
    SetGeometry (panel.shell, shell_geometry, &x, &y);
    WorkspaceAdjustPanelPosition (x, y, XtWidth (panel.shell),
                                  XtHeight (panel.shell));
+
+
+   /*  Remember the geometry for when the screen changes size, unless  */
+   /*  it is the default place.                                         */
+
+   XtFree (panel_geometry);
+   panel_geometry = NULL;
+   if (geometry_given && !CenteredAlongBottom (panel.shell, shell_geometry))
+      panel_geometry = XtNewString (shell_geometry);
 
 
    /* Set hints to avoid interactive placement */
@@ -925,6 +1008,151 @@ WmPanelistShow (Widget w)
    /*  screen global data.                                               */
 
    EmbeddedClientSetData ();
+}
+
+
+
+
+/************************************************************************
+ *
+ *  WmPanelistMoved
+ *	Called when the user has moved the front panel (f.move, with the
+ *	pointer or the keyboard): from then on, the panel stays where the
+ *	user put it when the screen changes size.
+ *
+ ************************************************************************/
+
+void
+WmPanelistMoved (void)
+
+{
+   panel_moved = True;
+}
+
+
+
+
+/************************************************************************
+ *
+ *  WmPanelistPlacedByDefault
+ *	Whether the front panel is where the default rule puts it,
+ *	centered along the bottom of the screen: neither a geometry nor
+ *	the user put it elsewhere.  Its position is not saved for the
+ *	session then, so that it is centered again on the next screen.
+ *
+ ************************************************************************/
+
+Boolean
+WmPanelistPlacedByDefault (void)
+
+{
+   return (!panel_moved && panel_geometry == NULL);
+}
+
+
+
+
+/************************************************************************
+ *
+ *  WmPanelistScreenResized
+ *	The screen changed size: place the front panel again.  Placed by
+ *	the default rule, it is centered along the bottom again; placed
+ *	by a geometry, the geometry is applied again (an edge given by a
+ *	negative offset follows the new size); moved by the user, it
+ *	stays.  In each case it is kept all on the screen.  The subpanels
+ *	that are posted follow it.
+ *
+ ************************************************************************/
+
+void
+WmPanelistScreenResized (WmScreenData * pSD)
+
+{
+   ClientData * pCD;
+   ClientData * pcdSub;
+   String       geometry = panel_geometry;
+   char         geometry_buffer[32];
+   int          screen_width = DisplayWidth (DISPLAY, pSD->screen);
+   int          screen_height = DisplayHeight (DISPLAY, pSD->screen);
+   int          frame_x, frame_y, x = 0, y = 0, x_off = 0, y_off = 0;
+   int          dx, dy, flags;
+
+   if (!pSD->wPanelist || pSD->wPanelist != panel.form || !panel.shell ||
+       !XtIsRealized (panel.shell) ||
+       XFindContext (DISPLAY, XtWindow (panel.shell),
+                     wmGD.windowContextType, (XPointer *) &pCD))
+      return;
+
+   frame_x = pCD->frameInfo.x;
+   frame_y = pCD->frameInfo.y;
+
+   if (!panel_moved)
+   {
+      /*  As WmPanelistShow and the window manager placed it at first:  */
+      /*  the window by the geometry, its frame by the window gravity.  */
+
+      if (geometry == NULL)
+      {
+         x = (screen_width > (int) pCD->clientWidth) ?
+             (screen_width - (int) pCD->clientWidth) / 2 : 0;
+         snprintf (geometry_buffer, sizeof (geometry_buffer), "+%d-0", x);
+         geometry = geometry_buffer;
+      }
+
+      flags = GeometryPosition (geometry, screen_width, screen_height,
+                                pCD->clientWidth, pCD->clientHeight, &x, &y);
+
+      if (wmGD.positionIsFrame)
+         CalculateGravityOffset (pCD, &x_off, &y_off);
+
+      if (flags & XValue)
+         frame_x = x + x_off - (pCD->clientX - pCD->frameInfo.x);
+      if (flags & YValue)
+         frame_y = y + y_off - (pCD->clientY - pCD->frameInfo.y);
+   }
+
+   /*  All of it on the screen  */
+
+   if (frame_x + (int) pCD->frameInfo.width > screen_width)
+      frame_x = screen_width - (int) pCD->frameInfo.width;
+   if (frame_x < 0)
+      frame_x = 0;
+   if (frame_y + (int) pCD->frameInfo.height > screen_height)
+      frame_y = screen_height - (int) pCD->frameInfo.height;
+   if (frame_y < 0)
+      frame_y = 0;
+
+   dx = frame_x - pCD->frameInfo.x;
+   dy = frame_y - pCD->frameInfo.y;
+   if (dx == 0 && dy == 0)
+      return;
+
+   MoveClientFrame (pCD, frame_x, frame_y);
+
+
+   /*  The posted subpanels (attached to the panel, not torn off) move  */
+   /*  with it, and stay attached.                                      */
+
+   for (pcdSub = pCD->transientChildren; pcdSub;
+        pcdSub = pcdSub->transientSiblings)
+   {
+      if (!(pcdSub->dtwmBehaviors & DtWM_BEHAVIOR_SUBPANEL))
+         continue;
+
+      frame_x = pcdSub->frameInfo.x + dx;
+      frame_y = pcdSub->frameInfo.y + dy;
+      if (frame_x + (int) pcdSub->frameInfo.width > screen_width)
+         frame_x = screen_width - (int) pcdSub->frameInfo.width;
+      if (frame_x < 0)
+         frame_x = 0;
+      if (frame_y + (int) pcdSub->frameInfo.height > screen_height)
+         frame_y = screen_height - (int) pcdSub->frameInfo.height;
+      if (frame_y < 0)
+         frame_y = 0;
+
+      MoveClientFrame (pcdSub, frame_x, frame_y);
+      pcdSub->dtwmBehaviors |= DtWM_BEHAVIOR_SUBPANEL;
+   }
 }
 
 

@@ -17,6 +17,7 @@ PKG      := pkg-config
 
 XLIBS    := $(shell $(PKG) --libs x11)
 XTST     := $(shell $(PKG) --libs xtst)
+XRANDR   := $(shell $(PKG) --libs xrandr)
 XTLIBS   := -lXm $(shell $(PKG) --libs xt xmu xext x11)
 TIRPC    := $(shell $(PKG) --cflags libtirpc 2>/dev/null)
 
@@ -61,7 +62,7 @@ ewmhtest: ewmhtest.c benchutil.c benchutil.h
 	$(CC) $(CFLAGS) $(WARN) \
 		-DEWMHTEST_WM='"$(ABSTOP)/programs/dtwm/.libs/dtwm"' \
 		-DEWMHTEST_LIBPATH='"$(LIBPATH)"' \
-		-o $@ ewmhtest.c benchutil.c $(XTST) $(XLIBS) -ldl
+		-o $@ ewmhtest.c benchutil.c $(XTST) $(XRANDR) $(XLIBS) -ldl
 
 cdebench-proxy: proxy.c
 	$(CC) $(CFLAGS) $(WARN) -o $@ proxy.c

@@ -49,6 +49,8 @@ extern void SetNewBackdrop(
                         Pixmap pixmap,
                         String bitmapFile,
                         DtWsmBackdropImageType imageType) ;
+extern void ResizeBackdrops(
+                        WmScreenData *pSD) ;
 extern Boolean IsBackdropWindow( 
                         WmScreenData *pSD,
                         Window win) ;

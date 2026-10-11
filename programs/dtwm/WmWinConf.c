@@ -102,6 +102,7 @@ static Boolean configExposePending = False;
 #include "WmIPlace.h"
 #include "WmIconBox.h"
 #include "WmKeyFocus.h"
+#include "WmPanelP.h"
 #include "WmProtocol.h"
 #include "WmWinInfo.h"
 
@@ -1394,6 +1395,8 @@ void CompleteFrameConfig (ClientData *pcd, XEvent *pev)
 	    }
 	}
 	else {	/* assume normal window frame */
+	    int oldX = pcd->clientX, oldY = pcd->clientY;
+
 	    /* reconfigure the window(s) */
 	    ProcessNewConfiguration (pcd, 
 				     moveX,
@@ -1403,6 +1406,13 @@ void CompleteFrameConfig (ClientData *pcd, XEvent *pev)
 				     (unsigned int) 
 					 (moveHeight - offsetX - offsetY),
 				     FALSE);
+
+	    /* the front panel stays where the user puts it */
+	    if ((pcd->clientFlags & FRONT_PANEL_BOX) &&
+		(pcd->clientX != oldX || pcd->clientY != oldY))
+	    {
+		WmPanelistMoved ();
+	    }
 	}
     }
     else if (wmGD.configAction == MARQUEE_SELECT)
@@ -2415,6 +2425,198 @@ void ProcessNewConfiguration (ClientData *pCD, int x, int y, unsigned int width,
 
 
 
+/*************************************<->*************************************
+ *
+ *  MoveClientFrame (pCD, frameX, frameY)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Moves the frame of a client to a position on the root window, as a
+ *  request of the window manager's own (not an interactive move).  Of a
+ *  maximized client, only the normal position (where it goes back to)
+ *  changes.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD		- pointer to client data
+ *  frameX	- x of the frame's upper left corner (normal geometry)
+ *  frameY	- y of the frame's upper left corner (normal geometry)
+ *
+ *************************************<->***********************************/
+
+void MoveClientFrame (ClientData *pCD, int frameX, int frameY)
+{
+    int clientX = frameX + pCD->clientOffset.x;
+    int clientY = frameY + pCD->clientOffset.y;
+    int xOff, yOff;
+
+    if (pCD->maxConfig)
+    {
+	pCD->clientX = clientX;
+	pCD->clientY = clientY;
+	return;
+    }
+
+    if (clientX == pCD->clientX && clientY == pCD->clientY)
+	return;
+
+    /* ProcessNewConfiguration takes a position as a ConfigureRequest */
+    xOff = wmGD.positionIsFrame ? pCD->clientOffset.x : 0;
+    yOff = wmGD.positionIsFrame ? pCD->clientOffset.y : 0;
+    ProcessNewConfiguration (pCD, clientX - xOff, clientY - yOff,
+	(unsigned int) pCD->clientWidth, (unsigned int) pCD->clientHeight,
+	True);
+}
+
+
+/*
+ * How much of a window frame must still be on the screen, across and
+ * down, after the screen changed size, for the window to stay where it
+ * is: enough to see it and to take it by its title bar.
+ */
+#define MIN_ON_SCREEN	64
+
+/*
+ * The position along one axis of a frame of the given size: the same if
+ * at least "least" of it (all of it if smaller) is on the screen, else
+ * the nearest that puts all of it on the screen, or its start at the
+ * screen's if it is larger.
+ */
+static int OnScreenPosition (int pos, int size, int screenSize, int least)
+{
+    int shown;
+
+    shown = ((pos + size < screenSize) ? pos + size : screenSize) -
+	    ((pos > 0) ? pos : 0);
+    if (least > size)
+	least = size;
+    if (shown >= least)
+	return (pos);
+
+    if (pos + size > screenSize)
+	pos = screenSize - size;
+    if (pos < 0)
+	pos = 0;
+    return (pos);
+}
+
+
+/*
+ * The size limits of a client that are the screen's (maxFromScreen: no
+ * maximum size in its hints), made again for the screen's new size: as
+ * large as the window would be maximized, as when it was managed.
+ */
+static void RefitSizeLimits (ClientData *pCD)
+{
+    Boolean maxConfig = pCD->maxConfig;
+    Boolean fullscreen = pCD->fullscreen;
+    int width, height;
+
+    if (!pCD->maxFromScreen)
+	return;
+
+    pCD->maxConfig = FALSE;
+    pCD->fullscreen = False;
+    GetMaxInfo (pCD, NULL, NULL, &width, &height);
+    pCD->maxConfig = maxConfig;
+    pCD->fullscreen = fullscreen;
+
+    if (width > MAX_MAX_SIZE(pCD).width)
+	width = MAX_MAX_SIZE(pCD).width;
+    if (height > MAX_MAX_SIZE(pCD).height)
+	height = MAX_MAX_SIZE(pCD).height;
+    if (width < pCD->minWidth)
+	width = pCD->minWidth;
+    if (height < pCD->minHeight)
+	height = pCD->minHeight;
+
+    if (pCD->maxFromScreen & MAX_AXIS_HORZ)
+	pCD->maxWidthLimit = width;
+    if (pCD->maxFromScreen & MAX_AXIS_VERT)
+	pCD->maxHeightLimit = height;
+}
+
+
+/* KeepClientsOnScreen for a client and its transients. */
+static void KeepClientOnScreen (ClientData *pCD, int screenWidth,
+    int screenHeight)
+{
+    ClientData *pcdChild;
+    int frameX, frameY, frameWidth, frameHeight, x, y;
+    Boolean all;
+
+    /*
+     * The front panel and its posted subpanels are placed by
+     * WmPanelistScreenResized, embedded clients are in the panel.
+     */
+    if (!(pCD->clientFlags & FRONT_PANEL_BOX) &&
+	!(pCD->dtwmBehaviors & DtWM_BEHAVIOR_SUBPANEL) &&
+	!pCD->pECD)
+    {
+	/* the normal geometry (a maximized window is refitted) */
+	frameX = pCD->clientX - pCD->clientOffset.x;
+	frameY = pCD->clientY - pCD->clientOffset.y;
+	frameWidth = pCD->clientWidth + 2 * pCD->clientOffset.x;
+	frameHeight = pCD->clientHeight + pCD->clientOffset.y +
+		      pCD->clientOffset.x;
+
+	/* the icon box all on the screen */
+	all = (pCD->clientFlags & ICON_BOX) != 0;
+	x = OnScreenPosition (frameX, frameWidth, screenWidth,
+			      all ? frameWidth : MIN_ON_SCREEN);
+	y = OnScreenPosition (frameY, frameHeight, screenHeight,
+			      all ? frameHeight : MIN_ON_SCREEN);
+	if (x != frameX || y != frameY)
+	    MoveClientFrame (pCD, x, y);
+    }
+    RefitSizeLimits (pCD);
+
+    for (pcdChild = pCD->transientChildren; pcdChild;
+	 pcdChild = pcdChild->transientSiblings)
+    {
+	KeepClientOnScreen (pcdChild, screenWidth, screenHeight);
+    }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  KeepClientsOnScreen (pSD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  The screen changed size: brings back the windows that are now (all
+ *  but less than MIN_ON_SCREEN pixels across or down) off the screen,
+ *  the least distance that puts them all on it, and keeps the icon box
+ *  all on the screen.  Windows in other workspaces and minimized ones
+ *  are moved too, and the position a maximized one goes back to.  The
+ *  size limits that came from the screen follow its size.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pSD		- pointer to screen data
+ *
+ *************************************<->***********************************/
+
+void KeepClientsOnScreen (WmScreenData *pSD)
+{
+    ClientListEntry *pCLE;
+    int screenWidth = DisplayWidth (DISPLAY, pSD->screen);
+    int screenHeight = DisplayHeight (DISPLAY, pSD->screen);
+
+    for (pCLE = pSD->clientList; pCLE; pCLE = pCLE->nextSibling)
+    {
+	/* each client has an entry, and another for its icon */
+	if (pCLE->type == NORMAL_STATE)
+	    KeepClientOnScreen (pCLE->pCD, screenWidth, screenHeight);
+    }
+}
+
+
 /*************************************<->*************************************
  *
  *  StartResizeConfig (pcd, pev)

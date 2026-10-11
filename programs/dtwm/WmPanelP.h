@@ -91,6 +91,9 @@ void    WmPanelistSetWorkspace (Widget, int);
 void    WmFrontPanelSetBusy (Boolean);
 Widget  WmPanelistWindowToSubpanel (Display *, Window);
 void    WmFrontPanelSessionSaveData ();
+void    WmPanelistMoved (void);
+Boolean WmPanelistPlacedByDefault (void);
+void    WmPanelistScreenResized (WmScreenData *);
 
 
 

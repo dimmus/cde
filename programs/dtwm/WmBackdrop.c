@@ -896,6 +896,70 @@ SetNewBackdrop(
 
 /******************************<->*************************************
  *
+ *  ResizeBackdrops (pSD)
+ *
+ *  Description:
+ *  -----------
+ *  The screen changed size: makes the backdrop window of each workspace
+ *  the size of the screen.  A tiled backdrop needs nothing more.  A
+ *  centered, fit or fill backdrop is a pixmap of the old size, made
+ *  from the image, which is not kept: load the image again and make
+ *  the new pixmap as the startup pass does (workspaces with the same
+ *  image share it again).
+ *
+ *  Inputs:
+ *  ------
+ *  pSD = pointer to screen data
+ *
+ *************************************<->***********************************/
+void
+ResizeBackdrops (WmScreenData *pSD)
+{
+    WmWorkspaceData *pWS;
+    unsigned long allocated;
+    int i;
+
+    for (i = 0; i < pSD->numWorkspaces; i++)
+    {
+	pWS = &pSD->pWS[i];
+	if (!pWS->backdrop.window)
+	    continue;
+
+	XResizeWindow (DISPLAY, pWS->backdrop.window,
+		       DisplayWidth (DISPLAY, pSD->screen),
+		       DisplayHeight (DISPLAY, pSD->screen));
+
+	if ((pWS->backdrop.imageType == DtWSM_BACKDROP_IMAGETYPE_TILED) ||
+	    !(pWS->backdrop.flags & BACKDROP_BITMAP) ||
+	    !pWS->backdrop.image)
+	    continue;
+
+	/*
+	 * The image again (as the first pass at startup), then the
+	 * pixmap of the screen size made from it.  Processing the
+	 * backdrop resets its flags but for the image string's.
+	 */
+	allocated = pWS->backdrop.flags & BACKDROP_IMAGE_ALLOCED;
+	FreeBackdropPixmap (pWS);
+	pWS->backdrop.imagePixmap = XmUNSPECIFIED_PIXMAP;
+	ProcessBackdropResources (pWS, CHANGE_BACKDROP);
+	if (pWS->backdrop.flags & BACKDROP_BITMAP)
+	{
+	    ProcessBackdropResources (pWS,
+				      CHANGE_BACKDROP | BACKDROP_RESOURCE_PASS);
+	}
+	pWS->backdrop.flags |= allocated;
+
+	if (pWS->backdrop.window == pSD->lastBackdropWin)
+	{
+	    XClearWindow (DISPLAY, pWS->backdrop.window);
+	}
+    }
+}
+
+
+/******************************<->*************************************
+ *
  *  Boolean IsBackdropWindow (pSD, win)
  *
  *  Description:

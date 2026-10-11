@@ -52,6 +52,7 @@
 #include "WmCEvent.h"
 #include "WmColormap.h"
 #include "WmFunction.h"
+#include "WmIPlace.h"
 #include "WmKeyFocus.h"
 #include "WmPanelP.h"  /* for typedef in WmManage.h */
 #include "WmManage.h"
@@ -59,6 +60,7 @@
 #include "WmICCC.h"
 #include "WmProperty.h"
 #include "WmWinInfo.h"
+#include "WmWinConf.h"
 #include "WmWinState.h"
 #include "WmResNames.h"
 #include "WmResParse.h"
@@ -801,6 +803,86 @@ Boolean WmDispatchMenuEvent (XButtonEvent *event)
 
 /*************************************<->*************************************
  *
+ *  UpdateScreenSize (display, screen, width, height)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Xlib keeps the size of each screen in its Screen record, as the
+ *  server gave it when the connection was opened; only libXrandr's
+ *  XRRUpdateConfiguration updates it.  dtwm does that itself, for each
+ *  of its connections, so that DisplayWidth, WidthOfScreen and the like
+ *  give the new size of the root window.  The size in millimeters is
+ *  scaled along, which keeps the resolution (RandR keeps it too when it
+ *  is not told another).
+ *
+ *************************************<->***********************************/
+
+static void UpdateScreenSize (Display *display, int screen, int width,
+    int height)
+{
+    Screen *scr = ScreenOfDisplay (display, screen);
+
+    if (scr->width > 0)
+	scr->mwidth = (int) ((long) scr->mwidth * width / scr->width);
+    if (scr->height > 0)
+	scr->mheight = (int) ((long) scr->mheight * height / scr->height);
+    scr->width = width;
+    scr->height = height;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  HandleRootResize (pSD, width, height)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  The root window of a screen changed size (RandR, e.g. xrandr or
+ *  dtrandr changing the resolution): makes the backdrops cover the new
+ *  size, places the front panel and the icons again, and brings the
+ *  windows that are now off the screen back.  Maximized and full screen
+ *  windows are fitted again when the work area is written
+ *  (EwmhRootResized marks it).
+ *
+ *************************************<->***********************************/
+
+static void HandleRootResize (WmScreenData *pSD, int width, int height)
+{
+    int i;
+
+    if (width == DisplayWidth (DISPLAY, pSD->screen) &&
+	height == DisplayHeight (DISPLAY, pSD->screen))
+    {
+	EwmhRootResized (pSD, width, height);
+	return;
+    }
+
+    UpdateScreenSize (DISPLAY, pSD->screen, width, height);
+    if (DISPLAY1 && DISPLAY1 != DISPLAY)
+	UpdateScreenSize (DISPLAY1, pSD->screen, width, height);
+
+    /* the default largest size of a window is twice the screen's */
+    if (pSD->maximumMaximumSizeDefault)
+    {
+	if (pSD->maximumMaximumSize.width < 2 * width)
+	    pSD->maximumMaximumSize.width = 2 * width;
+	if (pSD->maximumMaximumSize.height < 2 * height)
+	    pSD->maximumMaximumSize.height = 2 * height;
+    }
+
+    EwmhRootResized (pSD, width, height);
+    ResizeBackdrops (pSD);
+    for (i = 0; i < pSD->numWorkspaces; ++i)
+	ResizeIconPlacement (&pSD->pWS[i]);
+    WmPanelistScreenResized (pSD);
+    KeepClientsOnScreen (pSD);
+}
+
+
+/*************************************<->*************************************
+ *
  *  WmDispatchWsEvent (event)
  *
  *
@@ -985,8 +1067,8 @@ Boolean WmDispatchWsEvent (XEvent *event)
 		if (!XFindContext (DISPLAY, event->xconfigure.window,
 				   wmGD.screenContextType, (caddr_t *)&pSD))
 		{
-		    EwmhRootResized (pSD, event->xconfigure.width,
-				     event->xconfigure.height);
+		    HandleRootResize (pSD, event->xconfigure.width,
+				      event->xconfigure.height);
 		}
 	    }
 	    break;

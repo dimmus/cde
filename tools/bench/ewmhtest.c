@@ -3,13 +3,13 @@
  *
  * Licensed under the LGPL 2.1 license.
  *
- *   ewmhtest [-f] [-m DTWM] [-x RESOURCE]... TEST...
+ *   ewmhtest [-f] [-m DTWM] [-s WxH] [-x RESOURCE]... TEST...
  *
  * ewmhtest starts the dtwm under test (-m, by default the one of this
  * build) as the window manager of $DISPLAY, which must have none and no
  * other clients, as dtwmbench does: with an empty HOME, without the front
  * panel (-f keeps it) and with the extra resources given by -x (dtwm's
- * -xrm).  It then acts as an EWMH client and checks what dtwm publishes
+ * -xrm); -s first sets the size of the screen (RandR, as xrandr does).  It then acts as an EWMH client and checks what dtwm publishes
  * on the root window, waiting for the PropertyNotify events of its
  * writes (dtwm writes them when it goes idle).
  *
@@ -95,6 +95,23 @@
  *               is used; run it with -x 'Dtwm*useIconBox: True' too
  *   usertime    a window mapped with _NET_WM_USER_TIME 0 does not take
  *               the focus, others do
+ *   resize      the screen changing size (RandR; run it last, it moves
+ *               the front panel): to 1280x800 and back, or from it to the
+ *               largest size (Xvfb: the size it started with; -s 1280x800
+ *               starts dtwm on the smaller screen); each time
+ *               _NET_DESKTOP_GEOMETRY, the backdrop windows covering the
+ *               screen, a tiled, a centered and a fit backdrop (set as
+ *               dtstyle does) drawn for the new size, the front panel
+ *               centered along the bottom (or where its geometry, -x
+ *               'Dtwm*FrontPanel.geometry: -0+0', puts it), a maximized
+ *               and a full screen window fitted, an icon on the screen
+ *               as far from its edge as before; a window off the smaller
+ *               screen brought back, one still on it in part left alone,
+ *               a new window placed in the new part of the larger
+ *               screen, a window that came on the smaller one resized
+ *               larger than it; with -f and XTEST, the front panel moved
+ *               by the user (dragged by its handle) stays there, all on
+ *               the screen
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -121,6 +138,7 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
+#include <X11/extensions/Xrandr.h>
 
 #include "benchutil.h"
 
@@ -2286,8 +2304,12 @@ static void real_extents(Window w, long ext[4])
 	ext[3] = fy + fh - (y + ht);
 }
 
-/* _NET_FRAME_EXTENTS is what the frame shows. */
-static void expect_real_extents(Window w, const char *what)
+/*
+ * _NET_FRAME_EXTENTS is what the frame shows, and, with old, both
+ * changed from old (dtwm may not have seen the change asked for yet).
+ */
+static void expect_changed_extents(Window w, const long *old,
+				   const char *what)
 {
 	struct pollfd pfd = { ConnectionNumber(dpy), POLLIN, 0 };
 	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
@@ -2297,14 +2319,23 @@ static void expect_real_extents(Window w, const char *what)
 	/* (the frame may be caught between two of its changes) */
 	for (;;) {
 		real_extents(w, ext);
-		if (extents_are(w, prop, ext))
+		if (extents_are(w, prop, ext) &&
+		    !(old && !memcmp(ext, old, sizeof ext)))
 			return;
 		check_wm();
 		if (bench_now_ns() > deadline)
 			break;
 		poll(&pfd, 1, 20);
 	}
+	if (old && !memcmp(ext, old, sizeof ext))
+		fail("the frame extents of %s stayed %ld,%ld,%ld,%ld", what,
+		     ext[0], ext[1], ext[2], ext[3]);
 	expect_extents(w, ext, what);
+}
+
+static void expect_real_extents(Window w, const char *what)
+{
+	expect_changed_extents(w, NULL, what);
 }
 
 /* Ask for the frame extents of a window that is not mapped yet. */
@@ -3170,7 +3201,7 @@ static void test_redecorate(void)
 	/* a title bar and a border, no resize handles */
 	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0,
 		      MWM_DECOR_TITLE | MWM_DECOR_BORDER);
-	expect_real_extents(w, "a window with a title and a border");
+	expect_changed_extents(w, plain, "a window with a title and a border");
 	real_extents(w, titled);
 	if (titled[2] <= titled[0] || titled[0] >= plain[0] || !titled[0])
 		fail("odd extents for a title and a border: %ld,%ld,%ld,%ld",
@@ -3652,6 +3683,787 @@ static void test_usertime(void)
 	printf("usertime: ok\n");
 }
 
+/* ------------------------------------------------------------------ */
+/* The screen changing size                                            */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Set the size of the screen as xrandr does: the first connected output
+ * off, the new size, the output on again with a mode of that size (made
+ * if the server has none).  The size in millimeters keeps the resolution
+ * that the screen had at first, exactly when it is back to its first
+ * size (dtwm takes its border widths from the resolution).  The Screen
+ * record of this connection follows (Xlib's is that of the connection
+ * setup).  Returns 0 if RandR cannot.
+ */
+static int set_screen_size(int w, int h)
+{
+	static int first_w, first_h, first_mmw, first_mmh;
+	Screen *scr = DefaultScreenOfDisplay(dpy);
+	int mmw, mmh;
+	XRRScreenResources *res;
+	XRROutputInfo *out = NULL;
+	XRRModeInfo mi;
+	RROutput output = None;
+	RRMode mode = None;
+	char name[32];
+	int i, ev, er, minw, minh, maxw, maxh, cw, ch, ok = 0;
+
+	if (!XRRQueryExtension(dpy, &ev, &er) ||
+	    !XRRGetScreenSizeRange(dpy, rootw, &minw, &minh, &maxw, &maxh) ||
+	    w < minw || h < minh || w > maxw || h > maxh ||
+	    !(res = XRRGetScreenResourcesCurrent(dpy, rootw)))
+		return 0;
+	for (i = 0; i < res->noutput && !output; i++) {
+		out = XRRGetOutputInfo(dpy, res, res->outputs[i]);
+		if (out && out->connection == RR_Connected && out->crtc)
+			output = res->outputs[i];
+		else if (out)
+			XRRFreeOutputInfo(out);
+	}
+	if (!output)
+		goto done;
+	for (i = 0; i < res->nmode && !mode; i++) {
+		int j;
+
+		if ((int)res->modes[i].width != w ||
+		    (int)res->modes[i].height != h)
+			continue;
+		for (j = 0; j < out->nmode; j++)
+			if (out->modes[j] == res->modes[i].id)
+				mode = res->modes[i].id;
+	}
+	if (!mode) {
+		memset(&mi, 0, sizeof mi);
+		snprintf(name, sizeof name, "ewmhtest-%dx%d", w, h);
+		mi.width = w;
+		mi.height = h;
+		mi.hSyncStart = w + 16;
+		mi.hSyncEnd = w + 48;
+		mi.hTotal = w + 160;
+		mi.vSyncStart = h + 3;
+		mi.vSyncEnd = h + 9;
+		mi.vTotal = h + 30;
+		mi.dotClock = (unsigned long)mi.hTotal * mi.vTotal * 60;
+		mi.name = name;
+		mi.nameLength = strlen(name);
+		mode = XRRCreateMode(dpy, rootw, &mi);
+		XRRAddOutputMode(dpy, output, mode);
+	}
+	if (!first_w) {
+		first_w = WidthOfScreen(scr);
+		first_h = HeightOfScreen(scr);
+		first_mmw = WidthMMOfScreen(scr);
+		first_mmh = HeightMMOfScreen(scr);
+	}
+	mmw = (int)(((long)first_mmw * w + first_w / 2) / first_w);
+	mmh = (int)(((long)first_mmh * h + first_h / 2) / first_h);
+	XGrabServer(dpy);
+	XRRSetCrtcConfig(dpy, res, out->crtc, CurrentTime, 0, 0, None,
+			 RR_Rotate_0, NULL, 0);
+	XRRSetScreenSize(dpy, rootw, w, h, mmw, mmh);
+	XRRSetCrtcConfig(dpy, res, out->crtc, CurrentTime, 0, 0, mode,
+			 RR_Rotate_0, &output, 1);
+	XUngrabServer(dpy);
+	XSync(dpy, False);
+	root_geometry(rootw, &i, &i, &cw, &ch);
+	if (cw == w && ch == h) {
+		scr->mwidth = mmw;
+		scr->mheight = mmh;
+		scr->width = w;
+		scr->height = h;
+		ok = 1;
+	}
+done:
+	if (out)
+		XRRFreeOutputInfo(out);
+	XRRFreeScreenResources(res);
+	return ok;
+}
+
+/* -s WxH: the size of the screen for dtwm to start with */
+static int start_width, start_height;
+
+/* A condition that wait_until waits for: true, or why not in why. */
+typedef int (*condition)(const void *arg, char *why, size_t len);
+
+static void wait_until(condition cond, const void *arg, const char *what)
+{
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	char why[256];
+
+	for (;;) {
+		XSync(dpy, False);
+		*why = '\0';
+		if (cond(arg, why, sizeof why))
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("%s: %s", what, why);
+		usleep(20000);
+	}
+}
+
+static int desktop_geometry_is(const void *arg, char *why, size_t len)
+{
+	const int *size = arg;
+	unsigned long *v;
+	int n, ok;
+
+	v = get_prop(a_geometry, XA_CARDINAL, &n);
+	ok = n == 2 && (int)v[0] == size[0] && (int)v[1] == size[1];
+	snprintf(why, len, "_NET_DESKTOP_GEOMETRY is %ldx%ld, not %dx%d",
+		 n == 2 ? (long)v[0] : -1L, n == 2 ? (long)v[1] : -1L,
+		 size[0], size[1]);
+	if (v)
+		XFree(v);
+	return ok;
+}
+
+/* The frame (a root child) of the client window with this WM_CLASS name. */
+static int ignore_error(Display *d, XErrorEvent *ev)
+{
+	(void)d;
+	(void)ev;
+	return 0;
+}
+
+static Window find_named(Window w, const char *res_name, int depth)
+{
+	Window r, parent, *kids = NULL, found = None;
+	XClassHint ch = { NULL, NULL };
+	unsigned int i, nkids;
+
+	if (XGetClassHint(dpy, w, &ch)) {
+		if (ch.res_name && !strcmp(ch.res_name, res_name))
+			found = w;
+		XFree(ch.res_name);
+		XFree(ch.res_class);
+	}
+	if (found || !depth || !XQueryTree(dpy, w, &r, &parent, &kids, &nkids))
+		return found;
+	for (i = 0; i < nkids && !found; i++)
+		found = find_named(kids[i], res_name, depth - 1);
+	if (kids)
+		XFree(kids);
+	return found;
+}
+
+static Window front_panel_window(void)
+{
+	XErrorHandler old;
+	Window r, parent, *kids = NULL, w = None;
+	unsigned int i, nkids;
+
+	XSync(dpy, False);
+	old = XSetErrorHandler(ignore_error);
+	if (XQueryTree(dpy, rootw, &r, &parent, &kids, &nkids))
+		for (i = 0; i < nkids && !w; i++)
+			w = find_named(kids[i], "FrontPanel", 3);
+	if (kids)
+		XFree(kids);
+	XSync(dpy, False);
+	XSetErrorHandler(old);
+	return w;
+}
+
+/*
+ * Where the front panel is expected: by the geometry given with -x
+ * (Dtwm*FrontPanel.geometry), else centered along the bottom; or fixed
+ * (moved by the user) at fixed_x,fixed_y.
+ */
+struct panel_expect {
+	Window panel;
+	const char *geometry;
+	int fixed, fixed_x, fixed_y;
+};
+
+static const char *panel_geometry(void)
+{
+	const char *g;
+	int i;
+
+	for (i = 0; i < nxrm; i++)
+		if (strstr(xrm[i], "FrontPanel") &&
+		    (g = strstr(xrm[i], "geometry:"))) {
+			g += strlen("geometry:");
+			while (*g == ' ' || *g == '\t')
+				g++;
+			return g;
+		}
+	return NULL;
+}
+
+static int panel_placed(const void *arg, char *why, size_t len)
+{
+	const struct panel_expect *e = arg;
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	int x, y, w, h, gx = 0, gy = 0, ex, ey, flags = 0, cx, cy, cw, ch;
+	unsigned int gw, gh;
+
+	frame_geometry(e->panel, &x, &y, &w, &h);
+	root_geometry(e->panel, &cx, &cy, &cw, &ch);
+	if (e->fixed) {
+		ex = e->fixed_x;
+		ey = e->fixed_y;
+	} else if (e->geometry) {
+		flags = XParseGeometry(e->geometry, &gx, &gy, &gw, &gh);
+		ex = !(flags & XValue) ? x : (flags & XNegative) ?
+			sw - w + gx : gx;
+		ey = !(flags & YValue) ? y : (flags & YNegative) ?
+			sh - h + gy : gy;
+	} else {
+		/*
+		 * Centered as dtwm centers it at first: the frame where the
+		 * geometry it makes ("+x-0", x centering the window) puts
+		 * it, for the width the window has then (a pixel or two
+		 * less), or where a geometry close to that put it.
+		 */
+		ex = abs(x - (sw - cw) / 2) <= 8 ? x : (sw - cw) / 2;
+		ey = sh - h;
+	}
+	/* all on the screen in any case */
+	if (ex + w > sw)
+		ex = sw - w;
+	if (ex < 0)
+		ex = 0;
+	if (ey + h > sh)
+		ey = sh - h;
+	if (ey < 0)
+		ey = 0;
+	snprintf(why, len, "the front panel's frame is %dx%d+%d+%d, not at "
+		 "%d,%d (screen %dx%d)", w, h, x, y, ex, ey, sw, sh);
+	return x == ex && y == ey;
+}
+
+/*
+ * dtwm's backdrop windows: its override-redirect root children that
+ * cover the screen.
+ */
+#define MAX_BACKDROPS 16
+
+static int find_backdrops(Window *found)
+{
+	Window r, parent, *kids = NULL;
+	XWindowAttributes wa;
+	unsigned int i, nkids;
+	int n = 0;
+
+	XSync(dpy, False);
+	if (!XQueryTree(dpy, rootw, &r, &parent, &kids, &nkids))
+		fail("XQueryTree failed");
+	for (i = 0; i < nkids && n < MAX_BACKDROPS; i++)
+		if (XGetWindowAttributes(dpy, kids[i], &wa) &&
+		    wa.override_redirect && wa.class == InputOutput &&
+		    wa.x == 0 && wa.y == 0 &&
+		    wa.width == DisplayWidth(dpy, DefaultScreen(dpy)) &&
+		    wa.height == DisplayHeight(dpy, DefaultScreen(dpy)))
+			found[n++] = kids[i];
+	if (kids)
+		XFree(kids);
+	return n;
+}
+
+struct backdrops {
+	Window w[MAX_BACKDROPS];
+	int n;
+};
+
+static int backdrops_cover(const void *arg, char *why, size_t len)
+{
+	const struct backdrops *b = arg;
+	int i, x, y, w, h;
+
+	for (i = 0; i < b->n; i++) {
+		root_geometry(b->w[i], &x, &y, &w, &h);
+		if (w != DisplayWidth(dpy, DefaultScreen(dpy)) ||
+		    h != DisplayHeight(dpy, DefaultScreen(dpy))) {
+			snprintf(why, len, "backdrop window 0x%lx is %dx%d",
+				 b->w[i], w, h);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* The color of a pixel of the screen, 0xRRGGBB. */
+static unsigned long root_pixel(int x, int y)
+{
+	XImage *img;
+	unsigned long p;
+
+	img = XGetImage(dpy, rootw, x, y, 1, 1, AllPlanes, ZPixmap);
+	if (!img)
+		fail("cannot read the screen at %d,%d", x, y);
+	p = XGetPixel(img, 0, 0) & 0xFFFFFF;
+	XDestroyImage(img);
+	return p;
+}
+
+#define RED 0xFF0000UL
+
+/* The front panel (or None), which hides the backdrop where it is. */
+static Window backdrop_panel;
+
+/* The backdrop of the current desktop as an image type expects it. */
+static int backdrop_shows(const void *arg, char *why, size_t len)
+{
+	int type = *(const int *)arg;
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	struct {
+		int x, y, red;
+	} at[6];
+	int i, n = 0, px = 0, py = 0, pw = 0, ph = 0;
+
+	switch (type) {
+	case 0:		/* tiled: red everywhere, the far corners too */
+		at[n].x = sw - 3, at[n].y = 3, at[n++].red = 1;
+		at[n].x = sw - 3, at[n].y = sh - 3, at[n++].red = 1;
+		at[n].x = 3, at[n].y = sh - 3, at[n++].red = 1;
+		at[n].x = 3, at[n].y = sh / 2, at[n++].red = 1;
+		break;
+	case 1:		/* centered: the 64x64 image in the middle */
+		at[n].x = sw / 2, at[n].y = sh / 2, at[n++].red = 1;
+		at[n].x = sw / 2 - 40, at[n].y = sh / 2, at[n++].red = 0;
+		at[n].x = sw / 2, at[n].y = sh / 2 - 40, at[n++].red = 0;
+		break;
+	default:	/* fit: a square of the screen's height, centered */
+		at[n].x = sw / 2, at[n].y = sh / 2, at[n++].red = 1;
+		at[n].x = (sw - sh) / 2 - 20, at[n].y = sh / 2,
+			at[n++].red = 0;
+		at[n].x = (sw + sh) / 2 - 20, at[n].y = sh / 2,
+			at[n++].red = 1;
+		break;
+	}
+	if (backdrop_panel)
+		frame_geometry(backdrop_panel, &px, &py, &pw, &ph);
+	for (i = 0; i < n; i++) {
+		unsigned long p;
+
+		if (at[i].x >= px && at[i].x < px + pw &&
+		    at[i].y >= py && at[i].y < py + ph)
+			continue;
+		p = root_pixel(at[i].x, at[i].y);
+
+		if ((p == RED) != at[i].red) {
+			snprintf(why, len, "the pixel at %d,%d is 0x%06lx "
+				 "(screen %dx%d)", at[i].x, at[i].y, p, sw, sh);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* A 64x64 red image, as a pixmap and as an XPM file for dtwm to load. */
+static Pixmap red_image(char *path, size_t len)
+{
+	GC gc;
+	Pixmap p;
+	FILE *f;
+	int i, j;
+
+	snprintf(path, len, "%s/red.xpm", workdir);
+	if (!(f = fopen(path, "w")))
+		fail("cannot write %s: %s", path, strerror(errno));
+	fprintf(f, "/* XPM */\nstatic char *red[] = {\n\"64 64 1 1\",\n"
+		"\"r c #FF0000\",\n");
+	for (i = 0; i < 64; i++) {
+		fputc('"', f);
+		for (j = 0; j < 64; j++)
+			fputc('r', f);
+		fprintf(f, "\"%s\n", i < 63 ? "," : "");
+	}
+	fprintf(f, "};\n");
+	fclose(f);
+
+	p = XCreatePixmap(dpy, rootw, 64, 64,
+			  DefaultDepth(dpy, DefaultScreen(dpy)));
+	gc = XCreateGC(dpy, p, 0, NULL);
+	XSetForeground(dpy, gc, RED);
+	XFillRectangle(dpy, p, gc, 0, 0, 64, 64);
+	XFreeGC(dpy, gc);
+	return p;
+}
+
+/* What dtstyle does: change the backdrop of the current desktop. */
+static void change_backdrop(const char *path, Pixmap p, int type)
+{
+	char req[PATH_MAX + 80];
+	unsigned long *v;
+	int n;
+
+	snprintf(req, sizeof req, "f.change_backdrop %s %lx %d", path,
+		 (unsigned long)p, type);
+	v = get_prop(a_check, XA_WINDOW, &n);
+	if (n != 1)
+		fail("no _NET_SUPPORTING_WM_CHECK window");
+	XChangeProperty(dpy, v[0], a_dt_wm_request, XA_STRING, 8,
+			PropModeAppend, (const unsigned char *)req,
+			strlen(req) + 1);
+	XFree(v);
+}
+
+static void switch_desktop(int d)
+{
+	send_msg(rootw, a_current, d);
+	expect_card(rootw, a_current, d, "_NET_CURRENT_DESKTOP");
+}
+
+/* A window at a position the user gave. */
+static Window create_at(const char *title, int x, int y, int w, int h)
+{
+	Window win = create_window(title, None);
+	XSizeHints *sh = XAllocSizeHints();
+
+	XMoveResizeWindow(dpy, win, x, y, w, h);
+	sh->flags = USPosition | USSize;
+	sh->x = x;
+	sh->y = y;
+	sh->width = w;
+	sh->height = h;
+	XSetWMNormalHints(dpy, win, sh);
+	XFree(sh);
+	return win;
+}
+
+/* The frame of w fills the work area of the current desktop. */
+static int fills_workarea(const void *arg, char *why, size_t len)
+{
+	Window w = *(const Window *)arg;
+	unsigned long *v;
+	int i, n, x, y, wd, ht;
+	long a[4] = { -1, -1, -1, -1 }, d = card(rootw, a_current);
+
+	v = get_prop(XInternAtom(dpy, "_NET_WORKAREA", False), XA_CARDINAL,
+		     &n);
+	for (i = 0; d >= 0 && i < 4 && 4 * d + i < n; i++)
+		a[i] = (long)v[4 * d + i];
+	if (v)
+		XFree(v);
+	frame_geometry(w, &x, &y, &wd, &ht);
+	snprintf(why, len, "the maximized frame is %dx%d+%d+%d, the work "
+		 "area %ldx%ld+%ld+%ld", wd, ht, x, y, a[2], a[3], a[0], a[1]);
+	return a[2] == DisplayWidth(dpy, DefaultScreen(dpy)) &&
+	       x == a[0] && y == a[1] && wd == a[2] && ht == a[3];
+}
+
+/* The window w (undecorated) covers the screen. */
+static int fills_screen(const void *arg, char *why, size_t len)
+{
+	Window w = *(const Window *)arg;
+	int x, y, wd, ht;
+
+	root_geometry(w, &x, &y, &wd, &ht);
+	snprintf(why, len, "the full screen window is %dx%d+%d+%d", wd, ht,
+		 x, y);
+	return x == 0 && y == 0 && wd == DisplayWidth(dpy, DefaultScreen(dpy))
+	       && ht == DisplayHeight(dpy, DefaultScreen(dpy));
+}
+
+/* The frame of w is all on the screen. */
+static int frame_on_screen(const void *arg, char *why, size_t len)
+{
+	Window w = *(const Window *)arg;
+	int x, y, wd, ht;
+
+	frame_geometry(w, &x, &y, &wd, &ht);
+	snprintf(why, len, "the frame is %dx%d+%d+%d", wd, ht, x, y);
+	return x >= 0 && y >= 0 &&
+	       x + wd <= DisplayWidth(dpy, DefaultScreen(dpy)) &&
+	       y + ht <= DisplayHeight(dpy, DefaultScreen(dpy));
+}
+
+/*
+ * The icon: on the screen, as far from the top or the bottom (where the
+ * icons start, iconPlacement) as it was.
+ */
+struct icon_expect {
+	Window icon;
+	int bottom;		/* from the bottom, else from the top */
+	int distance;
+};
+
+static void icon_distance(struct icon_expect *e)
+{
+	int x, y, wd, ht, sh = DisplayHeight(dpy, DefaultScreen(dpy));
+
+	root_geometry(e->icon, &x, &y, &wd, &ht);
+	e->bottom = y + ht / 2 > sh / 2;
+	e->distance = e->bottom ? sh - y - ht : y;
+}
+
+static int icon_placed(const void *arg, char *why, size_t len)
+{
+	const struct icon_expect *e = arg;
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	int x, y, wd, ht, d;
+
+	root_geometry(e->icon, &x, &y, &wd, &ht);
+	d = e->bottom ? sh - y - ht : y;
+	snprintf(why, len, "the icon is %dx%d+%d+%d, %d from the %s, not "
+		 "about %d (screen %dx%d)", wd, ht, x, y, d,
+		 e->bottom ? "bottom" : "top", e->distance, sw, sh);
+	return x >= 0 && y >= 0 && x + wd <= sw && y + ht <= sh &&
+	       abs(d - e->distance) <= 16;
+}
+
+/* Change the size of the screen and wait until dtwm has followed. */
+static void resize_screen(int w, int h)
+{
+	int size[2] = { w, h };
+	char what[64];
+
+	if (w == DisplayWidth(dpy, DefaultScreen(dpy)) &&
+	    h == DisplayHeight(dpy, DefaultScreen(dpy)))
+		return;
+	if (!set_screen_size(w, h))
+		fail("cannot set the screen size to %dx%d", w, h);
+	snprintf(what, sizeof what, "the desktop geometry of %dx%d", w, h);
+	wait_until(desktop_geometry_is, size, what);
+}
+
+/*
+ * Drag the front panel by its left handle (a press and a move past
+ * moveThreshold make it run f.move) by dx,dy.
+ */
+static void drag_panel(Window panel, int dx, int dy)
+{
+	int x, y, w, h, i;
+
+	root_geometry(panel, &x, &y, &w, &h);
+	x += 6;
+	y += h / 2;
+	pointer_to(x, y);
+	XTestFakeButtonEvent(dpy, 1, True, CurrentTime);
+	XSync(dpy, False);
+	usleep(100000);
+	for (i = 1; i <= 10; i++) {
+		pointer_to(x + dx * i / 10, y + dy * i / 10);
+		usleep(30000);
+	}
+	XTestFakeButtonEvent(dpy, 1, False, CurrentTime);
+	XSync(dpy, False);
+	usleep(200000);
+	pointer_to(DisplayWidth(dpy, DefaultScreen(dpy)) / 2, 10);
+}
+
+/*
+ * The checks at a size: the backdrops of the first desktops, and the
+ * windows on another one (desktop), not to hide them.
+ */
+struct resize_state {
+	struct panel_expect panel;
+	struct backdrops backdrops;
+	int types[3], ntypes, desktop;
+	Window max, full, icon_of;
+	struct icon_expect icon;
+};
+
+static void check_size(struct resize_state *st, const char *when)
+{
+	char what[128];
+	int d;
+
+	snprintf(what, sizeof what, "backdrops %s", when);
+	wait_until(backdrops_cover, &st->backdrops, what);
+	for (d = 0; d < st->ntypes; d++) {
+		switch_desktop(d);
+		snprintf(what, sizeof what, "the %s backdrop %s",
+			 st->types[d] == 0 ? "tiled" : st->types[d] == 1 ?
+			 "centered" : "fit", when);
+		wait_until(backdrop_shows, &st->types[d], what);
+	}
+	switch_desktop(st->desktop);
+	if (st->panel.panel) {
+		snprintf(what, sizeof what, "the front panel %s", when);
+		wait_until(panel_placed, &st->panel, what);
+	}
+	snprintf(what, sizeof what, "the maximized window %s", when);
+	wait_until(fills_workarea, &st->max, what);
+	snprintf(what, sizeof what, "the full screen window %s", when);
+	wait_until(fills_screen, &st->full, what);
+	snprintf(what, sizeof what, "the icon %s", when);
+	wait_until(icon_placed, &st->icon, what);
+}
+
+static void test_resize(void)
+{
+	struct resize_state st;
+	int w0 = DisplayWidth(dpy, DefaultScreen(dpy));
+	int h0 = DisplayHeight(dpy, DefaultScreen(dpy));
+	int w1, h1, ev, er, maj, min, maxw, maxh, i, x, y, wd, ht, fx, fy;
+	int small_w, small_h, large_w, large_h, num, cw, ch;
+	char path[PATH_MAX + 16];
+	Window far, part, late, grow;
+	Pixmap red;
+	const char *types[] = { "tiled", "centered", "fit" };
+
+	if (!XRRQueryExtension(dpy, &ev, &er) ||
+	    !XRRGetScreenSizeRange(dpy, rootw, &i, &i, &maxw, &maxh)) {
+		printf("resize: skipped (no RandR)\n");
+		return;
+	}
+	/* the other size: 1280x800, or the largest if this is it */
+	if (w0 > 1280 || h0 > 800) {
+		w1 = 1280;
+		h1 = 800;
+	} else {
+		w1 = maxw;
+		h1 = maxh;
+	}
+	if ((w1 == w0 && h1 == h0) || !set_screen_size(w0, h0)) {
+		printf("resize: skipped (the screen cannot change size)\n");
+		return;
+	}
+	small_w = w1 > w0 ? w0 : w1;
+	small_h = w1 > w0 ? h0 : h1;
+	large_w = w1 > w0 ? w1 : w0;
+	large_h = w1 > w0 ? h1 : h0;
+	memset(&st, 0, sizeof st);
+	if (front_panel && !(st.panel.panel = front_panel_window()))
+		fail("no front panel window");
+	backdrop_panel = st.panel.panel;
+
+	/*
+	 * A tiled, a centered and a fit backdrop on the first desktops,
+	 * the windows on the last.
+	 */
+	num = (int)card(rootw, a_number);
+	st.desktop = num > 1 ? num - 1 : 0;
+	red = red_image(path, sizeof path);
+	for (st.ntypes = 0; st.ntypes < 3 && st.ntypes < st.desktop;
+	     st.ntypes++) {
+		st.types[st.ntypes] = st.ntypes;
+		switch_desktop(st.ntypes);
+		change_backdrop(path, red, st.ntypes);
+		wait_until(backdrop_shows, &st.types[st.ntypes],
+			   types[st.ntypes]);
+	}
+	switch_desktop(st.desktop);
+	st.backdrops.n = find_backdrops(st.backdrops.w);
+	if (st.backdrops.n < st.ntypes)
+		fail("%d backdrop windows for %d backdrops", st.backdrops.n,
+		     st.ntypes);
+
+	/* the front panel, centered along the bottom or by its geometry */
+	if (front_panel) {
+		/*
+		 * A geometry that centers it along the bottom (as dtwm saves
+		 * the position of a panel that was there) is the default.
+		 */
+		st.panel.geometry = panel_geometry();
+		frame_geometry(st.panel.panel, &x, &y, &wd, &ht);
+		root_geometry(st.panel.panel, &fx, &fy, &cw, &ch);
+		if (st.panel.geometry && abs(x - (w0 - cw) / 2) <= 8 &&
+		    y + ht == h0)
+			st.panel.geometry = NULL;
+	}
+
+	/* windows: maximized, full screen, minimized */
+	st.max = map_managed(create_window("ewmhtest resize max", None));
+	send_state(st.max, ADD, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	st.full = map_managed(create_window("ewmhtest resize full", None));
+	send_state(st.full, ADD, "FULLSCREEN", NULL);
+	st.icon_of = map_managed(create_window("ewmhtest resize icon",
+					       None));
+	st.icon.icon = iconify(st.icon_of);
+	icon_distance(&st.icon);
+	check_size(&st, "at first");
+
+	/*
+	 * A window off the smaller screen, one on it in part (more than
+	 * 64 pixels across), when the screen is the larger.
+	 */
+	resize_screen(large_w, large_h);
+	far = map_managed(create_at("ewmhtest resize far", small_w + 300,
+				    small_h + 100, 200, 100));
+	part = map_managed(create_at("ewmhtest resize part", small_w - 150,
+				     100, 300, 200));
+	frame_geometry(part, &fx, &fy, &wd, &ht);
+	resize_screen(small_w, small_h);
+	check_size(&st, "smaller");
+	wait_until(frame_on_screen, &far, "the window that was off the "
+		   "screen");
+	frame_geometry(part, &x, &y, &wd, &ht);
+	if (x != fx || y != fy)
+		fail("the window that is still on the screen in part moved "
+		     "from %d,%d to %d,%d", fx, fy, x, y);
+	grow = map_managed(create_window("ewmhtest resize grow", None));
+
+	/* larger: a new window can go to the new part of the screen */
+	resize_screen(large_w, large_h);
+	check_size(&st, "larger");
+
+	/* a window that came on the smaller screen may grow larger */
+	moveresize_window(grow, MR_W | MR_H, 0, 0, small_w + 100,
+			  small_h + 50);
+	expect_geometry(grow, ANY, ANY, small_w + 100, small_h + 50,
+			"a window larger than the smaller screen");
+	late = map_managed(create_at("ewmhtest resize late", small_w + 100,
+				     small_h - 150, 200, 100));
+	frame_geometry(late, &x, &y, &wd, &ht);
+	if (x < small_w)
+		fail("a window placed at %d,%d is at %d,%d, not in the new "
+		     "part of the screen", small_w + 100, small_h - 150, x,
+		     y);
+
+	/* back to the first size */
+	resize_screen(w0, h0);
+	check_size(&st, "back at the first size");
+
+	/*
+	 * The front panel moved by the user (and its geometry from then
+	 * on) stays where the user put it, all on the screen.
+	 */
+	if (front_panel) {
+		int ex, ey;
+
+		if (!XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
+			printf("resize: no XTEST, the panel is not moved\n");
+			goto done;
+		}
+		/* toward the top right corner of the larger screen */
+		resize_screen(large_w, large_h);
+		frame_geometry(st.panel.panel, &fx, &fy, &wd, &ht);
+		x = DisplayWidth(dpy, DefaultScreen(dpy)) - 20 - wd;
+		y = 200;
+		drag_panel(st.panel.panel, x - fx, y - fy);
+		frame_geometry(st.panel.panel, &ex, &ey, &wd, &ht);
+		if (ex == fx && ey == fy)
+			fail("the front panel did not move");
+		st.panel.fixed = 1;
+		st.panel.fixed_x = ex;
+		st.panel.fixed_y = ey;
+		wait_until(panel_placed, &st.panel, "the moved front panel");
+
+		/* smaller: as near as all of it on the screen allows */
+		resize_screen(small_w, small_h);
+		if (ex + wd > small_w)
+			ex = small_w - wd;
+		st.panel.fixed_x = ex;
+		wait_until(panel_placed, &st.panel,
+			   "the moved front panel on the smaller screen");
+
+		/* larger again: where it is */
+		resize_screen(large_w, large_h);
+		wait_until(panel_placed, &st.panel,
+			   "the moved front panel on the larger screen");
+		resize_screen(w0, h0);
+		wait_until(panel_placed, &st.panel,
+			   "the moved front panel at the first size");
+	}
+done:
+	destroy_all();
+	switch_desktop(0);
+	XFreePixmap(dpy, red);
+	printf("resize: ok (%dx%d and %dx%d%s)\n", w0, h0, w1, h1,
+	       front_panel ? (st.panel.geometry ? ", panel geometry" :
+			      ", panel") : "");
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
@@ -3671,6 +4483,7 @@ static const struct {
 	{ "moveresize", test_moveresize },
 	{ "icon", test_icon },
 	{ "usertime", test_usertime },
+	{ "resize", test_resize },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))
@@ -3679,7 +4492,7 @@ static void usage(FILE *f)
 {
 	int i;
 
-	fprintf(f, "usage: ewmhtest [-f] [-m DTWM] [-x RESOURCE]... "
+	fprintf(f, "usage: ewmhtest [-f] [-m DTWM] [-s WxH] [-x RESOURCE]... "
 		   "TEST...\ntests: all");
 	for (i = 0; i < NTESTS; i++)
 		fprintf(f, " %s", tests[i].name);
@@ -3690,10 +4503,18 @@ int main(int argc, char **argv)
 {
 	int opt, i, j;
 
-	while ((opt = getopt(argc, argv, "fm:x:h")) != -1) {
+	while ((opt = getopt(argc, argv, "fm:s:x:h")) != -1) {
 		switch (opt) {
 		case 'f':
 			front_panel = 1;
+			break;
+		case 's':
+			if (sscanf(optarg, "%dx%d", &start_width,
+				   &start_height) != 2 ||
+			    start_width <= 0 || start_height <= 0) {
+				usage(stderr);
+				return 2;
+			}
 			break;
 		case 'm':
 			wm_path = optarg;
@@ -3749,6 +4570,10 @@ int main(int argc, char **argv)
 	a_dt_wm_request = XInternAtom(dpy, "_DT_WM_REQUEST", False);
 	a_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
 	XSelectInput(dpy, rootw, PropertyChangeMask);
+
+	if (start_width && !set_screen_size(start_width, start_height))
+		fail("cannot set the screen size to %dx%d", start_width,
+		     start_height);
 
 	atexit(cleanup);
 	signal(SIGINT, on_signal);
