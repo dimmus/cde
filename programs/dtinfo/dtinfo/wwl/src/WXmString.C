@@ -52,16 +52,21 @@ WXmString::CopyUsingFont( char* newtag )
 {
    XmStringContext context;
    if( XmStringInitContext(&context,*this)){
-      char* text = NULL;
-      XmStringCharSet tag;
-      XmStringDirection direction;
-      Boolean separator;
+      XmStringComponentType type;
+      unsigned int length;
+      XtPointer value;
 
-      if( XmStringGetNextSegment(context,&text,&tag,&direction,&separator) ){
-	 WXmString NewString(text, newtag);
-	 delete text;
-         XmStringFreeContext(context);
-	 return NewString;
+      // The first text segment (XmStringGetNextSegment is obsolete)
+      while( (type = XmStringGetNextTriple(context,&length,&value))
+             != XmSTRING_COMPONENT_END ){
+	 if( type == XmSTRING_COMPONENT_TEXT ||
+	     type == XmSTRING_COMPONENT_LOCALE_TEXT ){
+	    WXmString NewString((char *) value, newtag);
+	    XtFree((char *) value);
+	    XmStringFreeContext(context);
+	    return NewString;
+	 }
+	 XtFree((char *) value);
       }
       XmStringFreeContext(context);
    }

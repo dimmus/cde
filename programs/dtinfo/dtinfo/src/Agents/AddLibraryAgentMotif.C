@@ -289,24 +289,24 @@ AddLibraryAgent::fileSelectedCallback ( Widget    w,
         (XmFileSelectionBoxCallbackStruct *) call_data;
     char     *name   = NULL;
     XmString  xmstr  = cb->value;  // The selected file
-    int       status = 0;
 
     if ( xmstr )   // Make sure a file was selected
     {
-        // Extract the first character string matching the default
-        // character set from the compound string
-
-        status = XmStringGetLtoR ( xmstr, XmFONTLIST_DEFAULT_TAG, &name );
-         if(status && strlen(name)<1)
+        // The text of the compound string (XmStringGetLtoR is obsolete)
+        name = (char *) XmStringUnparse ( xmstr, NULL, XmCHARSET_TEXT,
+                                          XmCHARSET_TEXT, NULL, 0,
+                                          XmOUTPUT_ALL );
+         if( name && strlen(name)<1)
          {
             XtFree(name);
             return;
          }
-         if( status )
+         if( name )
          {
             XmTextFieldSetString( (Widget) obj->f_text, name );
             // XtSetKeyboardFocus( (Widget) obj->f_form, (Widget) obj->f_ok );
             XmProcessTraversal( (Widget) obj->f_ok, XmTRAVERSE_CURRENT );
+            XtFree(name);
          }
     }
     XtUnmanageChild ( w );   // Bring the file selection dialog down.
