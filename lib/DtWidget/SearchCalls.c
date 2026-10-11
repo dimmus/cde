@@ -54,6 +54,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <string.h>
 #include <strings.h>
 #include <langinfo.h>
@@ -115,24 +116,133 @@ WriteAll(int fd, const char *buf, size_t len)
 }
 
 
+/*
+ * The spell filter's output is read from the event loop (XtAppAddInput)
+ * instead of blocking the application until the filter is done; the
+ * words are put in the list in one go and the dialog managed when the
+ * filter's output ends, as before.  One run per editor at a time.
+ */
+typedef struct _SpellJob {
+    struct _SpellJob	*next;
+    DtEditorWidget	editor;
+    FILE		*fp;
+    XtInputId		id;
+    char		fileName[64];
+    char		*line;		/* the partial line read so far */
+    size_t		len, max;
+    XmString		*words;		/* misspelled words, added in one go */
+    int			numWords, maxWords;
+} SpellJob;
+
+static SpellJob *spellJobs;
+
+static void SpellEditorDestroyedCB(Widget w, XtPointer client, XtPointer call);
+
+/* Stops JOB, without touching its widgets if CANCEL. */
+static void
+EndSpellJob(SpellJob *job, Boolean cancel)
+{
+    SpellJob **pp;
+    DtEditorWidget pPriv = job->editor;
+    int i;
+
+    for (pp = &spellJobs; *pp != NULL; pp = &(*pp)->next)
+	if (*pp == job) {
+	    *pp = job->next;
+	    break;
+	}
+    XtRemoveInput(job->id);
+    XtRemoveCallback((Widget)pPriv, XmNdestroyCallback,
+		     SpellEditorDestroyedCB, (XtPointer)job);
+    pclose(job->fp);
+    unlink(job->fileName);
+
+    if (!cancel) {
+	/* display the results: one list update instead of one per word */
+	if (job->numWords > 0)
+	    XmListAddItemsUnselected(M_search_spellList(pPriv),
+				     job->words, job->numWords, 0);
+	_DtEditorSearch(pPriv, True, False);
+	_DtTurnOffHourGlass(M_search_dialog(pPriv));
+	_DtTurnOffHourGlass(M_topLevelShell(pPriv));
+    }
+    for (i = 0; i < job->numWords; i++)
+	XmStringFree(job->words[i]);
+    XtFree((char *)job->words);
+    XtFree(job->line);
+    XtFree((char *)job);
+}
+
+/* ARGSUSED */
+static void
+SpellEditorDestroyedCB(Widget w, XtPointer client, XtPointer call)
+{
+    EndSpellJob((SpellJob *)client, True);
+}
+
+/* ARGSUSED */
+static void
+SpellInputCB(XtPointer client, int *source, XtInputId *id)
+{
+    SpellJob *job = (SpellJob *)client;
+    char buf[4096];
+    ssize_t n;
+    size_t i;
+
+    n = read(*source, buf, sizeof(buf));
+    if (n < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
+	return;
+    if (n <= 0) {
+	/* end of the output; a last line without a newline is dropped */
+	EndSpellJob(job, False);
+	return;
+    }
+
+    for (i = 0; i < (size_t)n; i++) {
+	if (buf[i] != '\n') {
+	    if (job->len == job->max) {
+		job->max += 50;
+		job->line = XtRealloc(job->line, job->max + 1);
+	    }
+	    job->line[job->len++] = buf[i];
+	    continue;
+	}
+	if (job->line == NULL)
+	    job->line = XtMalloc((job->max = 50) + 1);
+	job->line[job->len] = '\0';
+	if (job->numWords == job->maxWords) {
+	    job->maxWords = job->maxWords ? 2 * job->maxWords : 64;
+	    job->words = (XmString *) XtRealloc((char *) job->words,
+				sizeof(XmString) * job->maxWords);
+	}
+	job->words[job->numWords++] = XmStringCreateLocalized(job->line);
+	job->len = 0;
+    }
+}
+
 DtEditorErrorCode
 DtEditorInvokeSpellDialog(
 	Widget widget)
 {
     DtEditorWidget pPriv = (DtEditorWidget) widget;
     char fileName[64], *com, *string;
-    char *line;
     FILE *fp;           /* pipe to read words from */
     int fd;
     Boolean written;
-    int len = 0;        /* length of line read in */
-    int maxLen = 0;     /* max length of the line buffer */
-    XmString *words = NULL;	/* misspelled words, added in one go */
-    int numWords = 0, maxWords = 0;
+    SpellJob *job;
 
     DtEditorErrorCode error = DtEDITOR_NO_TMP_FILE;
     _DtWidgetToAppContext(widget);
     _DtAppLock(app);
+
+    /* a run still going for this editor is replaced by this one */
+    for (job = spellJobs; job != NULL; job = job->next)
+	if (job->editor == pPriv) {
+	    _DtTurnOffHourGlass(M_search_dialog(pPriv));
+	    _DtTurnOffHourGlass(M_topLevelShell(pPriv));
+	    EndSpellJob(job, True);
+	    break;
+	}
 
     if (!IsValidFilter(pPriv)) {
        error = DtEDITOR_SPELL_FILTER_FAILED;
@@ -181,6 +291,8 @@ DtEditorInvokeSpellDialog(
           else if ( fp == (FILE *)NULL )
             error = DtEDITOR_SPELL_FILTER_FAILED;
           else {
+            int flags;
+
             error = DtEDITOR_NO_ERRORS;
 
 	    /* 
@@ -194,61 +306,33 @@ DtEditorInvokeSpellDialog(
             XmListSetPos(M_search_spellList(pPriv), 1); 
             XmListDeleteAllItems(M_search_spellList(pPriv));
 
-	    /*
-	     * malloc the buffer
+            /*
+	     * Read the words as they come (SpellInputCB); the temporary
+	     * file goes when the filter is done with it.
 	     */
-	    maxLen = 50;
-	    line = (char *) XtMalloc (sizeof(char) * (maxLen + 1));
-	    len  = 0;
-
-            /* 
-	     * Now, get each word and hand it to the list 
-	     */
-            while(fgets(&line[len], maxLen - len, fp)) 
-            {
-               len += strlen(&line[len]);
-               if (len > 0)
-	       {
-                  if (line[len - 1] == '\n')
- 	          {
-                     line[len - 1] = '\0';
-		     if (numWords == maxWords) {
-			maxWords = maxWords ? 2 * maxWords : 64;
-			words = (XmString *) XtRealloc((char *) words,
-					sizeof(XmString) * maxWords);
-		     }
-                     words[numWords++] = XmStringCreateLocalized(line);
-		     len = 0;
-                  }
-	          else
-	          {
-		     maxLen += 50;
-		     line = (char *) XtRealloc (line, sizeof(char) * (maxLen + 1));
-	          }
-	       }
-            }
-
-            /* clean up and display the results: one list update
-	     * instead of one per word */
-	    XtFree(line);
-            pclose(fp);
-	    if (numWords > 0) {
-	       int i;
-
-	       XmListAddItemsUnselected(M_search_spellList(pPriv),
-					words, numWords, 0);
-	       for (i = 0; i < numWords; i++)
-		  XmStringFree(words[i]);
-	    }
-	    XtFree((char *) words);
-            _DtEditorSearch(pPriv, True, False);
-            _DtTurnOffHourGlass(M_search_dialog(pPriv));
+            job = (SpellJob *) XtCalloc(1, sizeof(SpellJob));
+            job->editor = pPriv;
+            job->fp = fp;
+            memcpy(job->fileName, fileName, sizeof(fileName));
+            flags = fcntl(fileno(fp), F_GETFL);
+            if (flags != -1)
+               fcntl(fileno(fp), F_SETFL, flags | O_NONBLOCK);
+            job->id = XtAppAddInput(XtWidgetToApplicationContext(widget),
+				    fileno(fp), (XtPointer) XtInputReadMask,
+				    SpellInputCB, (XtPointer) job);
+            XtAddCallback(widget, XmNdestroyCallback,
+			  SpellEditorDestroyedCB, (XtPointer) job);
+            job->next = spellJobs;
+            spellJobs = job;
          } /* end start the spell filter */
-         unlink(fileName);
+         if (error != DtEDITOR_NO_ERRORS)
+            unlink(fileName);
 
        } /* end create temporary file */
 
-       _DtTurnOffHourGlass(M_topLevelShell(pPriv));
+       /* a running filter keeps the hourglass until it is done */
+       if (error != DtEDITOR_NO_ERRORS)
+          _DtTurnOffHourGlass(M_topLevelShell(pPriv));
     }
 
     if (error != DtEDITOR_NO_ERRORS) {
