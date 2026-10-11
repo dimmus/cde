@@ -7684,7 +7684,7 @@ ProcessCallbackEvent(
          if (strcmp(name, "TYPE") == 0)
          {
             fval.addr = (caddr_t)&(event->type);
-            fval.size = sizeof(long);
+            fval.size = sizeof(event->type);
             XtConvert(Toplevel, "XE_EventType", &fval, XtRString, &tval);
             if (tval.size != 0) 
                ptr = (char *)(tval.addr);
