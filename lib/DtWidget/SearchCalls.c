@@ -177,7 +177,25 @@ EndSpellJob(SpellJob *job, Boolean cancel)
 static void
 SpellEditorDestroyedCB(Widget w, XtPointer client, XtPointer call)
 {
+    Widget shell = M_topLevelShell(((SpellJob *)client)->editor);
+
+    /* the shell can outlive the editor: give it its cursor back */
+    if (shell != NULL && !shell->core.being_destroyed && XtIsRealized(shell))
+	_DtTurnOffHourGlass(shell);
     EndSpellJob((SpellJob *)client, True);
+}
+
+/*
+ * The temporary file holds the document: do not leave it behind when
+ * the application exits while a filter is still running.
+ */
+static void
+SpellJobsAtExit(void)
+{
+    SpellJob *job;
+
+    for (job = spellJobs; job != NULL; job = job->next)
+	unlink(job->fileName);
 }
 
 /* ARGSUSED */
@@ -324,6 +342,12 @@ DtEditorInvokeSpellDialog(
 			  SpellEditorDestroyedCB, (XtPointer) job);
             job->next = spellJobs;
             spellJobs = job;
+            {
+               static Boolean atExitSet = False;
+
+               if (!atExitSet)
+                  atExitSet = (atexit(SpellJobsAtExit) == 0);
+            }
          } /* end start the spell filter */
          if (error != DtEDITOR_NO_ERRORS)
             unlink(fileName);

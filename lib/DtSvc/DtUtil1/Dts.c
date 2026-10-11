@@ -1477,9 +1477,10 @@ _DtDtsGetDataType(const char *file)
  * Directories seen without a .DtDirDataType file.  Almost none has one,
  * and dtfile types every subdirectory again on each reread, so this
  * saves an open() per directory and reread.  An entry is keyed on the
- * directory's device and inode and holds while its mtime is unchanged:
- * creating, removing or renaming an entry in a directory updates it.
- * A directory modified less than DIR_DT_RACY seconds ago is not cached,
+ * directory's device and inode and holds while its mtime and ctime are
+ * unchanged: creating, removing or renaming an entry in a directory
+ * updates both, and utime() can set the mtime back but not the ctime.
+ * A directory changed less than DIR_DT_RACY seconds ago is not cached,
  * so that a file created within the same tick of a coarse file system
  * clock is still found.
  */
@@ -1492,6 +1493,7 @@ static struct dir_dt_entry
 	dev_t		dev;
 	ino_t		ino;
 	struct timespec	mtim;
+	struct timespec	ctim;
 	int		valid;
 } *dir_dt_cache;
 static size_t	dir_dt_size;	/* slots */
@@ -1589,6 +1591,7 @@ dir_dt_add(const struct stat *st)
 	e->dev = st->st_dev;
 	e->ino = st->st_ino;
 	e->mtim = st->st_mtim;
+	e->ctim = st->st_ctim;
 	e->valid = 1;
 }
 
@@ -1630,7 +1633,9 @@ dir_data_type(type_info_t *info, const struct stat *st)
 
 	if(slot && slot->valid &&
 	   slot->mtim.tv_sec == st->st_mtim.tv_sec &&
-	   slot->mtim.tv_nsec == st->st_mtim.tv_nsec)
+	   slot->mtim.tv_nsec == st->st_mtim.tv_nsec &&
+	   slot->ctim.tv_sec == st->st_ctim.tv_sec &&
+	   slot->ctim.tv_nsec == st->st_ctim.tv_nsec)
 	{
 		return(0);
 	}
@@ -1679,6 +1684,7 @@ dir_data_type(type_info_t *info, const struct stat *st)
 		 */
 		if(errno == ENOENT &&
 		   (long long)st->st_mtim.tv_sec < (long long)time(NULL) - DIR_DT_RACY &&
+		   (long long)st->st_ctim.tv_sec < (long long)time(NULL) - DIR_DT_RACY &&
 		   dir_dt_lstat(info, &lst) == -1 && errno == ENOENT)
 		{
 			dir_dt_add(st);
