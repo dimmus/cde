@@ -2444,7 +2444,41 @@ MsgScrollingList::updateListItems(int current,
 
     // newList has one entry per listed (undeleted) message;
     // session_message_number also counts deleted ones.
+    //
+    // XmListReplaceItemsPos() rebuilds the list's selected positions
+    // for every item it replaces, scanning the items until it has found
+    // XmNselectedItemCount selected ones. When that count is stale (here
+    // it is 1 with no item selected, after the list was refilled) every
+    // replacement scans the whole list: quadratic, 30% of the time to
+    // open a 10,000 message mailbox. So replace the items with nothing
+    // selected, and select the same positions again afterwards (when
+    // selected_messages is given the selection is redone below anyway).
+    int sel_items = 0;
+    int sel_count = 0;
+    int * sel_pos = NULL;
+    XtVaGetValues(_w, XmNselectedItemCount, &sel_items,
+		  XmNselectedPositions, &sel_pos,
+		  XmNselectedPositionCount, &sel_count, NULL);
+    int * keep_pos = NULL;
+    if (sel_items > 0) {
+	if (sel_count > 0 && sel_pos != NULL && selected_messages == NULL) {
+	    keep_pos = new int[sel_count];
+	    memcpy(keep_pos, sel_pos, sel_count * sizeof(int));
+	}
+	else {
+	    sel_count = 0;
+	}
+	XmListDeselectAllItems(_w);
+    }
+    else {
+	sel_count = 0;
+    }
     XmListReplaceItemsPos(_w, newList, nmsgs, 1);
+    if (keep_pos != NULL) {
+	for (int sp = 0; sp < sel_count; sp++)
+	  XmListSelectPos(_w, keep_pos[sp], FALSE);
+	delete [] keep_pos;
+    }
     for (int fr = 0; fr < nmsgs; fr++)
       XmStringFree(newList[fr]);
 
