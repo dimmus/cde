@@ -62,20 +62,20 @@ endif
 
 libDtSvc_la_LIBADD = $(LIBTT) $(LIBXIN) $(XMLIB) $(XTLIB) $(X11LIB)
 
-libDtSvc_la_SOURCES = 	DtCodelibs/buf.C \
+libDtSvc_la_SOURCES = 	DtCodelibs/buf.c \
 	DtCodelibs/buf.h \
-	DtCodelibs/filegen.C \
-	DtCodelibs/mbschr.C \
-	DtCodelibs/pathcollapse.C \
-	DtCodelibs/privbuf.C \
-	DtCodelibs/shellscan.C \
-	DtCodelibs/strcase.C \
-	DtCodelibs/strend.C \
-	DtCodelibs/strhash.C \
-	DtCodelibs/stringio.C \
+	DtCodelibs/filegen.c \
+	DtCodelibs/mbschr.c \
+	DtCodelibs/pathcollapse.c \
+	DtCodelibs/privbuf.c \
+	DtCodelibs/shellscan.c \
+	DtCodelibs/strcase.c \
+	DtCodelibs/strend.c \
+	DtCodelibs/strhash.c \
+	DtCodelibs/stringio.c \
 	DtCodelibs/stringio.h \
-	DtCodelibs/strtokx.C \
-	DtCodelibs/strwcmp.C \
+	DtCodelibs/strtokx.c \
+	DtCodelibs/strwcmp.c \
 	DtEncap/bmsglob.c \
 	DtEncap/connect.c \
 	DtEncap/local.c \

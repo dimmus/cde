@@ -21,40 +21,31 @@
  * Floor, Boston, MA 02110-1301 USA
  */
 /*
- * File:	stringio.C $XConsortium: stringio.C /main/5 1996/06/21 17:36:19 ageorge $
+ * $XConsortium: privbuf.C /main/4 1996/04/21 19:09:31 drk $
  *
- * (c) Copyright 1993, 1994 Hewlett-Packard Company
- * (c) Copyright 1993, 1994 International Business Machines Corp.
- * (c) Copyright 1993, 1994 Sun Microsystems, Inc.
- * (c) Copyright 1993, 1994 Novell, Inc.
+ * (c) Copyright 1996 Digital Equipment Corporation.
+ * (c) Copyright 1993,1994,1996 Hewlett-Packard Company.
+ * (c) Copyright 1993,1994,1996 International Business Machines Corp.
+ * (c) Copyright 1993,1994,1996 Sun Microsystems, Inc.
+ * (c) Copyright 1993,1994,1996 Novell, Inc. 
+ * (c) Copyright 1996 FUJITSU LIMITED.
+ * (c) Copyright 1996 Hitachi.
  */
-#include <codelibs/nl_hack.h>
-#include "stringio.h"
+#define __PRIVATE_
+#include <codelibs/privbuf.h>
 
-int
-_StringIO::doit(int commit)
+PRIVBUF_IMPLEMENT_ARRAY(privbuf_charbuf, char, 128)
+PRIVBUF_IMPLEMENT_ARRAY(privbuf_strvec, char *, 128)
+
+void privbuf_release(void **var)
 {
-    wchar_t ch;
-    int cu = curr;
-    char *ccp;
-    wchar_t __nlh_char[1];
+    char *buf;
+    privbuf_func *p;
 
-    for (; cu >= 0; cu--)
-    {
-	ccp = ptr[cu];
-	ch = ccp ? CHARAT(ccp) : '\0';
-	if (ch != '\0')
-	    break;
-    }
-    if (commit)
-    {
-	old_curr = curr;
-	if ((curr = cu) >= 0)
-	{
-	    old_ccp = (const char *)ccp;
-	    ADVANCE(ccp);
-	    ptr[curr] = ccp;
-	}
-    }
-    return ch;
+    if (var == NULL || *var == NULL)
+	return;
+    buf = (char*)*var;
+    p = (privbuf_func*)(void*)buf;
+    *var = NULL;
+    (*p)((void*)buf);
 }

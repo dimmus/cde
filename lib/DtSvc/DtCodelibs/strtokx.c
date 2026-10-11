@@ -21,7 +21,7 @@
  * Floor, Boston, MA 02110-1301 USA
  */
 /*
- * $XConsortium: privbuf.C /main/4 1996/04/21 19:09:31 drk $
+ * $XConsortium: strtokx.c /main/4 1996/04/21 19:09:46 drk $
  *
  * (c) Copyright 1996 Digital Equipment Corporation.
  * (c) Copyright 1993,1994,1996 Hewlett-Packard Company.
@@ -31,35 +31,40 @@
  * (c) Copyright 1996 FUJITSU LIMITED.
  * (c) Copyright 1996 Hitachi.
  */
-#define __PRIVATE_
-#include <codelibs/privbuf.h>
+#include <codelibs/nl_hack.h>
+#include <codelibs/mbstring.h>
+#include <codelibs/stringx.h>
 
-implement_array(privbuf_charbuf, char, 128)
-implement_array(privbuf_strvec, char*, 128)
-
-void privbuf_release(void **var)
+char *
+strtokx(char **ptr, const char *sep)
 {
-    if (var == NULL || *var == NULL)
-	return;
-    char *buf = (char*)*var;
-    privbuf_func *p = (privbuf_func*)(void*)buf;
-    *var = NULL;
-    (*p)((void*)buf);
-}
+    char *ret, *end;
 
-void privbuf_freeprivbuf(void *buf)
-{
-    privbuf_buffer *b = (privbuf_buffer*)buf;
-    //delete b->buf;
-    //delete b->vec;
-    delete b;
-}
+    if (*ptr == NULL)
+	return NULL;
 
-privbuf_buffer *privbuf_allocprivbuf()
-{
-    privbuf_buffer *b = new privbuf_buffer;
-    b->func = privbuf_freeprivbuf;
-    //b->buf = new privbuf_charbuf;
-    //b->vec = new privbuf_strvec;
-    return b;
+    // find the beginning of the token
+    ret = *ptr;
+    while (*ret != '\0' && _mb_schr(sep, *ret) != NULL)
+	ADVANCE(ret);
+
+    // find the end of the token
+    end = ret;
+    while (*end != '\0' && _mb_schr(sep, *end) == NULL)
+	ADVANCE(end);
+
+    *ptr = end;
+
+    // If this isn't the last token, advance pointer and terminate
+    // current token.
+    if (*end != '\0')
+    {
+	ADVANCE(*ptr);
+	WCHAR('\0', end);
+    }
+
+    if (*ret == '\0')
+	return NULL;
+
+    return ret;
 }

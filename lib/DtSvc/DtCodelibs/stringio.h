@@ -28,70 +28,85 @@
  * (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  * (c) Copyright 1993, 1994 Novell, Inc.
  */
+#ifndef _DtSvc_stringio_h
+#define _DtSvc_stringio_h
+
 #include <codelibs/boolean.h>
 #define __PRIVATE_
 #include <codelibs/privbuf.h>
 
-class _StringIO
+/*
+ * A stack of string pointers that are read one character at a time:
+ * shellscan() pushes the value of a variable or command substitution
+ * and reads it before going on with the rest of the string.
+ */
+typedef struct _StringIO
 {
     privbuf_strvec ptr;
     int curr;
     int old_curr;
     char const *old_ccp;
-    int doit(int commit);
-public:
-    void push(char const *ccp);
-    _StringIO();
-    _StringIO(char const *ccp);
-    void unget();
-    int get();
-    int next();
-    boolean in_expansion();
-};
+} _StringIO;
 
-inline
-_StringIO::_StringIO()
+extern int _StringIO_doit(_StringIO *in, int commit);
+
+static inline void
+_StringIO_init(_StringIO *in)
 {
-    curr = old_curr = -1;
-    old_ccp = 0;
+    in->ptr.len = in->ptr.max = 0;
+    in->ptr.arr = NULL;
+    in->curr = in->old_curr = -1;
+    in->old_ccp = 0;
 }
 
-inline void
-_StringIO::push(char const *ccp)
+static inline void
+_StringIO_push(_StringIO *in, char const *ccp)
 {
-    ptr[++curr] = (char*)ccp;
+    *privbuf_strvec_at(&in->ptr, ++in->curr) = (char*)ccp;
 }
 
-inline
-_StringIO::_StringIO(char const *ccp)
+static inline void
+_StringIO_unget(_StringIO *in)
 {
-    curr = old_curr = -1;
-    old_ccp = 0;
-    push(ccp);
+    if (in->curr >= 0)
+	*privbuf_strvec_at(&in->ptr, in->curr) = (char*)in->old_ccp;
+    in->curr = in->old_curr;
 }
 
-inline void
-_StringIO::unget()
+/* Return the next character and move past it. */
+static inline int
+_StringIO_get(_StringIO *in)
 {
-    if (curr >= 0)
-	ptr[curr] = (char*)old_ccp;
-    curr = old_curr;
+    return _StringIO_doit(in, 1);
 }
 
-inline int
-_StringIO::get()
+/* Return the next character without moving past it. */
+static inline int
+_StringIO_next(_StringIO *in)
 {
-    return doit(1);
+    return _StringIO_doit(in, 0);
 }
 
-inline int
-_StringIO::next()
+static inline boolean
+_StringIO_in_expansion(_StringIO *in)
 {
-    return doit(0);
+    return ((boolean)(in->curr > 0));
 }
 
-inline boolean
-_StringIO::in_expansion()
+/* dst = src (a copy of the stack, as the C++ assignment made). */
+static inline void
+_StringIO_assign(_StringIO *dst, const _StringIO *src)
 {
-    return ((boolean)(curr > 0));
+    privbuf_strvec_copy(&dst->ptr, &src->ptr);
+    dst->curr = src->curr;
+    dst->old_curr = src->old_curr;
+    dst->old_ccp = src->old_ccp;
 }
+
+static inline void
+_StringIO_free(_StringIO *in)
+{
+    privbuf_strvec_free(&in->ptr);
+}
+
+#endif /* _DtSvc_stringio_h */

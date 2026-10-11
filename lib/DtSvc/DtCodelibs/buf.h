@@ -28,6 +28,10 @@
  * (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  * (c) Copyright 1993, 1994 Novell, Inc.
  */
+#ifndef _DtSvc_buf_h
+#define _DtSvc_buf_h
+
+#include <stdint.h>
 #include <codelibs/boolean.h>
 #define __PRIVATE_
 #include <codelibs/privbuf.h>
@@ -39,9 +43,12 @@
 
 typedef unsigned char Quote;
 
-class _SHXcomponents;
-
-class _SHXbuf
+/*
+ * The token buffer of shellscan().  vec holds the start of each token
+ * as an offset into buf until _SHXbuf_vector() turns the offsets into
+ * pointers.
+ */
+typedef struct _SHXbuf
 {
     boolean glob;
     boolean completion;
@@ -51,21 +58,39 @@ class _SHXbuf
     privbuf_charbuf buf;
     privbuf_charbuf flags;
     privbuf_strvec vec;
-    void start_token();
-    void filegen();
-    void expand(_SHXcomponents&, char* const, char*, int);
-public:
-    _SHXbuf()                    {reset(TRUE, FALSE);}
-    void reset(boolean glob, boolean completion);
-    void append(int const ch, char flag = 0);
-    void append(char const *cp, char flag = 0);
-    int ntokens()                {return vec.size();}
-    boolean new_token()          {return _new_token;}
-    Quote quote()		 {return _quote;}
-    void quote(Quote);
-    char **vector();
-};
+} _SHXbuf;
+
+extern void _SHXbuf_reset(_SHXbuf *b, boolean glob, boolean completion);
+extern void _SHXbuf_append_ch(_SHXbuf *b, int const ch, char flag);
+extern void _SHXbuf_append_str(_SHXbuf *b, char const *cp, char flag);
+extern void _SHXbuf_quote(_SHXbuf *b, Quote q);
+extern char **_SHXbuf_vector(_SHXbuf *b);
+extern void _SHXbuf_filegen(_SHXbuf *b);	/* filegen.c */
+
+static inline int
+_SHXbuf_ntokens(_SHXbuf *b)
+{
+    return (int)b->vec.len;
+}
+
+static inline boolean
+_SHXbuf_new_token(_SHXbuf *b)
+{
+    return b->_new_token;
+}
+
+static inline Quote
+_SHXbuf_get_quote(_SHXbuf *b)
+{
+    return b->_quote;
+}
+
+/* Token start offsets are kept in the char * slots of vec. */
+#define _SHX_OFFSET(p)	((long)(intptr_t)(p))
+#define _SHX_SLOT(off)	((char *)(intptr_t)(off))
 
 #ifndef NULL
 #define NULL 0
 #endif
+
+#endif /* _DtSvc_buf_h */

@@ -21,49 +21,40 @@
  * Floor, Boston, MA 02110-1301 USA
  */
 /*
- * File:	exception.h $XConsortium: exception.h /main/3 1995/10/26 16:12:07 rswiston $
+ * File:	stringio.C $XConsortium: stringio.C /main/5 1996/06/21 17:36:19 ageorge $
  *
  * (c) Copyright 1993, 1994 Hewlett-Packard Company
  * (c) Copyright 1993, 1994 International Business Machines Corp.
  * (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  * (c) Copyright 1993, 1994 Novell, Inc.
  */
-/* C++ exception handler package */
+#include <codelibs/nl_hack.h>
+#include "stringio.h"
 
-#ifndef __EXCEPTION_H_
-#define __EXCEPTION_H_
-
-#include <stddef.h>
-#include <setjmp.h>
-
-
-typedef const char *const Exception;
-
-class _Exception
+int
+_StringIO_doit(_StringIO *in, int commit)
 {
-	char raised, accepted;
-	_Exception *prev;
-public:
-	const char *val;
-	jmp_buf buf;
+    wchar_t ch = '\0';
+    int cu = in->curr;
+    char *ccp = NULL;
+    wchar_t __nlh_char[1];
 
-	_Exception();
-	~_Exception();
-	int accept(Exception val);
-	int recover();
-	void raise(Exception val);
-};
-extern _Exception *_curr_exception;
-extern void _raise_exception(Exception val);
-
-#define TRY _Exception _new_exception; if (setjmp(_new_exception.buf) == 0)
-#define RECOVER else if (_new_exception.recover())
-#define HANDLE(val) else if (_new_exception.accept(val))
-#define RAISE(val) _raise_exception(val)
-#define EXCEPTION (_curr_exception != NULL ? _curr_exception->val : NULL)
-
-
-#endif /* __EXCEPTION_H_ */
-/*
-@(#)REV: 2.18 90/12/13                                               
-*/
+    for (; cu >= 0; cu--)
+    {
+	ccp = *privbuf_strvec_at(&in->ptr, cu);
+	ch = ccp ? CHARAT(ccp) : '\0';
+	if (ch != '\0')
+	    break;
+    }
+    if (commit)
+    {
+	in->old_curr = in->curr;
+	if ((in->curr = cu) >= 0)
+	{
+	    in->old_ccp = (const char *)ccp;
+	    ADVANCE(ccp);
+	    *privbuf_strvec_at(&in->ptr, in->curr) = ccp;
+	}
+    }
+    return ch;
+}

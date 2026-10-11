@@ -21,7 +21,7 @@
  * Floor, Boston, MA 02110-1301 USA
  */
 /*
- * $TOG: strwcmp.C /main/7 1998/04/17 11:25:04 mgreess $
+ * $TOG: strwcmp.c /main/7 1998/04/17 11:25:04 mgreess $
  *
  * (c) Copyright 1996 Digital Equipment Corporation.
  * (c) Copyright 1993,1994,1996 Hewlett-Packard Company.
@@ -58,12 +58,12 @@
 
 /* FORWARD */
 static int match(const char *, const char *, int);
-static const char *next_patt(const char *, int advance = 1);
+static const char *next_patt(const char *, int advance);
 static int match_class(const char *, char);
 
 /* INLINE */
 static int
-next_char(const char *pattern, const char **cpp = NULL)
+next_char(const char *pattern, const char **cpp)
 {
     int ret;
     wchar_t __nlh_char[1];
@@ -177,7 +177,7 @@ match(const char *pattern, const char *string, int depth)
 	if (testchar == '\0')
 	    string = laststr;	// reverse string
 
-	pattern = next_patt(pattern);
+	pattern = next_patt(pattern, 1);
     }
 
     return RETURN(CHARAT(string) == '\0', depth);
