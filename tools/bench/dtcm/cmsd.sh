@@ -58,7 +58,7 @@ start() {
 
 	if [ "$(id -u)" = 0 ]; then
 		unshare -m sh -c "mount --bind '$w/spool' /var/spool/calendar \
-			&& exec '$bin' -d" 2>>"$w/cmsd.log" &
+			&& exec '$bin' -d" </dev/null >>"$w/cmsd.log" 2>&1 &
 	else
 		read -r uid ucnt <<<"$(subid /etc/subuid)"
 		read -r gid gcnt <<<"$(subid /etc/subgid)"
@@ -70,7 +70,7 @@ start() {
 		unshare --map-users="1:$uid:$ucnt" \
 			--map-groups="1:$gid:$gcnt" -r -m \
 			sh -c "mount --bind '$w/spool' /var/spool/calendar \
-			&& exec '$bin' -d" 2>>"$w/cmsd.log" &
+			&& exec '$bin' -d" </dev/null >>"$w/cmsd.log" 2>&1 &
 	fi
 	echo $! > "$w/cmsd.pid"
 	for _ in $(seq 100); do

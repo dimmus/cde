@@ -65,6 +65,7 @@
 #include "repeat.h"
 #include "misc.h"
 #include "utility.h"
+#include "cmsentry.h"
 
 extern	int	debug;
 extern	char	*pgname;
@@ -730,7 +731,7 @@ _DtCmsLookupRangeV4(
 			stat = _DtCmsCmsentriesToAbbrAppt4ForClient(entries,
 				abbr_r);
 
-		_DtCm_free_cms_entries(entries);
+		_DtCmsFreeReplyEntries(entries);
 		return (stat);
 	}
 

@@ -50,4 +50,13 @@ extern CSA_return_code _DtCmsGetCmsEntryForClient(
 			cms_entry	**e_r,
 			boolean_t	time_only);
 
+extern CSA_return_code _DtCmsGetCmsEntryForReply(
+			cms_entry	*e,
+			char		*start,
+			char		*end,
+			boolean_t	time_only,
+			cms_entry	**e_r);
+
+extern void _DtCmsFreeReplyEntries(cms_entry *entries);
+
 #endif

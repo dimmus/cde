@@ -44,6 +44,11 @@ extern _DtCmsComparisonResult _DtCmsCompareRptEntry(
 
 extern caddr_t _DtCmsGetEntryKey(caddr_t data);
 
+/*
+ * The entries returned share the calendar's attribute names and values
+ * (see _DtCmsGetCmsEntryForReply): send or convert them before the
+ * calendar changes, and free them with _DtCmsFreeReplyEntries().
+ */
 extern CSA_return_code _DtCmsLookupEntries(
 			_DtCmsCalendar	*cal,
 			char		*sender,

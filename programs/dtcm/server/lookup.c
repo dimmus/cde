@@ -67,14 +67,16 @@
  * forward declaration of static functions used within the file
  ******************************************************************************/
 static CSA_return_code _AddToLinkedEntries(cms_entry *eptr, cms_entry **head,
-					cms_entry **tail, boolean_t sort, boolean_t time_only);
+					cms_entry **tail, boolean_t sort, boolean_t time_only,
+					boolean_t reply);
 static CSA_return_code _EnumerateSequence(char *sender, uint access,
 					List_node *lnode, time_t start1,
 					time_t start2,
 					boolean_t no_end_time_range, time_t end1,
 					time_t end2, CSA_uint32 num_attrs,
 					cms_attribute *attrs, CSA_enum *ops,
-					cms_entry **head, cms_entry **tail);
+					boolean_t reply, cms_entry **head,
+					cms_entry **tail);
 static CSA_return_code _GetEntryAttrsByName(_DtCmsCalendar *cal,
 					cms_entry *entry, uint num_names,
 					cms_attr_name *names, uint *num_attrs_r,
@@ -154,7 +156,7 @@ _DtCmsLookupEntriesById(
 			if (_DtCmsMatchAttributes(eptr, num_attrs, attrs, ops)
 			    && ( ((stat2 = _DtCmsCheckViewAccess(sender, access, eptr)) == CSA_SUCCESS) || (stat2 == CSA_E_TIME_ONLY) ) ) {
 				stat = _AddToLinkedEntries(eptr, &head, &tail,
-					B_FALSE, B_FALSE);
+					B_FALSE, B_FALSE, B_FALSE);
 			}
 			*entries = head;
 			return (stat);
@@ -216,7 +218,7 @@ _DtCmsLookupEntries(
 			 * we don't want to sort it again
 			 */
 			if ((stat = _AddToLinkedEntries(eptr, &head, &tail,
-			    B_FALSE, B_FALSE)) != CSA_SUCCESS)
+			    B_FALSE, B_FALSE, B_TRUE)) != CSA_SUCCESS)
 				break;
 		}
 
@@ -242,13 +244,13 @@ nextone:
 
 		stat = _EnumerateSequence(sender, access, lnode, start1, start2,
 			no_end_time_range, end1, end2, num_attrs, attrs,
-			ops, &rhead, &rtail);
+			ops, B_TRUE, &rhead, &rtail);
 
 		if (rhead != NULL) {
 			if (stat == CSA_SUCCESS)
 				stat = _AddRun(&runs, &nruns, &maxruns, rhead);
 			if (stat != CSA_SUCCESS)
-				_DtCm_free_cms_entries(rhead);
+				_DtCmsFreeReplyEntries(rhead);
 		}
 
 		lnode = hc_lookup_next(lnode);
@@ -258,9 +260,9 @@ nextone:
 		*entries = _MergeRuns(runs, nruns);
 	} else {
 		if (head)
-			_DtCm_free_cms_entries(head);
+			_DtCmsFreeReplyEntries(head);
 		for (i = 0; i < nruns; i++)
-			_DtCm_free_cms_entries(runs[i]);
+			_DtCmsFreeReplyEntries(runs[i]);
 	}
 	free(runs);
 
@@ -308,7 +310,7 @@ _DtCmsEnumerateSequenceById(
 	} else {
 		stat = _EnumerateSequence(sender, access, lnode, start1, start2,
 			no_end_time_range, end1, end2, num_attrs, attrs, ops,
-			&head, &tail);
+			B_FALSE, &head, &tail);
 
 		if (stat == CSA_SUCCESS)
 			*entries = head;
@@ -469,12 +471,18 @@ _AddToLinkedEntries(
 	cms_entry	**head,
 	cms_entry	**tail,
 	boolean_t	sort,
-	boolean_t	time_only)
+	boolean_t	time_only,
+	boolean_t	reply)
 {
 	CSA_return_code	stat;
 	cms_entry	*newptr, *prev, *ptr;
 
-	if ((stat = _DtCmsGetCmsEntryForClient(eptr, &newptr,time_only)) != CSA_SUCCESS)
+	if (reply)
+		stat = _DtCmsGetCmsEntryForReply(eptr, NULL, NULL, time_only,
+			&newptr);
+	else
+		stat = _DtCmsGetCmsEntryForClient(eptr, &newptr, time_only);
+	if (stat != CSA_SUCCESS)
 		return (stat);
 
 	if (sort == B_FALSE) {
@@ -520,6 +528,7 @@ _EnumerateSequence(
 	CSA_uint32	num_attrs,
 	cms_attribute	*attrs,
 	CSA_enum	*ops,
+	boolean_t	reply,
 	cms_entry	**head,
 	cms_entry	**tail)
 {
@@ -586,7 +595,7 @@ _EnumerateSequence(
 		 */
 		stat = _AddToLinkedEntries(eptr, head, tail,
 			(*tail != NULL && (*tail)->key.time >= tick),
-			B_FALSE);
+			B_FALSE, reply);
 
 		eptr->key.time = fsttick;
 		eptr->attrs[CSA_ENTRY_ATTR_START_DATE_I].value->\

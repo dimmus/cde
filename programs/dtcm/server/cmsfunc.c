@@ -582,6 +582,7 @@ extern  cms_entries_res *
 cms_lookup_entries_5_svc(cms_lookup_entries_args *args, struct svc_req *svcrq)
 {
 	static cms_entries_res	res;
+	static boolean_t	res_is_reply;	/* from _DtCmsLookupEntries */
 	_DtCmsCalendar		*cal;
 	char			*user;
 	uint			access;
@@ -597,9 +598,13 @@ cms_lookup_entries_5_svc(cms_lookup_entries_args *args, struct svc_req *svcrq)
 		fprintf(stderr, "cms_lookup_entries_5_svc called\n");
 
 	if (res.entries) {
-		_DtCm_free_cms_entries(res.entries);
+		if (res_is_reply)
+			_DtCmsFreeReplyEntries(res.entries);
+		else
+			_DtCm_free_cms_entries(res.entries);
 		res.entries = NULL;
 	}
+	res_is_reply = B_FALSE;
 
 	if ((res.stat = _DtCmsV5LoadAndCheckAccess(svcrq, args->cal, &user,
 	    &access, &cal)) != CSA_SUCCESS)
@@ -640,11 +645,17 @@ cms_lookup_entries_5_svc(cms_lookup_entries_args *args, struct svc_req *svcrq)
 					no_start_time_range, no_end_time_range,
 					start1, start2, end1, end2, id, hnum,
 					hattrs, hops, &res.entries);
-		else
+		else {
+			/* entries sharing the calendar's attribute values,
+			 * encoded by svc_sendreply() before anything else
+			 * runs, and freed with the next call
+			 */
 			res.stat = _DtCmsLookupEntries(cal, user, access,
 					start1, start2, no_end_time_range,
 					end1, end2, hnum, hattrs, hops,
 					&res.entries);
+			res_is_reply = B_TRUE;
+		}
 	} else {
 		Range_4	prange;
 		Appt_4	*appt = NULL;;
