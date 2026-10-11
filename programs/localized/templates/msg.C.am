@@ -1,8 +1,6 @@
 # process the message files...
 
 # BROKEN (always has been): fmt_tbl.cat
-# Not built, as dtudcfonted and dtudcexch themselves are not: dtudcexch.cat,
-# dtudcfonted.cat
 
 BUILT_SOURCES = Xm.cat Mrm.cat Uil.cat DtHelp.cat DtMail.cat		\
       DtPrint.cat DtWidget.cat MotifApp.cat SUNW_TOOLTALK.cat dt.cat	\

@@ -860,21 +860,6 @@ programs/dtsession/sys.session.ive
 # programs/dtterm
 programs/dtterm/util/logger
 
-# programs/dtudcexch
-programs/dtudcexch/dtudcexch
-
-# programs/dtudcfonted
-programs/dtudcfonted/dtaddcpf/dtaddcpf
-programs/dtudcfonted/dtbdftocpf/dtbdftocpf
-programs/dtudcfonted/dtcpftobdf/dtcpftobdf
-programs/dtudcfonted/dtcpftogpf/dtcpftogpf
-programs/dtudcfonted/dtcpgpf/dtcpgpf
-programs/dtudcfonted/dtgpftobdf/dtgpftobdf
-programs/dtudcfonted/dtgpftocpf/dtgpftocpf
-programs/dtudcfonted/dtlsgpf/dtlsgpf
-programs/dtudcfonted/dtudcfonted
-programs/dtudcfonted/libfal/fonts.list
-
 # programs/dtwm
 programs/dtwm/Dtwm.defs
 programs/dtwm/dtfplist
@@ -928,8 +913,6 @@ programs/localized/C/app-defaults/Dtstyle
 programs/localized/C/app-defaults/Dtstyle.nls
 programs/localized/C/app-defaults/Dtterm
 programs/localized/C/app-defaults/Dtterm.nls
-programs/localized/C/app-defaults/Dtudcfonted
-programs/localized/C/app-defaults/Dtudcfonted.nls
 programs/localized/C/app-defaults/Dtwm
 programs/localized/C/app-defaults/Dtwm.nls
 programs/localized/C/backdrops/Backdrops.nls
@@ -1040,10 +1023,6 @@ programs/localized/C/msg/dtterm.cat
 programs/localized/C/msg/dtterm.msg
 programs/localized/C/msg/dttypes.cat
 programs/localized/C/msg/dttypes.msg
-programs/localized/C/msg/dtudcexch.cat
-programs/localized/C/msg/dtudcexch.msg
-programs/localized/C/msg/dtudcfonted.cat
-programs/localized/C/msg/dtudcfonted.msg
 programs/localized/C/msg/dtwm.cat
 programs/localized/C/msg/dtwm.msg
 programs/localized/C/msg/fmt_tbl.cat
@@ -1096,8 +1075,6 @@ programs/localized/de_DE.UTF-8/app-defaults/Dtstyle
 programs/localized/de_DE.UTF-8/app-defaults/Dtstyle.nls
 programs/localized/de_DE.UTF-8/app-defaults/Dtterm
 programs/localized/de_DE.UTF-8/app-defaults/Dtterm.nls
-programs/localized/de_DE.UTF-8/app-defaults/Dtudcfonted
-programs/localized/de_DE.UTF-8/app-defaults/Dtudcfonted.nls
 programs/localized/de_DE.UTF-8/app-defaults/Dtwm
 programs/localized/de_DE.UTF-8/app-defaults/Dtwm.nls
 programs/localized/de_DE.UTF-8/backdrops/Backdrops.nls
@@ -1169,8 +1146,6 @@ programs/localized/de_DE.UTF-8/msg/dtsession.cat
 programs/localized/de_DE.UTF-8/msg/dtstyle.cat
 programs/localized/de_DE.UTF-8/msg/dtterm.cat
 programs/localized/de_DE.UTF-8/msg/dttypes.cat
-programs/localized/de_DE.UTF-8/msg/dtudcexch.cat
-programs/localized/de_DE.UTF-8/msg/dtudcfonted.cat
 programs/localized/de_DE.UTF-8/msg/dtwm.cat
 programs/localized/de_DE.UTF-8/msg/fmt_tbl.cat
 programs/localized/de_DE.UTF-8/msg/libDtMail.cat
@@ -1287,8 +1262,6 @@ programs/localized/es_ES.UTF-8/app-defaults/Dtstyle
 programs/localized/es_ES.UTF-8/app-defaults/Dtstyle.nls
 programs/localized/es_ES.UTF-8/app-defaults/Dtterm
 programs/localized/es_ES.UTF-8/app-defaults/Dtterm.nls
-programs/localized/es_ES.UTF-8/app-defaults/Dtudcfonted
-programs/localized/es_ES.UTF-8/app-defaults/Dtudcfonted.nls
 programs/localized/es_ES.UTF-8/app-defaults/Dtwm
 programs/localized/es_ES.UTF-8/app-defaults/Dtwm.nls
 programs/localized/es_ES.UTF-8/backdrops/Backdrops.nls
@@ -1360,8 +1333,6 @@ programs/localized/es_ES.UTF-8/msg/dtsession.cat
 programs/localized/es_ES.UTF-8/msg/dtstyle.cat
 programs/localized/es_ES.UTF-8/msg/dtterm.cat
 programs/localized/es_ES.UTF-8/msg/dttypes.cat
-programs/localized/es_ES.UTF-8/msg/dtudcexch.cat
-programs/localized/es_ES.UTF-8/msg/dtudcfonted.cat
 programs/localized/es_ES.UTF-8/msg/dtwm.cat
 programs/localized/es_ES.UTF-8/msg/fmt_tbl.cat
 programs/localized/es_ES.UTF-8/msg/libDtMail.cat
@@ -1478,8 +1449,6 @@ programs/localized/fr_FR.UTF-8/app-defaults/Dtstyle
 programs/localized/fr_FR.UTF-8/app-defaults/Dtstyle.nls
 programs/localized/fr_FR.UTF-8/app-defaults/Dtterm
 programs/localized/fr_FR.UTF-8/app-defaults/Dtterm.nls
-programs/localized/fr_FR.UTF-8/app-defaults/Dtudcfonted
-programs/localized/fr_FR.UTF-8/app-defaults/Dtudcfonted.nls
 programs/localized/fr_FR.UTF-8/app-defaults/Dtwm
 programs/localized/fr_FR.UTF-8/app-defaults/Dtwm.nls
 programs/localized/fr_FR.UTF-8/backdrops/Backdrops.nls
@@ -1551,8 +1520,6 @@ programs/localized/fr_FR.UTF-8/msg/dtsession.cat
 programs/localized/fr_FR.UTF-8/msg/dtstyle.cat
 programs/localized/fr_FR.UTF-8/msg/dtterm.cat
 programs/localized/fr_FR.UTF-8/msg/dttypes.cat
-programs/localized/fr_FR.UTF-8/msg/dtudcexch.cat
-programs/localized/fr_FR.UTF-8/msg/dtudcfonted.cat
 programs/localized/fr_FR.UTF-8/msg/dtwm.cat
 programs/localized/fr_FR.UTF-8/msg/fmt_tbl.cat
 programs/localized/fr_FR.UTF-8/msg/libDtMail.cat
@@ -1669,8 +1636,6 @@ programs/localized/it_IT.UTF-8/app-defaults/Dtstyle
 programs/localized/it_IT.UTF-8/app-defaults/Dtstyle.nls
 programs/localized/it_IT.UTF-8/app-defaults/Dtterm
 programs/localized/it_IT.UTF-8/app-defaults/Dtterm.nls
-programs/localized/it_IT.UTF-8/app-defaults/Dtudcfonted
-programs/localized/it_IT.UTF-8/app-defaults/Dtudcfonted.nls
 programs/localized/it_IT.UTF-8/app-defaults/Dtwm
 programs/localized/it_IT.UTF-8/app-defaults/Dtwm.nls
 programs/localized/it_IT.UTF-8/backdrops/Backdrops.nls
@@ -1744,8 +1709,6 @@ programs/localized/it_IT.UTF-8/msg/dtsession.cat
 programs/localized/it_IT.UTF-8/msg/dtstyle.cat
 programs/localized/it_IT.UTF-8/msg/dtterm.cat
 programs/localized/it_IT.UTF-8/msg/dttypes.cat
-programs/localized/it_IT.UTF-8/msg/dtudcexch.cat
-programs/localized/it_IT.UTF-8/msg/dtudcfonted.cat
 programs/localized/it_IT.UTF-8/msg/dtwm.cat
 programs/localized/it_IT.UTF-8/msg/fmt_tbl.cat
 programs/localized/it_IT.UTF-8/msg/libDtMail.cat
@@ -1980,7 +1943,6 @@ programs/localized/zh_CN.UTF-8/app-defaults/Dtscreen
 programs/localized/zh_CN.UTF-8/app-defaults/Dtsession
 programs/localized/zh_CN.UTF-8/app-defaults/Dtstyle
 programs/localized/zh_CN.UTF-8/app-defaults/Dtterm
-programs/localized/zh_CN.UTF-8/app-defaults/Dtudcfonted
 programs/localized/zh_CN.UTF-8/app-defaults/Dtwm
 programs/localized/zh_CN.UTF-8/backdrops/desc.zh_CN.UTF-8
 programs/localized/zh_CN.UTF-8/config/Xresources
@@ -2045,7 +2007,6 @@ programs/localized/zh_TW.UTF-8/app-defaults/Dtscreen
 programs/localized/zh_TW.UTF-8/app-defaults/Dtsession
 programs/localized/zh_TW.UTF-8/app-defaults/Dtstyle
 programs/localized/zh_TW.UTF-8/app-defaults/Dtterm
-programs/localized/zh_TW.UTF-8/app-defaults/Dtudcfonted
 programs/localized/zh_TW.UTF-8/app-defaults/Dtwm
 programs/localized/zh_TW.UTF-8/backdrops/desc.zh_TW.UTF-8
 programs/localized/zh_TW.UTF-8/config/Xresources

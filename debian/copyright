@@ -83,14 +83,6 @@ Files: lib/DtHelp/XbmUtils.c
        programs/dtsession/SmProp.h
        programs/dtsession/SmWatch.c
        programs/dtsession/SmWatch.h
-       programs/dtudcfonted/libfal/_fallcWrap.c
-       programs/dtudcfonted/libfal/_fallcint.h
-       programs/dtudcfonted/libfal/_fallibint.h
-       programs/dtudcfonted/libfal/_fallocking.h
-       programs/dtudcfonted/libfal/_falrmI.h
-       programs/dtudcfonted/libfal/_falutil.h
-       programs/dtudcfonted/libfal/_falutilbitmap.c
-       programs/dtudcfonted/libfal/_falvarargs.h
 Copyright: 1984, 1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994
            X Consortium
            1993 - 2012 The Open Group
@@ -155,31 +147,6 @@ Files: config/makedepend/ifparser.c
        programs/dtdocbook/instant/*.h
        programs/dtlogin/bls/bls.h
        programs/dtlogin/bls/debug.c
-       programs/dtudcfonted/libfal/_falSetLocale.c
-       programs/dtudcfonted/libfal/_fallcCT.c
-       programs/dtudcfonted/libfal/_fallcCharSet.c
-       programs/dtudcfonted/libfal/_fallcConv.c
-       programs/dtudcfonted/libfal/_fallcDefConv.c
-       programs/dtudcfonted/libfal/_fallcEuc.c
-       programs/dtudcfonted/libfal/_fallcGenConv.c
-       programs/dtudcfonted/libfal/_fallcGeneric.c
-       programs/dtudcfonted/libfal/_fallcGeneric.h
-       programs/dtudcfonted/libfal/_fallcInit.c
-       programs/dtudcfonted/libfal/_fallcPrTxt.c
-       programs/dtudcfonted/libfal/_fallcPubI.h
-       programs/dtudcfonted/libfal/_fallcPubWrap.c
-       programs/dtudcfonted/libfal/_fallcPublic.c
-       programs/dtudcfonted/libfal/_fallcPublic.h
-       programs/dtudcfonted/libfal/_fallcRM.c
-       programs/dtudcfonted/libfal/_fallcSjis.c
-       programs/dtudcfonted/libfal/_fallcStd.c
-       programs/dtudcfonted/libfal/_fallcTxtPr.c
-       programs/dtudcfonted/libfal/_fallcUTF.c
-       programs/dtudcfonted/libfal/_fallcUTF.h
-       programs/dtudcfonted/libfal/_fallcUtil.c
-       programs/dtudcfonted/libfal/_falomGeneric.c
-       programs/dtudcfonted/libfal/_falomGeneric.h
-       programs/dtudcfonted/libfal/include/pcf.h
        lib/tt/demo/CoEd/CoEd/CoEdTextBuffer.h
        lib/tt/demo/CoEd/libCoEd/CoEd.h
        lib/tt/demo/CoEd/libCoEd/CoEdChangeHistory.h
