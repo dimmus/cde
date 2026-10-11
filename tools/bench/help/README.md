@@ -23,7 +23,7 @@ Needs at run time: `Xvfb`, `xdotool` (for `../apptime.py`), `python3`,
 
 | File | What it does |
 |---|---|
-| `helpbench.c` | Creates a `DtHelpDialog` on a private display and drives it like a user: the cases below, each REPEAT times (`-r`, default 5), reporting the median per operation and the first run separately.  Re-executes itself with `../libcdebench_preload.so` (mallocs, X requests, round trips) and `libhelpbench_preload.so` preloaded.  `-V VOL,...` picks the volumes (default `Filemgr`, 77 topics, many with TIFF figures), `-w WORD` the index search word, `-m PAGE` the man page, `-S DIR` writes a PPM screenshot of the help window after each topic, page and search instead of timing, so that two builds can be compared with `cmp`; `-v` prints the result counts.  `HELPBENCH_WATCHDOG=SECONDS` prints a backtrace and exits if a case hangs. |
+| `helpbench.c` | Creates a `DtHelpDialog` on a private display and drives it like a user: the cases below, each REPEAT times (`-r`, default 5), reporting the median per operation and the first run separately.  Re-executes itself with `../libcdebench_preload.so` (mallocs, X requests, round trips) and `libhelpbench_preload.so` preloaded.  `-V VOL,...` picks the volumes (default `Filemgr`, 77 topics, many with TIFF figures), `-w WORD` the index search word, `-m PAGE` the man page, `-S DIR` writes a PPM screenshot of the help window after each topic, page and search (one run unless `-r` is given; later runs are `NAME.runN.ppm`, to check what is shown again), so that two builds can be compared with `cmp`; `-v` prints the result counts.  `HELPBENCH_WATCHDOG=SECONDS` prints a backtrace and exits if a case hangs. |
 | `helppreload.c` → `libhelpbench_preload.so` | Counts the Xlib calls the help system makes per view: `XAllocColor`, `XAllocNamedColor`, `XLookupColor`, `XParseColor`, `XLoadQueryFont`, `XLoadFont`, `XQueryFont`, `XCreateFontSet`, `XListFonts`, `XPutImage`, `XCreatePixmap`, `XCreateGC`.  helpbench reads them in-process; any other program reports them at exit (and on SIGTERM with `CDEBENCH_REPORT_SIGTERM`) as a `helpbench pid=...` line in the `CDEBENCH_REPORT` file. |
 | `man` | A `man(1)` for hosts without one: DtHelp reads `man NAME` through `popen()`; this formats the page with `nroff -man` (overstrike output, as man gives to a pipe).  `run.py` puts it first on `PATH`. |
 | `run.py` | Runs the three groups on a private Xvfb (pinned to CPU 0 with `taskset` unless `--no-pin`) and writes one JSON document. |
@@ -35,6 +35,7 @@ Needs at run time: `Xvfb`, `xdotool` (for `../apptime.py`), `python3`,
 | `dialog` | create a help dialog on the volume's home topic, show it, destroy it |
 | `topics` | one topic, in tree order over every topic of the volumes, as a hyperlink shows it (only `DtNlocationId` set); run 1 is the first visit of each topic |
 | `requests` | the same, but setting `DtNhelpVolume` with each topic, as an application's help request does (the dialog then reopens the volume and reformats its title) |
+| `revisit` | one of 4 topics just visited, shown again as hyperlinks back and forth do |
 | `backtrack` | one Backtrack, after visiting 20 topics |
 | `manpage` | load the man page (ksh) |
 | `pagedown` | one page down through it, to the end |

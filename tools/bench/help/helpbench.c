@@ -29,6 +29,8 @@
  *               the median shows what revisiting costs
  *   requests    the same, but setting the volume with each topic, as an
  *               application's help request does [one topic]
+ *   revisit     visit 4 topics, then go to them in turn again, as
+ *               hyperlinks back and forth do [one topic]
  *   backtrack   visit 20 topics, then Backtrack 19 times [one Backtrack]
  *   manpage     show the man page PAGE (default ksh) [one load]
  *   pagedown    page down through it to the end [one page]
@@ -43,10 +45,11 @@
  *   index_word  a new help dialog, Index..., "Entries with" WORD
  *               (default "file") in all volumes [one search]
  *
- * -S DIR writes, instead of benchmarking, a screenshot (PPM) of the help
- * window after each topic of "topics", each page of "pagedown" and the
- * result list of each index case, so that two builds can be compared
- * with cmp(1).  Search results are also printed (item counts) with -v.
+ * -S DIR writes a screenshot (PPM) of the help window after each topic of
+ * "topics", each page of "pagedown" and the result list of each index
+ * case, so that two builds can be compared with cmp(1); one run unless
+ * -r is given (runs after the first are NAME.runN.ppm).  Search results
+ * are also printed (item counts) with -v.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -115,6 +118,8 @@ struct topic {
 	char *id;
 };
 static struct topic *topics;
+static int cur_run;		/* run of the case (0: the first) */
+static int repeat_set;		/* -r given */
 static long ntopics;
 
 static const struct helpbench_xcounts *xcounts(void)
@@ -233,7 +238,11 @@ static void shot(Widget w, const char *name)
 			AllPlanes, ZPixmap);
 	if (!img)
 		return;
-	snprintf(path, sizeof path, "%s/%s.ppm", shotdir, name);
+	if (cur_run > 0)
+		snprintf(path, sizeof path, "%s/%s.run%d.ppm", shotdir, name,
+			 cur_run + 1);
+	else
+		snprintf(path, sizeof path, "%s/%s.ppm", shotdir, name);
 	if ((f = fopen(path, "wb"))) {
 		fprintf(f, "P6\n%d %d\n255\n", img->width, img->height);
 		for (y = 0; y < img->height; y++)
@@ -465,6 +474,37 @@ static long run_requests(long n)
 	return ntopics;
 }
 
+/* back and forth among a few topics seen a moment ago */
+#define REVISIT_SET 4
+
+static int setup_revisit(long n)
+{
+	long i;
+
+	(void)n;
+	dialog_destroy();
+	dialog_create(vols[0], NULL);
+	for (i = 0; i < REVISIT_SET && i < ntopics; i++)
+		show_topic(topics[i].vol, topics[i].id);
+	return ntopics < 2;
+}
+
+static long run_revisit(long n)
+{
+	long i, set = ntopics < REVISIT_SET ? ntopics : REVISIT_SET;
+
+	for (i = 0; i < n; i++) {
+		show_topic(topics[i % set].vol, topics[i % set].id);
+		if (shotdir) {
+			char name[64];
+
+			snprintf(name, sizeof name, "revisit-%03ld", i);
+			shot(XtParent(dlg), name);
+		}
+	}
+	return n;
+}
+
 #define BACKTRACK_DEPTH 20
 
 static int setup_backtrack(long n)
@@ -488,6 +528,12 @@ static long run_backtrack(long n)
 	for (i = 0; i < depth - 1; i++) {
 		activate(back);
 		settle();
+		if (shotdir) {
+			char name[64];
+
+			snprintf(name, sizeof name, "back-%02ld", i);
+			shot(XtParent(dlg), name);
+		}
 	}
 	return depth - 1;
 }
@@ -781,6 +827,8 @@ static const struct hcase cases[] = {
 	  setup_topics, run_topics, NULL },
 	{ "requests", "every topic again, as help requests (volume set)", 1,
 	  setup_topics, run_requests, NULL },
+	{ "revisit", "hyperlinks back and forth among 4 topics", 40,
+	  setup_revisit, run_revisit, teardown_dialog },
 	{ "backtrack", "Backtrack over 20 visited topics", 1,
 	  setup_backtrack, run_backtrack, teardown_dialog },
 	{ "manpage", "load a man page", 3,
@@ -828,6 +876,8 @@ static int run_case(const struct hcase *hc, int repeat, struct result *res,
 
 	for (r = 0; r < repeat; r++) {
 		struct cdebench_counters c0, c1;
+
+		cur_run = r;
 		unsigned long x0[NCOUNT], x1[NCOUNT];
 		double t0, t1, p0, p1;
 		long ops;
@@ -861,9 +911,21 @@ static int run_case(const struct hcase *hc, int repeat, struct result *res,
 			for (k = 0; k < (int)NCOUNT; k++)
 				first->x[k] = v[5 + k][0];
 		}
-		if (verbose)
+		if (verbose) {
+			long pages_rss = 0, dummy;
+			FILE *sf = fopen("/proc/self/statm", "r");
+
+			if (sf) {
+				if (fscanf(sf, "%ld %ld", &dummy,
+					   &pages_rss) != 2)
+					pages_rss = 0;
+				fclose(sf);
+			}
 			fprintf(stderr, "helpbench: %s run %d: %ld ops, "
-				"%.0f ns/op\n", hc->name, r, ops, v[0][r]);
+				"%.0f ns/op, rss %ld KB\n", hc->name, r, ops,
+				v[0][r], pages_rss * (sysconf(_SC_PAGESIZE)
+							/ 1024));
+		}
 	}
 	res->ns = bench_median(v[0], repeat);
 	res->cpu_ns = bench_median(v[1], repeat);
@@ -924,6 +986,7 @@ int main(int argc, char **argv)
 	while ((opt = getopt(argc, argv, "r:j:V:w:m:n:S:vlh")) != -1) {
 		switch (opt) {
 		case 'r':
+			repeat_set = 1;
 			repeat = atoi(optarg);
 			if (repeat < 1 || repeat > MAX_REPEAT)
 				bench_die("helpbench: bad repeat count");
@@ -970,7 +1033,8 @@ int main(int argc, char **argv)
 		if (mkdir(dir, 0755) && errno != EEXIST)
 			bench_die("helpbench: %s: %s", dir, strerror(errno));
 		free(dir);
-		repeat = 1;
+		if (!repeat_set)
+			repeat = 1;
 	}
 
 	if (getenv("HELPBENCH_WATCHDOG")) {
