@@ -1640,6 +1640,108 @@ FormatCell(
 }
 
 /******************************************************************************
+ * Cell index
+ *
+ * ResolveCell finds the segment of each cell of a table by its id, the
+ * first cell whose id matches (_DtCvStrCaseCmpLatin1).  Searching the
+ * table's cells from the start for each made laying out a table (an SDL
+ * form: every list and table of a topic) O(cells^2).  Tables of
+ * CELL_INDEX_MIN cells or more get a hash index of their cells' ids
+ * for the time ProcessTable lays them out; it returns the same first
+ * match.
+ *****************************************************************************/
+#define	CELL_INDEX_MIN	16
+
+typedef struct {
+    _DtCvSegmentI **cells;
+    unsigned int    mask;	/* buckets - 1 (a power of 2) */
+    int		   *head;	/* first cell in each bucket */
+    int		   *next;	/* next cell in the same bucket */
+} CellIndex;
+
+/* the hash of what _DtCvStrCaseCmpLatin1 compares equal */
+static unsigned int
+CellIdHash (const char *id)
+{
+    unsigned int h = 2166136261u;
+    int		 c;
+
+    for (; '\0' != *id; id++)
+      {
+	c = (unsigned char) *id;
+	h ^= (unsigned int) _DtCvToLower(c);
+	h *= 16777619u;
+      }
+    return h;
+}
+
+/* builds the index of 'cells' or leaves it empty (search linearly) */
+static void
+CellIndexInit (
+    CellIndex		 *idx,
+    _DtCvSegmentI	**cells)
+{
+    int		 i;
+    int		 count;
+    unsigned int size;
+
+    idx->cells = NULL;
+    idx->head  = NULL;
+    idx->next  = NULL;
+    for (count = 0; NULL != cells && NULL != cells[count]; count++)
+	;
+    if (count < CELL_INDEX_MIN)
+	return;
+
+    for (size = 32; size < (unsigned int) count && size < (1u << 30);)
+	size *= 2;
+    idx->head = (int *) malloc(sizeof(int) * size);
+    idx->next = (int *) malloc(sizeof(int) * count);
+    if (NULL == idx->head || NULL == idx->next)
+      {
+	free(idx->head);
+	free(idx->next);
+	idx->head = NULL;
+	idx->next = NULL;
+	return;
+      }
+
+    idx->mask = size - 1;
+    for (i = 0; i < (int) size; i++)
+	idx->head[i] = -1;
+
+    /*
+     * insert from the end, so each chain is in list order and its first
+     * match is the first matching cell of the list.  Cells without an
+     * id never match.
+     */
+    for (i = count - 1; i >= 0; i--)
+      {
+	const char *id = _DtCvContainerIdOfSeg(cells[i]);
+
+	idx->next[i] = -1;
+	if (NULL != id)
+	  {
+	    unsigned int b = CellIdHash(id) & idx->mask;
+
+	    idx->next[i] = idx->head[b];
+	    idx->head[b] = i;
+	  }
+      }
+    idx->cells = cells;
+}
+
+static void
+CellIndexFree (CellIndex *idx)
+{
+    free(idx->head);
+    free(idx->next);
+    idx->cells = NULL;
+    idx->head  = NULL;
+    idx->next  = NULL;
+}
+
+/******************************************************************************
  * Function: ResolveCell
  *
  *****************************************************************************/
@@ -1654,7 +1756,8 @@ ResolveCell(
     int			 row,
     int			 max_cols,
     int			 max_rows,
-    CellInfo		*ret_info)
+    CellInfo		*ret_info,
+    const CellIndex	*cell_idx)
 {
     int i;
     char  *id = NULL;
@@ -1747,9 +1850,21 @@ ResolveCell(
 	  {
 	    c       = *ptr;
             *ptr    = '\0';
-	    while (f_data != NULL && NULL != *f_data &&
-	        _DtCvStrCaseCmpLatin1(_DtCvContainerIdOfSeg(*f_data),id) != 0)
-	        f_data++;
+	    if (NULL != cell_idx && NULL != cell_idx->cells &&
+					cell_idx->cells == f_data)
+	      {
+		/* the same first match, from the index */
+		for (i = cell_idx->head[CellIdHash(id) & cell_idx->mask];
+			i != -1 && _DtCvStrCaseCmpLatin1(
+				_DtCvContainerIdOfSeg(f_data[i]), id) != 0;
+			i = cell_idx->next[i])
+		    ;
+		f_data = (-1 == i) ? NULL : &f_data[i];
+	      }
+	    else
+	        while (f_data != NULL && NULL != *f_data &&
+	            _DtCvStrCaseCmpLatin1(_DtCvContainerIdOfSeg(*f_data),id) != 0)
+	            f_data++;
 	    /*
 	     * make sure to break the link to the next segment.
 	     * Otherwise, the formatting routines will format too much
@@ -2130,6 +2245,7 @@ ProcessTable(
     RowSpec	*rowSpecs = &defRow;
     DataPoint	 basePt;
     GrpInfo	 grpInfo = DefGrpInfo;
+    CellIndex	 cellIdx;
 
     /*
      * get the base margins that the table will be working in.
@@ -2327,6 +2443,7 @@ ProcessTable(
      */
     layout->table_flag = True;
     SetBeginCounts(canvas, &(grpInfo.cnt));
+    CellIndexInit(&cellIdx, _DtCvCellsOfTableSeg(table));
 
     /*
      * now process each column, row by row.
@@ -2421,7 +2538,7 @@ ProcessTable(
 	        layout->info.y_pos = tableYpos;
 	        redo = ResolveCell(canvas, layout, table,
 				    colSpecs, rowSpecs, col, row,
-				    maxCols, maxRows, cellInfo);
+				    maxCols, maxRows, cellInfo, &cellIdx);
 		/*
 		 * check for maximum row span
 		 */
@@ -2481,6 +2598,8 @@ ProcessTable(
 	 */
 	layout->txt_justify = colJustify;
       }
+
+    CellIndexFree(&cellIdx);
 
     /*
      * set the ending counts for the lines/text in the table.

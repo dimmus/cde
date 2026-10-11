@@ -4156,13 +4156,140 @@ FreeFontInfo(
 }
 
 /******************************************************************************
+ * Segment id index
+ *
+ * ResolveAsyncBlock looks up every cell id of a form among the form's
+ * cells and then among the async blocks (_DtCvStrCaseCmpLatin1, first
+ * match), which was O(cells^2) per form.  For SEG_INDEX_MIN segments or
+ * more the lists get a hash index that answers the same; segments added
+ * later (the async blocks copied into the form) go at the end of their
+ * chain, so the first match stays the first in list order.
+ ******************************************************************************/
+#define	SEG_INDEX_MIN	16
+
+typedef struct {
+    _DtCvSegment **segs;	/* in list order */
+    int		  *next;	/* next in the same bucket, -1 at the end */
+    int		  *head;	/* first in each bucket, -1 if none */
+    int		  *tail;	/* last in each bucket */
+    int		   cnt;
+    int		   max;
+    unsigned int   mask;	/* buckets - 1, a power of 2 */
+} SegIdIndex;
+
+/* the hash of what _DtCvStrCaseCmpLatin1 compares equal */
+static unsigned int
+SegIdHash (const char *id)
+{
+    unsigned int h = 2166136261u;
+    int		 c;
+
+    for (; '\0' != *id; id++)
+      {
+	c = (unsigned char) *id;
+	h ^= (unsigned int) _DtCvToLower(c);
+	h *= 16777619u;
+      }
+    return h;
+}
+
+static void
+SegIdIndexFree (SegIdIndex *idx)
+{
+    free(idx->segs);
+    free(idx->next);
+    free(idx->head);
+    free(idx->tail);
+    memset(idx, 0, sizeof(SegIdIndex));
+}
+
+/* returns False if out of memory (the index is then freed) */
+static _DtCvValue
+SegIdIndexAdd (SegIdIndex *idx, _DtCvSegment *seg)
+{
+    const char *id;
+
+    if (idx->cnt == idx->max)
+      {
+	int	       newMax = idx->max ? idx->max * 2 : 64;
+	_DtCvSegment **segs;
+	int	      *next;
+
+	segs = (_DtCvSegment **) realloc(idx->segs,
+					sizeof(_DtCvSegment *) * newMax);
+	if (NULL != segs)
+	    idx->segs = segs;
+	next = (int *) realloc(idx->next, sizeof(int) * newMax);
+	if (NULL != next)
+	    idx->next = next;
+	if (NULL == segs || NULL == next)
+	  {
+	    SegIdIndexFree(idx);
+	    return False;
+	  }
+	idx->max = newMax;
+      }
+
+    idx->segs[idx->cnt] = seg;
+    idx->next[idx->cnt] = -1;
+    id = _DtCvContainerIdOfSeg(seg);
+    if (NULL != id)		/* never matches */
+      {
+	unsigned int b = SegIdHash(id) & idx->mask;
+
+	if (-1 == idx->head[b])
+	    idx->head[b] = idx->cnt;
+	else
+	    idx->next[idx->tail[b]] = idx->cnt;
+	idx->tail[b] = idx->cnt;
+      }
+    idx->cnt++;
+    return True;
+}
+
+/* sets up the buckets for about 'cnt' segments */
+static _DtCvValue
+SegIdIndexInit (SegIdIndex *idx, int cnt)
+{
+    unsigned int size;
+    unsigned int i;
+
+    memset(idx, 0, sizeof(SegIdIndex));
+    for (size = 64; size < (unsigned int) cnt * 2 && size < (1u << 24);)
+	size *= 2;
+    idx->head = (int *) malloc(sizeof(int) * size);
+    idx->tail = (int *) malloc(sizeof(int) * size);
+    if (NULL == idx->head || NULL == idx->tail)
+      {
+	SegIdIndexFree(idx);
+	return False;
+      }
+    for (i = 0; i < size; i++)
+	idx->head[i] = -1;
+    idx->mask = size - 1;
+    return True;
+}
+
+static _DtCvSegment *
+SegIdIndexFind (SegIdIndex *idx, const char *id)
+{
+    int i;
+
+    for (i = idx->head[SegIdHash(id) & idx->mask]; -1 != i; i = idx->next[i])
+	if (_DtCvStrCaseCmpLatin1(_DtCvContainerIdOfSeg(idx->segs[i]), id) == 0)
+	    return idx->segs[i];
+    return NULL;
+}
+
+/******************************************************************************
  * Function:    static int ResolveAsyncBlock(my_struct, table_seg);
  *
  * Parameters:
  *
  * Returns:     0 if successful, -1 if errors
  *
- * Purpose:     
+ * Purpose:     Copy into the form's cells the async blocks its rows name
+ *		that are not among its cells yet.
  *
  ******************************************************************************/
 static	int
@@ -4178,14 +4305,48 @@ ResolveAsyncBlock(
     _DtCvSegment  *newSeg;
     _DtCvSegment  *asyncSegs;
     _DtCvValue	found;
+    int		cellCnt = 0;
+    int		asyncCnt = 0;
+    int		result = 0;
+    SegIdIndex	cellIdx;
+    SegIdIndex	asyncIdx;
+    _DtCvValue	haveCellIdx  = False;
+    _DtCvValue	haveAsyncIdx = False;
 
-    while (NULL != rowIds && NULL != *rowIds)
+    /*
+     * index the cells and the async blocks when there are many
+     */
+    cellSegs = _DtCvCellsOfTableSeg(table_seg);
+    while (NULL != cellSegs && NULL != cellSegs[cellCnt])
+	cellCnt++;
+    for (asyncSegs = my_struct->async_blks; NULL != asyncSegs;
+					asyncSegs = _DtCvNextSeg(asyncSegs))
+	asyncCnt++;
+
+    if (cellCnt >= SEG_INDEX_MIN && SegIdIndexInit(&cellIdx, cellCnt))
+      {
+	int i;
+
+	haveCellIdx = True;
+	for (i = 0; True == haveCellIdx && i < cellCnt; i++)
+	    haveCellIdx = SegIdIndexAdd(&cellIdx, cellSegs[i]);
+      }
+    if (asyncCnt >= SEG_INDEX_MIN && SegIdIndexInit(&asyncIdx, asyncCnt))
+      {
+	haveAsyncIdx = True;
+	for (asyncSegs = my_struct->async_blks;
+			True == haveAsyncIdx && NULL != asyncSegs;
+					asyncSegs = _DtCvNextSeg(asyncSegs))
+	    haveAsyncIdx = SegIdIndexAdd(&asyncIdx, asyncSegs);
+      }
+
+    while (0 == result && NULL != rowIds && NULL != *rowIds)
       {
 	/*
 	 * get the start of the row ids
 	 */
 	next = *rowIds;
-	while (NULL != next && '\0' != *next)
+	while (0 == result && NULL != next && '\0' != *next)
 	  {
 	    /*
 	     * skip leading spaces
@@ -4214,17 +4375,17 @@ ResolveAsyncBlock(
 		*next = '\0';
 
 		/*
-		 * get the cells in the table
+		 * check that one of the cells in the table matches the id
 		 */
-		cellSegs = _DtCvCellsOfTableSeg(table_seg);
-
-		/*
-		 * check that one of these cells matches the id
-		 */
-		found   = False;
-		if (NULL != cellSegs)
+		found = False;
+		if (True == haveCellIdx)
+		    found = (NULL != SegIdIndexFind(&cellIdx, start)) ?
+							True : False;
+		else
 		  {
-		    while (False == found && NULL != *cellSegs)
+		    cellSegs = _DtCvCellsOfTableSeg(table_seg);
+		    while (NULL != cellSegs && False == found &&
+							NULL != *cellSegs)
 		      {
 		        if (_DtCvStrCaseCmpLatin1(
 					_DtCvContainerIdOfSeg(*cellSegs),
@@ -4233,7 +4394,6 @@ ResolveAsyncBlock(
 		        else
 			    cellSegs++;
 		      }
-		    newSeg = *cellSegs;
 		  }
 
 		/*
@@ -4242,15 +4402,23 @@ ResolveAsyncBlock(
 		 */
 		if (False == found)
 		  {
-		    asyncSegs = my_struct->async_blks;
-		    while (False == found && NULL != asyncSegs)
+		    if (True == haveAsyncIdx)
 		      {
-		        if (_DtCvStrCaseCmpLatin1(
+			asyncSegs = SegIdIndexFind(&asyncIdx, start);
+			found = (NULL != asyncSegs) ? True : False;
+		      }
+		    else
+		      {
+			asyncSegs = my_struct->async_blks;
+			while (False == found && NULL != asyncSegs)
+			  {
+			    if (_DtCvStrCaseCmpLatin1(
 					_DtCvContainerIdOfSeg(asyncSegs),
 					start) == 0)
-			    found = True;
-			else
-			    asyncSegs = _DtCvNextSeg(asyncSegs);
+				found = True;
+			    else
+				asyncSegs = _DtCvNextSeg(asyncSegs);
+			  }
 		      }
 
 		    /*
@@ -4293,14 +4461,24 @@ ResolveAsyncBlock(
 			 * check to see if anything was copied
 			 */
 			if (NULL == newSeg)
-			    return -1;
+			  {
+			    *next = c;
+			    result = -1;
+			    break;
+			  }
+
 			/*
-			 * now place this segment in the list.
+			 * now place this segment in the list (as the
+			 * indexes see it too).
 			 */
 			_DtCvCellsOfTableSeg(table_seg) = (_DtCvSegment **)
-				_DtCvAddPtrToArray(
+				_DtCvAddPtrToArrayN(
 				(void **) _DtCvCellsOfTableSeg(table_seg),
-					(void *) newSeg);
+					cellCnt, (void *) newSeg);
+			if (NULL != _DtCvCellsOfTableSeg(table_seg))
+			    cellCnt++;
+			if (True == haveCellIdx)
+			    haveCellIdx = SegIdIndexAdd(&cellIdx, newSeg);
 		      }
 		  }
 	       /*
@@ -4316,7 +4494,12 @@ ResolveAsyncBlock(
 	rowIds++;
       }
 
-    return 0;
+    if (True == haveCellIdx)
+	SegIdIndexFree(&cellIdx);
+    if (True == haveAsyncIdx)
+	SegIdIndexFree(&asyncIdx);
+
+    return result;
 }
 
 /******************************************************************************
