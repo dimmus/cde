@@ -607,15 +607,10 @@ static void SetupWindowStateWithEventMask (ClientData *pCD, int newState,
 
 void ConfigureNewState (ClientData *pcd)
 {
-    Atom hints[3] = {
-	wmGD.xa__NET_WM_STATE_FULLSCREEN,
-	wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT,
-	wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ
-    };
-
     if (pcd->maxConfig && !pcd->fullscreen)
     {
 	pcd->maxConfig = FALSE;
+	pcd->maxAxes = MAX_AXES_BOTH;	/* f.maximize maximizes both */
 	RegenerateClientFrame(pcd);
 	XResizeWindow (DISPLAY, pcd->client,
 			   (unsigned int) pcd->clientWidth, 
@@ -634,6 +629,18 @@ void ConfigureNewState (ClientData *pcd)
 	GetMaxInfo (pcd, &pcd->maxX, &pcd->maxY, &pcd->maxWidth,
 		    &pcd->maxHeight);
 
+	/* maximized along one axis (EWMH): the other one stays */
+	if (!pcd->fullscreen && !(pcd->maxAxes & MAX_AXIS_HORZ))
+	{
+	    pcd->maxX = pcd->clientX;
+	    pcd->maxWidth = pcd->clientWidth;
+	}
+	if (!pcd->fullscreen && !(pcd->maxAxes & MAX_AXIS_VERT))
+	{
+	    pcd->maxY = pcd->clientY;
+	    pcd->maxHeight = pcd->clientHeight;
+	}
+
 	XResizeWindow (DISPLAY, pcd->client,
 			   (unsigned int) pcd->maxWidth, 
 			   (unsigned int) pcd->maxHeight);
@@ -647,27 +654,7 @@ void ConfigureNewState (ClientData *pcd)
 	}
     }
 
-    {
-	unsigned long offset = 0, nhints = 0;
-
-	if (pcd->maxConfig)
-	{
-	    if (pcd->fullscreen)
-	    {
-		offset = 0;
-		nhints = 1;
-	    }
-	    else
-	    {
-		offset = 1;
-		nhints = 2;
-	    }
-	}
-
-	ReplaceNetWmStates (pcd->client,
-			    hints, sizeof(hints) / sizeof(hints[0]),
-			    &hints[offset], nhints);
-    }
+    EwmhMarkClient (pcd, NET_CD_STATE);
 
     SendConfigureNotify (pcd);
 
@@ -801,6 +788,7 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 
         SetClientWsIndex (pNext);
 	SetWMStateOnce (pNext, wmState, ICON_FRAME_WIN(pNext));
+	EwmhMarkClient (pNext, NET_CD_STATE);
 	if (pNext->maxConfig && mwmState == NORMAL_STATE)
 	{
 	    pNext->clientState = MAXIMIZED_STATE;
@@ -819,6 +807,7 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
     }
 
     SetWMStateOnce (pCD, wmState, ICON_FRAME_WIN(pCD));
+    EwmhMarkClient (pCD, NET_CD_STATE);	/* _NET_WM_STATE_HIDDEN */
     pCD->clientState = mwmState;
     if (bToUnseen)
 	pCD->clientState |= UNSEEN_STATE;

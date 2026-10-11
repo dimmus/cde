@@ -136,11 +136,23 @@ extern Pixel		FPselectcolor;
 #define _XA__NET_WM_VISIBLE_ICON_NAME "_NET_WM_VISIBLE_ICON_NAME"
 #define _XA__NET_WM_FULLSCREEN_MONITORS "_NET_WM_FULLSCREEN_MONITORS"
 #define _XA__NET_WM_STATE "_NET_WM_STATE"
-#define _XA__NET_WM_STATE_MAXIMIZED_VERT "_NET_WM_STATE_MAXIMIZED_VERT"
-#define _XA__NET_WM_STATE_MAXIMIZED_HORZ "_NET_WM_STATE_MAXIMIZED_HORZ"
-#define _XA__NET_WM_STATE_FULLSCREEN "_NET_WM_STATE_FULLSCREEN"
-#define _XA__NET_WM_STATE_ABOVE "_NET_WM_STATE_ABOVE"
-#define _XA__NET_WM_STATE_BELOW "_NET_WM_STATE_BELOW"
+
+/* the _NET_WM_STATE atoms (wmGD.xa__NET_WM_STATE_[]), in property order */
+enum {
+    NETSTATE_MODAL,
+    NETSTATE_STICKY,
+    NETSTATE_MAXIMIZED_VERT,
+    NETSTATE_MAXIMIZED_HORZ,
+    NETSTATE_SKIP_TASKBAR,
+    NETSTATE_SKIP_PAGER,
+    NETSTATE_HIDDEN,
+    NETSTATE_FULLSCREEN,
+    NETSTATE_ABOVE,
+    NETSTATE_BELOW,
+    NETSTATE_DEMANDS_ATTENTION,
+    NETSTATE_FOCUSED,
+    NETSTATE_COUNT
+};
 
 /* window manager exit value on fatal errors: */
 #define WM_ERROR_EXIT_VALUE	1
@@ -1715,6 +1727,8 @@ struct _ClientData
     unsigned int netFlags;			/* NET_FLAG_* */
     unsigned int netDirty;			/* NET_CD_* to write */
     long	netDesktopWritten;		/* _NET_WM_DESKTOP */
+    unsigned int netStateWritten;		/* _NET_WM_STATE, NETSTATE bits */
+    unsigned char maxAxes;			/* MAX_AXIS_* when maximized */
 
     /* client window frame graphic data: */
 
@@ -1802,6 +1816,11 @@ typedef struct _ClientData *PtrClientData;
 #define MINIMIZED_STATE		2
 #define MAXIMIZED_STATE		3
 #define UNSEEN_STATE            8
+
+/* the axes that maximizing a client maximizes (maxAxes): */
+#define MAX_AXIS_VERT		(1 << 0)
+#define MAX_AXIS_HORZ		(1 << 1)
+#define MAX_AXES_BOTH		(MAX_AXIS_VERT | MAX_AXIS_HORZ)
 
 /* clientFlags field values: */
 #define CLIENT_HINTS_TITLE		(1L << 0)
@@ -2029,11 +2048,7 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_VISIBLE_ICON_NAME;
     Atom	xa__NET_WM_FULLSCREEN_MONITORS;
     Atom	xa__NET_WM_STATE;
-    Atom	xa__NET_WM_STATE_MAXIMIZED_VERT;
-    Atom	xa__NET_WM_STATE_MAXIMIZED_HORZ;
-    Atom	xa__NET_WM_STATE_FULLSCREEN;
-    Atom	xa__NET_WM_STATE_ABOVE;
-    Atom	xa__NET_WM_STATE_BELOW;
+    Atom	xa__NET_WM_STATE_[NETSTATE_COUNT];
     Atom	xa__NET_WM_DESKTOP;
 
     /* EWMH property writer (WmEwmh.c): */

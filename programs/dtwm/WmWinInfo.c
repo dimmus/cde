@@ -227,6 +227,8 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->netFlags = 0;
     pCD->netDirty = 0;
     pCD->netDesktopWritten = NET_DESKTOP_NOT_WRITTEN;
+    pCD->netStateWritten = NET_STATE_NOT_WRITTEN;
+    pCD->maxAxes = MAX_AXES_BOTH;
 
     for (i = 0; i < STRETCH_COUNT; ++i) pCD->clientStretchWin[i] = (Window)0L;
 
@@ -321,6 +323,13 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     ProcessWmSaveHint (pCD);
 
     /*
+     * The _NET_WM_STATE the client set: its flags, sticky (for
+     * GetClientWorkspaceInfo), modal (ProcessMwmHints), maximized
+     * (ApplyInitialNetWmState).
+     */
+    ReadInitialNetWmState (pCD);
+
+    /*
      *  Set client's workspace information.  NOTE: this also may
      *  set the geometry, initial state, etc.  For Sm-aware clients,
      *  this info will be in private DB; for older clients, it will
@@ -355,6 +364,11 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
      */
 
     ProcessWmHints (pCD, True /*first time*/);
+
+    /*
+     * Start maximized or full screen if _NET_WM_STATE says so.
+     */
+    ApplyInitialNetWmState (pCD);
 
 
     /*
@@ -1332,6 +1346,9 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
 	    }
 	}
     }
+
+    /* _NET_WM_STATE_DEMANDS_ATTENTION */
+    UpdateNetUrgency (pCD, (flags & XUrgencyHint) != 0);
 
     if (pXWMHints)
     {
@@ -3900,6 +3917,7 @@ void
 ProcessMwmHints (ClientData *pCD)
 {
     PropMwmHints *pHints;
+    Boolean explicitInputMode = False;
 
 
     /*
@@ -4033,6 +4051,7 @@ ProcessMwmHints (ClientData *pCD)
 
 	if (pHints->flags & MWM_HINTS_INPUT_MODE)
 	{
+	    explicitInputMode = True;
 	    if ((pHints->inputMode == MWM_INPUT_PRIMARY_APPLICATION_MODAL) ||
 		(pHints->inputMode == MWM_INPUT_FULL_APPLICATION_MODAL) ||
 		((pHints->inputMode == MWM_INPUT_SYSTEM_MODAL) &&
@@ -4071,6 +4090,18 @@ ProcessMwmHints (ClientData *pCD)
     {
 	ProcessOLDecoration (pCD);
     }
+
+    /*
+     * _NET_WM_STATE_MODAL, when the MWM hints give no input mode: modal
+     * for the primary window, or for the application if there is none.
+     */
+    if (!explicitInputMode && (pCD->netFlags & NET_FLAG_MODAL))
+    {
+	pCD->inputMode = (pCD->transientLeader) ?
+	    MWM_INPUT_PRIMARY_APPLICATION_MODAL :
+	    MWM_INPUT_FULL_APPLICATION_MODAL;
+    }
+    EwmhMarkClient (pCD, NET_CD_STATE);
 
     /* 
      * If primary window can't move between workspaces, then

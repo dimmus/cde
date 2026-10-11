@@ -778,14 +778,6 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
     ApplyPrematureClientMessages (pCD);
 
     /*
-     * An empty _NET_WM_STATE for a client that has none (there is
-     * nothing to read and merge).
-     */
-    if (!HasProperty (pCD, wmGD.xa__NET_WM_STATE))
-	XChangeProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_STATE, XA_ATOM,
-			 32, PropModeReplace, (unsigned char *) NULL, 0);
-
-    /*
      * Free the initial property list. This will force
      * reads of properties that change after the initial
      * management (see HasProperty() function.)

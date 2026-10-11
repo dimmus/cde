@@ -31,6 +31,13 @@
  *               the window's is deleted (f.delete_workspace)
  *   xdotool     the same through xdotool's desktop commands (skipped
  *               when xdotool is not installed)
+ *   states      _NET_WM_STATE: each state through messages (two unrelated
+ *               ones in one message, maximizing along one axis), focused
+ *               following the focus, hidden when iconified, demands
+ *               attention following the urgency hint and cleared by the
+ *               focus, states set before the window is mapped (full
+ *               screen, maximized vertically, sticky), and xdotool
+ *               windowstate
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -81,6 +88,7 @@ static int front_panel;
 static Atom a_supported, a_check, a_client_list, a_stacking, a_active;
 static Atom a_number, a_current, a_names, a_viewport, a_geometry;
 static Atom a_wm_desktop, a_wm_state, a_utf8, a_dt_wm_request;
+static Atom a_net_wm_state;
 
 /* The windows the tests created and have not destroyed. */
 #define MAX_OURS 32
@@ -1023,6 +1031,337 @@ static void test_xdotool(void)
 	printf("xdotool: ok\n");
 }
 
+/* ------------------------------------------------------------------ */
+/* States                                                              */
+/* ------------------------------------------------------------------ */
+
+#define REMOVE 0
+#define ADD 1
+#define TOGGLE 2
+
+static Atom state_atom(const char *name)
+{
+	char full[64];
+
+	snprintf(full, sizeof full, "_NET_WM_STATE_%s", name);
+	return XInternAtom(dpy, full, False);
+}
+
+static int has_state(Window w, Atom state)
+{
+	unsigned long *v;
+	int i, n, found = 0;
+
+	v = get_prop_on(w, a_net_wm_state, XA_ATOM, &n);
+	for (i = 0; i < n; i++)
+		if (v[i] == state)
+			found = 1;
+	if (v)
+		XFree(v);
+	return found;
+}
+
+struct state_expect {
+	Atom state;
+	int set;
+};
+
+static int state_is(Window w, Atom prop, const void *arg)
+{
+	const struct state_expect *e = arg;
+
+	(void)prop;
+	return has_state(w, e->state) == e->set;
+}
+
+static void expect_state(Window w, const char *name, int set)
+{
+	struct state_expect e = { state_atom(name), set };
+	char what[128];
+
+	snprintf(what, sizeof what, "_NET_WM_STATE %s %s", set ? "with" :
+		 "without", name);
+	wait_for_on(w, a_net_wm_state, state_is, &e, what);
+}
+
+static void send_state(Window w, long action, const char *first,
+		       const char *second)
+{
+	XEvent ev;
+
+	memset(&ev, 0, sizeof ev);
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = w;
+	ev.xclient.message_type = a_net_wm_state;
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = action;
+	ev.xclient.data.l[1] = first ? (long)state_atom(first) : 0;
+	ev.xclient.data.l[2] = second ? (long)state_atom(second) : 0;
+	ev.xclient.data.l[3] = 2;		/* from a pager */
+	XSendEvent(dpy, rootw, False,
+		   SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+}
+
+/* Add, remove, toggle on and toggle off a state that dtwm only shows. */
+static void cycle_state(Window w, const char *name)
+{
+	send_state(w, ADD, name, NULL);
+	expect_state(w, name, 1);
+	send_state(w, REMOVE, name, NULL);
+	expect_state(w, name, 0);
+	send_state(w, TOGGLE, name, NULL);
+	expect_state(w, name, 1);
+	send_state(w, TOGGLE, name, NULL);
+	expect_state(w, name, 0);
+}
+
+/* The dtwm frame of a managed window: its ancestor that is a root child. */
+static Window frame_of(Window w)
+{
+	Window r, parent, *kids;
+	unsigned int nkids;
+
+	for (;;) {
+		if (!XQueryTree(dpy, w, &r, &parent, &kids, &nkids))
+			fail("XQueryTree failed");
+		if (kids)
+			XFree(kids);
+		if (parent == rootw)
+			return w;
+		w = parent;
+	}
+}
+
+/* Root geometry of a window. */
+static void root_geometry(Window w, int *x, int *y, int *wd, int *ht)
+{
+	Window r, child;
+	unsigned int uw, uh, bw, depth;
+	int gx, gy;
+
+	XSync(dpy, False);
+	XGetGeometry(dpy, w, &r, &gx, &gy, &uw, &uh, &bw, &depth);
+	XTranslateCoordinates(dpy, w, rootw, 0, 0, x, y, &child);
+	*wd = (int)uw;
+	*ht = (int)uh;
+}
+
+static void set_urgency(Window w, int urgent)
+{
+	XWMHints *h = XGetWMHints(dpy, w);
+
+	if (!h)
+		fail("no WM_HINTS");
+	if (urgent)
+		h->flags |= XUrgencyHint;
+	else
+		h->flags &= ~XUrgencyHint;
+	XSetWMHints(dpy, w, h);
+	XFree(h);
+}
+
+/* Map a window that has these states set beforehand. */
+static Window map_with_states(const char *title, const char *first,
+			      const char *second)
+{
+	Window w = create_window(title, None);
+	Atom states[2];
+	int n = 0;
+
+	if (first)
+		states[n++] = state_atom(first);
+	if (second)
+		states[n++] = state_atom(second);
+	XChangeProperty(dpy, w, a_net_wm_state, XA_ATOM, 32, PropModeReplace,
+			(unsigned char *)states, n);
+	XMapWindow(dpy, w);
+	wait_for_on(w, a_wm_state, has_wm_state, NULL,
+		    "WM_STATE NormalState");
+	expect_list(a_client_list, "_NET_CLIENT_LIST", 1, 1, w);
+	return w;
+}
+
+static void test_states(void)
+{
+	static const char *const supported[] = {
+		"MODAL", "STICKY", "MAXIMIZED_VERT", "MAXIMIZED_HORZ",
+		"SKIP_TASKBAR", "SKIP_PAGER", "HIDDEN", "FULLSCREEN", "ABOVE",
+		"BELOW", "DEMANDS_ATTENTION", "FOCUSED",
+	};
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	int i, j, n, x, y, wd, ht, fx, fy, fw, fh;
+	unsigned long *v;
+	Window a, b, f, m, s;
+
+	v = get_prop(a_supported, XA_ATOM, &n);
+	for (i = 0; i < (int)(sizeof supported / sizeof supported[0]); i++) {
+		for (j = 0; j < n && v[j] != state_atom(supported[i]); j++)
+			;
+		if (j == n)
+			fail("_NET_SUPPORTED lacks _NET_WM_STATE_%s",
+			     supported[i]);
+	}
+	for (j = 0; j < n; j++)
+		if (v[j] == state_atom("SHADED"))
+			fail("_NET_SUPPORTED has _NET_WM_STATE_SHADED");
+	if (v)
+		XFree(v);
+
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	a = create_window("ewmhtest A", None);
+	b = create_window("ewmhtest B", None);
+	XMapWindow(dpy, a);
+	XMapWindow(dpy, b);
+	expect_list(a_client_list, "_NET_CLIENT_LIST", 0, 2, a, b);
+
+	/* focused follows the focus */
+	send_active(a);
+	expect_state(a, "FOCUSED", 1);
+	expect_state(b, "FOCUSED", 0);
+
+	/* the states that dtwm only shows, each through every action */
+	cycle_state(a, "SKIP_TASKBAR");
+	cycle_state(a, "SKIP_PAGER");
+	cycle_state(b, "DEMANDS_ATTENTION");
+	cycle_state(a, "ABOVE");
+	cycle_state(a, "BELOW");
+
+	/* two unrelated states in one message */
+	send_state(a, ADD, "SKIP_TASKBAR", "SKIP_PAGER");
+	expect_state(a, "SKIP_TASKBAR", 1);
+	expect_state(a, "SKIP_PAGER", 1);
+	send_state(a, REMOVE, "SKIP_PAGER", "SKIP_TASKBAR");
+	expect_state(a, "SKIP_TASKBAR", 0);
+	expect_state(a, "SKIP_PAGER", 0);
+
+	/* requests for dtwm's own states change nothing */
+	send_state(a, ADD, "MODAL", "HIDDEN");
+	send_state(a, REMOVE, "FOCUSED", NULL);
+	send_state(a, ADD, "SKIP_PAGER", NULL);
+	expect_state(a, "SKIP_PAGER", 1);
+	if (has_state(a, state_atom("MODAL")) ||
+	    has_state(a, state_atom("HIDDEN")) ||
+	    !has_state(a, state_atom("FOCUSED")))
+		fail("a request changed MODAL, HIDDEN or FOCUSED");
+	send_state(a, REMOVE, "SKIP_PAGER", NULL);
+	expect_state(a, "SKIP_PAGER", 0);
+
+	/* sticky is on all desktops */
+	cycle_state(a, "STICKY");
+	send_state(a, ADD, "STICKY", NULL);
+	expect_card(a, a_wm_desktop, ALL_DESKTOPS, "_NET_WM_DESKTOP of A");
+	send_state(a, REMOVE, "STICKY", NULL);
+	expect_card(a, a_wm_desktop, 0, "_NET_WM_DESKTOP of A");
+
+	/* demands attention: the urgency hint, cleared by the focus */
+	set_urgency(b, 1);
+	expect_state(b, "DEMANDS_ATTENTION", 1);
+	set_urgency(b, 0);
+	expect_state(b, "DEMANDS_ATTENTION", 0);
+	send_state(b, ADD, "DEMANDS_ATTENTION", NULL);
+	expect_state(b, "DEMANDS_ATTENTION", 1);
+	send_active(b);
+	expect_state(b, "FOCUSED", 1);
+	expect_state(b, "DEMANDS_ATTENTION", 0);
+	expect_state(a, "FOCUSED", 0);
+
+	/* maximizing: one axis, then the other, both in one message */
+	root_geometry(b, &x, &y, &wd, &ht);
+	send_state(b, ADD, "MAXIMIZED_VERT", NULL);
+	expect_state(b, "MAXIMIZED_VERT", 1);
+	if (has_state(b, state_atom("MAXIMIZED_HORZ")))
+		fail("MAXIMIZED_VERT also maximized horizontally");
+	root_geometry(frame_of(b), &fx, &fy, &fw, &fh);
+	if (fy != 0 || fh != sh || fw >= sw)
+		fail("maximized vertically, the frame is %dx%d+%d+%d",
+		     fw, fh, fx, fy);
+	root_geometry(b, &i, &j, &n, &fh);
+	if (n != wd || i != x)
+		fail("maximizing vertically changed the width or x");
+	send_state(b, ADD, "MAXIMIZED_HORZ", NULL);
+	expect_state(b, "MAXIMIZED_HORZ", 1);
+	expect_state(b, "MAXIMIZED_VERT", 1);
+	root_geometry(frame_of(b), &fx, &fy, &fw, &fh);
+	if (fx != 0 || fy != 0 || fw != sw || fh != sh)
+		fail("maximized, the frame is %dx%d+%d+%d", fw, fh, fx, fy);
+	send_state(b, REMOVE, "MAXIMIZED_VERT", NULL);
+	expect_state(b, "MAXIMIZED_VERT", 0);
+	expect_state(b, "MAXIMIZED_HORZ", 1);
+	send_state(b, TOGGLE, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_state(b, "MAXIMIZED_HORZ", 0);
+	send_state(b, TOGGLE, "MAXIMIZED_HORZ", "MAXIMIZED_VERT");
+	expect_state(b, "MAXIMIZED_VERT", 1);
+	expect_state(b, "MAXIMIZED_HORZ", 1);
+	send_state(b, REMOVE, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_state(b, "MAXIMIZED_VERT", 0);
+	expect_state(b, "MAXIMIZED_HORZ", 0);
+	root_geometry(b, &i, &j, &n, &fh);
+	if (i != x || j != y || n != wd || fh != ht)
+		fail("B did not get its geometry back after maximizing");
+
+	/* full screen */
+	cycle_state(b, "FULLSCREEN");
+
+	/* hidden when iconified, not any more once restored */
+	XIconifyWindow(dpy, b, DefaultScreen(dpy));
+	expect_state(b, "HIDDEN", 1);
+	expect_state(b, "FOCUSED", 0);
+	XMapWindow(dpy, b);
+	expect_state(b, "HIDDEN", 0);
+
+	/* states set before the window is mapped */
+	f = map_with_states("ewmhtest full screen", "FULLSCREEN", NULL);
+	expect_state(f, "FULLSCREEN", 1);
+	root_geometry(frame_of(f), &fx, &fy, &fw, &fh);
+	root_geometry(f, &x, &y, &wd, &ht);
+	if (fx != 0 || fy != 0 || fw != sw || fh != sh ||
+	    x != 0 || y != 0 || wd != sw || ht != sh)
+		fail("full screen at map: frame %dx%d+%d+%d, client %dx%d+%d+%d",
+		     fw, fh, fx, fy, wd, ht, x, y);
+
+	m = map_with_states("ewmhtest maximized vertically",
+			    "MAXIMIZED_VERT", "SKIP_TASKBAR");
+	expect_state(m, "MAXIMIZED_VERT", 1);
+	expect_state(m, "SKIP_TASKBAR", 1);
+	if (has_state(m, state_atom("MAXIMIZED_HORZ")))
+		fail("MAXIMIZED_VERT at map also maximized horizontally");
+	root_geometry(frame_of(m), &fx, &fy, &fw, &fh);
+	root_geometry(m, &x, &y, &wd, &ht);
+	if (fy != 0 || fh != sh || wd != 300)
+		fail("maximized vertically at map: frame %dx%d+%d+%d, "
+		     "client %dx%d", fw, fh, fx, fy, wd, ht);
+
+	s = map_with_states("ewmhtest sticky", "STICKY", "MODAL");
+	expect_card(s, a_wm_desktop, ALL_DESKTOPS, "_NET_WM_DESKTOP of S");
+	expect_state(s, "STICKY", 1);
+	expect_state(s, "MODAL", 1);
+
+	/* xdotool */
+	if (!system("xdotool version >/dev/null 2>&1")) {
+		xdotool("windowstate --add SKIP_PAGER 0x%lx", a);
+		expect_state(a, "SKIP_PAGER", 1);
+		xdotool("windowstate --remove SKIP_PAGER 0x%lx", a);
+		expect_state(a, "SKIP_PAGER", 0);
+		xdotool("windowstate --toggle STICKY 0x%lx", a);
+		expect_state(a, "STICKY", 1);
+		expect_card(a, a_wm_desktop, ALL_DESKTOPS,
+			    "_NET_WM_DESKTOP of A");
+		xdotool("windowstate --toggle STICKY 0x%lx", a);
+		expect_state(a, "STICKY", 0);
+		xdotool("windowstate --add MAXIMIZED_HORZ 0x%lx", a);
+		expect_state(a, "MAXIMIZED_HORZ", 1);
+		expect_state(a, "MAXIMIZED_VERT", 0);
+		xdotool("windowstate --remove MAXIMIZED_HORZ 0x%lx", a);
+		expect_state(a, "MAXIMIZED_HORZ", 0);
+	}
+
+	destroy_all();
+	printf("states: ok\n");
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
@@ -1031,6 +1370,7 @@ static const struct {
 	{ "active", test_active },
 	{ "desktops", test_desktops },
 	{ "xdotool", test_xdotool },
+	{ "states", test_states },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))
@@ -1107,6 +1447,7 @@ int main(int argc, char **argv)
 	a_wm_state = XInternAtom(dpy, "WM_STATE", False);
 	a_utf8 = XInternAtom(dpy, "UTF8_STRING", False);
 	a_dt_wm_request = XInternAtom(dpy, "_DT_WM_REQUEST", False);
+	a_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
 	XSelectInput(dpy, rootw, PropertyChangeMask);
 
 	atexit(cleanup);

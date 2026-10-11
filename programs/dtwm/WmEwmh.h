@@ -54,8 +54,24 @@
 #define NET_ALL_DESKTOPS	0xFFFFFFFFL
 #define NET_DESKTOP_NOT_WRITTEN	(-2L)
 
+/* An empty _NET_WM_STATE cache (not a set of NETSTATE bits). */
+#define NET_STATE_NOT_WRITTEN	(~0u)
+
 /* pCD->netFlags: */
 #define NET_FLAG_LISTED		(1u << 0)	/* in pSD->netClients */
+#define NET_FLAG_SKIP_TASKBAR	(1u << 1)	/* _NET_WM_STATE flags kept */
+#define NET_FLAG_SKIP_PAGER	(1u << 2)	/* for the client */
+#define NET_FLAG_DEMANDS_ATTENTION (1u << 3)	/* requested by the client */
+#define NET_FLAG_MODAL		(1u << 4)
+#define NET_FLAG_URGENT_HINT	(1u << 5)	/* WM_HINTS XUrgencyHint */
+#define NET_FLAG_INIT_STICKY	(1u << 6)	/* the _NET_WM_STATE the */
+#define NET_FLAG_INIT_MAX_VERT	(1u << 7)	/* client set before it */
+#define NET_FLAG_INIT_MAX_HORZ	(1u << 8)	/* was mapped, until */
+#define NET_FLAG_INIT_FULLSCREEN (1u << 9)	/* GetClientInfo is done */
+#define NET_FLAG_INIT		(NET_FLAG_INIT_STICKY | \
+				 NET_FLAG_INIT_MAX_VERT | \
+				 NET_FLAG_INIT_MAX_HORZ | \
+				 NET_FLAG_INIT_FULLSCREEN)
 
 void EwmhMarkScreen (WmScreenData *pSD, unsigned int bits);
 void EwmhMarkClient (ClientData *pCD, unsigned int bits);
@@ -69,6 +85,9 @@ void EwmhRootResized (WmScreenData *pSD, int width, int height);
 Boolean GetNetWmDesktop (ClientData *pCD, WorkspaceID **ppIDs,
     unsigned int *pNumIDs, Boolean *pbAll);
 void ProcessNetWmDesktop (ClientData *pCD, unsigned long desktop);
+void ReadInitialNetWmState (ClientData *pCD);
+void ApplyInitialNetWmState (ClientData *pCD);
+void UpdateNetUrgency (ClientData *pCD, Boolean urgent);
 void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     int top, int bottom, int left, int right);
 void ProcessNetWmState (ClientData *pCD, long action,

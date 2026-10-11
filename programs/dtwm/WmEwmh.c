@@ -91,15 +91,27 @@ static const struct
     { _XA__NET_WM_FULLSCREEN_MONITORS,
 	&wmGD.xa__NET_WM_FULLSCREEN_MONITORS,				True },
     { _XA__NET_WM_STATE,		&wmGD.xa__NET_WM_STATE,		True },
-    { _XA__NET_WM_STATE_MAXIMIZED_VERT,
-	&wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT,				True },
-    { _XA__NET_WM_STATE_MAXIMIZED_HORZ,
-	&wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ,				True },
-    { _XA__NET_WM_STATE_FULLSCREEN,	&wmGD.xa__NET_WM_STATE_FULLSCREEN,
-									True },
-    { _XA__NET_WM_STATE_ABOVE,		&wmGD.xa__NET_WM_STATE_ABOVE,	True },
-    { _XA__NET_WM_STATE_BELOW,		&wmGD.xa__NET_WM_STATE_BELOW,	True },
+#define NETSTATE(s) \
+    { "_NET_WM_STATE_" #s, &wmGD.xa__NET_WM_STATE_[NETSTATE_ ## s],	True }
+    NETSTATE (MODAL),
+    NETSTATE (STICKY),
+    NETSTATE (MAXIMIZED_VERT),
+    NETSTATE (MAXIMIZED_HORZ),
+    NETSTATE (SKIP_TASKBAR),
+    NETSTATE (SKIP_PAGER),
+    NETSTATE (HIDDEN),
+    NETSTATE (FULLSCREEN),
+    NETSTATE (ABOVE),
+    NETSTATE (BELOW),
+    NETSTATE (DEMANDS_ATTENTION),
+    NETSTATE (FOCUSED),
+#undef NETSTATE
 };
+
+#define NETSTATE_BIT(s)		(1u << NETSTATE_ ## s)
+
+/* The client whose _NET_WM_STATE_FOCUSED was last marked. */
+static ClientData *netFocusClient;
 
 /* The clients marked by EwmhMarkClient since the last flush. */
 static ClientData **dirtyClients;
@@ -220,7 +232,7 @@ void EwmhAddClient (ClientData *pCD)
     pCD->netFlags |= NET_FLAG_LISTED;
 
     EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING);
-    EwmhMarkClient (pCD, NET_CD_DESKTOP);
+    EwmhMarkClient (pCD, NET_CD_DESKTOP | NET_CD_STATE);
 }
 
 
@@ -260,6 +272,9 @@ void EwmhRemoveClient (ClientData *pCD)
 	}
 	pCD->netDirty = 0;
     }
+
+    if (netFocusClient == pCD)
+	netFocusClient = NULL;
 
     if (!(pCD->netFlags & NET_FLAG_LISTED)) return;
     pCD->netFlags &= ~NET_FLAG_LISTED;
@@ -466,19 +481,76 @@ static long NetWmDesktop (ClientData *pCD)
 }
 
 
-/* Client window properties: _NET_WM_DESKTOP (the others are to come). */
+/*
+ * _NET_WM_STATE, as NETSTATE bits, from what dtwm knows of the client:
+ * the state is dtwm's once the window is mapped, a client asks for
+ * changes with messages.
+ */
+static unsigned int NetWmState (ClientData *pCD)
+{
+    unsigned int state = 0;
+    int clientState = pCD->clientState & ~UNSEEN_STATE;
+
+    if (pCD->maxConfig && pCD->fullscreen)
+	state |= NETSTATE_BIT (FULLSCREEN);
+    else if (pCD->maxConfig)
+    {
+	if (pCD->maxAxes & MAX_AXIS_VERT) state |= NETSTATE_BIT (MAXIMIZED_VERT);
+	if (pCD->maxAxes & MAX_AXIS_HORZ) state |= NETSTATE_BIT (MAXIMIZED_HORZ);
+    }
+    if (pCD->pSD->topClient == pCD) state |= NETSTATE_BIT (ABOVE);
+    if (pCD->pSD->bottomClient == pCD) state |= NETSTATE_BIT (BELOW);
+    if (NetWmDesktop (pCD) == NET_ALL_DESKTOPS) state |= NETSTATE_BIT (STICKY);
+    if ((pCD->netFlags & NET_FLAG_MODAL) ||
+	(pCD->inputMode != MWM_INPUT_MODELESS))
+	state |= NETSTATE_BIT (MODAL);
+    if (clientState == MINIMIZED_STATE) state |= NETSTATE_BIT (HIDDEN);
+    if (pCD->netFlags & NET_FLAG_SKIP_TASKBAR)
+	state |= NETSTATE_BIT (SKIP_TASKBAR);
+    if (pCD->netFlags & NET_FLAG_SKIP_PAGER)
+	state |= NETSTATE_BIT (SKIP_PAGER);
+    if (pCD->netFlags & (NET_FLAG_URGENT_HINT | NET_FLAG_DEMANDS_ATTENTION))
+	state |= NETSTATE_BIT (DEMANDS_ATTENTION);
+    if (pCD == wmGD.keyboardFocus &&
+	(clientState == NORMAL_STATE || clientState == MAXIMIZED_STATE))
+	state |= NETSTATE_BIT (FOCUSED);
+
+    return state;
+}
+
+
+/* Client window properties: _NET_WM_DESKTOP, _NET_WM_STATE. */
 static void FlushClient (ClientData *pCD)
 {
+    Atom atoms[NETSTATE_COUNT];
+    unsigned int state;
     long desktop;
+    int i, num = 0;
 
     if (pCD->netDirty & NET_CD_DESKTOP)
     {
+	/* sticky is being on all desktops */
+	pCD->netDirty |= NET_CD_STATE;
 	desktop = NetWmDesktop (pCD);
 	if (desktop != pCD->netDesktopWritten)
 	{
 	    XChangeProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_DESKTOP,
 		XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 	    pCD->netDesktopWritten = desktop;
+	}
+    }
+
+    if (pCD->netDirty & NET_CD_STATE)
+    {
+	state = NetWmState (pCD);
+	if (state != pCD->netStateWritten)
+	{
+	    for (i = 0; i < NETSTATE_COUNT; ++i)
+		if (state & (1u << i))
+		    atoms[num++] = wmGD.xa__NET_WM_STATE_[i];
+	    XChangeProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_STATE,
+		XA_ATOM, 32, PropModeReplace, (unsigned char *)atoms, num);
+	    pCD->netStateWritten = state;
 	}
     }
 
@@ -651,7 +723,8 @@ void EwmhRootResized (WmScreenData *pSD, int width, int height)
  *  Description:
  *  -----------
  *  Reads the _NET_WM_DESKTOP that a client set before it was mapped, the
- *  workspace it asks to start in, or all of them.  It is read only when
+ *  workspace it asks to start in, or all of them (also when its initial
+ *  _NET_WM_STATE says sticky).  It is read only when
  *  the window has it (HasProperty), and ignored in mwm mode or when the
  *  index is out of range.
  *
@@ -678,20 +751,28 @@ Boolean GetNetWmDesktop (ClientData *pCD, WorkspaceID **ppIDs,
     unsigned long nitems, leftover, desktop;
     unsigned char *data = NULL;
 
-    if (wmGD.useStandardBehavior ||
-	!HasProperty (pCD, wmGD.xa__NET_WM_DESKTOP) ||
-	XGetWindowProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_DESKTOP,
-	    0L, 1L, False, XA_CARDINAL, &actualType, &actualFormat, &nitems,
-	    &leftover, &data) != Success)
+    if (wmGD.useStandardBehavior)
 	return False;
 
-    if (actualType != XA_CARDINAL || actualFormat != 32 || nitems != 1)
+    /* _NET_WM_STATE_STICKY: all of them */
+    if (pCD->netFlags & NET_FLAG_INIT_STICKY)
+	desktop = NET_ALL_DESKTOPS;
+    else
     {
-	if (data) XFree (data);
-	return False;
+	if (!HasProperty (pCD, wmGD.xa__NET_WM_DESKTOP) ||
+	    XGetWindowProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_DESKTOP,
+		0L, 1L, False, XA_CARDINAL, &actualType, &actualFormat,
+		&nitems, &leftover, &data) != Success)
+	    return False;
+
+	if (actualType != XA_CARDINAL || actualFormat != 32 || nitems != 1)
+	{
+	    if (data) XFree (data);
+	    return False;
+	}
+	desktop = *(unsigned long *)data & 0xFFFFFFFFUL;
+	XFree (data);
     }
-    desktop = *(unsigned long *)data & 0xFFFFFFFFUL;
-    XFree (data);
 
     if (desktop == NET_ALL_DESKTOPS)
     {
@@ -824,7 +905,11 @@ static Boolean EwmhFlushProc (XtPointer clientData)
 }
 
 
-/* _NET_ACTIVE_WINDOW follows the keyboard focus. */
+/*
+ * _NET_ACTIVE_WINDOW and _NET_WM_STATE_FOCUSED follow the keyboard
+ * focus; a client that gets it no longer demands attention (unless its
+ * urgency hint says so).
+ */
 void UpdateNetActiveWindow (void)
 {
     int scr;
@@ -832,6 +917,130 @@ void UpdateNetActiveWindow (void)
     for (scr = 0; scr < wmGD.numScreens; ++scr)
 	if (wmGD.Screens[scr].managed)
 	    EwmhMarkScreen (&wmGD.Screens[scr], NET_SD_ACTIVE);
+
+    if (netFocusClient != wmGD.keyboardFocus)
+    {
+	if (netFocusClient)
+	    EwmhMarkClient (netFocusClient, NET_CD_STATE);
+	netFocusClient = wmGD.keyboardFocus;
+	if (netFocusClient)
+	{
+	    netFocusClient->netFlags &= ~NET_FLAG_DEMANDS_ATTENTION;
+	    EwmhMarkClient (netFocusClient, NET_CD_STATE);
+	}
+    }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  UpdateNetUrgency (pCD, urgent)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Takes the urgency hint of WM_HINTS, shown as
+ *  _NET_WM_STATE_DEMANDS_ATTENTION.
+ *
+ *************************************<->***********************************/
+
+void UpdateNetUrgency (ClientData *pCD, Boolean urgent)
+{
+    if (!urgent == !(pCD->netFlags & NET_FLAG_URGENT_HINT)) return;
+
+    if (urgent)
+	pCD->netFlags |= NET_FLAG_URGENT_HINT;
+    else
+	pCD->netFlags &= ~NET_FLAG_URGENT_HINT;
+    EwmhMarkClient (pCD, NET_CD_STATE);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ReadInitialNetWmState (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reads the _NET_WM_STATE that a client set before it was mapped (only
+ *  when it has one, HasProperty).  dtwm keeps the flags that it only
+ *  shows (skip taskbar and pager, demands attention, modal), and notes
+ *  sticky, maximized and full screen for the steps of GetClientInfo that
+ *  apply them.  Hidden and focused are dtwm's, shaded is not supported.
+ *
+ *************************************<->***********************************/
+
+void ReadInitialNetWmState (ClientData *pCD)
+{
+    static const struct
+    {
+	int state;
+	unsigned int flag;
+    } initial[] =
+    {
+	{ NETSTATE_SKIP_TASKBAR,	NET_FLAG_SKIP_TASKBAR },
+	{ NETSTATE_SKIP_PAGER,		NET_FLAG_SKIP_PAGER },
+	{ NETSTATE_DEMANDS_ATTENTION,	NET_FLAG_DEMANDS_ATTENTION },
+	{ NETSTATE_MODAL,		NET_FLAG_MODAL },
+	{ NETSTATE_STICKY,		NET_FLAG_INIT_STICKY },
+	{ NETSTATE_MAXIMIZED_VERT,	NET_FLAG_INIT_MAX_VERT },
+	{ NETSTATE_MAXIMIZED_HORZ,	NET_FLAG_INIT_MAX_HORZ },
+	{ NETSTATE_FULLSCREEN,		NET_FLAG_INIT_FULLSCREEN },
+    };
+    Atom actualType;
+    int actualFormat, j;
+    unsigned long nitems, leftover, i;
+    Atom *states = NULL;
+
+    if (!HasProperty (pCD, wmGD.xa__NET_WM_STATE) ||
+	XGetWindowProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_STATE,
+	    0L, 64L, False, XA_ATOM, &actualType, &actualFormat, &nitems,
+	    &leftover, (unsigned char **)&states) != Success)
+	return;
+
+    if (actualType == XA_ATOM && actualFormat == 32)
+    {
+	for (i = 0; i < nitems; ++i)
+	    for (j = 0; j < XtNumber (initial); ++j)
+		if (states[i] == wmGD.xa__NET_WM_STATE_[initial[j].state])
+		    pCD->netFlags |= initial[j].flag;
+    }
+    if (states) XFree (states);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ApplyInitialNetWmState (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  A client that asked to start maximized (along one axis or both) or full
+ *  screen starts so, unless it is to start iconic or its state comes from
+ *  the session.  Called after WM_HINTS gave the initial state.
+ *
+ *************************************<->***********************************/
+
+void ApplyInitialNetWmState (ClientData *pCD)
+{
+    unsigned int flags = pCD->netFlags;
+
+    pCD->netFlags &= ~NET_FLAG_INIT;
+
+    if (!(flags & (NET_FLAG_INIT_MAX_VERT | NET_FLAG_INIT_MAX_HORZ |
+		   NET_FLAG_INIT_FULLSCREEN)) ||
+	(pCD->clientFlags & SM_CLIENT_STATE) ||
+	(pCD->clientState & ~UNSEEN_STATE) != NORMAL_STATE)
+	return;
+
+    if (flags & NET_FLAG_INIT_FULLSCREEN)
+	pCD->fullscreen = True;
+    else
+	pCD->maxAxes = ((flags & NET_FLAG_INIT_MAX_VERT) ? MAX_AXIS_VERT : 0) |
+		       ((flags & NET_FLAG_INIT_MAX_HORZ) ? MAX_AXIS_HORZ : 0);
+    pCD->clientState = MAXIMIZED_STATE | (pCD->clientState & UNSEEN_STATE);
 }
 
 
@@ -923,29 +1132,74 @@ void ProcessNetActiveWindow (ClientData *pCD, Time timestamp)
 static void ProcessNetWmStateAbove (ClientData *pCD, long action);
 static void ProcessNetWmStateBelow (ClientData *pCD, long action);
 
-static void ProcessNetWmStateMaximized (ClientData *pCD, long action)
+/* Whether a state is to be set after a _NET_WM_STATE action. */
+static Boolean NetStateAction (long action, Boolean set)
 {
-    int newState;
-
     switch (action)
     {
-	case _NET_WM_STATE_REMOVE:
-	    if (pCD->clientState != MAXIMIZED_STATE) return;
-	    newState = NORMAL_STATE;
-	    break;
-	case _NET_WM_STATE_ADD:
-	    if (pCD->clientState == MAXIMIZED_STATE) return;
-	    newState = MAXIMIZED_STATE;
-	    break;
-	case _NET_WM_STATE_TOGGLE:
-	    newState = pCD->clientState == MAXIMIZED_STATE ?
-		NORMAL_STATE : MAXIMIZED_STATE;
-	    break;
-	default:
-	    return;
+	case _NET_WM_STATE_REMOVE:	return False;
+	case _NET_WM_STATE_ADD:		return True;
+	case _NET_WM_STATE_TOGGLE:	return !set;
+	default:			return set;
     }
+}
 
-    SetClientState (pCD, newState, GetTimestamp ());
+/*
+ * Maximize along axes (MAX_AXIS_*).  Both axes in one message are one
+ * transition: toggling them unmaximizes a window maximized along either.
+ * A full screen window ignores maximize requests.
+ */
+static void ProcessNetWmStateMaximized (ClientData *pCD, long action, int axes)
+{
+    int current, wanted;
+
+    if (pCD->fullscreen) return;
+
+    current = (pCD->clientState == MAXIMIZED_STATE) ? pCD->maxAxes : 0;
+    if (axes == MAX_AXES_BOTH)
+	wanted = NetStateAction (action, current != 0) ? MAX_AXES_BOTH : 0;
+    else
+	wanted = NetStateAction (action, (current & axes) != 0) ?
+	    (current | axes) : (current & ~axes);
+    if (wanted == current) return;
+
+    /* NORMAL_STATE resets maxAxes */
+    if (current)
+	SetClientState (pCD, NORMAL_STATE, GetTimestamp ());
+    if (wanted)
+    {
+	pCD->maxAxes = wanted;
+	SetClientState (pCD, MAXIMIZED_STATE, GetTimestamp ());
+    }
+}
+
+/* Sticky is on all desktops: the _NET_WM_DESKTOP request for all, or the
+ * current one. */
+static void ProcessNetWmStateSticky (ClientData *pCD, long action)
+{
+    WmScreenData *pSD = pCD->pSD;
+    Boolean sticky = NetWmDesktop (pCD) == NET_ALL_DESKTOPS;
+
+    if (NetStateAction (action, sticky) == sticky) return;
+
+    ProcessNetWmDesktop (pCD, sticky ? (unsigned long)
+			 (pSD->pActiveWS - pSD->pWS) : NET_ALL_DESKTOPS);
+}
+
+/* The states that dtwm only shows. */
+static void ProcessNetWmStateFlag (ClientData *pCD, long action,
+    unsigned int flag)
+{
+    unsigned int shown = flag;
+
+    /* demanding attention shows the urgency hint too */
+    if (flag == NET_FLAG_DEMANDS_ATTENTION)
+	shown |= NET_FLAG_URGENT_HINT;
+
+    if (NetStateAction (action, (pCD->netFlags & shown) != 0))
+	pCD->netFlags |= flag;
+    else
+	pCD->netFlags &= ~flag;
 }
 
 static void ProcessNetWmStateFullscreen (ClientData *pCD, long action)
@@ -998,7 +1252,7 @@ static void ProcessNetWmStateAbove (ClientData *pCD, long action)
 	    return;
     }
 
-    UpdateNetWmState (pCD->client, &wmGD.xa__NET_WM_STATE_ABOVE, 1, action);
+    EwmhMarkClient (pCD, NET_CD_STATE);
 }
 
 static void ProcessNetWmStateBelow (ClientData *pCD, long action)
@@ -1021,7 +1275,7 @@ static void ProcessNetWmStateBelow (ClientData *pCD, long action)
 	    return;
     }
 
-    UpdateNetWmState (pCD->client, &wmGD.xa__NET_WM_STATE_BELOW, 1, action);
+    EwmhMarkClient (pCD, NET_CD_STATE);
 }
 
 /**
@@ -1061,36 +1315,82 @@ void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     pCD->fullscreenAuto = False;
 }
 
-/**
- * @brief Processes the _NET_WM_STATE client message.
+/*************************************<->*************************************
  *
- * @param pCD
- * @param action
- * @param firstProperty
- * @param secondProperty
- */
+ *  ProcessNetWmState (pCD, action, firstProperty, secondProperty)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Handles a _NET_WM_STATE client message: each of the two states is
+ *  changed on its own, except that maximizing vertically and
+ *  horizontally in one message is one transition.  The states that
+ *  change the window's geometry or stacking are ignored while it is not
+ *  shown (in another workspace).  Hidden, focused and modal are dtwm's
+ *  to say, shaded is not supported.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = client
+ *
+ *  action = _NET_WM_STATE_REMOVE, _ADD or _TOGGLE
+ *
+ *  firstProperty, secondProperty = the states (or None)
+ *
+ *************************************<->***********************************/
+
 void ProcessNetWmState (ClientData *pCD, long action,
     Atom firstProperty, Atom secondProperty)
 {
-    if (pCD->clientState & UNSEEN_STATE) return;
+    Atom *states = wmGD.xa__NET_WM_STATE_;
+    Atom property[2];
+    Boolean unseen = (pCD->clientState & UNSEEN_STATE) != 0;
+    int i, axes = 0;
 
-    if ((firstProperty  == wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT &&
-	 secondProperty == wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ) ||
-	(firstProperty  == wmGD.xa__NET_WM_STATE_MAXIMIZED_HORZ &&
-	 secondProperty == wmGD.xa__NET_WM_STATE_MAXIMIZED_VERT))
-	ProcessNetWmStateMaximized (pCD, action);
-    else if (firstProperty  == wmGD.xa__NET_WM_STATE_FULLSCREEN ||
-	     secondProperty == wmGD.xa__NET_WM_STATE_FULLSCREEN)
-	ProcessNetWmStateFullscreen (pCD, action);
-    else if (firstProperty  == wmGD.xa__NET_WM_STATE_ABOVE ||
-	     secondProperty == wmGD.xa__NET_WM_STATE_ABOVE)
-	ProcessNetWmStateAbove (pCD, action);
-    else if (firstProperty  == wmGD.xa__NET_WM_STATE_BELOW ||
-	     secondProperty == wmGD.xa__NET_WM_STATE_BELOW)
-	ProcessNetWmStateBelow (pCD, action);
+    property[0] = firstProperty;
+    property[1] = secondProperty;
 
-    if (!ClientInWorkspace (ACTIVE_WS, pCD))
+    for (i = 0; i < 2; ++i)
+    {
+	Atom state = property[i];
+
+	if (state == None || (i == 1 && state == property[0]))
+	    continue;
+
+	if (state == states[NETSTATE_MAXIMIZED_VERT])
+	    axes |= MAX_AXIS_VERT;
+	else if (state == states[NETSTATE_MAXIMIZED_HORZ])
+	    axes |= MAX_AXIS_HORZ;
+	else if (state == states[NETSTATE_FULLSCREEN])
+	{
+	    if (!unseen) ProcessNetWmStateFullscreen (pCD, action);
+	}
+	else if (state == states[NETSTATE_ABOVE])
+	{
+	    if (!unseen) ProcessNetWmStateAbove (pCD, action);
+	}
+	else if (state == states[NETSTATE_BELOW])
+	{
+	    if (!unseen) ProcessNetWmStateBelow (pCD, action);
+	}
+	else if (state == states[NETSTATE_STICKY])
+	    ProcessNetWmStateSticky (pCD, action);
+	else if (state == states[NETSTATE_SKIP_TASKBAR])
+	    ProcessNetWmStateFlag (pCD, action, NET_FLAG_SKIP_TASKBAR);
+	else if (state == states[NETSTATE_SKIP_PAGER])
+	    ProcessNetWmStateFlag (pCD, action, NET_FLAG_SKIP_PAGER);
+	else if (state == states[NETSTATE_DEMANDS_ATTENTION])
+	    ProcessNetWmStateFlag (pCD, action, NET_FLAG_DEMANDS_ATTENTION);
+    }
+
+    if (axes && !unseen)
+	ProcessNetWmStateMaximized (pCD, action, axes);
+
+    if (!unseen && !ClientInWorkspace (ACTIVE_WS, pCD))
 	SetClientState (pCD, pCD->clientState | UNSEEN_STATE, GetTimestamp ());
+
+    EwmhMarkClient (pCD, NET_CD_STATE);
 }
 
 /*************************************<->*************************************
