@@ -43,6 +43,7 @@ Needs at run time: `Xvfb`, `xdotool` (for `../apptime.py`), `python3`,
 | `index_open` | Index... in a new help dialog: it opens on the complete index of the current volume |
 | `index_all` | Index... in a new dialog, then "Complete Index" of "All Volumes": the dialog's first scan of the volumes and the search |
 | `index_again` | the same search again in the same dialog |
+| `index_stop` | Index... in a new dialog, a complete-index search of all volumes stopped at once, the current volume, all volumes again (the result must be `index_all`'s); then a dialog destroyed while its search runs |
 | `index_word` | Index... in a new dialog, "Entries with" WORD (default `file`) in all volumes |
 
 Each operation ends with the event queue drained and one `XSync`, so the

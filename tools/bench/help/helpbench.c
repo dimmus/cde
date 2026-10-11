@@ -42,6 +42,10 @@
  *               Volumes", until the search is done [one search, with the
  *               dialog's first scan of the volumes]
  *   index_again the same again in the same dialog [one search]
+ *   index_stop  a new dialog, complete index of all volumes stopped
+ *               at once, the current volume, all volumes again (the result
+ *               must be index_all's); then a dialog destroyed while its
+ *               search runs [the lot]
  *   index_word  a new help dialog, Index..., "Entries with" WORD
  *               (default "file") in all volumes [one search]
  *
@@ -709,6 +713,47 @@ static int result_count(Widget form)
 }
 
 /*
+ * How long the event loop goes without dispatching (the longest gap
+ * between the runs of a 2 ms timer) while a search runs: what a user
+ * waits for a repaint or the Stop button.
+ */
+static int stall_on;
+static double stall_last, stall_max;
+
+static void stall_tick(XtPointer data, XtIntervalId *id)
+{
+	double now = bench_now_ns();
+
+	(void)data;
+	(void)id;
+	if (now - stall_last > stall_max)
+		stall_max = now - stall_last;
+	stall_last = now;
+	if (stall_on)
+		XtAppAddTimeOut(app, 2, stall_tick, NULL);
+}
+
+static void stall_start(void)
+{
+	stall_on = 1;
+	stall_max = 0;
+	stall_last = bench_now_ns();
+	XtAppAddTimeOut(app, 2, stall_tick, NULL);
+}
+
+static void stall_stop(const char *what)
+{
+	double now = bench_now_ns();
+
+	stall_on = 0;
+	if (now - stall_last > stall_max)
+		stall_max = now - stall_last;
+	if (verbose)
+		fprintf(stderr, "helpbench: %s: longest event loop stall %.1f "
+			"ms\n", what, stall_max / 1e6);
+}
+
+/*
  * Search all volumes: the complete index (word == NULL) or the entries
  * containing word.  Switching from "Current" to "All Volumes" starts it.
  */
@@ -726,8 +771,10 @@ static void index_search_all(Widget form, const char *what, const char *w)
 	XmToggleButtonGadgetSetState(cur, True, False);
 	XmToggleButtonGadgetSetState(all, False, False);
 	arm_idle();
+	stall_start();
 	toggle_on(all);
 	wait_idle();
+	stall_stop(what);
 	if (verbose)
 		fprintf(stderr, "helpbench: %s: %d result lines\n", what,
 			result_count(form));
@@ -767,6 +814,75 @@ static long run_index_word(long n)
 }
 
 static Widget index_form;
+
+/*
+ * Stop an all-volumes search early (while the volumes are still being
+ * scanned, the first time in a dialog), search the current volume, then
+ * all volumes again: the result must be what an uninterrupted search
+ * gives.  Then start one in a new dialog and destroy the dialog while it
+ * runs.
+ */
+static void stop_search(XtPointer data, XtIntervalId *id)
+{
+	(void)id;
+	activate((Widget)data);		/* "Stop" */
+}
+
+static void destroy_dialog_cb(XtPointer data, XtIntervalId *id)
+{
+	(void)data;
+	(void)id;
+	dialog_destroy();
+	idle_reached = 1;
+	XtAppAddTimeOut(app, 0, wake, NULL);
+}
+
+static long run_index_stop(long n)
+{
+	long i;
+
+	for (i = 0; i < n; i++) {
+		Widget form, all, cur;
+
+		dialog_destroy();
+		dialog_create(vols[0], NULL);
+		form = index_dialog();
+		all = child(form, "*srchAllVolRadBtn");
+		cur = child(form, "*srchCurVolRadBtn");
+
+		XmToggleButtonGadgetSetState(cur, True, False);
+		XmToggleButtonGadgetSetState(all, False, False);
+		arm_idle();
+		XtAppAddTimeOut(app, 1, stop_search,
+				(XtPointer)child(form, "*actionBtn"));
+		toggle_on(all);
+		wait_idle();
+		if (verbose)
+			fprintf(stderr, "helpbench: index_stop: stopped: %d "
+				"result lines\n", result_count(form));
+
+		arm_idle();
+		toggle_on(cur);
+		wait_idle();
+		index_search_all(form, "index_stop", NULL);
+
+		/* destroyed while it runs */
+		dialog_destroy();
+		dialog_create(vols[0], NULL);
+		form = index_dialog();
+		all = child(form, "*srchAllVolRadBtn");
+		cur = child(form, "*srchCurVolRadBtn");
+		XmToggleButtonGadgetSetState(cur, True, False);
+		XmToggleButtonGadgetSetState(all, False, False);
+		idle_reached = 0;
+		XtAppAddTimeOut(app, 1, destroy_dialog_cb, NULL);
+		toggle_on(all);
+		while (!idle_reached)
+			XtAppProcessEvent(app, XtIMAll);
+		settle();
+	}
+	return n;
+}
 
 static int setup_index_again(long n)
 {
@@ -843,6 +959,8 @@ static const struct hcase cases[] = {
 	  setup_none, run_index_all, teardown_dialog },
 	{ "index_again", "the same again in the same dialog", 1,
 	  setup_index_again, run_index_again, teardown_dialog },
+	{ "index_stop", "stop, current volume, all again; destroy midway", 1,
+	  setup_none, run_index_stop, teardown_dialog },
 	{ "index_word", "entries with WORD in all volumes, new dialog", 1,
 	  setup_none, run_index_word, teardown_dialog },
 };
