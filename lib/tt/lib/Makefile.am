@@ -2,7 +2,26 @@ MAINTAINERCLEANFILES = Makefile.in
 
 include $(top_srcdir)/build-aux/cde-libs.am
 
-SUBDIRS = api db mp util tttk
+# The library is made of six convenience libraries, one per directory.
+# They are all built from this one Makefile (each directory's
+# Makefile.inc, included below) rather than by a make per directory, so
+# that make sees the whole library at once: the directories no longer
+# wait for one another, and a no-op build reads one Makefile instead of
+# eight.  Paths in the Makefile.inc files are relative to this directory
+# (%reldir%); sources include their headers as "dir/file.h" from here
+# (-I. -I$(srcdir)), or from their own directory.
+
+noinst_LTLIBRARIES =
+
+TT_VERSION = "CDE Version @CDE_VERSION_MAJOR@.@CDE_VERSION_MINOR@.@CDE_VERSION_MICRO@@CDE_VERSION_DEV@"
+TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
+
+include api/c/Makefile.inc
+include api/dnd/Makefile.inc
+include db/Makefile.inc
+include mp/Makefile.inc
+include util/Makefile.inc
+include tttk/Makefile.inc
 
 lib_LTLIBRARIES = libtt.la
 

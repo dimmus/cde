@@ -1099,13 +1099,6 @@ lib/tt/Makefile
 lib/tt/mini_isam/Makefile
 lib/tt/slib/Makefile
 lib/tt/lib/Makefile
-lib/tt/lib/api/Makefile
-lib/tt/lib/api/dnd/Makefile
-lib/tt/lib/api/c/Makefile
-lib/tt/lib/tttk/Makefile
-lib/tt/lib/db/Makefile
-lib/tt/lib/mp/Makefile
-lib/tt/lib/util/Makefile
 lib/tt/bin/Makefile
 lib/tt/bin/shell/Makefile
 lib/tt/bin/ttauth/Makefile
