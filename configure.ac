@@ -555,11 +555,16 @@ CDE_CHECK_CXXFLAG([-Wno-write-strings])
 CDE_CHECK_CFLAG([-Wno-unused-result])
 CDE_CHECK_CXXFLAG([-Wno-unused-result])
 
-dnl -fno-strict-aliasing stays tree-wide: the old code type-puns in ways
-dnl -Wstrict-aliasing does not report (e.g. lib/DtHelp/GifUtils.c fills a
-dnl char * array and reads it back through pixel **, which with strict
-dnl aliasing only shows up as a bogus -Wmaybe-uninitialized), so it cannot
-dnl be limited to the places the warning finds.
+dnl -fno-strict-aliasing stays tree-wide.  -Wstrict-aliasing=2 reports 529
+dnl places in about 150 files of more than 30 directories (rpcgen's
+dnl xdr_pointer((char **)&p->next), XGetWindowProperty((unsigned char **)
+dnl &prop), Xt class records, the raima and ISAM record casts...), so the
+dnl flag could not be limited to a few directories, and the warning also
+dnl misses real cases (GifUtils.c read char * objects through pixel **,
+dnl reported only by the noisy level 1).  Measured with the whole tree
+dnl built both ways: strict aliasing changes the code of 889 of 1646
+dnl objects but shrinks .text by only 0.13%, and dtsvcbench and ttbench
+dnl show no difference beyond their run-to-run noise.
 CDE_CHECK_CFLAG([-fno-strict-aliasing])
 CDE_CHECK_CXXFLAG([-fno-strict-aliasing])
 
