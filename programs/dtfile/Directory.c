@@ -119,6 +119,7 @@
 #include <Dt/Connect.h>
 #include <Dt/DtNlUtils.h>
 #include <Dt/Dts.h>
+#include <Dt/DtsI.h>
 #include <Dt/HourGlass.h>
 #include <Dt/Icon.h>
 #include <Tt/tttk.h>
@@ -282,6 +283,15 @@ typedef struct
 typedef int (*DirBackgroundProc)(int, Directory *, ActivityStatus);
 
 extern void _DtFlushIconFileCache(String path);
+
+/*
+ * The typing entry point that takes the lstat and the directory fd a
+ * folder read already has (Dt/DtsI.h) is internal to CDE.  A libDtSvc
+ * that does not export it leaves it NULL, and entries are typed with
+ * DtDtsDataToDataType as before.
+ */
+extern __typeof__(_DtDtsDataToDataTypeAt) _DtDtsDataToDataTypeAt
+   __attribute__((weak));
 
 
 /*--------------------------------------------------------------------
@@ -2519,7 +2529,18 @@ ReadFileData2At(
          char *ptr;
 
          file_data2->is_broken = False;
-         if (link_buf[0] == NILL)
+         if (link_buf[0] == NILL && _DtDtsDataToDataTypeAt != NULL)
+         {
+            /*
+             * Not a link: stat_buf is also its lstat, which answers
+             * the MODE l and LINK_NAME/LINK_PATH tests without another
+             * lstat() and readlink(); the content and a folder's
+             * .DtDirDataType are opened relative to dir_fd.
+             */
+            ptr = _DtDtsDataToDataTypeAt(dir_fd, file_name, full_file_name,
+                                         &stat_buf, &stat_buf, NULL);
+         }
+         else if (link_buf[0] == NILL)
             ptr = (char *) DtDtsDataToDataType(  full_file_name,
                                                  NULL, 0, &stat_buf,
                                                  NULL, NULL,
