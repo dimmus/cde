@@ -1148,23 +1148,6 @@ programs/dthelp/dthelpview/Makefile
 programs/dthelp/dthelpgen/Makefile
 programs/dthelp/dthelpprint/Makefile
 programs/dthelp/parser/Makefile
-programs/dthelp/parser/util/Makefile
-programs/dthelp/parser/pass1/Makefile
-programs/dthelp/parser/pass1/build/Makefile
-programs/dthelp/parser/pass1/eltdef/Makefile
-programs/dthelp/parser/pass1/helptag/Makefile
-programs/dthelp/parser/pass1/parser/Makefile
-programs/dthelp/parser/canon1/Makefile
-programs/dthelp/parser/canon1/build/Makefile
-programs/dthelp/parser/canon1/eltdef/Makefile
-programs/dthelp/parser/canon1/helptag/Makefile
-programs/dthelp/parser/canon1/parser/Makefile
-programs/dthelp/parser/pass2/Makefile
-programs/dthelp/parser/pass2/build/Makefile
-programs/dthelp/parser/pass2/eltdef/Makefile
-programs/dthelp/parser/pass2/htag2/Makefile
-programs/dthelp/parser/pass2/parser/Makefile
-programs/dthelp/parser/helptag/Makefile
 
 programs/dtmail/Makefile
 programs/dtmail/dtmail/Makefile
