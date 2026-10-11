@@ -5378,9 +5378,12 @@ fixLeftMarginAndNewlines(
     Widget widget = M_text(editor);
     XmTextLineTable lineTable;
     int lineIndex, lineLen, nextLen, lineIndent, lastIndex,
-        lineByteLen, total_lines;
+        lineByteLen, total_lines, endLine;
     Boolean newPara = True;
     char *pLine, *pNext, *pFirstNonBlank, *pLastChar;
+    char *pText, *pNextLine;
+    char empty[1] = "";
+    XmTextPosition textStart, textEnd, lastPos;
     size_t mbCurMax = MB_CUR_MAX;
 
     lineTable = _XmTextGetLineTable(widget, &total_lines);
@@ -5397,6 +5400,20 @@ fixLeftMarginAndNewlines(
     lineIndex = _DtEditorGetLineIndex((XmTextWidget)M_text(editor), startPos);
 
     lastIndex = _DtEditorGetLineIndex((XmTextWidget)M_text(editor), endPos);
+
+    /*
+     * Fetch the lines once (this used to fetch, convert and allocate each
+     * line, and the next one again at each paragraph start), and walk
+     * them: pNextLine is where line lineIndex starts.
+     */
+    lastPos = XmTextGetLastPosition(widget);
+    textStart = lineTable[lineIndex].start_pos;
+    endLine = (lastIndex > lineIndex) ? lastIndex : lineIndex;
+    textEnd = (endLine + 1 < total_lines) ?
+		lineTable[endLine + 1].start_pos : lastPos;
+    pText = _XmStringSourceGetString((XmTextWidget)M_text(editor),
+				     textStart, textEnd, False);
+    pNextLine = pText;
 
     /*
      * This loop terminates with one line unwritten.  This is correct
@@ -5416,9 +5433,8 @@ fixLeftMarginAndNewlines(
 
 	lineLen = lineTable[lineIndex + 1].start_pos - 
 		     lineTable[lineIndex].start_pos;
-        pLine = _XmStringSourceGetString((XmTextWidget)M_text(editor), 
-		    lineTable[lineIndex].start_pos, 
-		    lineTable[lineIndex + 1].start_pos, False);
+	pLine = (lineLen > 0) ? pNextLine : empty;
+	pNextLine = _DtEditorGetPointer(pNextLine, lineLen);
 	pLastChar = _DtEditorGetPointer(pLine, lineLen - 1);
 	lineByteLen = pLastChar - pLine + mblen(pLastChar, mbCurMax);
 
@@ -5432,7 +5448,6 @@ fixLeftMarginAndNewlines(
 	    fwrite( pLine, sizeof(char), 
 		    _DtEditorGetPointer(pLine, lineLen) - pLine, fp );
 	    newPara = True;
-	    XtFree(pLine);
 	    continue;
 	}
 	if(newPara == True)
@@ -5452,11 +5467,8 @@ fixLeftMarginAndNewlines(
 	        nextLen = lineTable[lineIndex + 2].start_pos -
                           lineTable[lineIndex + 1].start_pos;
             else
-                nextLen = XmTextGetLastPosition(widget) - 
-                                        lineTable[lineIndex + 1].start_pos;
-	    pNext = _XmStringSourceGetString((XmTextWidget)M_text(editor), 
-		    lineTable[lineIndex + 1].start_pos, 
-		    lineTable[lineIndex + 1].start_pos + nextLen, False);
+                nextLen = lastPos - lineTable[lineIndex + 1].start_pos;
+	    pNext = (nextLen > 0) ? pNextLine : empty;
 
 	    if(lineBlank(pNext, nextLen)) /* single line paragraph */
 		firstIndent = lineIndent = leftMargin;
@@ -5495,14 +5507,12 @@ fixLeftMarginAndNewlines(
 		   (pFirstNonBlank - pLine), fp);
 
 	    newPara = False;
-	    XtFree(pLine);
 	    continue;
 	}
 	writeBlanks(fp, lineIndent);
 	pFirstNonBlank = findNonBlank(pLine, lineLen);
         fwrite(pFirstNonBlank, sizeof(char), lineByteLen - 
 	       (pFirstNonBlank - pLine), fp);
-	XtFree(pLine);
     }
 
     if((total_lines - lineIndex) == 1)
@@ -5517,16 +5527,13 @@ fixLeftMarginAndNewlines(
            lineLen = lineTable[lineIndex + 1].start_pos -
                      lineTable[lineIndex].start_pos;
        else
-           lineLen = XmTextGetLastPosition(widget) - 
-                  lineTable[lineIndex].start_pos;
+           lineLen = lastPos - lineTable[lineIndex].start_pos;
 
        if(lineLen > 0)
        {
 	   writeBlanks(fp, lineIndent);
 
-           pLine = _XmStringSourceGetString((XmTextWidget)M_text(editor), 
-		    lineTable[lineIndex].start_pos, 
-		    lineTable[lineIndex].start_pos + lineLen, False);
+           pLine = pNextLine;
 	   pLastChar = _DtEditorGetPointer(pLine, lineLen - 1);
 	   lineByteLen = pLastChar - pLine + mblen(pLastChar, mbCurMax);
            if(lineBlank(pLine, lineLen))
@@ -5539,9 +5546,9 @@ fixLeftMarginAndNewlines(
                fwrite(pFirstNonBlank, sizeof(char), lineByteLen - 
 	              (pFirstNonBlank - pLine), fp);
 	   }
-	   XtFree(pLine);
        }
     }
+    XtFree(pText);
     XtFree((XtPointer)lineTable);
 }
 
