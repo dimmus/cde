@@ -178,8 +178,8 @@ _DtTermPrimBufferCreateBuffer
     /*
     ** Initialize the new TermBuffer.
     */
-    LINES(newTB)                = newTL;
-    newTB->term_buffer.linesBase  = newTL;
+    LINES_BASE(newTB)           = newTL;
+    LINES_FIRST(newTB)          = 0;
     newTB->term_buffer.linesAlloc = MAX(rows, 1);
     TABS(newTB)                 = tabs;
     ROWS(newTB)                 = rows;
@@ -233,8 +233,8 @@ _DtTermPrimBufferFreeBuffer
     */
     for (i = 0; i < MAX_ROWS(tb); i++)
     {
-        (void) free(BUFFER(LINES(tb)[i]));
-	(void) free(LINES(tb)[i]);
+        (void) free(BUFFER(LINES_BASE(tb)[i]));
+	(void) free(LINES_BASE(tb)[i]);
     }
     (void) free(TABS(tb));
     (void) free(tb->term_buffer.linesBase);
@@ -386,7 +386,7 @@ _DtTermPrimBufferResizeBuffer
 	    ** now extend the line buffers for all lines, (even lines that
 	    ** are not being used at the moment (ROWS < MAX_ROWS))...
 	    */
-	    newTL = LINES(*oldTB);
+	    newTL = LINES_BASE(*oldTB);
 	    for (i = 0; i < MAX_ROWS(*oldTB); i++)
 	    {
 		newLineBuffer = (termChar *) malloc((unsigned) 
@@ -427,11 +427,13 @@ _DtTermPrimBufferResizeBuffer
 		** the malloc succeeded, copy the old information, and
 		** then free it...
 		*/
-		memcpy(newTL, LINES(*oldTB), sizeof(TermLine) * 
-		       ROWS(*oldTB));
-		free((*oldTB)->term_buffer.linesBase);
-		LINES(*oldTB) = newTL;
-		(*oldTB)->term_buffer.linesBase = newTL;
+		for (i = 0; i < ROWS(*oldTB); i++)
+		{
+		    newTL[i] = LINE_OF_TBUF(*oldTB, i);
+		}
+		free(LINES_BASE(*oldTB));
+		LINES_BASE(*oldTB) = newTL;
+		LINES_FIRST(*oldTB) = 0;
 		(*oldTB)->term_buffer.linesAlloc = *newRows;
 		
 		/*
@@ -1478,8 +1480,6 @@ _DtTermPrimBufferMoveLockArea
 {
     TermLine lineCache[10];
     TermLine *holdLines = lineCache;
-    TermLine *destPtr;
-    TermLine *srcPtr;
     int cacheSize;
     int distance;
     int i;
@@ -1552,37 +1552,29 @@ _DtTermPrimBufferMoveLockArea
     /* cache them away... */
     if (distance > length) {
 	/* save away the locked area... */
-	destPtr = holdLines;
-	srcPtr = &(LINE_OF_TBUF(tb, src));
-
 	for (i = 0; i < length; i++) {
-	    *destPtr++ = *srcPtr++;
+	    holdLines[i] = LINE_OF_TBUF(tb, src + i);
 	}
 	/* move the area above/below the locked area... */
 	if (dest > src) {
 	    /* we are moving the locked area down, so we must move
 	     * the scroll area up...
 	     */
-	    destPtr = &(LINE_OF_TBUF(tb, src));
-	    srcPtr = &(LINE_OF_TBUF(tb, src + length));
 	    for (i = 0; i < distance; i++) {
-		*destPtr++ = *srcPtr++;
+		LINE_OF_TBUF(tb, src + i) = LINE_OF_TBUF(tb, src + length + i);
 	    }
 	} else {
 	    /* we are moving the locked area up, so we must move
 	     * the scroll area down...
 	     */
-	    destPtr = &(LINE_OF_TBUF(tb, src + length - 1));
-	    srcPtr = &(LINE_OF_TBUF(tb, src - 1));
 	    for (i = 0; i < distance; i++) {
-		*destPtr-- = *srcPtr--;
+		LINE_OF_TBUF(tb, src + length - 1 - i) =
+			LINE_OF_TBUF(tb, src - 1 - i);
 	    }
 	}
 	/* restore the cached lock area... */
-	destPtr = &(LINE_OF_TBUF(tb, dest));
-	srcPtr = holdLines;
 	for (i = 0; i < length; i++) {
-	    *destPtr++ = *srcPtr++;
+	    LINE_OF_TBUF(tb, dest + i) = holdLines[i];
 	}
     } else {
 	/* save away the area we will move the lock area over...
@@ -1590,42 +1582,31 @@ _DtTermPrimBufferMoveLockArea
 	if (dest > src) {
 	    /* moving it down.  Save the area under the lock area...
 	     */
-	    destPtr = holdLines;
-	    srcPtr = &(LINE_OF_TBUF(tb, src + length));
 	    for (i = 0; i < distance; i++) {
-		*destPtr++ = *srcPtr++;
+		holdLines[i] = LINE_OF_TBUF(tb, src + length + i);
 	    }
 	    /* move the lock area down... */
-	    destPtr = &(LINE_OF_TBUF(tb, dest + length - 1));
-	    srcPtr = &(LINE_OF_TBUF(tb, src + length - 1));
 	    for (i = 0; i < length; i++) {
-		*destPtr-- = *srcPtr--;
+		LINE_OF_TBUF(tb, dest + length - 1 - i) =
+			LINE_OF_TBUF(tb, src + length - 1 - i);
 	    }
 	    /* restore the area under (that is now over) the lock area... */
-	    destPtr = &(LINE_OF_TBUF(tb, src));
-	    srcPtr = holdLines;
 	    for (i = 0; i < distance; i++) {
-		*destPtr++ = *srcPtr++;
+		LINE_OF_TBUF(tb, src + i) = holdLines[i];
 	    }
 	} else {
 	    /* moving it up.  Save the area over the lock area...
 	     */
-	    destPtr = holdLines;
-	    srcPtr = &(LINE_OF_TBUF(tb, dest));
 	    for (i = 0; i < distance; i++) {
-		*destPtr++ = *srcPtr++;
+		holdLines[i] = LINE_OF_TBUF(tb, dest + i);
 	    }
 	    /* move the lock area up... */
-	    destPtr = &(LINE_OF_TBUF(tb, dest));
-	    srcPtr = &(LINE_OF_TBUF(tb, src));
 	    for (i = 0; i < length; i++) {
-		*destPtr++ = *srcPtr++;
+		LINE_OF_TBUF(tb, dest + i) = LINE_OF_TBUF(tb, src + i);
 	    }
 	    /* restore the area over (that is now under) the lock area... */
-	    destPtr = &(LINE_OF_TBUF(tb, dest + length));
-	    srcPtr = holdLines;
 	    for (i = 0; i < distance; i++) {
-		*destPtr++ = *srcPtr++;
+		LINE_OF_TBUF(tb, dest + length + i) = holdLines[i];
 	    }
 	}
     }
@@ -1645,10 +1626,8 @@ _DtTermPrimBufferMoveLockArea
 ** a line to a full history buffer, does on every new line).  Lines past
 ** ROWS (unused after the buffer shrank) stay where they are.
 **
-** Rather than moving every line pointer, this slides the start of the
-** line array forward in an allocation that has room for that, and only
-** moves the array back to the start of the allocation when it runs out of
-** room (every MAX_ROWS lines or so).
+** The lines are a ring (see LINES_BASE()), so when all of them are in use
+** this is just a move of the start of the ring.
 **
 ** Returns False (having changed nothing) if it can't.
 */
@@ -1658,45 +1637,43 @@ static Boolean
 rotateLinesUp(const TermBuffer tb, const int length)
 {
     TermLine save[ROTATE_MAX_LINES];
-    TermLine *lines;
-    TermLine *newBase;
     int maxRows = MAX_ROWS(tb);
-    int newAlloc;
+    int i;
 
     if ((length <= 0) || (length > ROTATE_MAX_LINES) || (length >= ROWS(tb))) {
 	return(False);
     }
 
-    if ((LINES(tb) - tb->term_buffer.linesBase) + maxRows + length >
-	    tb->term_buffer.linesAlloc) {
-	/* no room to slide forward... */
-	newAlloc = 2 * maxRows + ROTATE_MAX_LINES;
-	if (tb->term_buffer.linesAlloc < newAlloc) {
-	    /* make room... */
-	    newBase = (TermLine *) malloc(newAlloc * sizeof(TermLine));
-	    if (!newBase) {
-		return(False);
-	    }
-	    (void) memcpy(newBase, LINES(tb), maxRows * sizeof(TermLine));
-	    free(tb->term_buffer.linesBase);
-	    tb->term_buffer.linesBase = newBase;
-	    tb->term_buffer.linesAlloc = newAlloc;
-	} else {
-	    /* move back to the start... */
-	    (void) memmove(tb->term_buffer.linesBase, LINES(tb),
-		    maxRows * sizeof(TermLine));
-	}
-	LINES(tb) = tb->term_buffer.linesBase;
+    /* rotate the whole ring: rows [0, length) become the last ones... */
+    LINES_FIRST(tb) += length;
+    if (LINES_FIRST(tb) >= maxRows) {
+	LINES_FIRST(tb) -= maxRows;
     }
 
-    lines = LINES(tb);
-    (void) memcpy(save, lines, length * sizeof(TermLine));
     if (maxRows > ROWS(tb)) {
-	(void) memmove(&lines[ROWS(tb) + length], &lines[ROWS(tb)],
-		(maxRows - ROWS(tb)) * sizeof(TermLine));
+	/* ...then move them in front of the unused rows past ROWS, which
+	 * move back to where they were...
+	 */
+	for (i = 0; i < length; i++) {
+	    save[i] = LINE_OF_TBUF(tb, maxRows - length + i);
+	}
+	for (i = maxRows - length - 1; i >= ROWS(tb) - length; i--) {
+	    LINE_OF_TBUF(tb, i + length) = LINE_OF_TBUF(tb, i);
+	}
+	for (i = 0; i < length; i++) {
+	    LINE_OF_TBUF(tb, ROWS(tb) - length + i) = save[i];
+	}
     }
-    (void) memcpy(&lines[ROWS(tb)], save, length * sizeof(TermLine));
-    LINES(tb) = lines + length;
+
+#if defined(__GNUC__)
+    /* the lines that the next scroll will move to the bottom and clear
+     * have not been touched since they were filled, a whole buffer ago,
+     * so in a long history they are in no cache.  Start loading them
+     * now (waiting for that was most of the cost of a scrolled line)...
+     */
+    __builtin_prefetch(LINE_OF_TBUF(tb, 0), 1);
+    __builtin_prefetch(LINE_OF_TBUF(tb, 1), 1);
+#endif	/* __GNUC__ */
     return(True);
 }
 
@@ -1765,8 +1742,6 @@ _DtTermPrimBufferInsertLine
 {
     TermLine lineCache[10];
     TermLine *holdLines = lineCache;
-    TermLine *destPtr;
-    TermLine *srcPtr;
     int i;
     int refLineCount;
     TermLine *refLines;
@@ -1850,30 +1825,21 @@ _DtTermPrimBufferInsertLine
 	 * the saved lines...
 	 */
 
-	/* save away the top length lines... */
-	destPtr = holdLines;
-	srcPtr = &(LINE_OF_TBUF(tb, src));
+	/* save away the top length lines (these lines will be cleared, so
+	 * we don't need to track movement of them)...
+	 */
 	for (i = 0; i < length; i++) {
-	    /* these lines will be cleared, so we don't need to track
-	     * movement of them...
-	     */
-	    *destPtr++ = *srcPtr++;
+	    holdLines[i] = LINE_OF_TBUF(tb, src + i);
 	}
 	/* copy the lines above the insertion point up... */
-	destPtr = &(LINE_OF_TBUF(tb, src));
-	srcPtr = &(LINE_OF_TBUF(tb, src + length));
 	for (i = src; i < dest - length + 1; i++) {
-	    *destPtr++ = *srcPtr++;
+	    LINE_OF_TBUF(tb, i) = LINE_OF_TBUF(tb, i + length);
 	}
 	/* restore the saved lines above the insertion point... */
-	destPtr = &(LINE_OF_TBUF(tb, dest - length + 1));
-	srcPtr = holdLines;
 	for (i = 0; i < length; i++) {
-	    *destPtr = *srcPtr;
+	    LINE_OF_TBUF(tb, dest - length + 1 + i) = holdLines[i];
 	    /* clear the line... */
             _DtTermPrimBufferClearLine(tb, dest - length + 1 + i, 0);
-	    destPtr++;
-            srcPtr++;
 	}
 
 #ifdef	DONT_DO_THIS_ANY_MORE
@@ -1886,26 +1852,19 @@ _DtTermPrimBufferInsertLine
 	 * the saved lines...
 	 */
 	/* save away the bottom length lines... */
-	destPtr = holdLines;
-	srcPtr = &(LINE_OF_TBUF(tb, src));
 	for (i = 0; i < length; i++) {
-	    *destPtr++ = *srcPtr++;
+	    holdLines[i] = LINE_OF_TBUF(tb, src + i);
 	}
 	/* copy the lines below the insertion point down... */
-	destPtr = &(LINE_OF_TBUF(tb, src + length - 1));
-	srcPtr = &(LINE_OF_TBUF(tb, src - 1));
 	for (i = 0; i < src - dest; i++) {
-	    *destPtr-- = *srcPtr--;
+	    LINE_OF_TBUF(tb, src + length - 1 - i) =
+		    LINE_OF_TBUF(tb, src - 1 - i);
 	}
 	/* restore the saved lines below the insertion point... */
-	destPtr = &(LINE_OF_TBUF(tb, dest));
-	srcPtr = holdLines;
 	for (i = 0; i < length; i++) {
-	    *destPtr = *srcPtr;
+	    LINE_OF_TBUF(tb, dest + i) = holdLines[i];
 	    /* clear the line... */
             _DtTermPrimBufferClearLine(tb, dest + i, 0);
-	    destPtr++;
-            srcPtr++;
 	}
     }
 
@@ -1983,10 +1942,6 @@ _DtTermPrimBufferDeleteLine
 {
     TermLine lineCache[10];
     TermLine *holdLines = lineCache;
-#ifndef	USE_MEMCPY
-    TermLine *destPtr;
-    TermLine *srcPtr;
-#endif	/* USE_MEMCPY */
     int copyLength;
     int i;
     int refLineCount;
@@ -2021,44 +1976,20 @@ _DtTermPrimBufferDeleteLine
 	(void) _DtTermPrimBufferClearLine(tb, source + i, 0);
     }
 
-#ifdef	USE_MEMCPY
-    (void) memcpy(holdLines, &(LINE_OF_TBUF(tb, source)), length * 
-                  sizeof(TermLine));
-#else	/* USE_MEMCPY */
-    destPtr = holdLines;
-    srcPtr = &(LINE_OF_TBUF(tb, source));
     for (i = 0; i < length; i++) {
-	*destPtr++ = *srcPtr++;
+	holdLines[i] = LINE_OF_TBUF(tb, source + i);
     }
-#endif	/* USE_MEMCPY */
 
     /* ripple up the lines... */
     copyLength = MAX(0, MIN(ROWS(tb), lastUsedRow) - source - length);
-    if (copyLength > 0) {
-#ifdef	USE_MEMCPY
-	(void) memmove(&(LINE_OF_TBUF(tb, source)),
-                      &(LINE_OF_TBUF(tb, source + length)),
-		      copyLength * sizeof(TermLine));
-#else	/* USE_MEMCPY */
-	destPtr = &(LINE_OF_TBUF(tb, source));
-	srcPtr = &(LINE_OF_TBUF(tb, source + length));
-	for (i = 0; i < copyLength; i++) {
-	    *destPtr++ = *srcPtr++;
-	}
-#endif	/* USE_MEMCPY */
+    for (i = 0; i < copyLength; i++) {
+	LINE_OF_TBUF(tb, source + i) = LINE_OF_TBUF(tb, source + length + i);
     }
 
     /* copy back the deleted (cached) lines... */
-#ifdef	USE_MEMCPY
-    (void) memcpy(&(LINE_OF_TBUF(tb, source + copyLength)), holdLines,
-	    length * sizeof(TermLine));
-#else	/* USE_MEMCPY */
-    destPtr = &(LINE_OF_TBUF(tb, source + copyLength));
-    srcPtr = holdLines;
     for (i = 0; i < length; i++) {
-	*destPtr++ = *srcPtr++;
+	LINE_OF_TBUF(tb, source + copyLength + i) = holdLines[i];
     }
-#endif	/* USE_MEMCPY */
 
     /* free up the holdLines (if we malloc'ed it)... */
     if (holdLines != lineCache) {

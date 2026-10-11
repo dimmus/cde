@@ -82,6 +82,26 @@ _DtTermPrimFrameRemainingMs(Widget w)
     return((unsigned long) (ns / (1000L * 1000L)) + 1);
 }
 
+/* _DtTermPrimFrameDue() for the checks made for every scrolled line: while
+ * output streams in, those come a microsecond or less apart, so look at
+ * the clock only on every FRAME_CHECK_INTERVAL-th of them (which can put
+ * off a due frame by a few microseconds; the end of the output still
+ * looks at the clock, see endOfOutput())...
+ */
+#define	FRAME_CHECK_INTERVAL	16
+
+static Boolean
+frameDueSampled(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    if (++tpd->frameChecks < FRAME_CHECK_INTERVAL) {
+	return(False);
+    }
+    tpd->frameChecks = 0;
+    return(_DtTermPrimFrameDue(w));
+}
+
 void
 _DtTermPrimNoteFramePainted(Widget w)
 {
@@ -707,7 +727,7 @@ _DtTermPrimScrollText(Widget w, int lines)
 	    if (tw->term.jumpScroll &&
 		    (tpd->scrollTopRow == tpd->scrollLockTopRow) &&
 		    (tpd->scrollBottomRow == tpd->scrollLockBottomRow) &&
-		    !_DtTermPrimFrameDue(w)) {
+		    !frameDueSampled(w)) {
 		/* the queue is full, but we painted a moment ago.  Don't
 		 * paint again yet, queueJumpScroll() will turn the queue
 		 * into a repaint of the region...
@@ -911,7 +931,7 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 	if (tpd->scroll.jump.scrolled != 0) {
 	    if ((tpd->scrollTopRow == scrollStart) &&
 		    (tpd->scrollBottomRow == scrollStart + scrollLength - 1) &&
-		    !_DtTermPrimFrameDue(w)) {
+		    !frameDueSampled(w)) {
 		/* the queue is full, but we painted a moment ago.  Don't
 		 * paint again yet, queueJumpScroll() will turn the queue
 		 * into a repaint of the region...
@@ -1069,7 +1089,7 @@ _DtTermPrimScrollCompleteIfNecessary(Widget w, short scrollTopRow,
 	maxJumpScrollLines = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
 	if (((lines + tpd->scroll.jump.scrollLines > maxJumpScrollLines) ||
 		(lines + tpd->scroll.jump.scrollLines < -maxJumpScrollLines)) &&
-		_DtTermPrimFrameDue(w)) {
+		frameDueSampled(w)) {
 	    /* (if the frame is not due yet, the queue just becomes a
 	     * repaint of the region, see queueJumpScroll())...
 	     */

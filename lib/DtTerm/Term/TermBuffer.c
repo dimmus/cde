@@ -163,7 +163,7 @@ _DtTermBufferCreateBuffer
 )
 {
     TermBuffer      newTB;
-    DtLine    *lines;
+    int        i;
 
     newTB = _DtTermPrimBufferCreateBuffer(w, rows, cols, 
                                     sizeOfBuffer, sizeOfLine, sizeOfEnh);
@@ -181,11 +181,9 @@ _DtTermBufferCreateBuffer
 	}
 
 	NUM_ENH_FIELDS(newTB) = NUM_ENHANCEMENT_FIELDS;
-        for (lines = DT_LINES(newTB);
-             lines < DT_LINES(newTB) + ROWS(newTB);
-	     lines++)
+        for (i = 0; i < ROWS(newTB); i++)
         {
-            DT_ENH(*lines) = (DtEnh) NULL;
+            DT_ENH(DT_LINE_OF_TBUF(newTB, i)) = (DtEnh) NULL;
         }        
         DT_ENH_STATE(newTB)    = blankEnh;
         DT_ENH_DIRTY(newTB)    = 0;
@@ -239,7 +237,7 @@ _DtTermBufferResize
 	** (even lines that are not being used at the moment
 	** (ROWS < MAX_ROWS))...
 	*/
-	lines = DT_LINES(tb);
+	lines = (DtLine *) LINES_BASE(tb);
 	for (i = 0; i < MAX_ROWS(tb); i++)
 	{
 	    /*
@@ -311,10 +309,13 @@ _DtTermBufferResize
 	    ** the malloc succeeded, copy the old information, and then
 	    ** free it...
 	    */
-	    memcpy(lines, DT_LINES(tb), sizeof(DtLine) * MAX_ROWS(tb));
-	    free(tb->term_buffer.linesBase);
-	    LINES(tb) = (TermLine *)lines;
-	    tb->term_buffer.linesBase = (TermLine *)lines;
+	    for (i = 0; i < MAX_ROWS(tb); i++)
+	    {
+		lines[i] = DT_LINE_OF_TBUF(tb, i);
+	    }
+	    free(LINES_BASE(tb));
+	    LINES_BASE(tb) = (TermLine *)lines;
+	    LINES_FIRST(tb) = 0;
 	    tb->term_buffer.linesAlloc = *newRows;
 	    
 	    /*
@@ -381,16 +382,16 @@ _DtTermBufferFreeBuffer
     const TermBuffer tb
 )
 {
-    DtLine     *lines;
+    int         i;
 
     /*
     ** Free the Dt-specific buffer info...
     */
-    for (lines = DT_LINES(tb); lines < DT_LINES(tb) + ROWS(tb); lines++)
+    for (i = 0; i < ROWS(tb); i++)
     {
-        if (DT_ENH(*lines))
+        if (DT_ENH(DT_LINE_OF_TBUF(tb, i)))
         {
-            (void) free(DT_ENH(*lines));
+            (void) free(DT_ENH(DT_LINE_OF_TBUF(tb, i)));
         }
     }
     if (VALUE_LIST(tb))

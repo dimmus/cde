@@ -103,7 +103,6 @@ typedef struct _DtTermBufferRec
 ** Define some useful DT counter parts for the TermPrimBufferP.h macros
 */
 #define DT_LINE_OF_TBUF(tb, row) ((DtLine)(LINE_OF_TBUF(tb, row)))
-#define DT_LINES(tb)             ((DtLine*)(LINES(tb)))
 #define DT_ENH_STATE(tb)         (((DtTermBuffer)(tb))->dt_buffer.enhState)
 #define DT_ENH_DIRTY(tb)         (((DtTermBuffer)(tb))->dt_buffer.enhDirty)
 #define DT_ENH(line)             ((line)->dt_line.enh)

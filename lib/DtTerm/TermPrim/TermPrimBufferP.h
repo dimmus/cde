@@ -47,8 +47,15 @@ extern "C" {
 /*
 ** Make it easier to access members of the Terminal Buffer
 */
-#define LINES(tb)          ((tb)->term_buffer.lines)
-#define LINE_OF_TBUF(tb, row)  (LINES(tb)[row])
+/*
+** The lines of a buffer are a ring of MAX_ROWS(tb) line pointers in
+** LINES_BASE(tb), starting at slot LINES_FIRST(tb), so that moving the top
+** lines of a full buffer to its bottom (what scrolling does) is a change
+** of LINES_FIRST.  Use LINE_OF_TBUF() for a row, never LINES_BASE()[row].
+*/
+#define LINES_BASE(tb)     ((tb)->term_buffer.linesBase)
+#define LINES_FIRST(tb)    ((tb)->term_buffer.linesFirst)
+#define LINE_OF_TBUF(tb, row)  (*_DtTermPrimLineSlot((tb), (row)))
 #define ROWS(tb)           ((tb)->term_buffer.rows)
 #define COLS(tb)           ((tb)->term_buffer.cols)
 #define MAX_ROWS(tb)       ((tb)->term_buffer.maxRows)
@@ -180,7 +187,6 @@ typedef struct _TermBufferPart
     short               sizeOfLine;   /* bytes per enhancement record        */
     short               sizeOfEnh;    /* bytes per line record               */
     enhValues           valueList;    /* local storage for enhancement values*/
-    TermLine           *lines;
     TermBuffer          nextBuffer;   /* next term buffer in list            */
     TermBuffer          prevBuffer;   /* previous term buffer in list        */
     TermSelectInfo      selectInfo;   /* current select info record          */
@@ -197,14 +203,32 @@ typedef struct _TermBufferPart
     TermLineSetWidth    set_line_width;
     TermLineClear       clear_line;
     Widget		widget;	      /* the widget that created this buffer */
-    TermLine           *linesBase;    /* the allocation lines points into    */
+    TermLine           *linesBase;    /* the ring of lines (see LINES_BASE)  */
     int                 linesAlloc;   /* number of TermLines allocated       */
+    int                 linesFirst;   /* slot of row 0                       */
 } TermBufferPart;
 
 typedef struct _TermBufferRec
 {
     TermBufferPart term_buffer;
 } TermBufferRec;
+
+/* the slot of the line pointer of a row (see LINES_BASE)... */
+static inline TermLine *
+_DtTermPrimLineSlot(const struct _TermBufferRec *tb, int row)
+{
+    int i = tb->term_buffer.linesFirst + row;
+
+    if (i >= tb->term_buffer.maxRows)
+    {
+	i -= tb->term_buffer.maxRows;
+    }
+    else if (i < 0)
+    {
+	i += tb->term_buffer.maxRows;
+    }
+    return(&tb->term_buffer.linesBase[i]);
+}
 
 extern
 short

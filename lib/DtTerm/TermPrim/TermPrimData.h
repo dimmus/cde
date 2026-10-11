@@ -385,6 +385,7 @@ typedef struct termData {
     long lastPaintSec;			/* when output was last painted	*/
     long lastPaintNsec;			/*   (CLOCK_MONOTONIC)		*/
     XtIntervalId frameTimerId;		/* deferred end of output paint	*/
+    int frameChecks;			/* see frameDueSampled()	*/
     Boolean deferRender;		/* record refreshes as dirty
 					 * spans instead of drawing	*/
     Boolean dirtyRows;			/* some row has a dirty span	*/

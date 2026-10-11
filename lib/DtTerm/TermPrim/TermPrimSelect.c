@@ -2199,6 +2199,10 @@ _DtTermPrimSelectMoveLines
     int row;
     short col;
 
+    if ((len <= 0) || (src == dest) || !selectInfo->ownPrimary) {
+	return;
+    }
+
     posToBufferRowCol (tw, selectInfo->begin, &pb, &row, &col);
 
     /* if there are no lines, etc.  return... */
@@ -2226,6 +2230,13 @@ _DtTermPrimSelectDeleteLines
     TermBuffer pb;
     int row;
     short col;
+
+    /* if there are no lines or no selection, there is nothing to do (and
+     * this is called for every line that scrolls into the history)...
+     */
+    if ((len <= 0) || !selectInfo->ownPrimary) {
+	return;
+    }
 
     posToBufferRowCol (tw, selectInfo->begin, &pb, &row, &col);
 
