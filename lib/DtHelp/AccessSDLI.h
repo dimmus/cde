@@ -52,6 +52,10 @@ extern	void		 _DtHelpCeCloseSdlVolume (
 				_DtHelpVolumeHdl	volume);
 extern	void		 _DtHelpCeForgetSdlVolTitle (
 				_DtHelpVolumeHdl	volume);
+extern	void		*_DtHelpCeSdlVolTitleOwner (
+				_DtHelpVolumeHdl	volume);
+extern	void		 _DtHelpCeForgetVolTitlesOf (
+				void			*client_data);
 extern	int		 _DtHelpCeFindSdlId (
 				_DtHelpVolumeHdl  vol,
 				char		 *target_id,

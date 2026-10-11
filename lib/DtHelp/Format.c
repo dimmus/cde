@@ -50,7 +50,9 @@
 #include <fcntl.h>
 #include <locale.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
 #include <Xm/Xm.h>
@@ -89,6 +91,8 @@ extern int errno;
 #include "FormatCCDFI.h"
 #include "FormatSDLI.h"
 #include "StringFuncsI.h"
+#include "CanvasOsI.h"
+#include "CleanUpI.h"
 #include "FormatI.h"
 
 
@@ -108,6 +112,416 @@ extern int errno;
 
 static	char	*ScanString = "\n\t";
 static const _FrmtUiInfo defUiInfo = { NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, False };
+
+/******************************************************************************
+ * Parsed topic cache
+ *
+ * A display area formats (reads, decompresses, parses, resolves fonts
+ * and graphics of) a topic every time it shows one, also the topic it
+ * showed a moment ago (Backtrack, the history, hyperlinks back and
+ * forth), and the table of contents of the path area with every topic.
+ * The topics it has shown stay formatted for a while instead: when the
+ * display area moves on, the topic it showed is kept (up to
+ * TOPIC_CACHE_IDLE per display area, least recently shown dropped
+ * first) and handed out again when the same location of the same volume
+ * file is asked for.  A topic belongs to the display area it was
+ * formatted for (its fonts, graphics and metrics); it is laid out again
+ * when shown, exactly as on a resize.
+ *
+ * A kept topic is used only while what it was made from is unchanged:
+ * the volume file (device, inode, size, modification time) and every
+ * graphic file it shows (the same test as the graphic cache).  A topic
+ * whose formatting ran a script (an SDL <script>, which may also ask
+ * the user) is never kept, so it runs again on every visit as before.
+ ******************************************************************************/
+#define	TOPIC_CACHE_IDLE	16	/* kept topics per display area */
+#define	TOPIC_KIND_TOC		2	/* kind of a path-area topic */
+
+typedef struct {
+    dev_t	dev;
+    ino_t	ino;
+    off_t	size;
+    time_t	mtime_sec;
+    long	mtime_nsec;
+    int		exists;
+} TopicFileStamp;
+
+typedef struct _topicCacheEntry {
+    struct _topicCacheEntry *next;
+    XtPointer		 pDAS;		/* the display area it was made for */
+    char		*vol_file;
+    TopicFileStamp	 vol_stamp;
+    char		*id;		/* location id as asked */
+    int			 kind;		/* look_at_id (0, 1) or TOC */
+    int			 result;	/* the formatter's (TOC: 0 or 1) */
+    _DtCvTopicPtr	 topic;
+    int			 in_use;	/* handed out and not released */
+    unsigned long	 stamp;		/* when last handed out */
+    int			 gr_cnt;
+    char		**gr_files;	/* graphic files it shows */
+    TopicFileStamp	*gr_stamps;
+} TopicCacheEntry;
+
+static TopicCacheEntry	*TopicCache = NULL;
+static unsigned long	 TopicCacheClock = 0;
+
+/* the graphic files of the topic being formatted (process lock held) */
+static int		 GrRecording = 0;
+static int		 GrRecCnt = 0;
+static int		 GrRecMax = 0;
+static char		**GrRecFiles = NULL;
+static TopicFileStamp	*GrRecStamps = NULL;
+static int		 GrRecFailed = 0;
+
+static void
+StampFile(const char *path, TopicFileStamp *st)
+{
+    struct stat buf;
+
+    memset(st, 0, sizeof(*st));
+    if (NULL != path && stat(path, &buf) == 0)
+      {
+	st->exists     = 1;
+	st->dev        = buf.st_dev;
+	st->ino        = buf.st_ino;
+	st->size       = buf.st_size;
+	st->mtime_sec  = buf.st_mtim.tv_sec;
+	st->mtime_nsec = buf.st_mtim.tv_nsec;
+      }
+}
+
+static Boolean
+SameStamp(const char *path, const TopicFileStamp *st)
+{
+    TopicFileStamp now;
+
+    StampFile(path, &now);
+    return (now.exists == st->exists && now.dev == st->dev &&
+		now.ino == st->ino && now.size == st->size &&
+		now.mtime_sec == st->mtime_sec &&
+		now.mtime_nsec == st->mtime_nsec) ? True : False;
+}
+
+/*
+ * the ui_info load_graphic of a topic being formatted for the cache:
+ * notes the file (as _DtHelpDALoadGraphic names it) and loads it.
+ */
+static _DtCvStatus
+RecordLoadGraphic (
+    _DtCvPointer client_data,
+    char	*vol_xid,
+    char	*topic_xid,
+    char	*file_xid,
+    char	*format,
+    char	*method,
+    _DtCvUnit	*ret_width,
+    _DtCvUnit	*ret_height,
+    _DtCvPointer *ret_region)
+{
+    char *path = NULL;
+
+    if (GrRecording && !GrRecFailed)
+      {
+	if (NULL == file_xid)
+	    path = NULL;
+	else if ('/' == *file_xid || NULL == vol_xid)
+	    path = strdup(file_xid);
+	else
+	  {
+	    path = (char *) malloc(strlen(vol_xid) + strlen(file_xid) + 2);
+	    if (NULL != path)
+	      {
+		char *ptr;
+
+		strcpy(path, vol_xid);
+		if (_DtHelpCeStrrchr(path, "/", MB_CUR_MAX, &ptr) != -1)
+		    *ptr = '\0';
+		strcat(path, "/");
+		strcat(path, file_xid);
+	      }
+	  }
+
+	if (NULL != file_xid && NULL == path)
+	    GrRecFailed = 1;
+	else
+	  {
+	    if (GrRecCnt == GrRecMax)
+	      {
+		int		 newMax = GrRecMax ? GrRecMax * 2 : 8;
+		char		**files;
+		TopicFileStamp	 *stamps;
+
+		files  = (char **) realloc(GrRecFiles, sizeof(char *) * newMax);
+		if (NULL != files)
+		    GrRecFiles = files;
+		stamps = (TopicFileStamp *) realloc(GrRecStamps,
+					sizeof(TopicFileStamp) * newMax);
+		if (NULL != stamps)
+		    GrRecStamps = stamps;
+		if (NULL == files || NULL == stamps)
+		    GrRecFailed = 1;
+		else
+		    GrRecMax = newMax;
+	      }
+	    if (!GrRecFailed)
+	      {
+		StampFile(path, &GrRecStamps[GrRecCnt]);
+		GrRecFiles[GrRecCnt++] = path;
+		path = NULL;
+	      }
+	  }
+	free(path);
+      }
+
+    return _DtHelpDALoadGraphic(client_data, vol_xid, topic_xid, file_xid,
+				format, method, ret_width, ret_height,
+				ret_region);
+}
+
+static void
+RecordStart(void)
+{
+    GrRecording = 1;
+    GrRecCnt    = 0;
+    GrRecFailed = 0;
+}
+
+static void
+RecordStop(void)
+{
+    while (GrRecCnt > 0)
+	free(GrRecFiles[--GrRecCnt]);
+    GrRecording = 0;
+}
+
+static void
+FreeEntry(TopicCacheEntry *e, Boolean destroy_topic)
+{
+    int i;
+
+    if (destroy_topic)
+	_DtHelpDestroyTopicData(e->topic, _DtHelpDADestroyRegion,
+						(_DtCvPointer) e->pDAS);
+    for (i = 0; i < e->gr_cnt; i++)
+	free(e->gr_files[i]);
+    free(e->gr_files);
+    free(e->gr_stamps);
+    free(e->vol_file);
+    free(e->id);
+    free(e);
+}
+
+/*
+ * a kept topic for (pDAS, volume, id, kind), handed out (in use); or NULL.
+ */
+static TopicCacheEntry *
+TopicCacheGet(
+    XtPointer		 pDAS,
+    _DtHelpVolumeHdl	 volume,
+    const char		*id,
+    int			 kind)
+{
+    char		*volFile = _DtHelpCeGetVolumeName(volume);
+    TopicCacheEntry	*e;
+    int			 i;
+
+    if (NULL == volFile || NULL == id)
+	return NULL;
+
+    for (e = TopicCache; NULL != e; e = e->next)
+	if (e->pDAS == pDAS && e->kind == kind && 0 == e->in_use &&
+		0 == strcmp(e->id, id) && 0 == strcmp(e->vol_file, volFile))
+	  {
+	    if (SameStamp(volFile, &e->vol_stamp) == False)
+		return NULL;
+	    for (i = 0; i < e->gr_cnt; i++)
+		if (SameStamp(e->gr_files[i], &e->gr_stamps[i]) == False)
+		    return NULL;
+
+	    e->in_use = 1;
+	    e->stamp  = ++TopicCacheClock;
+	    return e;
+	  }
+
+    return NULL;
+}
+
+/*
+ * keep a topic just formatted for pDAS (handed out, in use); the
+ * graphic files are those recorded since RecordStart.
+ */
+static void
+TopicCachePut(
+    XtPointer		 pDAS,
+    _DtHelpVolumeHdl	 volume,
+    const char		*id,
+    int			 kind,
+    int			 result,
+    _DtCvTopicPtr	 topic)
+{
+    char		*volFile = _DtHelpCeGetVolumeName(volume);
+    TopicCacheEntry	*e;
+    int			 i;
+
+    TopicCacheEntry	**prev;
+
+    if (NULL == topic || NULL == volFile || NULL == id || GrRecFailed)
+	return;
+
+    /*
+     * an idle copy kept for the same location (made while the location
+     * was shown, i.e. in use) is superseded by this one.
+     */
+    prev = &TopicCache;
+    while (NULL != (e = *prev))
+      {
+	if (e->pDAS == pDAS && e->kind == kind && 0 == e->in_use &&
+		0 == strcmp(e->id, id) && 0 == strcmp(e->vol_file, volFile))
+	  {
+	    *prev = e->next;
+	    FreeEntry(e, True);
+	  }
+	else
+	    prev = &(e->next);
+      }
+
+    e = (TopicCacheEntry *) calloc(1, sizeof(TopicCacheEntry));
+    if (NULL == e)
+	return;
+
+    e->pDAS     = pDAS;
+    e->vol_file = strdup(volFile);
+    e->id       = strdup(id);
+    e->kind     = kind;
+    e->result   = result;
+    e->topic    = topic;
+    e->in_use   = 1;
+    e->stamp    = ++TopicCacheClock;
+    StampFile(volFile, &e->vol_stamp);
+    if (GrRecCnt > 0)
+      {
+	e->gr_files  = (char **) malloc(sizeof(char *) * GrRecCnt);
+	e->gr_stamps = (TopicFileStamp *)
+				malloc(sizeof(TopicFileStamp) * GrRecCnt);
+	if (NULL != e->gr_files && NULL != e->gr_stamps)
+	  {
+	    for (i = 0; i < GrRecCnt; i++)
+	      {
+		e->gr_files[i]  = GrRecFiles[i];
+		e->gr_stamps[i] = GrRecStamps[i];
+	      }
+	    e->gr_cnt = GrRecCnt;
+	    GrRecCnt  = 0;		/* the entry owns the names now */
+	  }
+      }
+
+    if (NULL == e->vol_file || NULL == e->id ||
+				(GrRecCnt > 0 && 0 == e->gr_cnt))
+      {
+	FreeEntry(e, False);
+	return;
+      }
+
+    e->next    = TopicCache;
+    TopicCache = e;
+}
+
+/******************************************************************************
+ * Function:	void _DtHelpReleaseTopic (XtPointer client_data,
+ *						_DtCvTopicPtr topic)
+ *
+ * Parameters:	client_data	Specifies the display area.
+ *		topic		Specifies the topic it stops showing.
+ *
+ * Purpose:	Free a topic the display area no longer shows, or keep it
+ *		in the parsed topic cache if it came from there.
+ ******************************************************************************/
+void
+_DtHelpReleaseTopic (
+    XtPointer		 client_data,
+    _DtCvTopicPtr	 topic)
+{
+    TopicCacheEntry	 *e;
+    TopicCacheEntry	**prev;
+    TopicCacheEntry	**oldest;
+    int			  idle;
+
+    if (NULL == topic)
+	return;
+
+    _DtHelpProcessLock();
+
+    for (e = TopicCache; NULL != e; e = e->next)
+	if (e->topic == topic && e->pDAS == client_data && e->in_use > 0)
+	    break;
+
+    if (NULL == e)
+      {
+	_DtHelpProcessUnlock();
+	_DtHelpDestroyTopicData(topic, _DtHelpDADestroyRegion,
+						(_DtCvPointer) client_data);
+	return;
+      }
+
+    e->in_use--;
+
+    /*
+     * drop the least recently shown idle topics of this display area
+     * beyond TOPIC_CACHE_IDLE.
+     */
+    for (;;)
+      {
+	idle   = 0;
+	oldest = NULL;
+	for (prev = &TopicCache; NULL != *prev; prev = &((*prev)->next))
+	    if ((*prev)->pDAS == client_data && 0 == (*prev)->in_use)
+	      {
+		idle++;
+		if (NULL == oldest || (*prev)->stamp < (*oldest)->stamp)
+		    oldest = prev;
+	      }
+	if (idle <= TOPIC_CACHE_IDLE)
+	    break;
+
+	e       = *oldest;
+	*oldest = e->next;
+	FreeEntry(e, True);
+      }
+
+    _DtHelpProcessUnlock();
+}
+
+/******************************************************************************
+ * Function:	void _DtHelpTopicCacheFlush (XtPointer client_data)
+ *
+ * Parameters:	client_data	Specifies a display area that goes away.
+ *
+ * Purpose:	Free the topics kept for the display area.  The one it
+ *		still shows (in use) is left to it, as before.
+ ******************************************************************************/
+void
+_DtHelpTopicCacheFlush (
+    XtPointer		 client_data)
+{
+    TopicCacheEntry	 *e;
+    TopicCacheEntry	**prev;
+
+    _DtHelpProcessLock();
+
+    prev = &TopicCache;
+    while (NULL != (e = *prev))
+      {
+	if (e->pDAS == client_data)
+	  {
+	    *prev = e->next;
+	    FreeEntry(e, (0 == e->in_use) ? True : False);
+	  }
+	else
+	    prev = &(e->next);
+      }
+
+    _DtHelpProcessUnlock();
+}
 
 /******************************************************************************
  *
@@ -1041,16 +1455,33 @@ _DtHelpFormatTopic(
     _FrmtUiInfo           myUiInfo = defUiInfo;
     DtHelpDispAreaStruct *pDAS = (DtHelpDispAreaStruct *) client_data;
     _DtCvTopicInfo	*topic = NULL;
+    TopicCacheEntry	*kept;
+    char		*askedId = id_string;
+    unsigned long	 interpCalls;
 
     if (_DtHelpCeLockVolume(volume, &lockInfo) != 0)
 	return -1;
+
+    /*
+     * shown (and kept) before?
+     */
+    _DtHelpProcessLock();
+    kept = TopicCacheGet(client_data, volume, id_string,
+					(look_at_id == False) ? 0 : 1);
+    _DtHelpProcessUnlock();
+    if (NULL != kept)
+      {
+	*ret_handle = (XtPointer) kept->topic;
+	_DtHelpCeUnlockVolume(lockInfo);
+	return 0;
+      }
 
     if (_DtHelpCeFindId(volume,id_string,lockInfo.fd,&filename,&offset)==True)
       {
 	if (look_at_id == False)
 	    id_string = NULL;
 
-	myUiInfo.load_graphic = _DtHelpDALoadGraphic;
+	myUiInfo.load_graphic = RecordLoadGraphic;
 	myUiInfo.resolve_spc  = _DtHelpDAResolveSpc;
 	myUiInfo.load_font    = _DtHelpDAResolveFont;
 	myUiInfo.exec_filter  = pDAS->exec_filter;
@@ -1065,6 +1496,8 @@ _DtHelpFormatTopic(
 
 	result = _DtHelpCeGetVolumeFlag(volume);
 	_DtHelpProcessLock();
+	RecordStart();
+	interpCalls = _DtCvRunInterpCalls;
         if (result == 1)
             result = _DtHelpCeParseSdlTopic(volume,
 						&myUiInfo,
@@ -1075,6 +1508,10 @@ _DtHelpFormatTopic(
 						filename, offset,
 						id_string,
 						&myUiInfo, &topic);
+	if (result == 0 && interpCalls == _DtCvRunInterpCalls)
+	    TopicCachePut(client_data, volume, askedId,
+				(look_at_id == False) ? 0 : 1, 0, topic);
+	RecordStop();
 	_DtHelpProcessUnlock();
 	*ret_handle = (XtPointer) topic;
 	if (result != 0)
@@ -1195,10 +1632,26 @@ _DtHelpFormatToc (
 
     if (result == 0)
       {
+	TopicCacheEntry	*kept;
+	unsigned long	 interpCalls;
         _FrmtUiInfo  myUiInfo = defUiInfo;
 
+	/*
+	 * shown (and kept) before?
+	 */
+	_DtHelpProcessLock();
+	kept = TopicCacheGet((XtPointer) pDAS, volume, *ret_id,
+							TOPIC_KIND_TOC);
+	_DtHelpProcessUnlock();
+	if (NULL != kept)
+	  {
+	    *ret_handle = (XtPointer) kept->topic;
+	    _DtHelpCeUnlockVolume(lockInfo);
+	    return kept->result;
+	  }
+
 	myUiInfo.client_data  = (XtPointer) pDAS;
-	myUiInfo.load_graphic = _DtHelpDALoadGraphic;
+	myUiInfo.load_graphic = RecordLoadGraphic;
 	myUiInfo.resolve_spc  = _DtHelpDAResolveSpc;
 	myUiInfo.load_font    = _DtHelpDAResolveFont;
 	myUiInfo.exec_filter  = pDAS->exec_filter;
@@ -1213,6 +1666,8 @@ _DtHelpFormatToc (
 
 	result = _DtHelpCeGetVolumeFlag(volume);
 	_DtHelpProcessLock();
+	RecordStart();
+	interpCalls = _DtCvRunInterpCalls;
         if (result == 1)
 	    result = _DtHelpCeFrmtSdlPathAndChildren(volume,
 							&myUiInfo,
@@ -1222,6 +1677,10 @@ _DtHelpFormatToc (
 	    result = _DtHelpCeFrmtCcdfPathAndChildren(volume,
 							*ret_id,
 							&myUiInfo, &topic);
+	if ((0 == result || 1 == result) && interpCalls == _DtCvRunInterpCalls)
+	    TopicCachePut((XtPointer) pDAS, volume, *ret_id, TOPIC_KIND_TOC,
+							result, topic);
+	RecordStop();
 	_DtHelpProcessUnlock();
 	*ret_handle = (XtPointer) topic;
       }

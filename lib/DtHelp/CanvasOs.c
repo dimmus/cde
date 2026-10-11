@@ -93,6 +93,8 @@
  * Semi Public Functions
  *
  *****************************************************************************/
+unsigned long _DtCvRunInterpCalls = 0;
+
 /*********************************************************************
  * Function: _DtCvRunInterp
  *
@@ -120,6 +122,8 @@ _DtCvRunInterp(
     int          i;
     char         readBuf[BUFSIZ];
     BufFilePtr   myBufFile;
+
+    _DtCvRunInterpCalls++;
 
     /*
      * ask for permission to run the interperator command.

@@ -724,8 +724,7 @@ _DtHelpDisplayAreaSetList (
     /*
      * free the old topic and remember the new
      */
-    _DtHelpDestroyTopicData(pDAS->lst_topic, _DtHelpDADestroyRegion,
-						(_DtCvPointer) pDAS);
+    _DtHelpReleaseTopic((XtPointer) pDAS, pDAS->lst_topic);
 
     pDAS->lst_topic = (_DtCvTopicPtr) topic_handle;
 
@@ -866,8 +865,7 @@ _DtHelpUpdatePath (
     /*
      * free the old topic and remember the new
      */
-    _DtHelpDestroyTopicData(pDAS->lst_topic, _DtHelpDADestroyRegion,
-						(_DtCvPointer) pDAS);
+    _DtHelpReleaseTopic((XtPointer) pDAS, pDAS->lst_topic);
 
     pDAS->lst_topic = (_DtCvTopicPtr) topic_handle;
 

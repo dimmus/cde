@@ -1114,11 +1114,12 @@ _DtHelpCeCloseSdlVolume (
  *
  * Purpose:     Free the volume's formatted title and snb.  They were made
  *              for (and hold fonts, special characters and graphics of)
- *              the display area that first asked for the title, and they
- *              are freed through that display area.  A volume that stays
- *              loaded after its last close must not keep them: that
- *              display area may be destroyed, and the next opener formats
- *              the title again for its own.
+ *              the display area that asked for the title (its owner, see
+ *              _DtHelpCeSdlVolTitleOwner), and they are freed through
+ *              that display area: this is done before the display area
+ *              goes (_DtHelpCeForgetVolTitlesOf), and when another one
+ *              asks for the title (GetDocumentTitle formats it again for
+ *              the asker).
  ******************************************************************************/
 void
 _DtHelpCeForgetSdlVolTitle (
@@ -1138,6 +1139,24 @@ _DtHelpCeForgetSdlVolTitle (
 	sdlVol->destroy_region  = NULL;
 	sdlVol->title_processed = False;
       }
+}
+
+/*******************************************************************************
+ * Function:    void *_DtHelpCeSdlVolTitleOwner (_DtHelpVolumeHdl volume);
+ *
+ * Returns:     the client data (display area) the volume's formatted title
+ *              was made for, or NULL.
+ ******************************************************************************/
+void *
+_DtHelpCeSdlVolTitleOwner (
+     _DtHelpVolumeHdl	 volume)
+{
+    CESDLVolume	*sdlVol = _DtHelpCeGetSdlVolumePtr(volume);
+
+    if (sdlVol == NULL || sdlVol->title_processed == False)
+	return NULL;
+
+    return (void *) sdlVol->client_data;
 }
 
 /*****************************************************************************

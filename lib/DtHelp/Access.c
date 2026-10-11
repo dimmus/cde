@@ -335,12 +335,10 @@ KeepClosedVolume (_DtHelpVolume vol)
       }
 
     /*
-     * the formatted title belongs to the display area that asked for it
-     * (and may be destroyed with it); the next opener formats its own.
+     * the formatted title stays: it belongs to the display area that
+     * asked for it, which forgets it before it goes (and another one
+     * gets a title of its own), see _DtHelpCeForgetVolTitlesOf.
      */
-    if (vol->sdl_flag == True)
-	_DtHelpCeForgetSdlVolTitle((_DtHelpVolumeHdl) vol);
-
     if (CLOSED_VOL_MAX == ClosedCnt)
 	DropClosedVolume(ClosedCnt - 1);
 
@@ -2546,6 +2544,44 @@ _DtHelpCloseVolume (
 
     _DtHelpProcessUnlock();
     return (0);
+}
+
+/*****************************************************************************
+ * Function: void _DtHelpCeForgetVolTitlesOf (void *client_data)
+ *
+ * Parameters:	client_data	Specifies a display area that goes away.
+ *
+ * Purpose:	Free the formatted titles of the loaded volumes (open or
+ *		kept after their last close) that were made for this
+ *		display area: they hold its fonts and graphics and are
+ *		freed through it.
+ *****************************************************************************/
+void
+_DtHelpCeForgetVolTitlesOf (
+     void	*client_data)
+{
+    int		  i;
+    _DtHelpVolume vol;
+
+    if (NULL == client_data)
+	return;
+
+    _DtHelpProcessLock();
+
+    for (vol = volChain; vol != NULL; vol = vol->nextVol)
+	if (vol->sdl_flag == True &&
+		_DtHelpCeSdlVolTitleOwner((_DtHelpVolumeHdl) vol) == client_data)
+	    _DtHelpCeForgetSdlVolTitle((_DtHelpVolumeHdl) vol);
+
+    for (i = 0; i < ClosedCnt; i++)
+      {
+	vol = ClosedVols[i].vol;
+	if (vol->sdl_flag == True &&
+		_DtHelpCeSdlVolTitleOwner((_DtHelpVolumeHdl) vol) == client_data)
+	    _DtHelpCeForgetSdlVolTitle((_DtHelpVolumeHdl) vol);
+      }
+
+    _DtHelpProcessUnlock();
 }
 
 /*****************************************************************************

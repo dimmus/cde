@@ -9603,6 +9603,16 @@ GetDocumentTitle(
     if (sdlVol == NULL)
 	return -1;
 
+    /*
+     * the title is kept for the display area it was formatted for
+     * (and stays while the volume is loaded, also after its last
+     * close).  Another asker gets one formatted for itself, as if the
+     * volume had just been loaded.
+     */
+    if (sdlVol->title_processed != False &&
+		sdlVol->client_data != ui_info->client_data)
+	_DtHelpCeForgetSdlVolTitle(volume);
+
     if (sdlVol->title_processed == False)
       {
 	if (flag == True)
@@ -9663,6 +9673,11 @@ GetDocumentTitle(
 	 */
         _DtLinkDbDestroy(frmtStruct.my_links);
 
+	/*
+	 * the owner, also of a failure (not retried for the same asker)
+	 */
+	sdlVol->client_data     = ui_info->client_data;
+	sdlVol->destroy_region  = ui_info->destroy_region;
         sdlVol->title_processed = procFlag;
       }
 

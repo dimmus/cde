@@ -61,6 +61,12 @@
 #include "GraphicsI.h"
 #include "HyperTextI.h"
 #include "StringFuncsI.h"
+#include "Access.h"
+#include "FontAttrI.h"
+#include "AccessP.h"
+#include "AccessSDLP.h"
+#include "AccessSDLI.h"
+#include "FormatI.h"
 
 #ifdef NLS16
 #endif
@@ -145,6 +151,13 @@ _DtHelpDisplayAreaDestroyCB (
     Display		 *dpy;
     DtHelpDispAreaStruct *pDAS = (DtHelpDispAreaStruct *) client_data;
     Boolean  usedDef = False;
+
+    /*
+     * the volume titles formatted for this display area go first
+     * (they are freed through it)
+     */
+    _DtHelpCeForgetVolTitlesOf(client_data);
+    _DtHelpTopicCacheFlush(client_data);
 
     /*
      * do the gross cleaning

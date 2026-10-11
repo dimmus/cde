@@ -81,6 +81,11 @@ extern	int		 _DtHelpFormatToc (
 				char                 *id_string,
 				char                **ret_id,
 				XtPointer            *ret_handle);
+extern	void		 _DtHelpReleaseTopic (
+				XtPointer	  client_data,
+				_DtCvTopicPtr	  topic);
+extern	void		 _DtHelpTopicCacheFlush (
+				XtPointer	  client_data);
 extern	int		 _DtHelpFormatTopic (
 				XtPointer	  client_data,
 				_DtHelpVolumeHdl     volume,

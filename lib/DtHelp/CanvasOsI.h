@@ -60,6 +60,10 @@ extern "C" {
 
 /********    Internal Macros Declarations    ********/
 
+/********    Internal Variable Declarations    ********/
+/* calls of _DtCvRunInterp so far (a topic that ran one is not cached) */
+extern	unsigned long	_DtCvRunInterpCalls;
+
 /********    Internal Function Declarations    ********/
 extern	int		_DtCvRunInterp(
 				int		(*filter)(void *, const char *, char **),
