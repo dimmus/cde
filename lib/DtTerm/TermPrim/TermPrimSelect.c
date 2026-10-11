@@ -421,6 +421,10 @@ scan
             {
               case scanLeft:
                 _DtTermPrimGetCharacterInfo(pb,row,col?--col:0,&charInfoRec);
+                /* an empty line has no character at column 0... */
+                if (!charInfoRec.u.pwc)
+                    col = -1;
+                else
                 while( !iswspace(*(wchar_t *)charInfoRec.u.pwc) &&
                                        ((col=charInfoRec.startCol-1)>=0) )
                  {
