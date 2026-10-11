@@ -647,9 +647,9 @@ changeSampleFontCB(
      * text message.
      */
     n = 0;
-    if (!font.userTextChanged) 
-      XtSetArg (args[n], XmNvalue, USER_MSG);
-    n++;
+    if (!font.userTextChanged) {
+      XtSetArg (args[n], XmNvalue, USER_MSG); n++;
+    }
     XtSetArg(args[n], XmNfontList, style.xrdb.fontChoice[pos].userFont); n++;
     XtSetValues (font.userText, args, n);
     XmTextShowPosition(font.userText, 0);
