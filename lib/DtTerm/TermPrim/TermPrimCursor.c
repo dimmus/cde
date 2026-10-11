@@ -59,6 +59,21 @@ static void timeoutCallback(XtPointer client_data, XtIntervalId *id);
  */
 #define	IM_SPOT_INTERVAL_MS	50
 
+/* keep the (short) scroll bar values of the widget record, which nothing
+ * in here reads any more, in step with tpd's...
+ */
+void
+_DtTermPrimNoteScrollBarValues(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+
+    tw->term.verticalScrollBarValue = (short) tpd->sbValue;
+    tw->term.verticalScrollBarMaximum = (short) tpd->sbMaximum;
+    tw->term.verticalScrollBarSliderSize = (short) tpd->sbSliderSize;
+    tw->term.verticalScrollBarPageIncrement = (short) tpd->sbPageIncrement;
+}
+
 /* milliseconds on the monotonic clock.  The value wraps around (it is
  * unsigned, so that this is well defined even where a long is 32 bits),
  * so compare two of them by their unsigned difference...
@@ -529,7 +544,7 @@ _DtTermPrimCursorUpdate(Widget w)
     struct termData *tpd = tw->term.tpd;
     Arg arglist[10];
     int i;
-    short value;
+    int value;
     Boolean newMaximum = False;
     Boolean newValue = False;
 
@@ -565,9 +580,9 @@ _DtTermPrimCursorUpdate(Widget w)
 	    }
 	}
 		    
-	if (tw->term.verticalScrollBarMaximum != value) {
+	if (tpd->sbMaximum != value) {
 	    /* need to set maximum ... */
-	    tw->term.verticalScrollBarMaximum = value;
+	    tpd->sbMaximum = value;
 	    newMaximum = True;
 	}
 
@@ -578,20 +593,20 @@ _DtTermPrimCursorUpdate(Widget w)
 		    tpd->scrollLockTopRow -
 		    (tw->term.rows - 1 - tpd->scrollLockBottomRow);
 	}
-	if (tw->term.verticalScrollBarSliderSize != value) {
+	if (tpd->sbSliderSize != value) {
 	    /* need to set sliderSize ... */
-	    tw->term.verticalScrollBarSliderSize = value;
+	    tpd->sbSliderSize = value;
 	    (void) XtSetArg(arglist[i], XmNsliderSize,
-		    tw->term.verticalScrollBarSliderSize); i++;
+		    tpd->sbSliderSize); i++;
 	    newValue = True;
 	}
 
 	/* verticalScrollBarPageIncrement = verticalScrollBarSliderSize... */
-	if (tw->term.verticalScrollBarPageIncrement != value) {
+	if (tpd->sbPageIncrement != value) {
 	    /* need to set pageIncrement ... */
-	    tw->term.verticalScrollBarPageIncrement = value;
+	    tpd->sbPageIncrement = value;
 	    (void) XtSetArg(arglist[i], XmNpageIncrement,
-		    tw->term.verticalScrollBarPageIncrement); i++;
+		    tpd->sbPageIncrement); i++;
 	    newValue = True;
 	}
 
@@ -605,50 +620,52 @@ _DtTermPrimCursorUpdate(Widget w)
 	value = tpd->topRow + tpd->lastUsedHistoryRow;
 #endif	/* NO_SCROLL_REGION_HISTORY_SCROLL */
 
-	if (tw->term.verticalScrollBarValue != value) {
+	if (tpd->sbValue != value) {
 	    /* need to set value... */
-	    tw->term.verticalScrollBarValue = value;
+	    tpd->sbValue = value;
 	    (void) XtSetArg(arglist[i], XmNvalue,
-		    tw->term.verticalScrollBarValue); i++;
+		    tpd->sbValue); i++;
 	    newValue = True;
 	}
 
 	/* check and see if value > max - size.  If it is, adjust
 	 * maximum...
 	 */
-	if (tw->term.verticalScrollBarValue >
-		tw->term.verticalScrollBarMaximum -
-		tw->term.verticalScrollBarSliderSize) {
-	    tw->term.verticalScrollBarMaximum =
-		    tw->term.verticalScrollBarValue +
-		    tw->term.verticalScrollBarSliderSize;
+	if (tpd->sbValue >
+		tpd->sbMaximum -
+		tpd->sbSliderSize) {
+	    tpd->sbMaximum =
+		    tpd->sbValue +
+		    tpd->sbSliderSize;
 	    newMaximum = True;
 	}
 
 	Debug('b', if (newMaximum || newValue) {
 		fprintf(stderr, ">>_DtTermPrimCursorUpdate: sb size=%d  min=%d  max=%d  value=%d  pginc=%d\n", 
-		tw->term.verticalScrollBarSliderSize,
+		tpd->sbSliderSize,
 		0,
-		tw->term.verticalScrollBarMaximum,
-		tw->term.verticalScrollBarValue,
-		tw->term.verticalScrollBarPageIncrement);
+		tpd->sbMaximum,
+		tpd->sbValue,
+		tpd->sbPageIncrement);
 	});
+
+	(void) _DtTermPrimNoteScrollBarValues(w);
 
 	if (newMaximum) {
 	    (void) XtSetArg(arglist[i], XmNmaximum,
-		    tw->term.verticalScrollBarMaximum); i++;
+		    tpd->sbMaximum); i++;
 	    (void) XtSetValues(tw->term.verticalScrollBar, arglist, i);
 	} else if (newValue) {
 	    /* only need to worry about setting value, slidersize, and
 	     * page increment...
 	     */
 	    (void) XmScrollBarSetValues(tw->term.verticalScrollBar,
-		tw->term.verticalScrollBarValue,
+		tpd->sbValue,
 					/* value			*/
-		tw->term.verticalScrollBarSliderSize,
+		tpd->sbSliderSize,
 					/* slider_size			*/
 		1,			/* increment			*/
-		tw->term.verticalScrollBarPageIncrement,
+		tpd->sbPageIncrement,
 					/* page_increment		*/
 		False);			/* notify			*/
 	}

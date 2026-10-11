@@ -641,12 +641,12 @@ doActualScroll(Widget w, int lines)
  */
 
 void
-_DtTermPrimScrollText(Widget w, short lines)
+_DtTermPrimScrollText(Widget w, int lines)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    short oldTopRow;
-    short newTopRow;
+    int oldTopRow;
+    int newTopRow;
     int lines2;
     int i;
 
@@ -857,7 +857,7 @@ _DtTermPrimScrollText(Widget w, short lines)
 }
 
 void
-_DtTermPrimScrollTextTo(Widget w, short topRow)
+_DtTermPrimScrollTextTo(Widget w, int topRow)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;

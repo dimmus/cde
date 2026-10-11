@@ -54,7 +54,7 @@ TermBuffer
 _DtTermPrimBufferCreateBuffer
 (
     const Widget  w,
-    const short   rows,
+    const int   rows,
     const short   cols,
     const short   sizeOfBuffer,
     const short   sizeOfLine,
@@ -255,7 +255,7 @@ void
 _DtTermPrimBufferResizeBuffer
 (
     TermBuffer *oldTB,
-    short      *newRows,
+    int      *newRows,
     short      *newCols
 )
 {
@@ -501,7 +501,7 @@ Boolean
 _DtTermPrimBufferCreateEnhancement
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col
 )
 {
@@ -516,7 +516,7 @@ void
 clearEnhancement
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col
 )
 {
@@ -540,7 +540,7 @@ static void
 insertEnhancements
 (
     const TermBuffer  tb, 
-    const short       row,
+    const int       row,
     const short       col,
     const short       insertCount,
     const Boolean     insertFlag
@@ -565,7 +565,7 @@ Boolean
 _DtTermPrimBufferFreeEnhancement
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col
 )
 {
@@ -656,7 +656,7 @@ short
 _DtTermPrimBufferGetText
 (
     const TermBuffer      tb,
-    const short           row,
+    const int           row,
     const short           col,
     const short           width,
           char           *buffer,
@@ -751,7 +751,7 @@ _DtTermPrimBufferGetText
     return(retLen);
 }
 
-short
+int
 _DtTermPrimBufferGetRows
 (
     const TermBuffer  tb
@@ -799,7 +799,7 @@ int
 _DtTermPrimBufferSetEnhancement
 (
     const TermBuffer      tb,
-    const short           row,
+    const int           row,
     const short           col,
     const unsigned char   id,
     const enhValue        value
@@ -823,7 +823,7 @@ Boolean
 _DtTermPrimBufferGetEnhancement
 (
     const TermBuffer      tb,
-    const short           row,
+    const int           row,
     const short           col,
           enhValue      **values,
           short          *count,
@@ -848,7 +848,7 @@ termChar *
 _DtTermPrimBufferGetCharacterPointer
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col
 )
 {
@@ -878,7 +878,7 @@ Boolean
 _DtTermPrimGetCharacterInfo
 (
     TermBuffer      tb,
-    short           row,
+    int           row,
     short           col,
     TermCharInfo    charInfo
 )
@@ -958,7 +958,7 @@ short
 _DtTermPrimBufferInsert
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col,
     const termChar   *newChars,
           short       numChars,
@@ -1109,7 +1109,7 @@ void
 _DtTermPrimBufferDelete
 (
     TermBuffer  tb,
-    short      *row,
+    int      *row,
     short      *col,
     short      *width,
     termChar  **returnChars,  /* pointer to delete buffer        */
@@ -1118,7 +1118,7 @@ _DtTermPrimBufferDelete
 {
     int      copyCount;
     TermLine line;
-    short    localRow;
+    int    localRow;
     short    localCol;    
     TermCharInfoRec charInfo;
     
@@ -1232,7 +1232,7 @@ void
 _DtTermPrimBufferErase
 (
     TermBuffer tb,
-    short      row,
+    int      row,
     short      startCol,
     short      stopCol
 )
@@ -1289,7 +1289,7 @@ Boolean
 _DtTermPrimBufferSetLineWidth
 (
     const TermBuffer    tb,
-    const short         row,
+    const int         row,
           short         newWidth
 )
 {
@@ -1357,7 +1357,7 @@ short
 _DtTermPrimBufferGetLineLength
 (
     const TermBuffer    tb,
-    const short         row
+    const int         row
 )
 {
     short           retLen;
@@ -1417,7 +1417,7 @@ short
 _DtTermPrimBufferGetLineWidth
 (
     const TermBuffer    tb,
-    const short         row
+    const int         row
 )
 {
     short           width = 0;
@@ -1471,17 +1471,17 @@ void
 _DtTermPrimBufferMoveLockArea
 (
     const TermBuffer tb, 
-    const short dest,
-    const short src,
-    const short length
+    const int dest,
+    const int src,
+    const int length
 )
 {
     TermLine lineCache[10];
     TermLine *holdLines = lineCache;
     TermLine *destPtr;
     TermLine *srcPtr;
-    short cacheSize;
-    short distance;
+    int cacheSize;
+    int distance;
     int i;
     int refLineCount;
     TermLine *refLines;
@@ -1655,7 +1655,7 @@ _DtTermPrimBufferMoveLockArea
 #define	ROTATE_MAX_LINES	16
 
 static Boolean
-rotateLinesUp(const TermBuffer tb, const short length)
+rotateLinesUp(const TermBuffer tb, const int length)
 {
     TermLine save[ROTATE_MAX_LINES];
     TermLine *lines;
@@ -1713,9 +1713,9 @@ Boolean
 _DtTermPrimBufferSwapLines
 (
     const TermBuffer tb1,
-    const short row1,
+    const int row1,
     const TermBuffer tb2,
-    const short row2
+    const int row2
 )
 {
     TermLine tmp;
@@ -1758,9 +1758,9 @@ void
 _DtTermPrimBufferInsertLine
 (
     const TermBuffer tb,
-    const short dest,
-    const short length,
-    const short src
+    const int dest,
+    const int length,
+    const int src
 )
 {
     TermLine lineCache[10];
@@ -1940,8 +1940,8 @@ void
 _DtTermPrimBufferInsertLineFromTB
 (
     const TermBuffer tb,
-    const short dest,
-    const short length,
+    const int dest,
+    const int length,
     const InsertSource insertSource
 )
 {
@@ -1976,9 +1976,9 @@ void
 _DtTermPrimBufferDeleteLine
 (   
     const TermBuffer tb, 
-    const short source,
-    const short length,
-    const short lastUsedRow
+    const int source,
+    const int length,
+    const int lastUsedRow
 )
 {
     TermLine lineCache[10];
@@ -1987,7 +1987,7 @@ _DtTermPrimBufferDeleteLine
     TermLine *destPtr;
     TermLine *srcPtr;
 #endif	/* USE_MEMCPY */
-    short copyLength;
+    int copyLength;
     int i;
     int refLineCount;
     TermLine *refLines;
@@ -2075,7 +2075,7 @@ void
 _DtTermPrimBufferPadLine
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       newWidth
 )
 {
@@ -2112,7 +2112,7 @@ Boolean
 _DtTermPrimBufferClearLine
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
           short       newWidth
 )
 {
@@ -2271,7 +2271,7 @@ void
 _DtTermPrimBufferSetLineWrapFlag
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     Boolean     state
 )
 {
@@ -2289,7 +2289,7 @@ Boolean
 _DtTermPrimBufferTestLineWrapFlag
 (
     TermBuffer  tb,
-    short       row
+    int       row
 )
 {
     if (VALID_ROW(tb, row))
@@ -2309,7 +2309,7 @@ void
 _DtTermPrimBufferSetInSelectionFlag
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     TermLineSelection     state
 )
 {
@@ -2333,7 +2333,7 @@ TermLineSelection
 _DtTermPrimBufferGetInSelectionFlag
 (
     TermBuffer  tb,
-    short       row
+    int       row
 )
 {
     if (VALID_ROW(tb, row))
@@ -2350,9 +2350,9 @@ void
 _DtTermPrimBufferSetSelectLines
 (
     TermBuffer tb,
-    short beginRow,
+    int beginRow,
     short beginCol,
-    short endRow,
+    int endRow,
     short endCol
 )
 {
@@ -2382,7 +2382,7 @@ static void
 _termBufferPrintLine
 (
     const TermBuffer tb,
-    const short row
+    const int row
 )
 {
     TermLine    line;
@@ -2415,7 +2415,7 @@ _termBufferPrintBuffer
     const TermBuffer tb
 )
 {
-    short i;
+    int i;
     short j;
     short k;
 

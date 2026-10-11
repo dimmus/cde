@@ -169,9 +169,9 @@ typedef struct _TermLineRec
 */
 typedef struct _TermBufferPart
 {
-    short               rows;  /* height (in chars) of character buffer      */
+    int                 rows;  /* height (in chars) of character buffer      */
     short               cols;  /* width  (in single width cols) of buffer    */
-    short               maxRows;  /* maximum height (before any resize)      */
+    int                 maxRows;  /* maximum height (before any resize)      */
     short               maxCols;  /* maximum width  (before any resize)      */
     short               bytesPerChar; /* bytes per character */
     Boolean            *tabs;         /* array of flags showing tab positions*/
@@ -211,7 +211,7 @@ short
 _DtTermPrimBufferInsertWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       col,
           wchar_t    *newChars,
           short       numChars,
@@ -225,7 +225,7 @@ short
 _DtTermPrimBufferInsertWcWidths
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       col,
           wchar_t    *newChars,
     const signed char *rawWidths,
@@ -240,7 +240,7 @@ Boolean
 _DtTermPrimBufferClearLineWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
           short       newWidth
 );
 

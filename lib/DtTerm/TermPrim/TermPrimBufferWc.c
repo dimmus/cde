@@ -57,7 +57,7 @@ static void
 _termBufferValidateLineWc
 (
     const TermBuffer tb,
-    const short row
+    const int row
 );
 
 static wchar_t *
@@ -72,7 +72,7 @@ static void
 _patchUpChar
 (
     TermBuffer   tb,
-    short        row,
+    int        row,
     short       *col
 );
 
@@ -103,7 +103,7 @@ static void
 _primBufferInsertWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
           short      *col,
           wchar_t    *newChars,
     const signed char *rawWidths,
@@ -119,7 +119,7 @@ static void
 _primBufferOverwriteWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
           short      *col,
           wchar_t    *newChars,
     const signed char *rawWidths,
@@ -224,7 +224,7 @@ static void
 _patchUpChar
 (
     TermBuffer   tb,
-    short        row,
+    int        row,
     short       *col
 )
 {
@@ -362,7 +362,7 @@ static void
 _primBufferInsertWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
           short      *col,
           wchar_t    *newChars,
     const signed char *rawWidths,
@@ -488,7 +488,7 @@ static void
 _primBufferOverwriteWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
           short      *col,
           wchar_t    *newChars,
     const signed char *rawWidths,
@@ -606,7 +606,7 @@ short
 _DtTermPrimBufferInsertWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col,
           wchar_t    *newChars,
           short       numChars,
@@ -628,7 +628,7 @@ short
 _DtTermPrimBufferInsertWcWidths
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       col,
           wchar_t    *newChars,
     const signed char *rawWidths,
@@ -736,7 +736,7 @@ void
 _DtTermPrimBufferDeleteWc
 (
     TermBuffer  tb,
-    short      *row,
+    int      *row,
     short      *col,
     short      *width,
     termChar  **returnChars,  /* pointer to delete buffer        */
@@ -746,7 +746,7 @@ _DtTermPrimBufferDeleteWc
     TermLine  line;
     wchar_t  *cells;
     wchar_t  *pwc;
-    short     localRow;
+    int     localRow;
     short     localCol;
     short     stopCol;
     short     c;
@@ -878,7 +878,7 @@ void
 _DtTermPrimBufferPadLineWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
     const short       width
 )
 {
@@ -931,7 +931,7 @@ Boolean
 _DtTermPrimBufferClearLineWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int       row,
           short       newWidth
 )
 {
@@ -1003,7 +1003,7 @@ void
 _DtTermPrimBufferEraseWc
 (
     TermBuffer tb,
-    short      row,
+    int      row,
     short      startCol,
     short      stopCol
 )
@@ -1057,7 +1057,7 @@ static void
 _termBufferValidateLineWc
 (
     const TermBuffer tb,
-    const short row
+    const int row
 )
 {
     wchar_t    *pwc;
@@ -1101,7 +1101,7 @@ static void
 _termBufferPrintLine
 (
     const TermBuffer tb,
-    const short row
+    const int row
 )
 {
     TermLine    line;

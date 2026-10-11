@@ -49,7 +49,7 @@ extern Boolean
 _DtTermPrimSelectIsAboveSelection
 (
     Widget w,
-    short row,
+    int row,
     short col
 );
 
@@ -76,25 +76,25 @@ extern void
 _DtTermPrimSelectMoveLines
 (
    Widget w,
-   short src,
-   short dest,
-   short len
+   int src,
+   int dest,
+   int len
 );
 
 extern void
 _DtTermPrimSelectDeleteLines
 (
    Widget w,
-   short src,
-   short len
+   int src,
+   int len
 );
 
 extern void
 _DtTermPrimSelectInsertLines
 (
    Widget w,
-   short src,
-   short len
+   int src,
+   int len
 );
 
 extern 
@@ -291,7 +291,7 @@ XmTextPosition
 rowColToPos
 (
     DtTermPrimitiveWidget   tw,
-    short                   row,
+    int                   row,
     short                   col
 );
 

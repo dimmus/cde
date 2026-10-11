@@ -44,5 +44,6 @@ extern Boolean _DtTermPrimGetCursorVisible(Widget w);
 extern void _DtTermPrimCursorKeyActivity(Widget w);
 extern void _DtTermPrimCursorDestroy(Widget w);
 extern unsigned long _DtTermPrimMonotonicMs(void);
+extern void _DtTermPrimNoteScrollBarValues(Widget w);
 #endif	/* _Dt_TermPrimCursor_h */
 /* DON'T ADD ANYTHING AFTER THIS #endif... */

@@ -45,7 +45,7 @@ static void
 clearEnhancements
 (
     TermBuffer tb,
-    short      row,
+    int      row,
     short      startCol,
     short      count
 );
@@ -54,7 +54,7 @@ static void
 _DtTermClearEnhancements
 (
     TermBuffer tb,
-    short      row,
+    int      row,
     short      col,
     short      count
 );
@@ -63,7 +63,7 @@ static int
 _DtTermSetEnhancement
 (
     TermBuffer      tb,
-    short           row,
+    int           row,
     short           col,
     unsigned char   id,
     enhValue        value
@@ -73,7 +73,7 @@ static Boolean
 _DtTermGetEnhancement
 (
     const TermBuffer      tb,
-    const short           row,
+    const int           row,
     const short           col,
     enhValue            **enhancements,
     short                *count,
@@ -84,7 +84,7 @@ static void
 _DtTermInsertEnhancements
 (
     const TermBuffer  tb, 
-    const short       row,
+    const int       row,
     const short       col,
     short             insertCount,
     const Boolean     insertFlag
@@ -94,7 +94,7 @@ static Boolean
 _DtTermBufferCreateEnhancement
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       col
 );
 
@@ -102,7 +102,7 @@ static void
 _DtTermBufferResize
 (
     TermBuffer  newTb,
-    short      *newRows,
+    int      *newRows,
     short      *newCols
 );
 
@@ -110,7 +110,7 @@ static void
 _DtTermDeleteEnhancement
 (
     TermBuffer  tb, 
-    short       row,
+    int       row,
     short       col,
     short       width
 );
@@ -119,7 +119,7 @@ static Boolean
 _DtTermSetLineLength
 (
     TermBuffer      tb,
-    short           row,
+    int           row,
     short           newLength
 );
 
@@ -127,7 +127,7 @@ static Boolean
 _DtTermClearLine
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       newLength
 );
 
@@ -136,7 +136,7 @@ static void
 validateEnhancements
 (
     TermBuffer  tb,
-    short       row
+    int       row
 );    
 #    define VALIDATE_ENHANCEMENTS(tb, row) validateEnhancements((tb), (row))
 #else    
@@ -155,7 +155,7 @@ TermBuffer
 _DtTermBufferCreateBuffer
 (
     const Widget  w,
-    const short   rows,
+    const int   rows,
     const short   cols,
     const short   sizeOfBuffer,
     const short   sizeOfLine,
@@ -212,11 +212,11 @@ static void
 _DtTermBufferResize
 (
     TermBuffer  tb,
-    short      *newRows,
+    int      *newRows,
     short      *newCols
 )
 {
-    short   i;
+    int   i;
     DtEnh   enh;
     DtLine *lines;
     
@@ -406,7 +406,7 @@ static void
 clearEnhancements
 (
     TermBuffer tb,
-    short      row,
+    int      row,
     short      col,
     short      count
 )
@@ -438,7 +438,7 @@ static void
 _DtTermClearEnhancements
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       col,
     short       count
 )
@@ -461,7 +461,7 @@ static void
 _DtTermInsertEnhancements
 (
     const TermBuffer  tb, 
-    const short       row,
+    const int       row,
     const short       col,
     short             insertCount,
     const Boolean     insertFlag
@@ -543,7 +543,7 @@ void
 _DtTermBufferDelete
 (
     TermBuffer  tb,
-    short      *row,
+    int      *row,
     short      *col,
     short      *count        /* number of columns to delete     */
 )
@@ -558,7 +558,7 @@ static void
 _DtTermDeleteEnhancement
 (
     TermBuffer  tb, 
-    short       row,
+    int       row,
     short       col,
     short       width
 )
@@ -601,7 +601,7 @@ static Boolean
 _DtTermBufferCreateEnhancement
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       col
 )
 {
@@ -647,7 +647,7 @@ Boolean
 _DtTermBufferFreeEnhancement
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       col
 )
 {
@@ -669,7 +669,7 @@ static int
 _DtTermSetEnhancement
 (
     TermBuffer      tb,
-    short           row,
+    int           row,
     short           col,
     unsigned char   id,
     enhValue        value
@@ -742,7 +742,7 @@ static Boolean
 _DtTermGetEnhancement
 (
     const TermBuffer      tb,
-    const short           row,
+    const int           row,
     const short           col,
           enhValue      **values,
           short          *count,
@@ -870,7 +870,7 @@ static Boolean
 _DtTermSetLineLength
 (
     TermBuffer      tb,
-    short           row,
+    int           row,
     short           newLength
 )
 {
@@ -885,7 +885,7 @@ static Boolean
 _DtTermClearLine
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       newWidth
 )
 {
@@ -927,7 +927,7 @@ void
 _DtTermBufferErase
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       col,
     short       count,
     DtEraseMode eraseSwitch
@@ -978,7 +978,7 @@ static void
 _DtTermValidateEnhancements
 (
     TermBuffer  tb,
-    short       row
+    int       row
 )
 {
     DtTermEnhPart  refEnh;
@@ -1080,7 +1080,7 @@ static void
 _printLine
 (
     TermBuffer tb,
-    short row
+    int row
 )
 {
     DtLine line;
@@ -1107,7 +1107,7 @@ static int
 _DtTermPrintEnhancement
 (
     TermBuffer tb,
-    short row,
+    int row,
     short col
 )
 {
@@ -1198,7 +1198,7 @@ _DtTermPrintBuffer
     DtTermBuffer tb
 )
 {
-    short i;
+    int i;
     short j;
     short k;
 

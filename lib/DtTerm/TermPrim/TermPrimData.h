@@ -116,27 +116,31 @@ typedef struct termData {
      * Buffer
      */
     TermBuffer  termBuffer;             /* character/enhancment buffer  */    
-    short bufferRows;			/* rows of term buffer memory	*/
-    short bufferRowRatio;		/* scaled ratio of term buffer
+    int bufferRows;			/* rows of term buffer memory	*/
+    int bufferRowRatio;		/* scaled ratio of term buffer
 					 * memory to term window
 					 */
 
     TermBuffer	historyBuffer;		/* history character buffer	*/
-    short historyBufferRows;		/* rows of term history buffer	*/
+    int historyBufferRows;		/* rows of term history buffer	*/
     
     short leftMargin;			/* left margin			*/
     short rightMargin;			/* right margin			*/
     /* 
     ** 
     */
-    short topRow;      	        	/* number of top row on screen  */
+    int topRow;      	        	/* number of top row on screen  */
     short cursorColumn;			/* current cursor position, col	*/
     short cursorRow;			/* current cursor position, row	*/
-    short lastUsedRow;			/* number of last used buffer row.
+    int lastUsedRow;			/* number of last used buffer row.
 					 * if == 0, no rows used, if == 1,
 					 * 1 row used, etc.
 					 */
-    short lastUsedHistoryRow;
+    int lastUsedHistoryRow;
+    int sbValue;			/* the vertical scroll bar's	*/
+    int sbMaximum;			/*   value, maximum, slider size*/
+    int sbSliderSize;			/*   and page increment, as last*/
+    int sbPageIncrement;		/*   set			*/
     short offsetX;			/* width of internal window
 					 * border.  With Motif, this is
 					 * the width of the
@@ -271,7 +275,7 @@ typedef struct termData {
 					 */
 	} jump;
 	struct {
-	    short pendingScrollLines;	/* number of lines in pending	*/
+	    int pendingScrollLines;	/* number of lines in pending	*/
 	    short pendingScrollTopRow;	/* top row of pending scroll	*/
 	    short pendingScrollBottomRow;
 					/* bottom row of pending scroll	*/

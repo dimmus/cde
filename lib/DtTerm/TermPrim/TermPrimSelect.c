@@ -154,7 +154,7 @@ XmTextPosition
 rowColToPos
 (
     DtTermPrimitiveWidget   tw,
-    short                   row,
+    int                   row,
     short                   col
 )
 {
@@ -228,10 +228,10 @@ xyToPos
     DtTermPrimData  tpd        = tw->term.tpd;
     TermSelectInfo  selectInfo = tpd->selectInfo;
     TermBuffer      tb;
-    short           row;
-    short           yPos;
+    int           row;
+    int           yPos;
     short           xPos;
-    static short    oldYPos = -1;
+    static int    oldYPos = -1;
     static short    oldXPos = -1;
     
 
@@ -325,13 +325,14 @@ posToBufferRowCol
     DtTermPrimitiveWidget  tw,
     XmTextPosition pos,
     TermBuffer *pb,
-    short *row,
+    int *row,
     short *col
 )
 {
     DtTermPrimData   tpd        = tw->term.tpd;
     TermSelectInfo   selectInfo = tpd->selectInfo;
-    short lrow, lcol;
+    int lrow;
+    short lcol;
 
     lrow = pos / (selectInfo->columns + 1);
     lcol = pos - (lrow * (selectInfo->columns + 1));
@@ -358,7 +359,7 @@ bufferRowColToPos
 (
     DtTermPrimitiveWidget  tw,
     TermBuffer pb,
-    short row,
+    int row,
     short col
 )
 {
@@ -388,7 +389,7 @@ scan
     DtTermPrimData   tpd        = tw->term.tpd;
     TermSelectInfo   selectInfo = tpd->selectInfo;
     XmTextPosition   position   = scanStart;
-    short            row;
+    int            row;
     short            col;
     TermBuffer pb ;
     
@@ -515,8 +516,10 @@ _DtTermPrimRenderRefreshTextLinear
     DtTermPrimitiveWidget   tw         = (DtTermPrimitiveWidget) w;
     DtTermPrimData          tpd        = tw->term.tpd;
     TermSelectInfo          selectInfo = tpd->selectInfo;
-    short                   startRow, startCol;
-    short                   stopRow , stopCol;
+    int                     startRow;
+    short                   startCol;
+    int                     stopRow;
+    short                   stopCol;
     
 
     /* 
@@ -544,30 +547,39 @@ _DtTermPrimRenderRefreshTextLinear
     
 
     /*
+    ** (_DtTermPrimRefreshText() takes short window rows and ignores
+    ** those outside the window, so rows far outside of it, which are
+    ** possible with a long history, are passed as -1 or rows)...
+    */
+#define	WINDOW_ROW(r)	((short) MAX(-1, MIN((r), tw->term.rows)))
+
+    /*
     ** refresh the first (and possibly only) line
     */
     if (startRow == stopRow)
     {
-        _DtTermPrimRefreshText((Widget)tw, startCol, startRow, 
-                               stopCol, startRow);
+        _DtTermPrimRefreshText((Widget)tw, startCol, WINDOW_ROW(startRow), 
+                               stopCol, WINDOW_ROW(startRow));
         return;
     }
-    _DtTermPrimRefreshText((Widget)tw, startCol, startRow, 
-                      selectInfo->columns - 1, startRow);
+    _DtTermPrimRefreshText((Widget)tw, startCol, WINDOW_ROW(startRow), 
+                      selectInfo->columns - 1, WINDOW_ROW(startRow));
     
     /* 
     ** refresh the middle block (if there is one)
     */
     if (startRow++ < stopRow)
     {
-        _DtTermPrimRefreshText((Widget)tw, 0, startRow, 
-                         selectInfo->columns - 1, stopRow - 1);
+        _DtTermPrimRefreshText((Widget)tw, 0, WINDOW_ROW(startRow), 
+                         selectInfo->columns - 1, WINDOW_ROW(stopRow - 1));
     }
 
     /* 
     ** refresh the last line 
     */
-    _DtTermPrimRefreshText((Widget)tw, 0, stopRow, stopCol, stopRow);
+    _DtTermPrimRefreshText((Widget)tw, 0, WINDOW_ROW(stopRow), stopCol,
+			   WINDOW_ROW(stopRow));
+#undef	WINDOW_ROW
     
 }
 
@@ -585,9 +597,9 @@ setSelection
     TermSelectInfo  selectInfo = tw->term.tpd->selectInfo;
     XmTextPosition  oldBegin, oldEnd;
     Boolean         disJoint;       /* true if new and current are disjoint */
-    short	    selectLineBegin;
+    int	    selectLineBegin;
     short	    selectColBegin;
-    short	    selectLineEnd;
+    int	    selectLineEnd;
     short	    selectColEnd;
 
     Debug('c', fprintf(stderr, ">>setSelection() starting\n"));
@@ -1723,12 +1735,12 @@ getString
     DtTermPrimData          tpd        = tw->term.tpd;
     TermSelectInfo          selectInfo = tpd->selectInfo;
     TermBuffer              tb;
-    short                   beginRow, 
+    int                   beginRow, 
                             beginCol;
-    short                   endRow,
+    int                   endRow,
                             endCol;
-    short                   thisRow;
-    short                   numRows;
+    int                   thisRow;
+    int                   numRows;
     char                   *buffer;
     char                   *pBuf;
     short                   len;
@@ -2140,7 +2152,7 @@ Boolean
 _DtTermPrimSelectIsAboveSelection
 (
    Widget w,
-   short row,
+   int row,
    short col
 )
 {
@@ -2176,15 +2188,16 @@ extern void
 _DtTermPrimSelectMoveLines
 (
    Widget w,
-   short src,
-   short dest,
-   short len
+   int src,
+   int dest,
+   int len
 )
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     TermSelectInfo selectInfo = tw->term.tpd->selectInfo;
     TermBuffer pb;
-    short row,col;
+    int row;
+    short col;
 
     posToBufferRowCol (tw, selectInfo->begin, &pb, &row, &col);
 
@@ -2203,15 +2216,16 @@ extern void
 _DtTermPrimSelectDeleteLines
 (
     Widget w,
-    short src,
-    short len
+    int src,
+    int len
 )
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     TermSelectInfo selectInfo = tw->term.tpd->selectInfo;
-    short selectLineBegin;
+    int selectLineBegin;
     TermBuffer pb;
-    short row,col;
+    int row;
+    short col;
 
     posToBufferRowCol (tw, selectInfo->begin, &pb, &row, &col);
 
@@ -2243,13 +2257,13 @@ extern void
 _DtTermPrimSelectInsertLines
 (
    Widget w,
-   short src,
-   short len
+   int src,
+   int len
 )
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     TermSelectInfo selectInfo = tw->term.tpd->selectInfo;
-    short selectLineBegin;
+    int selectLineBegin;
 
     /* if there are no lines, return... */
     if ((len <= 0) || !selectInfo->ownPrimary)  {
@@ -2648,7 +2662,8 @@ GetXFromPos(Widget w, XmTextPosition pos)
    DtTermPrimitiveWidget  tw = (DtTermPrimitiveWidget) w;
    DtTermPrimData tpd = tw->term.tpd;
    TermBuffer pb;
-   short row,col;
+   int row;
+   short col;
    
    posToBufferRowCol(tw,pos,&pb,&row,&col) ;
    return(tpd->offsetX+col*tpd->cellWidth);

@@ -69,11 +69,11 @@ termFuncErase
                                     return;
 
 static void
-doScroll(Widget w, short lines)
+doScroll(Widget w, int lines)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    short newtop;
+    int newtop;
 
     EXIT_IF_MARGINS_SET(tw)
     newtop = tpd->topRow + lines;
@@ -216,7 +216,7 @@ termFuncErase
 {
     DtTermPrimitiveWidget tw  = (DtTermPrimitiveWidget) w;
     DtTermPrimData        tpd = tw->term.tpd;
-    short row;
+    int row;
     short col;
 
     switch(eraseSwitch)
@@ -445,7 +445,7 @@ _DtTermFuncDeleteChar
 {
     DtTermPrimData tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
     short          deleteWidth;
-    short          row;
+    int          row;
     short          col;
 
     row = tpd->topRow + tpd->cursorRow;

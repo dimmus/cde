@@ -36,8 +36,8 @@ extern void _DtTermPrimScrollWait(Widget w);
 extern void _DtTermPrimScrollComplete(Widget w, Boolean flush);
 extern void _DtTermPrimScrollCompleteIfNecessary(Widget w, short scrollTopRow,
 	short scrollBottomRow, short lines);
-extern void _DtTermPrimScrollText(Widget w, short lines);
-extern void _DtTermPrimScrollTextTo(Widget w, short topRow);
+extern void _DtTermPrimScrollText(Widget w, int lines);
+extern void _DtTermPrimScrollTextTo(Widget w, int topRow);
 extern void _DtTermPrimScrollTextArea(Widget w, short scrollStart,
 	short scrollLength, short scrollDistance);
 extern Boolean _DtTermPrimFrameDue(Widget w);

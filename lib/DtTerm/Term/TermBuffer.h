@@ -119,7 +119,7 @@ extern TermBuffer
 _DtTermBufferCreateBuffer
 (
     const Widget  w,
-    const short   rows,
+    const int   rows,
     const short   cols,
     const short   sizeOfBuffer,
     const short   sizeOfLine,
@@ -141,7 +141,7 @@ void
 _DtTermBufferDelete
 (
     TermBuffer  tb,
-    short      *row,
+    int      *row,
     short      *col,
     short      *width
 );
@@ -150,7 +150,7 @@ extern void
 _DtTermBufferErase
 (
     TermBuffer  tb,
-    short       row,
+    int       row,
     short       col,
     short       count,
     DtEraseMode eraseSwitch

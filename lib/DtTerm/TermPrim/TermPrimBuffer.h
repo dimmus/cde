@@ -92,7 +92,7 @@ typedef TermBuffer
 (*BufferCreateProc)
 (
     const Widget,
-    const short,
+    const int,
     const short,
     const short,
     const short,
@@ -108,7 +108,7 @@ typedef void
 typedef void
 (*BufferResizeProc)
 (
-    TermBuffer, short *, short *
+    TermBuffer, int *, short *
 );
 
 typedef void
@@ -121,7 +121,7 @@ typedef void
 (*TermEnhClear)
 (
     TermBuffer,
-    short,
+    int,
     short,
     short
 );
@@ -130,7 +130,7 @@ typedef void
 (*TermEnhInsert)
 (
     const TermBuffer,
-    const short,
+    const int,
     const short, 
     short,
     const Boolean
@@ -140,7 +140,7 @@ typedef void
 (*TermEnhDelete)
 (
     TermBuffer,
-    short,
+    int,
     short,
     short
 );
@@ -149,7 +149,7 @@ typedef int
 (*TermEnhSet)
 (
     TermBuffer,
-    short,
+    int,
     short,
     unsigned char,
     enhValue
@@ -159,7 +159,7 @@ typedef Boolean
 (*TermEnhGet)
 (
     const TermBuffer,
-    const short,
+    const int,
     const short,
           enhValue **,
           short *, 
@@ -170,7 +170,7 @@ typedef Boolean
 (*TermLineSetLen)
 (
     TermBuffer,
-    short,
+    int,
     short
 );
 
@@ -178,7 +178,7 @@ typedef Boolean
 (*TermLineSetWidth)
 (
     TermBuffer,
-    short,
+    int,
     short
 );
 
@@ -186,7 +186,7 @@ typedef Boolean
 (*TermLineClear)
 (
     TermBuffer,
-    short,
+    int,
     short
 );
 
@@ -216,7 +216,7 @@ extern Boolean
 _DtTermPrimBufferClearLine
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
           short       newWidth
 );
 
@@ -237,7 +237,7 @@ extern TermBuffer
 _DtTermPrimBufferCreateBuffer
 (
     const Widget  w,
-    const short   rows,
+    const int     rows,
     const short   cols,
     const short   sizeOfBuffer,
     const short   sizeOfLine,
@@ -251,7 +251,7 @@ void
 _DtTermPrimBufferErase
 (
     TermBuffer tb,
-    short      row,
+    int        row,
     short      startCol,
     short      stopCol
 );
@@ -263,7 +263,7 @@ void
 _DtTermPrimBufferEraseWc
 (
     TermBuffer tb,
-    short      row,
+    int        row,
     short      startCol,
     short      stopCol
 );
@@ -296,7 +296,7 @@ extern void
 _DtTermPrimBufferResizeBuffer
 (
     TermBuffer *tb,
-    short      *newRows,
+    int        *newRows,
     short      *newCols
 );
 
@@ -314,7 +314,7 @@ extern Boolean
 _DtTermPrimBufferCreateEnhancement
 (
     TermBuffer  tb,
-    short       row,
+    int         row,
     short       col
 );
 
@@ -332,7 +332,7 @@ extern Boolean
 _DtTermPrimBufferFreeEnhancement
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       col
 );   
 
@@ -355,7 +355,7 @@ extern short
 _DtTermPrimBufferGetText
 (
     const TermBuffer      tb,
-    const short           row,
+    const int             row,
     const short           col,
     const short           length,
     char                 *buffer,
@@ -376,7 +376,7 @@ extern termChar *
 _DtTermPrimBufferGetCharacterPointer
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       col
 );
 
@@ -389,7 +389,7 @@ extern short
 _DtTermPrimBufferInsert
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       col,
     const termChar   *newChars,
           short       numChars,
@@ -410,7 +410,7 @@ extern void
 _DtTermPrimBufferDelete
 (
     TermBuffer  tb,
-    short      *row,
+    int        *row,
     short      *col,
     short      *count,
     termChar  **returnChars,  /* pointer to delete buffer        */
@@ -421,7 +421,7 @@ extern void
 _DtTermPrimBufferDeleteWc
 (
     TermBuffer  tb,
-    short      *row,
+    int        *row,
     short      *col,
     short      *count,
     termChar  **returnChars,  /* pointer to delete buffer        */
@@ -432,7 +432,7 @@ extern Boolean
 _DtTermPrimBufferSetLineWidth
 (
     const TermBuffer      tb,
-    const short           row,
+    const int             row,
           short           newWidth
 );
 
@@ -440,21 +440,21 @@ extern short
 _DtTermPrimBufferGetLineLength
 (
     const TermBuffer      tb,
-    const short           row
+    const int             row
 );
 
 extern short
 _DtTermPrimBufferGetLineWidth
 (
     const TermBuffer      tb,
-    const short           row
+    const int             row
 );
 
 extern int
 _DtTermPrimBufferSetEnhancement
 (
     const TermBuffer      tb,
-    const short           row,
+    const int             row,
     const short           col,
     const unsigned char   id,
     const enhValue        value
@@ -464,7 +464,7 @@ extern Boolean
 _DtTermPrimBufferGetEnhancement
 (
     const TermBuffer      tb,
-    const short           row,
+    const int             row,
     const short           col,
           enhValue      **values,
           short          *count,
@@ -474,7 +474,7 @@ _DtTermPrimBufferGetEnhancement
 /*
 ** Return the number of rows allocated to the term buffer.
 */
-extern short
+extern int
 _DtTermPrimBufferGetRows
 (
     const TermBuffer      tb
@@ -514,9 +514,9 @@ extern void
 _DtTermPrimBufferMoveLockArea
 (
     const TermBuffer	    tb,
-    const short	            dest,
-    const short	            src,
-    const short	            length
+    const int	            dest,
+    const int	            src,
+    const int	            length
 );
 
 typedef enum {
@@ -528,17 +528,17 @@ extern void
 _DtTermPrimBufferInsertLine
 (
     const TermBuffer	    tb,
-    const short	            dest,
-    const short	            length,
-    const short	            src
+    const int	            dest,
+    const int	            length,
+    const int	            src
 );
 
 extern void
 _DtTermPrimBufferInsertLineFromTB
 (
     const TermBuffer	    tb,
-    const short	            dest,
-    const short	            length,
+    const int	            dest,
+    const int	            length,
     const InsertSource    insertSource
 );
 
@@ -546,25 +546,25 @@ extern Boolean
 _DtTermPrimBufferSwapLines
 (
     const TermBuffer	    tb1,
-    const short	            row1,
+    const int	            row1,
     const TermBuffer	    tb2,
-    const short	            row2
+    const int	            row2
 );
 
 extern void
 _DtTermPrimBufferDeleteLine
 (
     const TermBuffer	    tb,
-    const short	            source,
-    const short	            length,
-    const short	            lastUsedRow
+    const int	            source,
+    const int	            length,
+    const int	            lastUsedRow
 );
 
 extern void
 _DtTermPrimBufferPadLine
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       newWidth
 );
 
@@ -572,7 +572,7 @@ extern void
 _DtTermPrimBufferPadLineWc
 (
     const TermBuffer  tb,
-    const short       row,
+    const int         row,
     const short       newWidth
 );
 
@@ -580,7 +580,7 @@ extern Boolean
 _DtTermPrimGetCharacterInfo
 (
     TermBuffer      tb,
-    short           row,
+    int             row,
     short           col,
     TermCharInfo    charInfo
 );
@@ -626,7 +626,7 @@ extern Boolean
 _DtTermPrimBufferTestLineWrapFlag
 (
     TermBuffer  tb,
-    short       row
+    int         row
 );
 
 /*
@@ -636,7 +636,7 @@ void
 _DtTermPrimBufferSetLineWrapFlag
 (
     TermBuffer  tb,
-    short       row,
+    int         row,
     Boolean     state
 );
 
@@ -647,7 +647,7 @@ extern TermLineSelection
 _DtTermPrimBufferGetInSelectionFlag
 (
     TermBuffer  tb,
-    short       row
+    int         row
 );
 
 /*
@@ -657,7 +657,7 @@ void
 _DtTermPrimBufferSetInSelectionFlag
 (
     TermBuffer  tb,
-    short       row,
+    int         row,
     TermLineSelection     state
 );
 
@@ -665,9 +665,9 @@ extern void
 _DtTermPrimBufferSetSelectLines
 (
     TermBuffer tb,
-    short beginRow,
+    int   beginRow,
     short beginCol,
-    short endRow,
+    int   endRow,
     short endCol
 );
 

@@ -72,7 +72,7 @@ typedef struct _termSelectInfoRec
     XmTextScanType       *scanArray;    /* possible values for scanType     */
     XmTextScanType        scanType;     /* line, word, character, all       */
     XtIntervalId          selectID;     /* AppTimeOut ID                    */
-    short                 rows;         /* rows,cols current buffer useful  */
+    int                 rows;         /* rows,cols current buffer useful  */
     short                 columns;      /* for converting position->row,col */
     XmTextPosition        anchor;       /* anchor for extending selecions   */
     XmTextPosition        begin;        /* upper left corner of selection   */

@@ -198,6 +198,12 @@ static XtActionsRec actionsList[] = {
 };
 
 #define	defaultColumns	80
+
+/* the most rows the term and history buffers may have together (saveLines
+ * beyond this is clipped; it is far more than the memory for that many
+ * lines would allow anyway)...
+ */
+#define	MAX_BUFFER_ROWS	(1L << 23)
 #define	defaultRows	24
 
 /* the resource list for Term... */
@@ -1542,7 +1548,10 @@ InitializeVerticalScrollBar(Widget w, Boolean initCallbacks)
 	return;
     }
 
-    /* update the scrollbar... */
+    /* update the scrollbar.  (The values are kept as ints in tpd: the
+     * short copies in the widget record overflow with a history of more
+     * than 32767 lines)...
+     */
     if (tw->term.verticalScrollBar) {
 	/* we can scroll the height of the history buffer and the
 	 * number of used rows less the protected areas...
@@ -1550,17 +1559,16 @@ InitializeVerticalScrollBar(Widget w, Boolean initCallbacks)
 	if (tpd->useHistoryBuffer) {
 #define	NO_SCROLL_REGION_HISTORY_SCROLL
 #ifdef	NO_SCROLL_REGION_HISTORY_SCROLL 
-	    tw->term.verticalScrollBarMaximum = tw->term.rows;
+	    tpd->sbMaximum = tw->term.rows;
 	    if ((tpd->scrollLockTopRow <= 0) &&
 		    (tpd->scrollLockBottomRow >= (tw->term.rows - 1))) {
-		tw->term.verticalScrollBarMaximum += tpd->lastUsedHistoryRow;
+		tpd->sbMaximum += tpd->lastUsedHistoryRow;
 	    }
 #else	/* NO_SCROLL_REGION_HISTORY_SCROLL */
-	    tw->term.verticalScrollBarMaximum = tw->term.rows +
-		    tpd->lastUsedHistoryRow;
+	    tpd->sbMaximum = tw->term.rows + tpd->lastUsedHistoryRow;
 #endif	/* NO_SCROLL_REGION_HISTORY_SCROLL */
 	} else {
-	    tw->term.verticalScrollBarMaximum = tpd->lastUsedRow +
+	    tpd->sbMaximum = tpd->lastUsedRow +
 		    tpd->scrollLockTopRow -
 		    (tw->term.rows - 1 - tpd->scrollLockBottomRow);
 
@@ -1570,53 +1578,50 @@ InitializeVerticalScrollBar(Widget w, Boolean initCallbacks)
 		/* add in a full screen (less one line and protected areas)
 		 * below the last used row...
 		 */
-		tw->term.verticalScrollBarMaximum += tw->term.rows - 1 -
+		tpd->sbMaximum += tw->term.rows - 1 -
 			tpd->scrollLockTopRow -
 			(tw->term.rows - 1 - tpd->scrollLockBottomRow);
 	    }
 	}
 
 	if (tpd->useHistoryBuffer) {
-	    tw->term.verticalScrollBarSliderSize = tw->term.rows;
+	    tpd->sbSliderSize = tw->term.rows;
 	} else {
-	    tw->term.verticalScrollBarSliderSize =
+	    tpd->sbSliderSize =
 		    tw->term.rows - tpd->scrollLockTopRow -
 		    (tw->term.rows - 1 - tpd->scrollLockBottomRow);
 	}
 
-	tw->term.verticalScrollBarPageIncrement =
-		tw->term.verticalScrollBarSliderSize;
+	tpd->sbPageIncrement = tpd->sbSliderSize;
 
 #ifdef	NO_SCROLL_REGION_HISTORY_SCROLL 
-	tw->term.verticalScrollBarValue = tpd->topRow;
+	tpd->sbValue = tpd->topRow;
 	if (tpd->useHistoryBuffer && (tpd->scrollLockTopRow <= 0) &&
 		(tpd->scrollLockBottomRow >= (tw->term.rows - 1))) {
-	    tw->term.verticalScrollBarValue += tpd->lastUsedHistoryRow;
+	    tpd->sbValue += tpd->lastUsedHistoryRow;
 	}
 #else	/* NO_SCROLL_REGION_HISTORY_SCROLL */
-	tw->term.verticalScrollBarValue = tpd->topRow + tpd->lastUsedHistoryRow;
+	tpd->sbValue = tpd->topRow + tpd->lastUsedHistoryRow;
 #endif	/* NO_SCROLL_REGION_HISTORY_SCROLL */
+	(void) _DtTermPrimNoteScrollBarValues(w);
 
 	i = 0;
 	(void) XtSetArg(arglist[i], XmNincrement, 1); i++;
 	(void) XtSetArg(arglist[i], XmNminimum, 0); i++;
-	(void) XtSetArg(arglist[i], XmNmaximum,
-		tw->term.verticalScrollBarMaximum); i++;
-	(void) XtSetArg(arglist[i], XmNpageIncrement,
-		tw->term.verticalScrollBarPageIncrement); i++;
-	(void) XtSetArg(arglist[i], XmNsliderSize,
-		tw->term.verticalScrollBarSliderSize); i++;
-	(void) XtSetArg(arglist[i], XmNvalue, tw->term.verticalScrollBarValue);
+	(void) XtSetArg(arglist[i], XmNmaximum, tpd->sbMaximum); i++;
+	(void) XtSetArg(arglist[i], XmNpageIncrement, tpd->sbPageIncrement);
 		i++;
+	(void) XtSetArg(arglist[i], XmNsliderSize, tpd->sbSliderSize); i++;
+	(void) XtSetArg(arglist[i], XmNvalue, tpd->sbValue); i++;
 	(void) XtSetValues(tw->term.verticalScrollBar, arglist, i);
 
 	Debug('b', fprintf(stderr,
 		"InitializeVerticalScrollBar: sb size=%d  min=%d  max=%d  value=%d  pginc=%d\n",
-		tw->term.verticalScrollBarSliderSize,
+		tpd->sbSliderSize,
 		0,
-		tw->term.verticalScrollBarMaximum,
-		tw->term.verticalScrollBarValue,
-		tw->term.verticalScrollBarPageIncrement));
+		tpd->sbMaximum,
+		tpd->sbValue,
+		tpd->sbPageIncrement));
     }
 }
 
@@ -1632,9 +1637,9 @@ InitOrResizeTermBuffer(Widget w)
     short			  newColumns;
     short			  newRows;
     short			  reqColumns;
-    short			  reqRows;
-    short			  newBufferRows = tpd->bufferRows;
-    short			  newHistoryBufferRows = tpd->historyBufferRows;
+    int				  reqRows;
+    int				  newBufferRows = tpd->bufferRows;
+    int				  newHistoryBufferRows = tpd->historyBufferRows;
     int				  linesNeeded;
     int				  historyLinesNeeded;
     int				  i1;
@@ -1670,7 +1675,8 @@ InitOrResizeTermBuffer(Widget w)
 	if (tpd->useHistoryBuffer) {
 	    if ((100 * (tpd->bufferRows + tpd->historyBufferRows) /
 		    newRows) < ((75 * tpd->bufferRowRatio) / 100)) {
-		newBufferRows = (tpd->bufferRowRatio * newRows) / 100;
+		newBufferRows = MIN(((long) tpd->bufferRowRatio * newRows) /
+			100, MAX_BUFFER_ROWS);
 		newHistoryBufferRows = newBufferRows - newRows;
 		newBufferRows = newRows;
 	    } else {
@@ -1680,7 +1686,8 @@ InitOrResizeTermBuffer(Widget w)
 	} else {
 	    if ((100 * tpd->bufferRows / newRows) <
 		    ((75 * tpd->bufferRowRatio) / 100)) {
-		newBufferRows = (tpd->bufferRowRatio * newRows) / 100;
+		newBufferRows = MIN(((long) tpd->bufferRowRatio * newRows) /
+			100, MAX_BUFFER_ROWS);
 	    }
 	}
 
@@ -1897,11 +1904,18 @@ InitOrResizeTermBuffer(Widget w)
 	 */
 	if (tw->term.saveLines && *tw->term.saveLines) {
 	    lines = strtol(tw->term.saveLines, &c, 0);
+	    /* (the row counts are ints: keep them well inside that)... */
+	    if (lines < 0) {
+		lines = 0;
+	    } else if (lines > MAX_BUFFER_ROWS) {
+		lines = MAX_BUFFER_ROWS;
+	    }
 	    if (c && (*c == 's')) {
 		/* in terms of screens... */
-		tpd->bufferRows = (lines + 1) * tw->term.rows;
+		tpd->bufferRows = MIN((lines + 1) * tw->term.rows,
+			MAX_BUFFER_ROWS);
 	    } else {
-		tpd->bufferRows = (lines + tw->term.rows);
+		tpd->bufferRows = MIN(lines + tw->term.rows, MAX_BUFFER_ROWS);
 	    }
 	} else {
 	    tpd->bufferRows = 2 * tw->term.rows;
@@ -4231,7 +4245,8 @@ PreeditDelete(
     DtTermPrimitiveWidget tw,
     XIMPreeditDrawCallbackStruct *call_data)
 {
-    short retcount, row, col, width;
+    short retcount, col, width;
+    int row;
     termChar *retchar;
 
     /*
