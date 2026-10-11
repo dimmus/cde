@@ -721,9 +721,15 @@ UpdateSomeEnough(
 {
    int i;
 
+   /*
+    * (A symbolic link changes with what it points to, which has no
+    * event here: deleting a file must also show a link to it as
+    * broken.  A full update checks the links again.)
+    */
    if (directory->wd <= 0 || !directory->ev_named ||
        directory->errnum != 0 || directory->modified_count == 0 ||
-       directory->modified_count > EV_NAMES_MAX(directory))
+       directory->modified_count > EV_NAMES_MAX(directory) ||
+       directory->has_links)
       return False;
 
    /* a change of "." or ".." also changes the path icons */
@@ -4009,6 +4015,13 @@ UpdateSomeProcess(
                                        directory->modified_list[i],
                                        IsToolBox));
    }
+
+   /* an entry was added or removed: "." changed too (as an update_all
+      would find) */
+   if (!TimespecEqual(&stat_buf.st_mtim, &directory->mtim))
+      FileDataBatchAdd(batch,
+                       ReadFileData2At(FileDataBatchNext(batch), dir_fd,
+                                       full_directory_name, ".", IsToolBox));
    FileDataBatchFlush(batch, False);
 
    TypeAttrCacheEnd();

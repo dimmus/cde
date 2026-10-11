@@ -5687,6 +5687,7 @@ MakeReuseList(
 		 XtSetArg (args[0], XmNdropSiteOperations, XmDROP_NOOP);
 		 XtRemoveAllCallbacks(w, XmNdropCallback);
 		 XtSetValues (w, args, 1);
+		 PlainDropSiteForget(w);   /* (a plain one, see SetHotRects) */
 #endif
 		 (*reuse_icons)[icon_count++] = w;
 	       }
