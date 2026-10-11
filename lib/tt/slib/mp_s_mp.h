@@ -111,9 +111,7 @@ class _Tt_s_mp : public _Tt_mp {
 	int				exit_main_loop;
 	int				unix_cred_chk_flag;
 	int				xfd;
-#ifdef OPT_UNIX_SOCKET_RPC
-	int				unix_fd;
-#endif
+	int				unix_fd;	// local RPC socket, or -1
 	int				fin;
 	int				fout;
 	int				in_file_scope(const _Tt_string &f);

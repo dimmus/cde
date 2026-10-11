@@ -146,6 +146,7 @@ _Tt_s_mp() : _Tt_mp()
 	_min_timeout = -1;
 	_next_procid_key = 0;
 	xfd = -1;
+	unix_fd = -1;
 	exit_main_loop = 0;
 	max_active_messages = 2000;
 	fin = 0;
@@ -230,15 +231,11 @@ init()
 		_active_fds->push(new _Tt_int_rec(xfd));
 		_active_fds_procids->push(_Tt_string("X"));
 	}
-#ifdef OPT_UNIX_SOCKET_RPC
-	/* XXX: UNIX_SOCKET */		
 	if (unix_fd != -1) {
 		// put in fd for local rpc connections
 		_active_fds->push(new _Tt_int_rec(unix_fd));
 		_active_fds_procids->push(_Tt_string("U"));
-	}		
-	/* XXX: UNIX_SOCKET */		
-#endif	// OPT_UNIX_SOCKET_RPC
+	}
 
 	return(TT_OK);
 }
@@ -552,7 +549,7 @@ install_otable(_Tt_otype_table_ptr &o)
 //
 // The _active_fds_procids list can contain two "pseudo-procids" that
 // are used to keep track of some special fds. These can be "U" for
-// the special unix socket fd (used if OPT_UNIX_SOCKET_RPC is defined)
+// the special local RPC socket fd (see mp_unix_socket.h)
 // that clients use to establish a unix socket rpc connection, and "X"
 // for the fd that represents the connection to our desktop session. 
 // See _Tt_s_mp::main_loop to see how they are used.
@@ -676,14 +673,13 @@ main_loop()
 							xfd = -2;
 							break;
 						}
-#ifdef OPT_UNIX_SOCKET_RPC
-					} else if ((0 - fds->val)==unix_fd) {
+					} else if (unix_fd != -1 &&
+						   (0 - fds->val)==unix_fd) {
 						// connection request
 						// for local rpc transport.
 
 						fds->val = unix_fd;
 						initial_s_session->u_rpc_init();
-#endif				// OPT_UNIX_SOCKET_RPC
 					} else {
 						// signalling channel
 						// became active for

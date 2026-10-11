@@ -55,28 +55,14 @@
 
 #include <X11/Xlib.h>     
 
-#ifdef OPT_UNIX_SOCKET_RPC
-#	include <sys/socket.h>
-#	include <sys/un.h>
-#	include "mp_rpc_server_utils.h"
-#endif // OPT_UNIX_SOCKET_RPC
+#include "mp/mp_unix_socket.h"
+#include "mp_rpc_server_utils.h"
 
 // Use the parent class (_Tt_session) for construction and destruction.
 _Tt_s_session::_Tt_s_session () {}
 
 _Tt_s_session::~_Tt_s_session () 
 {
-#ifdef OPT_UNIX_SOCKET_RPC
-	if (_socket_name.len()) {
-		// A UNIX domain socket that was bound to a pathname 
-		// and therefore must be removed by the owner when the session 
-		// server exits. This ensures that when the next session 
-		// server starts, it can choose the same pathname and bind
-		// to it. The pathname cannot refer to a file existing 
-		// on the system.
-		(void)unlink(_socket_name);
-	}
-#endif // OPT_UNIX_SOCKET_RPC
 }
 
 // 
@@ -90,65 +76,89 @@ _tt_xio_handler(Display * /* xdisp */)
 	return 0;
 }
 
-#ifdef OPT_UNIX_SOCKET_RPC
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
 
-// 
-// Utility routine to open a unix domain socket and bind it to the given
-// socket name.
-// 
-//  XXX: It would be more elegant to add unix domain support to the
-//  _Tt_stream_socket class rather than have these special routines for
-//  dealing with them.
-// 
-static int
-s_open_unix_socket(char *socket_name)
+// The local socket (see mp_unix_socket.h), removed again on exit by
+// the process that made it.
+static char	u_sock_path[sizeof(((struct sockaddr_un *)0)->sun_path)];
+static pid_t	u_sock_owner;
+
+static void
+s_remove_unix_socket()
 {
-	/* open a unix socket */
-	int			sock;
-	struct sockaddr_un	server_addr;
-	sock = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (sock < 0) {
-		_tt_syslog(0, LOG_ERR, "s_open_unix_socket(): socket(): %m");
-		return(-1);
+	if (u_sock_path[0] != 0 && getpid() == u_sock_owner) {
+		(void)unlink(u_sock_path);
+		u_sock_path[0] = 0;
 	}
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sun_family = AF_UNIX;
-	(void)unlink(socket_name);
-	strcpy(server_addr.sun_path, socket_name);
-#if defined(_AIX)
-        int servlen = strlen(server_addr.sun_path) + sizeof(server_addr.sun_fam\
-ily);
-        if (bind(sock, (struct sockaddr *)&server_addr,servlen) < 0) {
-#else
-	if (bind(sock, (struct sockaddr *)&server_addr,
-		 sizeof(struct sockaddr_un)) < 0) {
-#endif
-		return(-1);
-	}
-	if (listen(sock, 5) != 0) {
-		return(-1);
-	}
-
-	return(sock);
 }
 
+//
+// Opens the local socket for the session with the given pid and RPC
+// program number.  Returns the listening descriptor, or -1.
+//
+static int
+s_open_unix_socket(long pid, int program)
+{
+	struct sockaddr_un	server_addr;
+	static int		at_exit;
+	int			sock;
+
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sun_family = AF_UNIX;
+	if (! _tt_unix_socket_path(server_addr.sun_path,
+				   sizeof(server_addr.sun_path),
+				   pid, program, 1)) {
+		return -1;
+	}
+	sock = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+	if (sock < 0) {
+		return -1;
+	}
+	// A leftover of a ttsession that died with this pid and program
+	// number (in the user's own directory)
+	(void)unlink(server_addr.sun_path);
+	if (bind(sock, (struct sockaddr *)&server_addr,
+		 sizeof(server_addr)) != 0 ||
+	    listen(sock, SOMAXCONN) != 0) {
+		close(sock);
+		return -1;
+	}
+	strcpy(u_sock_path, server_addr.sun_path);
+	u_sock_owner = getpid();
+	if (! at_exit) {
+		atexit(s_remove_unix_socket);
+		at_exit = 1;
+	}
+	return sock;
+}
+
+#endif // _TT_HAVE_UNIX_SOCKET_RPC
+
 
 // 
-// Called in response to a client request for a new rpc connection. We
-// accept the connection on the unix socket and then use the standard
-// _Tt_rpc_server object, which acts accordingly if given an open file
-// descriptor in its constructor (see that method for more details) to
-// open the rpc connection.
+// Called in response to a client request for a new rpc connection on
+// the local socket.  We accept the connection, if it comes from our
+// user, and then use the standard _Tt_rpc_server object, which acts
+// accordingly if given an open file descriptor in its constructor (see
+// that method for more details) to open the rpc connection.
 // 
 void _Tt_s_session::
 u_rpc_init()
 {
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
 	int			msgsock;
+	uid_t			peer_uid;
+	pid_t			peer_pid;
 	_Tt_rpc_server_ptr	server_object;
 
-	//  connection request came in for the unix socket
-	msgsock = accept(_u_sock, (struct sockaddr *)0, 0);
+	msgsock = accept4(_tt_s_mp->unix_fd, (struct sockaddr *)0, 0,
+			  SOCK_CLOEXEC);
 	if (msgsock == -1) {
+		return;
+	}
+	if (! _tt_unix_socket_peer(msgsock, &peer_uid, &peer_pid) ||
+	    peer_uid != geteuid()) {
+		close(msgsock);
 		return;
 	}
 	server_object = new _Tt_rpc_server(_rpc_program,
@@ -158,8 +168,8 @@ u_rpc_init()
 	if (! server_object->init(_tt_service_rpc)) {
 		_tt_syslog(0, LOG_ERR, "u_rpc_init: server_object->init(): 0");
 	}	
+#endif // _TT_HAVE_UNIX_SOCKET_RPC
 }
-#endif // OPT_UNIX_SOCKET_RPC
 
 
 // 
@@ -270,14 +280,14 @@ s_init()
 		// session environment that we are in.
 
 		if ((status = advertise_address(seen_addr)) == TT_OK) {
-#ifdef OPT_UNIX_SOCKET_RPC
-			// open a unix domain socket for connection
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
+			// open the local socket for connection
 			// requests and set the unix_fd field in the
 			// _Tt_s_mp object to it so it can be added to
 			// the list of file descriptors polled.
-			_u_sock = s_open_unix_socket(local_socket_name());
-			_tt_s_mp->unix_fd = _u_sock;
-#endif	// OPT_UNIX_SOCKET_RPC
+			_tt_s_mp->unix_fd =
+				s_open_unix_socket((long)_pid, _rpc_program);
+#endif	// _TT_HAVE_UNIX_SOCKET_RPC
 			return(TT_OK);
 		} else {
 			if (status == TT_ERR_SESSION) {
@@ -626,4 +636,7 @@ unregister_rpc()
 	if (! _rpc_server.is_null()) {
 		_rpc_server->unset();
 	}
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
+	s_remove_unix_socket();
+#endif
 }

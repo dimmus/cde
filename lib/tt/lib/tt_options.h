@@ -37,8 +37,8 @@
  * This file controls any compilation-time options. The current set of
  * options is:
  * 
- * OPT_UNIX_SOCKET_RPC -- if defined then code to do rpc over unix
- *                        sockets is enabled (speeds up intra-system rpcs). 
+ * (RPC over a local AF_UNIX socket, formerly OPT_UNIX_SOCKET_RPC, is
+ * built where SO_PEERCRED is available; see mp/mp_unix_socket.h.)
  * 
  * OPT_TLI -- if defined then rpc code is compiled for the new
  *            transport-independent rpc

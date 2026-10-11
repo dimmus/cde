@@ -163,11 +163,6 @@ class _Tt_session : public _Tt_object {
 	uid_t				_server_uid;
 	_Tt_string			_type;
 	_Tt_desktop_ptr			_desktop;
-#ifdef OPT_UNIX_SOCKET_RPC
-	int				_u_sock;
-	char				*local_socket_name();
-	_Tt_string			_socket_name;
-#endif 			/* OPT_UNIX_SOCKET_RPC */
 
 	friend class _Tt_s_mp;
 	friend class _Tt_s_session;

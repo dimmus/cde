@@ -53,10 +53,7 @@
 #include "mp/mp_xdr_functions.h"
 #include <unistd.h>
 
-#ifdef OPT_UNIX_SOCKET_RPC
-#	include <sys/socket.h>
-#	include <sys/un.h>
-#endif // OPT_UNIX_SOCKET_RPC
+#include "mp/mp_unix_socket.h"
 
 
 _Tt_session::
@@ -92,78 +89,45 @@ _Tt_session::
 			}
 		}
 	}
-#ifdef OPT_UNIX_SOCKET_RPC
-	if (_is_server && _socket_name.len()) {
-		(void)unlink((char *)_socket_name);
-	}
-#endif
 }
 
 
 
-#ifdef OPT_UNIX_SOCKET_RPC
-// 
-// Returns the name of the socket file if the unix socket rpc option is
-// enabled. Note that the name should be unique for all sessions running
-// on the same machine so it has to be derived from the session id
-// (which has the required uniqueness properties).
-// 
-char * _Tt_session::
-local_socket_name()
-{
-#define SPRFX "/tmp/.TT"
-
-	if (_socket_name.len() == 0) {
-		char *sname = (char *)malloc(_id.len() + strlen(SPRFX) + 1); 
-		char *sc;
-
-		sprintf(sname,"%s%s", SPRFX, (char *)_id);
-		sc = sname;
-		while (*sc) {
-			if (*sc == ' ') {
-				*sc = '_';
-			}
-			sc++;
-		}
-		_socket_name = sname;
-		free((MALLOCTYPE *)sname);
-	}
-	
-	return((char *)_socket_name);
-}
-
-// 
-// Opens a connection to the unix socket bound to the given socket name.
-// If successful returns the fd for the connection. Otherwise, returns
-// -1. 
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
 //
-int
-c_open_unix_socket(char *socket_name)
+// Connects to the local socket of the ttsession with the given pid and
+// RPC program number (see mp_unix_socket.h).  Returns the connected
+// descriptor, or -1: no such socket, or not served by that ttsession
+// running as this user.
+//
+static int
+c_open_unix_socket(pid_t server_pid, int program)
 {
-	int			sock;
 	struct sockaddr_un	server_addr;
-	sock = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (sock < 0) {
-		_tt_syslog( 0, LOG_ERR, "c_open_unix_socket(): socket(): %m" );
-		return -1;
-	}
+	uid_t			peer_uid;
+	pid_t			peer_pid;
+	int			sock;
+
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, socket_name);
-#if defined(_AIX)
-        int servlen = strlen(server_addr.sun_path) + sizeof(server_addr.sun_fam\
-ily);
-        if (connect(sock, (sockaddr *)&server_addr, servlen) < 0) {
-#else
-	if (connect(sock, (sockaddr *)&server_addr, sizeof(sockaddr_un)) < 0) {
-#endif
-		return(-1);
+	if (! _tt_unix_socket_path(server_addr.sun_path,
+				   sizeof(server_addr.sun_path),
+				   (long)server_pid, program, 0)) {
+		return -1;
 	}
-
-	return(sock);
+	sock = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	if (sock < 0) {
+		return -1;
+	}
+	if (connect(sock, (sockaddr *)&server_addr, sizeof(server_addr)) != 0 ||
+	    ! _tt_unix_socket_peer(sock, &peer_uid, &peer_pid) ||
+	    peer_uid != geteuid() || peer_pid != server_pid) {
+		close(sock);
+		return -1;
+	}
+	return sock;
 }
-
-#endif // OPT_UNIX_SOCKET_RPC
+#endif // _TT_HAVE_UNIX_SOCKET_RPC
 
 
 //
@@ -262,33 +226,32 @@ client_session_init()
 		(void)set_id();
 	}
 
-#ifdef OPT_UNIX_SOCKET_RPC
-	if (_tt_global->get_local_host(lh)) {
-		// if we are in the same host as the server session
-		// then we attempt to connect to its advertised unix
-		// socket to set up an rpc connection. If we succeed
-		// then we set rpc_init_done to 1 to prevent a normal
-		// tcp rpc connection from being made.
-		if (lh->stringaddr() == _host->stringaddr()) {
-			_u_sock = c_open_unix_socket(local_socket_name());
-			if (_u_sock != -1) {
-				_rpc_client = new _Tt_rpc_client(_u_sock);
-				if (_rpc_client->init(lh, _rpc_program,
-						      _rpc_version,
-						      _server_uid,
-						      &_auth)) {
-					rpc_init_done = 1;
-					// Since we opened the fd ourselves,
-					// clnt_destroy won\'t close it
-					// unless we tell it it\'s OK.
-					clnt_control(_rpc_client->rpc_handle(),
-						     CLSET_FD_CLOSE,
-						     (char *) NULL);
-				}
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
+	// A session of this user on this host: try its local socket
+	// first (see mp_unix_socket.h).  Should the connection later
+	// need rebinding, _Tt_rpc_client::init() goes to TCP.
+	if (_server_uid == geteuid() &&
+	    _tt_global->get_local_host(lh) &&
+	    lh->stringaddr() == _host->stringaddr()) {
+		int u_sock = c_open_unix_socket(_pid, _rpc_program);
+
+		if (u_sock != -1) {
+			_rpc_client = new _Tt_rpc_client(u_sock);
+			if (_rpc_client->init(_host, _rpc_program,
+					      _rpc_version, _server_uid,
+					      _auth, 0)) {
+				rpc_init_done = 1;
+				// We opened the descriptor, so
+				// clnt_destroy() closes it only if
+				// told to.
+				clnt_control(_rpc_client->rpc_handle(),
+					     CLSET_FD_CLOSE, (char *)NULL);
+			} else {
+				close(u_sock);
 			}
 		}
 	}
-#endif	// OPT_UNIX_SOCKET_RPC
+#endif	// _TT_HAVE_UNIX_SOCKET_RPC
 	if (! rpc_init_done) {
 		_rpc_client = new _Tt_rpc_client();
 		if (! _rpc_client->init(_host, _rpc_program, _rpc_version,

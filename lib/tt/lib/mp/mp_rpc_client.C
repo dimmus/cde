@@ -71,6 +71,7 @@ extern "C" in_addr_t inet_addr(const char *);
 #include <sys/resource.h>
 #include <util/tt_global_env.h>
 #include <mp/mp_rpc_fns.h>
+#include <mp/mp_unix_socket.h>
 
 /* 
  * Constructs an rpc client. 
@@ -141,14 +142,13 @@ init(_Tt_host_ptr &host, int program, int version,
 		}
 		clnt_destroy(_client);
 		_client = (CLIENT *)0;
-		if (_own_socket) {
-			// clnt_destroy() closed the socket the RPC
-			// library opened for us.  Rebinding used to hand
-			// that stale descriptor number back to
-			// clnttcp_create(), which then talked RPC over
-			// whatever the number had been reused for.
-			_socket = RPC_ANYSOCK;
-		}
+		// clnt_destroy() closed the socket: the one the RPC
+		// library opened for us, or the local (AF_UNIX) one we
+		// gave it with CLSET_FD_CLOSE.  Rebinding used to hand
+		// that stale descriptor number back to clnttcp_create(),
+		// which then talked RPC over whatever the number had been
+		// reused for.  Rebind over TCP.
+		_socket = RPC_ANYSOCK;
 	}
 	optval = (_socket == RPC_ANYSOCK);
 	_own_socket = optval;
@@ -173,6 +173,25 @@ init(_Tt_host_ptr &host, int program, int version,
 	if (!inet_aton((char *)(_host->stringaddr()), &_server_addr.sin_addr))
 		return 0;
 
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
+	if (! optval) {
+		// A connected local socket (see mp_unix_socket.h):
+		// clnttcp_create() takes only TCP ones.
+		struct sockaddr_un	peer;
+		socklen_t		peer_len = sizeof(peer);
+		struct netbuf		svcaddr;
+
+		if (getpeername(_socket, (struct sockaddr *)&peer,
+				&peer_len) != 0) {
+			return 0;
+		}
+		svcaddr.maxlen = sizeof(peer);
+		svcaddr.len = peer_len;
+		svcaddr.buf = (char *)&peer;
+		_client = clnt_vc_create(_socket, &svcaddr, _program,
+					 _version, 4000, 4000);
+	} else
+#endif
 	_client = clnttcp_create(&_server_addr, _program,
 			         _version, &_socket, 4000, 4000);
 	if (_client == 0 && optval && _port != 0) {

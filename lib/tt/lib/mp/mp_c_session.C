@@ -48,11 +48,6 @@
 #include "util/tt_port.h"
 #include <unistd.h>
 #include <signal.h>
-
-#ifdef OPT_UNIX_SOCKET_RPC
-#	include <sys/socket.h>
-#	include <sys/un.h>
-#endif // OPT_UNIX_SOCKET_RPC
      
 // Use the parent class (_Tt_session) for construction and destruction.
 _Tt_c_session::_Tt_c_session () {}
