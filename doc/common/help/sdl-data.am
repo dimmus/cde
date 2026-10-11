@@ -4,11 +4,11 @@
 
 # install the common graphics files
 cmngraphdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/graphics
-dist_cmngraph_DATA = $(shell find common/graphics/*)
+dist_cmngraph_DATA = $(shell cd $(srcdir) && find common/graphics/*)
 
 # install the common/*.hf files
 hfdirdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)
-dist_hfdir_DATA = $(shell ls common/*.hf)
+dist_hfdir_DATA = $(shell cd $(srcdir) && ls common/*.hf)
 
 # Now, install any graphics assets found for each help section
 
@@ -18,77 +18,77 @@ dist_hfdir_DATA = $(shell ls common/*.hf)
 
 # Appmanager
 appmanagerdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Appmanager/graphics
-dist_appmanager_DATA = $(shell [ -d Appmanager/graphics ] && find Appmanager/graphics/* |grep -v /CDR)
+dist_appmanager_DATA = $(shell cd $(srcdir) && [ -d Appmanager/graphics ] && find Appmanager/graphics/* |grep -v /CDR)
 
 # AppBuilder
 appbuilderdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/AppBuilder/graphics
-dist_appbuilder_DATA = $(shell [ -d AppBuilder/graphics ] && find AppBuilder/graphics/* |grep -v /CDR)
+dist_appbuilder_DATA = $(shell cd $(srcdir) && [ -d AppBuilder/graphics ] && find AppBuilder/graphics/* |grep -v /CDR)
 
 # Calculator
 calculatordir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Calculator/graphics
-dist_calculator_DATA = $(shell [ -d Calculator/graphics ] && find Calculator/graphics/* |grep -v /CDR)
+dist_calculator_DATA = $(shell cd $(srcdir) && [ -d Calculator/graphics ] && find Calculator/graphics/* |grep -v /CDR)
 
 # Calendar
 calendardir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Calendar/graphics
-dist_calendar_DATA = $(shell [ -d Calendar/graphics ] && find Calendar/graphics/* |grep -v /CDR)
+dist_calendar_DATA = $(shell cd $(srcdir) && [ -d Calendar/graphics ] && find Calendar/graphics/* |grep -v /CDR)
 
 # CreatAct
 creatactdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/CreatAct/graphics
-dist_creatact_DATA = $(shell [ -d CreatAct/graphics ] && find CreatAct/graphics/* |grep -v /CDR)
+dist_creatact_DATA = $(shell cd $(srcdir) && [ -d CreatAct/graphics ] && find CreatAct/graphics/* |grep -v /CDR)
 
 # Filemgr
 filemgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Filemgr/graphics
-dist_filemgr_DATA = $(shell [ -d Filemgr/graphics ] && find Filemgr/graphics/* |grep -v /CDR)
+dist_filemgr_DATA = $(shell cd $(srcdir) && [ -d Filemgr/graphics ] && find Filemgr/graphics/* |grep -v /CDR)
 
 # FPanel
 fpaneldir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/FPanel/graphics
-dist_fpanel_DATA = $(shell [ -d FPanel/graphics ] && find FPanel/graphics/* |grep -v /CDR)
+dist_fpanel_DATA = $(shell cd $(srcdir) && [ -d FPanel/graphics ] && find FPanel/graphics/* |grep -v /CDR)
 
 # Help4Help
 help4helpdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Help4Help/graphics
-dist_help4help_DATA = $(shell [ -d Help4Help/graphics ] && find Help4Help/graphics/* |grep -v /CDR)
+dist_help4help_DATA = $(shell cd $(srcdir) && [ -d Help4Help/graphics ] && find Help4Help/graphics/* |grep -v /CDR)
 
 # Iconed
 iconeddir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Iconed/graphics
-dist_iconed_DATA = $(shell [ -d Iconed/graphics ] && find Iconed/graphics/* |grep -v /CDR)
+dist_iconed_DATA = $(shell cd $(srcdir) && [ -d Iconed/graphics ] && find Iconed/graphics/* |grep -v /CDR)
 
 # Infomgr
 infomgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Infomgr/graphics
-dist_infomgr_DATA = $(shell [ -d Infomgr/graphics ] && find Infomgr/graphics/* |grep -v /CDR)
+dist_infomgr_DATA = $(shell cd $(srcdir) && [ -d Infomgr/graphics ] && find Infomgr/graphics/* |grep -v /CDR)
 
 # Intromgr
 intromgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Intromgr/graphics
-dist_intromgr_DATA = $(shell [ -d Intromgr/graphics ] && find Intromgr/graphics/* |grep -v /CDR)
+dist_intromgr_DATA = $(shell cd $(srcdir) && [ -d Intromgr/graphics ] && find Intromgr/graphics/* |grep -v /CDR)
 
 # LibDtPrint
 libdtprintdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/LibDtPrint/graphics
-dist_libdtprint_DATA = $(shell [ -d LibDtPrint/graphics ] && find LibDtPrint/graphics/* |grep -v /CDR)
+dist_libdtprint_DATA = $(shell cd $(srcdir) && [ -d LibDtPrint/graphics ] && find LibDtPrint/graphics/* |grep -v /CDR)
 
 # Loginmgr
 loginmgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Loginmgr/graphics
-dist_loginmgr_DATA = $(shell [ -d Loginmgr/graphics ] && find Loginmgr/graphics/* |grep -v /CDR)
+dist_loginmgr_DATA = $(shell cd $(srcdir) && [ -d Loginmgr/graphics ] && find Loginmgr/graphics/* |grep -v /CDR)
 
 # Mailer
 mailerdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Mailer/graphics
-dist_mailer_DATA = $(shell [ -d Mailer/graphics ] && find Mailer/graphics/* |grep -v /CDR)
+dist_mailer_DATA = $(shell cd $(srcdir) && [ -d Mailer/graphics ] && find Mailer/graphics/* |grep -v /CDR)
 
 # Printmgr
 printmgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Printmgr/graphics
-dist_printmgr_DATA = $(shell [ -d Printmgr/graphics ] && find Printmgr/graphics/* |grep -v /CDR)
+dist_printmgr_DATA = $(shell cd $(srcdir) && [ -d Printmgr/graphics ] && find Printmgr/graphics/* |grep -v /CDR)
 
 # PrnSetup
 prnsetupdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/PrnSetup/graphics
-dist_prnsetup_DATA = $(shell [ -d PrnSetup/graphics ] && find PrnSetup/graphics/* |grep -v /CDR)
+dist_prnsetup_DATA = $(shell cd $(srcdir) && [ -d PrnSetup/graphics ] && find PrnSetup/graphics/* |grep -v /CDR)
 
 # Stylemgr
 stylemgrdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Stylemgr/graphics
-dist_stylemgr_DATA = $(shell [ -d Stylemgr/graphics ] && find Stylemgr/graphics/* |grep -v /CDR)
+dist_stylemgr_DATA = $(shell cd $(srcdir) && [ -d Stylemgr/graphics ] && find Stylemgr/graphics/* |grep -v /CDR)
 
 # Terminal
 terminaldir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Terminal/graphics
-dist_terminal_DATA = $(shell [ -d Terminal/graphics ] && find Terminal/graphics/* |grep -v /CDR)
+dist_terminal_DATA = $(shell cd $(srcdir) && [ -d Terminal/graphics ] && find Terminal/graphics/* |grep -v /CDR)
 
 # Textedit
 texteditdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)/Textedit/graphics
-dist_textedit_DATA = $(shell [ -d Textedit/graphics ] && find Textedit/graphics/* |grep -v /CDR)
+dist_textedit_DATA = $(shell cd $(srcdir) && [ -d Textedit/graphics ] && find Textedit/graphics/* |grep -v /CDR)
 
