@@ -111,6 +111,8 @@
 #include "SmXSMP.h"
 #include "SmDB.h"
 #include "SmProp.h"
+#include "../dtlogin/startup-trace.h"
+#include "../dtlogin/startup-trace.h"
 
 #include <X11/Xlibint.h>
 
@@ -711,6 +713,7 @@ BeginWM( void )
      */
 
     StartMsgServer();
+    cde_startup_trace("dtsession", "msgserver");
 }
 
 /*
@@ -3788,6 +3791,15 @@ StartLocalClient (
     int	   execStatus;
     char   clientMessage[MAXPATHLEN + 30];
     char   **tmpEnv, **ppchar;
+
+    if (cde_startup_tracing())
+    {
+	const char *base = strrchr(program, '/');
+	char what[64];
+
+	snprintf(what, sizeof what, "client-fork %s", base ? base + 1 : program);
+	cde_startup_trace("dtsession", what);
+    }
 	   
     /*
      * Fork and exec the client process
@@ -3993,6 +4005,8 @@ ForkWM( void )
     int	   execStatus;
 
      strcpy(tmpExecWmFile,CDE_INSTALLATION_TOP "/bin/dtwm");
+
+    cde_startup_trace("dtsession", "wm-fork");
 
     /*
      * Fork and exec the client process
@@ -4293,6 +4307,7 @@ WaitForWMManaging( void )
         XtRemoveTimeOut(timerId);
     XtRemoveEventHandler(smGD.topLevelWid, 0, True,
                          (XtEventHandler)HandleWMClientMessage, NULL);
+    cde_startup_trace("dtsession", "wm-managing");
 }
 
 static void 
@@ -4362,6 +4377,7 @@ WaitForWM( void )
     
     if (!wmTimeout)
         XtRemoveTimeOut(wmTimerId);
+    cde_startup_trace("dtsession", wmTimeout ? "wm-timeout" : "wm-ready");
     wmWaitStarted = False;
     if (pollId != (XtIntervalId) 0)
         XtRemoveTimeOut(pollId);

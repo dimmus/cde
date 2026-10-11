@@ -264,6 +264,19 @@ setEnv( char **e, char *name, char *value )
     return new;
 }
 
+/*
+ * Pass CDE_STARTUP_TRACE on (see startup-trace.h) when dtlogin has it.
+ */
+char **
+setTraceEnv( char **e )
+{
+    char	*value = getenv ("CDE_STARTUP_TRACE");
+
+    if (value && *value)
+	e = setEnv (e, "CDE_STARTUP_TRACE", value);
+    return e;
+}
+
 void
 freeEnv (char **env)
 {

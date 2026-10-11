@@ -67,6 +67,7 @@
 #endif
 # include	"dm.h"
 # include	"vgmsg.h"
+# include	"startup-trace.h"
 
 #ifdef sun
 #include <sys/kbio.h>
@@ -147,6 +148,9 @@ main( int argc, char **argv )
     mode_t	oldumask;
     struct passwd   *p;		/* pointer to  passwd structure (pwd.h)	   */
     
+    cde_startup_trace_clock();
+    cde_startup_trace("dtlogin", "start");
+
     /*
      *  make sure at least world write access is disabled...
      */

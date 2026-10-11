@@ -137,6 +137,25 @@ XCOMM Variables must be explicitly exported
 XCOMM 
 set +a
 
+XCOMM
+XCOMM CDE_STARTUP_TRACE stamps (see startup-trace.h in the dtlogin sources):
+XCOMM "<time> <pid> <component> <event> realtime" appended to the file it
+XCOMM names, which dtlogin creates; ksh93 formats the time without a
+XCOMM process.  Not through a symbolic link: this may run as root.
+XCOMM
+cde_startup_trace()
+{
+  [ -n "$CDE_STARTUP_TRACE" ] && [ -f "$CDE_STARTUP_TRACE" ] && \
+    [ ! -h "$CDE_STARTUP_TRACE" ] || return 0
+  case "$KSH_VERSION" in
+    *" 93"*|*"A 20"*) cst_t=$(printf '%(%s.%N)T' now) ;;
+    *) cst_t=$(date +%s.%N 2>/dev/null) ;;
+  esac
+  printf '%s %s %s %s realtime\n' "$cst_t" "$$" "$1" "$2" \
+    >> "$CDE_STARTUP_TRACE" 2>/dev/null
+}
+cde_startup_trace Xsession start
+
 XCOMM ##########################################################################
 XCOMM 
 XCOMM   Initialize session startup logging
@@ -439,6 +458,7 @@ $(<"$2")"
       Log "$syntax_errors"
     fi
   fi
+  cde_startup_trace Xsession profile
 
 
 XCOMM ##########################################################################
@@ -474,6 +494,7 @@ XCOMM ##########################################################################
       done
     fi
   done
+  cde_startup_trace Xsession xsession.d
 
 
 XCOMM ##########################################################################
@@ -559,6 +580,7 @@ StartFirst()
   else
     SetFirst startup dtstart_session        # get desktop session client
     StartFirst dtstart_hello                # start desktop hello client
+    cde_startup_trace Xsession hello
     HASH
     HASH Under ksh93, dtsearchpath also writes its output to a cache file,
     HASH as a script that hands it back only while what it depends on is
@@ -585,6 +607,7 @@ StartFirst()
       StartFirst dtstart_searchpath eval    # setup desktop search paths
     fi
     unset dtsp_out
+    cde_startup_trace Xsession searchpath
 
     SetFirst tooltalk dtstart_ttsession     # get tooltalk client
     SetFirst dtdbcache dtstart_dtdbcache    # get dtdbcache client
@@ -595,6 +618,7 @@ StartFirst()
     fi
 #endif
     StartFirst dtstart_appgather            # setup session applications
+    cde_startup_trace Xsession appgather
   fi
 
   HASH 
@@ -643,6 +667,7 @@ StartFirst()
   HASH for the next session; dtdbcache rebuilds it only if the database
   HASH changed.
   HASH
+  cde_startup_trace Xsession exec-session
   export DT=true;
   case ${SHELL##*/} in
       sh | bash) $SHELL -c "$source_profile; \

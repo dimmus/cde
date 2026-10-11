@@ -904,6 +904,8 @@ extern char ** setEnv(
 			char **e,
 			char *name,
 			char *value) ;
+extern char ** setTraceEnv(
+			char **e) ;
 extern unsigned char * ReadCatalog(
                         int  set_num,
                         int  msg_num,

@@ -54,6 +54,9 @@ libresource_a_CFLAGS = $(AM_CFLAGS) \
 
 dtgreet_SOURCES = vgcallback.c vglogo.c vgmain.c vgutil.c vglang.c
 
+# CDE_STARTUP_TRACE stamps; dtsession, dthello and dtdbcache include it too.
+noinst_HEADERS = startup-trace.h
+
 dtchooser_SOURCES = chooser.c dtchooser.c vglogo.c vgutil.c vgcallback.c \
 		    vglang.c
 

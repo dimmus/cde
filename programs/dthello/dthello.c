@@ -82,6 +82,7 @@
 
 #include <Dt/EnvControlP.h>
 #include "dthello.h"
+#include "../dtlogin/startup-trace.h"
 
 #ifndef NO_MESSAGE_CATALOG
 # define GETMESSAGE(set, number, string)    GetMessage(set, number, string)
@@ -243,6 +244,7 @@ main (int argc, char **argv)
     int         missing_count;
     XFontSetExtents *extents;
 
+    cde_startup_trace("dthello", "start");
     XtSetLanguageProc( NULL, NULL, NULL );
 
     /*
@@ -659,6 +661,11 @@ main (int argc, char **argv)
 	    DrawBox();
 	    PaintText();
 	    XFlush(dpy);
+	    if (cde_startup_tracing())
+	    {
+		XSync(dpy, False);
+		cde_startup_trace("dthello", "painted");
+	    }
 	    Done = False;
 	}
     } /* end while */
@@ -705,6 +712,7 @@ main (int argc, char **argv)
 	     * this is our cue...exit, stage left
 	     */
 	    alarm(0);
+	    cde_startup_trace("dthello", "exit");
 	    break;
 	}
 	else

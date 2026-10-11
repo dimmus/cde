@@ -63,6 +63,7 @@
 
 # include "dm.h"
 # include "vgmsg.h"
+# include "startup-trace.h"
 # include <signal.h>
 # include <X11/Xatom.h>
 # include <X11/Xmu/Error.h>
@@ -429,7 +430,9 @@ ManageSession( struct display *d )
 	while (greet.name == NULL) {
 	    SetHourGlassCursor(dpy, root);
 	    LoadXloginResources (d);
+	    cde_startup_trace ("dtlogin", "xlogin-resources");
 	    SetupDisplay(d, dpy);
+	    cde_startup_trace ("dtlogin", "xsetup-done");
 	    ApplyFontPathMods(d, dpy);
 	    (void)XSetErrorHandler(ErrorHandler);
 	    RunGreeter(d, &greet, &verify);
@@ -504,6 +507,7 @@ ManageSession( struct display *d )
 		d->startup);
 	SessionExit (d, OBEYSESS_DISPLAY);
     }
+    cde_startup_trace ("dtlogin", "xstartup-done");
 
 #ifdef sun
     if ( solaris_setdevperm(d->gettyLine, verify.uid, verify.gid) == 0 ) {
@@ -1784,6 +1788,7 @@ StartClient( struct verify_info *verify, struct display *d, int *pidp )
 	return 0;
     default:
 	Debug ("StartSession(): fork succeeded, pid = %d\n", pid);
+	cde_startup_trace ("dtlogin", "session-fork");
 	*pidp = pid;
 
 	return 1;
@@ -2172,6 +2177,7 @@ RunGreeter( struct display *d, struct greet_info *greet,
             if((path = getenv("OPENWINHOME")) != NULL)
                 env = setEnv(env, "OPENWINHOME", path);
 #endif
+	    env = setTraceEnv(env);
 
 	    Debug ("Greeter environment:\n");
 	    printEnv(env);
@@ -2226,6 +2232,7 @@ RunGreeter( struct display *d, struct greet_info *greet,
 
 	default:
 	    Debug ("Greeter started\n");
+	    cde_startup_trace ("dtlogin", "greeter-fork");
 
 	    close(response[1]); /* Close write end of response pipe */
 	    close(request[0]); /* Close read end of request pipe */
@@ -2790,6 +2797,8 @@ ManageGreeter( struct display *d, struct greet_info *greet,
        /*
         * General transitions.
         */
+        if (state->vf == VF_OK)
+          cde_startup_trace ("dtlogin", "auth-ok");
         switch (state->vf)
         {
           case VF_OK:           state->id = GREET_STATE_TERMINATEGREET; break; 

@@ -87,6 +87,7 @@
 #include	<Dt/EnvControlP.h>
 #include	"vg.h"
 #include	"vgmsg.h"
+#include	"startup-trace.h"
 #include 	<Dt/MenuButton.h>
 
 
@@ -345,6 +346,28 @@ static
  ***************************************************************************/
 
 
+/*
+ * CDE_STARTUP_TRACE: "first-expose" once the login dialog is painted,
+ * that is when the events that came with its first Expose are handled
+ * (the work procedure runs when the queue is empty) and the server has
+ * done the drawing.
+ */
+static Boolean
+TraceFirstPaint( XtPointer client_data )
+{
+    XSync(dpyinfo.dpy, False);
+    cde_startup_trace("dtgreet", "first-expose");
+    return True;
+}
+
+static void
+TraceFirstExpose( Widget w, XtPointer client_data, XEvent *event,
+		  Boolean *continue_to_dispatch )
+{
+    XtRemoveEventHandler(w, ExposureMask, False, TraceFirstExpose, NULL);
+    XtAppAddWorkProc(XtWidgetToApplicationContext(w), TraceFirstPaint, NULL);
+}
+
 int 
 main( int argc, char **argv )
 {
@@ -358,6 +381,7 @@ main( int argc, char **argv )
     vg_TRACE_EXECUTION("--------------------- main ------------------------");
 #endif /* VG_TRACE */
 
+    cde_startup_trace("dtgreet", "start");
     setlocale(LC_ALL, "");
     XtSetLanguageProc( NULL, NULL, NULL );
     langenv = getenv("LANG");
@@ -612,6 +636,11 @@ main( int argc, char **argv )
      * seconds on every boot and logout.)
      */
      XtAddInput(0, (XtPointer)XtInputReadMask, RequestCB, NULL);
+
+    if (cde_startup_tracing())
+	XtAddEventHandler(login_text, ExposureMask, False, TraceFirstExpose,
+			  NULL);
+    cde_startup_trace("dtgreet", "main-loop");
    
 #ifdef VG_TRACE
     vg_TRACE_EXECUTION("main:  entering XtMainLoop ...");

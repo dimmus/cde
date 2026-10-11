@@ -40,6 +40,25 @@ XCOMM
 XCOMM This script is run as root after the user is verified...
 XCOMM
 
+XCOMM
+XCOMM CDE_STARTUP_TRACE stamps (see startup-trace.h in the dtlogin sources):
+XCOMM "<time> <pid> <component> <event> realtime" appended to the file it
+XCOMM names, which dtlogin creates; ksh93 formats the time without a
+XCOMM process.  Not through a symbolic link: this may run as root.
+XCOMM
+cde_startup_trace()
+{
+  [ -n "$CDE_STARTUP_TRACE" ] && [ -f "$CDE_STARTUP_TRACE" ] && \
+    [ ! -h "$CDE_STARTUP_TRACE" ] || return 0
+  case "$KSH_VERSION" in
+    *" 93"*|*"A 20"*) cst_t=$(printf '%(%s.%N)T' now) ;;
+    *) cst_t=$(date +%s.%N 2>/dev/null) ;;
+  esac
+  printf '%s %s %s %s realtime\n' "$cst_t" "$$" "$1" "$2" \
+    >> "$CDE_STARTUP_TRACE" 2>/dev/null
+}
+cde_startup_trace Xstartup start
+
 XCOMM dtdbcache file's directory should match
 XCOMM _DTDTSMMTEMPDIR in DtSvc/DtUtil1/DtsMM.h
 XCOMM
@@ -88,4 +107,5 @@ utmp_flag=UTMP_FLAG
 utmp_flag=''
 #endif
 
+cde_startup_trace Xstartup done
 exec SESSREG -a $wtmp_flag $utmp_flag -l $DISPLAY $USER

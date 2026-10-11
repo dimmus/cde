@@ -80,12 +80,14 @@
 #include "SrvPalette.h"
 #include "SmProtocol.h"
 #include "SmXSMP.h"
+#include "../dtlogin/startup-trace.h"
 
 /*
  * Internal Functions
  */
 static void StopAll(int i);
 static int RegisterX11ScreenSaver(Display *display, int *ssEventType);
+static void TraceClientMaps(void);
 
 /*
  * Internal Defines
@@ -99,6 +101,66 @@ static int RegisterX11ScreenSaver(Display *display, int *ssEventType);
 #ifdef CSRG_BASED
 #define SECURE_SYS_PATH "/etc/master.passwd"
 #endif
+
+/*
+ * CDE_STARTUP_TRACE: "client-mapped <window>" for each top-level window
+ * (a window manager frame, an icon...) mapped during the first
+ * TRACE_MAPS_FOR ms of the session, so that the trace shows when the
+ * first and the last restored client appeared.  MapNotify has no time
+ * stamp, so it is stamped when dtsession handles it: every wait of the
+ * startup (for the window manager, for clients) dispatches events.
+ */
+#define TRACE_MAPS_FOR	30000	/* ms */
+
+static XtEventDispatchProc traceMapPrevDispatcher;
+static Boolean traceMapHadMask;
+
+static Boolean
+TraceMapDispatcher(XEvent *event)
+{
+    if (event->type == MapNotify &&
+	event->xmap.event == RootWindow(smGD.display, smGD.screen) &&
+	!event->xmap.override_redirect)
+    {
+	char what[48];
+
+	snprintf(what, sizeof what, "client-mapped 0x%lx",
+		 (unsigned long) event->xmap.window);
+	cde_startup_trace("dtsession", what);
+    }
+    return (*traceMapPrevDispatcher)(event);
+}
+
+static void
+TraceClientMapsEnd(XtPointer client_data, XtIntervalId *id)
+{
+    Window root = RootWindow(smGD.display, smGD.screen);
+    XWindowAttributes attr;
+
+    (void) XtSetEventDispatcher(smGD.display, MapNotify,
+				traceMapPrevDispatcher);
+    if (!traceMapHadMask && XGetWindowAttributes(smGD.display, root, &attr))
+	XSelectInput(smGD.display, root,
+		     attr.your_event_mask & ~SubstructureNotifyMask);
+}
+
+static void
+TraceClientMaps(void)
+{
+    Window root = RootWindow(smGD.display, smGD.screen);
+    XWindowAttributes attr;
+
+    if (!cde_startup_tracing() ||
+	!XGetWindowAttributes(smGD.display, root, &attr))
+	return;
+    traceMapHadMask = (attr.your_event_mask & SubstructureNotifyMask) != 0;
+    if (!traceMapHadMask)
+	XSelectInput(smGD.display, root,
+		     attr.your_event_mask | SubstructureNotifyMask);
+    traceMapPrevDispatcher = XtSetEventDispatcher(smGD.display, MapNotify,
+						  TraceMapDispatcher);
+    XtAppAddTimeOut(smGD.appCon, TRACE_MAPS_FOR, TraceClientMapsEnd, NULL);
+}
 
 
 
@@ -139,6 +201,7 @@ main (int argc, char **argv)
     struct sigaction            stopvec;
     char		 	*lang;
 
+    cde_startup_trace("dtsession", "start");
     setlocale( LC_ALL, "" );
     XtSetLanguageProc( NULL, NULL, NULL );
 
@@ -280,6 +343,7 @@ main (int argc, char **argv)
       */
       RestoreSessionResources(smGD.resourcePath);
     }
+    cde_startup_trace("dtsession", "resources");
 
     /*
      * Set up to catch SIGTERM
@@ -316,6 +380,7 @@ main (int argc, char **argv)
 
     srvDisplay = XtOpenDisplay(smGD.appCon, NULL, argv[0], SM_RESOURCE_CLASS,
                                  NULL, 0, &argc, argv);
+    cde_startup_trace("dtsession", "display-open");
 
     /*
      * Initialize XSMP
@@ -371,6 +436,7 @@ main (int argc, char **argv)
      * Start up the color server
      */
     InitializeDtcolor(srvDisplay, smGD.sessionType);
+    cde_startup_trace("dtsession", "colors");
 
     /*
      * AFTER the colors are set up - create the top level widget
@@ -433,6 +499,8 @@ main (int argc, char **argv)
     {
 	RestoreIndependentResources();
     }
+
+    TraceClientMaps();
 
     /*
      * Now restore the rest of the clients and the settings
@@ -497,6 +565,7 @@ main (int argc, char **argv)
                       True, ProcessEvent, NULL);
 
     smGD.smState = READY;
+    cde_startup_trace("dtsession", "ready");
 
     /* Make the lock dialogs ahead, when idle */
     ScheduleLockDialogs();

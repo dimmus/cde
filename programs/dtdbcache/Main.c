@@ -40,6 +40,7 @@ cc -g -o Main Main.c -I/usr/dt/include -I/usr/openwin/include -R/export2/build/S
 #include <Dt/UserMsg.h>
 #include <Dt/EnvControlP.h>
 #include <bms/XeUserMsg.h>
+#include "../dtlogin/startup-trace.h"
 
 static void DbCacheCreateError(Widget toplevel);
 static void DbCacheCreateErrorCallback(Widget, XtPointer, XtPointer);
@@ -86,6 +87,7 @@ main(int argc, char **argv)
 		 * Building the cache needs neither the X display nor the
 		 * toolkit: skip XtAppInitialize() and DtAppInitialize().
 		 */
+		cde_startup_trace("dtdbcache", "start");
 		DtProgName = argv[0];
 		if (!InitCache())
 		{
@@ -97,6 +99,7 @@ main(int argc, char **argv)
 			  "Couldn't create the Desktop Action/DataTypes Database.\n\
 Check disk space and/or permissions.\n");
 		}
+		cde_startup_trace("dtdbcache", "exit");
 		exit(0);
 	}
 

@@ -60,6 +60,7 @@
 #endif
 # include	"dm.h"
 # include	"vgmsg.h"
+# include	"startup-trace.h"
 
 static int receivedUsr1;
 
@@ -212,6 +213,7 @@ StartServerOnce( struct display *d )
 	break;
     }
     Debug ("Server started. Process ID = %d\n", pid);
+    cde_startup_trace ("dtlogin", "server-exec");
     d->serverPid = pid;
     if (serverPause ((unsigned) d->openDelay, pid, d, probe))
 	return FALSE;
@@ -409,6 +411,10 @@ serverPause( unsigned t, int serverPid, struct display *d, int probe )
     if (serverPauseRet) {
 	Debug ("Server died\n");
 	LogError(ReadCatalog(MC_LOG_SET,MC_LOG_SRV_DIED,MC_DEF_LOG_SRV_DIED));
+    } else {
+	if (receivedUsr1)
+	    cde_startup_trace ("dtlogin", "sigusr1");
+	cde_startup_trace ("dtlogin", "server-ready");
     }
     return serverPauseRet;
 }
@@ -509,6 +515,7 @@ WaitForServer( struct display *d )
 		(void) signal (SIGALRM, SIG_DFL);
 		Debug ("After XOpenDisplay()\n");
 		if (dpy) {
+		    cde_startup_trace ("dtlogin", "display-open");
 		    if (d->displayType.location == Foreign)
 			GetRemoteAddress (d, ConnectionNumber (dpy));
 		    RegisterCloseOnFork (ConnectionNumber (dpy));

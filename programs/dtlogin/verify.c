@@ -400,6 +400,8 @@ userEnv(
 	if (d->displayType.location != Local)
 	  env = setEnv (env, XFORCEINTERNET, "True");
 
+	env = setTraceEnv(env);
+
         if (d->environStr && strlen(d->environStr) > 0)
 	  env = parseEnv(env, d->environStr);
 
@@ -565,6 +567,8 @@ systemEnv( struct display *d, char *user, char *home )
     if (getEnv (env, "OPENWINHOME") == NULL) 
       env = setEnv(env, "OPENWINHOME", "/usr/openwin");
 #endif
+
+    env = setTraceEnv(env);
 
     return env;
 }

@@ -85,6 +85,7 @@
 
 #include	"vg.h"
 #include	"vgmsg.h"
+#include	"startup-trace.h"
 
 
 /***************************************************************************
@@ -1155,6 +1156,8 @@ RequestCB(
 #ifdef VG_TRACE
       vg_TRACE_EXECUTION("main:  got REQUEST_OP_EXIT ...");
 #endif /* VG_TRACE */
+      /* dtlogin sends it only once the user is authenticated */
+      cde_startup_trace("dtgreet", "auth-ok");
       RespondExitCB(NULL, NULL, NULL);
       break;
 
@@ -1502,6 +1505,7 @@ RespondChallengeCB(
   XtSetSensitive(help_button, False);
 
   textdata = GetLoginTextPtr(login_text);
+  cde_startup_trace("dtgreet", textdata->bEcho ? "enter-name" : "enter-password");
 
  /*
   * Get username and password. Username is obtained from widget
