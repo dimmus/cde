@@ -1693,49 +1693,150 @@ static void ScanStatusCB(
 
 
 /************************************************************************
- * Function: VolListBuild
+ * Volume scan jobs
  *
- *     Frees the old list and builds a new one by scanning the
- *     help directories for volumes and adding the associated
- *     volume information used for searching.
- *
+ * The first search of all volumes in a search dialog scans the help
+ * directories for volumes and opens each to get its title and index
+ * (VolListBuild).  That scan now runs a volume at a time in the search
+ * work procedure (DoBackgroundSearchWP), so the dialog keeps drawing,
+ * shows the count of volumes found, and Stop works while it runs; the
+ * search starts when it is complete.  A stopped scan carries on with the
+ * next all-volumes search.  What needs the list complete at once (the
+ * volume selection dialog) completes a running scan first, and the
+ * list it builds is the one the synchronous scan always built.
  ************************************************************************/
-static void VolListBuild(
+typedef struct _VolScanJob {
+    struct _VolScanJob     *next;
+    _DtHelpGlobSearchStuff *srch;	/* the search it is for */
+    _DtHelpFileScan         scan;
+    XmFontList              origFontList;
+    Boolean                 mod;	/* was the font list changed? */
+    Boolean                 searchStatus;
+    Boolean                 displayStatus;
+    Boolean                 selectedOnly;
+} VolScanJob;
+
+static VolScanJob * VolScanJobs = NULL;
+
+static VolScanJob * VolScanJobOf(
+          _DtHelpGlobSearchStuff * srch)
+{
+    VolScanJob * job;
+
+    for (job = VolScanJobs; NULL != job; job = job->next)
+       if (job->srch == srch) return job;
+    return NULL;
+}
+
+static void VolScanJobUnlink(
+          VolScanJob * job)
+{
+    VolScanJob ** prev;
+
+    for (prev = &VolScanJobs; NULL != *prev; prev = &((*prev)->next))
+       if (*prev == job)
+       {
+          *prev = job->next;
+          break;
+       }
+    free(job);
+}
+
+/* starts a scan of the help directories into the volume list */
+static VolScanJob * VolListBuildBegin(
           DtHelpDialogWidget hw,
           Boolean               searchStatus,
           Boolean               displayStatus,
           Boolean               selectedVolumesOnly)
 {
-    Boolean mod = False;	/* the scan only ORs into it */
-    XmFontList origFontList;
-
-    /* turn on hour glass */
-    _DtHelpTurnOnHourGlass(XtParent(hw->help_dialog.srch.srchForm));
-     if (hw->help_dialog.srch.selectionDlg)
-        _DtHelpTurnOnHourGlass(XtParent(hw->help_dialog.srch.selectionDlg));
+    VolScanJob * job;
 
     StatusLabelUpdate(hw,SCANNING_STATUS,True,0);
-     
-    origFontList = hw->help_dialog.srch.volTitlesFontList;
+
+    job = (VolScanJob *) calloc(1, sizeof(VolScanJob));
+    if (NULL == job) return NULL;
+
+    job->srch          = &hw->help_dialog.srch;
+    job->origFontList  = hw->help_dialog.srch.volTitlesFontList;
+    job->mod           = False;
+    job->searchStatus  = searchStatus;
+    job->displayStatus = displayStatus;
+    job->selectedOnly  = selectedVolumesOnly;
 
     /* and rescan the volumes for the new list */
-   _DtHelpFileListScanPaths( &hw->help_dialog.srch.volListHead,
-                     &hw->help_dialog.srch.volTitlesFontList,&mod,
+    job->scan = _DtHelpFileListScanBegin( &hw->help_dialog.srch.volListHead,
+                     &hw->help_dialog.srch.volTitlesFontList,&job->mod,
                      DtHelpVOLUME_TYPE, _DtHelpFileSuffixList, False, 
                      GetVolumeInfoCB,hw->help_dialog.help.pDisplayArea,
 /* sysPathCompare */ _DtHELP_FILE_NAME, 
 /*otherPathCompare*/ _DtHELP_FILE_NAME|_DtHELP_FILE_TIME| _DtHELP_FILE_IDSTR, 
 /* sortBy */         _DtHELP_FILE_TITLE, ScanStatusCB, (XtPointer)hw);
-  
-    /* if new fonts added to list, add them to the resultList */
-    if (mod)
+    if (NULL == job->scan)
     {
-        MergeFontListIntoWidgetFonts( 
-              hw->help_dialog.srch.resultList,
-              hw->help_dialog.srch.volTitlesFontList);
-
-        if (origFontList) XmFontListFree(origFontList);
+       free(job);
+       return NULL;
     }
+
+    job->next = VolScanJobs;
+    VolScanJobs = job;
+    return job;
+}
+
+/*
+ * scans for (at most) the next max_files volumes; True when complete.
+ * The volumes found so far have their volume info (as a complete scan
+ * gives it to all) so that the list can be used while the scan waits.
+ */
+static Boolean VolListBuildStep(
+          DtHelpDialogWidget hw,
+          VolScanJob *       job,
+          int                max_files)
+{
+    Boolean          done;
+    _DtHelpFileList  file;
+
+    done = _DtHelpFileListScanStep(job->scan, max_files);
+
+    for (file = hw->help_dialog.srch.volListHead;
+         NULL != file;
+         file = _DtHelpFileListGetNext(file,file) )
+       if (NULL == file->clientData)
+          AddVolInfoToFile(file, job->searchStatus, job->displayStatus,
+                                 job->selectedOnly);
+    return done;
+}
+
+/* ends a scan, complete or not (merge: the dialog's widgets still exist) */
+static void VolListBuildEnd(
+          DtHelpDialogWidget hw,
+          VolScanJob *       job,
+          Boolean            merge)
+{
+    _DtHelpFileListScanEnd(job->scan);
+
+    /* if new fonts added to list, add them to the resultList */
+    if (job->mod)
+    {
+        if (merge)
+            MergeFontListIntoWidgetFonts( 
+                  hw->help_dialog.srch.resultList,
+                  hw->help_dialog.srch.volTitlesFontList);
+
+        if (job->origFontList) XmFontListFree(job->origFontList);
+    }
+
+    VolScanJobUnlink(job);
+}
+
+/* the end of a complete scan */
+static void VolListBuildFinish(
+          DtHelpDialogWidget hw,
+          VolScanJob *       job,
+          Boolean               searchStatus,
+          Boolean               displayStatus,
+          Boolean               selectedVolumesOnly)
+{
+    VolListBuildEnd(hw, job, True);
 
     /* Add on the Vol info and (T,F) allow search on all volumes */
     AddVolInfoToList(hw->help_dialog.srch.volListHead, 
@@ -1744,6 +1845,40 @@ static void VolListBuild(
     hw->help_dialog.srch.volScanDone = True;
 
     StatusLabelUpdate(hw,BLANK_STATUS,True,0);
+}
+
+/************************************************************************
+ * Function: VolListBuild
+ *
+ *     Frees the old list and builds a new one by scanning the
+ *     help directories for volumes and adding the associated
+ *     volume information used for searching.  Completes a scan
+ *     the search work procedure has begun.
+ *
+ ************************************************************************/
+static void VolListBuild(
+          DtHelpDialogWidget hw,
+          Boolean               searchStatus,
+          Boolean               displayStatus,
+          Boolean               selectedVolumesOnly)
+{
+    VolScanJob * job;
+
+    /* turn on hour glass */
+    _DtHelpTurnOnHourGlass(XtParent(hw->help_dialog.srch.srchForm));
+     if (hw->help_dialog.srch.selectionDlg)
+        _DtHelpTurnOnHourGlass(XtParent(hw->help_dialog.srch.selectionDlg));
+
+    job = VolScanJobOf(&hw->help_dialog.srch);
+    if (NULL == job)
+       job = VolListBuildBegin(hw, searchStatus, displayStatus,
+                                   selectedVolumesOnly);
+    if (NULL != job)
+    {
+       (void) VolListBuildStep(hw, job, -1);
+       VolListBuildFinish(hw, job, searchStatus, displayStatus,
+                                   selectedVolumesOnly);
+    }
 
     /* turn off hour glass */
     _DtHelpTurnOffHourGlass(XtParent(hw->help_dialog.srch.srchForm));
@@ -1752,7 +1887,7 @@ static void VolListBuild(
 }
 
 
-
+
 #if 0 || defined(DEBUG)	/* for debug, set to 1 */
 /************************************************************************
  * Function: OutputVolInfo()
@@ -2068,6 +2203,13 @@ static void PrepSearchSourceData(
         if (    False == hw->help_dialog.srch.volScanDone
              || NULL == hw->help_dialog.srch.volListHead)
         {
+           /* scanned in the search work procedure, which then ends
+              the preparation (PrepAllVolumesScanned) */
+           hw->help_dialog.srch.volLeftCnt = 0;
+           if (   NULL != VolScanJobOf(&hw->help_dialog.srch)
+               || NULL != VolListBuildBegin(hw,True,True,False))
+              return;                     /* RETURN: scan in work proc */
+
            /* Add on the Vol info; (T,T,F) search, display, all */
            VolListBuild(hw,True,True,False);
         }
@@ -2149,6 +2291,28 @@ static void PrepSearchSourceData(
 }
 
 
+/************************************************************************
+ * Function: PrepAllVolumesScanned()
+ *
+ *	The end of PrepSearchSourceData() for all volumes, once the
+ *	volume scan is complete.
+ *
+ ************************************************************************/
+static void PrepAllVolumesScanned(
+    DtHelpDialogWidget hw)
+{
+     /* (T,T,F,F): enable search,enable display,no 0 hits,for all vols */
+     SetVolStatus(hw->help_dialog.srch.volListHead,True,True,False,False);
+
+     /* get num volumes to process */
+     hw->help_dialog.srch.volLeftCnt = 
+             CountSelectedVolumes(hw->help_dialog.srch.volListHead,True);
+
+     /* empty the results list */
+     XmUpdateDisplay(hw->help_dialog.srch.resultList);
+}
+
+
 /************************************************************************
  * Function: CloseSearchCB()
  *
@@ -3010,6 +3174,20 @@ static Boolean DoBackgroundSearchWP(
    DtHelpDialogWidget hw = (DtHelpDialogWidget) clientData;
   _DtHelpFileEntry curFile;
   _DtHelpGlobSrchVol * curVol = NULL;
+  VolScanJob * job = VolScanJobOf(&hw->help_dialog.srch);
+
+  /* first the scan for volumes, a volume per call */
+  if (   NULL != job
+      && _DtHelpGlobSrchAllVolumes == hw->help_dialog.srch.srchSources)
+  {
+     if (VolListBuildStep(hw, job, 1))
+     {
+        /* Add on the Vol info; (T,T,F) search, display, all */
+        VolListBuildFinish(hw, job, True, True, False);
+        PrepAllVolumesScanned(hw);
+     }
+     return False;              /* RETURN: False ==> continue processing */
+  }
   
   if ( 0 == hw->help_dialog.srch.volLeftCnt ) 
      goto searchComplete;                                  /* GOTO: done! */
@@ -5247,6 +5425,18 @@ void  _DtHelpGlobSrchCleanAndClose(
        _DtHelpGlobSearchStuff * srch,
        Boolean               destroy)
 {
+    VolScanJob * job = VolScanJobOf(srch);
+
+    /* a scan for volumes still to complete ends here */
+    if (NULL != job)
+    {
+       /* srch is in the help widget's instance record */
+       DtHelpDialogWidget hw = (DtHelpDialogWidget) ((char *) srch -
+                     XtOffsetOf(DtHelpDialogWidgetRec, help_dialog.srch));
+
+       VolListBuildEnd(hw, job, destroy ? False : True);
+    }
+
     /* close conversion context */
     _DtHelpCeIconvClose(&srch->iconv3Context);
   

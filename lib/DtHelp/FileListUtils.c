@@ -204,99 +204,6 @@ Boolean _DtHelpFileIsSameP(
 
 
 
-/*****************************************************************************
- * Function:   ScanDirForFiles
- *
- *  scan a directory looking for files with a matching suffix
- *  returns number of files found in this directory
- *
- *****************************************************************************/
-static int ScanDirForFiles(
-            char *         dirpath,
-            const char *   suffixList[],
-            _DtHelpFileList * in_out_list,
-            XmFontList *   io_fontList,
-            Boolean *      ret_mod,
-            int            foundFilesCnt,
-            _DtHelpFileInfoProc infoProc,
-            XtPointer      pDisplayArea,
-            int            compareFlags,
-            int            sortFlags,
-            _DtHelpFileScanProcCB scanProc,
-            XtPointer      clientData)
-{
-    int     count = 0;
-    char    fullName [MAXPATHLEN + 2];
-    char   *ptr;
-    DIR    *pDir;
-    struct dirent *result;
-    _Xreaddirparams dirEntryBuf;
-
-    (void) dirEntryBuf;	/* unused unless XTHREADS */
-
-    /* open the directory */
-    pDir = opendir (dirpath);
-    if (pDir == NULL) return 0;                        /* RETURN */
-
-    /* build the pathname */
-    snprintf(fullName, sizeof(fullName), "%s%s", dirpath, DirSlashStr);
-    ptr = fullName + strlen (fullName);
-
-    /*
-     * Scan through the files looking for matching suffixes
-     */
-    while ((result = _XReaddir(pDir, dirEntryBuf)) != NULL) {
-        const char * matchedSuffix;
-        char * ext;
-
-	/* Skip over any "." and ".." entries. */
-	if ((strcmp(result->d_name, ".") == 0) ||
-	    (strcmp(result->d_name, "..") == 0))
-	  continue;
-
-        /* get working values */
-	ext = GetExtension (result->d_name);
-        matchedSuffix = "";      /* default (==>no suffix to match) */
-
-        /* try to match with a suffix, if specified */
-        if (NULL != suffixList)
-        {
-          const char * * pSuffix;
-          matchedSuffix = NULL;
-          for (pSuffix = suffixList; 
-               NULL != *pSuffix && NULL == matchedSuffix; 
-               pSuffix++ )
-          {
-            if (strcmp(ext,*pSuffix) == 0)
-              matchedSuffix = *pSuffix;
-          }
-        }
-
-        /* and a match is found */
-	if ( NULL != matchedSuffix ) 
-	{
-           Boolean mod = False;	/* not set if no title is made */
-
-           /* then generate the full path and add to the list */
-	   strcpy (ptr, result->d_name);
-	   if (_DtHelpFileListAddFile(in_out_list,io_fontList,&mod,
-                  fullName,ptr,infoProc,compareFlags,sortFlags,pDisplayArea))
-           {
-              count++;
-              if (scanProc) (*scanProc)(count + foundFilesCnt,clientData);
-           }
-           *ret_mod |= mod;        /* accumulate mods */
-	}
-    } /* while more entries */
-
-    /* close the directory stream */
-    closedir(pDir);
-
-    return count;
-}
-
-
-
 /******************************************************************************
  * Function:  _DtHelpFileListGetMatch ()
  *
@@ -547,6 +454,333 @@ Boolean _DtHelpFileListAddFile (
 
 
 /******************************************************************************
+ * Incremental scan of the help search paths
+ *
+ * _DtHelpFileListScanBegin starts a scan, _DtHelpFileListScanStep adds
+ * (at most) the next 'max_files' files found and says whether the scan
+ * is complete, _DtHelpFileListScanEnd frees the scan and returns the
+ * count of files added.  The files are found and added in the same order
+ * as _DtHelpFileListScanPaths always did (which is now these three
+ * calls), so that a caller can spread a scan over work procedures.
+ * The search path strings are shared: a step leaves them as it found
+ * them.
+ *****************************************************************************/
+struct _DtHelpFileScanRec {
+    _DtHelpFileList	 *in_out_list;
+    XmFontList		 *io_fontList;
+    Boolean		 *ret_mod;
+    char		 *type;
+    const char		**suffixList;
+    _DtHelpFileInfoProc	  infoProc;
+    XtPointer		  pDisplayArea;
+    int			  sysPathCompareFlags;
+    int			  otherPathCompareFlags;
+    int			  sortFlags;
+    _DtHelpFileScanProcCB scanProc;
+    XtPointer		  clientData;
+
+    char		 *paths[_DtHELP_FILE_NUM_PATHS];
+    char		 *loc;
+    int			  curPathIndex;	/* path being scanned */
+    char		 *curPath;	/* next subpath in it */
+    Boolean		  subpathLeft;	/* is there a next subpath? */
+    int			  compareFlags;
+    char		**scannedPaths;
+    int			  scannedPathsCnt;
+
+    DIR			 *pDir;		/* directory being read */
+    char		  fullName[MAXPATHLEN + 2];
+    char		 *namePtr;	/* where the file name goes */
+    int			  dirCount;	/* files added from this directory */
+    int			  foundFilesCnt;
+    Boolean		  done;
+};
+
+/*
+ * the next directory to read, opened; False when no path is left.
+ */
+static Boolean
+ScanNextDir (
+    _DtHelpFileScan scan)
+{
+    char *ptr;
+    char *pathName;
+    struct stat status;
+
+    for (;;)
+      {
+	/*
+	 * the next path?  (each path that is set has at least one
+	 * subpath, possibly empty)
+	 */
+	while (False == scan->subpathLeft)
+	  {
+	    if (++scan->curPathIndex >= _DtHELP_FILE_NUM_PATHS)
+		return False;
+
+	    scan->curPath     = scan->paths[scan->curPathIndex];
+	    scan->subpathLeft = (NULL != scan->curPath) ? True : False;
+
+	    /* set the comparison flags */
+	    /* This enables implementation of different policies for
+	       listing files that are found, e.g. only list the first file
+	       of a given name found in the SYS search path, while listing
+	       same named files that have different times & ids in the
+	       USER PATH. */
+	    scan->compareFlags = scan->sysPathCompareFlags;
+	    if (_DtHELP_FILE_SYS_PATH != scan->curPathIndex)
+		scan->compareFlags = scan->otherPathCompareFlags;
+	  }
+
+	/* look for next subpath separator and insert and EOS if found */
+	ptr = NULL;
+	if (_DtHelpCeStrchr(scan->curPath,PathSeparator,MB_CUR_MAX,&ptr)==0)
+	    *ptr = EOS;
+
+	/* generate the (directory) path using all the variables
+	   and fix it up to remove the unwanted stuff involving the filename*/
+	pathName = _DtHelpCeExpandPathname(scan->curPath,
+				NULL, scan->type, NULL, scan->loc, NULL, 0);
+	if (pathName)
+	  {
+	    char * slashptr;
+
+	    if (_DtHelpCeStrrchr(pathName,DirSlashStr,MB_CUR_MAX,&slashptr)==0)
+		slashptr[0] = EOS;
+	  }
+
+	/* restore the subpath separator and advance past it */
+	if (ptr) *ptr++ = *PathSeparator;
+	scan->curPath     = ptr;
+	scan->subpathLeft = (ptr && *ptr) ? True : False;
+
+	/* if its a directory; scan for matching files in it */
+	if (     pathName != NULL
+	      && *pathName != EOS
+	      && access (pathName, R_OK | X_OK) == 0
+	      && stat (pathName, &status) == 0
+	      && S_ISDIR(status.st_mode))        /* a dir */
+	  {
+	    int i;
+
+	    /* check that we haven't already scanned it */
+	    for ( i=0; i<scan->scannedPathsCnt; i++ )
+		if (strcmp(scan->scannedPaths[i],pathName) == 0) break;
+
+	    /* scan it if haven't already */
+	    if ( i == scan->scannedPathsCnt )
+	      {
+		/* add to list of scanned */
+		scan->scannedPaths = (char **) XtRealloc(
+				(char *)scan->scannedPaths,
+				(scan->scannedPathsCnt+1) * sizeof(char *) );
+		scan->scannedPaths[scan->scannedPathsCnt++] = strdup(pathName);
+
+		scan->pDir = opendir (pathName);
+		if (NULL != scan->pDir)
+		  {
+		    /* build the pathname */
+		    snprintf(scan->fullName, sizeof(scan->fullName), "%s%s",
+						pathName, DirSlashStr);
+		    scan->namePtr  = scan->fullName + strlen (scan->fullName);
+		    scan->dirCount = 0;
+		    free (pathName);
+		    return True;
+		  }
+	      }
+	  }
+
+	if (pathName) free (pathName);
+      }
+}
+
+/******************************************************************************
+ * Function: _DtHelpFileScan _DtHelpFileListScanBegin ()
+ *
+ * Parameters:	as _DtHelpFileListScanPaths
+ *
+ * Returns:	the scan, or NULL if out of memory
+ *****************************************************************************/
+_DtHelpFileScan _DtHelpFileListScanBegin (
+        _DtHelpFileList * in_out_list,
+        XmFontList *   io_fontList,
+        Boolean *      ret_mod,
+	char *         type,
+        const char *   suffixList[],
+        Boolean        searchHomeDir,
+        _DtHelpFileInfoProc infoProc,
+        XtPointer      pDisplayArea,
+        int            sysPathCompareFlags,
+        int            otherPathCompareFlags,
+        int            sortFlags,
+        _DtHelpFileScanProcCB scanProc,
+        XtPointer      clientData)
+{
+    _DtHelpFileScan scan;
+
+    scan = (_DtHelpFileScan) calloc(1, sizeof(struct _DtHelpFileScanRec));
+    if (NULL == scan)
+	return NULL;
+
+    scan->in_out_list           = in_out_list;
+    scan->io_fontList           = io_fontList;
+    scan->ret_mod               = ret_mod;
+    scan->type                  = type;
+    scan->suffixList            = suffixList;
+    scan->infoProc              = infoProc;
+    scan->pDisplayArea          = pDisplayArea;
+    scan->sysPathCompareFlags   = sysPathCompareFlags;
+    scan->otherPathCompareFlags = otherPathCompareFlags;
+    scan->sortFlags             = sortFlags;
+    scan->scanProc              = scanProc;
+    scan->clientData            = clientData;
+
+    /* get the search paths */
+    _DtHelpFileGetSearchPaths( scan->paths, searchHomeDir );
+
+    /* get the locale */
+    scan->loc = _DtHelpGetLocale();
+    if (NULL == scan->loc || EOS == scan->loc[0])
+	scan->loc = strdup(LANG_C_STR);
+
+    /* zero found */
+    if (scanProc) (*scanProc)(0,clientData);
+
+    /* the first path is selected by the first step */
+    scan->curPathIndex = -1;
+    scan->curPath      = NULL;
+    scan->subpathLeft  = False;
+    return scan;
+}
+
+/******************************************************************************
+ * Function: Boolean _DtHelpFileListScanStep (_DtHelpFileScan scan,
+ *						int max_files)
+ *
+ * Parameters:	scan		the scan
+ *		max_files	how many files to add at most (-1: all)
+ *
+ * Returns:	True when the scan is complete
+ *
+ * Purpose:	Scan for (at most) the next 'max_files' files with matching
+ *		suffixes, adding them to the list.
+ *****************************************************************************/
+Boolean _DtHelpFileListScanStep (
+        _DtHelpFileScan scan,
+        int             max_files)
+{
+    struct dirent *result;
+    _Xreaddirparams dirEntryBuf;
+
+    (void) dirEntryBuf;	/* unused unless XTHREADS */
+
+    while (False == scan->done && 0 != max_files)
+      {
+	if (NULL == scan->pDir && ScanNextDir(scan) == False)
+	  {
+	    scan->done = True;
+	    break;
+	  }
+
+	/*
+	 * Scan through the files looking for matching suffixes
+	 */
+	while ((result = _XReaddir(scan->pDir, dirEntryBuf)) != NULL) {
+	    const char * matchedSuffix;
+	    char * ext;
+
+	    /* Skip over any "." and ".." entries. */
+	    if ((strcmp(result->d_name, ".") == 0) ||
+		(strcmp(result->d_name, "..") == 0))
+	      continue;
+
+	    /* get working values */
+	    ext = GetExtension (result->d_name);
+	    matchedSuffix = "";      /* default (==>no suffix to match) */
+
+	    /* try to match with a suffix, if specified */
+	    if (NULL != scan->suffixList)
+	    {
+	      const char * * pSuffix;
+	      matchedSuffix = NULL;
+	      for (pSuffix = scan->suffixList;
+		   NULL != *pSuffix && NULL == matchedSuffix;
+		   pSuffix++ )
+	      {
+		if (strcmp(ext,*pSuffix) == 0)
+		  matchedSuffix = *pSuffix;
+	      }
+	    }
+
+	    /* and a match is found */
+	    if ( NULL != matchedSuffix )
+	    {
+	       Boolean mod = False;	/* not set if no title is made */
+
+	       /* then generate the full path and add to the list */
+	       snprintf(scan->namePtr,
+			sizeof(scan->fullName) - (scan->namePtr - scan->fullName),
+			"%s", result->d_name);
+	       if (_DtHelpFileListAddFile(scan->in_out_list,scan->io_fontList,
+			  &mod,scan->fullName,scan->namePtr,scan->infoProc,
+			  scan->compareFlags,scan->sortFlags,
+			  scan->pDisplayArea))
+	       {
+		  scan->dirCount++;
+		  if (scan->scanProc)
+		      (*scan->scanProc)(scan->dirCount + scan->foundFilesCnt,
+							scan->clientData);
+	       }
+	       *scan->ret_mod |= mod;        /* accumulate mods */
+
+	       if (max_files > 0 && --max_files == 0)
+		   break;
+	    }
+	} /* while more entries */
+
+	if (NULL == result)
+	  {
+	    /* close the directory stream */
+	    closedir(scan->pDir);
+	    scan->pDir = NULL;
+	    scan->foundFilesCnt += scan->dirCount;
+	    scan->dirCount = 0;
+	  }
+      }
+
+    return scan->done;
+}
+
+/******************************************************************************
+ * Function: int _DtHelpFileListScanEnd (_DtHelpFileScan scan)
+ *
+ * Returns:	count of files the scan added to the list
+ *
+ * Purpose:	Free the scan, complete or not.
+ *****************************************************************************/
+int _DtHelpFileListScanEnd (
+        _DtHelpFileScan scan)
+{
+    int count;
+
+    if (NULL == scan)
+	return 0;
+
+    if (NULL != scan->pDir)
+	closedir(scan->pDir);
+
+    /* free all scanned paths */
+    while ( scan->scannedPathsCnt-- > 0 )
+	XtFree(scan->scannedPaths[scan->scannedPathsCnt]);
+    XtFree((char *)scan->scannedPaths);
+
+    XtFree(scan->loc);
+    count = scan->foundFilesCnt + scan->dirCount;
+    free(scan);
+    return count;
+}
+
+/******************************************************************************
  * Function: int _DtHelpFileListScanPaths ()
  *
  * Parameters:
@@ -578,115 +812,15 @@ int _DtHelpFileListScanPaths (
         _DtHelpFileScanProcCB scanProc,
         XtPointer      clientData)
 {
-    char *loc;
-    char *ptr;
-    char *pathName;
-    struct stat status;
-    char *curPath;
-    int   curPathIndex;
-    int   foundFilesCnt;
-    int   compareFlags;
-    char * paths[_DtHELP_FILE_NUM_PATHS];
-    char ** scannedPaths = NULL;
-    int     scannedPathsCnt = 0;
+    _DtHelpFileScan scan;
 
-    /* get the search paths */
-    _DtHelpFileGetSearchPaths( paths, searchHomeDir );
+    scan = _DtHelpFileListScanBegin(in_out_list, io_fontList, ret_mod, type,
+			suffixList, searchHomeDir, infoProc, pDisplayArea,
+			sysPathCompareFlags, otherPathCompareFlags, sortFlags,
+			scanProc, clientData);
+    if (NULL == scan)
+	return -1;
 
-    /* get the locale */
-    loc = _DtHelpGetLocale();
-    if (NULL == loc || EOS == loc[0]) loc = strdup(LANG_C_STR);
-
-    /* zero found */
-    if (scanProc) (*scanProc)(0,clientData);
-
-    /* outer loop is once for each path */
-    foundFilesCnt = 0;
-    for ( curPathIndex = 0;
-          curPathIndex < _DtHELP_FILE_NUM_PATHS; 
-          curPathIndex++ )
-    {
-       curPath = paths[curPathIndex];
-       if (NULL == curPath) continue;
-
-       /* set the comparison flags */
-       /* This enables implementation of different policies for
-          listing files that are found, e.g. only list the first file
-          of a given name found in the SYS search path, while listing
-          same named files that have different times & ids in the
-          USER PATH. */
-       compareFlags = sysPathCompareFlags;
-       if (_DtHELP_FILE_SYS_PATH != curPathIndex) 
-          compareFlags = otherPathCompareFlags;
-    
-       /* find the files in that path */
-       do
-       {
-          char * slashptr;
-          /* look for next subpath separator and insert and EOS if found */
-	  if (_DtHelpCeStrchr(curPath,PathSeparator,MB_CUR_MAX,&ptr)==0)
-	      *ptr = EOS;
-
-          /* generate the (directory) path using all the variables 
-             and fix it up to remove the unwanted stuff involving the filename*/
-	  pathName = _DtHelpCeExpandPathname(curPath, 
-                                     NULL, type, NULL, loc, NULL, 0);
-          if(   pathName 
-             && _DtHelpCeStrrchr(pathName,DirSlashStr,MB_CUR_MAX,&slashptr) == 0)
-             slashptr[0] = EOS; 
-
-          /* restore the subpath separator and advance past it */
-	  if (ptr) *ptr++ = *PathSeparator;
-
-          /* if its a directory; scan for matching files in it */
-	  if (     pathName != NULL 
-                && *pathName != EOS 
-                && access (pathName, R_OK | X_OK) == 0 
-                && stat (pathName, &status) == 0
-		&& S_ISDIR(status.st_mode))        /* a dir */
-          {
-              int i;
-              /* check that we haven't already scanned it */
-              for ( i=0; i<scannedPathsCnt; i++ )
-                 if (strcmp(scannedPaths[i],pathName) == 0) break;
-
-              /* scan it if haven't already */
-              if ( i == scannedPathsCnt )
-              {
-                 foundFilesCnt += ScanDirForFiles(
-                                    pathName,suffixList,
-                                    in_out_list,io_fontList,ret_mod,
-                                    foundFilesCnt,infoProc,pDisplayArea,
-                                    compareFlags,sortFlags,scanProc,clientData);
-
-                 /* add to list of scanned */
-                 scannedPaths = (char **) XtRealloc((char *)scannedPaths,
-                                        (scannedPathsCnt+1) * sizeof(char *) );
-                 scannedPaths[scannedPathsCnt++] = strdup(pathName);
-              }  /* if haven' scanned already */
-          }  /* if a directory */
-#if 0
-          else
-          {
-             printf("Unknown dir: %s\n", pathName);
-             printf("Access: %d, stat: %d, IS_DIR: %d, mode: %x\n",
-                access (pathName, R_OK | X_OK),
-                stat (pathName, &status),
-		S_ISDIR(status.st_mode),
-		status.st_mode);
-          }
-#endif
-
-	  if (pathName) free (pathName);
-	  curPath = ptr;
-       } while (curPath && *curPath); /* while more subpaths */
-   }  /* for all paths */
-
-   /* free all scanned paths */
-   while ( scannedPathsCnt-- > 0 ) XtFree(scannedPaths[scannedPathsCnt]);
-   XtFree((char *)scannedPaths);
-
-   XtFree(loc);
-   return foundFilesCnt;
+    (void) _DtHelpFileListScanStep(scan, -1);
+    return _DtHelpFileListScanEnd(scan);
 }
-

@@ -116,6 +116,28 @@ Boolean _DtHelpFileIsSameP(
 _DtHelpFileList _DtHelpFileListGetNext (
         _DtHelpFileList fileListHead,
         _DtHelpFileList curFile);
+/* an incremental scan (see FileListUtils.c) */
+typedef struct _DtHelpFileScanRec * _DtHelpFileScan;
+
+_DtHelpFileScan _DtHelpFileListScanBegin (
+        _DtHelpFileList * in_out_list,
+        XmFontList *      io_fontList,
+        Boolean *         ret_mod,
+        char *            type,
+        const char *      suffixList[],
+        Boolean           searchHomeDir,
+        _DtHelpFileInfoProc infoProc,
+        XtPointer           pDisplayArea,
+        int               sysPathCompareFlags,
+        int               otherPathCompareFlags,
+        int               sortFlags,
+        _DtHelpFileScanProcCB scanProc,
+        XtPointer         clientData);
+Boolean _DtHelpFileListScanStep (
+        _DtHelpFileScan   scan,
+        int               max_files);
+int _DtHelpFileListScanEnd (
+        _DtHelpFileScan   scan);
 int _DtHelpFileListScanPaths (
         _DtHelpFileList * in_out_list,
         XmFontList *      io_fontList,
