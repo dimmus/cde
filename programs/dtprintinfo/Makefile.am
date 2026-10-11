@@ -13,6 +13,14 @@ AM_CPPFLAGS = $(CDE_CPPFLAGS) -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./ob
 
 dtprintinfo_LDADD = $(LIBHELP) $(LIBSVC) $(XMLIB) $(XTLIB) $(XPMLIB) $(X11LIB)
 
+# libcups for the queue list, queue states and jobs (objects/PrintObj/Cups.C),
+# built in when cups-config is found; without it (or with
+# "make DTPRINTINFO_CUPS_LIBS=") lpstat and lpq are run.  configure does
+# not look for CUPS (GNU make syntax, as in ../dtksh/Makefile.am).
+DTPRINTINFO_CUPS_LIBS := $(if $(shell type cups-config 2>/dev/null),-lcups)
+AM_CPPFLAGS += $(if $(DTPRINTINFO_CUPS_LIBS),-DHAVE_LIBCUPS=1 $(shell cups-config --cflags 2>/dev/null))
+dtprintinfo_LDADD += $(DTPRINTINFO_CUPS_LIBS)
+
 UTIL_SRC = util/Invoke.C util/Invoke.h util/Process.C util/Process.h
 
 LIBUI_SRC = libUI/BaseUI.C libUI/BaseUI.h libUI/MotifUI/Application.C	\
@@ -39,6 +47,7 @@ LIBUI_SRC = libUI/BaseUI.C libUI/BaseUI.h libUI/MotifUI/Application.C	\
 	libUI/MotifUI/Icon.c libUI/MotifUI/WorkArea.c
 
 OBJ_SRC = objects/BaseObj.C objects/BaseObj.h				\
+	objects/PrintObj/Cups.C objects/PrintObj/Cups.h			\
 	objects/PrintObj/ParseJobs.C objects/PrintObj/PrintSubSys.C	\
 	objects/PrintObj/ParseJobs.h objects/PrintObj/PrintSubSys.h	\
 	objects/PrintObj/PrintJob.C objects/PrintObj/Queue.C		\

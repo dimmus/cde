@@ -48,6 +48,7 @@
 
 // Command Execution header
 #include "Invoke.h"
+#include "Cups.h"
 #include "Process.h"
 
 // Message header
@@ -473,6 +474,19 @@ void DtApp::StartStatusPoll()
    if (app_mode == SINGLE_PRINTER)
       UpdateStatusLine();
 #else
+#ifdef DTPRINTINFO_CUPS
+   // One CUPS-Get-Printers request for all queues, made in a thread
+   if (CupsInUse())
+    {
+      int fd = CupsQueueStatusAsync();
+      if (fd >= 0)
+       {
+	 status_running = true;
+	 Thread(fd, StatusOutputCB, 1024);
+	 return;
+       }
+    }
+#endif
    char *cmd = QueueStatusCommand(app_mode == SINGLE_PRINTER && single_printer
 				  ? single_printer->QueueObj()->Name() : NULL);
    status_running = true;
@@ -783,10 +797,19 @@ void DtApp::OpenClose(BaseUI *obj)
 	    // If lpq is running already, its callback shows the jobs
             if (printer_icon->updating == false)
              {
-               char cmd[1000];
-               LocalPrintJobsCommand(queue->Name(), cmd, sizeof(cmd));
                printer_icon->updating = true;
-               rc->Thread(cmd, LocalStatusCB, 512);
+#ifdef DTPRINTINFO_CUPS
+	       // One Get-Jobs request, made in a thread
+	       int fd = CupsInUse() ? CupsPrintJobsAsync(queue->Name()) : -1;
+	       if (fd >= 0)
+		  rc->Thread(fd, LocalStatusCB, 512);
+	       else
+#endif
+		{
+		  char cmd[1000];
+		  LocalPrintJobsCommand(queue->Name(), cmd, sizeof(cmd));
+		  rc->Thread(cmd, LocalStatusCB, 512);
+		}
              }
             return;
           }
@@ -1501,8 +1524,14 @@ void DtApp::UpdateQueues()
 #else
 	 char *cmd = "env LANG=C lpstat -d | awk '$1 != \"no\" {print $NF}'";
 #endif
-	 char *output;
-	 Invoke *_thread = new Invoke(cmd, &output);
+	 char *output = NULL;
+	 Invoke *_thread = NULL;
+#ifdef DTPRINTINFO_CUPS
+	 if (CupsInUse() && !(output = CupsDefaultPrinter()))
+	    output = strdup("");
+	 if (!output)
+#endif
+	 _thread = new Invoke(cmd, &output);
 	 strtok(output, "\n");
          for (j = 0; j < n_queues; j++)
             if (!STRCMP(output, queues[j]->Name()))

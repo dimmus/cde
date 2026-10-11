@@ -77,6 +77,7 @@ extern "C" { int rresvport(int *); }
 
 #include "ParseJobs.h"
 #include "Invoke.h"
+#include "Cups.h"
 
 static int G_AIX_LOCAL = 0;
 
@@ -715,6 +716,17 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    char buf[1000];
    char *output;
 
+#ifdef DTPRINTINFO_CUPS
+   if (CupsInUse())
+    {
+      // Kept until the next call, like the lpq parser's list
+      static char *job_list = NULL;
+      free(job_list);
+      job_list = CupsPrintJobs(printer, return_n_jobs);
+      *return_job_list = job_list ? job_list : (char *)"";
+      return;
+    }
+#endif
    LocalPrintJobsCommand(printer, buf, sizeof(buf));
    Invoke cmd(buf, &output);
    ParseLocalPrintJobs(printer, output, return_job_list, return_n_jobs);

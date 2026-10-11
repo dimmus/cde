@@ -31,6 +31,7 @@
 #include "PrintSubSys.h"
 #include "Queue.h"
 #include "Invoke.h"
+#include "Cups.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -54,19 +55,27 @@ const char *PRINTSUBSYSTEM = "PrintSubSystem";
 
 char *ListPrintQueues(int *status, char **device_list)
 {
-   char *std_out;
-   Invoke cmd(LIST_QUEUES, &std_out);
+   char *std_out = NULL;
+   int cmd_status = 0;
+#ifdef DTPRINTINFO_CUPS
+   // The same lines from the CUPS scheduler, if one answers
+   if (!(std_out = CupsDeviceList()))
+#endif
+    {
+      Invoke cmd(LIST_QUEUES, &std_out);
+      cmd_status = cmd.status;
+    }
    if (device_list)
       *device_list = NULL;
 #ifdef aix
    if (status)
-      *status = cmd.status;
+      *status = cmd_status;
    return std_out;
 #else
    // The old "lpstat | nawk | sort" pipeline reported the status of sort,
    // so only a failure to run the command counts, not lpstat's status.
    if (status)
-      *status = (cmd.status == -1) ? -1 : 0;
+      *status = (cmd_status == -1) ? -1 : 0;
    if (device_list)
       *device_list = strdup(std_out);
    // Same result as

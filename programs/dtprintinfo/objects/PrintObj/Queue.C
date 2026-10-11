@@ -32,6 +32,7 @@
 #include "PrintJob.h"
 #include "ParseJobs.h"
 #include "PrintSubSys.h"
+#include "Cups.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -521,6 +522,15 @@ void Queue::ParseLocalStatus(char *output)
 
    char *job_list;
    int n_jobs;
+#ifdef DTPRINTINFO_CUPS
+   // CupsPrintJobsAsync() gives the job list itself
+   if (CupsInUse())
+    {
+      if (output)
+	 ParseOutput(output, CupsCountJobs(output));
+      return;
+    }
+#endif
    ParseLocalPrintJobs((char *)Name(), output ? output : (char *)"",
 		       &job_list, &n_jobs);
    ParseOutput(job_list, n_jobs);
