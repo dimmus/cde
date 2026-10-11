@@ -157,3 +157,17 @@ XCOMM  If $HOME/.profile (.login) has been edited as described above, uncomment
 XCOMM  the following line.
 XCOMM
 XCOMM DTSOURCEPROFILE=true
+
+
+XCOMM ##########################################################################
+XCOMM #
+XCOMM #  When the session starts, the desktop applies the saved display setup
+XCOMM #  (which monitors are on, their resolution and arrangement) that
+XCOMM #  matches the connected monitors, and does it again when monitors are
+XCOMM #  plugged in or out; "dtrandr --save NAME" saves the current setup.
+XCOMM #  See dtrandr(1).  To leave the display setup alone, uncomment the
+XCOMM #  following line.
+XCOMM #
+XCOMM ##########################################################################
+
+XCOMM DTRANDR=no

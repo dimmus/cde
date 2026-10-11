@@ -1,0 +1,32 @@
+# A laptop at a desk: the panel (eDP-1) is on, a monitor on HDMI-1 is
+# connected but off, DP-1 is free.  Three CRTCs; CRTC 2 drives only DP-1.
+screen 1920x1080 mm 508x285 min 320x200 max 8192x8192
+primary eDP-1
+mode 0x41 1920x1080 1920x1080@60.01 +hsync -vsync
+mode 0x42 1920x1080 1920x1080@59.93 +hsync -vsync
+mode 0x43 1280x720 74.25 1280 1390 1430 1650 720 725 730 750 +hsync +vsync
+mode 0x44 2560x1440 2560x1440@59.95
+mode 0x45 1920x1080 1920x1080@50.00
+mode 0x46 1920x1080i 74.25 1920 2008 2052 2200 1080 1084 1094 1125 interlace
+mode 0x47 1280x1024 1280x1024@60.02
+mode 0x48 1024x768 1024x768@60.00
+crtc 0
+  active 0x41 0 0 normal normal eDP-1
+crtc 1
+crtc 2
+output eDP-1
+  connected
+  edid 00ffffffffffff000daeaaaa0000000001
+  mm 344x194
+  modes 0x41* 0x42 0x48
+  crtcs 0 1
+output HDMI-1
+  connected
+  edid 00ffffffffffff0010acbbbb0000000002
+  mm 597x336
+  modes 0x44* 0x41 0x42 0x45 0x46 0x43 0x48
+  crtcs 0 1
+output DP-1
+  disconnected
+  modes 0x47* 0x41 0x48
+  crtcs 0 1 2

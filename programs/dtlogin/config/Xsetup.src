@@ -72,6 +72,20 @@ fi
 #include "_common.ksh.src"
 #undef cpp_Xsetup
 
+XCOMM ##########################################################################
+XCOMM
+XCOMM  Display setup: apply the system display profile that matches the
+XCOMM  connected monitors (see dtrandr(1)), or else turn on the monitors
+XCOMM  that are connected but off, before the login screen comes up.
+XCOMM  It is skipped if DTRANDR is "no" in the environment of dtlogin
+XCOMM  (with Dtlogin.exportList: DTRANDR).
+XCOMM
+XCOMM ##########################################################################
+
+if [ "$DTRANDR" != "no" ] && [ -x CDE_INSTALLATION_TOP/bin/dtrandr ]; then
+  CDE_INSTALLATION_TOP/bin/dtrandr --change >/dev/null 2>&1
+fi
+
 #ifdef sun
   if [ ! -f /etc/pam.conf ]; then
     if [ -f CDE_INSTALLATION_TOP/config/sys.pam.conf ]; then

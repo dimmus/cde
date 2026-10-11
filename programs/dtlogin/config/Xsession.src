@@ -448,6 +448,24 @@ XCOMM ##########################################################################
 
 
 XCOMM ##########################################################################
+XCOMM
+XCOMM  Display setup section
+XCOMM
+XCOMM  Apply the display profile that matches the connected monitors (see
+XCOMM  dtrandr(1)) before the session starts, so that it starts on the
+XCOMM  right screens, then follow monitors that are plugged in or out.
+XCOMM  DTRANDR=no in $HOME/.dtprofile turns this off.
+XCOMM
+XCOMM ##########################################################################
+
+  if [ "$DTRANDR" != "no" ] && [ -x $DT_BINPATH/dtrandr ]; then
+    Log "starting $DT_BINPATH/dtrandr"
+    $DT_BINPATH/dtrandr --change
+    $DT_BINPATH/dtrandr --daemon </dev/null &
+  fi
+
+
+XCOMM ##########################################################################
 XCOMM 
 XCOMM   Startup section.
 XCOMM      
