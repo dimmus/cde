@@ -44,5 +44,6 @@ dtcm_editor_SOURCES = datefield.c     deskset.c       dssw.c \
 		      dtcm_editor.c   help.c          misc.c \
 		      reminders.c     rfp.c
 
+# rpc.cmsd keeps its calendars in _DtCMS_DEFAULT_DIR (server/log.h).
 install-exec-hook:
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(localstatedir)/spool/calendar
+	$(INSTALL) -m 0755 -d $(DESTDIR)/var/spool/calendar
