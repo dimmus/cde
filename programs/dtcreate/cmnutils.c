@@ -72,7 +72,9 @@ if (text_strings) {
     count = countItems (text_strings);
     xmstrings = (XmStringTable) calloc (sizeof(XmString), (count));
     for (lcv = 0; lcv < count; lcv++)
-        xmstrings[lcv] = (XmString) XmStringCreateSimple (text_strings[lcv]);
+        /* XmStringCreateSimple is obsolete */
+        xmstrings[lcv] = XmStringCreate (text_strings[lcv],
+                                         XmSTRING_DEFAULT_CHARSET);
 }
 return ((XmStringTable)xmstrings);
 }
@@ -84,11 +86,11 @@ return ((XmStringTable)xmstrings);
 /********************************************************************************/
 char *XmStringToText (XmString xmstring)
 {
-XmStringContext   context;
-XmStringCharSet   charset;
-XmStringDirection direction;
-Boolean           separator;
-char              *text_string = NULL, *temp = NULL;
+XmStringContext       context;
+XmStringComponentType type;
+unsigned int          length;
+XtPointer             value;
+char                  *text_string = NULL, *temp = NULL;
 
 text_string = (char *)calloc (1, sizeof (char));
 
@@ -98,14 +100,40 @@ if (xmstring) {
       free(text_string);
       return (NULL);
     }
-    while  (XmStringGetNextSegment (context, &temp, &charset,
-                                    &direction, &separator)) {
+    /* The text of the last segment, as XmStringGetNextSegment (obsolete) */
+    /* gave it: each text component is a segment, wide text as multibyte. */
+    while ((type = XmStringGetNextTriple (context, &length, &value))
+           != XmSTRING_COMPONENT_END) {
+      if (type == XmSTRING_COMPONENT_WIDECHAR_TEXT) {
+        size_t max = length * MB_CUR_MAX / sizeof (wchar_t);
+        size_t n;
+
+        temp = XtMalloc (max + 1);
+        n = wcstombs (temp, (wchar_t *) value, max);
+        XtFree ((char *) value);
+        if (n == (size_t) -1) {
+          XtFree (temp);
+          break;
+        }
+        temp[n] = '\0';
+      }
+      else if (type == XmSTRING_COMPONENT_TEXT ||
+               type == XmSTRING_COMPONENT_LOCALE_TEXT) {
+        temp = (char *) value;
+      }
+      else {
+        XtFree ((char *) value);
+        continue;
+      }
       text_string = (char *)realloc (text_string, strlen (temp)+1);
       if (text_string == NULL) {
         printf("Can't allocate space for file name.\n");
+        XtFree (temp);
+        XmStringFreeContext (context);
         return (NULL);
       }
       text_string = strcpy(text_string, temp);
+      XtFree (temp);
     }
 
     XmStringFreeContext(context);

@@ -494,10 +494,10 @@ main( int argc, char **argv )
     }
 
     /*
-     *  add the unit convertor for resources...
+     *  Motif registered the String to UnitType converter for resources,
+     *  the one the obsolete XmCvtStringToUnitType called, when it
+     *  initialized the toplevel shell's class.
      */
-     
-    XtAddConverter(XmRString, XmRUnitType, XmCvtStringToUnitType, NULL, 0);
 
     /*
      *  get user-specified resources...

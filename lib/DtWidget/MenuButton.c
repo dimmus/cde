@@ -53,7 +53,7 @@
  * by a comment including the string "MotifBc".
  *
  * For a description of the Motif widget binary compatibility mechanism
- * see the reference manual entry on XmResolveAllPartOffsets().
+ * see the reference manual entry on XmeResolvePartOffsets().
  *
  */
 
@@ -343,7 +343,7 @@ externaldef(dtmenubuttonwidgetclass)
 static void
 ClassInitialize(void)
 {
-    XmResolveAllPartOffsets(dtMenuButtonWidgetClass, &ipot, &cpot);
+    XmeResolvePartOffsets(dtMenuButtonWidgetClass, &ipot, &cpot);
 }
 
 static void 

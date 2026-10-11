@@ -62,6 +62,99 @@ using namespace std;
 #include <WWL/WComposite.h>
 #include <WWL/WXmSeparator.h>
 
+// What the obsolete XmStringGetLtoR(string, XmFONTLIST_DEFAULT_TAG, &text)
+// returns (see XmStringObso.c in Motif): an XtMalloc'ed copy of the text
+// of the first segment that is not right-to-left and is tagged
+// XmFONTLIST_DEFAULT_TAG or with the locale's charset, or NULL.  Locale
+// text with no tag of its own is taken to be tagged XmFONTLIST_DEFAULT_TAG.
+static char *
+GetLtoRText (XmString string)
+{
+    XmStringContext context;
+    XmStringComponentType type;
+    unsigned int length;
+    XtPointer value;
+    XmString probe;
+    char *charset = NULL;
+    char *tag = NULL;
+    char *text = NULL;
+    Boolean tagged = False;	// a tag since the last text
+    XmStringDirection direction = XmSTRING_DIRECTION_UNSET;
+
+    if (string == NULL)
+	return NULL;
+
+    // The locale's charset: XmSTRING_DEFAULT_CHARSET text's tag
+    probe = XmStringCreate ("", XmSTRING_DEFAULT_CHARSET);
+    if (XmStringInitContext (&context, probe)) {
+	if (XmStringGetNextTriple (context, &length, &value) ==
+	    XmSTRING_COMPONENT_TAG)
+	    charset = (char *) value;
+	else
+	    XtFree ((char *) value);
+	XmStringFreeContext (context);
+    }
+    XmStringFree (probe);
+
+    if (XmStringInitContext (&context, string)) {
+	while (text == NULL &&
+	       (type = XmStringGetNextTriple (context, &length, &value)) !=
+	       XmSTRING_COMPONENT_END) {
+	    switch (type) {
+	    case XmSTRING_COMPONENT_TAG:
+	    case XmSTRING_COMPONENT_LOCALE:
+		XtFree (tag);
+		tag = (char *) value;
+		value = NULL;
+		tagged = True;
+		break;
+	    case XmSTRING_COMPONENT_DIRECTION:
+		direction = *(XmStringDirection *) value;
+		break;
+	    case XmSTRING_COMPONENT_LOCALE_TEXT:
+		if (!tagged) {
+		    XtFree (tag);
+		    tag = XtNewString (XmFONTLIST_DEFAULT_TAG);
+		}
+		// FALLTHROUGH
+	    case XmSTRING_COMPONENT_TEXT:
+	    case XmSTRING_COMPONENT_WIDECHAR_TEXT:
+		tagged = False;
+		if (type == XmSTRING_COMPONENT_WIDECHAR_TEXT) {
+		    // As multibyte text; give up if it has none
+		    size_t max = length * MB_CUR_MAX / sizeof (wchar_t);
+		    char *mb = XtMalloc (max + 1);
+		    size_t n = wcstombs (mb, (wchar_t *) value, max);
+
+		    XtFree ((char *) value);
+		    value = NULL;
+		    if (n == (size_t) -1) {
+			XtFree (mb);
+			goto done;
+		    }
+		    mb[n] = '\0';
+		    value = (XtPointer) mb;
+		}
+		if (tag != NULL && direction != XmSTRING_DIRECTION_R_TO_L &&
+		    (strcmp (tag, XmFONTLIST_DEFAULT_TAG) == 0 ||
+		     (charset != NULL && strcmp (tag, charset) == 0))) {
+		    text = (char *) value;
+		    value = NULL;
+		}
+		break;
+	    default:
+		break;
+	    }
+	    XtFree ((char *) value);
+	}
+done:
+	XmStringFreeContext (context);
+    }
+    XtFree (tag);
+    XtFree (charset);
+    return text;
+}
+
 AddLibraryAgent::AddLibraryAgent (Widget parent):
 	f_shell (parent, True, "add_library_agent"),
 	f_done (False), f_cancelled (False), f_file_sel (NULL) {
@@ -292,10 +385,8 @@ AddLibraryAgent::fileSelectedCallback ( Widget    w,
 
     if ( xmstr )   // Make sure a file was selected
     {
-        // The text of the compound string (XmStringGetLtoR is obsolete)
-        name = (char *) XmStringUnparse ( xmstr, NULL, XmCHARSET_TEXT,
-                                          XmCHARSET_TEXT, NULL, 0,
-                                          XmOUTPUT_ALL );
+        // XmStringGetLtoR is obsolete
+        name = GetLtoRText ( xmstr );
          if( name && strlen(name)<1)
          {
             XtFree(name);

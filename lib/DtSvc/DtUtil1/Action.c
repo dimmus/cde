@@ -4199,7 +4199,10 @@ CreatePromptDialog(
 
       XtManageChild(promptDes[count].promptWidget);
 
-      XmAddTabGroup(promptDes[count].promptWidget);
+      /* XmAddTabGroup (obsolete) sets just this. */
+      n = 0;
+      XtSetArg(args[n], XmNnavigationType, XmEXCLUSIVE_TAB_GROUP);  n++;
+      XtSetValues(promptDes[count].promptWidget, args, n);
       topAttach = promptDes[count].promptWidget;
    }
 

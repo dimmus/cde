@@ -585,9 +585,15 @@ void free_Filetypedata(FiletypeData *pFtD)
 /******************************************************************************/
 void AddFiletypeToList(void)
 {
-  if (!XmListItemExists(CA_FiletypesList, XmStringCreateSimple(XmTextFieldGetString(AF_FileTypeNameTextField)))) {
-    XmListAddItem(CA_FiletypesList, XmStringCreateSimple(XmTextFieldGetString(AF_FileTypeNameTextField)), 0);
+  char     *name = XmTextFieldGetString(AF_FileTypeNameTextField);
+  /* XmStringCreateSimple is obsolete */
+  XmString item = XmStringCreate(name, XmSTRING_DEFAULT_CHARSET);
+
+  if (!XmListItemExists(CA_FiletypesList, item)) {
+    XmListAddItem(CA_FiletypesList, item, 0);
   }
+  XmStringFree(item);
+  XtFree(name);
 }
 
 /******************************************************************************/

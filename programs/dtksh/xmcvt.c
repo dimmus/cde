@@ -76,6 +76,90 @@ typedef struct {
 
 
 /*
+ * The next segment of a compound string, as the obsolete
+ * XmStringGetNextSegment() returned it (see _XmStringGetSegment() in
+ * Motif): its text, XtMalloc'ed and multibyte, or NULL for a segment of
+ * tabs only, and whether a separator ends it.  False at the end.
+ */
+static Boolean
+GetNextSegment(
+        XmStringContext context,
+        char **text,
+        Boolean *separator )
+{
+	XmStringComponentType type;
+	unsigned int length;
+	XtPointer value;
+	Boolean found = False;		/* text or tabs */
+	Boolean new_renditions = False;	/* renditions begin after tabs */
+
+	*text = NULL;
+	*separator = False;
+	for (;;) {
+		switch (XmStringPeekNextTriple(context)) {
+		case XmSTRING_COMPONENT_TEXT:
+		case XmSTRING_COMPONENT_LOCALE_TEXT:
+		case XmSTRING_COMPONENT_WIDECHAR_TEXT:
+			if (*text || new_renditions)
+				return(found);
+			break;
+		case XmSTRING_COMPONENT_TAB:
+		case XmSTRING_COMPONENT_TAG:
+		case XmSTRING_COMPONENT_LOCALE:
+		case XmSTRING_COMPONENT_DIRECTION:
+			if (*text)
+				return(found);
+			break;
+		case XmSTRING_COMPONENT_RENDITION_BEGIN:
+			if (*text)
+				return(found);
+			if (found)
+				new_renditions = True;
+			break;
+		case XmSTRING_COMPONENT_LAYOUT_PUSH:
+			if (found)
+				return(found);
+			break;
+		case XmSTRING_COMPONENT_SEPARATOR:
+			if (found) {
+				*separator = True;
+				return(found);
+			}
+			break;
+		case XmSTRING_COMPONENT_RENDITION_END:
+		case XmSTRING_COMPONENT_LAYOUT_POP:
+			break;
+		default:
+			return(found);
+		}
+		type = XmStringGetNextTriple(context, &length, &value);
+		if (type == XmSTRING_COMPONENT_TEXT ||
+		    type == XmSTRING_COMPONENT_LOCALE_TEXT) {
+			*text = (char *)value;
+			found = True;
+		} else if (type == XmSTRING_COMPONENT_WIDECHAR_TEXT) {
+			size_t max = length * MB_CUR_MAX / sizeof(wchar_t);
+			size_t n;
+
+			*text = XtMalloc(max + 1);
+			n = wcstombs(*text, (wchar_t *)value, max);
+			XtFree((char *)value);
+			if (n == (size_t)-1) {
+				XtFree(*text);
+				*text = NULL;
+				return(False);
+			}
+			(*text)[n] = '\0';
+			found = True;
+		} else {
+			if (type == XmSTRING_COMPONENT_TAB)
+				found = True;
+			XtFree((char *)value);
+		}
+	}
+}
+
+/*
  * Converters for DTKSH
  */
 
@@ -85,8 +169,6 @@ XmStringToString(
 {
 	static char *buf = NULL;
 	XmStringContext context;
-	XmStringCharSet charset;
-	XmStringDirection dir;
 	char *text;
 	Boolean separator = FALSE;
 
@@ -97,8 +179,9 @@ XmStringToString(
         XtFree(buf);
 	buf = NULL;
 	while (!separator) {
-		if (XmStringGetNextSegment(context, &text, &charset, &dir,
-			&separator)) {
+		if (GetNextSegment(context, &text, &separator)) {
+			if (text == NULL)
+				continue;
 			if (buf) {
 				buf = XtRealloc(buf, strlen(buf) + strlen(text) + 2);
 				strcat(buf, text);
@@ -158,8 +241,6 @@ _CvtXmStringTableToString(
 {
    static char *buf = NULL;
    XmStringContext context;
-   XmStringCharSet charset;
-   XmStringDirection dir;
    char *text;
    Boolean separator = FALSE;
    int i;
@@ -178,8 +259,10 @@ _CvtXmStringTableToString(
       XmStringInitContext(&context, stringtable[i]);
       while (!separator) 
       {
-         if (XmStringGetNextSegment(context, &text, &charset, &dir, &separator))
+         if (GetNextSegment(context, &text, &separator))
          {
+            if (text == NULL)
+               continue;
             /*
              * To be consistent with the Motif converter, which will take
              * a comma-separated string, and convert it to an XmStringTable,

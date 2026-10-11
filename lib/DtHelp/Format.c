@@ -174,17 +174,20 @@ FormatChunksToXmString(
             result = -1;
         else 
           {
-            XFontStruct *myFontStruct;
+            XmFontListEntry myEntry;
             /*
              * quarkize all the character sets found.
+             * (XmFontListGetNextFont is obsolete; XmFontListEntryGetTag
+             * returns the same XtNewString'ed tag of every entry.)
              */
             quarkCount = 0;
             do
               {
-                myMore = XmFontListGetNextFont (fontContext, &charSet,
-                                                                &myFontStruct);
+                myEntry = XmFontListNextEntry (fontContext);
+                myMore  = (myEntry != NULL);
                 if (myMore)
                   {
+                    charSet = XmFontListEntryGetTag (myEntry);
                     myCharSetQuarks[quarkCount++] = 
                                                 XrmStringToQuark (charSet);
                     XtFree (charSet);

@@ -2192,16 +2192,23 @@ build_dtIconShell( void )
         XmStringFree(tmpXmStr);
 
 
-        /* set up meaningful tab groups */
-        XmAddTabGroup(cmdButtonMgr);            /* drawing tools   */
-        XmAddTabGroup(fillToggle);              /* fill toggle     */
-        XmAddTabGroup(viewport);                /* drawing tablet  */
-        XmAddTabGroup(stdColorPens);            /* static colors   */
-        XmAddTabGroup(stdGreyPens);             /* static greys    */
-        XmAddTabGroup(symbolicColorPens);       /* symbolic colors */
+        /* set up meaningful tab groups (what the obsolete XmAddTabGroup did) */
+        XtVaSetValues(cmdButtonMgr,             /* drawing tools   */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
+        XtVaSetValues(fillToggle,               /* fill toggle     */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
+        XtVaSetValues(viewport,                 /* drawing tablet  */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
+        XtVaSetValues(stdColorPens,             /* static colors   */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
+        XtVaSetValues(stdGreyPens,              /* static greys    */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
+        XtVaSetValues(symbolicColorPens,        /* symbolic colors */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
 
         /* set up initial focus  */
-        XmAddTabGroup(mainWindow);              /* main window     */
+        XtVaSetValues(mainWindow,               /* main window     */
+                      XmNnavigationType, XmEXCLUSIVE_TAB_GROUP, NULL);
         XtVaSetValues(mainWindow, XmNinitialFocus, viewport, NULL);
 
 

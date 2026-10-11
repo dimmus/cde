@@ -70,7 +70,6 @@ public:
      }
    inline	WXmString (const WXmString& w)	{ string = w.Copy(); }
 
-#if XmVersion >= 1002
    inline	WXmString (const char* t, char *tag=XmFONTLIST_DEFAULT_TAG)
    {
       if (tag == XmFONTLIST_DEFAULT_TAG)
@@ -78,12 +77,6 @@ public:
       else
 	string = XmStringCreate ((char *) t, tag);
    }
-#else
-   inline	WXmString (char* t,
-			   XmStringCharSet charset=XmSTRING_DEFAULT_CHARSET) {
-      string = XmStringCreateLtoR (t, charset);
-   }
-#endif
    inline	WXmString (XmStringDirection d)	{
       string = XmStringDirectionCreate (d);
    }
@@ -108,11 +101,7 @@ public:
    }
    inline WXmString&	operator= (char *cs) {
       if (string) XmStringFree (string);
-#if XmVersion >= 1002
       string = XmStringCreateLocalized (cs);
-#else
-      string = XmStringCreateLtoR (cs, XmSTRING_DEFAULT_CHARSET);
-#endif
       return *this;
    }
 
@@ -120,11 +109,7 @@ public:
    inline		operator XtArgVal () const { return (XtArgVal) string; }
    inline		operator char* () const	{
       char* ret;
-#if XmVersion >= 1002
       XmStringUngenerate(string, XmFONTLIST_DEFAULT_TAG, &ret);
-#else
-      XmStringGetLtoR (string, XmSTRING_DEFAULT_CHARSET, &ret);
-#endif
       return ret;
    }
    inline Boolean	operator== (XmString s) const {
@@ -184,18 +169,10 @@ public:
    const {
       XmStringExtent (fl, string, w, h);
    }
-#if XmVersion >= 1002
    inline Boolean	GetLtoR (char** text, char *tag=XmFONTLIST_DEFAULT_TAG)
    const {
       return XmStringUngenerate(string, tag, text);
    }
-#else
-   inline Boolean	GetLtoR (char** text,
-				 XmStringCharSet cs=XmSTRING_DEFAULT_CHARSET)
-   const {
-      return XmStringGetLtoR (string, cs, text);
-   }
-#endif
    inline Dimension	Height (XmFontList fl) const {
       return XmStringHeight (fl, string);
    }

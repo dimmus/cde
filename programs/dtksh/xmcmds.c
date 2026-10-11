@@ -468,8 +468,11 @@ toolkit_initialize(
 		DtkshCvtStringToScreen, NULL, 0);
 	XtAddConverter(XtRString, XmRTopItemPosition, 
 		DtkshCvtStringToTopItemPosition, NULL, 0);
-	XtAddConverter(XtRString, XmRUnitType,
-		XmCvtStringToUnitType, NULL, 0);
+	/*
+	 * Motif registers its own String to UnitType converter, the one
+	 * the obsolete XmCvtStringToUnitType called, when the toplevel
+	 * shell's class is initialized.
+	 */
 	XtSetTypeConverter(XmRXmString, XtRString,
 		(XtTypeConverter)DtkshCvtXmStringToString, NULL, 0, 
                 XtCacheNone, NULL);

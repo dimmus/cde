@@ -99,12 +99,13 @@ express or implied warranty.
  * by a comment including the string "MotifBc".
  *
  * For a description of the Motif widget binary compatibility mechanism 
- * see the reference manual entry on XmResolveAllPartOffsets().
+ * see the reference manual entry on XmeResolvePartOffsets().
  *
  */
 
 /* _NO_PROTO support no longer required: */
 
+#include <string.h>		/* for memcmp */
 #include <Xm/XmP.h>		/* for fast subclassing in XmIsComboBox */
 #include <Xm/XmosP.h>		/* for INT_MAX */
 #include <Dt/DtMsgsP.h>
@@ -180,6 +181,8 @@ static Boolean	SetValues (DtComboBoxWidget current,
 static void	ClearShadow (DtComboBoxWidget w, Boolean all);
 static void	DrawShadow (DtComboBoxWidget w);
 static char*	GetTextString (XmString xm_string);
+static Boolean	StringByteCompare (XmString a, XmString b);
+static Cursor	GetMenuCursor (Display *disp);
 static void	SetTextFieldData (DtComboBoxPart *combo_p, XmString item);
 static void	SetMaximumLabelSize (DtComboBoxPart *combo_p,
 				     const _DtItemChange *change);
@@ -619,7 +622,7 @@ ClassInitialize(void)
 /*
  * MotifBc
  */
-    XmResolveAllPartOffsets(dtComboBoxWidgetClass, &ipot, &cpot);
+    XmeResolvePartOffsets(dtComboBoxWidgetClass, &ipot, &cpot);
 /* Parse the translation tables here
  */
     trans = 	  XtParseTranslationTable(ComboBoxTranslationTable);
@@ -1738,15 +1741,15 @@ SetValues(	DtComboBoxWidget current,
 	(Type(new) != Type(current)) ||
 	(ItemCount(new) != ItemCount(current)) ||
 	(SelectedPosition(new) != SelectedPosition(current)) ||
-	(XmStringByteCompare(SelectedItem(new), SelectedItem(current))!=True) ||
+	(StringByteCompare(SelectedItem(new), SelectedItem(current))!=True) ||
 	(Label(new) != Label(current)) ||
 	(UpdateLabel(new) != UpdateLabel(current)) ||
 	(LabelString(new) != LabelString(current))) {
 
 	/* selected_item resource used before selected_position */
 	if (SelectedItem(new) && XmeStringIsValid(SelectedItem(new)) &&
-	    (XmStringByteCompare(SelectedItem(new), 
-				 SelectedItem(current))!=True) ){
+	    (StringByteCompare(SelectedItem(new), 
+			       SelectedItem(current))!=True) ){
 	    if (SelectedItem(current)) {
 		XmStringFree(SelectedItem(current));
 		SelectedItem(current) = NULL;
@@ -1924,12 +1927,8 @@ SetTextFieldData(DtComboBoxPart *combo_p, XmString item)
     Boolean done = FALSE;
     Arg args[2];
     XmStringComponentType type;
-    char *text;
-    XmStringCharSet charset;
-    XmStringDirection direction;
-    XmStringComponentType unknown_tag;
-    unsigned short ul;
-    unsigned char *uv;
+    unsigned int length;
+    XtPointer value;
     XmStringTable list_items;
     int item_count;
     Boolean isItemCopied = FALSE;
@@ -1960,21 +1959,20 @@ SetTextFieldData(DtComboBoxPart *combo_p, XmString item)
 	
 	/* Loop until 1st char* found */
 	while (!done) {
-	    type = XmStringGetNextComponent(context, &text, &charset,
-					    &direction, &unknown_tag, 
-					    &ul, &uv);
+	    type = XmStringGetNextTriple(context, &length, &value);
 	    switch (type) {
 	    case XmSTRING_COMPONENT_END:
 		done = TRUE;
 		break;
 	    case XmSTRING_COMPONENT_TEXT:
 	    case XmSTRING_COMPONENT_LOCALE_TEXT:
-		XtSetArg(args[0], XmNvalue, text);
+		XtSetArg(args[0], XmNvalue, (char *)value);
 		XtSetValues(combo_p->text, args, 1);
-		XtFree(text);
+		XtFree((char *)value);
 		done = TRUE;
 		break;
 	    default:
+		XtFree((char *)value);
 		break;
 	    }
 	}
@@ -2396,11 +2394,8 @@ GetTextString(XmString xm_string)
 {
     XmStringContext context;
     XmStringComponentType type;
-    XmStringCharSet charset;
-    XmStringDirection direction;
-    XmStringComponentType unknown_tag;
-    unsigned short ul;
-    unsigned char *uv;
+    unsigned int length;
+    XtPointer value;
     char *text = NULL;
     Boolean done = FALSE;
 
@@ -2408,23 +2403,50 @@ GetTextString(XmString xm_string)
     
     /* Loop until 1st char* found */
     while (!done) {
-	type = XmStringGetNextComponent(context, &text, &charset,
-					&direction, &unknown_tag, 
-					&ul, &uv);
+	type = XmStringGetNextTriple(context, &length, &value);
 	switch (type) {
 	case XmSTRING_COMPONENT_END:
 	    done = TRUE;
 	    break;
 	case XmSTRING_COMPONENT_TEXT:
 	case XmSTRING_COMPONENT_LOCALE_TEXT:
+	    text = (char *)value;
 	    done = TRUE;
 	    break;
 	default:
+	    XtFree((char *)value);
 	    break;
 	}
     }
     XmStringFreeContext(context);
     return(text);
+}
+
+/*
+ * Replaces the obsolete XmStringByteCompare(): compare the byte
+ * stream (ASN.1) forms of the strings.
+ */
+static Boolean
+StringByteCompare(XmString a, XmString b)
+{
+    unsigned char *a_bytes = NULL;
+    unsigned char *b_bytes = NULL;
+    unsigned int a_length, b_length;
+    Boolean result;
+
+    if (a == NULL || b == NULL)
+	return(a == b);
+    a_length = XmCvtXmStringToByteStream(a, &a_bytes);
+    b_length = XmCvtXmStringToByteStream(b, &b_bytes);
+    /* Too long for the byte stream format: only equal to itself. */
+    if (a_bytes == NULL || b_bytes == NULL)
+	result = (a == b);
+    else
+	result = (a_length == b_length &&
+		  memcmp(a_bytes, b_bytes, a_length) == 0);
+    XtFree((char *)a_bytes);
+    XtFree((char *)b_bytes);
+    return(result);
 }
 
 static void
@@ -2640,7 +2662,7 @@ activate_cb(	Widget w,
     _XmAddGrab(Shell(combo_w), True, True);
     _XmGrabPointer(Shell(combo_w), True, ButtonPressMask |ButtonReleaseMask,
 			GrabModeAsync, GrabModeAsync, None, 
-		   XmGetMenuCursor(disp), CurrentTime);
+		   GetMenuCursor(disp), CurrentTime);
     _XmGrabKeyboard(List(combo_w), False, GrabModeAsync, GrabModeAsync, 
 		   CurrentTime);
     xmdisp->display.userGrabbed = True;
@@ -2654,7 +2676,22 @@ activate_cb(	Widget w,
      * correct menu during browse scrolling, etc.
      */
     XDefineCursor(disp, XtWindowOfObject(Shell(combo_w)), 
-		  XmGetMenuCursor(disp));
+		  GetMenuCursor(disp));
+}
+
+/*
+ * Replaces the obsolete XmGetMenuCursor(): the menu cursor of the
+ * XmScreen of the display's default screen.
+ */
+static Cursor
+GetMenuCursor(Display *disp)
+{
+    Cursor cursor = None;
+    Arg arg;
+
+    XtSetArg(arg, XmNmenuCursor, &cursor);
+    XtGetValues(XmGetXmScreen(DefaultScreenOfDisplay(disp)), &arg, 1);
+    return(cursor);
 }
 
 

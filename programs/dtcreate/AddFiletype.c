@@ -205,13 +205,17 @@ static  void    activateCB_AF_ApplyButton( Widget UxWidget,
      /* If in edit mode, then don't do apply type things.                   */
      /***********************************************************************/
      if (!(pFtD->fsInternal & CA_FT_EDIT)) {
+        XmString none;
 
         /********************************************************************/
         /* Update the Filetype listbox with this new filetype               */
         /********************************************************************/
-        if (XmListItemExists(CA_FiletypesList, XmStringCreateSimple("NONE"))) {
-          XmListDeleteItem(CA_FiletypesList, XmStringCreateSimple("NONE"));
+        /* XmStringCreateSimple is obsolete */
+        none = XmStringCreate("NONE", XmSTRING_DEFAULT_CHARSET);
+        if (XmListItemExists(CA_FiletypesList, none)) {
+          XmListDeleteItem(CA_FiletypesList, none);
         }
+        XmStringFree(none);
         AddFiletypeToList();
 
         /********************************************************************/

@@ -92,54 +92,5 @@ XmStringUngenerate(XmString string, XmStringCharSet tag, char** ret)
     else {
 	return False;
     }
-    
-#if 0
-  XmStringContext context;
-
-  if (! XmStringInitContext(&context, string)) {
-    *ret = NULL;
-    return False;
-  }
-
-  int bufsize, buflen;
-  char* buf = XtMalloc(bufsize = 128);
-  buf[0] = 0;
-  buflen  = 1;
-
-  char* text = NULL;
-  XmStringDirection dir;
-  Boolean sep;
-
-  while (XmStringGetNextSegment(context, &text, &tag, &dir, &sep)) {
-    if (text) {
-      len = strlen(text);
-      int textlen = len + (sep? 1 : 0);
-      { // buffer size adjustment
-	int bufsize_required = bufsize;
-	while (buflen + textlen > bufsize_required)
-	  bufsize_required += 128;
-	if (bufsize_required > bufsize) {
-	  buf = XtRealloc(buf, bufsize_required);
-	  bufsize = bufsize_required;
-	}
-      }
-      slen = strlen(buf);
-      *((char *) memcpy(buf + slen, text, len) + len) = '\0';
-      if (sep)
-	*((char *) memcpy(buf + slen + 1, "\n", 1) + 1) = '\0';
-      buflen += textlen;
-
-      XtFree(text);
-    }
-    text = NULL;
-  }
-
-  XmStringFreeContext(context);
-
-  *ret = buf;
-
-  return True;
-
-#endif
 }
 

@@ -84,7 +84,7 @@ express or implied warranty.
  * by a comment including the string "MotifBc".
  *
  * For a description of the Motif widget binary compatibility mechanism
- * see the reference manual entry on XmResolveAllPartOffsets().
+ * see the reference manual entry on XmeResolvePartOffsets().
  *
  */
 
@@ -552,7 +552,7 @@ ClassInitialize(void)
 /*
  * MotifBc
  */
-    XmResolveAllPartOffsets(dtSpinBoxWidgetClass, &ipot, &cpot);
+    XmeResolvePartOffsets(dtSpinBoxWidgetClass, &ipot, &cpot);
 
     child_trans = XtParseTranslationTable(SpinBoxChildTranslationTable);
     spin_trans = XtParseTranslationTable(SpinBoxTranslationTable);
@@ -1872,11 +1872,8 @@ GetTextString(XmString xm_string)
 {
     XmStringContext context;
     XmStringComponentType type;
-    XmStringCharSet charset;
-    XmStringDirection direction;
-    XmStringComponentType unknown_tag;
-    unsigned short ul;
-    unsigned char *uv;
+    unsigned int length;
+    XtPointer value;
     char *text = NULL;
     Boolean done = FALSE;
 
@@ -1884,18 +1881,18 @@ GetTextString(XmString xm_string)
     
     /* Loop until 1st char* found */
     while (!done) {
-	type = XmStringGetNextComponent(context, &text, &charset,
-					&direction, &unknown_tag, 
-					&ul, &uv);
+	type = XmStringGetNextTriple(context, &length, &value);
 	switch (type) {
 	case XmSTRING_COMPONENT_END:
 	    done = TRUE;
 	    break;
 	case XmSTRING_COMPONENT_TEXT:
 	case XmSTRING_COMPONENT_LOCALE_TEXT:
+	    text = (char *)value;
 	    done = TRUE;
 	    break;
 	default:
+	    XtFree((char *)value);
 	    break;
 	}
     }

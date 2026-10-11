@@ -217,14 +217,17 @@ void putCAactionHelpText (struct _ActionData *ca_struct)
 void putCAfileTypes (struct _ActionData *pAD)
 {
  int            i;
+ XmString       item;
 
   if (pAD->cFiletypes) {
      for (i=0; i < pAD->cFiletypes; i++) {
-       if (!XmListItemExists(CA_FiletypesList,
-              XmStringCreateSimple((pAD->papFiletypes[i])->pszName))) {
-          XmListAddItem(CA_FiletypesList,
-            XmStringCreateSimple((pAD->papFiletypes[i])->pszName), i+1);
+       /* XmStringCreateSimple is obsolete */
+       item = XmStringCreate((pAD->papFiletypes[i])->pszName,
+                             XmSTRING_DEFAULT_CHARSET);
+       if (!XmListItemExists(CA_FiletypesList, item)) {
+          XmListAddItem(CA_FiletypesList, item, i+1);
        }
+       XmStringFree(item);
      }
   }
 

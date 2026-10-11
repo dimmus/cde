@@ -414,32 +414,60 @@ static void StartPrintingCB(
     */
   if (titleLbl != NULL)
     {
-      int                len;
-      int                newLen = 0;
-      XmStringContext    theContext;
-      XmStringCharSet    theSet;
-      XmStringDirection  theDir;
-      char              *newTxt;
-      Boolean            theSep;
+      int                    len;
+      int                    newLen = 0;
+      XmStringContext        theContext;
+      XmStringComponentType  theType;
+      unsigned int           theLen;
+      XtPointer              theValue;
+      char                  *newTxt;
 
+      /*
+       * Concatenate the text of every segment, as XmStringGetNextSegment
+       * (obsolete) returned it: wide char text converted with wcstombs,
+       * stopping where that conversion fails.
+       */
       if (XmStringInitContext(&theContext, titleLbl) == True)
 	{
-	  while (XmStringGetNextSegment(theContext,
-					&newTxt,
-					&theSet,
-					&theDir,
-					&theSep) == True)
+	  while ((theType = XmStringGetNextTriple(theContext, &theLen,
+					&theValue)) != XmSTRING_COMPONENT_END)
 	    {
+	      newTxt = NULL;
+	      if (theType == XmSTRING_COMPONENT_TEXT ||
+		  theType == XmSTRING_COMPONENT_LOCALE_TEXT)
+		{
+		  newTxt   = (char *) theValue;
+		  theValue = NULL;
+		}
+	      else if (theType == XmSTRING_COMPONENT_WIDECHAR_TEXT)
+		{
+		  size_t mbLen = (theLen * MB_CUR_MAX) / sizeof(wchar_t);
+
+		  newTxt = XtMalloc(mbLen + 1);
+		  mbLen  = wcstombs(newTxt, (wchar_t *) theValue, mbLen);
+		  if (mbLen == (size_t) -1)
+		    {
+		      XtFree(newTxt);
+		      XtFree((char *) theValue);
+		      break;
+		    }
+		  newTxt[mbLen] = '\0';
+		}
+	      XtFree((char *) theValue);
+	      if (newTxt == NULL)
+		continue;
+
 	      len = strlen(newTxt);
 	      if (len > 0)
 		{
-	          topicTitle = XtRealloc(topicTitle, len + 1);
+	          topicTitle = XtRealloc(topicTitle, newLen + len + 1);
 	          if (topicTitle != NULL)
 		    {
 	              strcpy(&topicTitle[newLen], newTxt);
 		      newLen += len;
 		    }
 		}
+	      XtFree(newTxt);
 	    }
 	  XmStringFreeContext(theContext);
 	}

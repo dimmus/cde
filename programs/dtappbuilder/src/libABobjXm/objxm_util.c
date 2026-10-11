@@ -50,6 +50,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/param.h>
 #include <X11/Intrinsic.h>
@@ -353,25 +354,57 @@ load_pixmap(
 
 
 
+/*
+ * The XFontStruct that XmFontListGetNextFont (obsolete) returned for a
+ * font list entry: the font itself, the first font of a font set, or
+ * NULL if the entry has no core font.
+ */
+static XFontStruct *
+fontlist_entry_first_font(
+    XmFontListEntry	entry
+)
+{
+    XmFontType		type;
+    XtPointer		font;
+    XFontStruct		**font_structs;
+    char		**font_names;
+    Arg			args[2];
+    Cardinal		n = 0;
+
+    XtSetArg(args[n], XmNfontType, &type);	n++;
+    XtSetArg(args[n], XmNfont, &font);		n++;
+    XmRenditionRetrieve(entry, args, n);
+
+    if (font == (XtPointer)XmAS_IS)
+	return NULL;
+    if (type == XmFONT_IS_FONTSET)
+    {
+	if (XFontsOfFontSet((XFontSet)font, &font_structs, &font_names) &&
+	    font_structs[0]->fid != 0)
+	    return font_structs[0];
+	return NULL;
+    }
+    return (XFontStruct *)font;
+}
+
 XFontStruct *
 objxm_fontlist_to_font(
     XmFontList	fontlist
 )
 {
     XmFontContext	context;
-    XFontStruct		*font;
-    XmStringCharSet     charset;
+    XmFontListEntry	entry;
 
     if (!fontlist)
 	return NULL;
 
     XmFontListInitFontContext(&context, fontlist);
 
-    if (XmFontListGetNextFont(context, &charset, &font))
+    /* The first entry's font, as XmFontListGetNextFont (obsolete) gave it */
+    if ((entry = XmFontListNextEntry(context)) != NULL)
     {
         XmFontListFreeFontContext(context);
-	XtFree(charset);
-	return(font);
+	return(fontlist_entry_first_font(entry));
     }
     else if (util_get_verbosity() > 0)
     {
@@ -413,27 +446,97 @@ objxm_xmstr_to_str(
     XmString    xmstr
 )
 {
-    XmStringContext   context;
-    XmStringCharSet   char_set_tag;
-    XmStringDirection dir;
-    Boolean           sep;
-    char	      buf[MAXPATHLEN], *seg, *p;
+    XmStringContext       context;
+    XmStringComponentType type;
+    unsigned int          len;
+    XtPointer             value;
+    Boolean               has_text = FALSE, has_tabs = FALSE;
+    Boolean               new_rends = FALSE;
+    char	          buf[MAXPATHLEN], *seg, *p;
 
     p = buf;
+    *p = '\0';
     if (XmStringInitContext(&context, xmstr))
     {
-        while(XmStringGetNextSegment(context, &seg,
-                        &char_set_tag, &dir, &sep))
+	/*
+	 * The text of each segment XmStringGetNextSegment (obsolete)
+	 * returned, plus a newline if a separator ended the segment.
+	 * A segment is the tabs and text up to the next separator or
+	 * the next segment's leading components.
+	 */
+        while ((type = XmStringGetNextTriple(context, &len, &value))
+		!= XmSTRING_COMPONENT_END)
 	{
-	    snprintf(p, sizeof(buf), "%s", seg);
-	    p += (strlen(p));
-	    if (sep == TRUE)
+	    seg = NULL;
+	    switch (type)
 	    {
-		*p++ = '\n';
-		*p   = '\0';
+	    case XmSTRING_COMPONENT_LAYOUT_PUSH:
+		if (has_text || has_tabs)
+		    has_text = has_tabs = new_rends = FALSE;
+		break;
+	    case XmSTRING_COMPONENT_RENDITION_BEGIN:
+		if (has_text)
+		    has_text = has_tabs = new_rends = FALSE;
+		else if (has_tabs)
+		    new_rends = TRUE;
+		break;
+	    case XmSTRING_COMPONENT_TAG:
+	    case XmSTRING_COMPONENT_LOCALE:
+	    case XmSTRING_COMPONENT_DIRECTION:
+		if (has_text)
+		    has_text = has_tabs = new_rends = FALSE;
+		break;
+	    case XmSTRING_COMPONENT_TAB:
+		if (has_text)
+		    has_text = has_tabs = new_rends = FALSE;
+		has_tabs = TRUE;
+		break;
+	    case XmSTRING_COMPONENT_TEXT:
+	    case XmSTRING_COMPONENT_LOCALE_TEXT:
+	    case XmSTRING_COMPONENT_WIDECHAR_TEXT:
+		if (has_text || (has_tabs && new_rends))
+		    has_text = has_tabs = new_rends = FALSE;
+		has_text = TRUE;
+		if (type != XmSTRING_COMPONENT_WIDECHAR_TEXT)
+		{
+		    seg = (char *)value;
+		    value = NULL;
+		}
+		else
+		{
+		    size_t mb_len = (len * MB_CUR_MAX) / sizeof(wchar_t);
+
+		    seg = XtMalloc(mb_len + 1);
+		    mb_len = wcstombs(seg, (wchar_t *)value, mb_len);
+		    if (mb_len == (size_t)-1)
+		    {
+			XtFree(seg);
+			XtFree((char *)value);
+			goto done;
+		    }
+		    seg[mb_len] = '\0';
+		}
+		break;
+	    case XmSTRING_COMPONENT_SEPARATOR:
+		if (has_text || has_tabs)
+		{
+		    *p++ = '\n';
+		    *p   = '\0';
+		}
+		has_text = has_tabs = new_rends = FALSE;
+		break;
+	    default:
+		break;
 	    }
-	    XtFree(seg);
+	    XtFree((char *)value);
+	    if (seg != NULL)
+	    {
+		snprintf(p, sizeof(buf), "%s", seg);
+		p += (strlen(p));
+		XtFree(seg);
+	    }
 	}
+done:
 	XmStringFreeContext(context);
 	return((STRING)XtNewString(buf));
     }
