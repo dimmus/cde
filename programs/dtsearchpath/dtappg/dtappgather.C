@@ -76,6 +76,8 @@
 #include "DirIterator.h"
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <unistd.h>
 #include <iostream>
 
 Options * options;
@@ -106,7 +108,8 @@ AppManagerDirectory::AppManagerDirectory
 	const CString &  app
 	) : user_(user),
 	    appsp_(app),
-	    langVersionFound(0)
+	    langVersionFound(0),
+	    update_(!options->Retain())
 {
     // Set the users Application Manager subdirectory
 
@@ -133,18 +136,21 @@ AppManagerDirectory::AppManagerDirectory
 
 	user->OS()->changeOwnerGroup(dirname_,"","");
 	user->OS()->changePermissions(dirname_,0755);
+
+	// With -r, keep what is there but backups and dead links.
+	// Otherwise Update() makes the directory hold just the links
+	// gathered, changing only what differs: it used to remove
+	// everything here and link it all again, so at every login the
+	// Application Manager directory was empty for a moment and
+	// changed (its mtime) even when nothing else had.
+	if (options->Retain()) {
 #ifdef sun
-	user->OS()->removeFiles(dirname_, ".~*");
+	    user->OS()->removeFiles(dirname_, ".~*");
 #else
-	user->OS()->removeFiles(dirname_, "[.]~*");
+	    user->OS()->removeFiles(dirname_, "[.]~*");
 #endif
-	user->OS()->removeDeadLinks(dirname_);
-	if (!options->Retain())
-#ifdef sun
-	    user->OS()->removeFiles(dirname_,"*");
-#else
-	    user->OS()->removeFiles(dirname_,"[.]*");
-#endif
+	    user->OS()->removeDeadLinks(dirname_);
+	}
     }
     else {
 
@@ -307,13 +313,76 @@ void AppManagerDirectory::GatherAppsFromASearchElement
 #endif
 		wanted = stat(spath.data(), &file) == 0 &&
 			 (S_ISDIR(file.st_mode) || S_ISREG(file.st_mode));
-	    if (wanted)
-		if (goodFile(dirname_, dname))
-		    user_->OS()->symbolicLink (spath, dirname_ + "/" + dname);
+	    if (!wanted)
+		continue;
+	    if (update_) {
+		// The first of a name wins, as below.
+		if (dname != "." && dname != ".." &&
+		    wantedIndex_.find(dname.data()) == wantedIndex_.end()) {
+		    wantedIndex_[dname.data()] = wanted_.size();
+		    wanted_.push_back(std::make_pair(std::string(dname.data()),
+						     std::string(spath.data())));
+		}
+	    }
+	    else if (goodFile(dirname_, dname))
+		user_->OS()->symbolicLink (spath, dirname_ + "/" + dname);
 	}
 
 	user_->OS()->setUserId();
     }
+}
+
+/*********************************************************************
+ *
+ *  Update()
+ *
+ *	Without -r: make the directory hold the links gathered and
+ *	nothing else.  A link that is there already, to the same
+ *	target, is kept; anything else is removed (as it was before
+ *	gathering) and the missing links are made.
+ *
+ *********************************************************************/
+void AppManagerDirectory::Update()
+{
+    std::vector<std::string> names;
+    std::vector<char> present(wanted_.size(), 0);
+
+    if (!update_)
+	return;
+
+    {
+	DirectoryIterator dir(dirname_);
+	struct dirent * direntry;
+
+	while ((direntry = dir()))
+	    if (strcmp(direntry->d_name, ".") != 0 &&
+		strcmp(direntry->d_name, "..") != 0)
+		names.push_back(direntry->d_name);
+    }
+
+    for (size_t i = 0; i < names.size(); i++) {
+	std::map<std::string, size_t>::const_iterator w =
+	    wantedIndex_.find(names[i]);
+	CString path(dirname_ + "/" + names[i].c_str());
+
+	if (w != wantedIndex_.end()) {
+	    const std::string & target = wanted_[w->second].second;
+	    std::vector<char> buf(target.size() + 2);
+	    ssize_t n = readlink(path.data(), &buf[0], buf.size());
+
+	    if (n == (ssize_t) target.size() &&
+		target.compare(0, target.size(), &buf[0], n) == 0) {
+		present[w->second] = 1;
+		continue;
+	    }
+	}
+	user_->OS()->removeFile(path);
+    }
+
+    for (size_t i = 0; i < wanted_.size(); i++)
+	if (!present[i])
+	    user_->OS()->symbolicLink(wanted_[i].second.c_str(),
+				      dirname_ + "/" + wanted_[i].first.c_str());
 }
 
 int main (int argc, char **argv)
@@ -330,6 +399,7 @@ int main (int argc, char **argv)
 
     AppManagerDirectory * appman = new AppManagerDirectory(user, app);
     appman->TraversePath();
+    appman->Update();
 
     user->OS()->changePermissions((*appman)(),0555);
 

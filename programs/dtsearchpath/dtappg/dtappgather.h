@@ -40,6 +40,9 @@
  ********************************************************************/
 
 #include "Environ.h"
+#include <map>
+#include <string>
+#include <vector>
 
 class AppManagerDirectory {
  public:
@@ -49,6 +52,7 @@ class AppManagerDirectory {
 
   void GatherAppsFromASearchElement (const CString & path);
   void TraversePath();
+  void Update();
 
   char * operator()() const { return dirname_.data(); }
 
@@ -59,6 +63,12 @@ class AppManagerDirectory {
   CDEEnvironment * user_;
   CString          appsp_;
   int              langVersionFound;
+
+  // Without -r: the links the directory should hold (name, target),
+  // made by Update() changing only what differs.
+  int                                   update_;
+  std::vector<std::pair<std::string, std::string> > wanted_;
+  std::map<std::string, size_t>         wantedIndex_;
 };
 
 
