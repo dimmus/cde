@@ -70,6 +70,13 @@ protected:
    int _open(int mode);
    Boolean v_file_exist;
 
+// a read-only store is read from a mapping of its file (see readString)
+   char* f_map;
+   long f_map_len;
+   Boolean f_map_tried;
+   void _map();
+   void _unmap();
+
 public:
 // mode: see ios::in etc. stuff in file iostream.h 
    unixf_storage( char* file_path, 

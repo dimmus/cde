@@ -50,6 +50,10 @@
 
 #include "storage/unixf_storage.h"
 
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #ifdef _IBMR2 /* connolly 2/21/95 from the AIX fsync() manpage */
 extern "C" int fsync(int fd);
 #endif
@@ -63,7 +67,8 @@ unixf_storage( char* file_path, char* file_name,
              ) :
 abs_storage( file_path, file_name, UNIX_STORAGE_CODE, rep_p ), 
 fstream(), mode(m),
-total_bytes(-1), v_file_exist(exist_file(file_name, file_path))
+total_bytes(-1), v_file_exist(exist_file(file_name, file_path)),
+f_map(0), f_map_len(0), f_map_tried(false)
 {
 }
 
@@ -77,8 +82,12 @@ MESSAGE(cerr, "~unixf storeage ()");
    debug(cerr, my_path());
    debug(cerr, my_name());
 */
-   if ( policy )
+   // (a store read only through its mapping never had its file open,
+   // and is not in the open files' policy, whose remove() throws then)
+   if ( policy && get_position() != NOWHERE )
       policy -> remove(*this);
+
+   _unmap();
 
 #ifdef REPORT_IO_COUNT
 #endif
@@ -86,6 +95,9 @@ MESSAGE(cerr, "~unixf storeage ()");
 
 void unixf_storage::remove()
 {
+   _unmap();
+   f_map_tried = true;
+
 #ifdef C_API
    int fd = rdbuf() -> fd();
    fsync(fd);
@@ -199,11 +211,68 @@ int unixf_storage::_open(int new_mode)
 }
 
 /***********************************************************/
+// Mapping of a read-only store.
+//
+// A store opened read-only (an information library: dtinfo reads its
+// pages through readString() on every page cache miss) is read from a
+// shared, read-only mapping of its file instead of with seekg() and
+// read() on the fstream: two system calls and a copy through the
+// stream's buffer per page.  The mapping is made at the first read and
+// covers the file as it is then (which an information library does not
+// outgrow); a read outside it, or of a store that is not read-only, or
+// when the file cannot be mapped, goes through the fstream as before.
+// A store that is written to, truncated or removed drops its mapping.
+/***********************************************************/
+void unixf_storage::_map()
+{
+   struct stat st;
+   void* m;
+   int fd;
+
+   f_map_tried = true;
+
+   fd = ::open(::form("%s/%s", path, name), O_RDONLY);
+   if ( fd < 0 )
+      return;
+
+   if ( fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0 &&
+        (m = mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0)) != MAP_FAILED )
+   {
+      f_map = (char*)m;
+      f_map_len = st.st_size;
+   }
+
+   ::close(fd);
+}
+
+void unixf_storage::_unmap()
+{
+   if ( f_map ) {
+      munmap(f_map, f_map_len);
+      f_map = 0;
+      f_map_len = 0;
+   }
+}
+
+/***********************************************************/
 // Read a string from the store. Use internal buffer.
 /***********************************************************/
 int 
 unixf_storage::readString(mmdb_pos_t loc, char* base, int len, int str_off)
 {
+   if ( !BIT_TEST(mode, ios::out) ) {
+
+      if ( f_map == 0 && f_map_tried == false )
+         _map();
+
+      long offset = long(loc) + str_off;
+
+      if ( f_map && len >= 0 && offset >= 0 && offset + len <= f_map_len ) {
+         memcpy(base, f_map + offset, len);
+         return 0;
+      }
+   }
+
    _open(ios::in);
      
    int offset = int(loc) + str_off;
@@ -245,6 +314,9 @@ fprintf(stderr, "flush option=%d\n", flush_opt);
 */
 
    _open(ios::out);
+
+   _unmap();
+   f_map_tried = true;
 
 #ifdef C_API
    if ( ! seekg(loc+string_ofst, ios::beg) ) {
@@ -367,6 +439,9 @@ int unixf_storage::truncate(int target_length_in_bytes)
    char *fmt = NULL;
 
    _open(ios::out);
+
+   _unmap();
+   f_map_tried = true;
 
    if ( total_bytes > target_length_in_bytes ) {
       fmt = ::form("%s/%s", path, name);
