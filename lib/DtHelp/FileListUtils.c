@@ -275,7 +275,7 @@ static int ScanDirForFiles(
         /* and a match is found */
 	if ( NULL != matchedSuffix ) 
 	{
-           Boolean mod;
+           Boolean mod = False;	/* not set if no title is made */
 
            /* then generate the full path and add to the list */
 	   strcpy (ptr, result->d_name);

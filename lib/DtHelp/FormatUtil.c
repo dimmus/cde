@@ -485,8 +485,12 @@ _DtHelpCeGetNxtBuf(
 	return -1;
       }
 
-    (void ) strcpy (dst, (*src));
-    leftOver = strlen (dst);
+    /*
+     * the rest of the buffer moves to its start: *src points into dst
+     * (memmove: strcpy may not copy between overlapping strings)
+     */
+    leftOver = strlen (*src);
+    memmove (dst, *src, leftOver + 1);
 
     result = _DtHelpCeReadBuf (file, &(dst[leftOver]), (max_size - leftOver));
 

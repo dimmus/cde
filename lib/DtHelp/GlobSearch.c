@@ -1706,7 +1706,7 @@ static void VolListBuild(
           Boolean               displayStatus,
           Boolean               selectedVolumesOnly)
 {
-    Boolean mod;
+    Boolean mod = False;	/* the scan only ORs into it */
     XmFontList origFontList;
 
     /* turn on hour glass */
@@ -2092,7 +2092,7 @@ static void PrepSearchSourceData(
 
        if (NULL == cur && NULL != path)  /*file was located but isn't in list*/
        {  /* add it to the list */
-          Boolean mod;
+          Boolean mod = False;
           XmFontList origFontList;
 
           origFontList = hw->help_dialog.srch.volTitlesFontList;
