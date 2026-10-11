@@ -2304,3 +2304,15 @@ lib/DtMmdb/compression/sgml.C
 lib/DtMmdb/schema/sheet.C
 lib/DtMmdb/schema/sheet.tab.h
 lib/DtMmdb/schema/token.C
+
+# contrib generated files
+contrib/desktop2dt/desktop2dt
+contrib/desktopentry/cde.desktop
+contrib/rc/freebsd/dtlogin
+contrib/rc/linux/dtlogin
+contrib/rc/netbsd/dtlogin
+contrib/rc/openbsd/cmsd
+contrib/rc/openbsd/dtlogin
+contrib/xinetd/cmsd
+contrib/xinetd/ttdbserver
+contrib/rc/systemd/dtlogin.service
