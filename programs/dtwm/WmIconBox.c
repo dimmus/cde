@@ -3527,7 +3527,8 @@ String WmXmStringToString (XmString xmString)
           xmStrValue = NULL;
         }   
     }
-        
+
+    XmStringFreeContext(xmStrContext);
     return(asciiString);
 
 } /* END OF FUNCTION WmXmStringToString */
