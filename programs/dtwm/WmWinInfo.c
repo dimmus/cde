@@ -4019,8 +4019,9 @@ ProcessMwmHints (ClientData *pCD)
 	    }
 	    else
 	    {
-		/* client indicating applicable functions */
-		pCD->clientFunctions |= pHints->functions;
+		/* client indicating applicable functions (Motif: a client can
+		 * only take functions away, never add any) */
+		pCD->clientFunctions &= pHints->functions;
 	    }
 #if 0
 	    if (!(pCD->clientFlags & GOT_DT_WM_HINTS) &&
@@ -4056,8 +4057,9 @@ ProcessMwmHints (ClientData *pCD)
 	    }
 	    else
 	    {
-		/* client indicating decorations to be added */
-		pCD->clientDecoration |= pHints->decorations;
+		/* client indicating the decorations it wants (Motif: of the
+		 * ones it would otherwise get) */
+		pCD->clientDecoration &= pHints->decorations;
 	    }
 
 	    /*

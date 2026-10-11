@@ -2289,8 +2289,8 @@ static void request_extents(Window w, const long ext[4], const char *what)
 static const long no_extents[4] = { 0, 0, 0, 0 };
 
 /*
- * Functions given as those that do not apply: dtwm adds those given as
- * applying to its own (mwm keeps only them).
+ * Functions given as those that do not apply (MWM_FUNC_ALL set) or as
+ * the only ones that apply: both only take functions away.
  */
 #define NOT_MOVE_CLOSE (MWM_FUNC_ALL | MWM_FUNC_RESIZE | MWM_FUNC_MINIMIZE | \
 			MWM_FUNC_MAXIMIZE)
@@ -2335,6 +2335,15 @@ static void test_actions(void)
 		       "CHANGE_DESKTOP", "STICK", "ABOVE", "BELOW", NULL);
 	expect_real_extents(m, "a window without resize handles");
 	real_extents(m, fixed);
+
+	/* the same, given as the functions that apply */
+	t = create_window("ewmhtest actions only move close", None);
+	set_mwm_hints(t, MWM_HINTS_FUNCTIONS, MWM_FUNC_MOVE | MWM_FUNC_CLOSE, 0);
+	map_managed(t);
+	expect_actions(t, "a window that may only move and close", "MOVE",
+		       "CLOSE", "CHANGE_DESKTOP", "STICK", "ABOVE", "BELOW",
+		       NULL);
+	destroy_window(t);
 
 	/* and when the client changes them */
 	set_mwm_hints(w, MWM_HINTS_FUNCTIONS, MWM_FUNC_ALL | MWM_FUNC_RESIZE |
