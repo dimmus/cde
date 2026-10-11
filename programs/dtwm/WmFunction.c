@@ -41,6 +41,7 @@
 #include "WmGlobal.h"
 #include <stdio.h>
 #include <X11/Xos.h>
+#include <X11/Xlib-xcb.h>
 #include "WmICCC.h"
 #include "WmWrkspace.h"  /* for ClientInWorkspace() test */
 #include <Dt/EnvControlP.h>  /* for restoring **environ before an exec() */
@@ -2994,37 +2995,76 @@ Boolean F_Marquee_Selection (String args, ClientData *pCD, XEvent *event)
  *
  *  Description:
  *  -----------
- *  Recursively refresh this window and its children by doing
- *  XClearAreas
+ *  Refresh this window and all of its descendants by doing XClearAreas
+ *  (with exposures).
+ *
+ *  The tree is walked a level at a time: the QueryTree requests of all
+ *  the windows of a level are sent before the first reply is read
+ *  (through XCB, which Xlib uses underneath), so that the walk costs a
+ *  round trip per level of the tree rather than per window (f.refresh
+ *  of a desktop of 3000 windows used to wait for 3000 replies).  Each
+ *  window is still cleared before its children.
  *
  *************************************<->***********************************/
 static void
 RefreshByClearing (Window win)
 {
-    Status status;
-    int i;
-    Window root, parent;
-    unsigned int nchildren;
-    Window *winChildren;
+    xcb_connection_t *conn = XGetXCBConnection (DISPLAY);
+    xcb_query_tree_cookie_t *cookies = NULL;
+    Window *level, *next;
+    unsigned int numLevel = 1, numNext, maxNext, maxCookies = 0, i;
 
-    /* clear this window */
-    XClearArea(DISPLAY, win, 0, 0, 0, 0, True);
+    level = (Window *) XtMalloc (sizeof (Window));
+    level[0] = win;
 
-    /* find any children and clear them, too */
-    status = XQueryTree(DISPLAY, win, &root, &parent, &winChildren,
-		    &nchildren);
-    if (status != 0)
+    while (numLevel > 0)
     {
-	/* recurse for each child window */
-	for (i=0; i<nchildren; ++i) 
-        {
-	    RefreshByClearing(winChildren[i]);
+	if (numLevel > maxCookies)
+	{
+	    maxCookies = numLevel;
+	    cookies = (xcb_query_tree_cookie_t *) XtRealloc ((char *) cookies,
+		maxCookies * sizeof (xcb_query_tree_cookie_t));
 	}
 
-	/* clean up */
-	if (nchildren > 0) 
-	    XFree((char *)winChildren);
+	for (i = 0; i < numLevel; i++)
+	{
+	    /* clear this window, then find its children */
+	    XClearArea (DISPLAY, level[i], 0, 0, 0, 0, True);
+	    cookies[i] = xcb_query_tree (conn, (xcb_window_t) level[i]);
+	}
+
+	numNext = maxNext = 0;
+	next = NULL;
+	for (i = 0; i < numLevel; i++)
+	{
+	    xcb_query_tree_reply_t *reply;
+	    xcb_window_t *children;
+	    int j, num;
+
+	    /* NULL if the window went away meanwhile */
+	    reply = xcb_query_tree_reply (conn, cookies[i], NULL);
+	    if (!reply)
+		continue;
+	    children = xcb_query_tree_children (reply);
+	    num = xcb_query_tree_children_length (reply);
+	    if (numNext + num > maxNext)
+	    {
+		maxNext = 2 * (numNext + num);
+		next = (Window *) XtRealloc ((char *) next,
+					     maxNext * sizeof (Window));
+	    }
+	    for (j = 0; j < num; j++)
+		next[numNext++] = children[j];
+	    free (reply);
+	}
+
+	XtFree ((char *) level);
+	level = next;
+	numLevel = numNext;
     }
+
+    XtFree ((char *) level);
+    XtFree ((char *) cookies);
 }
 
 
