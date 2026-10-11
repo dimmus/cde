@@ -419,13 +419,21 @@ dnl code can use it directly without each Makefile.am having to add a
 dnl -DCDE_*_TOP=... define). Defaults preserve the historical CDE layout.
 dnl ----------------------------------------------------------------------
 
+AC_ARG_WITH([cde-install-dir],
+    AS_HELP_STRING([--with-cde-install-dir=DIR],
+        [root of the CDE tree (config, appconfig, app-defaults, ... and the
+         paths compiled into the programs) @<:@default=/usr/dt, whatever
+         --prefix is@:>@]),
+    [CDE_INSTALLATION_TOP="$withval"],
+    [CDE_INSTALLATION_TOP="$ac_default_prefix"])
+
 AC_ARG_WITH([cde-data-dir],
     AS_HELP_STRING([--with-cde-data-dir=DIR],
         [directory for CDE arch-independent data
          (backdrops, palettes, types, app-defaults, appconfig, infolib,
-         lib/nls) @<:@default=PREFIX@:>@]),
+         lib/nls) @<:@default=the CDE installation directory@:>@]),
     [CDE_DATA_TOP="$withval"],
-    [CDE_DATA_TOP='${prefix}'])
+    [CDE_DATA_TOP='${CDE_INSTALLATION_TOP}'])
 
 AC_ARG_WITH([cde-config-dir],
     AS_HELP_STRING([--with-cde-config-dir=DIR],
@@ -446,11 +454,12 @@ AC_ARG_WITH([cde-libexec-dir],
     [CDE_LIBEXEC_DIR="$withval"],
     [CDE_LIBEXEC_DIR='${bindir}'])
 
-dnl CDE_INSTALLATION_TOP follows --prefix. The previous code used
-dnl ${ac_default_prefix} which always resolves to AC_PREFIX_DEFAULT
-dnl (/usr/dt) regardless of --prefix, so packagers passing --prefix=/usr
-dnl unexpectedly got /usr/dt baked into their binaries.
-CDE_INSTALLATION_TOP='${prefix}'
+dnl CDE_INSTALLATION_TOP is /usr/dt unless --with-cde-install-dir says
+dnl otherwise.  (Upstream CDE makes it follow --prefix; here --prefix=/usr
+dnl keeps putting the programs in /usr/bin and the CDE tree in /usr/dt, as
+dnl it always did.  A distribution layout passes, for example,
+dnl --with-cde-install-dir=/usr --with-cde-data-dir=/usr/share/cde
+dnl --with-cde-config-dir=/etc/cde --with-cde-state-dir=/var/lib/cde.)
 CDE_USER_TOP=.dt
 
 AC_SUBST(CDE_INSTALLATION_TOP)
@@ -470,9 +479,13 @@ eval _cde_install_top="\"$CDE_INSTALLATION_TOP\""
 eval _cde_data_top="\"$CDE_DATA_TOP\""
 eval _cde_libexec_dir="\"$CDE_LIBEXEC_DIR\""
 eval _cde_libexec_dir="\"$_cde_libexec_dir\""
+dnl Substitute the resolved values too, so that the files config.status
+dnl makes from .in templates (help files, contrib scripts) get real paths.
+CDE_INSTALLATION_TOP="$_cde_install_top"
+CDE_DATA_TOP="$_cde_data_top"
 
 AC_DEFINE_UNQUOTED([CDE_INSTALLATION_TOP], ["$_cde_install_top"],
-    [Top of the CDE installation tree (== --prefix)])
+    [Top of the CDE installation tree])
 AC_DEFINE_UNQUOTED([CDE_DATA_TOP], ["$_cde_data_top"],
     [Top of the CDE arch-independent data tree])
 AC_DEFINE_UNQUOTED([CDE_CONFIGURATION_TOP], ["$CDE_CONFIGURATION_TOP"],

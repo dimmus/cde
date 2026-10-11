@@ -16,6 +16,7 @@
 #   ./configure --prefix=/usr \
 #     --bindir=/usr/bin --libdir=/usr/lib64 --includedir=/usr/include \
 #     --sysconfdir=/etc \
+#     --with-cde-install-dir=/usr \
 #     --with-cde-data-dir=/usr/share/cde \
 #     --with-cde-config-dir=/etc/cde \
 #     --with-cde-state-dir=/var/lib/cde \
