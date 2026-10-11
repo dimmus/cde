@@ -3,7 +3,7 @@
 
 noinst_LIBRARIES += %reldir%/libWidgets.a
 %canon_reldir%_libWidgets_a_CPPFLAGS = -I%reldir% -I$(srcdir)/%reldir% \
-	$(DTINFO_DIR_CPPFLAGS)
+	$(DTINFO_DIR_CPPFLAGS) $(DTINFO_FILE_MAP)
 %canon_reldir%_libWidgets_a_CXXFLAGS = $(DTINFO_LIB_CXXFLAGS)
 %canon_reldir%_libWidgets_a_SOURCES = %reldir%/Pixmap.c %reldir%/Tree.c %reldir%/Panner.c \
 	%reldir%/Simple.c %reldir%/Porthole.c %reldir%/XawInitFake.c \

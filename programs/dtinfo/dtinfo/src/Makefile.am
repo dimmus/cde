@@ -28,6 +28,12 @@ include Classlist.mk
 AUTOMAKE_OPTIONS = nostdinc
 
 DTINFO_DIR_CPPFLAGS = -I$(top_builddir)/include $(CDE_CPPFLAGS)
+
+# In the objects of the directories, __FILE__ (which the assertion
+# messages print) names the source file without its directory, as when
+# each directory had its own make: $(@D) is the directory of the object
+# being compiled.  (-fmacro-prefix-map came with -ffile-prefix-map.)
+DTINFO_FILE_MAP = $(if $(findstring -ffile-prefix-map,$(CDE_CXXFLAGS)),-fmacro-prefix-map=$(@D)/=)
 DTINFO_OTHER_INCLUDES = $(UAS_INCLUDES) $(MMDB_INCLUDES) $(WWL_INCLUDES)
 DTINFO_LIB_INCLUDES = -I. -I$(srcdir) $(DTINFO_OTHER_INCLUDES)
 DTINFO_LIB_CXXFLAGS = $(CDE_CXXFLAGS) $(DTINFO_DEFINES) $(DTINFO_LIB_INCLUDES)

@@ -5,7 +5,7 @@ include %reldir%/Classlist.mk
 
 noinst_LIBRARIES += %reldir%/libDtSR.a
 %canon_reldir%_libDtSR_a_CPPFLAGS = -I%reldir% -I$(srcdir)/%reldir% \
-	$(DTINFO_DIR_CPPFLAGS)
+	$(DTINFO_DIR_CPPFLAGS) $(DTINFO_FILE_MAP)
 %canon_reldir%_libDtSR_a_CXXFLAGS = $(CDE_CXXFLAGS) -I$(srcdir)/%reldir%/../Base \
 	-I$(srcdir)/%reldir%/Util_Classes -I. -I$(srcdir) \
 	$(DTINFO_DEFINES) -I$(srcdir)/%reldir%/.. $(DTINFO_OTHER_INCLUDES)

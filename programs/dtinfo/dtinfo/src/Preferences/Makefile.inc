@@ -5,7 +5,7 @@ include %reldir%/Classlist.mk
 
 noinst_LIBRARIES += %reldir%/libPreferences.a
 %canon_reldir%_libPreferences_a_CPPFLAGS = -I%reldir% -I$(srcdir)/%reldir% \
-	$(DTINFO_DIR_CPPFLAGS)
+	$(DTINFO_DIR_CPPFLAGS) $(DTINFO_FILE_MAP)
 %canon_reldir%_libPreferences_a_CXXFLAGS = $(DTINFO_LIB_CXXFLAGS)
 %canon_reldir%_libPreferences_a_SOURCES = $(Preferences_SRCS)
 %canon_reldir%_libPreferences_a_AR = $(LD) -r -o

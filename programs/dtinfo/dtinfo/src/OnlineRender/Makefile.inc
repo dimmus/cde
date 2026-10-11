@@ -5,7 +5,7 @@ include %reldir%/Classlist.mk
 
 noinst_LIBRARIES += %reldir%/libOnlineRender.a
 %canon_reldir%_libOnlineRender_a_CPPFLAGS = -I%reldir% -I$(srcdir)/%reldir% \
-	$(DTINFO_DIR_CPPFLAGS)
+	$(DTINFO_DIR_CPPFLAGS) $(DTINFO_FILE_MAP)
 %canon_reldir%_libOnlineRender_a_CXXFLAGS = $(DTINFO_LIB_CXXFLAGS)
 %canon_reldir%_libOnlineRender_a_SOURCES = %reldir%/CanvasRenderer.C %reldir%/FeatureSupport.C \
 	%reldir%/FontCache.C %reldir%/SegClientData.C

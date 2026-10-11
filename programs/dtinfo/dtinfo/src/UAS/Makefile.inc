@@ -9,7 +9,7 @@ include %reldir%/DtSR/Makefile.inc
 
 noinst_LIBRARIES += %reldir%/libUAS.a
 %canon_reldir%_libUAS_a_CPPFLAGS = -I%reldir% -I$(srcdir)/%reldir% \
-	$(DTINFO_DIR_CPPFLAGS)
+	$(DTINFO_DIR_CPPFLAGS) $(DTINFO_FILE_MAP)
 %canon_reldir%_libUAS_a_CXXFLAGS = $(DTINFO_LIB_CXXFLAGS)
 %canon_reldir%_libUAS_a_SOURCES =
 %canon_reldir%_libUAS_a_LIBADD = %reldir%/Base/libBase.a %reldir%/MMDB/libMMDB.a %reldir%/DtSR/libDtSR.a
