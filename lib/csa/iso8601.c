@@ -151,6 +151,16 @@ _csa_iso8601_to_tick(char *buf, time_t *tick_out)
  *
  * Note 2: All input and output time information is UTC.
  */
+/* n decimal digits of v (0 <= v < 10^n), zero-padded */
+static void
+put_digits(char *p, int v, int n)
+{
+	while (n-- > 0) {
+		p[n] = '0' + v % 10;
+		v /= 10;
+	}
+}
+
 int
 _csa_tick_to_iso8601(time_t tick, char *buf_out)
 {
@@ -167,14 +177,27 @@ _csa_tick_to_iso8601(time_t tick, char *buf_out)
 	if ((time_str = _XGmtime(&tk, gmtime_buf)) == NULL)
 		return (-1);
 
-	/* format string forces fixed width (zero-padded) fields */
-	sprintf(buf_out, "%04d%02d%02dT%02d%02d%02dZ",
-		time_str->tm_year + 1900,
-		time_str->tm_mon + 1,
-		time_str->tm_mday,
-		time_str->tm_hour,
-		time_str->tm_min,
-		time_str->tm_sec);
+	/*
+	 * Fixed width, zero-padded fields: "%04d%02d%02dT%02d%02d%02dZ",
+	 * written digit by digit (this runs once per instance and date in
+	 * every lookup reply); sprintf for years of more than 4 digits.
+	 */
+	if (time_str->tm_year + 1900 > 9999) {
+		sprintf(buf_out, "%04d%02d%02dT%02d%02d%02dZ",
+			time_str->tm_year + 1900, time_str->tm_mon + 1,
+			time_str->tm_mday, time_str->tm_hour,
+			time_str->tm_min, time_str->tm_sec);
+		return (0);
+	}
+	put_digits(buf_out, time_str->tm_year + 1900, 4);
+	put_digits(buf_out + 4, time_str->tm_mon + 1, 2);
+	put_digits(buf_out + 6, time_str->tm_mday, 2);
+	buf_out[8] = 'T';
+	put_digits(buf_out + 9, time_str->tm_hour, 2);
+	put_digits(buf_out + 11, time_str->tm_min, 2);
+	put_digits(buf_out + 13, time_str->tm_sec, 2);
+	buf_out[15] = 'Z';
+	buf_out[16] = '\0';
 
 	return (0);
 }
