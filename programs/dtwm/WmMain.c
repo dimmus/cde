@@ -49,6 +49,7 @@
 #include "WmError.h"
 #include "WmIPC.h"
 #include "WmBackdrop.h"
+#include "../../tools/bench/startup-trace.h"
 
 
 /*
@@ -99,6 +100,8 @@ main (int argc, char *argv [], char *environ [])
 {
     XEvent	event;
     Boolean	dispatchEvent;
+
+    cde_startup_trace ("dtwm", "start");	/* CDE_STARTUP_TRACE */
 
     setlocale(LC_ALL, "");
 

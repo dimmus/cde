@@ -50,6 +50,7 @@
 #include "WmXSMP.h"
 #include "WmPanelP.h"
 #include "DataBaseLoad.h"
+#include "../../tools/bench/startup-trace.h"
 
 
 /*
@@ -525,6 +526,8 @@ WmFlushWorkspaceMessages (Boolean force)
 void 
 dtReadyNotification( void )
 {
+    cde_startup_trace ("dtwm", "ready");	/* CDE_STARTUP_TRACE */
+
     SendClientMsg( wmGD.dtSmWindow,
 		  (long) wmGD.xa_DT_SM_WM_PROTOCOL,
 		  (long) wmGD.xa_DT_WM_READY,

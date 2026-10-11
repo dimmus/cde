@@ -67,6 +67,7 @@
 
 #include "WmMultiHead.h"
 #include "WmWinState.h"
+#include "../../tools/bench/startup-trace.h"
 static void SlideWindowOut (ClientData *pCD);
 static void UnmapClients (ClientData *pCD, unsigned int event_mask);
 static void SetupWindowStateWithEventMask (ClientData *pCD, int newState, Time setTime, unsigned int event_mask);
@@ -194,6 +195,16 @@ void SetClientStateWithEventMask (ClientData *pCD, int newState, Time setTime, u
 	    XMapWindow (DISPLAY, pCD->client);
 	    XMapWindow (DISPLAY, pCD->clientFrameWin);
             WmStopWaiting();   /* in WmIPC.c */
+	    if (pCD->dtwmBehaviors & DtWM_BEHAVIOR_PANEL)
+	    {
+		static Boolean stamped;
+
+		if (!stamped)	/* CDE_STARTUP_TRACE */
+		{
+		    cde_startup_trace ("dtwm", "frontpanel-mapped");
+		    stamped = True;
+		}
+	    }
 	    EwmhClientShown (pCD);
 	    break;
 	}
