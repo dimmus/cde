@@ -70,6 +70,8 @@
 #include <sys/wait.h>
 #if defined(__linux__)
 #include <sys/vfs.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 #endif
 #include <Dt/DtPStrings.h>
 
@@ -3466,7 +3468,8 @@ RFCMailBox::writeMailBox(DtMailEnv &error, DtMailBoolean hide_access)
   // this way if we run out of disk space or some other such problem,
   // it is caught here and now.
   //
-  unsigned long bytesWritten = SafeWritev(fd, iovFirst, iovLast-iovFirst);
+  unsigned long bytesWritten =
+    writeMailBoxVectors(fd, iovFirst, (int) (iovLast-iovFirst));
   if (bytesWritten == (unsigned long)-1 || fsync(fd) == -1) {
     int errno2 = errno;
     for (tempMsgList *tml = tmlFirst; tml < tmlLast; tml++) {
@@ -3637,6 +3640,88 @@ RFCMailBox::writeMailBox(DtMailEnv &error, DtMailBoolean hide_access)
   free (iovFirst);
 
   return;
+}
+
+// Where in the mailbox file (_fd) do the len bytes at start come from?
+// Returns their file offset when they lie wholly inside one region that
+// maps the mailbox file, else -1 (a dirty message's rebuilt headers, or
+// a buffer object). The mapped regions are PROT_READ mappings of the
+// open mailbox, which is locked while it is written out, so the bytes
+// in memory and in the file are the same.
+//
+long
+RFCMailBox::mappedFileOffset(const char *start, size_t len)
+{
+  if (_space != DtMailFileObject || _fd < 0) {
+    return(-1);
+  }
+
+  int me = _mappings.length();
+  for (int m = 0; m < me; m++) {
+    MapRegion *map = _mappings[m];
+    // The mapping starts at file offset map->offset; the file's bytes
+    // run up to the end of the region's data.
+    const char *lo = map->map_region;
+    const char *hi = map->file_region + map->file_size;
+
+    if (start >= lo && start < hi) {
+      if (len > (size_t) (hi - start)) {
+	return(-1);
+      }
+      return(map->offset + (long) (start - lo));
+    }
+  }
+  return(-1);
+}
+
+// Write the new mailbox contents described by iov to fd, like
+// SafeWritev(). The new file is written whole, fsync()ed and renamed
+// over the old one as before, so a crash leaves the old mailbox intact;
+// but on file systems that can share extents between files (btrfs,
+// XFS, bcachefs, ...), the leading run of messages that are unchanged
+// is cloned from the old file with FICLONERANGE instead of being
+// copied: those blocks are neither read nor written, and fsync() has
+// only the rest to flush. So on such file systems a save writes in
+// effect only from the first changed (or deleted) message on. Other
+// file systems (ext4, tmpfs, NFS) refuse the ioctl at once and get the
+// plain write. Returns the number of bytes written, or -1 with errno
+// set.
+//
+unsigned long
+RFCMailBox::writeMailBoxVectors(int fd, struct iovec *iov, int iovcnt)
+{
+  unsigned long cloned = 0;
+
+#if defined(FICLONERANGE)
+  // Only the leading run qualifies: clone ranges must start at the
+  // same block-aligned offset in both files, which a later run only
+  // does by chance.
+  struct stat st;
+  if (iovcnt > 0 && iov[0].iov_len >= 65536 &&
+      mappedFileOffset((const char *) iov[0].iov_base, iov[0].iov_len) == 0 &&
+      fstat(fd, &st) == 0 && st.st_size == 0) {
+    unsigned long blk = st.st_blksize >= 4096 ? st.st_blksize : 4096;
+    unsigned long len = iov[0].iov_len - (iov[0].iov_len % blk);
+    struct file_clone_range range;
+
+    range.src_fd = _fd;
+    range.src_offset = 0;
+    range.src_length = len;
+    range.dest_offset = 0;
+    if (len > 0 && ioctl(fd, FICLONERANGE, &range) == 0 &&
+	lseek(fd, (off_t) len, SEEK_SET) == (off_t) len) {
+      iov[0].iov_base = (char *) iov[0].iov_base + len;
+      iov[0].iov_len -= len;
+      cloned = len;
+    }
+  }
+#endif
+
+  unsigned long written = SafeWritev(fd, iov, iovcnt);
+  if (written == (unsigned long) -1) {
+    return(written);
+  }
+  return(cloned + written);
 }
 
 void
