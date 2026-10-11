@@ -124,6 +124,12 @@ sun_wcwidth
 }
 #endif /*  USE_SUN_WCWIDTH_PATCH */
 
+int
+_DtTermPrimWcCellWidth(wchar_t wc)
+{
+    return(MAX(1, wcwidth(wc)));
+}
+
 short
 _DtTermPrimBufferGetTextWc
 (
@@ -225,6 +231,16 @@ _countWidth
     *width = 0;
     for (pwc = wcBuffer; pwc < wcBuffer + wcLen; pwc++)
     {
+	/* printable ASCII, the common case... */
+	if (((unsigned long) *pwc) - 0x20UL < 0x5fUL)
+	{
+	    if (*width + 1 > maxWidth)
+	    {
+		break;
+	    }
+	    *width += 1;
+	    continue;
+	}
         switch (charWidth = wcwidth(*pwc))
         {
           case -1:
@@ -348,7 +364,7 @@ _primBufferInsertWc
 	    for (pwc = ((wchar_t *)BUFFER(line)) + LENGTH(line) - 1; 
 		 pwc >= charInfo.u.pwc; pwc--)
 	    {
-		overflowWidth -= MAX(1, wcwidth(*pwc));
+		overflowWidth -= CELL_WIDTH(*pwc);
 
 		if (overflowWidth <= 0)
 		{

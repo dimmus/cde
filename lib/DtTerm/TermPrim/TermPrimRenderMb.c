@@ -309,10 +309,7 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 	    for (chunkLineWidth = 0, wc = linePtr;
 		    chunkLineWidth < chunkWidth;
 		    chunkLineWidth += i1, wc++) {
-		if ((i1 = wcwidth(*wc)) <= 0) {
-		    /* take care of null characters... */
-		    i1 = 1;
-		}
+		i1 = CELL_WIDTH(*wc);
 	    }
 	    /* adjust for a multi-column character that spans the line
 	     * boundary...
@@ -705,7 +702,7 @@ _DtTermPrimInsertTextWc
     insertCharWidth = 0;
 
     for (i = 0; (i < wcBufLen) && tpd->ptyInputId; i++) {
-	thisCharWidth = MAX(1, wcwidth(wcBuffer[i]));
+	thisCharWidth = CELL_WIDTH(wcBuffer[i]);
 
 	/* the following code performs two functions.  If we are in
 	 * autowrap, it performs a sanity check on the insert position.

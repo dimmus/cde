@@ -92,7 +92,18 @@ extern "C" {
 #define	MIN_SELECTION_COL  (0)
 #define	MAX_SELECTION_COL  (32700)
 #define	NON_SELECTION_COL  (-1)
-#define BYTES_PER_CHAR(tb) ((tb)->term_buffer.bytesPerChar) 
+#define BYTES_PER_CHAR(tb) ((tb)->term_buffer.bytesPerChar)
+
+/*
+** The number of columns a wide character takes in the buffer: 2 for a
+** double width character, else 1 (non-printing and zero width characters
+** take a column of their own).  Printable ASCII is 1 in every locale, so
+** it doesn't need a call to wcwidth().
+*/
+extern int _DtTermPrimWcCellWidth(wchar_t wc);
+#define	CELL_WIDTH(wc) \
+	((((unsigned long) (wc)) - 0x20UL < 0x5fUL) ? 1 : \
+	_DtTermPrimWcCellWidth(wc))
 
 /* 
 ** declare the private enhancement information

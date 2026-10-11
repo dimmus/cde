@@ -901,7 +901,7 @@ _DtTermPrimGetCharacterInfo
         charInfo->idx      = 0;
         charInfo->len      = BYTES_PER_CHAR(tb);
         charInfo->startCol = 0;
-        charInfo->width    = MAX(1, wcwidth(*((wchar_t *)BUFFER(line))));
+        charInfo->width    = CELL_WIDTH(*((wchar_t *)BUFFER(line)));
         charInfo->enh      = 0;
         charInfo->enhLen   = 0;
     }
@@ -920,7 +920,7 @@ _DtTermPrimGetCharacterInfo
                  pwc < (wchar_t *)BUFFER(line) + LENGTH(line);
                  pwc++)
             {
-                charWidth = MAX(1, wcwidth(*pwc));
+                charWidth = CELL_WIDTH(*pwc);
                 totalWidth += charWidth;
                 if (col < totalWidth)
                 {
@@ -945,7 +945,7 @@ _DtTermPrimGetCharacterInfo
                  pwc >= (wchar_t *)BUFFER(line);
                  pwc--)
             {
-                charWidth = MAX(1, wcwidth(*pwc));
+                charWidth = CELL_WIDTH(*pwc);
                 totalWidth -= charWidth;
                 if (totalWidth <= col)
                 {
