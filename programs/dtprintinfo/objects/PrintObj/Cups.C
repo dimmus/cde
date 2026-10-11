@@ -37,6 +37,10 @@
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
+#include <iconv.h>
+#include <langinfo.h>
+#include <strings.h>
+#include <wchar.h>
 
 static int cups_in_use = 0;
 
@@ -99,19 +103,78 @@ static http_t *Connect()
 		       cupsEncryption(), 1, 30000, NULL);
 }
 
-// A copy of s fit for one field of a line: no line breaks, no field
+// s, a UTF-8 string as IPP sends them, in the locale's character set, as
+// lpstat and lpq print it; NULL if no conversion is needed or possible.
+static char *FromUTF8(const char *s)
+{
+   const char *codeset = nl_langinfo(CODESET);
+   if (!codeset || !*codeset || !strcasecmp(codeset, "UTF-8") ||
+       !strcasecmp(codeset, "UTF8"))
+      return NULL;
+   char to[64];
+   snprintf(to, sizeof(to), "%s//TRANSLIT", codeset);
+   iconv_t cd = iconv_open(to, "UTF-8");
+   if (cd == (iconv_t)-1 && (cd = iconv_open(codeset, "UTF-8")) == (iconv_t)-1)
+      return NULL;
+   size_t len = strlen(s), size = 4 * len + 1;
+   char *out = (char *)malloc(size);
+   if (out)
+    {
+      char *in = (char *)s, *o = out;
+      size_t in_left = len, out_left = size - 1;
+      while (in_left > 0 &&
+	     iconv(cd, &in, &in_left, &o, &out_left) == (size_t)-1)
+       {
+	 // a byte that is not UTF-8 or a character the locale lacks
+	 if (errno == E2BIG || out_left == 0)
+	    break;
+	 *o++ = '?';
+	 out_left--;
+	 in++;
+	 in_left--;
+       }
+      *o = '\0';
+    }
+   iconv_close(cd);
+   return out;
+}
+
+// A copy of s fit for one field of a line: characters of the locale only
+// (anything else becomes '?': DtStrtok() stops at an invalid character
+// and the job parser would read NULL fields), no line breaks, no field
 // separator SEP, never empty (the parsers skip empty fields).
 static char *Field(const char *s, char sep, const char *empty)
 {
    if (!s || !*s)
       s = empty;
-   char *f = strdup(s);
-   if (!f)
+   char *f = FromUTF8(s);
+   if (!f && !(f = strdup(s)))
       return NULL;
-   char *p;
-   for (p = f; *p; p++)
-      if (*p == '\n' || *p == '\r' || *p == sep)
-	 *p = ' ';
+   mbstate_t state;
+   memset(&state, 0, sizeof(state));
+   char *p = f;
+   while (*p)
+    {
+      size_t n = mbrtowc(NULL, p, MB_CUR_MAX, &state);
+      if (n == (size_t)-1 || n == (size_t)-2)
+       {
+	 *p++ = '?';
+	 memset(&state, 0, sizeof(state));
+       }
+      else if (n == 1)
+       {
+	 if (*p == '\n' || *p == '\r' || *p == sep)
+	    *p = ' ';
+	 p++;
+       }
+      else
+	 p += n;
+    }
+   if (!*f)
+    {
+      free(f);
+      f = strdup(empty);
+    }
    return f;
 }
 
@@ -259,11 +322,6 @@ char *CupsPrintJobs(const char *printer, int *n_jobs)
       "job-k-octets",
       "time-at-creation"
     };
-   static const char * const months[] =
-    {
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-    };
    *n_jobs = 0;
    http_t *http = Connect();
    if (!http)
@@ -326,9 +384,13 @@ char *CupsPrintJobs(const char *printer, int *n_jobs)
       // The size as lpq gives it: job-k-octets * 1024 bytes
       if (f_title && f_user)
        {
-	 TextAdd(&t, "%s|%s|%d|%s|%s %d|%02d:%02d:%02d|%.0f\n", queue,
-		 f_title, id, f_user, months[tm.tm_mon % 12], tm.tm_mday,
-		 tm.tm_hour, tm.tm_min, tm.tm_sec, 1024.0 * k_octets);
+	 // date|time as the other job parsers write them, in the
+	 // locale's language
+	 char when[100];
+	 if (!strftime(when, sizeof(when), "%b %e|%T", &tm))
+	    strcpy(when, "-|-");
+	 TextAdd(&t, "%s|%s|%d|%s|%s|%.0f\n", queue, f_title, id, f_user,
+		 when, 1024.0 * k_octets);
 	 (*n_jobs)++;
        }
       free(f_title);
