@@ -46,6 +46,7 @@
 #include "WmWinList.h"
 #include "WmCEvent.h"
 #include "WmEvent.h"
+#include "WmEwmh.h"
 #include "WmFunction.h"
 #include "WmKeyFocus.h"
 #include "WmMenu.h"
@@ -103,6 +104,8 @@ void AddClientToList (WmWorkspaceData *pWS, ClientData *pCD, Boolean onTop)
     WmScreenData *pSD = pWS->pSD;
     WsClientData *pWsc = GetWsClientData (pWS, pCD);
 
+
+    EwmhMarkScreen (pSD, NET_SD_STACKING);
 
     if (pCD->inputMode == MWM_INPUT_SYSTEM_MODAL)
     {
@@ -234,6 +237,8 @@ void AddClientToList (WmWorkspaceData *pWS, ClientData *pCD, Boolean onTop)
 void AddEntryToList (WmWorkspaceData *pWS, ClientListEntry *pEntry, Boolean onTop, ClientListEntry *pStackEntry)
 {
     WmScreenData *pSD = pWS->pSD;
+
+    EwmhMarkScreen (pSD, NET_SD_STACKING);
 
     if (onTop)
     {
@@ -379,7 +384,8 @@ void MoveEntryInList (WmWorkspaceData *pWS, ClientListEntry *pEntry, Boolean onT
 
 void DeleteEntryFromList (WmWorkspaceData *pWS, ClientListEntry *pListEntry)
 {
-    
+    EwmhMarkScreen (pWS->pSD, NET_SD_STACKING);
+
     if (pListEntry->prevSibling)
     {
 	pListEntry->prevSibling->nextSibling = pListEntry->nextSibling;
@@ -428,6 +434,8 @@ void DeleteClientFromList (WmWorkspaceData *pWS, ClientData *pCD)
 {
     WsClientData *pWsc = GetWsClientData (pWS, pCD);
     WmScreenData *pSD = pWS->pSD;
+
+    EwmhMarkScreen (pSD, NET_SD_STACKING);
 
     if (pCD->transientLeader)
     {
@@ -1105,6 +1113,8 @@ void RestackTransients (ClientData *pcd)
     if (count < 2)
       return;
 
+    EwmhMarkScreen (pcd->pSD, NET_SD_STACKING);
+
     if (count > size)
     {
 	/*
@@ -1702,6 +1712,8 @@ void StackTransientWindow (ClientData *pcd)
     XWindowChanges changes;
     ClientData *pcdPrev;
 
+
+    EwmhMarkScreen (pcd->pSD, NET_SD_STACKING);
 
     if (pcd->transientLeader->transientChildren == pcd)
     {

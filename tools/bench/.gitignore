@@ -3,6 +3,7 @@
 /dtsvcbench
 /ttbench
 /dtwmbench
+/ewmhtest
 /cdebench-proxy
 /results/
 *.json

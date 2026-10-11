@@ -26,6 +26,38 @@
 #ifndef WMEWMH_H
 #define WMEWMH_H
 
+/*
+ * What EwmhFlushProc has to recompute and write, when it differs from
+ * what it last wrote.  Root window properties, per screen (pSD->netDirty,
+ * EwmhMarkScreen):
+ */
+#define NET_SD_CLIENTS		(1u << 0)	/* _NET_CLIENT_LIST */
+#define NET_SD_STACKING		(1u << 1)	/* _NET_CLIENT_LIST_STACKING */
+#define NET_SD_DESKTOPS		(1u << 2)	/* _NET_NUMBER_OF_DESKTOPS, */
+						/* _NET_DESKTOP_VIEWPORT */
+#define NET_SD_NAMES		(1u << 3)	/* _NET_DESKTOP_NAMES */
+#define NET_SD_WORKAREA		(1u << 4)	/* _NET_WORKAREA */
+#define NET_SD_ACTIVE		(1u << 5)	/* _NET_ACTIVE_WINDOW */
+#define NET_SD_SHOWING		(1u << 6)	/* _NET_SHOWING_DESKTOP */
+
+/* Client window properties, per client (pCD->netDirty, EwmhMarkClient): */
+#define NET_CD_STATE		(1u << 0)	/* _NET_WM_STATE */
+#define NET_CD_DESKTOP		(1u << 1)	/* _NET_WM_DESKTOP */
+#define NET_CD_ACTIONS		(1u << 2)	/* _NET_WM_ALLOWED_ACTIONS */
+#define NET_CD_EXTENTS		(1u << 3)	/* _NET_FRAME_EXTENTS */
+
+/* An empty Window cache: no XID has its top three bits set. */
+#define NET_NOT_WRITTEN		((Window) ~0UL)
+
+/* pCD->netFlags: */
+#define NET_FLAG_LISTED		(1u << 0)	/* in pSD->netClients */
+
+void EwmhMarkScreen (WmScreenData *pSD, unsigned int bits);
+void EwmhMarkClient (ClientData *pCD, unsigned int bits);
+void EwmhAddClient (ClientData *pCD);
+void EwmhRemoveClient (ClientData *pCD);
+void HandleNetRootMessage (WmScreenData *pSD,
+    XClientMessageEvent *clientEvent);
 void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     int top, int bottom, int left, int right);
 void ProcessNetWmState (ClientData *pCD, long action,

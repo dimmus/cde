@@ -1274,6 +1274,16 @@ InitWmScreen (WmScreenData *pSD, int sNum)
     pSD->topClient = NULL;
     pSD->bottomClient = NULL;
 
+    pSD->netDirty = 0;
+    pSD->netClients = NULL;
+    pSD->numNetClients = 0;
+    pSD->sizeNetClients = 0;
+    pSD->numNetClientsWritten = -1;
+    pSD->netStackWritten = NULL;
+    pSD->numNetStackWritten = -1;
+    pSD->sizeNetStackWritten = 0;
+    pSD->netActiveWritten = NET_NOT_WRITTEN;
+
     /*
      *  We've got display resolution type--now, let's get color
      *  characteristics.

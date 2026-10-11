@@ -1334,6 +1334,17 @@ typedef struct _WmScreenData
     /* top and bottom clients */
     struct _ClientData	*topClient;
     struct _ClientData	*bottomClient;
+
+    /* EWMH root window properties (see WmEwmh.c) */
+    unsigned int	netDirty;		/* NET_SD_* to write */
+    Window		*netClients;		/* _NET_CLIENT_LIST */
+    int			numNetClients;
+    int			sizeNetClients;
+    int			numNetClientsWritten;	/* prefix written, or -1 */
+    Window		*netStackWritten;	/* ..._STACKING written */
+    int			numNetStackWritten;	/* or -1 */
+    int			sizeNetStackWritten;
+    Window		netActiveWritten;	/* _NET_ACTIVE_WINDOW */
 } WmScreenData;
 
 typedef struct _WmScreenData *PtrScreenData;
@@ -1695,6 +1706,8 @@ struct _ClientData
     Dimension	titleWidth;			/* is cached here */
     Boolean	titleFromNetWmName;		/* title is _NET_WM_NAME */
     Boolean	iconTitleFromNetWmName;		/* ... _NET_WM_ICON_NAME */
+    unsigned int netFlags;			/* NET_FLAG_* */
+    unsigned int netDirty;			/* NET_CD_* to write */
 
     /* client window frame graphic data: */
 
@@ -2014,6 +2027,10 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_STATE_FULLSCREEN;
     Atom	xa__NET_WM_STATE_ABOVE;
     Atom	xa__NET_WM_STATE_BELOW;
+
+    /* EWMH property writer (WmEwmh.c): */
+
+    XtWorkProcId ewmhFlushId;		/* EwmhFlushProc pending, or 0 */
 
     /* atoms used for workspace management: */
 

@@ -223,6 +223,8 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->titleWidthString = NULL;
     pCD->titleFromNetWmName = False;
     pCD->iconTitleFromNetWmName = False;
+    pCD->netFlags = 0;
+    pCD->netDirty = 0;
 
     for (i = 0; i < STRETCH_COUNT; ++i) pCD->clientStretchWin[i] = (Window)0L;
 

@@ -44,6 +44,7 @@
  */
 #include "WmEvent.h"
 #include "WmError.h"
+#include "WmEwmh.h"
 #include "WmBackdrop.h"
 #include "WmWrkspace.h"
 #include "WmCDInfo.h"
@@ -961,6 +962,17 @@ Boolean WmDispatchWsEvent (XEvent *event)
 
 	case FocusOut:
 	{
+	    break;
+	}
+
+	case ClientMessage:
+	{
+	    /* an EWMH request about the screen */
+	    if (!XFindContext (DISPLAY, event->xclient.window,
+			       wmGD.screenContextType, (caddr_t *)&pSD))
+	    {
+		HandleNetRootMessage (pSD, (XClientMessageEvent *)event);
+	    }
 	    break;
 	}
 

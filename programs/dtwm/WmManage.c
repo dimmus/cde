@@ -724,6 +724,7 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
      */
     AddClientToList (GetWorkspaceData (pSD, pCD->pWsList[0].wsID),
 	pCD, True /*on top*/);
+    EwmhAddClient (pCD);
 
     /*
      * SetClientState uses the time only to move the focus when a window
@@ -1291,6 +1292,8 @@ void WithdrawWindow (ClientData *pCD)
  * Fix for 5325 - Delete reference by dirty stack 
  */
     ClearDirtyStackEntry(pCD);
+
+    EwmhRemoveClient (pCD);
 
     XtFree ((char *)pCD);
 

@@ -31,7 +31,7 @@ LIBPATH  := $(subst $(space),:,$(strip $(LIBDIRS)))
 INCS     := -I$(ABSTOP)/include $(TIRPC)
 
 PROGS    := libcdebench_preload.so libdtwmbench_preload.so dtsvcbench \
-	    ttbench dtwmbench cdebench-proxy
+	    ttbench dtwmbench ewmhtest cdebench-proxy
 
 all: $(PROGS)
 
@@ -56,6 +56,12 @@ dtwmbench: dtwmbench.c dtwmbench.h
 		-DDTWMBENCH_LIBPATH='"$(LIBPATH)"' \
 		-DDTWMBENCH_PRELOAD='"$(abspath .)/libdtwmbench_preload.so"' \
 		-o $@ dtwmbench.c $(XTST) $(XLIBS)
+
+ewmhtest: ewmhtest.c benchutil.c benchutil.h
+	$(CC) $(CFLAGS) $(WARN) \
+		-DEWMHTEST_WM='"$(ABSTOP)/programs/dtwm/.libs/dtwm"' \
+		-DEWMHTEST_LIBPATH='"$(LIBPATH)"' \
+		-o $@ ewmhtest.c benchutil.c $(XLIBS) -ldl
 
 cdebench-proxy: proxy.c
 	$(CC) $(CFLAGS) $(WARN) -o $@ proxy.c
