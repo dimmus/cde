@@ -163,6 +163,8 @@ static void BlinkCaret( XtPointer, XtIntervalId *) ;
 static Boolean TryGrabs( void ) ;
 static void RetryGrabs( XtPointer, XtIntervalId *) ;
 static void GrabsDone( void ) ;
+static void CreateLockDialogs( Boolean ) ;
+static Boolean PrecreateLockDialogs( XtPointer ) ;
 
 
 
@@ -193,14 +195,132 @@ static void GrabsDone( void ) ;
 static Position visibleY;
 static Position hiddenY;
 
+static XtWorkProcId precreateId = (XtWorkProcId)0;
+
+
+/*************************************<->*************************************
+ *
+ *  CreateLockDialogs (cover)
+ *
+ *  Description:
+ *  -----------
+ *  Create the lock dialogs: with cover, the cover dialogs of the screens
+ *  and the lock dialog on the cover; without, the lock dialog alone.
+ *
+ *************************************<->***********************************/
+static void
+CreateLockDialogs( Boolean cover )
+{
+    int		i, screenNum = DefaultScreen(smGD.display);
+    Widget	parent = NULL;
+    XColor	xcolors[2];
+
+    /*
+     * If the user has specified cover - create the cover dialog
+     */
+    if(cover == True)
+    {
+	for(i = (smGD.numSavedScreens - 1);i >= 0;i--)
+	{
+	    if(i == screenNum)
+	    {
+		smDD.coverDialog[i] = CreateCoverDialog(i, True);
+		parent = smDD.coverDrawing[i];
+	    }
+	    else
+	    {
+		smDD.coverDialog[i] = CreateCoverDialog(i, False);
+	    }
+	}
+	smDD.lockCoverDialog = CreateLockDialogWithCover(parent);
+    }
+    else if(smDD.lockDialog == NULL)
+    {
+	/*
+	 * Create the lock dialog if the user has specified that
+	 */
+	smDD.lockDialog = CreateLockDialog();
+
+	/*
+	 * Get colors for the password cursor
+	 */
+	i = 0;
+	XtSetArg(uiArgs[i], XmNtopShadowColor, &(xcolors[0]));i++;
+	XtSetArg(uiArgs[i], XmNbottomShadowColor, &(xcolors[1]));i++;
+	XtGetValues(smDD.lockDialog, uiArgs, i);
+
+	smGD.backgroundPix = xcolors[0].pixel;
+	smGD.foregroundPix = xcolors[1].pixel;
+	if (smGD.backgroundPix == smGD.foregroundPix)
+	{
+	    smGD.backgroundPix = smGD.whitePixel;
+	    smGD.foregroundPix = smGD.blackPixel;
+	}		
+    }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  PrecreateLockDialogs ()
+ *  ScheduleLockDialogs ()
+ *
+ *  Description:
+ *  -----------
+ *  The lock dialogs used to be created when the display is locked (and
+ *  are destroyed when it is unlocked), which delayed locking.  What they
+ *  look like depends on nothing that changes while the session runs:
+ *  the resource database and the palette colors are those dtsession got
+ *  when it started, the screen size is that of the connection, and the
+ *  user and the messages are fixed.  Only which kind is used, with
+ *  screen cover or without, is decided at lock time from the screen
+ *  saver settings.  So the kind the current settings would use is made
+ *  ahead, when dtsession is idle: at startup and after each unlock.  If
+ *  the settings call for the other kind when locking, it is created
+ *  then, as before.
+ *
+ *  Only with TrueColor/DirectColor visuals: with a colormap the dialogs
+ *  hold colormap cells (the reason they are destroyed after unlocking),
+ *  and they are still made only to lock.
+ *
+ *************************************<->***********************************/
+static Boolean
+PrecreateLockDialogs( XtPointer client_data )
+{
+    Boolean cover = (smSaverRes.saverTimeout != 0);
+
+    precreateId = (XtWorkProcId)0;
+    if((smGD.lockedState == UNLOCKED) && (smGD.smState == READY) &&
+       (cover ? smDD.lockCoverDialog == NULL : smDD.lockDialog == NULL))
+    {
+	CreateLockDialogs(cover);
+    }
+    return True;	/* done */
+}
+
+void
+ScheduleLockDialogs( void )
+{
+    int i;
+
+    for(i = 0; i < smGD.numSavedScreens && i < ScreenCount(smGD.display); i++)
+    {
+	int class = DefaultVisual(smGD.display, i)->class;
+
+	if((class != TrueColor) && (class != DirectColor))
+	    return;
+    }
+    if(precreateId == (XtWorkProcId)0)
+	precreateId = XtAppAddWorkProc(smGD.appCon, PrecreateLockDialogs,
+				       NULL);
+}
+
 void 
 LockDisplay( 
   Boolean lockNow) 
 {
     register int i;
-    int	     screenNum;
-    Widget   parent = NULL, lockDlg;
-    XColor   xcolors[2];
+    Widget   lockDlg;
     int lockDelay;
 
     timerId = lockTimeId = lockDelayId = cycleId = flash_id = (XtIntervalId)0;
@@ -261,6 +381,14 @@ LockDisplay(
 	return;
     }
      
+    /*
+     * Make the dialogs (unless made ahead: see PrecreateLockDialogs())
+     */
+    if(precreateId != (XtWorkProcId)0)
+    {
+	XtRemoveWorkProc(precreateId);
+	precreateId = (XtWorkProcId)0;
+    }
     if(((smDD.lockCoverDialog == NULL) && (smGD.coverScreen == True)) ||
        ((smDD.lockDialog == NULL) && (smGD.coverScreen == False)))
     {
@@ -269,50 +397,7 @@ LockDisplay(
 	 */
 	grabWidget = NULL;
 
-	/*
-	 * If the user has specified cover - create the cover dialog
-	 */
-	screenNum = DefaultScreen(smGD.display);
-	if(smGD.coverScreen == True)
-	{
-	    for(i = (smGD.numSavedScreens - 1);i >= 0;i--)
-	    {
-		if(i == screenNum)
-		{
-		    smDD.coverDialog[i] = CreateCoverDialog(i, True);
-		    parent = smDD.coverDrawing[i];
-		}
-		else
-		{
-		    smDD.coverDialog[i] = CreateCoverDialog(i, False);
-		}
-	    }
-	    smDD.lockCoverDialog = CreateLockDialogWithCover(parent);
-	}
-	
-	/*
-	 * Create the lock dialog if the user has specified that
-	 */
-	if((smDD.lockDialog == NULL) && (smGD.coverScreen == False))
-	{
-	    smDD.lockDialog = CreateLockDialog();
-
-	    /*
-	     * Get colors for the password cursor
-	     */
-	    i = 0;
-	    XtSetArg(uiArgs[i], XmNtopShadowColor, &(xcolors[0]));i++;
-	    XtSetArg(uiArgs[i], XmNbottomShadowColor, &(xcolors[1]));i++;
-	    XtGetValues(smDD.lockDialog, uiArgs, i);
-
-	    smGD.backgroundPix = xcolors[0].pixel;
-	    smGD.foregroundPix = xcolors[1].pixel;
-	    if (smGD.backgroundPix == smGD.foregroundPix)
-	    {
-		smGD.backgroundPix = smGD.whitePixel;
-		smGD.foregroundPix = smGD.blackPixel;
-	    }		
-	}
+	CreateLockDialogs(smGD.coverScreen);
     }
 
    /*
@@ -1254,6 +1339,9 @@ UnlockDisplay(
     smGD.lockedState = UNLOCKED;
 
     XSync(smGD.display, 0);
+
+    /* For the next time */
+    ScheduleLockDialogs();
 
     /*
      * Tell the Workspace Manager to unlock the display (depress the lock

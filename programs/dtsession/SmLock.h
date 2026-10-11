@@ -77,6 +77,7 @@
  */
 
 extern void LockDisplay( Boolean locknow ) ;
+extern void ScheduleLockDialogs( void ) ;
 extern void CreateLockCursor( void ) ;
 
 

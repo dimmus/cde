@@ -76,6 +76,7 @@
 #include "SmCommun.h"
 #include "SmRestore.h"
 #include "SmUI.h"
+#include "SmLock.h"
 #include "SrvPalette.h"
 #include "SmProtocol.h"
 #include "SmXSMP.h"
@@ -496,6 +497,9 @@ main (int argc, char **argv)
                       True, ProcessEvent, NULL);
 
     smGD.smState = READY;
+
+    /* Make the lock dialogs ahead, when idle */
+    ScheduleLockDialogs();
 
     while(1)
     {
