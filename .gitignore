@@ -2319,24 +2319,3 @@ contrib/xinetd/cmsd
 contrib/xinetd/ttdbserver
 contrib/rc/systemd/dtlogin.service
 lib/tt/lib/dummy.cxx
-
-# ksh93's own build (bin/package) leaves these behind
-programs/dtksh/ksh93/bin/dylink
-programs/dtksh/ksh93/bin/mamprobe
-programs/dtksh/ksh93/bin/mkdeps
-programs/dtksh/ksh93/bin/mkreq
-programs/dtksh/ksh93/bin/mkreq-maplib
-programs/dtksh/ksh93/bin/mprobe
-programs/dtksh/ksh93/bin/probe
-programs/dtksh/ksh93/dyn/
-programs/dtksh/ksh93/etc/
-programs/dtksh/ksh93/src/cmd/INIT/dylink
-programs/dtksh/ksh93/src/cmd/INIT/mkdeps
-programs/dtksh/ksh93/src/cmd/INIT/mkreq
-programs/dtksh/ksh93/src/cmd/INIT/mkreq-maplib
-programs/dtksh/ksh93/src/cmd/INIT/proto
-programs/dtksh/ksh93/src/cmd/ksh93/git.h
-programs/dtksh/ksh93/src/lib/libast/astmath.out
-programs/dtksh/ksh93/src/lib/libast/mamake
-programs/dtksh/ksh93/src/lib/libcmd/cmdext.h.new
-programs/dtksh/ksh93/src/lib/libcmd/cmdlist.h.new

@@ -12,10 +12,17 @@ dist_ksh_SCRIPTS = DtFuncs.dtsh
 
 KSH93SRC = ksh93
 
-KSH93LIBSHELL = $(KSH93SRC)/lib/libshell.a
-KSH93LIBS = $(KSH93SRC)/lib/libcmd.a $(KSH93SRC)/lib/libast.a \
-	    $(KSH93SRC)/lib/libdll.a
-KSH93PMAIN = $(KSH93SRC)/src/cmd/ksh93/pmain.o
+# ksh93's bin/package builds in $(KSH93SRC)/arch/HOSTTYPE (ignored by
+# ksh93's own .gitignore) and installs its libraries and headers there.
+# It is run without "flat", which would also link every file it builds
+# into bin/, lib/, include/ and the source directories of $(KSH93SRC).
+KSH93_HOSTTYPE := $(shell CC='$(CC)' $(KSH93SRC)/bin/package host type 2>/dev/null)
+KSH93ROOT = $(KSH93SRC)/arch/$(KSH93_HOSTTYPE)
+
+KSH93LIBSHELL = $(KSH93ROOT)/lib/libshell.a
+KSH93LIBS = $(KSH93ROOT)/lib/libcmd.a $(KSH93ROOT)/lib/libast.a \
+	    $(KSH93ROOT)/lib/libdll.a
+KSH93PMAIN = $(KSH93ROOT)/src/cmd/ksh93/pmain.o
 
 bin_PROGRAMS = dtksh
 
@@ -32,8 +39,8 @@ KSH93_SHOPTS = -DSHOPT_DYNAMIC=1 -DSHOPT_NAMESPACE=1 -DSHOPT_MULTIBYTE=1 \
 	-DSHOPT_ESH=1 -DSHOPT_VSH=1 -DSHOPT_FIXEDARRAY=1 -DSHOPT_SUID_EXEC=1 \
 	-DSHOPT_BRACEPAT=1 -DSHOPT_ECHOPRINT=1 -D_BLD_ksh
 
-dtksh_CPPFLAGS = $(CDE_CPPFLAGS) -I$(KSH93SRC)/include/ast -I$(KSH93SRC)/src/cmd/ksh93/include \
-		 -I$(KSH93SRC)/src/cmd/ksh93 -I${srcdir}/lib/DtPrint \
+dtksh_CPPFLAGS = $(CDE_CPPFLAGS) -I$(KSH93ROOT)/include/ast -I$(KSH93SRC)/src/cmd/ksh93/include \
+		 -I$(KSH93ROOT)/src/cmd/ksh93 -I$(KSH93SRC)/src/cmd/ksh93 -I${srcdir}/lib/DtPrint \
 		 -I${srcdir}/lib/DtHelp $(KSH93_SHOPTS) \
 		 -D_PACKAGE_ast -DKSHELL \
 		 '-DERROR_CONTEXT_T=Error_context_t' \
@@ -72,7 +79,9 @@ dtksh_SOURCES = init.c \
 # make (-jN in MAKEFLAGS; mamake does not take part in the jobserver, but
 # nothing else is built while it runs).  bin/package refuses to continue
 # when CC or CCFLAGS differ from those of the previous build, so start
-# over in that case.
+# over in that case.  A flat view left by an older build (lib/package/gen
+# in $(KSH93SRC), which makes bin/package keep updating it) is removed
+# first.
 #
 # ksh93's build asks git for the commit and branch it is built from, to
 # put the commit into the version string and to choose between a release
@@ -88,18 +97,22 @@ KSH93_SRCFILES := $(shell find $(KSH93SRC)/src $(KSH93SRC)/bin/package -type f !
 
 ksh93.stamp: $(KSH93_SRCFILES) Makefile
 	@cc='$(KSH93_CC)'; ccflags='$(KSH93_CCFLAGS)'; \
-	gen=$(KSH93SRC)/lib/package/gen; \
+	if test -d $(KSH93SRC)/lib/package/gen; then \
+		echo "ksh93: removing the flat view of an older build"; \
+		$(KSH93SRC)/bin/package clean flat || exit 1; \
+	fi; \
+	gen=$(KSH93ROOT)/lib/package/gen; \
 	if test -f $$gen/CC && { test "`cat $$gen/CC`" != "$$cc" || \
 	   test "`cat $$gen/CCFLAGS 2>/dev/null`" != "$$ccflags"; }; then \
 		echo "ksh93: CC or CFLAGS changed, rebuilding it from scratch"; \
 		$(KSH93SRC)/bin/package clean || exit 1; \
 	fi; \
-	echo "$(KSH93SRC)/bin/package flat make -j $(KSH93_JOBS) CC='$$cc' CCFLAGS='$$ccflags'"; \
+	echo "$(KSH93SRC)/bin/package make -j $(KSH93_JOBS) CC='$$cc' CCFLAGS='$$ccflags'"; \
 	GIT_CEILING_DIRECTORIES='$(abs_srcdir)' \
-	$(KSH93SRC)/bin/package flat make -j $(KSH93_JOBS) CC="$$cc" CCFLAGS="$$ccflags"
+	$(KSH93SRC)/bin/package make -j $(KSH93_JOBS) CC="$$cc" CCFLAGS="$$ccflags"
 	@touch $@
 
-$(KSH93SRC)/bin/ksh $(KSH93LIBSHELL) $(KSH93LIBS) $(KSH93PMAIN): ksh93.stamp
+$(KSH93ROOT)/bin/ksh $(KSH93LIBSHELL) $(KSH93LIBS) $(KSH93PMAIN): ksh93.stamp
 	@:
 
 # Everything here includes headers that the ksh93 build generates.
@@ -117,7 +130,7 @@ check-local:
 	./dtksh -c true && ksh93/bin/shtests --posix --utf8 SHELL=.libs/dtksh
 
 clean-local:
-	ksh93/bin/package clean
+	$(KSH93SRC)/bin/package clean
 
 DtFuncs.dtsh: DtFuncs.sh
 	$(CP) DtFuncs.sh DtFuncs.dtsh
