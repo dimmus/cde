@@ -107,6 +107,14 @@ ADDFONTPATH() {
 #ifdef cpp_Xsession
     Log "setting font path..."
 #endif
+#ifdef cpp_Xsetup
+    HASH
+    HASH dtlogin sets DTLOGIN_FONTPATH when it has already appended these
+    HASH directories itself (it does so only for an Xsetup that mentions
+    HASH the variable, like this one).
+    HASH
+    if [ -z "$DTLOGIN_FONTPATH" ]; then
+#endif
 #if defined (_AIX)
     if [ "$DTXSERVERLOCATION" != "remote" -a -z "$XSTATION" ]; then
 #else
@@ -185,6 +193,9 @@ ADDFONTPATH() {
       $XDIR/xset fp+ FONTALIASESDATADIR 1>/dev/null
 
     fi
+#ifdef cpp_Xsetup
+    fi
+#endif
 #ifdef cpp_Xsession
   fi 
 #endif

@@ -104,6 +104,7 @@
 #endif
 
 int ApplyFontPathMods(struct display *d, Display *dpy); // fontpath.c
+int AppendDesktopFontPath(struct display *d, Display *dpy); // fontpath.c
 
 #ifdef SIA
 
@@ -192,7 +193,7 @@ static SIGVAL catchAlrm( int arg ) ;
 static SIGVAL catchHUP( int arg ) ;
 static SIGVAL catchTerm( int arg ) ;
 static SIGVAL waitAbort( int arg ) ;
-static void SetupDisplay(struct display *d);
+static void SetupDisplay(struct display *d, Display *dpy);
 
 static void TellGreeter(RequestHeader *phdr);
 static int AskGreeter(RequestHeader *preqhdr, char *b, int blen);
@@ -428,7 +429,7 @@ ManageSession( struct display *d )
 	while (greet.name == NULL) {
 	    SetHourGlassCursor(dpy, root);
 	    LoadXloginResources (d);
-	    SetupDisplay(d);
+	    SetupDisplay(d, dpy);
 	    ApplyFontPathMods(d, dpy);
 	    (void)XSetErrorHandler(ErrorHandler);
 	    RunGreeter(d, &greet, &verify);
@@ -1193,14 +1194,18 @@ _ExpandLang(
 
 
 static void
-SetupDisplay (struct display *d)
+SetupDisplay (struct display *d, Display *dpy)
 {
     char **env = 0, **crt_systemEnviron;
 
     if (d->setup && d->setup[0] && (access(d->setup, R_OK ) == 0))
     {
+        int fontPathDone = AppendDesktopFontPath(d, dpy);
+
         crt_systemEnviron = verify.systemEnviron;
         env = systemEnv (d, (char *) 0, (char *) 0);
+        if (fontPathDone)
+            env = setEnv (env, "DTLOGIN_FONTPATH", "done");
         if (d->authFile && strlen(d->authFile) > 0 )
             env = setEnv( env, "XAUTHORITY", d->authFile );
         if(d->displayType.location == Local)  

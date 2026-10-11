@@ -23,6 +23,8 @@ AM_CFLAGS = $(CDE_CFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
             -DCDE_LOGFILES_TOP=\"$(CDE_LOGFILES_TOP)\" \
 	    -DBINDIR=\"$(XBINDIR)\" \
 	    -DXDMDIR=\"$(XDMDIR)\" \
+	    -DFONTALIASESCONFDIR=\"$(sysconfdir)/$(PACKAGE_TARNAME)/fontaliases\" \
+	    -DFONTALIASESDATADIR=\"$(pkgdatadir)/fontaliases\" \
 	    -DKORNSHELL=$(KSH) -DUNIXCONN -DTCPCONN -DXDMCP
 
 dtlogin_SOURCES = access.c auth.c genauth.c daemon.c dm.c \
