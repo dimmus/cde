@@ -1276,12 +1276,9 @@ SetCurrentWorkspaceProperty (WmScreenData *pSD)
     UpdateNetCurrentDesktop (pSD);
 
     /*
-     * Make sure the server has the properties before the ToolTalk notice
-     * of the change (dtSendWorkspaceModifyNotification) can reach a client
-     * that reads it: once flushed, the request could still be waiting in
-     * the server's input while the other client's request is processed.
+     * The ToolTalk notice of the change waits until the server has
+     * processed these writes (see QueueWorkspaceMessage in WmIPC.c).
      */
-    XSync (DISPLAY, False);
 
 } /* END OF FUNCTION SetCurrentWorkspaceProperty */
 

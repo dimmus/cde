@@ -34,6 +34,7 @@ extern void dtInitializeMessaging( Widget ) ;
 extern void dtCloseIPC( void ) ;
 extern void dtReadyNotification( void ) ;
 extern void WmStopWaiting( void ) ;
+extern void WmFlushWorkspaceMessages( Boolean force ) ;
 extern void dtSendWorkspaceModifyNotification(
 	WmScreenData 		*pSD, 
 	Atom 			aWs, 

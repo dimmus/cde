@@ -205,6 +205,9 @@ main (int argc, char *argv [], char *environ [])
                 XtDispatchEvent (&event);
 	    }
 	}
+
+	/* workspace messages waiting for the server to process writes */
+	WmFlushWorkspaceMessages (False);
     }
 
 } /* END OF FUNCTION main */

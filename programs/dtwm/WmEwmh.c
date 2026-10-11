@@ -1208,8 +1208,8 @@ static void FlushNetDesktopNames (WmScreenData *pSD)
  *  Description:
  *  -----------
  *  Writes _NET_CURRENT_DESKTOP if it changed, at once (not from
- *  EwmhFlushProc): SetCurrentWorkspaceProperty, which calls it, then
- *  syncs before the workspace change is announced.
+ *  EwmhFlushProc), with the other workspace properties, before the
+ *  workspace change is announced (QueueWorkspaceMessage).
  *
  *
  *  Inputs:

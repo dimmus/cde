@@ -71,6 +71,7 @@
 #include "WmHelp.h"
 #include "WmResNames.h"
 #include "WmResParse.h"
+#include "WmWinInfo.h"
 #include "WmFunction.h"
 #include "WmWrkspace.h"
 
@@ -546,6 +547,32 @@ WorkspaceAdjustPanelPosition (Position x,
 
 /************************************************************************
  *
+ *  SetPanelTitle
+ *	Set the title and icon name of the front panel.  dtwm, as its
+ *	window manager, then takes the icon title from what it wrote
+ *	instead of reading it back (NoteOwnIconName).
+ *
+ ************************************************************************/
+
+static void
+SetPanelTitle (char * title)
+
+{
+   Arg al[2];
+
+   XtSetArg (al[0], XmNiconName, title);
+   XtSetArg (al[1], XmNtitle, title);
+   XtSetValues (panel.shell, al, 2);
+
+   if (XtIsRealized (panel.shell))
+      NoteOwnIconName (XtWindow (panel.shell), title);
+}
+
+
+
+
+/************************************************************************
+ *
  *  SwitchShowCurrent
  *	Show the workspace atom_name as the current one: set its switch
  *	button and unset the old one, and title the front panel after it.
@@ -560,7 +587,6 @@ SwitchShowCurrent (SwitchData * switch_data,
 
 {
    int i;
-   Arg al[2];
 
    for (i = 0; i < switch_data->switch_count; i++)
    {
@@ -568,9 +594,7 @@ SwitchShowCurrent (SwitchData * switch_data,
       {
          if (i != switch_data->active_switch)
          {
-            XtSetArg (al[0], XmNiconName, switch_data->switch_names[i]); 
-            XtSetArg (al[1], XmNtitle, switch_data->switch_names[i]);
-            XtSetValues (panel.shell, al, 2);
+            SetPanelTitle (switch_data->switch_names[i]);
 
             _DtIconSetState (switch_data->buttons[switch_data->active_switch], False, False);
             switch_data->active_switch = i;
@@ -845,9 +869,7 @@ WorkspaceModifyCB (Widget    w,
 
                if (i == switch_data->active_switch)
                {
-                  XtSetArg (al[0], XmNiconName, workspace_info->pchTitle);
-                  XtSetArg (al[1], XmNtitle, workspace_info->pchTitle);
-                  XtSetValues (panel.shell, al, 2);
+                  SetPanelTitle (workspace_info->pchTitle);
                }
 
                break;

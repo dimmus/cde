@@ -360,7 +360,146 @@ dtInitializeMessaging(Widget toplevel)
 void 
 dtCloseIPC( void )
 {
+    WmFlushWorkspaceMessages (True);
 } /* END OF FUNCTION dtCloseIPC */
+
+
+/******************************<->*************************************
+ *
+ *  Ordering the workspace messages after the properties
+ *
+ *  Description:
+ *  -----------
+ *  A client that gets a DtWorkspace_Modified notice, or the reply to a
+ *  DtWorkspace_* request, reads the workspace properties that dtwm has
+ *  just written (_DT_WORKSPACE_CURRENT, _DT_WORKSPACE_LIST, ...) on its
+ *  own connection.  The X server must have processed those writes before
+ *  the message can reach the client: flushing them is not enough, the
+ *  requests could still be waiting in the server's input while the
+ *  other client's are processed.  dtwm used to XSync before announcing
+ *  a workspace change (and only that change), blocking for a round trip
+ *  each time.
+ *
+ *  The messages are queued instead, each with the serial number of a
+ *  request issued after the writes it announces: a zero-length append
+ *  to WM_STATE on the workspace window (as GetTimestamp does), whose
+ *  PropertyNotify comes back to dtwm.  Once the server has reported
+ *  processing that request (any event or reply with that serial or a
+ *  later one, LastKnownRequestProcessed), the writes before it are
+ *  visible to every client and the message is sent.  The main loop
+ *  checks after each event (WmFlushWorkspaceMessages (False)); a timer
+ *  bounds the delay should the PropertyNotify be consumed by a nested
+ *  event loop, and dtCloseIPC sends whatever is left.  The messages
+ *  keep their order.
+ *
+ ******************************<->***********************************/
+
+typedef struct {
+    unsigned long serial;	/* sent once the server processed this */
+    Tt_message	  msg;
+    Boolean	  reply;	/* reply to msg, else send it */
+} PendingWsMessage;
+
+static PendingWsMessage *pendingWsMsgs;
+static int numPendingWsMsgs, maxPendingWsMsgs;
+static XtIntervalId pendingWsTimer;
+
+#define PENDING_WS_TIMEOUT	250	/* ms */
+
+static void
+PendingWsTimeout (XtPointer client_data, XtIntervalId *id)
+{
+    pendingWsTimer = (XtIntervalId) 0;
+    WmFlushWorkspaceMessages (True);
+}
+
+static void
+QueueWorkspaceMessage (WmScreenData *pSD, Tt_message msg, Boolean reply)
+{
+    long empty = 0;
+
+    if (numPendingWsMsgs == maxPendingWsMsgs)
+    {
+	maxPendingWsMsgs = maxPendingWsMsgs ? 2 * maxPendingWsMsgs : 8;
+	pendingWsMsgs = (PendingWsMessage *) XtRealloc ((char *) pendingWsMsgs,
+	    maxPendingWsMsgs * sizeof (PendingWsMessage));
+    }
+
+    /* the request whose processing the message waits for */
+    XChangeProperty (DISPLAY, pSD->wmWorkspaceWin, wmGD.xa_WM_STATE,
+	wmGD.xa_WM_STATE, 32, PropModeAppend, (unsigned char *) &empty, 0);
+
+    pendingWsMsgs[numPendingWsMsgs].serial = NextRequest (DISPLAY) - 1;
+    pendingWsMsgs[numPendingWsMsgs].msg = msg;
+    pendingWsMsgs[numPendingWsMsgs].reply = reply;
+    numPendingWsMsgs++;
+
+    if (!pendingWsTimer)
+    {
+	pendingWsTimer = XtAppAddTimeOut (wmGD.mwmAppContext,
+	    PENDING_WS_TIMEOUT, PendingWsTimeout, NULL);
+    }
+}
+
+/*
+ * Replies to a DtWorkspace_* request once the properties written for
+ * it are visible to the requester, and destroys the message.
+ */
+static void
+QueueWorkspaceReply (WmScreenData *pSD, Tt_message m)
+{
+    QueueWorkspaceMessage (pSD ? pSD : ACTIVE_PSD, m, True);
+}
+
+/******************************<->*************************************
+ *
+ *  WmFlushWorkspaceMessages (force)
+ *
+ *  Description:
+ *  -----------
+ *  Sends the queued workspace messages whose properties the server has
+ *  processed, in order; with force, syncs and sends them all.
+ *
+ ******************************<->***********************************/
+void
+WmFlushWorkspaceMessages (Boolean force)
+{
+    int i;
+
+    if (numPendingWsMsgs == 0)
+	return;
+
+    if (force)
+	XSync (DISPLAY, False);
+
+    for (i = 0; i < numPendingWsMsgs; i++)
+    {
+	/* serials are increasing; compare them as the server's wrap */
+	if ((long) (LastKnownRequestProcessed (DISPLAY) -
+		    pendingWsMsgs[i].serial) < 0)
+	    break;
+
+	if (pendingWsMsgs[i].reply)
+	    tt_message_reply (pendingWsMsgs[i].msg);
+	else
+	    tt_message_send (pendingWsMsgs[i].msg);
+	tt_message_destroy (pendingWsMsgs[i].msg);
+    }
+
+    if (i > 0)
+    {
+	numPendingWsMsgs -= i;
+	memmove (pendingWsMsgs, pendingWsMsgs + i,
+		 numPendingWsMsgs * sizeof (PendingWsMessage));
+    }
+
+    if (numPendingWsMsgs == 0 && pendingWsTimer)
+    {
+	XtRemoveTimeOut (pendingWsTimer);
+	pendingWsTimer = (XtIntervalId) 0;
+    }
+
+} /* END OF FUNCTION WmFlushWorkspaceMessages */
 
 
 
@@ -490,11 +629,8 @@ dtSendWorkspaceModifyNotification(
     if (status != TT_OK) {
         return;
     }
-    status = tt_message_send(msg);
-    if (status != TT_OK) {
-        return;
-    }
-    tt_message_destroy(msg);
+    /* sent once the server has the properties it announces */
+    QueueWorkspaceMessage (pSD, msg, False);
 }
 
 
@@ -783,8 +919,7 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	    ChangeToWorkspace (pWS);
 	}
 
-	tt_message_reply(m);
-	tt_message_destroy(m);
+	QueueWorkspaceReply (pSD, m);
     }
     else if (!strcmp(op, "DtWorkspace_Title_Set")) {
 	/*
@@ -820,8 +955,7 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	}
 	if (pch) tt_free( pch );
 
-	tt_message_reply(m);
-	tt_message_destroy(m);
+	QueueWorkspaceReply (pSD, m);
     }
     else if (!strcmp(op, "DtWorkspace_Add")) {
 	/*
@@ -833,8 +967,7 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 	F_CreateWorkspace( pch, NULL, NULL );
 	if (pch) tt_free( pch );
 
-	tt_message_reply(m);
-	tt_message_destroy(m);
+	QueueWorkspaceReply (NULL, m);
     }
     else if (!strcmp(op, "DtWorkspace_Delete")) {
 	/*
@@ -856,8 +989,7 @@ RequestMsgCB(Tt_message m, Tt_pattern p)
 
 	F_DeleteWorkspace( sName, NULL, NULL );
 
-	tt_message_reply(m);
-	tt_message_destroy(m);
+	QueueWorkspaceReply (NULL, m);
 
 	XtFree(sName);
     }

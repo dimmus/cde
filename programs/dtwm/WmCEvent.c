@@ -829,6 +829,18 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 {
     unsigned long serial;
 
+    /*
+     * Every managed window reports its property changes to DISPLAY
+     * (GetClientInfo).  dtwm's own shells (front panel, subpanels...)
+     * live on DISPLAY1, where Xt selects them too: the same change then
+     * comes again from DISPLAY1, and was processed twice (reading the
+     * title of the front panel twice on each workspace change).
+     */
+    if (propertyEvent->display != DISPLAY)
+    {
+	return;
+    }
+
     switch (propertyEvent->atom)
     {
         case XA_WM_HINTS:
@@ -973,6 +985,10 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 		     propertyEvent->atom == wmGD.xa__NET_WM_STRUT)
 	    {
 		ProcessNetWmStrut (pCD, False /*not first time*/);
+	    }
+	    else if (ProcessOwnWmIconTitle (pCD, propertyEvent))
+	    {
+		/* dtwm titled its own window, no need to read it back */
 	    }
 	    else if (propertyEvent->atom == XA_WM_ICON_NAME ||
 		     propertyEvent->atom == wmGD.xa__NET_WM_ICON_NAME)

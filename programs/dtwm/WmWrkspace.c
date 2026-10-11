@@ -435,10 +435,10 @@ ChangeWorkspaceTitle(
      * Replace old workspace in info property
      */
     SetWorkspaceInfoProperty (pWS);
-    XFlush (DISPLAY);
 
     /*
-     * Inform the world of the new workspace title
+     * Inform the world of the new workspace title (once the server has
+     * the property)
      */
     dtSendWorkspaceModifyNotification(pWS->pSD, pWS->id, DtWSM_REASON_TITLE);
 

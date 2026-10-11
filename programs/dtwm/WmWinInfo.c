@@ -2521,8 +2521,95 @@ FixSubpanelEmbeddedClientGeometry (ClientData *pCD)
  * 
  *************************************<->***********************************/
 
+static void
+ProcessWmIconTitleProp (ClientData *pCD, Boolean firstTime, Atom changed,
+			XTextProperty *known);
+
 void 
 ProcessWmIconTitle (ClientData *pCD, Boolean firstTime, Atom changed)
+{
+  ProcessWmIconTitleProp (pCD, firstTime, changed, NULL);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  NoteOwnIconName (win, text)
+ *  ProcessOwnWmIconTitle (pCD, propertyEvent)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  dtwm titles its front panel shell after the current workspace on each
+ *  workspace change (SwitchShowCurrent), and then, as the panel's window
+ *  manager, got the PropertyNotify of WM_ICON_NAME and read the value
+ *  back: a round trip per workspace change.  NoteOwnIconName records
+ *  that dtwm has just written text as the WM_ICON_NAME of win (one
+ *  write, so one PropertyNotify to come).  The shell is on dtwm's second
+ *  connection, so the event's serial number cannot tell which write it
+ *  is for: the events of these writes are counted instead.
+ *  ProcessOwnWmIconTitle processes such an event without reading the
+ *  property, from the text last written, which is the value the
+ *  property then has (nothing else writes it), encoded as Xt did
+ *  (XmbTextListToTextProperty, XStdICCTextStyle: the shell's
+ *  iconNameEncoding is the default None), and returns True.  Any other
+ *  event returns False, to be processed as usual.
+ *
+ *************************************<->***********************************/
+
+static struct {
+  Window	win;
+  int		pending;	/* PropertyNotify events still to come */
+  char		*text;
+} ownIconName;
+
+void
+NoteOwnIconName (Window win, const char *text)
+{
+  if (win != ownIconName.win)
+  {
+    ownIconName.win = win;
+    ownIconName.pending = 0;
+  }
+  XtFree (ownIconName.text);
+  ownIconName.text = XtNewString (text);
+  ownIconName.pending++;
+}
+
+Boolean
+ProcessOwnWmIconTitle (ClientData *pCD, XPropertyEvent *propertyEvent)
+{
+  XTextProperty prop;
+  char *list[1];
+
+  if (ownIconName.pending <= 0 ||
+      propertyEvent->window != ownIconName.win ||
+      propertyEvent->atom != XA_WM_ICON_NAME ||
+      propertyEvent->state != PropertyNewValue)
+  {
+    return (False);
+  }
+  ownIconName.pending--;
+
+  list[0] = ownIconName.text;
+  if (XmbTextListToTextProperty (DISPLAY, list, 1, XStdICCTextStyle,
+				 &prop) < Success)
+  {
+    return (False);
+  }
+  ProcessWmIconTitleProp (pCD, FALSE, XA_WM_ICON_NAME, &prop);
+  XFree (prop.value);
+  return (True);
+}
+
+
+/*
+ * ProcessWmIconTitle, with the value of WM_ICON_NAME in known when the
+ * caller has it.
+ */
+static void
+ProcessWmIconTitleProp (ClientData *pCD, Boolean firstTime, Atom changed,
+			XTextProperty *known)
 {
   char *netStr;
   XTextProperty wmIconNameProp;
@@ -2561,6 +2648,10 @@ ProcessWmIconTitle (ClientData *pCD, Boolean firstTime, Atom changed)
       icon_xms = XmStringCreateLocalized (netStr);
       XFree (netStr);
       pCD->iconTitleFromNetWmName = True;
+    }
+    else if (readWmIconName && known)
+    {
+      icon_xms = WmICCCMToXmString (known);
     }
     else if (readWmIconName &&
 	     XGetWMIconName (DISPLAY, win, &wmIconNameProp))
@@ -2610,7 +2701,7 @@ ProcessWmIconTitle (ClientData *pCD, Boolean firstTime, Atom changed)
     pCD->instantTitle = XmStringCreateLocalized (netStr);
     XFree (netStr);
   }
-} /* END OF FUNCTION ProcessWmIconTitle */
+} /* END OF FUNCTION ProcessWmIconTitleProp */
 
 
 

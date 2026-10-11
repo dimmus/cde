@@ -55,6 +55,9 @@ extern void ProcessWmClass (ClientData *pCD);
 extern void ProcessWmHints (ClientData *pCD, Boolean firstTime);
 extern void ProcessWmIconTitle (ClientData *pCD, Boolean firstTime,
 				Atom changed);
+extern void NoteOwnIconName (Window win, const char *text);
+extern Boolean ProcessOwnWmIconTitle (ClientData *pCD,
+				      XPropertyEvent *propertyEvent);
 extern void ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, 
 				  long manageFlags);
 extern void ProcessWmNormalHintsNoMaxSize (ClientData *pCD);
