@@ -408,6 +408,12 @@ clear(Tt_pattern p)
 	if (pat.is_null()) {
 		return;
 	}
+	// lookup_pat_by_id() must not hand out the handle freed here.
+	if (last_phandle == p) {
+		last_pat_id = 0;
+		last_pattern = (_Tt_pattern *)0;
+		last_phandle = 0;
+	}
 	_Tt_api_handle_list_cursor c(pbucket(pat->id()));
 	
 	while (c.next()) {

@@ -757,16 +757,30 @@ _tt_c_procid_first_contact(_Tt_c_session *s)
 			// dropping p closes the channel it offered.
 			return s->ping();
 		}
+	    {
+		_Tt_string	addr = s->address_string();
+
 		s->set_id(sid);
+		if (s->address_string() != addr) {
+			// The session calls itself by another address
+			// (set_id() took it from the id), which the
+			// procid id has to end in, as when ping() came
+			// first: leave the procid to init(), and drop p
+			// (closing the channel it offered).
+			return TT_OK;
+		}
 		delete opened_procid;
 		opened_procid = new _Tt_c_procid_ptr(p);
 		return TT_OK;
-	    case TT_ERR_UNIMP:		// an older ttsession
-	    case TT_ERR_PROCID:		// alive, but refused the procid
-		return s->ping();
-	    default:
+	    }
+	    case TT_ERR_NOMP:
 		// The session did not answer; ping() would not either.
 		return status;
+	    default:
+		// TT_ERR_UNIMP: an older ttsession; TT_ERR_PROCID: alive,
+		// but refused the procid; anything else (a reply that
+		// did not decode, say): let ping() decide, as before.
+		return s->ping();
 	}
 }
 
