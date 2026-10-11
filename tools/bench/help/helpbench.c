@@ -67,6 +67,7 @@
 #include <X11/Shell.h>
 #include <X11/Xutil.h>
 #include <Xm/Xm.h>
+#include <Xm/CutPaste.h>
 #include <Xm/DrawnB.h>
 #include <Xm/List.h>
 #include <Xm/PushBG.h>
@@ -566,6 +567,42 @@ static long run_pagedown(long n)
 	return pages;
 }
 
+/* -S: the selected text, as Copy puts it on the clipboard, in DIR/NAME.txt */
+static void save_selection(const char *name)
+{
+	static const char *formats[] = { "STRING", "COMPOUND_TEXT",
+					 "UTF8_STRING" };
+	Widget da = display_area(NULL);
+	Window win = XtWindow(da);
+	char path[PATH_MAX];
+	unsigned long len = 0, got = 0;
+	unsigned int f;
+	long id;
+	char *buf;
+	FILE *fp;
+
+	XtCallActionProc(da, "CopyToClipboard", NULL, NULL, 0);
+	settle();
+	for (f = 0; f < sizeof formats / sizeof formats[0]; f++)
+		if (XmClipboardInquireLength(dpy, win, (char *)formats[f],
+					     &len) == ClipboardSuccess && len)
+			break;
+	if (!len)
+		return;
+	buf = malloc(len);
+	if (!buf)
+		return;
+	if (XmClipboardRetrieve(dpy, win, (char *)formats[f], buf, len, &got,
+				&id) == ClipboardSuccess) {
+		snprintf(path, sizeof path, "%s/%s.txt", shotdir, name);
+		if ((fp = fopen(path, "wb"))) {
+			fwrite(buf, 1, got, fp);
+			fclose(fp);
+		}
+	}
+	free(buf);
+}
+
 /*
  * The man page all selected, then the window made narrower and wider:
  * each width change lays the page out again and carries the selection
@@ -598,8 +635,10 @@ static long run_selresize(long n)
 			      NULL);
 		settle();
 	}
-	if (shotdir)
+	if (shotdir) {
 		shot(shell, "selresize");
+		save_selection("selresize");
+	}
 	return n;
 }
 

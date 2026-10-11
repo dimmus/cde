@@ -608,11 +608,153 @@ BuildLine(
 }
 
 /*****************************************************************************
+ * Line finder
+ *
+ * GetSelectedText and GetSegsInArea visit the unprocessed lines of a
+ * selection row by row: FindNextMinY gives the lowest bottom of the
+ * lines not processed yet, FindMinX the leftmost unprocessed line (first
+ * index on a tie) straddling that y, and the caller processes it.  Done
+ * by scanning every line each time that is O(lines^2) for a selection;
+ * the finder gets the same answers from the lines sorted once.
+ *
+ * It relies on what those callers keep true: lines only ever go from
+ * unprocessed to processed, and every unprocessed line has its bottom at
+ * or below the y asked for (MarkLinesOutsideBoundary processes the lines
+ * above the start of the selection; later y's are FindNextMinY's minimum
+ * bottoms, which only grow).  "Straddles y" (top < y <= bottom) is then
+ * just "top < y", so the candidates are a prefix of the lines in top
+ * order, kept in a heap on (text_x, index).
+ *****************************************************************************/
+#define	FINDER_MIN_LINES	32
+
+typedef struct {
+    _DtCvDspLine *lines;
+    int		  cnt;
+    int		 *by_top;	/* lines in (top, index) order */
+    int		  nxt_top;	/* by_top[0..nxt_top) were offered */
+    int		 *by_bot;	/* lines in (bottom, index) order */
+    int		  nxt_bot;	/* by_bot[0..nxt_bot) are processed */
+    int		 *heap;		/* candidates, min (text_x, index) on top */
+    int		  heap_n;
+} LineFinder;
+
+static _DtCvDspLine *SortLines;		/* for the qsort comparisons */
+
+static int
+CmpTop(const void *a, const void *b)
+{
+    int		 i = *(const int *) a;
+    int		 j = *(const int *) b;
+    _DtCvUnit	 ti = SortLines[i].baseline - SortLines[i].ascent;
+    _DtCvUnit	 tj = SortLines[j].baseline - SortLines[j].ascent;
+
+    if (ti != tj)
+	return (ti < tj) ? -1 : 1;
+    return (i > j) - (i < j);
+}
+
+static int
+CmpBot(const void *a, const void *b)
+{
+    int		 i = *(const int *) a;
+    int		 j = *(const int *) b;
+    _DtCvUnit	 bi = SortLines[i].baseline + SortLines[i].descent;
+    _DtCvUnit	 bj = SortLines[j].baseline + SortLines[j].descent;
+
+    if (bi != bj)
+	return (bi < bj) ? -1 : 1;
+    return (i > j) - (i < j);
+}
+
+static int
+HeapLess(_DtCvDspLine *lines, int i, int j)
+{
+    if (lines[i].text_x != lines[j].text_x)
+	return lines[i].text_x < lines[j].text_x;
+    return i < j;
+}
+
+static void
+HeapPush(LineFinder *f, int line)
+{
+    int k = f->heap_n++;
+
+    while (k > 0 && HeapLess(f->lines, line, f->heap[(k - 1) / 2]))
+      {
+	f->heap[k] = f->heap[(k - 1) / 2];
+	k = (k - 1) / 2;
+      }
+    f->heap[k] = line;
+}
+
+static void
+HeapPop(LineFinder *f)
+{
+    int k = 0;
+    int last = f->heap[--f->heap_n];
+
+    for (;;)
+      {
+	int c = 2 * k + 1;
+
+	if (c >= f->heap_n)
+	    break;
+	if (c + 1 < f->heap_n && HeapLess(f->lines, f->heap[c + 1], f->heap[c]))
+	    c++;
+	if (!HeapLess(f->lines, f->heap[c], last))
+	    break;
+	f->heap[k] = f->heap[c];
+	k = c;
+      }
+    if (f->heap_n > 0)
+	f->heap[k] = last;
+}
+
+/* Returns False (use the scans) for few lines or when out of memory. */
+static _DtCvValue
+FinderInit(LineFinder *f, _DtCvDspLine *lines, int cnt)
+{
+    int i;
+
+    f->by_top = NULL;
+    if (cnt < FINDER_MIN_LINES)
+	return False;
+
+    f->by_top = (int *) malloc(sizeof(int) * 3 * cnt);
+    if (NULL == f->by_top)
+	return False;
+
+    f->lines   = lines;
+    f->cnt     = cnt;
+    f->by_bot  = f->by_top + cnt;
+    f->heap    = f->by_bot + cnt;
+    f->nxt_top = 0;
+    f->nxt_bot = 0;
+    f->heap_n  = 0;
+    for (i = 0; i < cnt; i++)
+	f->by_top[i] = f->by_bot[i] = i;
+
+    SortLines = lines;
+    qsort(f->by_top, cnt, sizeof(int), CmpTop);
+    qsort(f->by_bot, cnt, sizeof(int), CmpBot);
+    SortLines = NULL;
+    return True;
+}
+
+static void
+FinderFree(LineFinder *f)
+{
+    free(f->by_top);
+    f->by_top = NULL;
+}
+
+/*****************************************************************************
  * Function: FindMinX
  *
  *****************************************************************************/
 static	int
 FindMinX (
+    LineFinder	*f,
     _DtCvDspLine *lines,
     int		 txt_cnt,
     _DtCvUnit	 target_y,
@@ -622,6 +764,37 @@ FindMinX (
     int   cnt    = 0;
     _DtCvUnit  curMin = -1;
     _DtCvUnit  curX;
+
+    if (NULL != f && NULL != f->by_top)
+      {
+	/*
+	 * offer the lines starting above target_y
+	 */
+	while (f->nxt_top < f->cnt)
+	  {
+	    i = f->by_top[f->nxt_top];
+	    if (!(lines[i].baseline - lines[i].ascent < target_y))
+		break;
+	    if (_DtCvIsNotProcessed(lines[i]))
+		HeapPush(f, i);
+	    f->nxt_top++;
+	  }
+
+	/*
+	 * drop the candidates processed since
+	 */
+	while (f->heap_n > 0 && !_DtCvIsNotProcessed(lines[f->heap[0]]))
+	    HeapPop(f);
+
+	if (0 == f->heap_n)
+	    return 0;
+
+	*ret_line = f->heap[0];
+	for (i = 0; i < f->heap_n; i++)
+	    if (_DtCvIsNotProcessed(lines[f->heap[i]]))
+		cnt++;
+	return cnt;
+      }
 
     for (i = 0; i < txt_cnt; i++)
       {
@@ -650,6 +823,7 @@ FindMinX (
  *****************************************************************************/
 static _DtCvValue
 FindNextMinY(
+    LineFinder	*f,
     _DtCvDspLine *lines,
     int		 max_cnt,
     _DtCvUnit	 target_y,
@@ -658,6 +832,22 @@ FindNextMinY(
     int		i     = 0;
     _DtCvUnit	maxY;
     _DtCvValue	found = False;
+
+    if (NULL != f && NULL != f->by_top && -1 == target_y)
+      {
+	while (f->nxt_bot < f->cnt &&
+			!_DtCvIsNotProcessed(lines[f->by_bot[f->nxt_bot]]))
+	    f->nxt_bot++;
+
+	if (f->nxt_bot < f->cnt)
+	  {
+	    i = f->by_bot[f->nxt_bot];
+	    *ret_y = lines[i].baseline + lines[i].descent;
+	    return True;
+	  }
+	*ret_y = -1;
+	return False;
+      }
 
     while (i < max_cnt)
      {
@@ -692,7 +882,7 @@ GetSelectedText(
     _DtCvPointer	*ret_data)
 {
     _DtCvUnit   maxY;
-    _DtCvUnit   botY;
+    _DtCvUnit   botY = 0;	/* (BuildLine leaves it unset on errors) */
     int    i;
     int    lineCnt  = 0;
     int    junk;
@@ -702,11 +892,13 @@ GetSelectedText(
     _DtCvFlags endFlag;
     _DtCvValue  processing = True;
     _DtCvDspLine   *lines = canvas->txt_lst;
+    LineFinder      finder;
 
     for (i = 0; i < txtCnt; i++)
 	_DtCvClearProcessed(lines[i]);
 
     MarkLinesOutsideBoundary(canvas, next.y, next.x, end.y, end.x);
+    (void) FinderInit(&finder, lines, txtCnt);
 
     maxY = next.y;
     if (next.line_idx == -1)
@@ -714,15 +906,18 @@ GetSelectedText(
 	/*
 	 * find the first selected line
 	 */
-	if (FindNextMinY(lines, txtCnt, -1, &next.y) == False)
+	if (FindNextMinY(&finder, lines, txtCnt, -1, &next.y) == False)
+	  {
+	    FinderFree(&finder);
 	    return 0;
+	  }
 
 	next.x  = 0;
-	lineCnt = FindMinX(lines, txtCnt, next.y, &next.line_idx);
+	lineCnt = FindMinX(&finder, lines, txtCnt, next.y, &next.line_idx);
 	next.char_idx = 0;
       }
     else
-	lineCnt = FindMinX(lines, txtCnt, next.y, &junk);
+	lineCnt = FindMinX(&finder, lines, txtCnt, next.y, &junk);
 
     while (processing == True && result == 0)
       {
@@ -747,19 +942,20 @@ GetSelectedText(
 		maxY = botY;
 
 	    next.char_idx = 0;
-	    lineCnt       = FindMinX(lines, txtCnt, next.y, &next.line_idx);
+	    lineCnt       = FindMinX(&finder, lines, txtCnt, next.y, &next.line_idx);
 
 	  } while (result == 0 && lineCnt > 0);
 
 	if (result == 0)
 	  {
 	    next.x = 0;
-	    processing = FindNextMinY(lines, txtCnt, -1, &next.y);
+	    processing = FindNextMinY(&finder, lines, txtCnt, -1, &next.y);
 	    if (processing == True)
-		lineCnt = FindMinX(lines, txtCnt, next.y, &next.line_idx);
+		lineCnt = FindMinX(&finder, lines, txtCnt, next.y, &next.line_idx);
 	  }
       }
 
+    FinderFree(&finder);
     return result;
 
 } /* End GetSelectedText */
@@ -794,6 +990,7 @@ GetSegsInArea (
     _DtCvSegPts		*newPt;
     _DtCvSegmentI	*pSeg;
     _DtCvDspLine	*lines = canvas->txt_lst;
+    LineFinder		 finder;
 
     *ret_segs = NULL;
 
@@ -817,6 +1014,7 @@ GetSegsInArea (
      */
     next = *beg;
     MarkLinesOutsideBoundary(canvas, next.y, next.x, end->y, end->x);
+    (void) FinderInit(&finder, lines, canvas->txt_cnt);
 
     /*
      * start the minimum and maximum Y at this location.
@@ -832,7 +1030,7 @@ GetSegsInArea (
 	/*
 	 * find the first selected line within the region.
 	 */
-	if (FindNextMinY(lines, canvas->txt_cnt, -1, &next.y) == False)
+	if (FindNextMinY(&finder, lines, canvas->txt_cnt, -1, &next.y) == False)
 	    processing = False;		/* empty of any text */
 	else
 	  {
@@ -841,12 +1039,12 @@ GetSegsInArea (
 	     * the number of lines.
 	     */
 	    next.x  = 0;
-	    lineCnt = FindMinX(lines, canvas->txt_cnt, next.y, &next.line_idx);
+	    lineCnt = FindMinX(&finder, lines, canvas->txt_cnt, next.y, &next.line_idx);
 	    next.char_idx = 0;
           }
       }
     else /* find the number of lines on this 'line' */
-	lineCnt = FindMinX(lines, canvas->txt_cnt, next.y, &cnt);
+	lineCnt = FindMinX(&finder, lines, canvas->txt_cnt, next.y, &cnt);
 
     /*
      * loop will there are segments to process
@@ -966,18 +1164,20 @@ GetSegsInArea (
 	     * get the next line
 	     */
 	    next.char_idx = 0;
-	    lineCnt       = FindMinX(lines, canvas->txt_cnt, next.y,
+	    lineCnt       = FindMinX(&finder, lines, canvas->txt_cnt, next.y,
 							&next.line_idx);
 	  }
 
 	if (result == 0)
 	  {
 	    next.x = 0;
-	    processing = FindNextMinY(lines,canvas->txt_cnt, -1, &next.y);
+	    processing = FindNextMinY(&finder, lines,canvas->txt_cnt, -1, &next.y);
 	    if (processing == True)
-		lineCnt = FindMinX(lines,canvas->txt_cnt,next.y,&next.line_idx);
+		lineCnt = FindMinX(&finder, lines,canvas->txt_cnt,next.y,&next.line_idx);
 	  }
       }
+
+    FinderFree(&finder);
 
     /*
      * if no errors, add a null to the array
