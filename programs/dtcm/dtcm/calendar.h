@@ -377,6 +377,11 @@ extern void		destroy_paint_cache(Paint_cache *, int);
 extern void		invalidate_cache(Calendar *);
 
 extern CSA_return_code	allocate_paint_cache(CSA_entry_handle *, int, Paint_cache **);
+extern void		fill_paint_cache(Calendar *, time_t, time_t);
+extern void		month_paint_range(Calendar *, time_t *, time_t *);
+extern void		week_paint_range(Calendar *, time_t *, time_t *);
+extern void		day_paint_range(Calendar *, time_t *, time_t *);
+extern int		repaint_month_days(Calendar *, Paint_cache *, int);
 
 extern Boolean 		fontlist_to_font(XmFontList, Cal_Font *);
 extern void 		CalTextExtents	(Cal_Font *, char *, int, 

@@ -790,6 +790,16 @@ resize_weekview(
         }
 }
 
+/* The range of the week view's paint cache. */
+extern void
+week_paint_range(Calendar *c, time_t *start, time_t *stop)
+{
+        Week *w = (Week *)c->view->week_info;
+
+	*start = (time_t) lowerbound(w->start_date);
+	*stop = (time_t) next_ndays(*start, 7) - 1;
+}
+
 static void
 draw_week(Calendar *c, XRectangle *rect, Boundary boundary)
 {
@@ -810,10 +820,6 @@ draw_week(Calendar *c, XRectangle *rect, Boundary boundary)
 	OrderingType	ot = get_int_prop(p, CP_DATEORDERING);
 	Tick		start_tick, end_tick;
 	time_t start, stop;
-        CSA_entry_handle *list;
-        CSA_attribute *range_attrs;
-	CSA_enum *ops;
-	CSA_uint32 a_total;
         int i, lower_bound = 0, upper_bound = 0;
 	XFontSetExtents regfontextents, boldfontextents;
         
@@ -822,19 +828,9 @@ draw_week(Calendar *c, XRectangle *rect, Boundary boundary)
         start_date      = w->start_date;
         xc              = c->xcontext;
 
-       	start = (time_t) lowerbound(start_date);
-       	stop = (time_t) next_ndays(start, 7) - 1;
-
-        if (c->paint_cache == NULL) {
-		setup_range(&range_attrs, &ops, &i, start, stop, CSA_TYPE_EVENT,
-	    		0, B_FALSE, c->general->version);
-		csa_list_entries(c->cal_handle, i, range_attrs, ops, 
-				 &a_total, &list, NULL);
-		free_range(&range_attrs, &ops, i);
-                allocate_paint_cache(list, a_total, &c->paint_cache);
-                c->paint_cache_size = a_total;
-		csa_free(list);
-        }
+        week_paint_range(c, &start, &stop);
+        if (c->paint_cache == NULL)
+		fill_paint_cache(c, start, stop);
 
 
         gr_clear_box(xc, 0, 0, w->canvas_w, w->canvas_h);

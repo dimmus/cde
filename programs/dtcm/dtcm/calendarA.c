@@ -246,6 +246,47 @@ invalidate_cache(Calendar *c) {
 	}
 }
 
+/*
+ * Fetch the entries of [start, stop] into the paint cache, as the views
+ * do when it is empty.
+ */
+extern void
+fill_paint_cache(Calendar *c, time_t start, time_t stop)
+{
+	CSA_attribute		*range_attrs;
+	CSA_enum		*ops;
+	CSA_entry_handle	*list = NULL;
+	CSA_uint32		a_total = 0;
+	int			n;
+
+	setup_range(&range_attrs, &ops, &n, start, stop, CSA_TYPE_EVENT, 0,
+		    B_FALSE, c->general->version);
+	csa_list_entries(c->cal_handle, n, range_attrs, ops, &a_total, &list,
+			 NULL);
+	free_range(&range_attrs, &ops, n);
+	allocate_paint_cache(list, a_total, &c->paint_cache);
+	c->paint_cache_size = a_total;
+	csa_free(list);
+}
+
+/* Would the two caches paint the same? */
+static Boolean
+same_paint_cache(Paint_cache *a, int na, Paint_cache *b, int nb)
+{
+	int	i;
+
+	if (a == NULL || b == NULL || na != nb)
+		return (False);
+	for (i = 0; i < na; i++)
+		if (a[i].start_time != b[i].start_time ||
+		    a[i].end_time != b[i].end_time ||
+		    a[i].show_time != b[i].show_time ||
+		    strcmp(a[i].summary ? a[i].summary : "",
+			   b[i].summary ? b[i].summary : "") != 0)
+			return (False);
+	return (True);
+}
+
 CSA_return_code
 allocate_paint_cache(CSA_entry_handle *list, int num_entries, Paint_cache **return_cache) {
 	Dtcm_appointment 	*appt;
@@ -3193,9 +3234,8 @@ switch_it(Calendar *c, char *new_calendar, WindowType win)
  * have registered them on.
  *
  * This is a simple callback routine: it doesn't care what the
- * reason is for the call... it always refreshes all data & display.
- * An optimization would be to only refresh the canvas region affected
- * by the data changed.
+ * reason is for the call... it always refreshes all data, and repaints
+ * what changed (update_canvas).
  */
 /*
  * The refresh is deferred and coalesced: one change can bring several
@@ -3206,6 +3246,51 @@ switch_it(Calendar *c, char *new_calendar, WindowType win)
 
 static XtIntervalId	update_timer = 0;
 
+/*
+ * The canvas is updated incrementally: the view's entries are fetched
+ * again and compared with what it shows.  Nothing is repainted when they
+ * are the same (a change outside the range shown) or in the year view,
+ * which shows no entries; in the month view only the day boxes whose
+ * entries changed are; the week and day views are repainted whole when
+ * anything changed, as before.
+ */
+static void
+update_canvas(Calendar *c)
+{
+	Paint_cache	*old = c->paint_cache;
+	int		nold = c->paint_cache_size;
+	Glance		glance = c->view->glance;
+	time_t		start, stop;
+
+	c->paint_cache = NULL;
+	c->paint_cache_size = 0;
+	invalidate_cache(c);		/* the browser's cache */
+
+	if (glance == yearGlance) {
+		destroy_paint_cache(old, nold);
+		return;
+	}
+	if (old == NULL || (glance != monthGlance && glance != weekGlance &&
+	    glance != dayGlance)) {
+		destroy_paint_cache(old, nold);
+		paint_canvas(c, NULL, RENDER_CLEAR_FIRST);
+		return;
+	}
+
+	if (glance == monthGlance)
+		month_paint_range(c, &start, &stop);
+	else if (glance == weekGlance)
+		week_paint_range(c, &start, &stop);
+	else
+		day_paint_range(c, &start, &stop);
+	fill_paint_cache(c, start, stop);
+
+	if (!same_paint_cache(old, nold, c->paint_cache, c->paint_cache_size) &&
+	    (glance != monthGlance || repaint_month_days(c, old, nold) < 0))
+		paint_canvas(c, NULL, RENDER_CLEAR_FIRST);
+	destroy_paint_cache(old, nold);
+}
+
 static void
 do_update(XtPointer data, XtIntervalId *id)
 {
@@ -3214,8 +3299,7 @@ do_update(XtPointer data, XtIntervalId *id)
 	update_timer = 0;
 
 	/* sync canvas */
-	invalidate_cache(c);
-	paint_canvas(c, NULL, RENDER_CLEAR_FIRST);
+	update_canvas(c);
 	reset_alarm(c);
 
 	/* sync editors */

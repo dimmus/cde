@@ -114,7 +114,7 @@ static Boolean	print_month ( Calendar *, int,
 			     void *, Tick, Props *, Boolean);
 static int	count_month_pages(Calendar *, Tick, int, CmRangeList *);
 static void	paint_daynames(Calendar *, XRectangle *);
-static void	paint_month(Calendar *, Tick, XRectangle *);
+static void	paint_month(Calendar *, Tick, XRectangle *, const char *);
 static void	unmanage_children(Calendar *);
 static void	manage_children(Calendar *);
 static int	count_month_appts(CSA_entry_handle *, int, Calendar *);
@@ -258,23 +258,113 @@ month_button(Widget widget, XtPointer data, XtPointer cbs)
 	XtMapWidget(c->canvas);
 }
 
+/* The first day of the month of 'key', as paint_month() computes it. */
+static Tick
+month_first_day(Tick key)
+{
+	struct tm	tm;
+	_Xltimeparams	localtime_buf;
+	(void) localtime_buf;	/* unused unless XTHREADS */
+
+	tm = *_XLocaltime(&key, localtime_buf);
+	tm.tm_mday = 1;
+#if defined(SVR4) || defined(__linux__)
+	tm.tm_isdst = -1;
+	return (mktime(&tm));
+#else
+	return (timelocal(&tm));
+#endif
+}
+
+/* The range of the month view's paint cache. */
+extern void
+month_paint_range(Calendar *c, time_t *start, time_t *stop)
+{
+	Tick	day = month_first_day(c->view->date);
+
+	*start = (time_t) lowerbound(day);
+	*stop = (time_t) last_dom(day);
+}
+
+/*
+ * Do the entries of [lower, upper) paint the same in the two caches?  A
+ * day box shows their start times, summaries and whether the time is
+ * shown, in cache order.
+ */
+static Boolean
+same_day_entries(Paint_cache *a, int na, Paint_cache *b, int nb,
+		 Tick lower, Tick upper)
+{
+	int	i = 0, j = 0;
+
+	for (;;) {
+		while (i < na && (a[i].start_time < lower ||
+		    a[i].start_time >= upper))
+			i++;
+		while (j < nb && (b[j].start_time < lower ||
+		    b[j].start_time >= upper))
+			j++;
+		if (i == na || j == nb)
+			return (i == na && j == nb);
+		if (a[i].start_time != b[j].start_time ||
+		    a[i].show_time != b[j].show_time ||
+		    strcmp(a[i].summary ? a[i].summary : "",
+			   b[j].summary ? b[j].summary : "") != 0)
+			return (False);
+		i++;
+		j++;
+	}
+}
+
+/*
+ * After the paint cache was refreshed: repaint the day boxes of the
+ * month shown whose entries differ from those in 'old', and nothing
+ * else.  Returns the number of days repainted.
+ */
+extern int
+repaint_month_days(Calendar *c, Paint_cache *old, int nold)
+{
+	Month	*m = (Month *)c->view->month_info;
+	char	only[32];
+	Tick	day;
+	int	i, n = 0, ndays;
+
+	if (m == NULL || !allocated(c))
+		return (-1);
+	day = month_first_day(c->view->date);
+	ndays = monthlength(day);
+	if (ndays > 31)
+		return (-1);
+	memset(only, 0, sizeof(only));
+	for (i = 1; i <= ndays; i++, day = nextday(day))
+		if (!same_day_entries(old, nold, c->paint_cache,
+		    c->paint_cache_size, lowerbound(day), next_ndays(day, 1))) {
+			only[i] = 1;
+			n++;
+		}
+	if (n > 0) {
+		paint_month(c, c->view->date, NULL, only);
+		calendar_select(c, daySelect, (caddr_t)NULL);
+	}
+	return (n);
+}
+
 /*
  * Do the actual month grid, headers and appointments
  */
+/*
+ * 'only', when not NULL, says which days to paint (only[1] for the 1st):
+ * their boxes are cleared first and the others left alone.
+ */
 static void
-paint_month(Calendar *c, Tick key, XRectangle *rect)
+paint_month(Calendar *c, Tick key, XRectangle *rect, const char *only)
 {
         Month    	*m = (Month *)c->view->month_info;
-        int 		x, y, i, j;
-	CSA_uint32 	a_total;
+        int 		x, y, i;
         int 		firstdom, boxw, boxh, dayname_height, margin, default_height;
         Tick 		day;
         struct tm 	tm;
 	Dimension 	btn_ht=0, btn_w=0;
-	time_t 		start, stop;
-	CSA_enum 	*ops;
-	CSA_attribute 	*range_attrs;
-	CSA_entry_handle *list = NULL;
 	XFontSetExtents fontextents;
 	_Xltimeparams	localtime_buf;
 	(void) localtime_buf;	/* unused unless XTHREADS */
@@ -297,18 +387,9 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
 	dayname_height  = ((Month *) calendar->view->month_info)->dayname_height;
  
 
-	if (c->paint_cache == NULL) {
-        	start = (time_t) lowerbound(day);
-        	stop = (time_t) last_dom(day);
-		setup_range(&range_attrs, &ops, &j, start, stop, CSA_TYPE_EVENT,
-		    	0, B_FALSE, c->general->version);
-		csa_list_entries(c->cal_handle, j, range_attrs, ops, &a_total, &list, NULL);
-	
-		free_range(&range_attrs, &ops, j);
-		allocate_paint_cache(list, a_total, &c->paint_cache);
-		c->paint_cache_size = a_total;
-		csa_free(list);
-	}
+	if (c->paint_cache == NULL)
+		fill_paint_cache(c, (time_t) lowerbound(day),
+				 (time_t) last_dom(day));
 
 	CalFontExtents(c->fonts->viewfont, &fontextents);
 	default_height = fontextents.max_logical_extent.height;
@@ -319,6 +400,12 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
 
 		box_origin_x = (x * boxw) + margin;
 		box_origin_y = (y * boxh) + dayname_height + c->view->topoffset;
+
+		if (only && !only[i])
+			goto next;
+		if (only)
+			gr_clear_area(c->xcontext, box_origin_x + 1,
+				      box_origin_y + 1, boxw - 1, boxh - 1);
 
 		XtVaGetValues(m->hot_button[i-1], XmNheight, &btn_ht,
 			XmNwidth, &btn_w, NULL);
@@ -331,6 +418,7 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
                         box_origin_y + default_height + btn_ht, 
 			boxw - 4, boxh - btn_ht - 4,
 			c->paint_cache, c->paint_cache_size, rect);
+next:
 
                 day = nextday(day);
                 x++;
@@ -521,7 +609,7 @@ repaint_damaged_month(
 
         paint_daynames(c, rect);
         paint_grid(c, rect);
-        paint_month(c, c->view->date, rect);
+        paint_month(c, c->view->date, rect, NULL);
         calendar_select(c, daySelect, (caddr_t)NULL);
 }
 

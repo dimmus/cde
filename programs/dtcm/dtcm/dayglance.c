@@ -590,6 +590,16 @@ in_moboxes(Calendar *c, int x, int y)
 	return in_mobox;
 }
 
+/* The range of the day view's paint cache. */
+extern void
+day_paint_range(Calendar *c, time_t *start, time_t *stop)
+{
+	int end = get_int_prop((Props *)c->properties, CP_DAYEND);
+
+	*start = (time_t) lower_bound(0, c->view->date);
+	*stop = (time_t) next_nhours(*start, end + 1) - 1;
+}
+
 extern void
 paint_dayview(Calendar *c, Boolean repaint, XRectangle *rect, Boolean update_months)
 {
@@ -597,11 +607,6 @@ paint_dayview(Calendar *c, Boolean repaint, XRectangle *rect, Boolean update_mon
 	int 		beg = get_int_prop(p, CP_DAYBEGIN);
 	int 		end = get_int_prop(p, CP_DAYEND);
 	time_t 		start, stop;
-	CSA_attribute 		*range_attrs;
-        CSA_entry_handle 	*list;
-	CSA_enum 	*ops;
-	int 		j;
-	CSA_uint32 	a_total;
 	int		panel0_year, panel0_month;
 	int		panel1_year, panel1_month;
 	int		panel2_year, panel2_month;
@@ -612,16 +617,8 @@ paint_dayview(Calendar *c, Boolean repaint, XRectangle *rect, Boolean update_mon
 	int		bottom_panel = 2;
 
 	if (c->paint_cache == NULL) {
-		start = (time_t) lower_bound(0, c->view->date);
-        	stop = (time_t) next_nhours(start, end+1) - 1;
-		setup_range(&range_attrs, &ops, &j, start, stop, CSA_TYPE_EVENT, 0,
-		    	B_FALSE, c->general->version);
-        	csa_list_entries(c->cal_handle, j, range_attrs, ops, &a_total, &list, NULL);
-	
-		free_range(&range_attrs, &ops, j);
-		allocate_paint_cache(list, a_total, &c->paint_cache);
-		c->paint_cache_size = a_total;
-		csa_free(list);
+		day_paint_range(c, &start, &stop);
+		fill_paint_cache(c, start, stop);
 	}
 
 	year_num = year(c->view->date);
