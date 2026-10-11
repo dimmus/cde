@@ -4304,6 +4304,14 @@ RFCMailBox::dotLockBusy(void)
     return(DTM_FALSE);
   }
 
+  // A lock file that is already 5 minutes old is stale: lockFile()
+  // removes it at once rather than waiting, so let the caller go ahead.
+  // (lockFile() measures the age against the file system's clock; a
+  // local clock that runs ahead only makes it wait that much.)
+  if (time(NULL) >= sbuf.st_ctime + 300) {
+    return(DTM_FALSE);
+  }
+
   clock_gettime(CLOCK_MONOTONIC, &now);
   if ((unsigned long) sbuf.st_ino != _busy_lock_ino ||
       (long) sbuf.st_ctime != _busy_lock_ctime) {
@@ -4328,6 +4336,9 @@ RFCMailBox::scheduleLockRetry(void)
     return;
   }
 
+  if (_lock_retry_ms > 6400) {
+    return;			// (and do not double it further: overflow)
+  }
   _lock_retry_ms = _lock_retry_ms <= 0 ? 50 : _lock_retry_ms * 2;
   if (_lock_retry_ms > 6400) {
     return;
@@ -4463,10 +4474,12 @@ RFCMailBox::lockFile(DtMailEnv & error)
         delete [] tempLockFileName;
 	return;
       }
-      if (watch.fd == -2) {
-	watch.fd = lockWatchOpen(_lockFileName);
-      }
-      lockWait(backoffMs, watch.fd, _lockFileName);
+      // The lock file is already gone, so there is no removal to wait
+      // for: a plain timed wait. (Waiting on the directory here would
+      // return at once on the removal of our own temporary lock file,
+      // and where link() always fails, e.g. on a file system without
+      // hard links, spin through lock attempts for the 30 s.)
+      lockWait(backoffMs, -1, _lockFileName);
       continue;
     }
 
