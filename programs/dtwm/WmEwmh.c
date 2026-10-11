@@ -41,6 +41,8 @@
 #include "WmWinState.h"
 #include "WmWrkspace.h"
 #include "WmCDInfo.h"
+#include "WmIDecor.h"
+#include "WmImage.h"
 
 /*
  * The window manager's EWMH state is published without reading the
@@ -70,6 +72,7 @@ static Atom xa__NET_CLOSE_WINDOW;
 static Atom xa__NET_MOVERESIZE_WINDOW;
 static Atom xa__NET_RESTACK_WINDOW;
 static Atom xa__NET_SHOWING_DESKTOP;
+static Atom xa__NET_WM_USER_TIME;
 
 /* the _NET_WM_ALLOWED_ACTIONS atoms (shading is not supported) */
 enum {
@@ -181,6 +184,8 @@ static const struct
     { "_NET_RESTACK_WINDOW",		&xa__NET_RESTACK_WINDOW,	True },
     { "_NET_WM_MOVERESIZE",		&wmGD.xa__NET_WM_MOVERESIZE,	True },
     { "_NET_SHOWING_DESKTOP",		&xa__NET_SHOWING_DESKTOP,	True },
+    { "_NET_WM_USER_TIME",		&xa__NET_WM_USER_TIME,		True },
+    { "_NET_WM_ICON",			&wmGD.xa__NET_WM_ICON,		True },
 };
 
 /*
@@ -1403,6 +1408,339 @@ void ProcessNetWmWindowType (ClientData *pCD)
 
 
 /*
+ * _NET_WM_ICON.  The icons are read in one request, of at most this many
+ * values (4 MB of image); a larger property is not used.
+ */
+#define NET_WM_ICON_MAX_LONGS	(1L << 20)
+
+/* An 8 bit color component of a pixel of a TrueColor visual, and back. */
+static void MaskShape (unsigned long mask, int *pShift, unsigned long *pMax)
+{
+    int shift = 0;
+
+    if (mask)
+	while (!(mask & 1))
+	{
+	    mask >>= 1;
+	    ++shift;
+	}
+    *pShift = shift;
+    *pMax = mask;
+}
+
+static unsigned int PixelComponent (unsigned long pixel, unsigned long mask)
+{
+    unsigned long max;
+    int shift;
+
+    MaskShape (mask, &shift, &max);
+    if (!max) return 0;
+    return (unsigned int) ((((pixel & mask) >> shift) * 255 + max / 2) / max);
+}
+
+static unsigned long ComponentPixel (unsigned int value, unsigned long mask)
+{
+    unsigned long max;
+    int shift;
+
+    MaskShape (mask, &shift, &max);
+    return (((value * max + 127) / 255) << shift) & mask;
+}
+
+
+/*
+ * The icon image of _NET_WM_ICON: of the icons it holds, the smallest
+ * that is at least iconImageMaximum, else the largest, scaled down to fit
+ * that size with a box filter, its alpha blended over the client's icon
+ * image background.  Only for a TrueColor or DirectColor default visual
+ * (other visuals would need colors allocated).  None when there is no
+ * usable icon (MakeIconPixmap also refuses one smaller than
+ * iconImageMinimum).
+ */
+static Pixmap MakeNetWmIconPixmap (ClientData *pCD)
+{
+    WmScreenData *pSD = pCD->pSD;
+    Visual *visual = DefaultVisual (DISPLAY, pSD->screen);
+    int depth = DefaultDepth (DISPLAY, pSD->screen);
+    unsigned long maxWidth = pSD->iconImageMaximum.width;
+    unsigned long maxHeight = pSD->iconImageMaximum.height;
+    unsigned long nitems, leftover, i, w, h, width = 0, height = 0;
+    unsigned long dw, dh, x, y, sx, sy, x0, x1, y0, y1, argb;
+    unsigned long *data = NULL, *best = NULL;
+    unsigned int bgRed, bgGreen, bgBlue;
+    double n, a, r, g, b;
+    Boolean bestFits = False, fits;
+    Atom actualType;
+    int actualFormat;
+    XImage *image;
+    Pixmap pixmap, iconPixmap;
+    GC gc;
+
+    if ((visual->class != TrueColor && visual->class != DirectColor) ||
+	XGetWindowProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_ICON, 0L,
+	    NET_WM_ICON_MAX_LONGS, False, XA_CARDINAL, &actualType,
+	    &actualFormat, &nitems, &leftover,
+	    (unsigned char **)&data) != Success)
+	return None;
+
+    if (actualType != XA_CARDINAL || actualFormat != 32 || leftover)
+    {
+	if (data) XFree (data);
+	return None;
+    }
+
+    /* width, height, then width * height ARGB values, for each icon */
+    for (i = 0; i + 2 <= nitems; i += 2 + w * h)
+    {
+	w = data[i] & 0xFFFFFFFFUL;
+	h = data[i + 1] & 0xFFFFFFFFUL;
+	if (!w || !h || w > 0xFFFF || h > 0xFFFF ||
+	    (nitems - i - 2) / w < h)
+	    break;
+
+	fits = (w >= maxWidth && h >= maxHeight);
+	if (!best ||
+	    (fits && (!bestFits || w * h < width * height)) ||
+	    (!fits && !bestFits && w * h > width * height))
+	{
+	    best = &data[i + 2];
+	    width = w;
+	    height = h;
+	    bestFits = fits;
+	}
+    }
+    if (!best)
+    {
+	XFree (data);
+	return None;
+    }
+
+    /* scaled down to fit, the aspect kept */
+    dw = width;
+    dh = height;
+    if (width > maxWidth || height > maxHeight)
+    {
+	if (width * maxHeight >= height * maxWidth)
+	{
+	    dw = maxWidth;
+	    dh = height * maxWidth / width;
+	}
+	else
+	{
+	    dh = maxHeight;
+	    dw = width * maxHeight / height;
+	}
+	if (!dw) dw = 1;
+	if (!dh) dh = 1;
+    }
+
+    image = XCreateImage (DISPLAY, visual, depth, ZPixmap, 0, NULL, dw, dh,
+			  32, 0);
+    if (!image || !(image->data = malloc (image->bytes_per_line * dh)))
+    {
+	if (image) XDestroyImage (image);
+	XFree (data);
+	return None;
+    }
+
+    bgRed = PixelComponent (pCD->iconImageBackground, visual->red_mask);
+    bgGreen = PixelComponent (pCD->iconImageBackground, visual->green_mask);
+    bgBlue = PixelComponent (pCD->iconImageBackground, visual->blue_mask);
+
+    for (y = 0; y < dh; ++y)
+    {
+	y0 = y * height / dh;
+	y1 = (y + 1) * height / dh;
+	if (y1 <= y0) y1 = y0 + 1;
+
+	for (x = 0; x < dw; ++x)
+	{
+	    x0 = x * width / dw;
+	    x1 = (x + 1) * width / dw;
+	    if (x1 <= x0) x1 = x0 + 1;
+
+	    /* the mean of the box, premultiplied by alpha */
+	    a = r = g = b = 0;
+	    for (sy = y0; sy < y1; ++sy)
+		for (sx = x0; sx < x1; ++sx)
+		{
+		    unsigned long alpha;
+
+		    argb = best[sy * width + sx];
+		    alpha = (argb >> 24) & 0xFF;
+		    a += alpha;
+		    r += alpha * ((argb >> 16) & 0xFF);
+		    g += alpha * ((argb >> 8) & 0xFF);
+		    b += alpha * (argb & 0xFF);
+		}
+	    n = (double)((x1 - x0) * (y1 - y0));
+	    a /= n;
+
+	    /* over the background */
+	    XPutPixel (image, x, y,
+		ComponentPixel ((unsigned int)
+		    ((r / n + bgRed * (255 - a)) / 255 + 0.5),
+		    visual->red_mask) |
+		ComponentPixel ((unsigned int)
+		    ((g / n + bgGreen * (255 - a)) / 255 + 0.5),
+		    visual->green_mask) |
+		ComponentPixel ((unsigned int)
+		    ((b / n + bgBlue * (255 - a)) / 255 + 0.5),
+		    visual->blue_mask));
+	}
+    }
+    XFree (data);
+
+    pixmap = XCreatePixmap (DISPLAY, pSD->rootWindow, dw, dh, depth);
+    gc = XCreateGC (DISPLAY, pixmap, 0, NULL);
+    XPutImage (DISPLAY, pixmap, gc, image, 0, 0, 0, 0, dw, dh);
+    XFreeGC (DISPLAY, gc);
+    XDestroyImage (image);
+
+    iconPixmap = MakeIconPixmap (pCD, pixmap, None, dw, dh, depth);
+    XFreePixmap (DISPLAY, pixmap);
+    return iconPixmap;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  GetNetWmIcon (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Makes the icon image of a client being managed from its _NET_WM_ICON
+ *  (only when it has one, HasProperty), for ProcessWmHints: where a
+ *  client supplied icon image may be used (useClientIcon, or no iconImage
+ *  resource), _NET_WM_ICON comes after the WM_HINTS icon window and
+ *  before the WM_HINTS icon pixmap.
+ *
+ *
+ *  Outputs:
+ *  -------
+ *  RETURN = True if pCD->iconPixmap was made (ICON_NET_PIXMAP)
+ *
+ *************************************<->***********************************/
+
+Boolean GetNetWmIcon (ClientData *pCD)
+{
+    Pixmap pixmap;
+
+    if (!HasProperty (pCD, wmGD.xa__NET_WM_ICON) ||
+	!(pixmap = MakeNetWmIconPixmap (pCD)))
+	return False;
+
+    pCD->iconPixmap = pixmap;
+    pCD->iconFlags |= ICON_NET_PIXMAP;
+    return True;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessNetWmIcon (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  _NET_WM_ICON changed: the icon image is made again from it, or, when
+ *  it is gone or cannot be used, from the WM_HINTS icon pixmap, the
+ *  iconImage resource or the default image, as when the window was
+ *  managed.  Nothing changes for a client whose icon image cannot come
+ *  from the client, or that has an icon window.
+ *
+ *************************************<->***********************************/
+
+void ProcessNetWmIcon (ClientData *pCD)
+{
+    Pixmap pixmap, oldPixmap = pCD->iconPixmap;
+    long oldFlags = pCD->iconFlags;
+    XWMHints *pXWMHints;
+
+    if (!(pCD->clientFunctions & MWM_FUNC_MINIMIZE) || pCD->transientLeader ||
+	!(ICON_DECORATION(pCD) & ICON_IMAGE_PART) ||
+	!(pCD->useClientIcon || !pCD->iconImage) || pCD->iconWindow)
+	return;
+
+    if ((pixmap = MakeNetWmIconPixmap (pCD)))
+    {
+	pCD->iconPixmap = pixmap;
+	pCD->iconFlags = (pCD->iconFlags & ~ICON_HINTS_PIXMAP) | ICON_NET_PIXMAP;
+    }
+    else if (oldFlags & ICON_NET_PIXMAP)
+    {
+	/* back to what the window would have without it */
+	pCD->iconPixmap = None;
+	pCD->iconFlags &= ~ICON_NET_PIXMAP;
+	if ((pXWMHints = XGetWMHints (DISPLAY, pCD->client)))
+	{
+	    if ((pXWMHints->flags & IconPixmapHint) &&
+		(pCD->iconPixmap = MakeClientIconPixmap (pCD,
+		    pXWMHints->icon_pixmap, (pXWMHints->flags & IconMaskHint) ?
+		    pXWMHints->icon_mask : None)))
+	    {
+		pCD->iconFlags |= ICON_HINTS_PIXMAP;
+		pCD->hintIconPixmap = pXWMHints->icon_pixmap;
+		pCD->hintIconMask = (pXWMHints->flags & IconMaskHint) ?
+		    pXWMHints->icon_mask : None;
+	    }
+	    XFree ((char *)pXWMHints);
+	}
+	if (!pCD->iconPixmap && pCD->iconImage)
+	    pCD->iconPixmap = MakeNamedIconPixmap (pCD, pCD->iconImage);
+	if (!pCD->iconPixmap)
+	    pCD->iconPixmap = MakeNamedIconPixmap (pCD, NULL);
+    }
+    else
+	return;
+
+    /* the client's own images are freed, not the shared named ones */
+    if ((oldFlags & (ICON_HINTS_PIXMAP | ICON_NET_PIXMAP)) && oldPixmap)
+	XFreePixmap (DISPLAY, oldPixmap);
+
+    if (((pCD->clientState == MINIMIZED_STATE) ||
+	 (pCD->pSD->useIconBox && P_ICON_BOX(pCD))) &&
+	ICON_FRAME_WIN(pCD))
+	IconExposureProc (pCD, True);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessNetWmUserTime (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  A window mapped with a _NET_WM_USER_TIME of 0 (only when it has one,
+ *  HasProperty) was not mapped by the user: it does not get the focus.
+ *  Other times are not compared with anything; _NET_WM_USER_TIME_WINDOW
+ *  is not read.
+ *
+ *************************************<->***********************************/
+
+void ProcessNetWmUserTime (ClientData *pCD)
+{
+    Atom actualType;
+    int actualFormat;
+    unsigned long nitems, leftover;
+    unsigned char *data = NULL;
+
+    if (!HasProperty (pCD, xa__NET_WM_USER_TIME) ||
+	XGetWindowProperty (DISPLAY, pCD->client, xa__NET_WM_USER_TIME,
+	    0L, 1L, False, XA_CARDINAL, &actualType, &actualFormat, &nitems,
+	    &leftover, &data) != Success)
+	return;
+
+    if (actualType == XA_CARDINAL && actualFormat == 32 && nitems == 1 &&
+	!(*(unsigned long *)data & 0xFFFFFFFFUL))
+	pCD->netFlags |= NET_FLAG_NOFOCUS_MAP;
+    if (data) XFree (data);
+}
+
+
+/*
  * The default decorations and functions of the window type, for
  * ProcessMwmHints to use instead of dtwm's when no resource sets them.
  */
@@ -1739,7 +2077,7 @@ static void EstimateDecoration (ClientData *pCD)
 	    else if (pHints->functions & WM_FUNC_DEFAULT)
 		functions &= ~(pHints->functions);
 	    else
-		functions |= pHints->functions;
+		functions &= pHints->functions;
 	}
 	if (pHints->flags & MWM_HINTS_DECORATIONS)
 	{
@@ -1750,7 +2088,7 @@ static void EstimateDecoration (ClientData *pCD)
 	    else if (pHints->decorations & WM_DECOR_DEFAULT)
 		decoration &= ~(pHints->decorations);
 	    else
-		decoration |= pHints->decorations;
+		decoration &= pHints->decorations;
 
 	    if (decoration &
 		(MWM_DECOR_MENU | MWM_DECOR_MINIMIZE | MWM_DECOR_MAXIMIZE))
@@ -1919,6 +2257,48 @@ static int ReferenceToClient (int along, int ref, int size, int before,
 	case GRAVITY_STATIC:	return ref;
 	default:		return ref + before;
     }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  GravityClientPosition (pCD, oldLeft, oldTop, pX, pY)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Where a client goes when its frame offsets change (its decorations
+ *  did) from oldLeft, oldTop to pCD->clientOffset: the frame keeps the
+ *  reference point of the client's window gravity (ICCCM), the top left
+ *  corner for the default north-west gravity, and the client stays where
+ *  it is with static gravity.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = client, with its new offsets
+ *  oldLeft, oldTop = its old offsets (the old bottom one was oldLeft)
+ *  *pX, *pY = the client position (normal, not maximized)
+ *
+ *  Outputs:
+ *  -------
+ *  *pX, *pY = the new client position
+ *
+ *************************************<->***********************************/
+
+void GravityClientPosition (ClientData *pCD, int oldLeft, int oldTop,
+    int *pX, int *pY)
+{
+    int along = GravityAlongX (pCD->windowGravity);
+    int down = GravityAlongY (pCD->windowGravity);
+    int left = pCD->clientOffset.x, top = pCD->clientOffset.y;
+
+    *pX = ReferenceToClient (along,
+	FrameReference (along, *pX, pCD->clientWidth, oldLeft, oldLeft),
+	pCD->clientWidth, left, left);
+    *pY = ReferenceToClient (down,
+	FrameReference (down, *pY, pCD->clientHeight, oldTop, oldLeft),
+	pCD->clientHeight, top, left);
 }
 
 

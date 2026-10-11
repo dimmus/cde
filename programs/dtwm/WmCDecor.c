@@ -57,6 +57,9 @@
 #include "WmIconBox.h"
 #include "WmMenu.h"
 #include "WmWinInfo.h"
+#include "WmWinState.h"
+#include "WmProtocol.h"
+#include "WmEwmh.h"
 
 
 /*
@@ -2321,6 +2324,7 @@ ShowInactiveClientFrame (ClientData *pcd)
 void RegenerateClientFrame (ClientData *pcd)
 {
     unsigned long decor = pcd->decor;
+    Boolean newStretchers = False;
     /* 
      * If an embedded client, there is no frame.
      */
@@ -2346,6 +2350,7 @@ void RegenerateClientFrame (ClientData *pcd)
 
     /* resize the stretcher windows */
     if (SHOW_RESIZE_CURSORS(pcd) && (decor & MWM_DECOR_RESIZEH)) {
+	newStretchers = !pcd->clientStretchWin[STRETCH_NORTH_WEST];
 	CreateStretcherWindows (pcd);
 
 	XMoveResizeWindow (DISPLAY, 
@@ -2399,11 +2404,26 @@ void RegenerateClientFrame (ClientData *pcd)
     /* resize title bar window */
     if (decor & MWM_DECOR_TITLE)
     {
-	if (!pcd->clientTitleWin) CreateTitleBarWindow (pcd);
+	if (!pcd->clientTitleWin)
+	{
+	    /* (the frame had none: its decorations changed) */
+	    CreateTitleBarWindow (pcd);
+	    if (DECOUPLE_TITLE_APPEARANCE(pcd))
+	    {
+		XSaveContext (DISPLAY, pcd->clientTitleWin,
+		    wmGD.windowContextType, (caddr_t)pcd);
+		if (!pcd->pclientTitleTopShadows)
+		    AllocateFrameDisplayLists (pcd);
+	    }
+	}
 
 	XResizeWindow (DISPLAY, pcd->clientTitleWin,
 	   pcd->frameInfo.width - 2*pcd->frameInfo.upperBorderWidth,
 	   pcd->frameInfo.titleBarHeight);
+
+	/* the title bar clips the corner resize windows */
+	if (newStretchers)
+	    XRaiseWindow (DISPLAY, pcd->clientTitleWin);
     }
 
     /* recreate gadget rectangles */
@@ -2421,6 +2441,88 @@ void RegenerateClientFrame (ClientData *pcd)
     /* map all subwindows of client frame */
     XMapSubwindows(DISPLAY, pcd->clientFrameWin);
 } /* END OF FUNCTION  RegenerateClientFrame  */
+
+
+
+/*************************************<->*************************************
+ *
+ *  ChangeClientDecoration (pcd, oldLeft, oldTop)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Rebuilds the frame of a managed client whose decorations changed
+ *  (pcd->decor, and clientOffset by SetClientOffset; its _MOTIF_WM_HINTS
+ *  changed): a title bar or resize handles that no longer apply go, new
+ *  ones are made, and the client moves as its window gravity says
+ *  (GravityClientPosition).  A maximized window is fitted again; a full
+ *  screen window keeps no frame until it leaves full screen.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pcd		- pointer to client data
+ *  oldLeft, oldTop - the client offsets of the old decorations
+ *
+ *************************************<->***********************************/
+
+void ChangeClientDecoration (ClientData *pcd, int oldLeft, int oldTop)
+{
+    int i;
+
+    if (!pcd->clientFrameWin || pcd->pECD) return;
+
+    /*
+     * The title bar and the resize windows are made again where the new
+     * decorations want them (RegenerateClientFrame), if they want them.
+     */
+    if (pcd->clientTitleWin)
+    {
+	XDeleteContext (DISPLAY, pcd->clientTitleWin, wmGD.windowContextType);
+	XDestroyWindow (DISPLAY, pcd->clientTitleWin);
+	pcd->clientTitleWin = (Window)0L;
+    }
+    for (i = 0; i < STRETCH_COUNT; i++)
+    {
+	if (pcd->clientStretchWin[i])
+	{
+	    XDestroyWindow (DISPLAY, pcd->clientStretchWin[i]);
+	    pcd->clientStretchWin[i] = (Window)0L;
+	}
+    }
+
+    /* (allocated for as many gadgets as the old decorations had) */
+    XtFree ((char *)pcd->pTitleGadgets);
+    pcd->pTitleGadgets = NULL;
+    pcd->cTitleGadgets = 0;
+    XtFree ((char *)pcd->pResizeGadgets);
+    pcd->pResizeGadgets = NULL;
+
+    GravityClientPosition (pcd, oldLeft, oldTop, &pcd->clientX,
+			   &pcd->clientY);
+
+    if (pcd->maxConfig && pcd->fullscreen)
+    {
+	/* ConfigureNewState frames it when it leaves full screen */
+	AllocateGadgetRectangles (pcd);
+	ComputeGadgetRectangles (pcd);
+	return;
+    }
+
+    if (pcd->maxConfig)
+    {
+	/* maximized again, within the new decorations */
+	pcd->maxConfig = FALSE;
+	ConfigureNewState (pcd);
+    }
+    else
+    {
+	RegenerateClientFrame (pcd);
+	SendConfigureNotify (pcd);
+    }
+    FrameExposureProc (pcd);
+
+} /* END OF FUNCTION  ChangeClientDecoration  */
 
 
 

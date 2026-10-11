@@ -50,6 +50,7 @@ extern void GetSystemMenuPosition (ClientData *pcd, int *px, int *py, unsigned i
 extern void ShowActiveClientFrame (ClientData *pcd);
 extern void ShowInactiveClientFrame (ClientData *pcd);
 extern void RegenerateClientFrame (ClientData *pcd);
+extern void ChangeClientDecoration (ClientData *pcd, int oldLeft, int oldTop);
 extern void BevelSystemButton (RList *prTop, RList *prBot, int x, int y, unsigned int width, unsigned int height);
 extern void BevelMinimizeButton (RList *prTop, RList *prBot, int x, int y, unsigned int height);
 extern void BevelMaximizeButton (RList *prTop, RList *prBot, int x, int y, unsigned int height);

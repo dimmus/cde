@@ -101,12 +101,17 @@ void ReadInitialNetWmState (ClientData *pCD);
 void ApplyInitialNetWmState (ClientData *pCD);
 void UpdateNetUrgency (ClientData *pCD, Boolean urgent);
 void ProcessNetWmWindowType (ClientData *pCD);
+void ProcessNetWmUserTime (ClientData *pCD);
+Boolean GetNetWmIcon (ClientData *pCD);
+void ProcessNetWmIcon (ClientData *pCD);
 Boolean GetNetWmTypeWorkspaces (ClientData *pCD, WorkspaceID **ppIDs,
     unsigned int *pNumIDs, Boolean *pbAll);
 long NetTypeDecoration (ClientData *pCD, long decoration);
 long NetTypeFunctions (ClientData *pCD, long functions);
 void ApplyNetWmTypePlacement (ClientData *pCD);
 void ProcessNetWmStrut (ClientData *pCD, Boolean firstTime);
+void GravityClientPosition (ClientData *pCD, int oldLeft, int oldTop,
+    int *pX, int *pY);
 void GetNetWorkArea (ClientData *pCD, int *pX, int *pY, int *pWidth,
     int *pHeight);
 void ProcessNetWmFullscreenMonitors (ClientData *pCD,

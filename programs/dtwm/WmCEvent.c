@@ -936,6 +936,10 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 	    }
 	    else if (propertyEvent->atom == wmGD.xa_MWM_HINTS)
 	    {
+		long oldDecor = pCD->decor;
+		int oldLeft = pCD->clientOffset.x;
+		int oldTop = pCD->clientOffset.y;
+
 		ProcessMwmHints (pCD);
 		SetClientOffset (pCD);
 
@@ -946,6 +950,10 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 		 * which clobbered the client's own hints.)
 		 */
 		ProcessWmNormalHintsNoMaxSize (pCD);
+
+		/* and the frame (gtk_window_set_decorated, ...) */
+		if (pCD->decor != oldDecor)
+		    ChangeClientDecoration (pCD, oldLeft, oldTop);
 	    }
 	    else if (propertyEvent->atom == XA_WM_NAME ||
 		     propertyEvent->atom == wmGD.xa__NET_WM_NAME)
@@ -956,6 +964,10 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 		if (NextRequest (DISPLAY) != serial)	/* it read the title */
 		    DiscardStalePropertyNotify (pCD->client,
 						propertyEvent->atom, serial);
+	    }
+	    else if (propertyEvent->atom == wmGD.xa__NET_WM_ICON)
+	    {
+		ProcessNetWmIcon (pCD);
 	    }
 	    else if (propertyEvent->atom == wmGD.xa__NET_WM_STRUT_PARTIAL ||
 		     propertyEvent->atom == wmGD.xa__NET_WM_STRUT)

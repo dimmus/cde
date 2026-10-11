@@ -1776,6 +1776,9 @@ struct _ClientData
     long	strut[12];			/* _NET_WM_STRUT_PARTIAL */
     Boolean	hasStrut;			/* strut[] is set */
     unsigned int netActionsWritten;		/* _NET_WM_ALLOWED_ACTIONS */
+    int		mwmBaseFunctions;		/* clientFunctions and */
+    int		mwmBaseDecoration;		/* clientDecoration before */
+    Boolean	mwmBaseSet;			/* _MOTIF_WM_HINTS */
     long	netExtentsWritten[4];		/* _NET_FRAME_EXTENTS */
 
     /* client window frame graphic data: */
@@ -1909,6 +1912,7 @@ typedef struct _ClientData *PtrClientData;
 #define ICON_HINTS_POSITION		(1L << 0)
 #define ICON_HINTS_TITLE		(1L << 1)
 #define ICON_HINTS_PIXMAP		(1L << 2)
+#define ICON_NET_PIXMAP			(1L << 3)	/* _NET_WM_ICON */
 
 /* client protocol flags and sizes: */
 #define PROTOCOL_WM_SAVE_YOURSELF	(1L << 0)
@@ -2102,6 +2106,7 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_STRUT;
     Atom	xa__NET_WM_STRUT_PARTIAL;
     Atom	xa__NET_WM_MOVERESIZE;
+    Atom	xa__NET_WM_ICON;
 
     /* EWMH property writer (WmEwmh.c): */
 

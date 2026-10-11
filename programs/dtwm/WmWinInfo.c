@@ -229,6 +229,7 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->netDesktopWritten = NET_DESKTOP_NOT_WRITTEN;
     pCD->netStateWritten = NET_STATE_NOT_WRITTEN;
     pCD->netActionsWritten = NET_ACTIONS_NOT_WRITTEN;
+    pCD->mwmBaseSet = False;
     pCD->netExtentsWritten[0] = -1;
     pCD->maxAxes = MAX_AXES_BOTH;
     pCD->netType = NETTYPE_NORMAL;
@@ -318,6 +319,7 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
      */
 
     ProcessNetWmWindowType (pCD);
+    ProcessNetWmUserTime (pCD);
 
     /*
      * Get client window resource data (from resources, .mwmrc):
@@ -1167,7 +1169,13 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
 		         */
 		    }
 	        }
-	        if (!pCD->iconWindow && (flags & IconPixmapHint))
+	        /* _NET_WM_ICON: color with alpha, at the size wanted */
+	        if (!pCD->iconWindow)
+	        {
+		    (void) GetNetWmIcon (pCD);
+	        }
+	        if (!pCD->iconWindow && !pCD->iconPixmap &&
+		    (flags & IconPixmapHint))
 	        {
 		    iconMask = (flags & IconMaskHint) ?
 				pXWMHints->icon_mask : (Pixmap) NULL;
@@ -1301,7 +1309,8 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
     }
     else /* not the first time the hints are processed */
     {
-	if (flags & IconPixmapHint)
+	/* (_NET_WM_ICON is preferred to the WM_HINTS icon pixmap) */
+	if ((flags & IconPixmapHint) && !(pCD->iconFlags & ICON_NET_PIXMAP))
 	{
 	    /*
              * Process an icon image change if the icon image was initially
@@ -3943,6 +3952,16 @@ ProcessMwmHints (ClientData *pCD)
 
 
     /*
+     * Again (the hints changed): from what the resources and the window
+     * type gave, not from what the previous hints left.
+     */
+    if (pCD->mwmBaseSet)
+    {
+	pCD->clientFunctions = pCD->mwmBaseFunctions;
+	pCD->clientDecoration = pCD->mwmBaseDecoration;
+    }
+
+    /*
      * Fix the client functions and decorations fields if they have
      * default resource values.
      */
@@ -3992,6 +4011,10 @@ ProcessMwmHints (ClientData *pCD)
 	    pCD->clientDecoration &= WM_DECOR_PANEL_DEFAULT;   
 	}
     }
+
+    pCD->mwmBaseFunctions = pCD->clientFunctions;
+    pCD->mwmBaseDecoration = pCD->clientDecoration;
+    pCD->mwmBaseSet = True;
 
 
     /*

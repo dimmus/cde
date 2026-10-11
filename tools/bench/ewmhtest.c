@@ -64,7 +64,12 @@
  *               mapped), transients, docks, desktop windows and
  *               notifications; _NET_FRAME_EXTENTS as the frame shows them,
  *               decorated or not, full screen or not, and answering
- *               _NET_REQUEST_FRAME_EXTENTS before the window is mapped
+ *               _NET_REQUEST_FRAME_EXTENTS before the window is mapped;
+ *               decorations changed while mapped (_MOTIF_WM_HINTS):
+ *               undecorated and back, title and border only, the frame
+ *               and _NET_FRAME_EXTENTS agreeing, the frame corner kept
+ *               (north-west gravity) or the client (static gravity),
+ *               maximized and full screen windows
  *   requests    _NET_CLOSE_WINDOW (WM_DELETE_WINDOW, or the client is
  *               killed; xdotool windowquit and windowclose),
  *               _NET_MOVERESIZE_WINDOW with each kind of gravity and
@@ -78,6 +83,18 @@
  *               moving and resizing with the keyboard, cancelling, and a
  *               window that may not move (skipped without XTEST); run it
  *               with -x 'Dtwm*moveOpaque: True' too
+ *   icon        _NET_WM_ICON as the icon image (read back from the icon,
+ *               WM_STATE's icon window): a large icon scaled down to
+ *               iconImageMaximum, its changes, a checkerboard averaged
+ *               to grey, the icon of the right size among several, a
+ *               smaller one not scaled up, alpha blended over the icon
+ *               background, preferred to the WM_HINTS icon pixmap (also
+ *               after WM_HINTS changes), and the pixmap or the default
+ *               image back when the property goes; on a display without
+ *               true colors (Xvfb -screen 0 WxHx8), only the icon pixmap
+ *               is used; run it with -x 'Dtwm*useIconBox: True' too
+ *   usertime    a window mapped with _NET_WM_USER_TIME 0 does not take
+ *               the focus, others do
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -2272,9 +2289,21 @@ static void real_extents(Window w, long ext[4])
 /* _NET_FRAME_EXTENTS is what the frame shows. */
 static void expect_real_extents(Window w, const char *what)
 {
+	struct pollfd pfd = { ConnectionNumber(dpy), POLLIN, 0 };
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	Atom prop = net_atom("_NET_FRAME_EXTENTS");
 	long ext[4];
 
-	real_extents(w, ext);
+	/* (the frame may be caught between two of its changes) */
+	for (;;) {
+		real_extents(w, ext);
+		if (extents_are(w, prop, ext))
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			break;
+		poll(&pfd, 1, 20);
+	}
 	expect_extents(w, ext, what);
 }
 
@@ -2294,6 +2323,8 @@ static const long no_extents[4] = { 0, 0, 0, 0 };
  */
 #define NOT_MOVE_CLOSE (MWM_FUNC_ALL | MWM_FUNC_RESIZE | MWM_FUNC_MINIMIZE | \
 			MWM_FUNC_MAXIMIZE)
+
+static void test_redecorate(void);
 
 static void test_actions(void)
 {
@@ -2416,7 +2447,12 @@ static void test_actions(void)
 	/* a request about a managed window answers too */
 	request_extents(m, fixed, "a managed window");
 
+	/* the frame of w lost its resize handles with its resize function */
+	expect_extents(w, fixed, "a window that no longer resizes");
+	expect_real_extents(w, "a window that no longer resizes");
+
 	destroy_all();
+	test_redecorate();
 	printf("actions: ok\n");
 }
 
@@ -3073,6 +3109,549 @@ static void test_moveresize(void)
 	printf("moveresize: ok\n");
 }
 
+/* ------------------------------------------------------------------ */
+/* Decorations changed while mapped                                    */
+/* ------------------------------------------------------------------ */
+
+#define MWM_DECOR_ALL		(1L << 0)
+#define MWM_DECOR_BORDER	(1L << 1)
+#define MWM_DECOR_TITLE		(1L << 3)
+
+/* _NET_FRAME_EXTENTS has this value, and the frame shows it. */
+static void expect_both_extents(Window w, const long ext[4], const char *what)
+{
+	long real[4];
+
+	expect_extents(w, ext, what);
+	expect_real_extents(w, what);
+	real_extents(w, real);
+	if (memcmp(real, ext, sizeof real))
+		fail("%s: the frame shows %ld,%ld,%ld,%ld", what, real[0],
+		     real[1], real[2], real[3]);
+}
+
+static void set_gravity(Window w, int gravity)
+{
+	XSizeHints *sh = XAllocSizeHints();
+	long supplied;
+
+	XGetWMNormalHints(dpy, w, sh, &supplied);
+	sh->flags |= PWinGravity;
+	sh->win_gravity = gravity;
+	XSetWMNormalHints(dpy, w, sh);
+	XFree(sh);
+}
+
+static void test_redecorate(void)
+{
+	static const long none[4] = { 0, 0, 0, 0 };
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int wh = work_height();
+	long plain[4], titled[4];
+	int fx, fy, fw, fh, cx, cy, cw, ch, x, y, wd, ht;
+	Window w, s;
+
+	/* north-west gravity: the frame's corner stays */
+	w = map_managed(create_window("ewmhtest redecorate", None));
+	expect_real_extents(w, "a window to undecorate");
+	real_extents(w, plain);
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	root_geometry(w, &cx, &cy, &cw, &ch);
+
+	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0, 0);
+	expect_both_extents(w, none, "a window undecorated while mapped");
+	expect_geometry(w, fx, fy, cw, ch, "the undecorated window");
+
+	set_mwm_hints(w, 0, 0, 0);
+	expect_both_extents(w, plain, "a window decorated again");
+	expect_geometry(w, fx, fy, cw, ch, "the window decorated again");
+	expect_client_at(w, cx, cy, "the window decorated again");
+
+	/* a title bar and a border, no resize handles */
+	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0,
+		      MWM_DECOR_TITLE | MWM_DECOR_BORDER);
+	expect_real_extents(w, "a window with a title and a border");
+	real_extents(w, titled);
+	if (titled[2] <= titled[0] || titled[0] >= plain[0] || !titled[0])
+		fail("odd extents for a title and a border: %ld,%ld,%ld,%ld",
+		     titled[0], titled[1], titled[2], titled[3]);
+	expect_geometry(w, fx, fy, cw, ch, "the window with a title");
+	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0, MWM_DECOR_ALL);
+	expect_both_extents(w, plain, "a window with all decorations again");
+	expect_client_at(w, cx, cy, "the window with all decorations again");
+
+	/* static gravity: the client stays put */
+	s = create_window("ewmhtest redecorate static", None);
+	set_gravity(s, StaticGravity);
+	map_managed(s);
+	expect_real_extents(s, "a window of static gravity");
+	root_geometry(s, &x, &y, &wd, &ht);
+	set_mwm_hints(s, MWM_HINTS_DECORATIONS, 0, 0);
+	expect_both_extents(s, none, "a static window undecorated");
+	expect_client_at(s, x, y, "the static window undecorated");
+	set_mwm_hints(s, 0, 0, 0);
+	expect_both_extents(s, plain, "a static window decorated again");
+	expect_client_at(s, x, y, "the static window decorated again");
+
+	/* maximized: fitted again */
+	send_state(w, ADD, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_state(w, "MAXIMIZED_VERT", 1);
+	expect_frame_bottom(w, wh, "maximized");
+	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0, 0);
+	expect_both_extents(w, none, "a maximized window undecorated");
+	expect_geometry(w, 0, ANY, sw, ANY, "the maximized window undecorated");
+	expect_frame_bottom(w, wh, "the maximized window undecorated");
+	set_mwm_hints(w, 0, 0, 0);
+	expect_both_extents(w, plain, "a maximized window decorated again");
+	expect_geometry(w, 0, ANY, sw - plain[0] - plain[1], ANY,
+			"the maximized window decorated again");
+	expect_frame_bottom(w, wh, "the maximized window decorated again");
+	send_state(w, REMOVE, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_state(w, "MAXIMIZED_VERT", 0);
+	expect_geometry(w, fx, fy, cw, ch, "the window restored");
+
+	/* full screen: no frame until it leaves, then the new decorations */
+	send_state(w, ADD, "FULLSCREEN", NULL);
+	expect_both_extents(w, none, "a full screen window");
+	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0, 0);
+	XSync(dpy, False);
+	expect_both_extents(w, none, "a full screen window undecorated");
+	send_state(w, REMOVE, "FULLSCREEN", NULL);
+	expect_state(w, "FULLSCREEN", 0);
+	expect_both_extents(w, none, "the undecorated window out of full "
+			    "screen");
+	expect_geometry(w, ANY, ANY, cw, ch, "the window out of full screen");
+	send_state(w, ADD, "FULLSCREEN", NULL);
+	expect_state(w, "FULLSCREEN", 1);
+	set_mwm_hints(w, 0, 0, 0);
+	send_state(w, REMOVE, "FULLSCREEN", NULL);
+	expect_state(w, "FULLSCREEN", 0);
+	expect_both_extents(w, plain, "the decorated window out of full "
+			    "screen");
+
+	destroy_all();
+}
+
+/* ------------------------------------------------------------------ */
+/* _NET_WM_ICON                                                        */
+/* ------------------------------------------------------------------ */
+
+#define OPAQUE(rgb)	(0xFF000000UL | (rgb))
+
+/*
+ * Icons for _NET_WM_ICON: n square icons of these sizes, each of one
+ * color, or (color 0) a black and white checkerboard.
+ */
+static void set_net_icon(Window w, int n, const int *sizes,
+			 const unsigned long *colors)
+{
+	unsigned long *v;
+	long total = 0;
+	int i, x, y, k = 0;
+
+	for (i = 0; i < n; i++)
+		total += 2 + (long)sizes[i] * sizes[i];
+	v = calloc(total, sizeof *v);
+	if (!v)
+		fail("out of memory");
+	for (i = 0; i < n; i++) {
+		v[k++] = sizes[i];
+		v[k++] = sizes[i];
+		for (y = 0; y < sizes[i]; y++)
+			for (x = 0; x < sizes[i]; x++)
+				v[k++] = colors[i] ? colors[i] :
+					 ((x + y) & 1) ? OPAQUE(0xFFFFFF) :
+					 OPAQUE(0);
+	}
+	XChangeProperty(dpy, w, net_atom("_NET_WM_ICON"), XA_CARDINAL, 32,
+			PropModeReplace, (unsigned char *)v, (int)total);
+	free(v);
+}
+
+static int is_iconic(Window w, Atom prop, const void *arg)
+{
+	unsigned long *v;
+	int n, ok;
+
+	(void)arg;
+	v = get_prop_on(w, prop, a_wm_state, &n);
+	ok = n >= 2 && v[0] == IconicState && v[1];
+	if (v)
+		XFree(v);
+	return ok;
+}
+
+/* Iconify w and return its icon (WM_STATE). */
+static Window iconify(Window w)
+{
+	unsigned long *v;
+	Window icon;
+	int n;
+
+	XIconifyWindow(dpy, w, DefaultScreen(dpy));
+	wait_for_on(w, a_wm_state, is_iconic, NULL, "WM_STATE IconicState");
+	v = get_prop_on(w, a_wm_state, a_wm_state, &n);
+	icon = v[1];
+	XFree(v);
+	return icon;
+}
+
+/* The image of a window (the icon), its pixels as 0xRRGGBB. */
+struct shot {
+	int w, h;
+	unsigned long *rgb;
+};
+
+static void take_shot(Window win, struct shot *s)
+{
+	Visual *vis = DefaultVisual(dpy, DefaultScreen(dpy));
+	XWindowAttributes wa;
+	XImage *img;
+	XColor c;
+	int x, y;
+
+	XSync(dpy, False);
+	if (!XGetWindowAttributes(dpy, win, &wa) ||
+	    !(img = XGetImage(dpy, win, 0, 0, wa.width, wa.height, AllPlanes,
+			      ZPixmap)))
+		fail("cannot read the image of the icon 0x%lx", win);
+	s->w = wa.width;
+	s->h = wa.height;
+	s->rgb = malloc(sizeof *s->rgb * s->w * s->h);
+	if (!s->rgb)
+		fail("out of memory");
+	for (y = 0; y < s->h; y++)
+		for (x = 0; x < s->w; x++) {
+			c.pixel = XGetPixel(img, x, y);
+			if (vis->class == TrueColor)
+				s->rgb[y * s->w + x] = c.pixel & 0xFFFFFF;
+			else
+				s->rgb[y * s->w + x] = c.pixel;
+		}
+	XDestroyImage(img);
+}
+
+/* How many pixels have this color, and the first of them. */
+static int count_color(const struct shot *s, unsigned long rgb, int *px,
+		       int *py)
+{
+	int i, n = 0;
+
+	for (i = 0; i < s->w * s->h; i++)
+		if (s->rgb[i] == rgb) {
+			if (!n && px) {
+				*px = i % s->w;
+				*py = i / s->w;
+			}
+			n++;
+		}
+	return n;
+}
+
+/* Wait until the icon shows exactly count pixels of the color. */
+static void expect_icon_color(Window icon, unsigned long rgb, int count,
+			      const char *what)
+{
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	struct shot s;
+	int n;
+
+	for (;;) {
+		take_shot(icon, &s);
+		n = count_color(&s, rgb, NULL, NULL);
+		free(s.rgb);
+		if (n == count)
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("%s: the icon has %d pixels of #%06lx, not %d",
+			     what, n, rgb, count);
+		usleep(20000);
+	}
+}
+
+/* Two icons show the same image. */
+static void expect_same_icons(Window a, Window b, const char *what)
+{
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	struct shot sa, sb;
+	int same;
+
+	for (;;) {
+		take_shot(a, &sa);
+		take_shot(b, &sb);
+		same = sa.w == sb.w && sa.h == sb.h &&
+		       !memcmp(sa.rgb, sb.rgb, sizeof *sa.rgb * sa.w * sa.h);
+		free(sa.rgb);
+		free(sb.rgb);
+		if (same)
+			return;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("%s: the icons differ", what);
+		usleep(20000);
+	}
+}
+
+static Pixmap test_bitmap(void)
+{
+	static char bits[32 * 32 / 8];
+	size_t i;
+
+	for (i = 0; i < sizeof bits; i++)
+		bits[i] = (char)((i & 4) ? 0xF0 : 0x0F);
+	return XCreateBitmapFromData(dpy, rootw, bits, 32, 32);
+}
+
+static void set_icon_pixmap(Window w, Pixmap p)
+{
+	XWMHints *h = XGetWMHints(dpy, w);
+
+	h->flags |= IconPixmapHint;
+	h->icon_pixmap = p;
+	XSetWMHints(dpy, w, h);
+	XFree(h);
+}
+
+static void test_icon(void)
+{
+	static const int big[] = { 256 };
+	static const unsigned long big_color[] = { OPAQUE(0x12C456) };
+	static const int sizes[] = { 16, 32, 48, 64 };
+	static const unsigned long colors[] = {
+		OPAQUE(0xD01010), OPAQUE(0x10D010), OPAQUE(0x1010D0),
+		OPAQUE(0xD0D010),
+	};
+	static const int small[] = { 16, 32 };
+	static const unsigned long small_colors[] = {
+		OPAQUE(0xA02080), OPAQUE(0x20A0A0),
+	};
+	Visual *vis = DefaultVisual(dpy, DefaultScreen(dpy));
+	unsigned long *alpha, bg, blended, got;
+	struct shot s;
+	int max, i, x, y, n, want;
+	Window focus, a, b, icon, icon2;
+	Pixmap bitmap = test_bitmap();
+	char title[64];
+	double deadline;
+	XSizeHints *sh;
+
+	expect_supported("_NET_WM_ICON", 1);
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	/* (away from the icons, which XGetImage reads from the screen) */
+	focus = create_window("ewmhtest icon focus", None);
+	sh = XAllocSizeHints();
+	sh->flags = USPosition | PSize;
+	sh->x = DisplayWidth(dpy, DefaultScreen(dpy)) / 2;
+	sh->y = DisplayHeight(dpy, DefaultScreen(dpy)) / 2;
+	sh->width = 300;
+	sh->height = 200;
+	XMoveWindow(dpy, focus, sh->x, sh->y);
+	XSetWMNormalHints(dpy, focus, sh);
+	XFree(sh);
+	map_managed(focus);
+
+	if (vis->class != TrueColor && vis->class != DirectColor) {
+		/* the icon pixmap, as if there were no _NET_WM_ICON */
+		a = create_window("ewmhtest icon", None);
+		set_net_icon(a, 1, big, big_color);
+		set_icon_pixmap(a, bitmap);
+		b = create_window("ewmhtest icon", None);
+		set_icon_pixmap(b, bitmap);
+		map_managed(a);
+		map_managed(b);
+		icon = iconify(a);
+		icon2 = iconify(b);
+		send_active(focus);
+		wait_for(a_active, active_is, &focus, "the focus elsewhere");
+		expect_same_icons(icon, icon2, "_NET_WM_ICON on a visual "
+				  "without true colors");
+		destroy_all();
+		printf("icon: ok (visual class %d: icon pixmap used)\n",
+		       vis->class);
+		return;
+	}
+
+	/* a large icon is scaled down to iconImageMaximum */
+	a = create_window("ewmhtest icon large", None);
+	set_net_icon(a, 1, big, big_color);
+	map_managed(a);
+	icon = iconify(a);
+	send_active(focus);
+	wait_for(a_active, active_is, &focus, "the focus elsewhere");
+	deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	for (;;) {
+		take_shot(icon, &s);
+		n = count_color(&s, big_color[0] & 0xFFFFFF, NULL, NULL);
+		free(s.rgb);
+		for (max = 1; max * max < n; max++)
+			;
+		if (n >= 16 * 16 && max * max == n)
+			break;
+		check_wm();
+		if (bench_now_ns() > deadline)
+			fail("a large icon: the icon shows %d pixels of its "
+			     "image, not a square of at least 16", n);
+		usleep(20000);
+	}
+	expect_icon_color(icon, big_color[0] & 0xFFFFFF, max * max,
+			  "a large icon");
+
+	/* it changes with the property */
+	set_net_icon(a, 1, big, colors);
+	expect_icon_color(icon, colors[0] & 0xFFFFFF, max * max,
+			  "the icon changed");
+	expect_icon_color(icon, big_color[0] & 0xFFFFFF, 0,
+			  "the icon changed");
+
+	/* a box filter: a checkerboard is grey */
+	set_net_icon(a, 1, (int[]){ 2 * max }, (unsigned long[]){ 0 });
+	expect_icon_color(icon, 0x808080, max * max, "a checkerboard icon");
+
+	/* and goes when the property does: as if it never was */
+	b = create_window("ewmhtest icon large", None);
+	map_managed(b);
+	icon2 = iconify(b);
+	XDeleteProperty(dpy, a, net_atom("_NET_WM_ICON"));
+	send_active(focus);
+	wait_for(a_active, active_is, &focus, "the focus elsewhere");
+	expect_icon_color(icon, 0x808080, 0, "the icon deleted");
+	expect_same_icons(icon, icon2, "the icon deleted, and none");
+	destroy_window(a);
+	destroy_window(b);
+
+	/* of several sizes, the smallest that fills iconImageMaximum */
+	for (i = 0; i < 4 && sizes[i] < max; i++)
+		;
+	if (i == 4)
+		i = 3;
+	want = sizes[i] < max ? sizes[i] : max;
+	a = create_window("ewmhtest icon sizes", None);
+	set_net_icon(a, 4, sizes, colors);
+	map_managed(a);
+	icon = iconify(a);
+	snprintf(title, sizeof title, "the %d pixel icon of 16, 32, 48, 64",
+		 sizes[i]);
+	expect_icon_color(icon, colors[i] & 0xFFFFFF, want * want, title);
+	destroy_window(a);
+
+	/* only smaller ones: the largest, not scaled up */
+	a = create_window("ewmhtest icon small", None);
+	set_net_icon(a, 2, small, small_colors);
+	map_managed(a);
+	icon = iconify(a);
+	want = max < 32 ? max : 32;
+	expect_icon_color(icon, small_colors[1] & 0xFFFFFF, want * want,
+			  "the 32 pixel icon of 16, 32");
+
+	/* alpha: the left half opaque, the right half half transparent */
+	alpha = calloc(2 + 16 * 16, sizeof *alpha);
+	alpha[0] = alpha[1] = 16;
+	for (y = 0; y < 16; y++)
+		for (x = 0; x < 16; x++)
+			alpha[2 + y * 16 + x] = x < 8 ? OPAQUE(0x2060E0) :
+						0x80E06020UL;
+	XChangeProperty(dpy, a, net_atom("_NET_WM_ICON"), XA_CARDINAL, 32,
+			PropModeReplace, (unsigned char *)alpha, 2 + 16 * 16);
+	free(alpha);
+	expect_icon_color(icon, 0x2060E0, 8 * 16, "the opaque half");
+	take_shot(icon, &s);
+	count_color(&s, 0x2060E0, &x, &y);
+	bg = s.rgb[(y + 8) * s.w + x - 2];
+	got = s.rgb[(y + 8) * s.w + x + 12];
+	free(s.rgb);
+	blended = 0;
+	for (i = 0; i < 3; i++) {
+		unsigned long c = (0xE06020UL >> (8 * i)) & 0xFF;
+		unsigned long b8 = (bg >> (8 * i)) & 0xFF;
+
+		blended |= ((c * 128 + b8 * 127 + 127) / 255) << (8 * i);
+	}
+	for (i = 0; i < 3; i++) {
+		long d = (long)((got >> (8 * i)) & 0xFF) -
+			 (long)((blended >> (8 * i)) & 0xFF);
+
+		if (d > 1 || d < -1)
+			fail("the half transparent half is #%06lx, not #%06lx "
+			     "(#E06020 at 128 over #%06lx)", got, blended, bg);
+	}
+	destroy_window(a);
+
+	/* _NET_WM_ICON comes before the WM_HINTS icon pixmap ... */
+	a = create_window("ewmhtest icon pixmap", None);
+	set_net_icon(a, 1, big, big_color);
+	set_icon_pixmap(a, bitmap);
+	map_managed(a);
+	icon = iconify(a);
+	expect_icon_color(icon, big_color[0] & 0xFFFFFF, max * max,
+			  "_NET_WM_ICON and an icon pixmap");
+	/* ... also when WM_HINTS changes */
+	set_urgency(a, 1);
+	set_urgency(a, 0);
+	expect_state(a, "DEMANDS_ATTENTION", 0);
+	expect_icon_color(icon, big_color[0] & 0xFFFFFF, max * max,
+			  "_NET_WM_ICON after a WM_HINTS change");
+	/* the pixmap when it goes */
+	b = create_window("ewmhtest icon pixmap", None);
+	set_icon_pixmap(b, bitmap);
+	map_managed(b);
+	icon2 = iconify(b);
+	XDeleteProperty(dpy, a, net_atom("_NET_WM_ICON"));
+	send_active(focus);
+	wait_for(a_active, active_is, &focus, "the focus elsewhere");
+	expect_same_icons(icon, icon2, "the icon pixmap back");
+
+	XFreePixmap(dpy, bitmap);
+	destroy_all();
+	printf("icon: ok (iconImageMaximum %dx%d)\n", max, max);
+}
+
+/* ------------------------------------------------------------------ */
+/* _NET_WM_USER_TIME                                                   */
+/* ------------------------------------------------------------------ */
+
+static Window create_timed(const char *title, long time)
+{
+	Window w = create_window(title, None);
+
+	XChangeProperty(dpy, w, net_atom("_NET_WM_USER_TIME"), XA_CARDINAL,
+			32, PropModeReplace, (unsigned char *)&time, 1);
+	return w;
+}
+
+static void test_usertime(void)
+{
+	Window focus, w;
+
+	expect_supported("_NET_WM_USER_TIME", 1);
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	focus = map_managed(create_window("ewmhtest usertime focus", None));
+	send_active(focus);
+	wait_for(a_active, active_is, &focus, "_NET_ACTIVE_WINDOW = focus");
+
+	/* 0: not mapped by the user, no focus */
+	w = map_managed(create_timed("ewmhtest usertime 0", 0));
+	expect_card(w, a_wm_desktop, 0, "_NET_WM_DESKTOP");	/* a fence */
+	if (!active_is(rootw, a_active, &focus))
+		fail("a window of _NET_WM_USER_TIME 0 took the focus");
+	if (has_state(w, state_atom("FOCUSED")))
+		fail("a window of _NET_WM_USER_TIME 0 is focused");
+
+	/* other times: the focus, as without */
+	w = map_managed(create_timed("ewmhtest usertime 1234", 1234));
+	wait_for(a_active, active_is, &w, "_NET_ACTIVE_WINDOW = the window "
+		 "of _NET_WM_USER_TIME 1234");
+	w = map_managed(create_window("ewmhtest usertime none", None));
+	wait_for(a_active, active_is, &w, "_NET_ACTIVE_WINDOW = the window "
+		 "without _NET_WM_USER_TIME");
+
+	destroy_all();
+	printf("usertime: ok\n");
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
@@ -3090,6 +3669,8 @@ static const struct {
 	{ "actions", test_actions },
 	{ "requests", test_requests },
 	{ "moveresize", test_moveresize },
+	{ "icon", test_icon },
+	{ "usertime", test_usertime },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))
