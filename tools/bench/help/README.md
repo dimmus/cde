@@ -4,14 +4,14 @@ The help harness of `TODO.md` Phase 0: the help dialog of libDtHelp
 driven in-process (topics, Backtrack, a man page paged down, the Index
 dialog over all volumes), `dthelpprint -allTopics` over every installed
 volume, `dthelpview` started on a volume and on a man page, and the
-reading of a dtinfo infolib through libDtMmdb.  Like
+reading of a dtinfo infolib through libDtMmdb, and DtSearch queries.  Like
 `..`, this directory is not part of the automake build; it links against
 the libraries of the built tree and runs its uninstalled programs.
 
 ```sh
 make -C tools/bench/help                     # also builds ../libcdebench_preload.so
 tools/bench/help/run.py -o help.json         # everything, median of 5
-tools/bench/help/run.py --quick print view   # one pass of two groups (helpbench print view mmdb)
+tools/bench/help/run.py --quick print view   # one pass of two groups (helpbench print view mmdb dtsearch)
 ../bench.py compare old.json new.json        # the helpbench cases compare like the C benchmarks
 ```
 
@@ -27,6 +27,8 @@ Needs at run time: `Xvfb`, `xdotool` (for `../apptime.py`), `python3`,
 | `helpbench.c` | Creates a `DtHelpDialog` on a private display and drives it like a user: the cases below, each REPEAT times (`-r`, default 5), reporting the median per operation and the first run separately.  Re-executes itself with `../libcdebench_preload.so` (mallocs, X requests, round trips) and `libhelpbench_preload.so` preloaded.  `-V VOL,...` picks the volumes (default `Filemgr`, 77 topics, many with TIFF figures), `-w WORD` the index search word, `-m PAGE` the man page, `-S DIR` writes a PPM screenshot of the help window after each topic, page and search (one run unless `-r` is given; later runs are `NAME.runN.ppm`, to check what is shown again), so that two builds can be compared with `cmp`; `-v` prints the result counts.  `HELPBENCH_WATCHDOG=SECONDS` prints a backtrace and exits if a case hangs. |
 | `helppreload.c` → `libhelpbench_preload.so` | Counts the Xlib calls the help system makes per view: `XAllocColor`, `XAllocNamedColor`, `XLookupColor`, `XParseColor`, `XLoadQueryFont`, `XLoadFont`, `XQueryFont`, `XCreateFontSet`, `XListFonts`, `XPutImage`, `XCreatePixmap`, `XCreateGC`.  helpbench reads them in-process; any other program reports them at exit (and on SIGTERM with `CDEBENCH_REPORT_SIGTERM`) as a `helpbench pid=...` line in the `CDEBENCH_REPORT` file. |
 | `mmdbbench.C` | Opens a dtinfo information library as dtinfo does (`OLIAS_DB::openInfoLib`) and reads every section's data and every graphic through the smart pointers dtinfo's node views use, REPEAT times in one process (`-r`, default 3: run 1 is cold for libDtMmdb's page cache); time and CPU per object and the bytes read; `-o FILE` writes the data of the first run, to compare two builds. |
+| `srbench.c` | DtSearch queries (default: collocation and boolean queries for the `mksrdb.sh` database) with `DtSearchQuery()` and, when libDtSearch exports it, with the asynchronous `DtSearchQueryStart()`/`DtSearchQueryContinue()`: time, hits, the number of calls and the longest call of the asynchronous search, and whether both gave the same results; then an asynchronous search stopped with `DtSearchQueryStop()`.  Exits 1 on a difference. |
+| `mksrdb.sh`, `mksrdb.py` | Build a DtSearch database that stores its documents (AusText flavor: the CDE infolibs' databases only index, and refuse collocation queries) from 3,000 generated documents, with the tree's `dtsrcreate`, `dtsrload` and `dtsrindex` and a Huffman encode table made from the decode tree in `lib/DtSearch/ophuf.c`. |
 | `man` | A `man(1)` for hosts without one: DtHelp reads `man NAME` through `popen()`; this formats the page with `nroff -man` (overstrike output, as man gives to a pipe).  `run.py` puts it first on `PATH`. |
 | `run.py` | Runs the three groups on a private Xvfb (pinned to CPU 0 with `taskset` unless `--no-pin`) and writes one JSON document. |
 
@@ -72,3 +74,8 @@ and the same counts.
 `/usr/dt/infolib/C/cde.dti`): open time, time and CPU per section and
 per graphic for each run, the bytes read, and the syscalls of the whole
 run (`strace -f -c`).
+
+## dtsearch
+
+`dtsearch` builds the `mksrdb.sh` database in a temporary directory
+(500 documents with `--quick`) and runs `srbench` on it.

@@ -1,6 +1,7 @@
 # CDE benchmarks, help: a standalone Makefile, not part of the automake
-# build (like ../Makefile).  Links helpbench against libDtHelp, and
-# mmdbbench against libDtMmdb, of this configured and built tree.
+# build (like ../Makefile).  Links helpbench against libDtHelp,
+# mmdbbench against libDtMmdb and srbench against libDtSearch, of this
+# configured and built tree.
 #
 #   make -C tools/bench/help          (also builds ../libcdebench_preload.so)
 #   tools/bench/help/run.sh           see README.md
@@ -23,7 +24,13 @@ CXX      ?= c++
 MMDBINC  := -I$(ABSTOP)/lib/DtMmdb -I$(ABSTOP)/include -DNO_DB_LOCK
 MMDBLIB  := -L$(ABSTOP)/lib/DtMmdb/.libs -Wl,-rpath,$(ABSTOP)/lib/DtMmdb/.libs
 
-all: helpbench libhelpbench_preload.so mmdbbench ../libcdebench_preload.so
+all: helpbench libhelpbench_preload.so mmdbbench srbench \
+	../libcdebench_preload.so
+
+srbench: srbench.c
+	$(CC) -std=gnu11 $(CFLAGS) $(WARN) $(INCS) -o $@ srbench.c \
+		-L$(ABSTOP)/lib/DtSearch/.libs \
+		-Wl,-rpath,$(ABSTOP)/lib/DtSearch/.libs -lDtSearch -ldl
 
 mmdbbench: mmdbbench.C
 	$(CXX) $(CFLAGS) -Wall $(MMDBINC) -o $@ mmdbbench.C $(MMDBLIB) \
@@ -41,6 +48,6 @@ libhelpbench_preload.so: helppreload.c helpbench.h
 	$(MAKE) -C .. libcdebench_preload.so
 
 clean:
-	rm -f helpbench libhelpbench_preload.so mmdbbench
+	rm -f helpbench libhelpbench_preload.so mmdbbench srbench
 
 .PHONY: all clean

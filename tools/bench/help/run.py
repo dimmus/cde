@@ -29,6 +29,11 @@ Groups (all by default):
              as dtinfo's node views read them, three times in one
              process; time per object per run, bytes, and the syscalls
              of the whole (strace -c)
+  dtsearch   ./srbench on a DtSearch database that stores its documents
+             (./mksrdb.sh builds one): collocation and boolean queries
+             with DtSearchQuery() and, when libDtSearch exports it, with
+             DtSearchQueryStart/Continue (calls, longest call, same
+             results)
 
 The man page is formatted by ./man (nroff), which is put first on PATH.
 The programs are the uninstalled ones of this build tree.  Compare two
@@ -323,6 +328,41 @@ def run_mmdb(env, args, work):
     return res
 
 
+def run_dtsearch(env, args, work):
+    exe = os.path.join(HERE, "srbench")
+    if not os.path.exists(exe):
+        log("dtsearch: no srbench; skipped")
+        return None
+    log("dtsearch: building the test database")
+    db = os.path.join(work, "srdb")
+    p = subprocess.run([os.path.join(HERE, "mksrdb.sh"), db,
+                        "500" if args.quick else "3000"], env=env,
+                       capture_output=True, text=True)
+    ocf = os.path.join(db, "srbench.ocf")
+    if p.returncode != 0 or not os.path.exists(ocf):
+        log("dtsearch: mksrdb.sh failed: " + p.stderr.strip())
+        return None
+    log("dtsearch: queries")
+    p = subprocess.run(args.pin + [exe, ocf], env=env, capture_output=True,
+                       text=True)
+    res = {"exit": p.returncode, "queries": [],
+           "async": "does not export" not in p.stdout}
+    for line in p.stdout.splitlines():
+        m = re.match(r"'(.*)': (-?\d+), (\d+) hits, (\d+) ms"
+                     r"(?:; asynchronous (\d+) ms in (\d+) calls, longest "
+                     r"([\d.]+) ms, (.*))?$", line)
+        if m:
+            q = {"query": m.group(1), "status": int(m.group(2)),
+                 "hits": int(m.group(3)), "ms": int(m.group(4))}
+            if m.group(5):
+                q.update({"async_ms": int(m.group(5)),
+                          "async_calls": int(m.group(6)),
+                          "async_longest_ms": float(m.group(7)),
+                          "async_same": m.group(8) == "same results"})
+            res["queries"].append(q)
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -335,9 +375,10 @@ def main():
     ap.add_argument("--no-pin", action="store_true")
     ap.add_argument("groups", nargs="*")
     args = ap.parse_args()
-    groups = args.groups or ["helpbench", "print", "view", "mmdb"]
+    allg = ["helpbench", "print", "view", "mmdb", "dtsearch"]
+    groups = args.groups or allg
     for g in groups:
-        if g not in ("helpbench", "print", "view", "mmdb"):
+        if g not in allg:
             ap.error("unknown group " + g)
     args.pin = [] if args.no_pin or not shutil.which("taskset") else \
         ["taskset", "-c", "0"]
@@ -364,6 +405,8 @@ def main():
             doc["view"] = run_view(env, args, work)
         if "mmdb" in groups:
             doc["mmdb"] = run_mmdb(env, args, work)
+        if "dtsearch" in groups:
+            doc["dtsearch"] = run_dtsearch(env, args, work)
     finally:
         xvfb.terminate()
         try:
