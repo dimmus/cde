@@ -150,7 +150,7 @@ typedef void (*DialogMapWindowProc)(
  *  Resource write proc and structure used for dialog resources. 
  */
 
-typedef void (*WriteResourceProc)();
+typedef void (*WriteResourceProc)(int fd, void *value, char *out_buf);
 /*  XtPointer resource_val;   */
 
 typedef struct 

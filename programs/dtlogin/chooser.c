@@ -139,11 +139,11 @@ extern Widget chooser_list;
 extern int orig_argc;
 extern char **orig_argv;
 extern int amChooser;
-extern void MakeOptionsProc();
+extern void MakeOptionsProc(XtPointer data, XtIntervalId *id);
 
 static Arg  chooserArgs[25];     /** Hopefully enough args **/
 
-static void	CvtStringToARRAY8();
+static void	CvtStringToARRAY8(XrmValue *, unsigned int *, XrmValue *, XrmValue *);
 
 static struct _app_resources {
     ARRAY8Ptr   xdmAddress;
@@ -230,13 +230,8 @@ PingHosts (XtPointer closure, XtIntervalId *id)
 char	**NameTable;
 int	NameTableSize;
 
-#if defined(__STDC__)
 static int
 HostnameCompare (const void *a, const void *b)
-#else
-static int
-HostnameCompare (char *a, char *b)
-#endif
 {
     return strcmp (*(char **)a, *(char **)b);
 }

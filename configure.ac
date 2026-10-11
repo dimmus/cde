@@ -122,6 +122,15 @@ dnl other things as we go along.
 EXTRA_LIBS=""
 EXTRA_INCS=""
 
+dnl Use Motif's advertised compiler interface when pkg-config metadata is
+dnl available. Some Motif implementations expose dependencies such as Xft
+dnl through their public headers. Keep the legacy library detection below
+dnl for Motif implementations without pkg-config metadata and for CDE's
+dnl existing linker ordering.
+PKG_CHECK_MODULES([MOTIF], [motif],
+    [CPP_COMPILER_FLAGS="${CPP_COMPILER_FLAGS} ${MOTIF_CFLAGS}"],
+    [:])
+
 # pam currently only works on netbsd (9.2 tested) and linux
 supports_pam=no
 
@@ -264,6 +273,18 @@ AC_ARG_ENABLE([japanese],
 )
 AM_CONDITIONAL([JAPANESE], [test "x$enable_japanese" != xno])
 
+AC_ARG_ENABLE([chinese],
+        AS_HELP_STRING([--enable-chinese], [Build Chinese (zh_CN.UTF-8) locale (default=no)]),
+        [enable_zh="yes"], [enable_zh=""]
+)
+AM_CONDITIONAL([CHINESE], [test -n "$enable_zh"])
+
+AC_ARG_ENABLE([chinese-tw],
+        AS_HELP_STRING([--enable-chinese-tw], [Build Chinese Traditional (zh_TW.UTF-8) locale (default=no)]),
+        [enable_zt="yes"], [enable_zt=""]
+)
+AM_CONDITIONAL([CHINESE_TW], [test -n "$enable_zt"])
+
 dnl interface font
 AC_ARG_ENABLE([misc-fixed],
         AS_HELP_STRING([--enable-misc-fixed], [Set interface font to misc-fixed (default=no)]),
@@ -389,16 +410,90 @@ AC_SUBST(RM)
 CP="cp -f"
 AC_SUBST(CP)
 
-dnl these should be configurable someday...
-CDE_INSTALLATION_TOP="$ac_default_prefix"
-CDE_LOGFILES_TOP=/var/dt
-CDE_CONFIGURATION_TOP=/etc/dt
+dnl ----------------------------------------------------------------------
+dnl Packager-overridable roots.
+dnl
+dnl Each "top" is exposed both as an automake-substituted variable (for
+dnl Makefile.am) and as a C preprocessor macro in cde_config.h (so source
+dnl code can use it directly without each Makefile.am having to add a
+dnl -DCDE_*_TOP=... define). Defaults preserve the historical CDE layout.
+dnl ----------------------------------------------------------------------
+
+AC_ARG_WITH([cde-install-dir],
+    AS_HELP_STRING([--with-cde-install-dir=DIR],
+        [root of the CDE tree (config, appconfig, app-defaults, ... and the
+         paths compiled into the programs) @<:@default=/usr/dt, whatever
+         --prefix is@:>@]),
+    [CDE_INSTALLATION_TOP="$withval"],
+    [CDE_INSTALLATION_TOP="$ac_default_prefix"])
+
+AC_ARG_WITH([cde-data-dir],
+    AS_HELP_STRING([--with-cde-data-dir=DIR],
+        [directory for CDE arch-independent data
+         (backdrops, palettes, types, app-defaults, appconfig, infolib,
+         lib/nls) @<:@default=the CDE installation directory@:>@]),
+    [CDE_DATA_TOP="$withval"],
+    [CDE_DATA_TOP='${CDE_INSTALLATION_TOP}'])
+
+AC_ARG_WITH([cde-config-dir],
+    AS_HELP_STRING([--with-cde-config-dir=DIR],
+        [directory for CDE system configuration @<:@default=/etc/dt@:>@]),
+    [CDE_CONFIGURATION_TOP="$withval"],
+    [CDE_CONFIGURATION_TOP="/etc/dt"])
+
+AC_ARG_WITH([cde-state-dir],
+    AS_HELP_STRING([--with-cde-state-dir=DIR],
+        [directory for CDE runtime state/logs @<:@default=/var/dt@:>@]),
+    [CDE_LOGFILES_TOP="$withval"],
+    [CDE_LOGFILES_TOP="/var/dt"])
+
+AC_ARG_WITH([cde-libexec-dir],
+    AS_HELP_STRING([--with-cde-libexec-dir=DIR],
+        [directory for CDE-internal helper binaries
+         (rpc.cmsd, ttsession, ...) @<:@default=BINDIR@:>@]),
+    [CDE_LIBEXEC_DIR="$withval"],
+    [CDE_LIBEXEC_DIR='${bindir}'])
+
+dnl CDE_INSTALLATION_TOP is /usr/dt unless --with-cde-install-dir says
+dnl otherwise.  (Upstream CDE makes it follow --prefix; here --prefix=/usr
+dnl keeps putting the programs in /usr/bin and the CDE tree in /usr/dt, as
+dnl it always did.  A distribution layout passes, for example,
+dnl --with-cde-install-dir=/usr --with-cde-data-dir=/usr/share/cde
+dnl --with-cde-config-dir=/etc/cde --with-cde-state-dir=/var/lib/cde.)
 CDE_USER_TOP=.dt
 
 AC_SUBST(CDE_INSTALLATION_TOP)
+AC_SUBST(CDE_DATA_TOP)
 AC_SUBST(CDE_CONFIGURATION_TOP)
 AC_SUBST(CDE_LOGFILES_TOP)
+AC_SUBST(CDE_LIBEXEC_DIR)
 AC_SUBST(CDE_USER_TOP)
+
+dnl Resolve the substitution vars now (expanding ${prefix}/${bindir})
+dnl so the values land as concrete strings in cde_config.h. The
+dnl "prefix=NONE" idiom is the autoconf-recommended way to do this
+dnl from configure.ac without writing a custom m4 macro.
+test "x$prefix"      = xNONE && prefix="$ac_default_prefix"
+test "x$exec_prefix" = xNONE && exec_prefix="$prefix"
+eval _cde_install_top="\"$CDE_INSTALLATION_TOP\""
+eval _cde_data_top="\"$CDE_DATA_TOP\""
+eval _cde_libexec_dir="\"$CDE_LIBEXEC_DIR\""
+eval _cde_libexec_dir="\"$_cde_libexec_dir\""
+dnl Substitute the resolved values too, so that the files config.status
+dnl makes from .in templates (help files, contrib scripts) get real paths.
+CDE_INSTALLATION_TOP="$_cde_install_top"
+CDE_DATA_TOP="$_cde_data_top"
+
+AC_DEFINE_UNQUOTED([CDE_INSTALLATION_TOP], ["$_cde_install_top"],
+    [Top of the CDE installation tree])
+AC_DEFINE_UNQUOTED([CDE_DATA_TOP], ["$_cde_data_top"],
+    [Top of the CDE arch-independent data tree])
+AC_DEFINE_UNQUOTED([CDE_CONFIGURATION_TOP], ["$CDE_CONFIGURATION_TOP"],
+    [Top of the CDE system configuration tree])
+AC_DEFINE_UNQUOTED([CDE_LOGFILES_TOP], ["$CDE_LOGFILES_TOP"],
+    [Top of the CDE runtime state/log tree])
+AC_DEFINE_UNQUOTED([CDE_LIBEXEC_DIR], ["$_cde_libexec_dir"],
+    [Directory for CDE-internal helper binaries])
 
 dnl This variable will contain a list of programs that were not found,
 dnl but are required to build CDE.  At the end, if the variable is
@@ -690,7 +785,7 @@ dnl Used to check if program 'tic' is available to install terminfo files
 AC_CHECK_PROGS(TIC, tic, :)
 
 dnl headers
-AC_CHECK_HEADERS([locale.h security/pam_appl.h utempter.h])
+AC_CHECK_HEADERS([locale.h poll.h sys/poll.h security/pam_appl.h utempter.h])
 
 dnl Xrender header
 if test "x$enable_xrender" != xno; then
@@ -869,11 +964,25 @@ AC_DEFINE_UNQUOTED([ICONV_CONST], [${iconv_const}],
 
 dnl figure out pam support
 dnl Right now this only works on linux and netbsd (9.2 tested)
+
+dnl PAM configuration directory - configurable for non-root installs
+AC_ARG_WITH([pam-dir],
+  AS_HELP_STRING([--with-pam-dir=DIR],
+    [directory for PAM configuration files (default: /etc/pam.d; /usr/local/etc/pam.d on FreeBSD)]),
+  [PAM_CONFDIR="$withval"],
+  [if test "$build_freebsd" = "yes"; then
+     PAM_CONFDIR="/usr/local/etc/pam.d"
+   else
+     PAM_CONFDIR="/etc/pam.d"
+   fi])
+AC_SUBST(PAM_CONFDIR)
+
 if test "$supports_pam" = "yes"
 then
         AC_CHECK_LIB(pam, pam_start,
              [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DHAS_PAM_LIBRARY";
-	      PAMLIB="-lpam"])
+	      PAMLIB="-lpam";
+              AC_MSG_NOTICE([PAM configuration directory: $PAM_CONFDIR])])
         AC_SUBST(PAMLIB)
 else
         AC_CHECK_LIB(pam, NOTSUPPORTED)
@@ -1236,6 +1345,22 @@ programs/localized/ja_JP.UTF-8/types/Makefile
 programs/localized/ja_JP.UTF-8/palettes/Makefile
 programs/localized/ja_JP.UTF-8/msg/Makefile
 programs/localized/ja_JP.UTF-8/appmanager/Makefile
+programs/localized/zh_CN.UTF-8/Makefile
+programs/localized/zh_CN.UTF-8/app-defaults/Makefile
+programs/localized/zh_CN.UTF-8/config/Makefile
+programs/localized/zh_CN.UTF-8/backdrops/Makefile
+programs/localized/zh_CN.UTF-8/types/Makefile
+programs/localized/zh_CN.UTF-8/palettes/Makefile
+programs/localized/zh_CN.UTF-8/msg/Makefile
+programs/localized/zh_CN.UTF-8/appmanager/Makefile
+programs/localized/zh_TW.UTF-8/Makefile
+programs/localized/zh_TW.UTF-8/app-defaults/Makefile
+programs/localized/zh_TW.UTF-8/config/Makefile
+programs/localized/zh_TW.UTF-8/backdrops/Makefile
+programs/localized/zh_TW.UTF-8/types/Makefile
+programs/localized/zh_TW.UTF-8/palettes/Makefile
+programs/localized/zh_TW.UTF-8/msg/Makefile
+programs/localized/zh_TW.UTF-8/appmanager/Makefile
 
 doc/Makefile
 
@@ -1276,6 +1401,16 @@ include/Makefile
 copyright
 doc/common/help/HELPEnt.sgm
 lib/tt/bin/ttauth/ttauth.man
+
+contrib/desktopentry/cde.desktop
+contrib/rc/linux/dtlogin
+contrib/rc/freebsd/dtlogin
+contrib/rc/netbsd/dtlogin
+contrib/rc/openbsd/dtlogin
+contrib/rc/openbsd/cmsd
+contrib/xinetd/cmsd
+contrib/xinetd/ttdbserver
+contrib/desktop2dt/desktop2dt
 ])
 
 dnl include/Dt/Dt.h carries the version and is included by most of the

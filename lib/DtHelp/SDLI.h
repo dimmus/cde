@@ -721,9 +721,11 @@ typedef	struct {
 	const FontSpecOption	*options;
 } SDLFontSpecList;
 
+typedef struct _formatStruct FormatStruct;
+
 typedef	struct {
 	SDLMask	mask[SDL_MASK_LEN];
-	int	(*model)();
+	int	(*model)(FormatStruct *, const SDLMask *, enum SdlElement, SDLMask *, SDLMask *);
 } SDLContent;
 
 enum	SdlStructType {

@@ -103,13 +103,13 @@ typedef struct
         unsigned char   *Uxname_field_title;
         int     UxnumberOfBottomButtons;
         unsigned char   *Uxbottom_button_one_label;
-        void    (*Uxbottom_button_one_cb)();
+        void    (*Uxbottom_button_one_cb)(Widget, XtPointer, XtPointer);
         unsigned char   *Uxbottom_button_two_label;
-        void    (*Uxbottom_button_two_cb)();
+        void    (*Uxbottom_button_two_cb)(Widget, XtPointer, XtPointer);
         unsigned char   *Uxbottom_button_three_label;
-        void    (*Uxbottom_button_three_cb)();
+        void    (*Uxbottom_button_three_cb)(Widget, XtPointer, XtPointer);
         unsigned char   *Uxbottom_button_four_label;
-        void    (*Uxbottom_button_four_cb)();
+        void    (*Uxbottom_button_four_cb)(Widget, XtPointer, XtPointer);
 } _UxCicon_selection_dialog;
 
 #ifdef CONTEXT_MACRO_ACCESS
@@ -186,13 +186,13 @@ Widget  create_icon_selection_dialog(swidget,
                                      unsigned char *,
                                      int,
                                      unsigned char *,
-                                     void (*)(),
+                                     void (*)(Widget, XtPointer, XtPointer),
                                      unsigned char *,
-                                     void (*)(),
+                                     void (*)(Widget, XtPointer, XtPointer),
                                      unsigned char *,
-                                     void (*)(),
+                                     void (*)(Widget, XtPointer, XtPointer),
                                      unsigned char *,
-                                     void (*)()
+                                     void (*)(Widget, XtPointer, XtPointer)
                                     );
 
 #endif  /* _ICON_SELECTION_DIALOG_INCLUDED */

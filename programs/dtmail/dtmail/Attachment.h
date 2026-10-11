@@ -133,13 +133,8 @@ class Attachment : public UIComponent {
     void 			setLabel( XmString str );	
 
     void	 		setX(Position);
-#ifdef DEAD_WOOD
-    void	 		setY(Position);
-    void	 		setRow(int);
-#else /* ! DEAD_WOOD */
     void	 		setY(Position);
     void	 		setRow(int row) { _row = row; }
-#endif /* ! DEAD_WOOD */
 
     void	 		deleteIt();
     void 			undeleteIt();
@@ -153,9 +148,6 @@ class Attachment : public UIComponent {
 
     void			name_to_type();
     void	   		setAttachArea(AttachArea *);
-#ifdef DEAD_WOOD
-    Boolean        		check_if_binary(String, unsigned long);
-#endif /* DEAD_WOOD */
 
     // SR -- Added methods below
     

@@ -135,7 +135,7 @@ ACTION OpenHelpTag
         LABEL           %|nls-16008-#OpenHelpTag|
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-	EXEC_STRING	/usr/dt/bin/dtpad "%(File)Arg_1%"
+	EXEC_STRING	CDE_INSTALLATION_TOP/bin/dtpad "%(File)Arg_1%"
 	DESCRIPTION	%|nls-16009-#The OpenHelpTag ...#|
 }
 

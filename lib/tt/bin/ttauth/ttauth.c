@@ -100,7 +100,7 @@ NULL };
     for (msg = prefixmsg; *msg; msg++) {
 	fprintf (stderr, "%s\n", *msg);
     }
-    print_help (stderr, NULL, "    ");	/* match prefix indentation */
+    print_help (stderr, NULL);
     fprintf (stderr, "\n");
     for (msg = suffixmsg; *msg; msg++) {
 	fprintf (stderr, "%s\n", *msg);

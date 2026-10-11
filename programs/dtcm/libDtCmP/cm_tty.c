@@ -1392,7 +1392,7 @@ generate_recurrence_rule(Dtcm_appointment *appt, int version) {
  */
 extern Validate_op
 parse_appt_from_file(nl_catd catd, char *file, CmDataList *list, Props *p,
-		     boolean_t(*query)(), void *key_data, int version) {
+		     boolean_t(*query)(void *), void *key_data, int version) {
 	int			len, dur;
 	char			line[MAXNAMELEN], *tmp, *key_str, *val_str,
 				s_buf[MAXNAMELEN], e_buf[MAXNAMELEN],
@@ -2487,7 +2487,7 @@ validate_appt(nl_catd catd, Dtcm_appointment *a, char *s_buf, char *e_buf,
 
 extern Validate_op
 validate_dssw(Dtcm_appointment *a, char *s_buf, char *e_buf, char *d_buf,
-	      int dur, char *w_buf, boolean_t(*query)(), void *key_data) {
+	      int dur, char *w_buf, boolean_t(*query)(void *), void *key_data) {
 	Tick	end_tick = 0;
 	char	buf[MAXNAMELEN];
 	Tick	appt_time = 0;

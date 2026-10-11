@@ -194,7 +194,9 @@ IL_PRIVATE ilBool _ilDecompPackbits (
 
     pPriv = (ilDecompPBPrivPtr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilDecompPBPrivRec), 0, 
         (ilSrcElementData *)NULL, &dstdata, 
-        IL_NPF, IL_NPF, IL_NPF, ilDecompPackbitsExecute, NULL, 0);
+        IL_NPF, IL_NPF, IL_NPF,
+        (ilError (*)(ilExecuteData *, long, long *)) ilDecompPackbitsExecute,
+        NULL, 0);
     if (!pPriv) 
         return FALSE;
 

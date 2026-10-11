@@ -73,11 +73,11 @@ static XtResource resources[] = {
 /*
  * widget class methods used below
  */
-static void Realize();			/* set gravity and upcall */
-static void Resize();			/* report new size */
-static XtGeometryResult GeometryManager();  /* deal with child requests */
-static void ChangeManaged();		/* somebody added a new widget */
-static XtGeometryResult QueryGeometry();  /* say how big would like to be */
+static void Realize(Widget gw, Mask *valueMask, XSetWindowAttributes *attributes);			/* set gravity and upcall */
+static void Resize(Widget gw);			/* report new size */
+static XtGeometryResult GeometryManager(Widget w, XtWidgetGeometry *req, XtWidgetGeometry *reply);  /* deal with child requests */
+static void ChangeManaged(Widget gw);		/* somebody added a new widget */
+static XtGeometryResult QueryGeometry(Widget gw, XtWidgetGeometry *intended, XtWidgetGeometry *preferred);  /* say how big would like to be */
 
 #if XmVersion == 1002
 static void ClassInitialize();

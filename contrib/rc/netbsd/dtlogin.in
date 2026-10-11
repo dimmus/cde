@@ -1,0 +1,16 @@
+#!/bin/sh
+# PROVIDE: dtlogin
+# REQUIRE: DAEMON LOGIN wscons
+# KEYWORD: shutdown
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="dtlogin"
+rcvar=$name
+command="@bindir@/${name}"
+command_args="-daemon"
+pidfile=@CDE_LOGFILES_TOP@/Xpid
+extra_commands=""
+
+load_rc_config $name
+run_rc_command "$1"

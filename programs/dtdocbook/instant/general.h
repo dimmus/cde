@@ -298,7 +298,12 @@ char		*FindElementPath(Element_t *, char *);
 char		*NearestOlderElem(Element_t *, char *);
 void		PrintLocation(Element_t *, FILE *);
 char		**Split(char *, int *, int);
-void		DescendTree(Element_t *, void(*)(), void(*)(), void(*)(), void *);
+void		DescendTree(
+    Element_t	*e,
+    void	(*enter_f)(Element_t *e, void *dp),
+    void	(*leave_f)(Element_t *e, void *dp),
+    void	(*data_f)(Content_t *c, void *dp),
+    void	*dp);
 Map_t		*NewMap(int);
 Mapping_t	*FindMapping(Map_t *, char *);
 char		*FindMappingVal(Map_t *, char *);

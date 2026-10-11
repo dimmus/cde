@@ -72,13 +72,16 @@ extern int  reinittime;
 extern Bool usefirst;
 extern Bool mono;
 extern Bool create;
-extern void (*callback) ();
-extern void (*init) ();
+extern void (*callback) (perwindow *);
+extern void (*init) (perwindow *);
 
-extern void GetResources();
+extern void GetResources(int argc, char *argv[]);
 extern void CheckResources();
-extern void hsbramp();
-extern void error();
+extern void hsbramp(double h1, double s1, double b1,
+        double h2, double s2, double b2,
+        int count,
+        u_char *red, u_char *green, u_char *blue);
+extern void error(char *, char *);
 extern long seconds();
 extern void usage();
 extern void hide_hft_ring();
@@ -87,7 +90,17 @@ extern void unhide_hft_ring();
 
 /* System V Release 4 redefinitions of BSD functions and structures */
 
+#if HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
+
 #if defined (SYSV) || defined (SVR4)
+
+#if HAVE_POLL_H
+#include <poll.h>
+#elif HAVE_SYS_POLL_H
+#include <sys/poll.h>
+#endif
 
 #include <sys/time.h>
 #define passwd spwd
@@ -95,7 +108,6 @@ extern void unhide_hft_ring();
 #if defined(AIXV3)
 #undef NULL
 #define NULL 0
-#include <sys/poll.h>
 
 struct passwd {
         char    *pw_name;
@@ -107,7 +119,6 @@ struct passwd {
         char    *pw_shell;
 };
 #else
-#include <poll.h>
 #include <shadow.h>
 #define getpwnam getspnam
 #endif

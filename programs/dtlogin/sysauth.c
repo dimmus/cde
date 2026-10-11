@@ -960,7 +960,6 @@ Authenticate( struct display *d, char *name, char *passwd, char **msg )
     static int		login_attempts = 0; /* # failed authentications	   */
     
     struct passwd	*p;		/* password structure */
-    char 		*crypt();
 
     int			n;
 

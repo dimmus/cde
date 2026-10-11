@@ -46,9 +46,6 @@
 #include "Undelete.hh"
 #include "MsgScrollingList.hh"
 #include "RoamMenuWindow.h"
-#ifdef DEAD_WOOD
-#include "QueryDialogManager.hh"
-#endif /* DEAD_WOOD */
 #include "DialogShell.h"
 #include "Application.h"
 #include "ButtonInterface.h"

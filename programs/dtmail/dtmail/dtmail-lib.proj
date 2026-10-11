@@ -110,7 +110,7 @@ suppress 1104
 load  /lib/libc.so.1
 load  /usr/lib/libdl.so.1
 load  /net/leaves/export/tools/compilers/CenterLine/sparc-solaris2/lib/libC.so.2.0
-load -CXX  Dialog.C DialogShell.C DtMailGenDialog.C DtMailWDM.C Editor.C FindDialog.C Image.C MailSession.C MsgHndArray.C MsgScrollingList.C NoOpCmd.C PasswordDialogManager.C QueryDialogManager.C RoamApp.C RoamCmds.C RoamInterruptibleCmd.C RoamMenuWindow.C SendMsgDialog.C Undelete.C ViewMsgDialog.C XmTextEditor.C
+load -CXX  Dialog.C DialogShell.C DtMailGenDialog.C DtMailWDM.C Editor.C FindDialog.C MailSession.C MsgHndArray.C MsgScrollingList.C NoOpCmd.C PasswordDialogManager.C RoamApp.C RoamCmds.C RoamInterruptibleCmd.C RoamMenuWindow.C SendMsgDialog.C Undelete.C ViewMsgDialog.C XmTextEditor.C
 load -CXX AttachArea.C AttachCmds.C Attachment.C DtMailEditor.C Icon.C StringTab.c
 load ../MotifApp/libMotifApp.a
 load  ../../../binstall/lib/libDtHelp.so.1

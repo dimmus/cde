@@ -80,7 +80,7 @@
 #include "WmXSMP.h"
 
 #include <Xm/RowColumnP.h> /* for MS_LastManagedMenuTime */
-extern XmMenuState _XmGetMenuState();
+extern XmMenuState _XmGetMenuState(Widget);
 
 #if defined(HAVE_CONFIG_H)
 #include <cde_config.h>

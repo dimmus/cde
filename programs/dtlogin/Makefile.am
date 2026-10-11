@@ -14,11 +14,12 @@ DEF_SERVER = $(XBINDIR)/X
 DEF_USER_PATH = $(PATH):$(XBINDIR)
 DEF_SYSTEM_PATH = $(PATH):$(XBINDIR)
 
-DEF_BM_PATH = $(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B
-DEF_PM_PATH = $(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B
+DEF_BM_PATH = $(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B:$(CDE_DATA_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_DATA_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_DATA_TOP)/appconfig/icons/%L/%B:$(CDE_DATA_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_DATA_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_DATA_TOP)/appconfig/icons/C/%B
+DEF_PM_PATH = $(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B:$(CDE_DATA_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_DATA_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_DATA_TOP)/appconfig/icons/%L/%B:$(CDE_DATA_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_DATA_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_DATA_TOP)/appconfig/icons/C/%B
 
 AM_CFLAGS = $(CDE_CFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
             -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+            -DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
             -DCDE_LOGFILES_TOP=\"$(CDE_LOGFILES_TOP)\" \
 	    -DBINDIR=\"$(XBINDIR)\" \
 	    -DXDMDIR=\"$(XDMDIR)\" \

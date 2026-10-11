@@ -114,7 +114,7 @@ void d_free(CHAR_P *p)
 }
 
 
-static int NewInit(P1(LL_P *));
+static int NewInit(LL_P *);
 
 /* Resets pointer to current element and checks for an empty list
 */

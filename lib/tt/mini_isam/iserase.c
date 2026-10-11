@@ -41,8 +41,10 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-static void _unlink_datfile(), _unlink_indfile(), _unlink_varfile();
-static int _amerase();
+static void _unlink_datfile(char *isfname);
+static void _unlink_indfile(char *isfname);
+static void _unlink_varfile(char *isfnam);
+static int _amerase(Bytearray *isfhandle, struct errcode *errcode);
 
 /*
  * isfd = iserase(isfname, mode)

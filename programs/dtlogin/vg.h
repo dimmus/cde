@@ -87,7 +87,7 @@ extern int errno;
 
 #define NO_LOGIN_FILE		"/etc/nologin"
 
-#define DTLITESESSION		"/usr/dt/bin/dtlitesession"
+#define DTLITESESSION		CDE_INSTALLATION_TOP "/bin/dtlitesession"
 
 #define LOGIN_STR_LEN 1024
 

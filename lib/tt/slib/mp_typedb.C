@@ -175,7 +175,7 @@ _Tt_typedb::tt_path()
 		pathlist->append(home.cat("/.tt/types.xdr"));
 		pathlist->append(_Tt_string("/etc/tt/types.xdr"));
 		pathlist->append(
-			_Tt_string("/usr/dt/appconfig/tttypes/types.xdr"));
+			_Tt_string(CDE_DATA_TOP "/appconfig/tttypes/types.xdr"));
 		home = getenv("OPENWINHOME");
 		if (home.len() == 0) {
 			home = "/usr/openwin";

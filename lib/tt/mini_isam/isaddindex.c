@@ -58,7 +58,6 @@
 int 
 isaddindex(int isfd, struct keydesc *keydesc)
 {
-    int			_amaddindex();
     Fab	*fab;
     int			ret;
 

@@ -38,7 +38,8 @@ extern void PaintFeedbackWindow (WmScreenData *pSD);
 extern void ShowFeedbackWindow (WmScreenData *pSD, int x, int y, 
 				unsigned int width, unsigned int height, 
 				unsigned long style);
-extern void ShowWaitState (Boolean flag);
+extern void EnterWaitState(void);
+extern void LeaveWaitState(void);
 extern void UpdateFeedbackInfo (WmScreenData *pSD, int x, int y, 
 				unsigned int width, unsigned int height);
 extern void UpdateFeedbackText (WmScreenData *pSD, int x, int y, 

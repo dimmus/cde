@@ -150,7 +150,9 @@ ilCropCompPrivPtr       pPriv;
 
             pPriv = (ilCropCompPrivPtr)ilAddPipeElement (pipe, IL_FILTER, 
                 sizeof (ilCropCompPrivRec), IL_ADD_PIPE_NO_DST, (ilSrcElementData *)NULL,
-                &dstData, ilCropCompInit, IL_NPF, IL_NPF, ilCropCompExecute, NULL,  0);
+                &dstData,
+                (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilCropCompInit,
+                IL_NPF, IL_NPF, ilCropCompExecute, NULL,  0);
             if (!pPriv)
                 return FALSE;
             pPriv->topStrip = topStrip;
@@ -546,16 +548,28 @@ ilRect                  Srcrect, Dstrect;
        switch (imdes.nSamplesPerPixel) {
             case 3:
                             pPriv = (ilCropPrivptr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilCropPriv), 0, (ilSrcElementData *) NULL,
-                                                                     &dstdata, ilCropInit, IL_NPF, IL_NPF, ilCrop3ByteExecute, NULL, 0);
+                                                                     &dstdata,
+                                                                     (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilCropInit,
+                                                                     IL_NPF, IL_NPF,
+                                                                     (ilError (*)(ilExecuteData *, long, long *)) ilCrop3ByteExecute,
+                                                                     NULL, 0);
                      break;
 
             case 1:  
                      if(bitonal) 
                             pPriv = (ilCropPrivptr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilCropPriv), 0, (ilSrcElementData *) NULL,
-                                                                     &dstdata, ilCropInit, IL_NPF, IL_NPF, ilCropBitonalExecute, NULL, 0);
+                                                                     &dstdata,
+                                                                     (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilCropInit,
+                                                                     IL_NPF, IL_NPF,
+                                                                     (ilError (*)(ilExecuteData *, long, long *))ilCropBitonalExecute,
+                                                                     NULL, 0);
                      else 
                             pPriv = (ilCropPrivptr) ilAddPipeElement(pipe, IL_FILTER, sizeof(ilCropPriv), 0, (ilSrcElementData *) NULL,
-                                                                     &dstdata, ilCropInit, IL_NPF, IL_NPF, ilCropByteExecute, NULL, 0);
+                                                                     &dstdata,
+                                                                     (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilCropInit,
+                                                                     IL_NPF, IL_NPF,
+                                                                     (ilError (*)(ilExecuteData *, long, long *))ilCropByteExecute,
+                                                                     NULL, 0);
        }
 
        if(!pPriv)

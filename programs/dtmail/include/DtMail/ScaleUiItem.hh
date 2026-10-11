@@ -53,17 +53,9 @@ class ScaleUiItem : public PropUiItem {
 public:
   ScaleUiItem(Widget w, int source, char *search_key);
   virtual ~ScaleUiItem(){;}; // we don't alloc any memory
-#ifdef DEAD_WOOD
-  virtual int getType(){ return _SCALE_ITEM; };
-  virtual int getSource(){ return data_source; };
-#endif /* DEAD_WOOD */
   virtual void writeFromUiToSource();
   virtual void writeFromSourceToUi();
 
-private:
-#ifdef DEAD_WOOD
-  int data_source;
-#endif /* DEAD_WOOD */
 };
 
 #endif

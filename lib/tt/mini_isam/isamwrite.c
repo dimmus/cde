@@ -40,7 +40,7 @@
 
 #include "isam_impl.h"
 
-static int _addkeys2 ();
+static int _addkeys2 (Fcb *fcb, char *record, Recno recnum, Bytearray *curpos);
 extern long *ismaxlong;
 
 /*
@@ -70,7 +70,7 @@ _amwrite(Bytearray *isfhandle, char *record, int reclen,
     Recno		recnum2;
     Crp 		*crp;
     int			err;
-    int			(*rec_write)();
+    int			(*rec_write)(Fcb *, char *, Recno *, int);
 
     _isam_entryhook();
 

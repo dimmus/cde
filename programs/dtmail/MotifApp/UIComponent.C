@@ -215,41 +215,6 @@ UIComponent::getResources( const XtResourceList resources,
 			    0 );
 }
 
-
-#ifdef DEAD_WOOD
-void
-UIComponent::setDefaultResources( const Widget w, 
-				  const String *resourceSpec )
-{
-    int         i;	
-    Display    *dpy = XtDisplay ( w );	// Retrieve the display pointer
-    XrmDatabase rdb = NULL;		// A resource data base
-    
-    // Create an empty resource database
-
-    rdb = XrmGetStringDatabase ( "" );
-
-    // Add the Component resources, prepending the name of the component
-
-    i = 0;
-    while ( resourceSpec[i] != NULL )
-	{
-	    char *buf = new char[1000];
-	    sprintf(buf, "*%s%s", _name, resourceSpec[i++]);
-	    XrmPutLineResource( &rdb, buf );
-	    delete [] buf;
-	}
-
-    // Merge them into the Xt database, with lowest precendence
-    
-    if ( rdb )
-	{
-	    XrmDatabase db = XtDatabase(dpy);
-	    XrmCombineDatabase(rdb, &db, FALSE);
-	}
-}
-#endif /* DEAD_WOOD */
-
 #ifndef CAN_INLINE_VIRTUALS
 const char *const
 UIComponent::className(void)

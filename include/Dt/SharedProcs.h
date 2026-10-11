@@ -57,17 +57,17 @@ extern void _DtMessage(
                         char *title,
                         char *message_text,
                         XtPointer helpIdStr,
-                        void (*helpCallback)()) ;
+                        void (*helpCallback)(Widget widget,	XtPointer client_data, XtPointer call_data)) ;
 extern Widget _DtMessageDialog(
                         Widget w,
                         char *title,
                         char *message_text,
                         XtPointer helpIdStr,
                         Boolean cancel_btn,
-                        void (*cancel_callback)(),
-                        void (*ok_callback)(),
-                        void (*close_callback)(),
-                        void (*help_callback)(),
+                        void (*cancel_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                        void (*ok_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                        void (*close_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
+                        void (*help_callback)(Widget widget, XtPointer client_data, XtPointer call_data),
                         Boolean deleteOnClose,
                         int dialogType) ;
 extern void _DtMessageOK(

@@ -5,6 +5,7 @@
 
 GENCPP_DEFINES = -DCDE_CONFIGURATION_TOP=$(CDE_CONFIGURATION_TOP) \
             -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \
+            -DCDE_DATA_TOP=$(CDE_DATA_TOP) \
             -DCDE_LOGFILES_TOP=$(CDE_LOGFILES_TOP) \
             -DFONTALIASESCONFDIR=$(sysconfdir)/$(PACKAGE_TARNAME)/fontaliases \
             -DFONTALIASESDATADIR=$(pkgdatadir)/fontaliases \
@@ -22,16 +23,14 @@ CPP_TARGETS = 0060.dtsysenv Dtlogin Xaccess Xconfig Xconfig.con	\
 if HAS_PAM_LIBRARY
 CPP_TARGETS += dtlogin
 dist_pam_DATA = dtlogin
+pamdir = $(PAM_CONFDIR)
 if FREEBSD
-pamdir = /usr/local/etc/pam.d
 PAM_AUTHENTICATION_MODULE = /usr/local/lib/security/pam_pwauth_suid.so
 GENCPP_DEFINES += -DPAM_AUTHENTICATION_MODULE=$(PAM_AUTHENTICATION_MODULE)
-else
-pamdir = /etc/pam.d
+endif
 if NETBSD
 PAM_AUTHENTICATION_MODULE = /usr/pkg/lib/security/pam_pwauth_suid.so
 GENCPP_DEFINES += -DPAM_AUTHENTICATION_MODULE=$(PAM_AUTHENTICATION_MODULE)
-endif
 endif
 endif
 
@@ -76,7 +75,7 @@ CLEANFILES = $(CPP_TARGETS)
 # programs/localization/
 
 configsdir=$(CDE_INSTALLATION_TOP)/config
-dist_configs_DATA = Xaccess Xconfig Xfailsafe Xservers
+dist_configs_DATA = Xaccess Xconfig Xservers
 dist_configs_SCRIPTS = sys.dtprofile Xfailsafe Xreset Xsetup Xstartup
 
 xsessdir=$(CDE_INSTALLATION_TOP)/config/Xsession.d

@@ -180,7 +180,7 @@ static Boolean FlashState=False;
 static int flash_x, flash_y, flash_width, flash_height;
 static int box_x1, box_y1, box_x2, box_y2;
 static XtIntervalId selectTimerID;
-static void Do_HotBox();
+static void Do_HotBox(XtPointer *client_data, XtIntervalId *local_id);
 
 /*
  * The flashing border is only animated while the editor window is mapped

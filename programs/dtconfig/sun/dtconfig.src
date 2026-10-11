@@ -50,7 +50,7 @@ usage_error() {
     Message 4  "  $prg_name -kill     (kill dtlogin)" $prg_name
     Message 5  "  $prg_name -reset    (reset dtlogin)" $prg_name
     Message 6  "  $prg_name -p        (printer action update)" $prg_name
-    Message 25 "  $prg_name -inetd    (inetd.conf /usr/dt daemons)" $prg_name
+    Message 25 "  $prg_name -inetd    (inetd.conf CDE_INSTALLATION_TOP daemons)" $prg_name
     Message 26 "  $prg_name -inetd.ow (inetd.conf /usr/openwin daemons)" $prg_name
     echo " "
 }
@@ -87,7 +87,7 @@ LEVEL_0_KILL=/etc/rc0.d/K10dtlogin
 LEVEL_1_KILL=/etc/rc1.d/K10dtlogin
 LEVEL_2_START=/etc/rc2.d/S99dtlogin
 
-DTDSPMSG=/usr/dt/bin/dtdspmsg
+DTDSPMSG=CDE_INSTALLATION_TOP/bin/dtdspmsg
 
 NAWK=/usr/bin/nawk
 
@@ -138,7 +138,7 @@ nawk_check() {
 
 XCOMM Following inetdSP() procedure is from Sun CDE SI post_install
 XCOMM configMin file.  It adds the Subprocess Control daemon inetd.conf
-XCOMM line so it points to /usr/dt/bin/dtspcd.
+XCOMM line so it points to CDE_INSTALLATION_TOP/bin/dtspcd.
 
 inetdSP()
 {
@@ -227,7 +227,7 @@ XCOMM
 
 XCOMM Following inetdTT() procedure code from Sun CDE SI post_install
 XCOMM configTT file.  It updates the ToolTalk daemon inetd.conf
-XCOMM line so it points to /usr/dt/bin/rpc.ttdbserverd.
+XCOMM line so it points to CDE_INSTALLATION_TOP/bin/rpc.ttdbserverd.
 
 inetdTT()
 {
@@ -310,7 +310,7 @@ XCOMM
 
 XCOMM Following inetdCM() procedure is from Sun CDE SI post_install
 XCOMM configRun file.  It updates the Calendar Manager daemon inetd.conf
-XCOMM line so it points to /usr/dt/bin/rpc.cmsd.
+XCOMM line so it points to CDE_INSTALLATION_TOP/bin/rpc.cmsd.
 
 inetdCM()
 {
@@ -497,7 +497,7 @@ case "$mode" in
 	inetdCM
 	inetdTT
 	Message 14 "done"
-	Message 27 "Next system boot, following will be run from /usr/dt/bin"
+	Message 27 "Next system boot, following will be run from CDE_INSTALLATION_TOP/bin"
 	Message 28 "    rpc.ttdbserverd         (ToolTalk)" 
 	Message 29 "    rpc.cmsd                (Calendar Manager)"
 	Message 30 "    dtspcd                  (Subprocess Control)"

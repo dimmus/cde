@@ -36,6 +36,7 @@
 
 #include "WmGlobal.h"
 #include <time.h>
+#include "WmEwmh.h"
 #include "WmICCC.h"
 #include "WmProtocol.h"
 #include "WmIPC.h"
@@ -493,6 +494,7 @@ static void SetupWindowStateWithEventMask (ClientData *pCD, int newState,
 	    {
 		ClearFocusIndication (pCD, False /*no refresh*/);
 		wmGD.keyboardFocus = NULL;
+		UpdateNetActiveWindow ();
 	    }
 	}
     }
@@ -820,6 +822,8 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
     pCD->clientState = mwmState;
     if (bToUnseen)
 	pCD->clientState |= UNSEEN_STATE;
+
+    UpdateNetActiveWindow ();
 
 } /* END OF FUNCTION SetClientWMState */
 

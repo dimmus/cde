@@ -25,10 +25,13 @@
 //%%  (c) Copyright 1993, 1994 Sun Microsystems, Inc.			
 //%%  (c) Copyright 1993, 1994 Novell, Inc. 				
 //%%  $TOG: tttk.C /main/5 1999/09/14 13:00:44 mgreess $ 			 				
-#if defined(__linux__)
-# include <sys/poll.h>
-#else
+#if HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
+#if HAVE_POLL_H
 # include <poll.h>
+#elif HAVE_SYS_POLL_H
+# include <sys/poll.h>
 #endif
 #include <errno.h>
 #include <unistd.h>

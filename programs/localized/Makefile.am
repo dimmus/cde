@@ -19,3 +19,11 @@ endif
 if JAPANESE
 SUBDIRS += ja_JP.UTF-8
 endif
+
+if CHINESE
+SUBDIRS += zh_CN.UTF-8
+endif
+
+if CHINESE_TW
+SUBDIRS += zh_TW.UTF-8
+endif

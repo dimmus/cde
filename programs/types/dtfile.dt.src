@@ -429,7 +429,7 @@ ACTION Dtappmgr
         TT_CLASS		TT_REQUEST
         TT_SCOPE		TT_SESSION
         TT_OPERATION		DtTools_Show
-        TT_FILE			/var/dt/appconfig/appmanager/$DTUSERSESSION
+        TT_FILE			CDE_LOGFILES_TOP/appconfig/appmanager/$DTUSERSESSION
         TT_ARG0_MODE            TT_IN
         TT_ARG0_VTYPE           -title
         TT_ARG0_REP_TYPE        TT_REP_STRING
@@ -663,7 +663,7 @@ ACTION PrintFolderList
         WINDOW_TYPE     NO_STDIO
         EXEC_STRING     sh -c ' \
                         ls -aLlF "%(File)Arg_1%" | \
-                        /usr/dt/bin/dtlp -u "%(File)Arg_1%"'
+                        CDE_INSTALLATION_TOP/bin/dtlp -u "%(File)Arg_1%"'
         DESCRIPTION     %|nls-4031-#The PrintFolderList action....#|
 }
 

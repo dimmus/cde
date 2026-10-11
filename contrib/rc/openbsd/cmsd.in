@@ -1,0 +1,11 @@
+daemon="@bindir@/rpc.cmsd &"
+
+. /etc/rc.d/rc.subr
+
+pexp="rpc.cmsd: ${daemon}${daemon_flags:+ ${daemon_flags}} \[listener\].*"
+
+rc_reload() {
+        ${daemon} ${daemon_flags} -t && pkill -HUP -xf "${pexp}"
+}
+
+rc_cmd $1

@@ -40,11 +40,11 @@
 extern	void	_DtHelpFreeSegments(
 				_DtCvSegment	*seg_list,
 				_DtCvStatus	 unresolved,
-				void		(*destroy_region)(),
+				void		(*destroy_region)(void *, void *),
 				_DtCvPointer	 client_data);
 extern	void	_DtHelpDestroyTopicData(
 				_DtCvTopicPtr	 topic,
-				void 		(*destroy_region)(),
+				void 		(*destroy_region)(void *, void *),
 				_DtCvPointer	 client_data);
 /********    End Public Function Declarations    ********/
 

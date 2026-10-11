@@ -631,8 +631,12 @@ ilImageDes         *pimdes
 	pPriv = (ilDecompG3G4PrivPtr) ilAddPipeElement(pipe, IL_FILTER, 
 	    sizeof(ilDecompG3G4PrivRec), 0,
 	    (ilSrcElementData *)NULL,
-	    &dstdata, _ilDecompG4Init,_ilDecompG4Cleanup,
-	    IL_NPF, _ilDecompG4Execute, NULL, 0);
+	    &dstdata,
+	    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) _ilDecompG4Init,
+	    (ilError (*)(ilByte *, ilBool)) _ilDecompG4Cleanup,
+	    IL_NPF,
+	    (ilError (*)(ilExecuteData *, long, long *)) _ilDecompG4Execute,
+	    NULL, 0);
 
 	if (!pPriv) return FALSE; /* EXIT */
 

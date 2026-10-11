@@ -62,11 +62,17 @@ int ttMark;
 int tt_tmpfile_fd = -1;
 static int undeclared = 0;
 static Tt_message local_msg = (Tt_message) 0;
-void DieFromToolTalkError( );
-Tt_message ProcessToolTalkMessage( );
-Tt_message ProcessToolTalkMediaMessage( );
-extern void ProcessAppArgs();
-void send_tt_saved();
+void DieFromToolTalkError(Widget parent, char *errfmt, Tt_status status);
+Tt_message ProcessToolTalkMessage(Tt_message msg, void* cdata, Tt_message contract);
+Tt_message ProcessToolTalkMediaMessage( Tt_message      msg,
+                                        void*           cdata,
+                                        Tttk_op         op,
+                                        Tt_status       diag,
+                                        unsigned char*  contents,
+                                        int             len,
+                                        char*           file,
+                                        char*           doc);
+void send_tt_saved(void);
 #define dticon_ptype "DT_Icon_Editor"
 
 int edit_notifier(char* fname, Tt_message msg, int clear);
@@ -827,7 +833,7 @@ DESCRIPTION:    Handles the popping up or popping down of dialog shells
 
 CREATION:       Visual Edge Software            Sept 19/91
 -----------------------------------------------------------------------------*/
-static  int     handle_dialog_child( Widget wgt, void (*manage_func)() )
+static  int     handle_dialog_child( Widget wgt, void (*manage_func)(Widget) )
 {
         int      i;
         XtArgVal num_children;

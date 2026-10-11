@@ -1,0 +1,6 @@
+# This directory intentionally left blank
+#
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore

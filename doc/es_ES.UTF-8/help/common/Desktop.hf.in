@@ -16,7 +16,7 @@
 
 *.charSet:      UTF-8
 *.title:        Common Desktop Environment
-*.bitmap:       @prefix@/appconfig/help/es_ES.UTF-8/graphics/cdelogo.pm
+*.bitmap:       @CDE_DATA_TOP@/appconfig/help/es_ES.UTF-8/graphics/cdelogo.pm
 *.abstract:     Información general y Conocimientos básicos del escritorio \
  * Uso de la Ayuda \
  * El Gestor de aplicaciones \

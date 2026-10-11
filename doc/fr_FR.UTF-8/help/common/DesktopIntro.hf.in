@@ -16,7 +16,7 @@
 
 *.charSet:      UTF-8
 *.title:        Généralités et Connaissances de base du Bureau
-*.bitmap:       @prefix@/appconfig/help/fr_FR.UTF-8/graphics/cdelogo.pm
+*.bitmap:       @CDE_DATA_TOP@/appconfig/help/fr_FR.UTF-8/graphics/cdelogo.pm
 *.abstract:     Généralités et Connaissances de base du Bureau CDE
 
 *.volumes:  \

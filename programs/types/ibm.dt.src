@@ -272,7 +272,7 @@ ACTION NCSA_Mosaic
      ICON          Dtmosaic
      TYPE          COMMAND
      WINDOW_TYPE   NO_STDIO
-     EXEC_STRING   /usr/dt/bin/dtmosaic
+     EXEC_STRING   CDE_INSTALLATION_TOP/bin/dtmosaic
      DESCRIPTION   The NCSA_Mosaic action opens the NCSA Mosaic \
                    hypertext viewer if it exists, or provides \
                    help in downloading, installing, and configuring \
@@ -286,7 +286,7 @@ ACTION NCSA_Mosaic
      ICON          Dtmosaic
      TYPE          COMMAND
      WINDOW_TYPE   NO_STDIO
-     EXEC_STRING   /usr/dt/bin/dtmosaic "%(File)Arg_1%"
+     EXEC_STRING   CDE_INSTALLATION_TOP/bin/dtmosaic "%(File)Arg_1%"
      DESCRIPTION   The NCSA_Mosaic action opens the NCSA Mosaic \
                    hypertext viewer if it exists, or provides \
                    help in downloading, installing, and configuring \

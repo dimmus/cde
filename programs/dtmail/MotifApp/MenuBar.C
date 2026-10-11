@@ -786,23 +786,6 @@ MenuBar::rotateLabels(
     XmStringFree(endlabel);
 }
 
-#ifdef DEAD_WOOD
-Boolean
-MenuBar::isValidMenuPane(Widget w)
-{
-	Boolean retval = FALSE;
-	Widget parent = w;
-
-	while(parent && parent != _w)
-		parent = XtParent(parent);
-
-	if(parent == _w)
-		retval = TRUE;
-
-	return retval;
-}
-#endif /* DEAD_WOOD */
-
 void
 MenuBar::removeCommand(
     Widget pulldown,

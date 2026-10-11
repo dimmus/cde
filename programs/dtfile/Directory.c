@@ -6534,7 +6534,7 @@ TimerEvent(
     * checked) and schedule backround processes on those dirs that
     * haven't been checked in the longest time.
     */
-   qsort(check_list, n, sizeof(int), (int (*)())CheckListCmp);
+   qsort(check_list, n, sizeof(int), (int (*)(const void *, const void *)) CheckListCmp);
 
    /* arrange for background process to be started */
    links_left = False;

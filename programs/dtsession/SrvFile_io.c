@@ -96,7 +96,7 @@ static int error_value;
 
 #define HOME               "HOME"
 #define USER_PALETTE_DIR   "/.dt/palettes"
-#define SYSTEM_PALETTE_DIR CDE_INSTALLATION_TOP "/palettes"
+#define SYSTEM_PALETTE_DIR CDE_DATA_TOP "/palettes"
 #define CONFIG_PALETTE_DIR CDE_CONFIGURATION_TOP "/palettes"
 #define DEFAULT_PALETTE    "Default.dp"
 

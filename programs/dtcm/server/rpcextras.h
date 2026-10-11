@@ -34,7 +34,7 @@
 #define RPCGEN_ACTION(routine) routine
 
 struct rpcgen_table {
-    char	*(*proc)();
+    char	*(*proc)(void *, struct svc_req *);
     xdrproc_t	xdr_arg;
     unsigned	len_arg;
     xdrproc_t	xdr_res;

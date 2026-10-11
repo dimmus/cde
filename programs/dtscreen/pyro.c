@@ -95,11 +95,6 @@
 #define INTRAND(min,max) (random()%((max+1)-(min))+(min))
 #define FLOATRAND(min,max) ((min)+(random()/MAXRAND)*((max)-(min)))
 
-static void ignite();
-static void animate();
-static void shootup();
-static void burst();
-
 typedef struct {
     int         state;
     int         shelltype;
@@ -138,6 +133,11 @@ typedef struct {
     float       rockdecel, stardecel;
     rocket     *rockq;
 }           pyrostruct;
+
+static void ignite(perwindow *pwin, pyrostruct *pp);
+static void animate(perwindow *pwin, pyrostruct *pp, rocket *rp);
+static void shootup(perwindow *pwin, pyrostruct *pp, rocket *rp);
+static void burst(perwindow *pwin, pyrostruct *pp, rocket *rp);
 
 static int  orig_p_ignite;
 static int  just_started = True;/* Greet the user right away */

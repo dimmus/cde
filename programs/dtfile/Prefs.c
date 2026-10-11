@@ -184,31 +184,31 @@ static DialogResource resources[] =
 {
    { "showType", SHOW_TYPE, sizeof(unsigned char),
      XtOffset(PreferencesDataPtr, show_type),
-     (XtPointer) SINGLE_DIRECTORY, ShowTypeToString },
+     (XtPointer) SINGLE_DIRECTORY, (WriteResourceProc) ShowTypeToString },
 
    { "treeFiles", TREE_FILES, sizeof(unsigned char),
      XtOffset(PreferencesDataPtr, tree_files),
-     (XtPointer) TREE_FILES_NEVER, TreeFilesToString },
+     (XtPointer) TREE_FILES_NEVER, (WriteResourceProc) TreeFilesToString },
 
    { "view_single", VIEW, sizeof(unsigned char),
      XtOffset(PreferencesDataPtr, view_single),
-     (XtPointer) BY_NAME_AND_ICON, ViewToString },
+     (XtPointer) BY_NAME_AND_ICON, (WriteResourceProc) ViewToString },
 
    { "view_tree", VIEW, sizeof(unsigned char),
      XtOffset(PreferencesDataPtr, view_tree),
-     (XtPointer) BY_NAME_AND_SMALL_ICON, ViewToString },
+     (XtPointer) BY_NAME_AND_SMALL_ICON, (WriteResourceProc) ViewToString },
 
    { "order", ORDER, sizeof(unsigned char), 
      XtOffset(PreferencesDataPtr, order),
-     (XtPointer) ORDER_BY_ALPHABETICAL, OrderToString },
+     (XtPointer) ORDER_BY_ALPHABETICAL, (WriteResourceProc) OrderToString },
 
    { "direction", DIRECTION_RESRC, sizeof(unsigned char), 
      XtOffset(PreferencesDataPtr, direction),
-     (XtPointer) DIRECTION_ASCENDING, DirectionToString },
+     (XtPointer) DIRECTION_ASCENDING, (WriteResourceProc) DirectionToString },
 
    { "positionEnabled", RANDOM, sizeof(unsigned char), 
      XtOffset(PreferencesDataPtr, positionEnabled),
-     (XtPointer) RANDOM_OFF, RandomToString },
+     (XtPointer) RANDOM_OFF, (WriteResourceProc) RandomToString },
 };
 
 /*  Callback function definitions  */

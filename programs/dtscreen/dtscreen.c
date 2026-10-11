@@ -133,8 +133,8 @@ nl_catd  scmc_catd;   /* Cat descriptor for scmc conversion */
 
 char       *ProgramName;        /* argv[0] */
 Display    *dsp = NULL;         /* server display connection */
-void        (*callback) () = NULL;
-void        (*init) () = NULL;
+void        (*callback) (perwindow *) = NULL;
+void        (*init) (perwindow *) = NULL;
 
 static perwindow *Win; /* perwindow information */
 static int  windows;            /* number of windows */

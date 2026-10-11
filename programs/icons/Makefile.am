@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-icondir = $(CDE_INSTALLATION_TOP)/appconfig/icons/C
+icondir = $(CDE_DATA_TOP)/appconfig/icons/C
 
 dist_icon_DATA = \
 acroread.l.pm                   Dtmanpg.t.pm \

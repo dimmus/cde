@@ -91,10 +91,10 @@ static XtResource resources[] = {
 };
 
 static void ClassPartInitialize(WidgetClass);
-static void ClassInitialize();
+static void ClassInitialize(void);
 static void Realize(Widget, Mask*, XSetWindowAttributes*);
 static void ConvertCursor(Widget);
-static Boolean SetValues();
+static Boolean SetValues(Widget current, Widget request, Widget new, ArgList args, Cardinal *num_args);
 static Boolean ChangeSensitive(Widget);
 
 SimpleClassRec simpleClassRec = {
@@ -246,7 +246,7 @@ ConvertCursor(Widget w)
 
 
 /* ARGSUSED */
-static Boolean SetValues(Widget current, Widget request, Widget new)
+static Boolean SetValues(Widget current, Widget request, Widget new, ArgList args, Cardinal *num_args)
 {
     SimpleWidget s_old = (SimpleWidget) current;
     SimpleWidget s_new = (SimpleWidget) new;

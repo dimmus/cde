@@ -42,7 +42,7 @@ CLEANFILES += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
 # ever change, but for now we will list them as they are currently
 # installed.
 
-cdedtidir = $(CDE_INSTALLATION_TOP)/infolib/$(LANG)/cde.dti
+cdedtidir = $(CDE_DATA_TOP)/infolib/$(LANG)/cde.dti
 dist_cdedti_DATA = ../cde.dti/bookcase.map ../cde.dti/cde.oli
 
 cdedtidocdir = $(cdedtidir)/CDEDOC
@@ -66,5 +66,9 @@ dist_cdedtidocsearch_DATA = ../cde.dti/CDEDOC/dtsearch/CDEDOC.d00	\
 	../cde.dti/CDEDOC/dtsearch/CDEDOC.knj			\
 	../cde.dti/CDEDOC/dtsearch/dtsearch.ocf
 
-BUILT_SOURCES += $(cdedti_DATA) $(cdedtidoc_DATA) $(cdedtidocsearch_DATA)
-CLEANFILES += $(cdedti_DATA) $(cdedtidoc_DATA) $(cdedtidocsearch_DATA)
+generated_cdedtidocsearch_outputs = $(filter-out $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf,$(dist_cdedtidocsearch_DATA))
+
+BUILT_SOURCES += $(dist_cdedti_DATA) $(dist_cdedtidoc_DATA) $(dist_cdedtidocsearch_DATA)
+CLEANFILES += $(dist_cdedti_DATA) $(dist_cdedtidoc_DATA) $(dist_cdedtidocsearch_DATA)
+
+$(dist_cdedti_DATA) $(dist_cdedtidoc_DATA) $(generated_cdedtidocsearch_outputs): $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf

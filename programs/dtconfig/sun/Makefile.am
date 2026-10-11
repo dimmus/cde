@@ -10,6 +10,7 @@ configdir = $(CDE_INSTALLATION_TOP)/config
 dist_config_DATA = dtlogin.rc dtlogin.xml
 
 SCRIPTFLAGS = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \
+-DCDE_DATA_TOP=$(CDE_DATA_TOP) \
               -DCDE_CONFIGURATION_TOP=$(CDE_CONFIGURATION_TOP)
 
 BUILT_SOURCES = dtconfig dtlogin.rc

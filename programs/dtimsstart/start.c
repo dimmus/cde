@@ -35,16 +35,16 @@
 #endif
 
     /* local functions */
-static int	check_ims_opt(/* ptr */);
-static char	*find_session_resfile(/* res_type */);
-static int	check_selection(/* sel */);
-static int	build_run_env(/* sel */);
-static int	run_ims(/* sel */);
-static int	invoke_ims(/* sel */);
-static void	on_sig_chld(/* sig */);
-static bool	is_ims_running(/* renv, ims */);
-static int	settle_ims(/* sel */);
-static Window	property_owner(/* prop_atom, prop_str */);
+static int	check_ims_opt(char *ptr);
+static char	*find_session_resfile(int res_type);
+static int	check_selection(UserSelection *sel);
+static int	build_run_env(UserSelection *sel);
+static int	run_ims(UserSelection *sel);
+static int	invoke_ims(UserSelection *sel);
+static void	on_sig_chld(int sig);
+static bool	is_ims_running(RunEnv *renv, ImsConf *ims);
+static int	settle_ims(UserSelection *sel);
+static Window	property_owner(Atom *prop_atom, char *prop_str);
 static void	close_all_fds(void);
 
 void	ximsStart(void)
@@ -601,7 +601,7 @@ static int	invoke_ims(UserSelection *sel)
 #endif
 	execl(SH_PATH, "sh", "-c", renv->cmdbuf, NULL);
 
-	put_xims_log("%s: exec failed [%s]", SH_PATH, strerror(errno) , 0, 0);
+	put_xims_log("%s: exec failed [%s]", SH_PATH, strerror(errno) , 0);
 	/* perror(SH_PATH); */
 	sleep(1);
 	_exit(1);

@@ -87,19 +87,19 @@ static void _pr_class(
 static void _pr_resource_list( 
                         XtResource *res) ;
 static void sort_and_print_res( void ) ;
-static void gather_resource_list( 
-                        char *name,
+static int gather_resource_list( 
+                        const char *name,
                         char *r,
                         void *notUsed) ;
 static void _pr_resource( 
                         classtab_t *c,
                         wtab_t *w) ;
-static void pr_resource( 
-                        char *name,
+static int pr_resource( 
+                        const char *name,
                         char *r,
                         void *notUsed) ;
-static void pr_class( 
-                        char *name,
+static int pr_class( 
+                        const char *name,
                         char *c,
                         void *notUsed) ;
 static char * getname( 
@@ -802,21 +802,22 @@ static void
 sort_and_print_res( void )
 {
 	int i;
-	qsort(Res, Nres, sizeof(XtResource *), (int (*)())rescompare);
+	qsort(Res, Nres, sizeof(XtResource *), (int (*)(const void *, const void *))rescompare);
 	for (i = 0; i < Nres; i++) {
 		_pr_resource_list(Res[i]);
 	}
 }
 
-static void
+static int
 gather_resource_list(
-        char *name,
+        const char *name,
         char *r,
         void *notUsed )
 {
         XtResource *res = (XtResource *)r;
 
 	Res[Nres++] = res;
+	return 0; /* Not used */
 }
 
 static int Show_constraint;
@@ -847,36 +848,38 @@ _pr_resource(
 
 	Nres = 0;
 
-        hashwalk((Hash_table_t*)(Show_constraint ? c->con : c->res), 0, (int (*)())gather_resource_list, NULL);
+        hashwalk((Hash_table_t*)(Show_constraint ? c->con : c->res), 0, gather_resource_list, NULL);
 	if (!Show_constraint && w && w->parent != NULL && 
 		XtIsConstraint(w->parent->w)) {
-                hashwalk((Hash_table_t *)w->parent->wclass->con, 0, (int (*)())gather_resource_list, NULL);
+                hashwalk((Hash_table_t *)w->parent->wclass->con, 0, gather_resource_list, NULL);
 
 	}
 
 	sort_and_print_res();
 }
 
-static void
+static int
 pr_resource(
-        char *name,
+        const char *name,
         char *r,
         void *notUsed )
 {
         classtab_t *c = (classtab_t *)r;
 
 	_pr_resource(c, NULL);
+	return 0; /* Not used */
 }
 
-static void
+static int
 pr_class(
-        char *name,
+        const char *name,
         char *c,
         void *notUsed )
 {
         classtab_t *class = (classtab_t *)c;
 
 	_pr_class(class);
+	return 0; /* Not used */
 }
 
 static char *
@@ -1001,7 +1004,7 @@ do_DtWidgetInfo(
 			/* print all the resources in each widget or class */
 			if (argc == 2) {
                                 hashwalk((Hash_table_t *)Wclasses, 0, 
-                                           (int (*)())pr_resource, 0);
+                                           pr_resource, 0);
 				return(0);
 			} else {
 				for (i = 2; i < argc; i++) {
@@ -1024,7 +1027,7 @@ do_DtWidgetInfo(
 			 * class is available
 			 */
 			if (argc == 2) {
-                                hashwalk((Hash_table_t *)Wclasses, 0, (int (*)())pr_class, 0);
+                                hashwalk((Hash_table_t *)Wclasses, 0, pr_class, 0);
 			} else {
 				for (i = 2; i < argc; i++) {
 					if ((c = str_to_class(argv[0], argv[i])) != NULL)

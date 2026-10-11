@@ -99,6 +99,10 @@
 Widget G_toplevel;
 int    G_dialog_closed = FALSE;
 
+char * _DtCopyPathFromInput(char *input_string, char *current_dir);
+char * _DtCopyChangeTildeToHome(char *input_string);
+
+
 /*----------------------------------------------------------
  *
  *  split_path
@@ -150,7 +154,6 @@ char *
 get_path(char *path)
 {
     char *rpath, tmppath[MAX_PATH];
-    char * _DtCopyPathFromInput();
     if (!getcwd(tmppath,MAX_PATH))
         return NULL;
     rpath = _DtCopyPathFromInput(path,tmppath);
@@ -556,7 +559,6 @@ _DtCopyPathFromInput(char *input_string, char *current_dir)
     char *path = NULL;
     char *tmp_path = NULL;
     int dir_len;
-    char *_DtCopyChangeTildeToHome();
 
     /* find relative path */
 
@@ -636,14 +638,8 @@ _DtCopyPathFromInput(char *input_string, char *current_dir)
         *(path + dir_len - 1) = '\0';
     return path;
 }
-char *
-#ifdef _NO_PROTO
-_DtCopyChangeTildeToHome (input_string)
-    char *input_string;
-#else
-    _DtCopyChangeTildeToHome (
-    char *input_string)
-#endif
+
+char *_DtCopyChangeTildeToHome(char *input_string)
 {
     char *full_path;
     struct passwd * pwInfo;

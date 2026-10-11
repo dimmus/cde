@@ -412,22 +412,6 @@ XmTextEditor::set_to_bottom()
 	XmTextSetInsertionPosition( _w, XmTextGetLastPosition(_w) );
 }
 
-#ifdef DEAD_WOOD
-void
-XmTextEditor::focus_callback(
-    Widget,
-    void *clientData,
-    void *
-)
-{
- 
-    XmTextEditor  *obj=(XmTextEditor *) clientData;
-
-    obj->obtained_focus();
-
-}
-#endif /* DEAD_WOOD */
-
 void
 XmTextEditor::obtained_focus()
 {

@@ -55,17 +55,8 @@ class CheckBoxUiItem : public PropUiItem {
 public:
   CheckBoxUiItem(Widget w, int source, char *search_key);
   virtual ~CheckBoxUiItem(){;}; // we don't alloc any memory
-#ifdef DEAD_WOOD
-  virtual int getType(){ return _CHECKBOX_ITEM; };
-  virtual int getSource(){ return data_source; };
-#endif /* DEAD_WOOD */
   virtual void writeFromUiToSource();
   virtual void writeFromSourceToUi();
-
-private:
-#ifdef DEAD_WOOD
-  int data_source;
-#endif /* DEAD_WOOD */
 };
 
 #endif

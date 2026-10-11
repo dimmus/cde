@@ -76,7 +76,7 @@ int _isapplmw(int isfd, char *magicstring);
 
 /* isbsearch.c */
 char *_isbsearch(char *key, char *table, int nelems, int keylen,
-                 int (*cmpf)(char *, char *));
+                 int (*cmpf)(const void *, const void *));
 
 /* isbtree2.c */
 void _isbtree_insert(Btree *btree, char *key);
@@ -166,7 +166,7 @@ int iserase(char *isfname);
 void _isfatal_error(char *msg);
 void _isfatal_error1(char *msg);
 void _isam_warning(char *msg);
-int _isfatal_error_set_func(int (*func)(void));
+int _isfatal_error_set_func(int (*func)(char *));
 void _setiserrno2(int error, int is1, int is2);
 void _seterr_errcode(struct errcode *errcode);
 
@@ -253,7 +253,7 @@ int le_odd(int n);
 
 /* iskeycmp.c */
 void _iskeycmp_set(Keydesc2 *pkeydesc2, int nparts);
-int _iskeycmp(char *lkey, char *rkey);
+int _iskeycmp(const void *lkey, const void *rkey);
 
 /* iskeyconv.c */
 void _iskey_itox(struct keydesc2 *pikdesc, struct keydesc *pxkdesc);
@@ -305,7 +305,7 @@ void _issignals_mask(void);
 void _issignals_unmask(void);
 
 /* issort.c */
-Issort *_issort_create(int reclen, int nrecs, int (*compfunc)(char *, char *));
+Issort *_issort_create(int reclen, int nrecs, int (*compfunc)(const void *, const void *));
 void _issort_destroy(Issort *srt);
 void _issort_insert(Issort *srt, char *record);
 void _issort_sort(Issort *srt);

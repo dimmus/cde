@@ -9,7 +9,7 @@ BUILT_SOURCES = Appmanager.sdl $(APPBUILDER) Calculator.sdl		\
 CLEANFILES = $(BUILT_SOURCES)
 
 # install the help SDL files
-sdlhelpdir = $(CDE_INSTALLATION_TOP)/appconfig/help/$(LANG)
+sdlhelpdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)
 dist_sdlhelp_DATA = $(BUILT_SOURCES)
 
 DTDOCBOOK = $(top_srcdir)/programs/dtdocbook/doc_utils/dtdocbook2sdl

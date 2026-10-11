@@ -2720,6 +2720,11 @@ void HandleClientMessage (ClientData *pCD, XClientMessageEvent *clientEvent)
 			     XA_CARDINAL, 32, PropModeReplace,
 			     (unsigned char *) clientEvent->data.l, 4);
     }
+    else if (clientEvent->message_type == wmGD.xa__NET_ACTIVE_WINDOW)
+    {
+	if (clientEvent->format == 32)
+	    ProcessNetActiveWindow (pCD, (Time)clientEvent->data.l[1]);
+    }
     else if (clientEvent->message_type == wmGD.xa__NET_WM_STATE)
     {
 	ProcessNetWmState (pCD, clientEvent->data.l[0], clientEvent->data.l[1],

@@ -67,7 +67,7 @@
 #include "Dt/Wsm.h"
 
 #include <Xm/RowColumnP.h> /* for MS_LastManagedMenuTime */
-extern XmMenuState _XmGetMenuState();
+extern XmMenuState _XmGetMenuState(Widget);
 
 /*
  * FUNCTION PARSER TABLE
@@ -79,7 +79,7 @@ typedef struct {
    unsigned int   resource;
    long           mgtMask;
    WmFunction     wmFunction;
-   Boolean       (*parseProc)();
+   Boolean       (*parseProc)(unsigned char **, WmFunction, char **);
 } FunctionTableEntry;
 
 
@@ -1202,7 +1202,7 @@ Boolean HandleKeyPress (XKeyEvent *keyEvent,
 		  wmGD.passKeysKeySpec = keySpecs;
 		}
 	      if (!(keySpecs->wmFunction (keySpecs->wmFuncArgs,
-					  functionClient, keyEvent)))
+					  functionClient, (XEvent *) keyEvent)))
 		{
 		  /*
 		   * The window manager function return indicates that further
@@ -1494,7 +1494,7 @@ Boolean CheckForButtonAction (XButtonEvent *buttonEvent, Context context, Contex
 		}
 
 	        if (!(buttonSpec->wmFunction (buttonSpec->wmFuncArgs, pCD,
-					      buttonEvent)))
+					      (XEvent *) buttonEvent)))
 		{
 		    /*
 		     * The window manager function return indicates that
@@ -2357,6 +2357,14 @@ void HandleWsFocusIn (XFocusInEvent *focusEvent)
 {
     ClientData *pCD;
     Boolean sameScreen;
+
+    /* Focus can move directly from a client to the root window. */
+    if (focusEvent->mode == NotifyNormal &&
+        focusEvent->detail == NotifyInferior &&
+        focusEvent->window == ACTIVE_PSD->rootWindow)
+    {
+        SetKeyboardFocus (NULL, REFRESH_LAST_FOCUS);
+    }
 
     /*
      * This code is used to handle the case of the focus being

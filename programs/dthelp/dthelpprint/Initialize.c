@@ -58,12 +58,12 @@ $COPYRIGHT$:
 /*#define DEBUG	*/
 
 /*=========== file/dir constants ===========*/
-#define DTAPPDEFAULTS_DIR	CDE_INSTALLATION_TOP "/app-defaults/C/"
+#define DTAPPDEFAULTS_DIR	CDE_DATA_TOP "/app-defaults/C/"
 #define XAPPDEFAULTS_DIR	"/usr/lib/X11/app-defaults/"
 #define XDEFAULTS_FILE		"/.Xdefaults"
 #define XDEFAULTS_HOST_FILE	"/.Xdefaults-"
 #define TMP_DIR_STR		"/.dt/tmp"
-#define DTHELPPRINTSH_FILE	"/usr/dt/bin/dthelpprint.sh"
+#define DTHELPPRINTSH_FILE	CDE_INSTALLATION_TOP "/bin/dthelpprint.sh"
 
 /*=========== helper constants ===========*/
 #define EOS           '\0'

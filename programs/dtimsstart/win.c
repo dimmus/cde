@@ -63,7 +63,7 @@ static Widget		HostRC = (Widget) 0;
 
 static Widget		FocusW = (Widget) 0;
 
-static int		(*defaultErrorHandler)() = 0;
+static int		(*defaultErrorHandler)(Display *, XErrorEvent *) = NULL;
 
 
 /* application resource */
@@ -128,54 +128,56 @@ static char	*fallbacks[] = {
 
 	/* local functions */
     /* window env */
-static int	ignoreBadWindow(/* dpy, error */);
+static int	ignoreBadWindow(Display *dpy, XErrorEvent *error);
 #ifdef	unused
-static void	finish_window(/* w, end_window */);
+static void	finish_window(Widget *w, int end_window);
 #endif	/* unused */
-static int	own_main_atom(/* win */);
-static int	disown_main_atom(/* win */);
+static int	own_main_atom(Window win);
+static int	disown_main_atom(Window win);
     /* selection window */
-static void	free_ims_list(/* list */);
-static void	clear_selection_var(/*  */);
-static void	finish_selection_window(/* end_window */);
-static void	done_cb(/* w, client_data, call_data */);
-static void	select_cb(/* w, client_data, call_data */);
-static void	host_btn_cb(/* w, client_data, call_data */);
-static void	help_cb(/* w, client_data, call_data */);
-static int	create_selection_window(/*  */);
-static int	change_host(/* new_host, host_type */);
-static void	add_btn_trans(/* btn */);
-static void	change_ims_list(/* last_ims_name, init_idx */);
-static void	set_host_label(/* host_type, hostname */);
-static void	add_cmd_btn(/* parent_rc, cb_ok, cb_clear, cb_cancel, cb_host, cb_help */);
+static void	free_ims_list(ImsList *list);
+static void	clear_selection_var(void);
+static void	finish_selection_window(int end_window);
+static void	done_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	select_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	host_btn_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	help_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static int	create_selection_window(void);
+static int	change_host(char *new_host, int host_type);
+static void	add_btn_trans(Widget btn);
+static void	change_ims_list(char *last_ims_name, int init_idx);
+static void	set_host_label(int host_type, char *hostname);
+static void	add_cmd_btn(Widget parent_rc, void (*cb_ok)(Widget, XtPointer, XtPointer),
+                            void (*cb_clear)(Widget, XtPointer, XtPointer), void (*cb_cancel)(Widget, XtPointer, XtPointer),
+                            void (*cb_host)(Widget, XtPointer, XtPointer), void (*cb_help)(Widget, XtPointer, XtPointer));
     /* host window */
-static void	start_host_window(/* cur_host */);
-static void	finish_host_window(/*  */);
-static void	host_done_cb(/* w, client_data, call_data */);
-static void	host_clear_cb(/* w, client_data, call_data */);
-static void	host_done_action(/* w, ev, args, num_args */);
-static void	create_host_window(/* cur_host */);
+static void	start_host_window(char *cur_host);
+static void	finish_host_window(void);
+static void	host_done_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	host_clear_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	host_done_action(Widget w, XEvent *ev, String *args, Cardinal *num_args);
+static void	create_host_window(char *cur_host);
     /* mode window */
-static void	finish_mode_window(/* end_window */);
-static void	mode_done_cb(/* w, client_data, call_data */);
-static void	mode_cb(/* w, client_data, call_data */);
-static void	mode_help_cb(/* w, client_data, call_data */);
-static int	create_mode_window(/* cur_mode */);
+static void	finish_mode_window(int end_window);
+static void	mode_done_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	mode_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static void	mode_help_cb(Widget w, XtPointer client_data, XtPointer call_data);
+static int	create_mode_window(int cur_mode);
     /* help window */
-static void	help_ok(/* w, client_data, call_data */);
-static void	create_help(/*  */);
+static void	help_ok(Widget w, XtPointer client_data, XtPointer call_data);
+static void	create_help(void);
     /* msg window */
-static void	dialog_resp_cb(/* w, client_data, call_data */);
+static void	dialog_resp_cb(Widget w, XtPointer client_data, XtPointer call_data);
 #ifdef	unused
-static int	wait_confirmation(/* w */);
+static int	wait_confirmation(Widget w);
 #endif	/* unused */
     /* locate window */
-static int	window_location(/* loc_str */);
-static void	locate_window(/* w */);
+static int	window_location(char *loc_str);
+static void	locate_window(Widget w);
     /* cursor */
-static void	set_cursor(/* w, is_wait */);
+static void	set_cursor(Widget w, int is_wait);
     /* timer */
-static void	xt_timer_cb(/* client_data, timer_id */);
+static void	xt_timer_cb(XtPointer client_data, XtIntervalId *timer_id);
 
 
 	/* ********  window env  ******** */
@@ -896,9 +898,12 @@ static void	set_host_label(int host_type, char *hostname)
 }
 
 
-static void	add_cmd_btn(Widget parent_rc, void (*cb_ok)(),
-                            void (*cb_clear)(), void (*cb_cancel)(),
-                            void (*cb_host)(), void (*cb_help)())
+static void	add_cmd_btn(Widget parent_rc,
+                            void (*cb_ok)(Widget, XtPointer, XtPointer),
+                            void (*cb_clear)(Widget, XtPointer, XtPointer),
+                            void (*cb_cancel)(Widget, XtPointer, XtPointer),
+                            void (*cb_host)(Widget, XtPointer, XtPointer),
+                            void (*cb_help)(Widget, XtPointer, XtPointer))
 {
     Widget	pb[4];
     Arg		args[12];

@@ -38,8 +38,8 @@
 
 #include "isam_impl.h"
 
-static int _getoffset();
-static Blkno _getblkno();
+static int _getoffset(long pos);
+static Blkno _getblkno(long pos);
 
 
 /*

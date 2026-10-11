@@ -68,7 +68,7 @@ typedef struct _StateEntryRec
     unsigned char   lower;	    /* lower end of character range	 */
     unsigned char   upper;	    /* upper end of character range	 */
     StateTable      nextState;	    /* next state to enter		 */
-    void            (*action)();    /* index to next runtime routine     */
+    void            (*action)(Widget w);    /* index to next runtime routine     */
 } StateEntryRec, *StateEntry;
 
 typedef struct _StateTableRec

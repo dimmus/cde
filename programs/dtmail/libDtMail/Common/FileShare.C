@@ -473,14 +473,6 @@ FileShare::readWriteOverride(DtMailEnv & error)
   return(answer);
 }
 
-#ifdef DEAD_WOOD
-DtMailBoolean
-FileShare::locked(void)
-{
-    return(_have_write_access);
-}
-#endif /* DEAD_WOOD */
-
 Tt_message 
 FileShare::fileCB(Tt_message msg,
 		  Tttk_op op,

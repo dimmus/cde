@@ -49,6 +49,7 @@
  ***************************************************************************/
 
 #include	<stdio.h>
+#include	<string.h>
 #include	"vg.h"
 #include	"vgmsg.h"
 #include	<Xm/CascadeBG.h>
@@ -268,8 +269,8 @@ _enumLanglistEnd(
 
 struct _enumObject
 {
-  Boolean (*methodNext)();
-  void (*methodEnd)();
+  Boolean (*methodNext)(void *, char**, char **);
+  void (*methodEnd)(void *);
   void *enumstate;
 };
 

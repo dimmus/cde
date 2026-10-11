@@ -1713,10 +1713,10 @@ static void
 dtMakeDefaultDir( void )
 {
     dtmkdir("/var", 0755, 0);
-    dtmkdir("/var/dt", 0755, 1);
-    dtmkdir("/var/dt/tmp", 0755, 1);
-    dtmkdir("/var/dt/appconfig", 0755, 1);
-    dtmkdir("/var/dt/appconfig/appmanager", 0755, 1);
+    dtmkdir(CDE_LOGFILES_TOP, 0755, 1);
+    dtmkdir(CDE_LOGFILES_TOP "/tmp", 0755, 1);
+    dtmkdir(CDE_LOGFILES_TOP "/appconfig", 0755, 1);
+    dtmkdir(CDE_LOGFILES_TOP "/appconfig/appmanager", 0755, 1);
 }
 
 static void

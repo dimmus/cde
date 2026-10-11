@@ -110,7 +110,7 @@
 
 
 static int _xmcreatefunc( 
-                        Widget (*func)(),
+                        Widget (*func)(Widget, String, ArgList, Cardinal),
                         char *wclass,
                         int argc,
                         char *argv[]) ;
@@ -118,29 +118,29 @@ static wtab_t * verifyListWidget(
                         char *cmd,
                         char *widget) ;
 static int List_ItemAndPos( 
-                        void (*func)(),
+                        void (*func)(Widget, XmString, int),
                         int argc,
                         char *argv[]) ;
 static int List_ItemListAndPos( 
-                        void (*func)(),
+                        void (*func)(Widget, XmString *, int, int),
                         int argc,
                         char *argv[]) ;
 static int List_WidgetOnly( 
-                        void (*func)(),
+                        void (*func)(Widget),
                         int argc,
                         char *argv[]) ;
 static int GetSelectedPosList(
-	                Boolean (*func)(),
+	                Boolean (*func)(Widget, XmString, int **, int *),
 	                int paramCount,
 	                char * errmsg,
                         int argc,
                         char *argv[] ) ;
 static int List_ItemOnly( 
-                        void (*func)(),
+                        void (*func)(Widget, XmString),
                         int argc,
                         char *argv[]) ;
 static int List_PositionOnly( 
-                        void (*func)(),
+                        void (*func)(Widget, int),
                         int argc,
                         char *argv[]) ;
 static int ListSelectItem( 
@@ -153,7 +153,7 @@ static int GetMainWindowSeparator(
                         char *argv[]) ;
 static int CatchAndIgnoreXError( 
                         Display *display,
-                        XEvent *event) ;
+                        XErrorEvent *event) ;
 static int AddOrDeleteWMProtocols( 
                         int argc,
                         char *argv[]) ;
@@ -167,7 +167,7 @@ static wtab_t * verifyTextWidget(
                         char *cmd,
                         char *widget) ;
 static int Text_Widget( 
-                        Boolean (*func)(),
+                        Boolean (*func)(Widget),
                         Boolean returnBoolean,
                         int argc,
                         char *argv[]) ;
@@ -181,7 +181,7 @@ static int Text_WidgetAndBoolean(
                         int argc,
                         char *argv[]) ;
 static int Text_WidgetAndOneParam( 
-                        Boolean (*func)(),
+                        Boolean (*func)(Widget, intptr_t),
                         Boolean returnBoolean,
                         Boolean paramIsString,
                         char *usageMsg,
@@ -204,12 +204,12 @@ static wtab_t * ConvertWidgetToWtab(
                         Widget w);
 static int GetSubWidget(
 	                char * errmsg,
-	                Widget (*func)(),
+	                Widget (*func)(Widget),
                         int argc,
                         char *argv[] );
 
 static int _CreatePDMJobSetup( 
-                        Widget (*func)(),
+                        Widget (*func)(Widget),
                         int argc,
                         char *argv[]) ;
 
@@ -642,7 +642,7 @@ toolkit_special_resource(
 
 static int
 _xmcreatefunc(
-        Widget (*func)(),
+        Widget (*func)(Widget, String, ArgList, Cardinal),
         char *wclass,
         int argc,
         char *argv[] )
@@ -1439,7 +1439,7 @@ verifyListWidget(
 
 static int
 List_ItemAndPos(
-        void (*func)(),
+        void (*func)(Widget, XmString, int),
         int argc,
         char *argv[] )
 {
@@ -1490,7 +1490,7 @@ do_XmListAddItemUnselected(
 
 static int
 List_ItemListAndPos(
-        void (*func)(),
+        void (*func)(Widget, XmString *, int, int),
         int argc,
         char *argv[] )
 {
@@ -1576,7 +1576,7 @@ do_XmListReplaceItemsPosUnselected(
 
 static int
 List_WidgetOnly(
-        void (*func)(),
+        void (*func)(Widget),
         int argc,
         char *argv[] )
 {
@@ -1631,7 +1631,7 @@ do_XmListUpdateSelectedList(
 
 static int
 List_ItemOnly(
-        void (*func)(),
+        void (*func)(Widget, XmString),
         int argc,
         char *argv[] )
 {
@@ -1698,7 +1698,7 @@ do_XmListSetItem(
 
 static int
 List_PositionOnly(
-        void (*func)(),
+        void (*func)(Widget, int),
         int argc,
         char *argv[] )
 {
@@ -1889,7 +1889,7 @@ do_XmListDeletePositions(
 
 static int
 GetSelectedPosList(
-	Boolean (*func)(),
+	Boolean (*func)(Widget, XmString, int **, int *),
 	int paramCount,
 	char * errmsg,
         int argc,
@@ -1916,8 +1916,19 @@ GetSelectedPosList(
       return(1);
    }
 
+   /* *func is either
+    * 
+    * Boolean XmListGetSelectedPos(Widget widget, int **position_list, int *position_count);
+    * or
+    * Boolean XmListGetMatchPos(Widget widget, XmString item, int **position_list, int *position_count
+    * based on paramCount
+    * TODO this is hideous fix this
+    * */
    if (paramCount == 3)
-      result = (*func)(w->w, &posList, &posCount);
+   {
+      Boolean (*func2)(Widget, int **, int *) = (Boolean (*)(Widget, int **, int *)) func;
+      result = (*func2)(w->w, &posList, &posCount);
+   }
    else
    {
       string = XmStringCreateLocalized(argv[3]);
@@ -1960,7 +1971,7 @@ do_XmListGetSelectedPos(
 
    errmsg = strdup(GETMESSAGE(
                    "Usage: XmListGetSelectedPos variable widget"));
-   result = GetSelectedPosList(XmListGetSelectedPos, 3, errmsg, argc, argv);
+   result = GetSelectedPosList((Boolean (*)(Widget, XmString, int **, int *)) XmListGetSelectedPos, 3, errmsg, argc, argv);
    free(errmsg);
    return(result);
 }
@@ -2546,7 +2557,7 @@ do_XmInternAtom(
 static int
 CatchAndIgnoreXError(
         Display *display,
-        XEvent *event )
+        XErrorEvent *event )
 {
    return(0);
 }
@@ -2560,7 +2571,7 @@ do_XmGetAtomName(
    char *name;
    Atom atom;
    char * p;
-   int (*oldHandler)();
+   int (*oldHandler)(Display *, XErrorEvent *);
    Display * display;
    char * errmsg;
 
@@ -2593,9 +2604,9 @@ do_XmGetAtomName(
       alt_env_set_var(argv[1], ""); 
       return(1);
    }
-   oldHandler = XSetErrorHandler((int(*)())CatchAndIgnoreXError);
+   oldHandler = XSetErrorHandler(CatchAndIgnoreXError);
    name = XmGetAtomName (display, atom);
-   XSetErrorHandler((int(*)())oldHandler);
+   XSetErrorHandler(oldHandler);
    if (name == NULL)
    {
       alt_env_set_var(argv[1], ""); 
@@ -3242,7 +3253,7 @@ do_XmIsTraversable(
         int argc,
         char *argv[] )
 {
-	return(do_single_widget_test_func((int(*)())XmIsTraversable, argc, 
+	return(do_single_widget_test_func(XmIsTraversable, argc, 
                                           argv));
 }
 
@@ -3588,7 +3599,7 @@ GetToggleState(
       return(1);
    }
 
-   return(do_single_widget_test_func((int(*)())XmToggleButtonGetState, argc, 
+   return(do_single_widget_test_func(XmToggleButtonGetState, argc, 
                                      argv));
 }
 
@@ -3836,7 +3847,7 @@ verifyTextWidget(
 
 static int
 Text_Widget(
-        Boolean (*func)(),
+        Boolean (*func)(Widget),
         Boolean returnBoolean,
         int argc,
         char *argv[] )
@@ -3872,7 +3883,10 @@ do_XmTextDisableRedisplay(
         int argc,
         char *argv[] )
 {
-   return (Text_Widget((Boolean (*)())XmTextDisableRedisplay, False, argc, 
+   /* Warning, this cast works on most architectures, but potentially
+    * has portability problems where return values are passed on the
+    * stack not in a register */
+   return (Text_Widget((Boolean (*)(Widget)) XmTextDisableRedisplay, False, argc, 
            argv));
 }
 
@@ -3882,7 +3896,10 @@ do_XmTextEnableRedisplay(
         int argc,
         char *argv[] )
 {
-   return (Text_Widget((Boolean (*)())XmTextEnableRedisplay, False, argc, 
+   /* Warning, this cast works on most architectures, but potentially
+    * has portability problems where return values are passed on the
+    * stack not in a register */
+   return (Text_Widget((Boolean (*)(Widget)) XmTextEnableRedisplay, False, argc, 
            argv));
 }
 
@@ -3965,7 +3982,7 @@ do_XmTextGetTopCharacter(
         int argc,
         char *argv[] )
 {
-   return (Text_VarAndWidget((long (*)())XmTextGetTopCharacter, False, argc, 
+   return (Text_VarAndWidget(XmTextGetTopCharacter, False, argc, 
            argv));
 }
 
@@ -3975,7 +3992,7 @@ do_XmTextGetBaseline(
         int argc,
         char *argv[] )
 {
-    return (Text_VarAndWidget((long (*)())XmTextGetBaseline, False, argc, argv));
+    return (Text_VarAndWidget((long (*)(Widget)) XmTextGetBaseline, False, argc, argv));
 }
 
 
@@ -3984,7 +4001,7 @@ do_XmTextGetInsertionPosition(
         int argc,
         char *argv[] )
 {
-   return (Text_VarAndWidget((long (*)())XmTextGetInsertionPosition, False, 
+   return (Text_VarAndWidget(XmTextGetInsertionPosition, False, 
            argc, argv));
 }
 
@@ -3994,7 +4011,7 @@ do_XmTextGetLastPosition(
         int argc,
         char *argv[] )
 {
-   return (Text_VarAndWidget((long (*)())XmTextGetLastPosition, False, argc, 
+   return (Text_VarAndWidget(XmTextGetLastPosition, False, argc, 
                              argv));
 }
 
@@ -4004,7 +4021,7 @@ do_XmTextGetMaxLength(
         int argc,
         char *argv[] )
 {
-   return (Text_VarAndWidget((long (*)())XmTextGetMaxLength, False, argc, argv));
+   return (Text_VarAndWidget((long (*)(Widget)) XmTextGetMaxLength, False, argc, argv));
 }
 
 
@@ -4013,7 +4030,7 @@ do_XmTextGetSelection(
         int argc,
         char *argv[] )
 {
-   return (Text_VarAndWidget((long (*)())XmTextGetSelection, True, argc, argv));
+   return (Text_VarAndWidget((long (*)(Widget)) XmTextGetSelection, True, argc, argv));
 }
 
 
@@ -4022,7 +4039,7 @@ do_XmTextGetString(
         int argc,
         char *argv[] )
 {
-   return (Text_VarAndWidget((long (*)())XmTextGetString, True, argc, argv));
+   return (Text_VarAndWidget((long (*)(Widget)) XmTextGetString, True, argc, argv));
 }
 
 
@@ -4083,7 +4100,7 @@ do_XmTextSetAddMode(
 
 static int
 Text_WidgetAndOneParam(
-        Boolean (*func)(),
+        Boolean (*func)(Widget, intptr_t),
         Boolean returnBoolean,
         Boolean paramIsString,
         char *usageMsg,
@@ -4107,7 +4124,7 @@ Text_WidgetAndOneParam(
       return(1);
 
    if (paramIsString)
-      result = (*func) (w->w, argv[2]);
+      result = (*func) (w->w, (intptr_t) argv[2]);
    else
    {
       param = strtoul(argv[2], &p, 0);
@@ -4139,7 +4156,7 @@ do_XmTextScroll(
    int retVal;
    
    errmsg = strdup(GETMESSAGE("Usage: %s widget lines"));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextScroll, False, False, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextScroll, False, False, 
                                     errmsg, argc, argv);
    free(errmsg);
    return (retVal);
@@ -4156,7 +4173,7 @@ do_XmTextSetInsertionPosition(
    int retVal;
    
    errmsg = strdup(GetSharedMsg(DT_USAGE_WIDGET_POS));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextSetInsertionPosition, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextSetInsertionPosition, 
                                     False, False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
@@ -4172,7 +4189,7 @@ do_XmTextSetTopCharacter(
    int retVal;
    
    errmsg = strdup(GetSharedMsg(DT_USAGE_WIDGET_POS));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextSetTopCharacter, False, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextSetTopCharacter, False, 
                                    False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
@@ -4188,7 +4205,7 @@ do_XmTextSetMaxLength(
    int retVal;
    
    errmsg = strdup(GETMESSAGE("Usage: %s widget maxLength"));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextSetMaxLength, False, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextSetMaxLength, False, 
                                    False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
@@ -4204,7 +4221,7 @@ do_XmTextSetString(
    int retVal;
    
    errmsg = strdup(GETMESSAGE("Usage: %s widget string"));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextSetString, False, True, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextSetString, False, True, 
                                    errmsg, argc, argv);
    free(errmsg);
    return(retVal);
@@ -4220,7 +4237,7 @@ do_XmTextShowPosition(
    int retVal;
    
    errmsg = strdup(GetSharedMsg(DT_USAGE_WIDGET_POS));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextShowPosition, False, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextShowPosition, False, 
                                    False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
@@ -4236,7 +4253,7 @@ do_XmTextClearSelection(
    int retVal;
    
    errmsg = strdup(GetSharedMsg(DT_USAGE_WIDGET_TIME));
-   retVal = Text_WidgetAndOneParam((Boolean (*)())XmTextClearSelection, False, 
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextClearSelection, False, 
                                     False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
@@ -4252,7 +4269,7 @@ do_XmTextCopy(
    int retVal;
    
    errmsg = strdup(GetSharedMsg(DT_USAGE_WIDGET_TIME));
-   retVal = Text_WidgetAndOneParam(XmTextCopy, True, False, errmsg, argc, argv);
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextCopy, True, False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
 }
@@ -4267,7 +4284,7 @@ do_XmTextCut(
    int retVal;
    
    errmsg = strdup(GetSharedMsg(DT_USAGE_WIDGET_TIME));
-   retVal = Text_WidgetAndOneParam(XmTextCut, True, False, errmsg, argc, argv);
+   retVal = Text_WidgetAndOneParam((Boolean (*)(Widget, intptr_t)) XmTextCut, True, False, errmsg, argc, argv);
    free(errmsg);
    return(retVal);
 }
@@ -4726,7 +4743,7 @@ do_XmTextFindString(
 static int
 GetSubWidget(
 	char * errmsg,
-	Widget (*func)(),
+	Widget (*func)(Widget),
         int argc,
         char *argv[] )
 {
@@ -4929,7 +4946,7 @@ do_XmFileSelectionDoSearch(
 
 static int
 _CreatePDMJobSetup(
-        Widget (*func)(),
+        Widget (*func)(Widget),
         int argc,
         char *argv[] )
 {

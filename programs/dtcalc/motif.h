@@ -94,8 +94,8 @@ extern Boolean ignore_event;
 #ifndef CDE_INSTALLATION_TOP
 #define CDE_INSTALLATION_TOP "/usr/dt"
 #endif
-#define CALC_ICON_NAME     CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtcalc.l.pm"
-#define CALC_ICON_NAME_BM  CDE_INSTALLATION_TOP "/appconfig/icons/C/Dtcalc.l.bm"
+#define CALC_ICON_NAME     CDE_DATA_TOP "/appconfig/icons/C/Dtcalc.l.pm"
+#define CALC_ICON_NAME_BM  CDE_DATA_TOP "/appconfig/icons/C/Dtcalc.l.bm"
 
 #define HELP_HELP_MENU                  710
 

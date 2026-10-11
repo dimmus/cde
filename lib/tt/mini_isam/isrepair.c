@@ -63,16 +63,16 @@
  *   verbose option (if set to nonzero) will print messages to stdout.
  */
 
-Static	char *rp_readrecord_v(), *rp_readrecord_f();
+Static char *rp_readrecord_v(int datfd, int varfd, long offset, int minreclen, int maxreclen);
+Static char *rp_readrecord_f(int datfd, long offset, int reclen);
 Static int printkey(int, struct keydesc *, int (*)(const char *, ...));
 Static void cmd_error(const char *, int (*)(const char *, ...));
-Static int typeletter();
-Static int rp_readcntlpg();
+Static int typeletter(int type);
+Static int rp_readcntlpg(int datfd, char *cntlpg);
 static int  isnoprintf(const char *, ...);
 
 int isrepair(char *isfname, int verbose)
 {
-  extern      char *rp_readrecord_v(), *rp_readrecord_f();
   char	      cntlpg[ISCNTLSIZE];
   int	      datfd = -1, indfd = -1, varfd = -1;
   int	      minreclen, maxreclen;

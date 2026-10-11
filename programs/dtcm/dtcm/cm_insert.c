@@ -88,7 +88,7 @@ static char cm_what[1024] = "Appointment";
 static char cm_appt_file[1024] = "";
 					/* file to find an appointment template in */
 
-static void cm_args();			/* parse command line */
+static void cm_args(int argc, char **argv);	/* parse command line */
 
 static char**
 grab(char **argv,				/* command line arguments */

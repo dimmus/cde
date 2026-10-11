@@ -425,7 +425,7 @@ static int RestoreObject(
                         char *source,
                         char *target,
                         Boolean  isContainer,
-                        void (*errorHandler)(),
+                        void (*errorHandler)(Widget, XtPointer, XtPointer),
                         Boolean checkForBusyDir,
                         int type ,
                         Boolean CheckedAlready);
@@ -3018,7 +3018,7 @@ MoveToTrashProcess(
 
       /* move file to the trash directory */
       success = FileManip((Widget) (intptr_t) pipe_fd, MOVE_FILE, path, to, TRUE,
-                          FileOpError, True, TRASH_DIRECTORY);
+                          (void (*)(Widget, XtPointer, XtPointer)) FileOpError, True, TRASH_DIRECTORY);
       if (success)
       {
          pipe_msg = PIPEMSG_DONE;
@@ -3696,7 +3696,7 @@ RestoreProcess(
       {
 
          status = RestoreObject((Widget) (intptr_t) pipe_fd, MOVE_FILE, from,to,
-			TRUE, FileOpError, False, NOT_DESKTOP,CheckedAlready);
+			TRUE, (void (*)(Widget, XtPointer, XtPointer)) FileOpError, False, NOT_DESKTOP,CheckedAlready);
          /* restore was successful */
          if(status == (int) True)
 	   rc[i] = 0;
@@ -4526,7 +4526,7 @@ RestoreObject(
         char *source,
         char *target,
         Boolean  isContainer,
-        void (*errorHandler)(),
+        void (*errorHandler)(Widget, XtPointer, XtPointer),
         Boolean checkForBusyDir,
         int type ,
         Boolean CheckedAlready)
@@ -4564,7 +4564,7 @@ RestoreObject(
 
   free(localdir);
   return ((int )FileManip((Widget)w, MOVE_FILE, source, target, TRUE,
-                          FileOpError, False, NOT_DESKTOP));
+                          (void (*)(Widget, XtPointer, XtPointer)) FileOpError, False, NOT_DESKTOP));
 }
 static void
 CreateRestoreDialog(

@@ -400,11 +400,11 @@ GetImsList(
 
     /* First check if dtimsstart is installed correctly */
 
-    if ((ret = stat ("/usr/dt/bin/dtimsstart", &buf)) != NoError) {
+    if ((ret = stat (CDE_INSTALLATION_TOP "/bin/dtimsstart", &buf)) != NoError) {
 	return ErrNoDtimsstart;
     }
     
-    sprintf(pipe_command, "/usr/dt/bin/dtimsstart -listname -hostname %s", 
+    sprintf(pipe_command, CDE_INSTALLATION_TOP "/bin/dtimsstart -listname -hostname %s",
 	    hostname);
 
     if ((fp = popen(pipe_command, "r"))) {

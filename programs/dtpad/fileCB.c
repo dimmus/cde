@@ -86,7 +86,7 @@ static void IncludeFile(
         caddr_t call_data );
 static Boolean SaveUnsaved(
 	Editor* pPad,
-	void (*callingFunc)() );
+	void (*callingFunc)(struct _WidgetRec *, caddr_t, caddr_t) );
 static Boolean FileExitWP(
 	XtPointer client_data);
 
@@ -225,7 +225,7 @@ FileSaveCB(
         caddr_t call_data )
 {
     Editor *pPad = (Editor *)client_data;
-    void (*pFunc)();
+    void (*pFunc)(Widget, caddr_t, caddr_t);
     DtEditorErrorCode errorCode;
     Boolean addNewlines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
@@ -249,7 +249,7 @@ FileSaveCB(
 	_DtTurnOffHourGlass(pPad->app_shell);
 	if (errorCode != DtEDITOR_NO_ERRORS) {
 	    PostSaveError(pPad, pPad->fileStuff.fileName, errorCode);
-	    pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+	    pPad->fileStuff.pendingFileFunc = NULL;
 	    TTfailPendingSave(pPad);
 	    return;
 	}
@@ -278,7 +278,7 @@ FileSaveCB(
 			TTfailPendingQuit(pPad);
 		    }
 		    TTfailPendingSave(pPad);
-		    pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+		    pPad->fileStuff.pendingFileFunc = NULL;
 		    return;	/* deposit failed */
 		}
 	    } else {	/* TT request without fileName and contents */
@@ -299,8 +299,8 @@ FileSaveCB(
 	}
     }
 
-    if ((pFunc = pPad->fileStuff.pendingFileFunc) != (void (*)())NULL)  {
-	pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+    if ((pFunc = pPad->fileStuff.pendingFileFunc) != NULL)  {
+	pPad->fileStuff.pendingFileFunc = NULL;
 	if (pFunc != FileSaveCB) {
 	    (*pFunc)(w, client_data, call_data);
 	}
@@ -678,46 +678,46 @@ FileExitWP(XtPointer client_data)
     /* -----> clear ToolTalk message info */
     TTresetQuitArgs(pPad);
     pPad->ttEditReq.contract = 0;
-    if (pPad->ttEditReq.msg_id != (char *)NULL) {
+    if (pPad->ttEditReq.msg_id != NULL) {
 	XtFree(pPad->ttEditReq.msg_id);
-	pPad->ttEditReq.msg_id = (char *)NULL;
+	pPad->ttEditReq.msg_id = NULL;
     }
-    if (pPad->ttEditReq.vtype != (char *)NULL) {
+    if (pPad->ttEditReq.vtype != NULL) {
 	XtFree(pPad->ttEditReq.vtype);
-	pPad->ttEditReq.vtype = (char *)NULL;
+	pPad->ttEditReq.vtype = NULL;
     }
-    if (pPad->ttEditReq.fileName != (char *)NULL) {
+    if (pPad->ttEditReq.fileName != NULL) {
 	XtFree(pPad->ttEditReq.fileName);
-	pPad->ttEditReq.fileName = (char *)NULL;
+	pPad->ttEditReq.fileName = NULL;
     }
-    if (pPad->ttEditReq.docName != (char *)NULL) {
+    if (pPad->ttEditReq.docName != NULL) {
 	XtFree(pPad->ttEditReq.docName);
-	pPad->ttEditReq.docName = (char *)NULL;
+	pPad->ttEditReq.docName = NULL;
     }
     if (pPad->ttEditReq.savePattern) {
 	tt_pattern_destroy(pPad->ttEditReq.savePattern);
 	pPad->ttEditReq.savePattern = NULL;
     }
 
-    if (pPad->dialogTitle != (char *)NULL) {
+    if (pPad->dialogTitle != NULL) {
 	XtFree(pPad->dialogTitle);
 	pPad->dialogTitle = NULL;
     }
 
     pPad->saveRestore = False;
 
-    pPad->fileStuff.pendingFileFunc = (void (*)())NULL;
-    pPad->fileStuff.pendingFileHelpFunc = (void (*)())NULL;
+    pPad->fileStuff.pendingFileFunc = NULL;
+    pPad->fileStuff.pendingFileHelpFunc = NULL;
     pPad->fileStuff.fileExists = False;
     pPad->fileStuff.saveWithNewlines = True;
     pPad->fileStuff.readOnly = False;
-    if (pPad->fileStuff.fileName != (char *) NULL) {
+    if (pPad->fileStuff.fileName != NULL) {
 	XtFree(pPad->fileStuff.fileName);
-	pPad->fileStuff.fileName = (char *) NULL;
+	pPad->fileStuff.fileName = NULL;
     }
-    if (pPad->fileStuff.netfile != (char *) NULL) {
+    if (pPad->fileStuff.netfile != NULL) {
 	tt_free(pPad->fileStuff.netfile);
-	 pPad->fileStuff.netfile = (char *) NULL;
+	 pPad->fileStuff.netfile = NULL;
     }
 
     /* -----> Clear contents, undo, find/change, format and message area */
@@ -820,45 +820,45 @@ oldFileExitCB(
     /* -----> clear ToolTalk message info */
     TTresetQuitArgs(pPad);
     pPad->ttEditReq.contract = 0;
-    if (pPad->ttEditReq.msg_id != (char *)NULL) {
+    if (pPad->ttEditReq.msg_id != NULL) {
 	XtFree(pPad->ttEditReq.msg_id);
-	pPad->ttEditReq.msg_id = (char *)NULL;
+	pPad->ttEditReq.msg_id = NULL;
     }
-    if (pPad->ttEditReq.vtype != (char *)NULL) {
+    if (pPad->ttEditReq.vtype != NULL) {
 	XtFree(pPad->ttEditReq.vtype);
-	pPad->ttEditReq.vtype = (char *)NULL;
+	pPad->ttEditReq.vtype = NULL;
     }
-    if (pPad->ttEditReq.fileName != (char *)NULL) {
+    if (pPad->ttEditReq.fileName != NULL) {
 	XtFree(pPad->ttEditReq.fileName);
-	pPad->ttEditReq.fileName = (char *)NULL;
+	pPad->ttEditReq.fileName = NULL;
     }
-    if (pPad->ttEditReq.docName != (char *)NULL) {
+    if (pPad->ttEditReq.docName != NULL) {
 	XtFree(pPad->ttEditReq.docName);
-	pPad->ttEditReq.docName = (char *)NULL;
+	pPad->ttEditReq.docName = NULL;
     }
     if (pPad->ttEditReq.savePattern) {
 	tt_pattern_destroy(pPad->ttEditReq.savePattern);
 	pPad->ttEditReq.savePattern = NULL;
     }
 
-    if (pPad->dialogTitle != (char *)NULL) {
+    if (pPad->dialogTitle != NULL) {
 	XtFree(pPad->dialogTitle);
     }
 
     pPad->saveRestore = False;
 
-    pPad->fileStuff.pendingFileFunc = (void (*)())NULL;
-    pPad->fileStuff.pendingFileHelpFunc = (void (*)())NULL;
+    pPad->fileStuff.pendingFileFunc = NULL;
+    pPad->fileStuff.pendingFileHelpFunc = NULL;
     pPad->fileStuff.fileExists = False;
     pPad->fileStuff.saveWithNewlines = True;
     pPad->fileStuff.readOnly = False;
-    if (pPad->fileStuff.fileName != (char *) NULL) {
+    if (pPad->fileStuff.fileName != NULL) {
 	XtFree(pPad->fileStuff.fileName);
-	pPad->fileStuff.fileName = (char *) NULL;
+	pPad->fileStuff.fileName = NULL;
     }
-    if (pPad->fileStuff.netfile != (char *) NULL) {
+    if (pPad->fileStuff.netfile != NULL) {
 	tt_free(pPad->fileStuff.netfile);
-	 pPad->fileStuff.netfile = (char *) NULL;
+	 pPad->fileStuff.netfile = NULL;
     }
 
     /* -----> Clear contents, undo, find/change, format and message area */
@@ -894,17 +894,17 @@ NoSaveCB(
         caddr_t call_data )
 {
     Editor *pPad = (Editor *)client_data;
-    void (*pFunc)();
+    void (*pFunc)(Widget, caddr_t, caddr_t);
 
     XtUnmanageChild(pPad->fileStuff.fileWidgets.select.save_warning);
 
 
-    if ((pFunc = pPad->fileStuff.pendingFileFunc) != (void(*)()) NULL)  {
+    if ((pFunc = pPad->fileStuff.pendingFileFunc) != NULL)  {
 	/* -----> don't clear the pending function if it calls SaveUnsaved() */
 	if (pPad->fileStuff.pendingFileFunc != FileNewCB &&
 	  pPad->fileStuff.pendingFileFunc != FileOpenCB &&
 	  pPad->fileStuff.pendingFileFunc != FileExitCB) {
-	    pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+	    pPad->fileStuff.pendingFileFunc = NULL;
 	}
 	if (pFunc != FileSaveCB) {
 	    (*pFunc)(w, client_data, call_data);
@@ -925,8 +925,8 @@ CancelFileSelectCB(
 {
     Editor *pPad = (Editor *)client_data;
 
-    pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
-    pPad->fileStuff.pendingFileHelpFunc = (void(*)()) NULL;
+    pPad->fileStuff.pendingFileFunc = NULL;
+    pPad->fileStuff.pendingFileHelpFunc = NULL;
 
     /* popdown the file selection box */
     XtUnmanageChild (w);
@@ -1051,7 +1051,7 @@ IncludeFile(
 static Boolean
 SaveUnsaved(
 	Editor* pPad,
-	void (*callingFunc)() )
+	void (*callingFunc)(struct _WidgetRec *, caddr_t,caddr_t) )
 {
     Boolean addNewlines;
 
@@ -1094,7 +1094,7 @@ SaveUnsaved(
 		     * choose to not save changes in order to exit. */
 		    pPad->xrdb.saveOnClose = False;
 		}
-		pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+		pPad->fileStuff.pendingFileFunc = NULL;
 		return True;	/* don't finish calling func */
 	    } else {
 		if (pPad->ttEditReq.contract) {
@@ -1112,7 +1112,7 @@ SaveUnsaved(
 		/* We've already did AskIfSave but the user responded
 		 * "No" so lets not keep asking (NoSaveCB does not clear
 		 * pPad->fileStuff.pendingFileFunc). */
-		pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+		pPad->fileStuff.pendingFileFunc = NULL;
 		pPad->ttEditReq.returnBufContents = False;
 	    } else {
 		/* AskIfSave assigns either FileSaveAsCB or FileSaveCB to the
@@ -1162,7 +1162,7 @@ SaveAsOkCB(
 {
     Editor *pPad = (Editor *)client_data;
     SaveAs *pSaveAs = &pPad->fileStuff.fileWidgets.saveAs;
-    void (*pFunc)();
+    void (*pFunc)(Widget, caddr_t, caddr_t);
     DtEditorErrorCode errorCode;
     Boolean addNewlines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
@@ -1224,8 +1224,8 @@ SaveAsOkCB(
     if (errorCode != DtEDITOR_NO_ERRORS) {
         PostSaveError(pPad, pPad->fileStuff.savingName, errorCode);
 	XtFree(pPad->fileStuff.savingName);
-	pPad->fileStuff.savingName = (char *)NULL;
-	pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+	pPad->fileStuff.savingName = NULL;
+	pPad->fileStuff.pendingFileFunc = NULL;
     } else {
 	if (pPad->ttEditReq.contract) {
 	    /* ZZZ -----> Create and send Saved notice */
@@ -1252,8 +1252,8 @@ SaveAsOkCB(
     XtUnmanageChild (pSaveAs->saveAs_form);
     _DtTurnOffHourGlass(pSaveAs->saveAs_form);
     _DtTurnOffHourGlass(pPad->app_shell);
-    if ((pFunc = pPad->fileStuff.pendingFileFunc) != (void (*)())NULL)  {
-	pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+    if ((pFunc = pPad->fileStuff.pendingFileFunc) != NULL)  {
+	pPad->fileStuff.pendingFileFunc = NULL;
 	(*pFunc)(w, client_data, call_data);
     }
 }
@@ -1278,7 +1278,7 @@ AlrdyExistsOkCB(
         caddr_t call_data )
 {
     Editor *pPad = (Editor *)client_data;
-    void (*pFunc)();
+    void (*pFunc)(Widget, caddr_t, caddr_t);
     DtEditorErrorCode errorCode;
     Boolean addNewlines = pPad->xrdb.wordWrap == True &&
 			  pPad->fileStuff.saveWithNewlines == True;
@@ -1332,10 +1332,10 @@ AlrdyExistsOkCB(
     }
     if (pPad->fileStuff.savingName != pPad->fileStuff.fileName)
 	XtFree(pPad->fileStuff.savingName);
-    pPad->fileStuff.savingName = (char *)NULL;
+    pPad->fileStuff.savingName = NULL;
 
-    if ((pFunc = pPad->fileStuff.pendingFileFunc) != (void (*)())NULL)  {
-	pPad->fileStuff.pendingFileFunc = (void(*)()) NULL;
+    if ((pFunc = pPad->fileStuff.pendingFileFunc) != NULL)  {
+	pPad->fileStuff.pendingFileFunc = NULL;
 	(*pFunc)(w, client_data, call_data);
     }
 }
@@ -1354,8 +1354,8 @@ SaveAsCancelCB(
     Editor *pPad = (Editor *) client_data;
 
     XtUnmanageChild ((Widget) pPad->fileStuff.fileWidgets.saveAs.saveAs_form);
-    pPad->fileStuff.pendingFileFunc = (void (*)())NULL;
-    pPad->fileStuff.pendingFileHelpFunc = (void (*)())NULL;
+    pPad->fileStuff.pendingFileFunc = NULL;
+    pPad->fileStuff.pendingFileHelpFunc = NULL;
 }
 
 
@@ -1372,9 +1372,9 @@ AlrdyExistsCancelCB(
     Editor *pPad = (Editor *)client_data;
     XtUnmanageChild ((Widget) pPad->fileStuff.fileWidgets.saveAs.alrdy_exist);
     XtFree(pPad->fileStuff.savingName);
-    pPad->fileStuff.savingName = (char *) NULL;
-    pPad->fileStuff.pendingFileFunc = (void (*)())NULL;
-    pPad->fileStuff.pendingFileHelpFunc = (void (*)())NULL;
+    pPad->fileStuff.savingName = NULL;
+    pPad->fileStuff.pendingFileFunc = NULL;
+    pPad->fileStuff.pendingFileHelpFunc = NULL;
 }
 
 
@@ -1394,7 +1394,7 @@ AskIfSaveCancelCB(
     if (pPad->fileStuff.pendingFileFunc == FileExitCB) {
 	TTfailPendingQuit(pPad);
     }
-    pPad->fileStuff.pendingFileFunc = (void (*)())NULL;
-    pPad->fileStuff.pendingFileHelpFunc = (void (*)())NULL;
+    pPad->fileStuff.pendingFileFunc = NULL;
+    pPad->fileStuff.pendingFileHelpFunc = NULL;
 }
 

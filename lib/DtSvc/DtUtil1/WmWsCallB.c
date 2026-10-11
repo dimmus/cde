@@ -92,7 +92,7 @@ _DtWsmWsChangeHandler (
 	/*
 	 * Call registered callback function.
 	 */
-	(*(pCbCtx->ws_cb)) (pCbCtx->widget, aWS, 
+	(*(pCbCtx->ws_cb)) (pCbCtx->widget, (DtWsmCBProc) aWS, 
 					pCbCtx->client_data);
     }
     
@@ -148,7 +148,7 @@ DtWsmAddCurrentWorkspaceCallback (
      * Save what we want to remember
      */
     pCbCtx->widget = widget;
-    pCbCtx->ws_cb = ws_change;
+    pCbCtx->ws_cb = (DtWsmCBProc) ws_change;
     pCbCtx->client_data = client_data;
 
     /*
@@ -378,7 +378,7 @@ DtWsmAddWorkspaceModifiedCallback (
      */
     pCbCtx->pattern = pattern;
     pCbCtx->widget = widget;
-    pCbCtx->ws_cb = ws_modify;
+    pCbCtx->ws_cb =  (DtWsmCBProc) ws_modify;
     pCbCtx->client_data = client_data;
     pCbCtx->nested_context = NULL;
 

@@ -762,114 +762,6 @@ dtb_get_command()
 }
 
 
-#ifdef DEAD_WOOD
-/* 
-** Generic callback function to be attached as XmNhelpCallback and
-** provide support for on-object and Help-key help.  The help text to
-** be displayed is provided via a specialized data structure passed in
-** as client data.
-*/
-
-void
-dtb_help_dispatch(
-    Widget 	widget,
-    XtPointer 	clientData,
-    XtPointer 	callData
-)
-{
-    DtbObjectHelpData 	help_data = (DtbObjectHelpData)clientData;
-    int             	i;
-    Arg             	wargs[10];
-    char		*buffer = new char[100];
-    Widget		back_button;
-    static Widget	Quick_help_dialog = (Widget)NULL;
-    static Widget	MoreButton;
-
-    /* 
-    ** In order to save the more-help info (help volume & location ID) as part
-    ** of the quick help dialog's backtrack mechanism, we have to splice the 
-    ** volume & ID strings together and save them as the help volume field.
-    ** If there isn't supplemental help information, we save a null string.
-    **
-    ** Checking the status of the more-help info also lets us decide whether
-    ** the "More..." button should be enabled on the dialog.
-    */
-    if( help_data->help_volume     ==0 || *(help_data->help_volume) == NULL ||
-	help_data->help_locationID ==0 || *(help_data->help_locationID)== NULL){
-		buffer[0] = '\0';
-    }
-    else {
-	sprintf(buffer,"%s/%s",help_data->help_volume,help_data->help_locationID);
-    }
-
-    /* 
-    ** If this is our first time to post help, create the proper dialog and
-    ** set its attributes to suit the current object.  If not, then just
-    ** update the attributes.
-    **
-    ** (You have to be careful about gratuitous SetValues on the dialog because
-    ** its internal stack mechanism takes repeated settings as separate items
-    ** and updates the stack for each.)
-    */
-    if(Quick_help_dialog == (Widget)NULL) {
-        /* Create shared help dialog */
-        i = 0;
-	XtSetArg(wargs[i],XmNtitle, "Application Help");            i++;
-	XtSetArg(wargs[i],DtNhelpType, DtHELP_TYPE_DYNAMIC_STRING); i++;
-	XtSetArg(wargs[i],DtNstringData,help_data->help_text);      i++;
-        XtSetArg(wargs[i],DtNhelpVolume,buffer);		    i++;
-	Quick_help_dialog = DtCreateHelpQuickDialog(dtb_get_toplevel_widget(),
-		"Help",wargs,i);
-
-	/* 
-	** Fetch out the Dialog's More button child and hook the 'more help'
-	** handler to its activateCallback.  Set it's current status to
-	** indicate whether this object has supplemental help data. 
-	*/
-	MoreButton = DtHelpQuickDialogGetChild(Quick_help_dialog,
-		DtHELP_QUICK_MORE_BUTTON);
-	XtManageChild(MoreButton);
-	XtAddCallback(MoreButton,XmNactivateCallback,dtb_more_help_dispatch,
-		(XtPointer)Quick_help_dialog);
-	if(buffer[0] == '\0') XtSetSensitive(MoreButton,False);
-
-	/* 
-	** Fetch out the Dialog's Backtrack button child & hook a callback
-	** that will control button sensitivity based on the presence of more
-	** help data.
-	*/
-	back_button = DtHelpQuickDialogGetChild(Quick_help_dialog,
-		DtHELP_QUICK_BACK_BUTTON);
-	XtAddCallback(back_button,XmNactivateCallback,dtb_help_back_hdlr,
-		(XtPointer)Quick_help_dialog);
-    }
-    /* Otherwise the dialog already exists so we just set the attributes. */
-    else {
-	/* 
-	** If we have supplemental help info, enable the more button.
-	** Also save this info for later use in the backtrack handler.
-	*/
-	if(buffer[0] == '\0') {
-	    XtSetSensitive(MoreButton,False);
-	}
-	else {
-	    XtSetSensitive(MoreButton,True);
-	}
-
-        XtVaSetValues(Quick_help_dialog,
-    	    DtNhelpType, DtHELP_TYPE_DYNAMIC_STRING,
-            DtNhelpVolume,buffer,
-            DtNstringData,help_data->help_text,
-	    NULL);
-    }
-
-    /* Now display the help dialog */
-    XtManageChild(Quick_help_dialog);
-    delete [] buffer;
-}
-#endif /* DEAD_WOOD */
-
-
 /*
 ** This callback is invoked when the user presses "More..." on the
 ** QuickHelpDialog.  It figures out whether a help volume entry is associated
@@ -976,40 +868,6 @@ dtb_help_back_hdlr(
 }
 
 
-#ifdef DEAD_WOOD
-/*
-** Utility function used to provide support for on-item help.
-** It is typically invoked via a callback on the "On Item" item in the
-** main menubar's "Help" menu.
-*/
-void
-dtb_do_onitem_help()
-{
-    Widget	target;
-
-    /* Call the DtHelp routine that supports interactive on-item help. */
-    if(DtHelpReturnSelectedWidgetId(dtb_get_toplevel_widget(),
-	(Cursor)NULL,&target) != DtHELP_SELECT_VALID) return;
-	
-    /*
-    ** Starting at the target widget, wander up the widget tree looking
-    ** for one that has an XmNhelpCallback, and call the first one we
-    ** find.
-    */
-    while(target != (Widget)NULL) {
-	if( XtHasCallbacks(target,XmNhelpCallback) == XtCallbackHasSome) {
-	    XtCallCallbacks(target,XmNhelpCallback,(XtPointer)NULL);
-	    return;
-	}
-	else {
-	    target = XtParent(target);
-	}
-    }
-    return;
-}
-#endif /* DEAD_WOOD */
-
-
 /*
 ** Utility function called to display help volume information.
 ** It needs the name of the help volume and the location ID (both as
@@ -1049,28 +907,6 @@ dtb_show_help_volume_info(
 
     return(0);
 }
-
-
-#ifdef DEAD_WOOD
-/* 
-** dtb_call_help_callback()
-** Utility routine to call the help callbacks on a target widget.  This
-** is predominantly used to display help data on a dialog by having this
-** function as the activate callback on the dialog's help button.
-*/
-void 
-dtb_call_help_callback(
-    Widget widget,
-    XtPointer clientData,
-    XtPointer callData
-)
-{
-	Widget target = (Widget)clientData;
-
-	XtCallCallbacks(target,XmNhelpCallback,(XtPointer)NULL);
-}
-#endif /* DEAD_WOOD */
-
 
 /*
  * dtb_session_save()
@@ -1244,78 +1080,6 @@ dtb_get_client_session_saveCB()
     return(dtb_client_session_saveCB);
 
 }
-
-
-#ifdef DEAD_WOOD
-/*
- * This function will center all the passed form's children.
- * The type of centering depends on what 'type' is.
- */
-void
-dtb_children_center(
-    Widget		form,
-    DTB_CENTERING_TYPES	type
-)
-{
-    WidgetList		children_list;
-    int			i, 
-			num_children;
-
-    if (!form || (type == DTB_CENTER_NONE))
-	return;
-
-    /*
-     * Get children list
-     */
-    XtVaGetValues(form,
-            XmNnumChildren, &num_children,
-            XmNchildren, &children_list,
-            NULL);
-
-    /*
-     * Center all children
-     */
-    for (i=0; i < num_children; ++i)
-    {
-	dtb_center(children_list[i], type);
-    }
-}
-
-
-/*
- * This function 'uncenters' the children of the passed
- * form widget.
- */
-void
-dtb_children_uncenter(
-    Widget		form,
-    DTB_CENTERING_TYPES	type
-)
-{
-    WidgetList		children_list;
-    int			i;
-    int			num_children;
-
-    if (!form || (type == DTB_CENTER_NONE))
-	return;
-
-    /*
-     * Get children list
-     */
-    XtVaGetValues(form,
-            XmNnumChildren, &num_children,
-            XmNchildren, &children_list,
-            NULL);
-
-    /*
-     * Center all children
-     */
-    for (i=0; i < num_children; ++i)
-    {
-	dtb_uncenter(children_list[i], type);
-    }
-}
-#endif /* DEAD_WOOD */
 
 
 /*

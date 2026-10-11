@@ -321,9 +321,9 @@ ACTION ReloadApps
         ARG_COUNT       0
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /bin/sh -c '/usr/dt/bin/dtaction ReloadActions; \
-                           /usr/dt/bin/dtappgather -r; \
-			   /usr/dt/bin/dthelpgen -dir $HOME/.dt/help '
+        EXEC_STRING     /bin/sh -c 'CDE_INSTALLATION_TOP/bin/dtaction ReloadActions; \
+                           CDE_INSTALLATION_TOP/bin/dtappgather -r; \
+			   CDE_INSTALLATION_TOP/bin/dthelpgen -dir $HOME/.dt/help '
         DESCRIPTION     %|nls-2021-#The#|
 }
 
@@ -348,16 +348,16 @@ ACTION DtwmrcEdit
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
         EXEC_STRING     sh -c 'if [ ! -f $HOME/.dt/dtwmrc ] ; then \
-                                  if [ ! -f /etc/dt/config/sys.dtwmrc ] ; then \
-                                    cp /usr/dt/config/$LANG/sys.dtwmrc \
+                                  if [ ! -f CDE_CONFIGURATION_TOP/config/sys.dtwmrc ] ; then \
+                                    cp CDE_INSTALLATION_TOP/config/$LANG/sys.dtwmrc \
                                                             $HOME/.dt/dtwmrc; \
                                   else \
-                                    cp /etc/dt/config/sys.dtwmrc \
+                                    cp CDE_CONFIGURATION_TOP/config/sys.dtwmrc \
                                                             $HOME/.dt/dtwmrc; \
                                   fi; \
                                   chmod u+w $HOME/.dt/dtwmrc; \
                                fi; \
-                               /usr/dt/bin/dtaction Open $HOME/.dt/dtwmrc'
+                               CDE_INSTALLATION_TOP/bin/dtaction Open $HOME/.dt/dtwmrc'
         DESCRIPTION     %|nls-2025-#The#|
 }
 
@@ -495,7 +495,7 @@ ACTION DttermErrorlog
         EXEC_STRING     /bin/sh -c 'if [ ! -f $HOME/.dt/errorlog ] ; then \
                                       /bin/touch $HOME/.dt/errorlog; \
                                      fi; \
-                        /usr/dt/bin/dtterm -map -title \
+                        CDE_INSTALLATION_TOP/bin/dtterm -map -title \
 			     "%|nls-2039-#Watch#|" \
                              -e tail -f $HOME/.dt/errorlog'
         DESCRIPTION     %|nls-2040-#The#|
@@ -510,7 +510,7 @@ ACTION Dttypes
         TYPE            COMMAND
         WINDOW_TYPE     PERM_TERMINAL
         EXEC_STRING     sh -c ' \
-                        /usr/dt/bin/dttypes | \${PAGER:-more}; \
+                        CDE_INSTALLATION_TOP/bin/dttypes | \${PAGER:-more}; \
             echo "%|nls-7-#Select#|"'
         DESCRIPTION     %|nls-2042-#The#|
 }
@@ -519,7 +519,7 @@ ACTION Dttypes
         LABEL           %|nls-2041-#Types and Actions List#|
         TYPE            COMMAND
         WINDOW_TYPE     PERM_TERMINAL
-        EXEC_STRING     sh -c '/usr/dt/bin/dttypes -type "%(File)Arg_1%"; \
+        EXEC_STRING     sh -c 'CDE_INSTALLATION_TOP/bin/dttypes -type "%(File)Arg_1%"; \
                  echo "%|nls-7-#Select#|"'
         DESCRIPTION     %|nls-2042-#The#|
 }

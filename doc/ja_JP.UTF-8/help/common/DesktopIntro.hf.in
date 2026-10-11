@@ -16,7 +16,7 @@
 
 *.charSet:      ja_JP.UTF-8
 *.title:        概要と基本的なデスクトップのスキル
-*.bitmap:       @prefix@/appconfig/help/ja_JP.UTF-8/graphics/cdelogo.pm
+*.bitmap:       @CDE_DATA_TOP@/appconfig/help/ja_JP.UTF-8/graphics/cdelogo.pm
 *.abstract:     共通デスクトップ環境の \
                 概要と基本的なデスクトップのスキル
 

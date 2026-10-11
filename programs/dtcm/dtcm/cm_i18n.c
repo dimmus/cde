@@ -348,10 +348,6 @@ euc_to_octal(char *srcStr)
 /* This routine should be in libdeskset.
  * This routine uses fconvert() to avoid locale conversion.
  */
-/* 310 characters are the minimum needed to accommodate any double-precision
- * value + 1 null terminator.
- */
-#define DBL_SIZE  311
 /*
  *  Returns a null terminated formatted string.
  *  If error is encountered, such as malloc() failed, then return NULL.
@@ -362,57 +358,24 @@ euc_to_octal(char *srcStr)
 char *
 cm_printf(double value, int decimal_pt)
 {
-	int sign = 0;
-	int deci_pt = 0;
-	int buf_cnt = 0;
-	int formatted_cnt = 0;
-	int buf_len = 0;
-	char *buf = NULL;
 	static char *formatted = NULL;
+	int len;
 
 	if ( formatted != NULL ) {
 		free(formatted);
 		formatted = NULL;
 	}
-	if ( (value == (double)0) && (decimal_pt == 0) ) {
-		formatted = (char *)cm_strdup("0");
-		return formatted;
-	}
-	if ( (buf = (char *)malloc(DBL_SIZE + decimal_pt)) == NULL ) {
+	if ( decimal_pt < 0 )
+		decimal_pt = 0;
+	/*
+	 * This used fcvt(), which gives the digits and the position of the
+	 * decimal point; put back together with the sign, that is what
+	 * "%.*f" prints.
+	 */
+	len = snprintf(NULL, 0, "%.*f", decimal_pt, value);
+	if ( len < 0 || (formatted = (char *)malloc(len + 1)) == NULL ) {
 		return (char *)NULL;
 	}
-	if ( (formatted = (char *)calloc(1, DBL_SIZE + decimal_pt)) == NULL ) {
-		free(buf);
-		return (char *)NULL;
-	}
-#ifdef SunOS
-	fconvert(value, decimal_pt, &deci_pt, &sign, buf);
-#elif defined(CSRG_BASED)
-	snprintf(buf, decimal_pt, "%f", value);
-#else
-	/* this version, available on the HP and AIX machine is not reentrant. */
-
-	strcpy(buf, fcvt(value, decimal_pt, &deci_pt, &sign));
-#endif
-	if ( sign ) {
-		strcpy(formatted, "-");
-	}
-	buf_len = deci_pt + decimal_pt;
-	if ( deci_pt ) {
-		strncat(formatted, buf, deci_pt);
-	} else {    /* zero */
-		strcat(formatted, "0");	
-	}
-	if ( deci_pt == buf_len ) {
-		strcat(formatted, "\0");
-		free(buf);
-		return formatted;
-	}
-	strcat(formatted, ".");
-	for ( formatted_cnt = strlen(formatted), buf_cnt = deci_pt;  buf_cnt < buf_len;  buf_cnt++, formatted_cnt++ ) {
-		formatted[formatted_cnt] = buf[buf_cnt];
-	}
-	formatted[formatted_cnt] = '\0';
-	free(buf);
-	return formatted;	
+	snprintf(formatted, len + 1, "%.*f", decimal_pt, value);
+	return formatted;
 }

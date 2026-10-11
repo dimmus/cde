@@ -9,3 +9,9 @@ libHardCopy_la_SOURCES = FPset.C \
 			 TemplatesAutoNumber.C \
 			 autoNumber.C \
 			 autoNumberFP.C
+
+noinst_HEADERS = \
+    FPset.h \
+    HardCopyFP.h \
+    autoNumber.h \
+    autoNumberFP.h

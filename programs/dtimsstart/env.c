@@ -36,7 +36,7 @@ typedef	enum {
 
 
     /* local func */
-static int	shell_type(/* shell */);
+static int	shell_type(char *shell);
 
 int	set_cmd_env(void)
 {

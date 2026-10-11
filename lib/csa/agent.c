@@ -28,14 +28,19 @@
  *  (c) Copyright 1993, 1994 Sun Microsystems, Inc.
  */
 
+#if HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
 #include <EUSCompat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <rpc/rpc.h>
-#if !defined(__linux__) && !defined(CSRG_BASED)
+#if HAVE_POLL_H
 # include <poll.h>
+#elif HAVE_SYS_POLL_H
+# include <sys/poll.h>
 #endif
 #if defined(SunOS)
 #include <netconfig.h>

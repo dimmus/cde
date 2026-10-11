@@ -40,7 +40,8 @@
 #include "isam_impl.h"
 #include <sys/time.h>
 
-static int _amrewrec(), _changekeys();
+static int _amrewrec(Bytearray *isfhandle, char *record, int reclen, Recno recnum, struct errcode *errcode);
+static int _changekeys(Fcb *fcb, char *record, char *oldrecord, Recno recnum);
 
 /*
  * err = isrewrec(isfd, recnum, record)
@@ -132,8 +133,8 @@ _amrewrec(Bytearray *isfhandle, char *record, int reclen, Recno recnum,
     char		oldrecbuf[ISMAXRECLEN];
     int			err;
     int			reclen2;
-    int			(*rec_read)();
-    int			(*rec_rewrite)();
+    int			(*rec_read)(Fcb *, char *, Recno, int *);
+    int			(*rec_rewrite)(Fcb *, char *, Recno, int);
 
     _isam_entryhook();
 

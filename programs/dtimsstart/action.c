@@ -28,11 +28,11 @@
 
 #include	"xims.h"
 
-static void	DbReloadProc(/* cd */);
-static bool	init_action_env(/*  */);
+static void	DbReloadProc(XtPointer cd);
+static bool	init_action_env(void);
 static void	action_cb(long unsigned id, XtPointer cd,
 			  DtActionArg *args, int argcnt, DtActionStatus status);
-static void	wait_action_done(/*  */);
+static void	wait_action_done(void);
 
 static bool			actionEnabled = False;
 static int			actionDone = True;

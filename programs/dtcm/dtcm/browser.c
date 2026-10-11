@@ -131,7 +131,7 @@ br_display(Calendar *c) {
         Browser		*b = (Browser *)c->browser;
 	BlistData	*bd;
 	Browselist	*bl = (Browselist *)c->browselist;
-	void		mb_update_array();
+	void		mb_update_array(char *, Calendar *);
 
 	if (!b)
 		return;

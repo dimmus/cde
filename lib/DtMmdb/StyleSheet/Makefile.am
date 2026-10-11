@@ -53,3 +53,25 @@ style.C: style.yy
 
 tokenStyle.C: tokenStyle.ll
 	$(LEX) $(AM_LFLAGS) -P style -o $@ $<
+
+EXTRA_DIST = \
+    defParser.yy \
+    defToken.ll \
+    style.yy \
+    tokenStyle.ll
+
+noinst_HEADERS = \
+    Attribute.h \
+    AttributeList.h \
+    BitVector.h \
+    Debug.h \
+    Feature.h \
+    FeatureDefDictionary.h \
+    PathQualifier.h \
+    PathTable.h \
+    RendererHCV.h \
+    ResolverStack.h \
+    StyleSheet.h \
+    StyleSheetExceptions.h \
+    SymTab.h \
+    Types.h

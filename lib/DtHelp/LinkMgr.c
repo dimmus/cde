@@ -143,7 +143,7 @@ ResolveSwitch (
     _DtCvLinkDb	 link_db,
     int		 link_no,
     int		 iterations,
-    int		(*filter)(),
+    int		(*filter)(void *, const char *, char **),
     void	*client_data,
     int		*ret_link,
     int		*ret_hint)
@@ -354,7 +354,7 @@ int
 _DtLinkDbGetLinkInfo (
     _DtCvLinkDb		 link_db,
     int			 link_index,
-    int			(*filter)(),
+    int			(*filter)(void *, const char *, char **),
     void		*client_data,
     _DtCvLinkInfo	*ret_info)
 {

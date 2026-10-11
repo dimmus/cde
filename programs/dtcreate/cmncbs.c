@@ -142,13 +142,13 @@ void activateCB_open_FindSet (Widget find_set_button, XtPointer cdata,
                                                (unsigned char *)name_field_title,
                                                numberOfBottomButtons,
                                                (unsigned char *)bottom_button_one_label,
-                                               (void (*)())bottom_button_one_cb,
+                                               bottom_button_one_cb,
                                                (unsigned char *)bottom_button_two_label,
-                                               (void (*)())bottom_button_two_cb,
+                                               bottom_button_two_cb,
                                                (unsigned char *)bottom_button_three_label,
-                                               (void (*)())bottom_button_three_cb,
+                                               bottom_button_three_cb,
                                                (unsigned char *)bottom_button_four_label,
-                                               (void (*)())bottom_button_four_cb);
+                                               bottom_button_four_cb);
 #ifndef _ICONSELECTOR_DESTROY_ENABLED
   }
 #endif  /* _ICONSELECTOR_DESTROY_ENABLED */
@@ -322,7 +322,7 @@ void DisplayHelpDialog(Widget wid, XtPointer client_data, XtPointer cbs)
   if ( mainHelpDialog == NULL ) {
       mainHelpDialog = DtCreateHelpDialog(parent, "mainHelpDialog", args, i);
       XtAddCallback(mainHelpDialog, DtNcloseCallback,
-                (void (*)())closeCB_mainHelpDialog,
+                (XtCallbackProc) closeCB_mainHelpDialog,
                 (XtPointer)NULL);
       XtManageChild(mainHelpDialog);
   } else {

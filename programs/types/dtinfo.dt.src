@@ -155,7 +155,7 @@ ACTION DtInfoStart
 {
 	TYPE				COMMAND
 	WINDOW_TYPE			NO_STDIO
-	EXEC_STRING			/usr/dt/bin/dtinfo \
+	EXEC_STRING			CDE_INSTALLATION_TOP/bin/dtinfo \
 		     				-l "%(String)Arg_1%"
 }
 
@@ -163,7 +163,7 @@ ACTION DtInfoStartAtLoc
 {
 	TYPE				COMMAND
 	WINDOW_TYPE			NO_STDIO
-	EXEC_STRING			/usr/dt/bin/dtinfo \
+	EXEC_STRING			CDE_INSTALLATION_TOP/bin/dtinfo \
 		     				-l "%(String)Arg_1%"    \
 		     				-sect "%(String)Arg_2%"
 }

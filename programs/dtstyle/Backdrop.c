@@ -406,8 +406,8 @@ CreateBackdropDialog(
     /* from that locale's description file from the system location */
     lang = setlocale (LC_CTYPE,NULL);
 
-    bd_desc = (char *)XtMalloc(strlen("/usr/dt/backdrops/desc.") + strlen(lang) + 1);
-    strcpy (bd_desc,"/usr/dt/backdrops/desc.");
+    bd_desc = (char *)XtMalloc(strlen(CDE_DATA_TOP "/backdrops/desc.") + strlen(lang) + 1);
+    strcpy (bd_desc,CDE_DATA_TOP "/backdrops/desc.");
     strcat (bd_desc, lang);
     if((sys_bd_DB = XrmGetFileDatabase (bd_desc)))
       	XrmMergeDatabases(sys_bd_DB, &bd_DB);
@@ -415,8 +415,8 @@ CreateBackdropDialog(
     
     /* load the backdrop description data base for the given locale*/
     /* from that locale's description file from the admin location */
-    bd_desc = (char *)XtMalloc(strlen("/etc/dt/backdrops/desc.") + strlen(lang) + 1);
-    strcpy (bd_desc,"/etc/dt/backdrops/desc.");
+    bd_desc = (char *)XtMalloc(strlen(CDE_CONFIGURATION_TOP "/backdrops/desc.") + strlen(lang) + 1);
+    strcpy (bd_desc,CDE_CONFIGURATION_TOP "/backdrops/desc.");
     strcat (bd_desc, lang);
     if ((adm_bd_DB = XrmGetFileDatabase (bd_desc)))
 	XrmMergeDatabases(adm_bd_DB, &bd_DB);
@@ -648,9 +648,9 @@ static int
   backdrops.tmpNumBitmaps = 0;
   
   /* read system backdrop directory */
-    ReadBitmapDirectory("/usr/dt/backdrops");
+    ReadBitmapDirectory(CDE_DATA_TOP "/backdrops");
   /* read sys admin backdrop directory */
-  ReadBitmapDirectory("/etc/dt/backdrops");
+  ReadBitmapDirectory(CDE_CONFIGURATION_TOP "/backdrops");
   
   /* Parse the backdropDirectories resource to get the individual directories */
   if (style.xrdb.backdropDir)

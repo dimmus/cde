@@ -154,86 +154,6 @@ RoamCmd::RoamCmd
     _menuwindow = window;
 }
 
-#ifdef DEAD_WOOD
-SearchCmd::SearchCmd(
-		     char *name, 
-		     char *label,
-		     int active, 
-		     RoamMenuWindow *window
-		     ) : InterruptibleCmd (name, label, active)
-{
-    _menuwindow = window;
-    _criteria = NULL;
-}
-
-void
-SearchCmd::execute ( 
-		     TaskDoneCallback callback, 
-		     void *clientData 
-		     )
-{
-    InterruptibleCmd::execute( callback, clientData );
-}
-
-void
-SearchCmd::execute()
-{
-    
-    _menuwindow->list()->clearMsgs();
-    _menuwindow->busyCursor();
-    
-    if ( !_criteria ) {
-	_criteria=( char * )realloc(_criteria, strlen( this->name()) + 1);
-	strcpy(_criteria, this->name());
-    }
-    
-    InterruptibleCmd::execute();
-}
-
-void
-SearchCmd::doit()
-{
-    int 	count;
-    DtMailEnv	mail_error;
-    
-    // Initialize the mail_error.
-    mail_error.clear();
-    
-    MsgScrollingList *list=_menuwindow->list();
-    
-    
-    // load_headers will retrieve all of the message headers and
-    // add the handles to the list.
-    //
-    count = list->load_headers(mail_error);
-    
-    _menuwindow->normalCursor();
-    
-    if (count == 0) {
-	_menuwindow->message(CATGETS(DT_catd, 3, 46, "Empty container"));
-	_done = TRUE;
-	return;
-    }
-    
-    list->scroll_to_bottom();
-    _done=TRUE;
-}      
-
-void
-SearchCmd::undoit()
-{
-    // Just print a message that allows us to trace the execution
-    
-    DebugPrintf(1, "%s: undoit\n", name());
-}       
-
-void
-SearchCmd::updateMessage (char *msg)
-{
-    InterruptibleCmd::updateMessage(msg);
-}
-#endif /* DEAD_WOOD */
-
 CheckForNewMailCmd::CheckForNewMailCmd( 
 					char *name, 
 					char *label,
@@ -1460,26 +1380,6 @@ UndeleteCmd::doit()
 }
 
 
-#ifdef DEAD_WOOD
-SaveCmd::SaveCmd ( char *name, 
-		   char *label, 
-		   int active, 
-		   RoamMenuWindow *window 
-		) : RoamCmd ( name, label, active, window )
-{
-    
-}
-
-void
-SaveCmd::doit()
-{
-    
-    assert(_menuwindow->mailbox() != NULL);
-}
-#endif /* DEAD_WOOD */
-
-
-
 MoveCopyCmd::MoveCopyCmd( char *name, 
 			  char *label,
 			  int active, 
@@ -1740,32 +1640,6 @@ PrevCmd::doit()
     _menuwindow->list()->select_prev_item();
 }
 
-#ifdef DEAD_WOOD
-MessagesCmd::MessagesCmd( 
-			  char *name, 
-			  char *label,
-			  int active, 
-			  RoamMenuWindow *window 
-			  ) : RoamCmd ( name, label, active, window )
-{
-}
-
-
-void
-MessagesCmd::doit()
-{
-    Boolean old=_menuwindow->fullHeader();
-    MsgScrollingList *list=_menuwindow->list();
-    
-    ( !strcmp( this->name(), "Full Header" ) ? _menuwindow->fullHeader( True ) : _menuwindow->fullHeader( False ) );
-    
-    if ( old!=_menuwindow->fullHeader() && _menuwindow->msgView() ) {
-//    list->chooseCurrent();
-    }
-    
-}
-#endif /* DEAD_WOOD */
-
 PrintCmd::PrintCmd ( 
 		     char *name, 
 		     char *label,
@@ -1920,27 +1794,6 @@ PrintCmd::_unregister_tmp_file(
     return;
 }
 
-#ifdef DEAD_WOOD
-PopupCmd::PopupCmd ( 
-		     char *name, 
-		     char *label,
-		     int active,
-		     PopupWindow * (RoamMenuWindow::* member) (void), 
-		     RoamMenuWindow *myparent 
-		     ) : NoUndoCmd ( name, label, active )
-{
-    parent=myparent;
-    pmpopup=member;
-}
-
-void
-PopupCmd::doit()
-{
-    PopupWindow *popup=(parent->*pmpopup)();
-//  popup->manage();
-}
-#endif /* DEAD_WOOD */
-
 // OnItemCmd brings up the Help On Item help.
 OnItemCmd::OnItemCmd ( char * name, 
 		       char *label, 
@@ -2078,101 +1931,6 @@ RelNoteCmd::~RelNoteCmd()
 {
     delete _genDialog;
 }
-
-#ifdef DEAD_WOOD
-ClearCmd::ClearCmd ( 
-		     char * name, 
-		     char *label,
-		     int active, 
-		     RoamMenuWindow *window 
-		     ) : NoUndoCmd (name, label, active )
-{
-    parent=window;
-}
-
-void
-ClearCmd::doit()
-{
-//  ((FindPopup *) parent->find_popup())->clear_text_values();
-}
-
-StartCmd::StartCmd( char *name, 
-		    char *label,
-		    int active ) : Cmd ( name, label, active )
-{
-}
-
-void 
-StartCmd::doit()
-{
-    char *forward= ".forward";
-    
-    struct passwd pwd;
-    GetPasswordEntry(pwd);
-    
-    char *forward_filename=new char[strlen(pwd.pw_dir)+1+strlen(forward)+1];
-    sprintf( forward_filename, "%s/%s", pwd.pw_dir, forward );
-}
-
-
-void 
-StartCmd::undoit()
-{
-}
-
-
-ChangeCmd::ChangeCmd( 
-		      char *name, 
-		      char *label,
-		      int active 
-		      ) : Cmd (name, label, active )
-{
-}
-
-void 
-ChangeCmd::doit()
-{
-    struct passwd pwd;
-    GetPasswordEntry(pwd);
-    
-    char *user_name=new char[strlen(pwd.pw_name)+1];
-    strcpy(user_name,pwd.pw_name);
-    
-}
-
-
-void 
-ChangeCmd::undoit()
-{
-}
-
-
-StopCmd::StopCmd( 
-		  char *name, 
-		  char *label,
-		  int active, 
-		  RoamMenuWindow *window 
-		  ) : Cmd (name, label, active )
-{
-    parent=window;
-}
-
-void
-StopCmd::doit()
-{
-    unlink( parent->forwardFilename() );
-    parent->title( NULL );
-}
-
-
-void
-StopCmd::undoit()
-{
-    
-}
-#endif /* DEAD_WOOD */
-
-
 
 SendCmd::SendCmd(
 		 char *name, 

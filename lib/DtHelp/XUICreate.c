@@ -354,9 +354,9 @@ HelpCreateDA(
     int          rows,
     int          columns,
     unsigned short media_resolution,
-    void	(*hyperTextCB)(),
-    void	(*resizeCB)(),
-    int		(*exec_ok_routine)(),
+    void	(*hyperTextCB)(DtHelpDispAreaStruct *, void *, DtHelpHyperTextStruct *),
+    void	(*resizeCB)(void *),
+    int		(*exec_ok_routine)(void *, const char *, char **),
     XtPointer	 client_data,
     XmFontList	 default_list )
 {
@@ -991,9 +991,9 @@ _DtHelpCreateDisplayArea(
     Boolean	 traversal_flag,
     int		 rows,
     int		 columns,
-    void	(*hyperTextCB)(),
-    void	(*resizeCB)(),
-    int		(*exec_ok_routine)(),
+    void	(*hyperTextCB)(DtHelpDispAreaStruct *, void *, DtHelpHyperTextStruct *),
+    void	(*resizeCB)(void *),
+    int		(*exec_ok_routine)(void *, const char *, char **),
     XtPointer	 client_data,
     XmFontList	 default_list )
 {
@@ -1025,9 +1025,9 @@ _DtHelpCreateOutputArea(
     Dimension	 width,
     Dimension	 height,
     unsigned short media_resolution,
-    void	(*hyperTextCB)(),
-    void	(*resizeCB)(),
-    int		(*exec_ok_routine)(),
+    void	(*hyperTextCB)(DtHelpDispAreaStruct *, void *, DtHelpHyperTextStruct *),
+    void	(*resizeCB)(void *),
+    int		(*exec_ok_routine)(void *, const char *, char **),
     XtPointer	 client_data,
     XmFontList	 default_list )
 {

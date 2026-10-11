@@ -174,7 +174,7 @@ ACTION DttermRlogin
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
         EXEC_STRING     KORNSHELL -c 'export _title="%"%|nls-12017-#Hostname:#|"%"; \
-            /usr/dt/bin/dtterm -title "%|nls-12022-#\$_title#|" -e KORNSHELL -c \
+            CDE_INSTALLATION_TOP/bin/dtterm -title "%|nls-12022-#\$_title#|" -e KORNSHELL -c \
             "echo %|nls-12023-#Trying to#|; \
             rlogin \$_title; sleep 5;";'
 	DESCRIPTION	%|nls-12024-#The#|
@@ -271,7 +271,7 @@ ACTION Xfd
 	EXEC_STRING	sh -c 'xfd -fn \
                 "%(String)Arg_1"%|nls-12040-#Font#|"%"; \
 	               if [ \$? -eq 1 ] ; then \
-                         /usr/dt/bin/dterror.ds \
+                         CDE_INSTALLATION_TOP/bin/dterror.ds \
                           "%|nls-12041-#The font#|" \
                           "%|nls-12042-#Font Name#|" \
                           "%|nls-6-#OK#|" ; \

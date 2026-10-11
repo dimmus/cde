@@ -125,7 +125,7 @@ AppManagerDirectory::AppManagerDirectory
     else if ((char *)strstr(userhostdir.data(),"/"))
 	userhostdir = "generic-display-0";
 
-    dirname_ = "/var/dt/appconfig/appmanager/";
+    dirname_ = CDE_LOGFILES_TOP "/appconfig/appmanager/";
     dirname_ += userhostdir;
 
     if (user->OS()->isDirectory(dirname_) &&
@@ -186,7 +186,7 @@ AppManagerDirectory::AppManagerDirectory
 
     // Make /var/dt/tmp directory if not present
 
-    CString tmp("/var/dt/tmp/");
+    CString tmp(CDE_LOGFILES_TOP "/tmp/");
     if (!user->OS()->isDirectory(tmp)) {  // does tmp exist?
 	user->OS()->MakeDirectory(tmp,0755);
 	user->OS()->changeOwnerGroup(tmp,"root","bin");
@@ -218,7 +218,7 @@ void AppManagerDirectory::TraversePath()
 	while (!dir.isNull()) {
 	    GatherAppsFromASearchElement (dir);
 	    dir = subpath.next();
-	    if (langVersionFound && dir == "/usr/dt/appconfig/appmanager/C")
+	    if (langVersionFound && dir == CDE_DATA_TOP "/appconfig/appmanager/C")
 		dir = subpath.next();
 	}
     }
@@ -272,7 +272,7 @@ void AppManagerDirectory::GatherAppsFromASearchElement
 		source.replace("%L",user_->OS()->LANG());
 		if (!user_->OS()->isDirectory(source))
 		     return;
-		if (source.contains("/usr/dt/appconfig/appmanager/"))
+		if (source.contains(CDE_DATA_TOP "/appconfig/appmanager/"))
 		    langVersionFound = 1;
 	    }
 	    else

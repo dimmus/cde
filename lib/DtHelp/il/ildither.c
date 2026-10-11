@@ -203,7 +203,8 @@ static ilError ilInitDitherRGB (
 
         /*  Destroy() function: free pPriv->pPalette. */
 static ilError ilDestroyDitherRGB (
-    ilDitherPrivPtr     pPriv
+    ilDitherPrivPtr     pPriv,
+    ilBool bIgnored
     )
 {
     if (pPriv->pPalette)
@@ -215,7 +216,8 @@ static ilError ilDestroyDitherRGB (
 
         /*  Cleanup() function: only if diffusion: free pPriv->pErrors. */
 static ilError ilCleanupDitherRGB (
-    ilDitherPrivPtr     pPriv
+    ilDitherPrivPtr     pPriv,
+    ilBool              bNotUsed
     )
 {
     if (pPriv->pErrors)
@@ -1019,7 +1021,8 @@ IL_PRIVATE ilBool _ilConvertRGBToPalette (
     ilDitherPrivPtr pPriv;
     ilDstElementData        dstData;
     ilSrcElementData        srcData;
-    ilError                 (*executeFunction)(), (*cleanupFunction)();
+    ilError                 (*executeFunction)(ilExecuteData *, long, long *);
+    ilError                 (*cleanupFunction)(ilByte *, ilBool);
     ilPtr                   pTranslate;
     unsigned short         *pPalette;
     long                   *pColorTable;
@@ -1097,7 +1100,7 @@ IL_PRIVATE ilBool _ilConvertRGBToPalette (
               }
         if ((pData->levels[0] * pData->levels[1] * pData->levels[2]) > 256)
             return ilDeclarePipeInvalid (pipe, IL_ERROR_CONVERT_TO_PALETTE);
-        cleanupFunction = ilCleanupDitherRGB;
+        cleanupFunction = (ilError (*)(ilByte *, ilBool)) ilCleanupDitherRGB;
         diffusion = TRUE;
         chooseColors = FALSE;
         if (pData->method == IL_DIFFUSION)
@@ -1237,7 +1240,10 @@ IL_PRIVATE ilBool _ilConvertRGBToPalette (
     dstData.pPalette = pPalette;
     pPriv = (ilDitherPrivPtr)ilAddPipeElement (pipe, IL_FILTER, sizeof(ilDitherPrivRec), 0,
             (chooseColors) ? &srcData : (ilSrcElementData *)NULL, &dstData, 
-            ilInitDitherRGB, cleanupFunction, ilDestroyDitherRGB, executeFunction, NULL, 0);
+            (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitDitherRGB,
+            cleanupFunction,
+            (ilError (*)(ilByte *)) ilDestroyDitherRGB,
+            executeFunction, NULL, 0);
     if (!pPriv)
         goto cleanup;
 

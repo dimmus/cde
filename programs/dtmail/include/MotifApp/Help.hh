@@ -114,9 +114,6 @@
 
 char *getHelpId(Widget);
 void printHelpId(char *, Widget);
-#ifdef DEAD_WOOD
-void HelpMenuCB(Widget, XtPointer, XtPointer);
-#endif /* DEAD_WOOD */
 void HelpCB(Widget, XtPointer, XtPointer);
 void HelpTexteditCB( Widget, XtPointer, XtPointer ) ;
 extern void DisplayMain(Widget, char *, char *);

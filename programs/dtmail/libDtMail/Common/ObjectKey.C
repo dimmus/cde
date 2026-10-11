@@ -61,57 +61,6 @@ ObjectKey::~ObjectKey(void)
     delete _type;
 }
 
-#ifdef DEAD_WOOD
-int
-ObjectKey::operator==(ObjectKey &)
-{
-    assert(!"Pure virtual ObjectKey::operator== called");
-    return(0);
-}
-
-int
-ObjectKey::operator!=(ObjectKey &)
-{
-    assert(!"Pure virtual ObjectKey::operator!= called\n");
-    return(0);
-}
-
-int
-ObjectKey::operator<(ObjectKey &)
-{
-    assert(!"Pure virtual ObjectKey::operator< called\n");
-    return(0);
-}
-
-int
-ObjectKey::operator<=(ObjectKey &)
-{
-    assert(!"Pure virtual ObjectKey::operator<= called\n");
-    return(0);
-}
-
-int
-ObjectKey::operator>(ObjectKey &)
-{
-    assert(!"Pure virtual ObjectKey::operator> called\n");
-    return(0);
-}
-
-int
-ObjectKey::operator>=(ObjectKey &)
-{
-    assert(!"Pure virtual ObjectKey::operator>= called\n");
-    return(0);
-}
-
-HashVal
-ObjectKey::hashValue(void)
-{
-    assert(!"Pure virtual ObjectKey::hashValue called\n");
-    return(0);
-}
-#endif /* DEAD_WOOD */
-
 HashVal
 ObjectKey::genericHashValue(void * buf, int len)
 {

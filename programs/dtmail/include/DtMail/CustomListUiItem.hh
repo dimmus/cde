@@ -45,9 +45,6 @@
 #ifndef _CUSTOMLISTUIITEM_HH
 #define _CUSTOMLISTUIITEM_HH
 
-#ifdef DEAD_WOOD
-void handleDoubleSelection(Widget w, XtPointer clientdata, XtPointer calldata);
-#endif /* DEAD_WOOD */
 // CLASS CustomListUiItem
 // derived class for prop sheet glue items for textfield
 ///////////////////////////////////////////////////////////

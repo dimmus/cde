@@ -76,9 +76,9 @@
  ****************************************************************************/
 #define NLSPATH_ENV  "NLSPATH=" \
                         CDE_INSTALLATION_TOP "/nls/msg/%L/%N.cat:" \
-                        CDE_INSTALLATION_TOP "/lib/nls/msg/%L/%N.cat:" \
-                        CDE_INSTALLATION_TOP "/lib/nls/msg/%l/%t/%c/%N.cat:" \
-                        CDE_INSTALLATION_TOP "/lib/nls/msg/%l/%c/%N.cat"
+                        CDE_DATA_TOP "/lib/nls/msg/%L/%N.cat:" \
+                        CDE_DATA_TOP "/lib/nls/msg/%l/%t/%c/%N.cat:" \
+                        CDE_DATA_TOP "/lib/nls/msg/%l/%c/%N.cat"
 
 #define NLS_CATALOG  "dtlogin"
 

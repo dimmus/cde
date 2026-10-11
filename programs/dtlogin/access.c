@@ -699,7 +699,7 @@ indirectAlias(
 }
 
 
-ARRAY8Ptr IndirectChoice ();
+ARRAY8Ptr IndirectChoice (ARRAY8Ptr clientAddress, CARD16 connectionType);
 
 int 
 ForEachMatchingIndirectHost(

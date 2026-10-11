@@ -85,17 +85,17 @@
 
 
 					/* widget class method */
-static void             ClassInitialize();
-static void             Initialize();
-static void             ConstraintInitialize();
-static void             ConstraintDestroy();
-static Boolean          ConstraintSetValues();
-static void             Destroy();
-static Boolean          SetValues();
-static XtGeometryResult GeometryManager();
-static void             ChangeManaged();
-static void             Redisplay();
-static XtGeometryResult	QueryGeometry();
+static void             ClassInitialize(void);
+static void             Initialize(Widget grequest, Widget gnew, ArgList args, Cardinal *num_args);
+static void             ConstraintInitialize(Widget request, Widget new, ArgList args, Cardinal *num_args);
+static void             ConstraintDestroy(Widget w);
+static Boolean          ConstraintSetValues(Widget current, Widget request, Widget new, ArgList args, Cardinal *num_args);
+static void             Destroy(Widget gw);
+static Boolean          SetValues(Widget gcurrent, Widget grequest, Widget gnew, ArgList args, Cardinal *num_args);
+static XtGeometryResult GeometryManager(Widget w, XtWidgetGeometry *request, XtWidgetGeometry *reply);
+static void             ChangeManaged(Widget gw);
+static void             Redisplay(TreeWidget tw, XEvent *event, Region region);
+static XtGeometryResult	QueryGeometry(Widget w, XtWidgetGeometry *intended, XtWidgetGeometry *preferred);
 
 					/* utility routines */
 static void             insert_node(Widget, Widget);
@@ -164,7 +164,7 @@ TreeClassRec treeClassRec = {
     TRUE,				/* visible_interest   */
     Destroy,				/* destroy            */
     NULL,				/* resize             */
-    Redisplay,				/* expose             */
+    (void (*)(Widget, XEvent *, struct _XRegion *)) Redisplay,				/* expose             */
     SetValues,				/* set_values         */
     NULL,				/* set_values_hook    */	
     XtInheritSetValuesAlmost,		/* set_values_almost  */
@@ -343,7 +343,7 @@ static void ClassInitialize (void)
 }
 
 
-static void Initialize (Widget grequest, Widget gnew)
+static void Initialize (Widget grequest, Widget gnew, ArgList arguments, Cardinal *num_args)
 {
     TreeWidget request = (TreeWidget) grequest, new = (TreeWidget) gnew;
     Arg args[2];
@@ -397,7 +397,7 @@ static void Initialize (Widget grequest, Widget gnew)
 
 
 /* ARGSUSED */
-static void ConstraintInitialize (Widget request, Widget new)
+static void ConstraintInitialize (Widget request, Widget new, ArgList args, Cardinal *num_args)
 {
     TreeConstraints tc = TREE_CONSTRAINT(new);
     TreeWidget tw = (TreeWidget) new->core.parent;
@@ -426,7 +426,7 @@ static void ConstraintInitialize (Widget request, Widget new)
 
 
 /* ARGSUSED */
-static Boolean SetValues (Widget gcurrent, Widget grequest, Widget gnew)
+static Boolean SetValues (Widget gcurrent, Widget grequest, Widget gnew, ArgList args, Cardinal *num_args)
 {
     TreeWidget current = (TreeWidget) gcurrent, new = (TreeWidget) gnew;
     Boolean redraw = FALSE;

@@ -70,8 +70,8 @@ static int cptr = -1;
 static int buflen;
 
 /* ********************** LOCAL FUNCTION DECLARATIONS **************** */
-static void bgets(P1(char *) Pi(int) Pi(int));
-static int nextc(P1(int));
+static void bgets(char *, int, int);
+static int nextc(int);
 
 /* Map ASCII-Characters for output and sorting
 */

@@ -62,7 +62,7 @@ extern "C" {
 
 /********    Internal Function Declarations    ********/
 extern	int		_DtCvRunInterp(
-				int		(*filter)(),
+				int		(*filter)(void *, const char *, char **),
 				_DtCvPointer	  client_data,
 				char		 *interp,
 				char		 *data,

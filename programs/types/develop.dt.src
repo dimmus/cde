@@ -366,7 +366,7 @@ ACTION PrintNm
         WINDOW_TYPE     NO_STDIO
         EXEC_STRING     /bin/sh -c ' \
                         /usr/ccs/bin/nm "%(File)Arg_1%" | \
-                        /usr/dt/bin/dtlp -u "%|nls-6018-#Symbols List#|"'
+                        CDE_INSTALLATION_TOP/bin/dtlp -u "%|nls-6018-#Symbols List#|"'
         DESCRIPTION     %|nls-6022-#The Print Symbol List#|
 }
 
@@ -388,7 +388,7 @@ ACTION PrintNm
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
         EXEC_STRING     /bin/sh -c ' nm "%(File)Arg_1%" | \
-                        /usr/dt/bin/dtlp -u "%|nls-6018-#Symbols List#|"'
+                        CDE_INSTALLATION_TOP/bin/dtlp -u "%|nls-6018-#Symbols List#|"'
         DESCRIPTION     %|nls-6022-#The Print Symbol List#|
 }
 #endif

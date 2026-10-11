@@ -5,3 +5,5 @@ noinst_LTLIBRARIES = libbtree.la
 libbtree_la_CXXFLAGS = $(CDE_CXXFLAGS) -I..
 
 libbtree_la_SOURCES = btree.C
+
+noinst_HEADERS = btree.h

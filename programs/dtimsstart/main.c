@@ -48,20 +48,20 @@ static nl_catd	catd = (nl_catd) -1;
 extern char *find_system_locale_name(char *);
 
     /* local functions */
-static int	IsNoError(/* error */);
-static int	EnvNeeded(/* error */);
-static int	ErrMsgDisabled(/* error */);
-static int	ximsShowImsList(/*  */);
-static int	ximsShowCurrentIms(/*  */);
-static int	prepare_remote(/* win_st */);
-static int	ximsRemoteConf(/*  */);
-static int	ximsSetMode(/*  */);
-static void	show_select_mode(/* mode */);
-static int	set_locale_env(/* locale */);
-static void	init_command(/* progname */);
-static bool	optname_match(/* name, str, minlen */);
-static int	parse_options(/* argc, argv */);
-static void	usage(/* force */);
+static int	IsNoError(ximsError error);
+static int	EnvNeeded(ximsError error);
+static int	ErrMsgDisabled(ximsError error);
+static int	ximsShowImsList(void);
+static int	ximsShowCurrentIms(void);
+static int	prepare_remote(int win_st);
+static int	ximsRemoteConf(void);
+static int	ximsSetMode(void);
+static void	show_select_mode(int mode);
+static int	set_locale_env(char *locale);
+static void	init_command(char *progname);
+static bool	optname_match(char *name, char *str, int minlen);
+static int	parse_options(int argc, char **argv);
+static void	usage(int force);
 
 static int	exitSignalNumber = 0;
 static bool	do_usage = False;

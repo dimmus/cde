@@ -54,7 +54,14 @@
 #endif
 
 int debug = 0;
-static Tt_message load_cb();
+static Tt_message load_cb(Tt_message	msg,
+	void		*clientdata,
+	Tttk_op		op,
+	Tt_status	diagnosis,
+	unsigned char	*contents,
+	int		len,
+	char 		*file,
+	char 		*docname);
 
 static const char *ptype = "Dt_AppointmentEditor";
 

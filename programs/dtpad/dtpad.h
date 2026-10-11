@@ -206,8 +206,8 @@ typedef struct {
 } FileWidgets;
 
 typedef struct {
-    void (*pendingFileFunc)();
-    void (*pendingFileHelpFunc)();
+    void (*pendingFileFunc)(Widget w, caddr_t client_data, caddr_t call_data);
+    void (*pendingFileHelpFunc)(Widget w, caddr_t client_data, caddr_t call_data);
     Boolean fileExists,
 	    saveWithNewlines,
 	    readOnly;

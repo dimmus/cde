@@ -1038,7 +1038,7 @@ static void
 p_gap_create_entry_string(Props_pu *p, char *who, char *p_str, XmString *val) {
 	char		*buf;
 
-	buf = (char *)ckalloc(NAME_LEN + PERMISSION_LEN + 1);
+	buf = (char *)ckalloc(NAME_LEN + cm_strlen(who) + cm_strlen(p_str) + 1);
 	sprintf(buf, "%-*s%s", NAME_LEN, who, p_str);
 	*val = XmStringCreateLocalized(buf);
 	free(buf);
@@ -1303,7 +1303,7 @@ p_create_v4_group_access_pane(Props_pu *p) {
 	{
 	  char *user = XtNewString(CATGETS(c->DT_catd, 1, 983, "User Name"));
 	  char *perm = XtNewString(CATGETS(c->DT_catd, 1, 413, "Permissions"));
-	  buf = (char *)ckalloc(cm_strlen(user) + cm_strlen(perm) + 10);
+	  buf = (char *)ckalloc(NAME_LEN + cm_strlen(user) + cm_strlen(perm) + 1);
 	  sprintf(buf, "%-*s%s", NAME_LEN, user, perm);
 	  xmstr = XmStringCreateLocalized(buf);
 	  XtFree(perm);

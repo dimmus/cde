@@ -65,7 +65,7 @@ _iskeycmp_set (Keydesc2 *pkeydesc2, int nparts)
  */
 
 int
-_iskeycmp(char *lkey, char *rkey)
+_iskeycmp(const void *lkey, const void *rkey)
 {
     int		   	     i, ret;
     struct keypart2 *p;
@@ -73,11 +73,14 @@ _iskeycmp(char *lkey, char *rkey)
     long	     llong, rlong;
     double		     ldouble, rdouble;
 
+    const char* charLkey = (const char*)lkey;
+    const char* charRkey = (const char*)rkey;
+
     ret = 0;
     for (i = 0, p = _curtab; ret == 0 && i < _ncurtab;i++, p++) {
 	
-	l = lkey + p->kp2_offset;
-	r = rkey + p->kp2_offset;
+	l = charLkey + p->kp2_offset;
+	r = charRkey + p->kp2_offset;
 
 	switch (p->kp2_type) {
 	case CHARTYPE:

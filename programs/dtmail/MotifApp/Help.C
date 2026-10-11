@@ -166,65 +166,6 @@ DisplayVersion (
 }
 
 
-#ifdef DEAD_WOOD
-// The callback for the Help Menu in the combo window.
-
-void
-HelpMenuCB (
-	Widget widget,
-	XtPointer	clientdata,
-	XtPointer)
-{
-    Widget selWidget = NULL;
-    int	status = DtHELP_SELECT_ERROR;
-
-    // Determine which help button was activated and display the
-    // appropriate help information.
-
-    switch ((long) clientdata) {
-	case HELP_ON_ITEM:
-	    while (!XtIsSubclass(widget, applicationShellWidgetClass))
-		widget = XtParent(widget);
-	    status = DtHelpReturnSelectedWidgetId(widget, NULL, &selWidget);
-
-	    switch ((int) status) {
-		case DtHELP_SELECT_ERROR:
-		    printf(CATGETS(catd, 2, 1, "Selection Error, cannot continue\n"));
-		    break;
-		case DtHELP_SELECT_VALID:
-		    while (selWidget != NULL) {
-			if ((XtHasCallbacks(selWidget, XmNhelpCallback)
-					== XtCallbackHasSome)) {
-			    XtCallCallbacks((Widget)selWidget,
-					XmNhelpCallback, NULL);
-			    break;
-			} else {
-			    selWidget = XtParent(selWidget);
-			}
-		    }
-		    break;
-		case DtHELP_SELECT_ABORT:
-		    printf(CATGETS(catd, 2, 2, "Selection aborted by user.\n"));
-		    break;
-		case DtHELP_SELECT_INVALID:
-		    printf(CATGETS(catd, 1, 6,
-			   "You must select a component withing your app.\n"));
-		    break;
-	    }
-	    break;
-	case HELP_ON_TOPIC:
-	    DisplayMain(widget, NULL, APP_MENU_ID);
-	    break;
-	case HELP_ON_VERSION:
-	    DisplayVersion(widget, NULL, VER_MENU_ID);
-	    break;
-	default:
-	    break;
-    }
-}
-#endif /* DEAD_WOOD */
-
-	
 // Callback to process JUMP-NEW and APP-LINK hypertext requests in a
 // given Help Dialog Window.
 //

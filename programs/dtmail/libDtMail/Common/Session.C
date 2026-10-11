@@ -873,15 +873,6 @@ DtMail::Session::registerDisableGroupPrivilegesCallback(
     _disableGroupPrivileges_cb_data = cb_data;
 }
 
-#ifdef DEAD_WOOD
-void
-DtMail::Session::unregisterDisableGroupPrivilegesCallback(void)
-{
-    _disableGroupPrivileges_cb = NULL;
-    _disableGroupPrivileges_cb_data = NULL;
-}
-#endif /* DEAD_WOOD */
-
 void
 DtMail::Session::disableGroupPrivileges(void)
 {
@@ -899,15 +890,6 @@ DtMail::Session::registerEnableGroupPrivilegesCallback(
     _enableGroupPrivileges_cb_data = cb_data;
 }
 
-#ifdef DEAD_WOOD
-void
-DtMail::Session::unregisterEnableGroupPrivilegesCallback(void)
-{
-    _enableGroupPrivileges_cb = NULL;
-    _enableGroupPrivileges_cb_data = NULL;
-}
-#endif /* DEAD_WOOD */
-
 void
 DtMail::Session::enableGroupPrivileges(void)
 {
@@ -924,15 +906,6 @@ DtMail::Session::registerBusyCallback(DtMailEnv&,
     _busy_cb = cb;
     _busy_cb_data = cb_data;
 }
-
-#ifdef DEAD_WOOD
-void
-DtMail::Session::unregisterBusyCallback(DtMailEnv & error)
-{
-    _busy_cb = NULL;
-    _busy_cb_data = NULL;
-}
-#endif /* DEAD_WOOD */
 
 void
 DtMail::Session::setBusyState(DtMailEnv &error, DtMailBusyState busy_state)

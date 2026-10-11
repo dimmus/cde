@@ -460,7 +460,8 @@ ilImageDes              des;
     dstData.pPalette = (unsigned short *)NULL;
     pPriv = (ilBiGrayPrivPtr)ilAddPipeElement (pipe, IL_FILTER, sizeof (ilBiGrayPrivRec), 
                          IL_ADD_PIPE_HOLD_SRC, (ilSrcElementData *)NULL, &dstData, 
-                         ilBiGrayInit, IL_NPF, IL_NPF, ilBiGrayExecute, NULL, 0);
+                         (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilBiGrayInit,
+                         IL_NPF, IL_NPF, ilBiGrayExecute, NULL, 0);
     if (!pPriv)
         return;
 
@@ -527,7 +528,8 @@ ilDstElementData        dstData;
     dstData.pPalette = (unsigned short *)NULL;
     pPriv = (ilBiGrayPrivPtr)ilAddPipeElement (pipe, IL_FILTER, sizeof (ilBiGrayPrivRec), 
                          IL_ADD_PIPE_HOLD_SRC, (ilSrcElementData *)NULL, &dstData, 
-                         ilBiGrayInit, IL_NPF, IL_NPF, ilBiGrayExecute, NULL, 0);
+                         (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilBiGrayInit,
+                         IL_NPF, IL_NPF, ilBiGrayExecute, NULL, 0);
     if (!pPriv)
         return;
 

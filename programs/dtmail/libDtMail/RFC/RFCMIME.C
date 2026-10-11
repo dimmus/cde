@@ -243,10 +243,6 @@ RFCMIME::getEncodingType(const char * body,
     }
 
     if (curChar == '\n') {
-#ifdef DEAD_WOOD
-      DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
-      
       if ((cur - last_nl) > 76) {
 	encode = DTM_TRUE;
 	qprint_growth += 2;
@@ -352,10 +348,6 @@ RFCMIME::getEncodingType(const char * body,
 	}
 
 	if (*cur == '\n') {
-#ifdef DEAD_WOOD
-	    DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
-	    
 	    if (strict_mime && ((cur - last_nl) > 76)) {
 		qprint_growth += 2;
 	    }
@@ -786,9 +778,6 @@ RFCMIME::writeBase64(Buffer & buf, const char * bp, const unsigned long len)
 
 	if (lf == 72) {
 	    buf.appendData(line, lf);
-#ifdef DEAD_WOOD
-	    DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	    crlf(buf);
 	    lf = 0;
 	}
@@ -1042,9 +1031,6 @@ RFCMIME::writeQPrint(Buffer & buf, const char * bp, const unsigned long bp_len)
 	  if (off > 72) {
 	    line_buf[off++] = '=';
 	    buf.appendData(line_buf, off);
-#ifdef DEAD_WOOD
-	    DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	    crlf(buf);
 	    off = 0;
 	    last_nl = 0;
@@ -1058,9 +1044,6 @@ RFCMIME::writeQPrint(Buffer & buf, const char * bp, const unsigned long bp_len)
 	if (off) {
 	  line_buf[off++] = '=';
 	  buf.appendData(line_buf, off);
-#ifdef DEAD_WOOD
-	  DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	  crlf(buf);
 	  last_nl = 0;
 	  off = 0;
@@ -1109,9 +1092,6 @@ RFCMIME::writeQPrint(Buffer & buf, const char * bp, const unsigned long bp_len)
 	}
 	
 	buf.appendData(line_buf, off);
-#ifdef DEAD_WOOD
-	DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	last_nl = 0;
 	off = 0;
 	
@@ -1175,9 +1155,6 @@ RFCMIME::writePlainText(Buffer & buf, const char * bp, const unsigned long len)
 	    }
 
 	    buf.appendData(line_start, real_end - line_start);
-#ifdef DEAD_WOOD
-	    DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	    line_start = cur + 1;
 	    crlf(buf);
 	}
@@ -1212,9 +1189,6 @@ RFCMIME::md5PlainText(const char * bp, const unsigned long len, unsigned char * 
     const char * cur;
     for (cur = bp; cur < (bp + len); cur++) {
 	if (*cur == '\n') {
-#ifdef DEAD_WOOD
-	    DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	    if (cur == bp || *(cur - 1) == '\r') {
 		MD5Update(&context, (unsigned char *)last,
 			  cur - last + 1);
@@ -1354,9 +1328,6 @@ RFCMIME::formatBodies(DtMailEnv & error,
 			(unsigned char *)bp_contents,
 			(unsigned int) bp_len);
 		MD5Final(digest, &context);
-#ifdef DEAD_WOOD
-		DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 	    }
 	}
 
@@ -1484,9 +1455,6 @@ RFCMIME::formatBodies(DtMailEnv & error,
 			(unsigned char *)bp_contents,
 			(unsigned int) bp_len);
 		    MD5Final(digest, &context);
-#ifdef DEAD_WOOD
-		    DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
 		}
 	    }
 
@@ -1638,10 +1606,6 @@ RFCMIME::getHdrEncodingType(const char * body,
     }
     
     if (curChar == '\n') {
-#ifdef DEAD_WOOD
-      DtMailProcessClientEvents();
-#endif /* DEAD_WOOD */
-     
       if ((cur - last_nl) > 76) {
 	encode = DTM_TRUE;
 	qprint_growth += 2;

@@ -263,7 +263,7 @@ char * get_element(char *, int);
 int renfiles(void);
 
 /* From startup.c: */
-int startup(DBN_FIX_D1 TASK_PTR_Di LOCK_Di);
+int startup(int);
 
 /* From taffcns.c: */
 int taf_open(void);

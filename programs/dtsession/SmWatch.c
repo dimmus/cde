@@ -64,8 +64,8 @@ in this Software without prior written authorization from the X Consortium.
 /*
  * Forward declarations
  */
-void _XtIceWatchProc ();
-void _XtProcessIceMsgProc ();
+void _XtIceWatchProc (IceConn ice_conn, IcePointer client_data, Bool opening, IcePointer *watch_data);
+void _XtProcessIceMsgProc (XtPointer client_data, int *source, XtInputId *id);
 
 Status
 InitWatchProcs (

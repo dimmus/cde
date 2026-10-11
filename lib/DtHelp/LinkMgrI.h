@@ -98,7 +98,7 @@ extern	int		 _DtLinkDbGetHint(
 extern	int		 _DtLinkDbGetLinkInfo(
 				_DtCvLinkDb	 link_data,
 				int		 link_index,
-				int		(*filter)(),
+				int		(*filter)(void *, const char *, char **),
 				void		*client_data,
 				_DtCvLinkInfo	*ret_info);
 extern	char		*_DtLinkDbGetLinkSpec(

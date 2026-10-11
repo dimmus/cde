@@ -129,7 +129,7 @@ int	CheckRelation(Element_t *, char *, char *, char *, FILE*, RelAction_t);
 Trans_t	*FindTrans(Element_t *);
 Trans_t	*FindTransByName(char *);
 Trans_t	*FindTransByID(int);
-void	PrepTranspecs(Element_t *);
+void	PrepTranspecs(Element_t *, void *unused);
 void	ProcessOneSpec(char *, Element_t *, FILE *, int);
 void	TransElement(Element_t *, FILE *, Trans_t *);
 void	TranByAction(Element_t *, int, FILE *);

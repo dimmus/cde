@@ -62,7 +62,7 @@
 IL_PRIVATE ilObjectPtr _ilCreateObject (
     ilContext           context,                /* context to add object to */
     int                 objectType,             /* code for object, e.g. IL_PIPE */
-    void                (*Destroy)(),           /* destroy function; see above */
+    void                (*Destroy)(ilByte *),   /* destroy function; see above */
 /* Use portable type, bug report OSF_QAR#32082 */
     size_t              sizeInBytes             /* size of object to create */
     )
@@ -123,7 +123,7 @@ ilObjectPtr    pObject;
     if (--pObject->refCount > 0)
         return TRUE;                    /* object still attached; EXIT */
 
-    (*pObject->Destroy) (pObject);
+    (*pObject->Destroy) ((ilByte *) pObject);
     if (pObject->p.pPrivate)
         free (pObject->p.pPrivate);     /* note: caller used malloc, not IL_MALLOC() */
 

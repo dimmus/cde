@@ -176,7 +176,7 @@ IsIndirectClient (
     return 0;
 }
 
-extern char *NetaddrPort();
+extern char *NetaddrPort(XdmcpNetaddr netaddrp, int *lenp);
 
 static int
 FormatChooserArgument (
@@ -336,7 +336,7 @@ AddChooserHost (
     ARRAY8Ptr   addr,
     char        *closure)
 {
-    char	***argp, **parseArgs();
+    char	***argp;
     char	hostbuf[1024];
 
     argp = (char ***) closure;
@@ -409,7 +409,7 @@ void
 RunChooser (
     struct display  *d)
 {
-    char    **args, **parseArgs(), **systemEnv();
+    char    **args;
     char    buf[1024];
     char    **env;
 

@@ -416,14 +416,6 @@ header_form_traverse(Widget w, XtPointer, XtPointer)
     (void) XmProcessTraversal(w, XmTRAVERSE_NEXT_TAB_GROUP);
 }
 
-#ifdef DEAD_WOOD
-void
-send_pushb_callback(Widget, XtPointer, XtPointer)
-{
-    
-}
-#endif /* DEAD_WOOD */
-
 // Create Message Handle with empty first body part.
 DtMail::Message *
 SendMsgDialog::makeMessage(void)
@@ -1704,20 +1696,6 @@ bogus_cb(void *)
 // Should theInfoDialogManager be destroyed here ???
 }
 
-#ifdef DEAD_WOOD
-void
-SendMsgDialog::open_att_cb( void *clientData, char *selection )
-{
-    SendMsgDialog *obj = (SendMsgDialog *)clientData;
-    
-    obj->open_att(selection);
-}
-
-void
-SendMsgDialog::open_att( char *)  // arg is char *selection
-{
-}
-#endif /* DEAD_WOOD */
 
 void
 SendMsgDialog::include_file_cb( void *client_data, char *selection )

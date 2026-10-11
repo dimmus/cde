@@ -24,6 +24,8 @@
 /*	Copyright (c) 1995,1996 FUJITSU LIMITED		*/
 /*	All Rights Reserved				*/
 
+#include "../../config.h"
+
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
@@ -35,7 +37,7 @@
 #include <StyleSheet/StyleSheet.h>
 #include "Tml_TextRenderer.hh"
 
-#include "config.h"
+#include "../../config.h"
 #include "Basic/Error.hh"
 #include "Basic/FolioObject.hh"
 #include "Basic/List.hh"

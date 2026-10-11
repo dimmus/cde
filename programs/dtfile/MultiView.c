@@ -110,9 +110,9 @@ _DtCreateMenuSystem(
         Boolean createSharedComponents,
         MenuDesc * menuDesc,
         int numMenuComponents,
-        void (*getMenuDataProc)(),
-        void (*setMenuSensitivity)(),
-        void (*restoreMenuSensitivity)() )
+        void (*getMenuDataProc)(Widget, XtPointer *, MenuDesc **, int *, unsigned int **, unsigned int **),
+        void (*setMenuSensitivity)(Widget, XtPointer, XtPointer),
+        void (*restoreMenuSensitivity)(Widget, XtPointer, XtPointer) )
 
 {
    int n;
@@ -260,7 +260,7 @@ _DtGlobalSetMenuSensitivity(
    Arg menuPaneArgs[1];
    Widget mbar;
    XmMenuShellWidget mshell = (XmMenuShellWidget) w;
-   void (*getMenuData)() = (void(*)())client_data;
+   void (*getMenuData)(Widget, XtPointer *, MenuDesc **, int *, unsigned int **, unsigned int **) = client_data;
    XtPointer mainRecord;
    MenuDesc * menuDesc;
    int menuItemCount;
@@ -313,7 +313,7 @@ _DtGlobalRestoreMenuSensitivity(
 {
    Widget mbar;
    XmMenuShellWidget mshell = (XmMenuShellWidget) w;
-   void (*getMenuData)() = (void (*)())client_data;
+   void (*getMenuData)(Widget, XtPointer *, MenuDesc **, int *, unsigned int **, unsigned int **) = client_data;
    XtPointer mainRecord;
    MenuDesc * menuDesc;
    int menuItemCount;

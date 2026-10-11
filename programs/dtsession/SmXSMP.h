@@ -151,7 +151,7 @@ extern Atom 			XaSmClientId;
 /*
  * Public function declarations
  */
-extern Boolean InitXSMP ( );
+extern Boolean InitXSMP ( void );
 
 void SaveYourselfReqProc (
 	SmsConn     		smsConn,

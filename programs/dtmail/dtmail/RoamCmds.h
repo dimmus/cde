@@ -92,15 +92,6 @@ public:
   virtual const char *const className() { return "OpenMsgCmd"; }
 };
 
-#ifdef DEAD_WOOD
-class SaveCmd : public RoamCmd {
-  public:
-    virtual void doit();   
-    SaveCmd( char *, char *, int, RoamMenuWindow * );
-    virtual const char *const className () { return "SaveCmd"; }
-};
-#endif /* DEAD_WOOD */
-
 
 class UnifiedSelectFileCmd : public SelectFileCmd {
   private:
@@ -252,17 +243,6 @@ class PrevCmd : public RoamCmd {
 };
 
 
-#ifdef DEAD_WOOD
-class MessagesCmd : public RoamCmd {
-  public:
-    virtual void doit();   
-    MessagesCmd( char *, char *, int, RoamMenuWindow * );
-    virtual const char *const className () { return "MessagesCmd"; }
-};
-#endif /* DEAD_WOOD */
-
-
-
 class ChooseCmd : public NoUndoCmd {
   protected:
     
@@ -277,40 +257,6 @@ class ChooseCmd : public NoUndoCmd {
     DtMailMessageHandle    msgno() { return _msgno; }
     void    msgno( DtMailMessageHandle msgno) { _msgno=msgno; }
 };
-
-#ifdef DEAD_WOOD
-class ClearCmd : public NoUndoCmd {
-  protected:
-    
-    class RoamMenuWindow	*parent;
-  public:
-    virtual void doit();   
-    ClearCmd( char *, char *, int, RoamMenuWindow * );
-    virtual const char *const className () { return "ClearCmd"; }
-};
-
-
-class SearchCmd : public InterruptibleCmd {
-    
-  protected:
-    
-    RoamMenuWindow *_menuwindow;
-    char 		*_criteria;
-    long		_msgs_fetched;
-    int h_index;
-    virtual void doit();   
-    virtual void undoit(); 
-    
-  public:
-    SearchCmd ( char *, char *, int, RoamMenuWindow * );
-    virtual void execute();    
-    virtual void execute ( TaskDoneCallback, void * );
-    void	set_criteria( char *criteria ) { _criteria=criteria; };
-    virtual void updateMessage ( char * );
-    virtual const char *const className () { return "SearchCmd"; }
-};
-#endif /* DEAD_WOOD */
-
 
 class CheckForNewMailCmd : public NoUndoCmd {
   protected:
@@ -548,18 +494,6 @@ class PrintCmd : public ChooseCmd {
     static void printjobcb(Widget,XtPointer,XtPointer);
 }; 
 
-#ifdef DEAD_WOOD
-class PopupCmd : public NoUndoCmd {
-  private:
-    RoamMenuWindow *parent;
-    PopupWindow *(RoamMenuWindow::* pmpopup) ( void );
-  public:
-    virtual void doit();   
-    PopupCmd( char *, char *, int, PopupWindow * (RoamMenuWindow::*) (void), RoamMenuWindow * );
-    virtual const char *const className () { return "PopupCmd"; }
-};
-#endif /* DEAD_WOOD */
-
 class OnItemCmd : public NoUndoCmd {
   private:
     UIComponent *_parent;
@@ -623,39 +557,6 @@ class FindCmd : public RoamCmd {
     FindCmd( char *, char *, int, RoamMenuWindow * );
     virtual const char *const className () { return "FindCmd"; }
 };
-
-
-#ifdef DEAD_WOOD
-class StartCmd : public Cmd {
-  private:
-    //  VacationPopup	*parent;
-    int parent;
-  public:
-    virtual void doit();   
-    virtual void undoit();   
-    //  StartCmd( char *, char *, int, VacationPopup * );
-    StartCmd( char *, char *, int );
-    virtual const char *const className () { return "StartCmd"; }
-};
-
-class ChangeCmd : public Cmd {
-  public:
-    virtual void doit();   
-    virtual void undoit();   
-    ChangeCmd( char *, char *, int );
-    virtual const char *const className () { return "ChangeCmd"; }
-};
-
-class StopCmd : public Cmd {
-  private:
-    RoamMenuWindow *parent;
-  public:
-    virtual void doit();   
-    virtual void undoit();   
-    StopCmd( char *, char *, int, RoamMenuWindow * );
-    virtual const char *const className () { return "StopCmd"; }
-};
-#endif /* DEAD_WOOD */
 
 class SendCmd : public NoUndoCmd {
   private:

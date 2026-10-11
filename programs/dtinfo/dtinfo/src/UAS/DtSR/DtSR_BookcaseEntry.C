@@ -24,13 +24,14 @@
 /*	Copyright (c) 1995,1996 FUJITSU LIMITED		*/
 /*	All Rights Reserved				*/
 
+#include "../../config.h"
 #include <assert.h>
 #include <string.h>
 
 #include <iostream>
 using namespace std;
 
-#include "config.h"
+#include "../../config.h"
 #include "Basic/Error.hh"
 #include "Basic/FolioObject.hh"
 #include "Basic/List.hh"

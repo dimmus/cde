@@ -82,7 +82,7 @@
 static _DtActInvRecT	**_DtActInvRecArray;		/* top of array */
 static int		_actInvRecArraySize;		/* size of array */
 
-static void	_DtActFreeInvRec();			/* free an inv rec */	
+static void	_DtActFreeInvRec( _DtActInvRecT *invp);			/* free an inv rec */	
 static void	 _DtActFreeChildRec( _DtActChildRecT *childp);
 
 #ifndef NDEBUG

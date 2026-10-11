@@ -60,13 +60,14 @@
 #pragma weak DtHelpQuickDialogGetChild = _DtHelpQuickDialogGetChild
 #pragma weak DtHelpReturnSelectedWidgetId = _DtHelpReturnSelectedWidgetId
 
-typedef Widget (*SUNWWidgetProc)();
-typedef int (*SUNWIntProc)();
+typedef Widget (*SUNWWidgetProc)(Widget parent, char *name, ArgList al, Cardinal ac);
+typedef Widget (*SUNWWidgetProcOther)(Widget parent, unsigned char);
+typedef int (*SUNWIntProc)(Widget parent, Cursor cursor, Widget  *widget);
 
 typedef struct _SUNWHelpProcList {
     SUNWWidgetProc	DtCreateHelpDialogSym;
     SUNWWidgetProc	DtCreateHelpQuickDialogSym;
-    SUNWWidgetProc	DtHelpQuickDialogGetChildSym;
+    SUNWWidgetProcOther	DtHelpQuickDialogGetChildSym;
     SUNWIntProc		DtHelpReturnSelectedWidgetIdSym;
 } SUNWHelpProcList;
 
@@ -91,7 +92,7 @@ int SUNWDtHelpdlopen()
 			 dlsym(libDtHelpHandle, "DtCreateHelpDialog");
     pmySUNWProcList->DtCreateHelpQuickDialogSym = (SUNWWidgetProc)
 			 dlsym(libDtHelpHandle, "DtCreateHelpQuickDialog");
-    pmySUNWProcList->DtHelpQuickDialogGetChildSym = (SUNWWidgetProc)
+    pmySUNWProcList->DtHelpQuickDialogGetChildSym = (SUNWWidgetProcOther)
 			 dlsym(libDtHelpHandle, "DtHelpQuickDialogGetChild");
     pmySUNWProcList->DtHelpReturnSelectedWidgetIdSym = (SUNWIntProc)
 			 dlsym(libDtHelpHandle, "DtHelpReturnSelectedWidgetId");

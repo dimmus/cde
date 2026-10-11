@@ -606,7 +606,8 @@ IL_PRIVATE ilBool _ilConvertYCbCrToRGB (
     )
 {
     ilDstElementData        dstData;
-    ilError                 (*executeFunction)(), (*destroyFunction)();
+    ilError                 (*executeFunction)(ilExecuteData *, long, long *);
+    ilError                 (*destroyFunction)(ilByte *);
     ilYCbCrToRGBPrivPtr     pPriv;
     ilRGBTransPtr  pTrans;
 
@@ -629,7 +630,7 @@ IL_PRIVATE ilBool _ilConvertYCbCrToRGB (
     pTrans = ilGetYCbCrConvertTable (pDes);
     if (!pTrans)
         return ilDeclarePipeInvalid (pipe, IL_ERROR_MALLOC);
-    destroyFunction = (pTrans == _ilStdYCbCrTransPtr) ? IL_NPF : ilDestroyTransTable;
+    destroyFunction = (pTrans == _ilStdYCbCrTransPtr) ? IL_NPF : (ilError (*)(ilByte *)) ilDestroyTransTable;
 
         /*  Add element to the pipe, init private */
     dstData.producerObject = (ilObject)NULL;
@@ -1083,7 +1084,10 @@ IL_PRIVATE ilBool _ilDitherYCbCr (
 
     pPriv = (ilYCbCr2DitherPrivPtr)ilAddPipeElement (pipe, IL_FILTER, 
             sizeof(ilYCbCr2DitherPrivRec), 0, &srcData, &dstData, 
-            ilYCbCr2DitherInit, IL_NPF, ilYCbCr2DitherDestroy, ilYCbCr2DitherExecute, NULL, 0);
+            (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilYCbCr2DitherInit,
+            IL_NPF,
+            (ilError (*)(ilByte *)) ilYCbCr2DitherDestroy,
+            ilYCbCr2DitherExecute, NULL, 0);
     if (!pPriv) {
         return FALSE;
         }

@@ -33,7 +33,7 @@ void setopt(char *string, LOGICAL filelenonly);
 
 LOGICAL setvalopt(int thisopt, char *string, LOGICAL filelenonly);
 
-char *strstr(const char *s1, const char *s2);
+/* strstr() comes from <string.h>; modern glibc declares it via _Generic */
 
 int m_upper(int c);
 

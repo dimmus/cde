@@ -548,26 +548,6 @@ DtMailEnv::vSetError(const DTMailError_t minor_code,
   delete [] messageBuffer;
 }
 
-#ifdef DEAD_WOOD
-const char *
-DtMailEnv::implGetMessage()
-{
-  if (_client != NULL && _implMessageFunc != NULL) {
-	return((*_implMessageFunc)(_client));
-  }
- return(NULL);
-}
-
-int
-DtMailEnv::implGetError()
-{
-  if (_client != NULL && _implErrorFunc != NULL) {
-	return((*_implErrorFunc)(_client));
-  }
- return(0);
-}
-#endif /* DEAD_WOOD */
-
 void
 DtMailEnv::logError(DtMailBoolean criticalError, const char *format, ...) const
 {
@@ -598,17 +578,3 @@ DtMailEnv::logError(DtMailBoolean criticalError, const char *format, ...) const
 		NULL, messageBuffer);
   delete [] messageBuffer;
 }
-
-#ifdef DEAD_WOOD
-void
-DtMailEnv::logFatalError(DtMailBoolean criticalError, const char *format, ...)
-{
-  _fatal = DTM_TRUE;
-
-  va_list	var_args;
-
-  va_start(var_args, format);
-  logError(criticalError, format, var_args);
-  va_end(var_args);
-}
-#endif /* DEAD_WOOD */

@@ -60,10 +60,6 @@ class FileShare : public DtCPlusPlusAllocator {
     DtMailBoolean readOnly(DtMailEnv & error);
     DtMailBoolean readWriteOverride(DtMailEnv & error);
 
-#ifdef DEAD_WOOD
-    DtMailBoolean locked(void);
-#endif /* DEAD_WOOD */
-
   private:
     struct TTHandle : public DtCPlusPlusAllocator {
 	DtMail::Session		*session;

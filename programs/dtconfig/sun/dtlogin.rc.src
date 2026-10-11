@@ -48,8 +48,8 @@ XCOMM Add print actions to workstation's database for all printer's known
 XCOMM to this workstation if action is not already present in the database.
 
 update_printers() {
-   if [ -x /usr/dt/bin/dtprintinfo ] ; then
-       	    /usr/dt/bin/dtprintinfo -populate
+   if [ -x CDE_INSTALLATION_TOP/bin/dtprintinfo ] ; then
+	    CDE_INSTALLATION_TOP/bin/dtprintinfo -populate
    fi
 }
 

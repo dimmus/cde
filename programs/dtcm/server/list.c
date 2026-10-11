@@ -346,7 +346,7 @@ hc_enumerate_down(Hc_list *hc_list, _DtCmsEnumerateProc doit)
 	p_node = hc_list->root;
 	while (p_node != NULL)
 	{
-		if (doit ((caddr_t)p_node, p_node->data))
+		if (doit (p_node->data))
 			return;
 		p_node = p_node->llink;
 	}
@@ -360,7 +360,7 @@ hc_enumerate_up(Hc_list *hc_list, _DtCmsEnumerateProc doit)
 	p_node = hc_list->root;
 	while (p_node != NULL)
 	{
-		if (doit ((caddr_t)p_node, p_node->data))
+		if (doit (p_node->data))
 			return (rb_failed);
 		p_node = hc_lookup_next (p_node);
 	}

@@ -320,8 +320,8 @@ void AlternatesListUiItem::handleChangeButtonPress()
 	    XmListSelectPos(this->getWidget(),
 			    pos_list[0],
 			    TRUE);
+	    props_changed = TRUE;
 	  }
-      props_changed = TRUE;
     }
 }
 ///////////////////////////////////////////////////////////

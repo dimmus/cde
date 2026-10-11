@@ -83,12 +83,12 @@
                  CDE_CONFIGURATION_TOP "/appconfig/help/C/%H:" \
                  CDE_CONFIGURATION_TOP "/appconfig/help/C/%H.sdl:" \
                  CDE_CONFIGURATION_TOP "/appconfig/help/C/%H.hv:" \
-                 CDE_INSTALLATION_TOP "/appconfig/help/%L/%H:" \
-                 CDE_INSTALLATION_TOP "/appconfig/help/%L/%H.sdl:" \
-                 CDE_INSTALLATION_TOP "/appconfig/help/%L/%H.hv" \
-                 CDE_INSTALLATION_TOP "/appconfig/help/C/%H:" \
-                 CDE_INSTALLATION_TOP "/appconfig/help/C/%H.sdl:" \
-                 CDE_INSTALLATION_TOP "/appconfig/help/C/%H.hv:"
+                 CDE_DATA_TOP "/appconfig/help/%L/%H:" \
+                 CDE_DATA_TOP "/appconfig/help/%L/%H.sdl:" \
+                 CDE_DATA_TOP "/appconfig/help/%L/%H.hv" \
+                 CDE_DATA_TOP "/appconfig/help/C/%H:" \
+                 CDE_DATA_TOP "/appconfig/help/C/%H.sdl:" \
+                 CDE_DATA_TOP "/appconfig/help/C/%H.hv:"
 
 
 #define DtDEFAULT_USER_PATH_FORMAT \

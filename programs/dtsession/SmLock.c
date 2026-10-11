@@ -1669,7 +1669,6 @@ localAuthenticate(
 {
     struct passwd *pwent = NULL;
     char *p, *q;
-    char *crypt();
     Boolean rc = True;
     Boolean done = False;
     struct spwd *sp = NULL;

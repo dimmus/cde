@@ -1389,8 +1389,8 @@ DialogUp(
 
 /*************************************<->*************************************
  *
- *  ShowWaitState (flag)
- *
+ *  EnterWaitState (void)
+ *  LeaveWaitState (void)
  *
  *  Description:
  *  -----------
@@ -1399,7 +1399,7 @@ DialogUp(
  *
  *  Inputs:
  *  ------
- *  flag = TRUE for Enter, FALSE for Leave.
+ *  None.
  *
  *
  *  Outputs:
@@ -1414,24 +1414,23 @@ DialogUp(
  *************************************<->***********************************/
 
 void
-ShowWaitState(
-        Boolean flag )
+EnterWaitState(void)
 {
-    if (flag)
-    {
-	XGrabPointer (smGD.display, DefaultRootWindow(smGD.display), FALSE,
-		      0, GrabModeAsync, GrabModeAsync, None,
-		      smGD.waitCursor, CurrentTime);
-	XGrabKeyboard (smGD.display, DefaultRootWindow(smGD.display), FALSE,
-		       GrabModeAsync, GrabModeAsync, CurrentTime);
-    }
-    else
-    {
-	XUngrabPointer (smGD.display, CurrentTime);
-	XUngrabKeyboard (smGD.display, CurrentTime);
-    }
+    XGrabPointer (smGD.display, DefaultRootWindow(smGD.display), FALSE,
+	      0, GrabModeAsync, GrabModeAsync, None,
+	      smGD.waitCursor, CurrentTime);
+    XGrabKeyboard (smGD.display, DefaultRootWindow(smGD.display), FALSE,
+	      GrabModeAsync, GrabModeAsync, CurrentTime);
+    XSync(smGD.display,0);
+}
+
+void LeaveWaitState(void){
+    XUngrabPointer (smGD.display, CurrentTime);
+    XUngrabKeyboard (smGD.display, CurrentTime);
     XSync(smGD.display, 0);
 }
+
+
 
 
 /*************************************<->*************************************

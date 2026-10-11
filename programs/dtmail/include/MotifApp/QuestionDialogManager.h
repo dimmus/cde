@@ -86,9 +86,4 @@ class QuestionDialogManager : public DialogManager {
     
     QuestionDialogManager ( char * );
 };
-
-#ifdef DEAD_WOOD
-extern QuestionDialogManager *theQuestionDialogManager;
-#endif /* DEAD_WOOD */
-
 #endif

@@ -11,6 +11,7 @@ bin_PROGRAMS = dtsession
 bin_SCRIPTS = dtsession_res
 
 dtsession_CFLAGS = $(CDE_CFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
           -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
 	  -DXRDB_PROGRAM=\"$(XRDB)\" -Ddtsession
 
@@ -51,6 +52,7 @@ DTSM_CMD5 = $(CDE_INSTALLATION_TOP)/bin/dtaction Dthelpgen_delay
 
 LOCAL_CPP_DEFINES = -DCDE_CONFIGURATION_TOP=$(CDE_CONFIGURATION_TOP) \
 		    -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \
+		    -DCDE_DATA_TOP=$(CDE_DATA_TOP) \
 		    -DXRDB=$(XRDB) \
 		    -DKORNSHELL=$(KSH) \
 		    -DDTSM_CMD1="\"$(DTSM_CMD1)\"" \
@@ -131,7 +133,7 @@ sys.session.ive: sys.session.src
 
 install-exec-hook:
 if !HAS_PAM_LIBRARY
-	chown root $(DESTDIR)$(bindir)/dtsession
-	chmod 4755 $(DESTDIR)$(bindir)/dtsession
+	-chown root $(DESTDIR)$(bindir)/dtsession
+	-chmod 4755 $(DESTDIR)$(bindir)/dtsession
 endif
 

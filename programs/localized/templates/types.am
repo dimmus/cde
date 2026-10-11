@@ -26,7 +26,7 @@ BUILT_SOURCES = $(DTTYPES) action
 CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 # we do not want to install 'action'
-typesdir = $(CDE_INSTALLATION_TOP)/appconfig/types/$(LANG)
+typesdir = $(CDE_DATA_TOP)/appconfig/types/$(LANG)
 dist_types_DATA = $(DTTYPES)
 
 TOP = $(top_builddir)/programs

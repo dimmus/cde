@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 include $(top_srcdir)/build-aux/cde-libs.am
 
-appdefaultsdir = $(CDE_INSTALLATION_TOP)/app-defaults/C
+appdefaultsdir = $(CDE_DATA_TOP)/app-defaults/C
 
 dist_appdefaults_DATA = Ttsnoop
 

@@ -176,11 +176,11 @@ INT32		    i;
 IL_PRIVATE ilConvertRec _ilRGBToGray = {
     IL_NPF,                                     /* CheckFormat() */
     IL_STD_FORMAT_3BYTE_PIXEL,                  /* srcFormatCode */
-    ilAddElementRGBGrayConversions,             /* AddElement() */
+    (ilError (*)(ilByte *, unsigned short *, void *)) ilAddElementRGBGrayConversions, /* AddElement() */
     IL_DES_GRAY,                                /* pDstDes */
     IL_FORMAT_BYTE,                             /* pDstFormat */
     sizeof (ilRGBToGrayRec),                    /* nBytesPrivate */
-    ilInitRGBGrayConversions,                   /* Init() */
+    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitRGBGrayConversions, /* Init() */
     IL_NPF,                                     /* Cleanup() */
     IL_NPF,                                     /* Destroy() */
     ilExecuteRGBToGray                          /* Execute() */
@@ -266,7 +266,7 @@ IL_PRIVATE ilConvertRec _ilGrayToRGB = {
     IL_DES_RGB,                                 /* pDstDes */
     IL_FORMAT_3BYTE_PIXEL,                      /* pDstFormat */
     sizeof (ilRGBToGrayRec),                    /* nBytesPrivate */
-    ilInitRGBGrayConversions,                   /* Init() */
+    (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilInitRGBGrayConversions, /* Init() */
     IL_NPF,                                     /* Cleanup() */
     IL_NPF,                                     /* Destroy() */
     ilExecuteGrayToRGB                          /* Execute() */

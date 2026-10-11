@@ -81,7 +81,8 @@ make_goto(Calendar *c)
 	Goto 		*g;
 	XmString 	xmstr;
 	Widget		separator, button_form;
-	void 		goto_date(), g_cancel_cb();
+	void 		goto_date(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs);
+   void     g_cancel_cb(Widget  widget, XtPointer client_data, XmPushButtonCallbackStruct *cbs);
 	char		*title;
 
 	if (c->goTo == NULL) {
@@ -133,7 +134,7 @@ make_goto(Calendar *c)
 		XmNrightOffset, 	10,
 		XmNcolumns,		32,
                 NULL);
-        XtAddCallback(g->datetext, XmNactivateCallback, goto_date, NULL);
+        XtAddCallback(g->datetext, XmNactivateCallback, (void *) goto_date, NULL);
 
 
 	separator = XtVaCreateWidget("separator",
@@ -171,7 +172,7 @@ make_goto(Calendar *c)
 		XmNrightAttachment, 	XmATTACH_POSITION,
 		XmNrightPosition, 	1,
                 NULL);
-        XtAddCallback(g->datebutton, XmNactivateCallback, goto_date, NULL);
+        XtAddCallback(g->datebutton, XmNactivateCallback, (void *) goto_date, NULL);
 	XmStringFree(xmstr);
 
         xmstr = XmStringCreateLocalized(CATGETS(c->DT_catd, 1, 680, "Close"));
@@ -185,7 +186,7 @@ make_goto(Calendar *c)
 		XmNrightPosition, 	2,
 		XmNlabelString, 	xmstr,
                 NULL);
-	XtAddCallback(g->cancelbutton, XmNactivateCallback, g_cancel_cb, NULL);
+	XtAddCallback(g->cancelbutton, XmNactivateCallback, (void *) g_cancel_cb, NULL);
 	XmStringFree(xmstr);
 
 

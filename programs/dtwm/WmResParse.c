@@ -110,6 +110,14 @@ extern int errno;
 # define SYS_DT_WMRC     CDE_CONFIGURATION_TOP "/sys.dtwmrc"
 
 /*
+ * missing button definitions in X.h
+ */
+#define Button6	6
+#define Button7	7
+#define Button8	8
+#define Button9	9
+
+/*
  * Global Variables And Tables:
  */
 static char cfileName[MAXWMPATH+1];
@@ -153,7 +161,7 @@ static MaskTableEntry modifierStrings[] = {
 typedef struct {
    char         *event;
    unsigned int  eventType;
-   Boolean       (*parseProc)();
+   Boolean       (*parseProc)(unsigned char **linePP, unsigned int closure, unsigned int  *detail);
    unsigned int  closure;
    Boolean       fClick;
 } EventTableEntry;
@@ -247,14 +255,30 @@ static EventTableEntry buttonEvents[] = {
     {"btn5up",      ButtonRelease,  ParseImmed,    Button5,  FALSE},
     {"btn5click",   ButtonRelease,  ParseImmed,    Button5,  TRUE},
     {"btn5click2",  ButtonPress,    ParseImmed,    Button5,  TRUE},
-    { NULL, 0, (Boolean(*)())NULL,  0, FALSE}
+    {"btn6down",    ButtonPress,    ParseImmed,    Button6,  FALSE},
+    {"btn6up",      ButtonRelease,  ParseImmed,    Button6,  FALSE},
+    {"btn6click",   ButtonRelease,  ParseImmed,    Button6,  TRUE},
+    {"btn6click2",  ButtonPress,    ParseImmed,    Button6,  TRUE},
+    {"btn7down",    ButtonPress,    ParseImmed,    Button7,  FALSE},
+    {"btn7up",      ButtonRelease,  ParseImmed,    Button7,  FALSE},
+    {"btn7click",   ButtonRelease,  ParseImmed,    Button7,  TRUE},
+    {"btn7click2",  ButtonPress,    ParseImmed,    Button7,  TRUE},
+    {"btn8down",    ButtonPress,    ParseImmed,    Button8,  FALSE},
+    {"btn8up",      ButtonRelease,  ParseImmed,    Button8,  FALSE},
+    {"btn8click",   ButtonRelease,  ParseImmed,    Button8,  TRUE},
+    {"btn8click2",  ButtonPress,    ParseImmed,    Button8,  TRUE},
+    {"btn9down",    ButtonPress,    ParseImmed,    Button9,  FALSE},
+    {"btn9up",      ButtonRelease,  ParseImmed,    Button9,  FALSE},
+    {"btn9click",   ButtonRelease,  ParseImmed,    Button9,  TRUE},
+    {"btn9click2",  ButtonPress,    ParseImmed,    Button9,  TRUE},
+    { NULL,         0,              NULL,          0,        FALSE}
 };
 
 
 static EventTableEntry keyEvents[] = {
 
     {"key",         KeyPress,    ParseKeySym,    0,  FALSE},
-    { NULL,         0,    (Boolean(*)())NULL,    0,  FALSE}
+    { NULL,         0,           NULL,           0,  FALSE}
 };
 
 typedef struct _ConfigFileStackEntry {
@@ -290,7 +314,7 @@ typedef struct {
    unsigned int   resource;
    long           mgtMask;
    WmFunction     wmFunction;
-   Boolean       (*parseProc)();
+   Boolean       (*parseProc)(unsigned char **linePP, WmFunction wmFunction, String *pArgs);
 } FunctionTableEntry;
 
 
@@ -314,12 +338,12 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Circle_Down,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.circle_up",	F_SUBCONTEXT_IB_IICON|F_SUBCONTEXT_IB_WICON,
 			CRS_ANY,
 			0,
 			F_Circle_Up,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.create_workspace", 0,
 			CRS_ANY,
 			0,
@@ -406,7 +430,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Next_Key,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.next_workspace",	0,
 			CRS_ANY,
 			0,
@@ -458,7 +482,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Prev_Key,
-			ParseWmFuncGrpArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncGrpArg},
     {"f.prev_workspace",	0,
 			CRS_ANY,
 			0,
@@ -531,7 +555,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Send_Msg,
-			ParseWmFuncNbrArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncNbrArg},
     {"f.separator",	0,
 			CRS_MENU,
 			0,
@@ -546,7 +570,7 @@ FunctionTableEntry functionTable[] = {
 			CRS_ANY,
 			0,
 			F_Set_Context,
-			ParseWmFuncNbrArg},
+			(Boolean (*)(unsigned char **, Boolean (*)(char *, ClientData *, XEvent *), char **)) ParseWmFuncNbrArg},
     {"f.title",		0,
 			CRS_MENU,
 			0,
@@ -5341,7 +5365,7 @@ ParseWmFunctionArg (
      * Apply the function argument parser.
      */
     if ((functionTable[ix].wmFunction != wmFunc) ||
-	!(*(functionTable [ix].parseProc)) (&lineP, wmFunc, ppArg))
+	!(*(functionTable [ix].parseProc)) (&lineP, wmFunc, (char **) ppArg))
     {
 	bValidArg = False;
     }

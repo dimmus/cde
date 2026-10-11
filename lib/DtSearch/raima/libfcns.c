@@ -63,10 +63,8 @@
 #include "dbtype.h"
 
 /* Internal function prototypes */
-static int rec_okay(P1(int) Pi(int *) 
-				   Pi(RECORD_ENTRY * *));
-static int ctblcmp(P1(const unsigned char FAR*)
-                                  Pi(const unsigned char FAR*) Pi(int));
+static int rec_okay(int, int *, RECORD_ENTRY * *);
+static int ctblcmp(const unsigned char *, const unsigned char *, int);
 
 /* Check for valid db number and set curr_db, curr_db_table and curr_rn_table
 */
@@ -201,7 +199,7 @@ const char *f2    /* pointer to field 2 */
 	    return ( bytecmp(f1, f2, len) );
 	 else if ( fld_ptr->fd_dim[0] )
 	 {
-	    if ( db_global.ctbl_activ ) return ( ctblcmp(f1, f2, len) );
+	    if ( db_global.ctbl_activ ) return ( ctblcmp((const unsigned char *)f1, (const unsigned char *)f2, len) );
 	    else return ( strncmp(f1, f2, len) );
 	 }
 	 else

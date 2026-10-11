@@ -1157,7 +1157,7 @@ MakeDialog( DialogType dtype )
 
     int		width;
     
-    FILE	*fp, *fopen();
+    FILE	*fp;
     char	buffer[128];
 
     Widget	w = NULL, text;

@@ -36,6 +36,7 @@
  */
 
 #include "WmGlobal.h"
+#include "WmEwmh.h"
 #include "WmICCC.h"
 /*
  * include extern functions
@@ -1281,7 +1282,10 @@ void WithdrawWindow (ClientData *pCD)
     if (wmGD.nextKeyboardFocus == pCD)
 	wmGD.nextKeyboardFocus = NULL;
     if (wmGD.keyboardFocus == pCD)
+    {
 	wmGD.keyboardFocus = NULL;
+	UpdateNetActiveWindow ();
+    }
 
 /*
  * Fix for 5325 - Delete reference by dirty stack 

@@ -28,11 +28,11 @@
 
     /* local func */
 static void put_selection_entry(FILE *fp, int ent_type, bool is_valid, char *val, char *val2);
-static void	put_ims_conf(/* fp, sel */);
-static void	put_select_mode(/* fp, select_mode */);
-static void	put_selection_header(/* fp */);
-static void	put_selection_sep(/* fp */);
-static int	user_selection_fname(/* buf, buf_len, dpy_specific */);
+static void	put_ims_conf(FILE *fp, UserSelection *sel);
+static void	put_select_mode(FILE *fp, int select_mode);
+static void	put_selection_header(FILE *fp);
+static void	put_selection_sep(FILE *fp);
+static int	user_selection_fname(char *buf, int buf_len, int dpy_specific);
 
 static char	*SelectFileFormat = NULL;
 static bool	cmdconf_initialized = False;

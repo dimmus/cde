@@ -40,7 +40,7 @@
 
 #include "isam_impl.h"
 
-static int _check_typelen();
+static int _check_typelen(int type, int length);
 
 /*
  * _validate_keydesc(keydesc, minreclen)

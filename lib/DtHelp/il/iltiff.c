@@ -1157,7 +1157,7 @@ ilTIFFHeader            header;
         /*  File seems to be a valid TIFF file.  Create an ilFileRec object, init it
             and return ptr to it.
         */
-    pFile = (ilFilePtr)_ilCreateObject (context, IL_FILE, ilFreeFileList, sizeof(ilFileRec));
+    pFile = (ilFilePtr)_ilCreateObject (context, IL_FILE, (void (*)(ilByte *)) ilFreeFileList, sizeof(ilFileRec));
     if (!pFile)
         return (ilFile)NULL;                        /* context->error already set */
 

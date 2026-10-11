@@ -53,10 +53,6 @@ class ListUiItem : public PropUiItem {
 public:
   ListUiItem(Widget w, int source, char *search_key, DtVirtArray<char *> *alias_list);
   virtual ~ListUiItem(){;}; // we don't alloc any memory
-#ifdef DEAD_WOOD
-  virtual int getType(){ return _LIST_ITEM; };
-  virtual int getSource(){ return data_source; };
-#endif /* DEAD_WOOD */
   virtual void writeFromUiToSource();
   virtual void writeFromSourceToUi();
   virtual void AddDefaults();
@@ -64,11 +60,6 @@ public:
   virtual void handleAddButtonPress(){;};
   virtual void handleChangeButtonPress(){;};
   virtual void handleDeleteButtonPress(){;};
-
-private:
-#ifdef DEAD_WOOD
-  int data_source;
-#endif /* DEAD_WOOD */
 };
 
 #endif

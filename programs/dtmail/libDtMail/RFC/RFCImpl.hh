@@ -161,12 +161,6 @@ class RFCMessage : public DtMail::Message {
     virtual DtMail::BodyPart * newBodyPart(DtMailEnv &,
 					   DtMail::BodyPart *);
 
-#ifdef DEAD_WOOD
-    virtual void newBodyPartOrder(DtMailEnv &,
-				  DtMail::BodyPart *,
-				  const int) { };
-#endif /* DEAD_WOOD */
-
     virtual void setFlag(DtMailEnv &,
 			 const DtMailMessageState);
     
@@ -510,10 +504,6 @@ class RFCBodyPart : public DtMail::BodyPart {
     virtual char *csFromContentType(DtMailValueSeq & value) = 0;
 	// End of For CHARSET
 
-#ifdef DEAD_WOOD
-    virtual DtMailChecksumState checksum(DtMailEnv &) = 0;
-#endif /* DEAD_WOOD */
-
     // Methods below this point are specific to RFCBodyPart.
     //
     virtual char *writeBodyParts(char * buf) = 0;
@@ -579,10 +569,6 @@ class MIMEBodyPart : public RFCBodyPart {
 		 const char ** end,
 		 const char * boundary);
 
-#ifdef DEAD_WOOD
-    virtual DtMailChecksumState checksum(DtMailEnv &);
-#endif /* DEAD_WOOD */
-
     char *writeBodyParts(char * buf);
 
     int rfcSize(const char * boundary, DtMailBoolean &);
@@ -622,10 +608,6 @@ class V3BodyPart : public RFCBodyPart {
 	       DtMail::Message * parent,
 	       const char * start,
 	       const char ** end);
-
-#ifdef DEAD_WOOD
-    virtual DtMailChecksumState checksum(DtMailEnv &);
-#endif /* DEAD_WOOD */
 
     char *writeBodyParts(char * buf);
 
@@ -707,9 +689,6 @@ class RFCMailBox : public DtMail::MailBox
 					const DtMailHeaderRequest &,
 					DtMailHeaderLine &);
     virtual const char		*impl(DtMailEnv & error);
-#ifdef DEAD_WOOD
-    virtual int			 messageCount(DtMailEnv &);
-#endif /* DEAD_WOOD */
     virtual DtMail::Message	*newMessage(DtMailEnv &);
     virtual DtMailCallbackOp	 retrieveNewMail(DtMailEnv&);
     virtual void		 updateMailRetrievalPassword(char *passwd=NULL);
@@ -967,14 +946,8 @@ class RFCValue : public DtMailValue {
     virtual const char * operator= (const char *);
 
     virtual DtMailValueDate toDate(void);
-#ifdef DEAD_WOOD
-    virtual void fromDate(const DtMailValueDate &) { }
-#endif /* DEAD_WOOD */
 
     virtual DtMailAddressSeq * toAddress(void);
-#ifdef DEAD_WOOD
-    virtual void fromAddress(const DtMailAddressSeq &) { }
-#endif /* DEAD_WOOD */
     virtual const char * raw(void);
 
   protected:

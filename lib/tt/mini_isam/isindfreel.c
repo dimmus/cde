@@ -39,8 +39,6 @@
 
 #include "isam_impl.h"
 
-extern Bufhdr *_isdisk_fix();
-
 /*
  * blkno = _isfreel_alloc()
  *

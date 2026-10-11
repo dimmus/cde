@@ -144,7 +144,7 @@ static STRING	dtcodegenCmdList[] =
     "",				/* exe-dir filled in at run time */
     "",				/* exe-dir/../abmf : filled in at runtime */
     "dtcodegen", 
-    "/usr/dt/bin/dtcodegen", 
+    CDE_INSTALLATION_TOP "/bin/dtcodegen",
     NULL
 };
 

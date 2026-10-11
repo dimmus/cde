@@ -142,7 +142,7 @@ static Boolean NewAllocColor( XtPointer shell) ;
 static Boolean NewBottomColor( XtPointer shell) ;
 static Boolean NewCreateButtons( XtPointer shell) ;
 
-extern void WaitChildDeath(void);
+extern void WaitChildDeath(int notused);
 
 /*++++++++++++++++++++++++++++++++++++++*/
 /* Internal Variables                   */
@@ -561,9 +561,9 @@ malloc_trace(0);
     string = (char *)XtMalloc(strlen(style.home) + strlen("/.dt/backdrops:") + 1);
     sprintf(string, "%s/.dt/backdrops:", style.home);
 
-    dirs = (char *)XtCalloc(1, strlen("/etc/dt/backdrops:/usr/dt/backdrops") + 
+    dirs = (char *)XtCalloc(1, strlen(CDE_CONFIGURATION_TOP "/backdrops:" CDE_DATA_TOP "/backdrops") +
 			    (style.xrdb.backdropDir == NULL ? 2 :
-			    strlen(style.xrdb.backdropDir)) + 
+			    strlen(style.xrdb.backdropDir)) +
 			    strlen(string) + 2);
   
 
@@ -573,7 +573,7 @@ malloc_trace(0);
 	strcat(dirs, style.xrdb.backdropDir);
 	strcat(dirs, ":"); 
       }
-    strcat(dirs, "/etc/dt/backdrops:/usr/dt/backdrops");
+    strcat(dirs, CDE_CONFIGURATION_TOP "/backdrops:" CDE_DATA_TOP "/backdrops");
 
     _DtWsmSetBackdropSearchPath(style.screen, dirs, style.useMultiColorIcons);
 
@@ -601,11 +601,11 @@ malloc_trace(0);
       GetDefaultPal(style.shell);
     }
     
-    signal(SIGINT,(void (*)())activateCB_exitBtn); 
-    signal(SIGTERM,(void (*)())activateCB_exitBtn); 
+    signal(SIGINT, activateCB_exitBtnSignal); 
+    signal(SIGTERM, activateCB_exitBtnSignal); 
 
     /* to avoid defunct screen saver processes */    
-    signal(SIGCHLD, (void (*)())WaitChildDeath);
+    signal(SIGCHLD, WaitChildDeath);
 
     /* backdrop dialog  needs to know when the workspace changes to recolor 
        the bitmap displayed in the dialog */
@@ -1071,11 +1071,11 @@ NewCreateButtons(
  * 
  *************************************<->***********************************/
 void
-WaitChildDeath( void )
+WaitChildDeath( int notused )
 {
   int   stat_loc;
   
   wait(&stat_loc);
-  signal(SIGCHLD,(void (*)())WaitChildDeath);
+  signal(SIGCHLD, WaitChildDeath);
 
 }

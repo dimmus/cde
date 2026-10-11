@@ -82,13 +82,9 @@
 #include "cmfns.h"
 #endif
 
-static void tb_cancel_cb();
+static void tb_cancel_cb(Widget widget, XtPointer client_data, XmPushButtonCallbackStruct *cb);
 static void tempbr_show_cb(Widget w, XtPointer data, XtPointer cbs);
-#if defined(__linux__)
 #include <string.h>
-#else
-extern char *strdup(const char *);
-#endif
 
 #ifdef FNS_DEMO
 /* This stuff is currently broken */
@@ -306,7 +302,7 @@ make_std_tempbr(Calendar *c)
                 NULL);
 	XmStringFree(label_str);
         XtAddCallback(tb->cancel_button, 
-			XmNactivateCallback, tb_cancel_cb, NULL);
+			XmNactivateCallback, (void *) tb_cancel_cb, NULL);
 
         label_str = XmStringCreateLocalized(CATGETS(c->DT_catd, 1, 77, "Help"));
         tb->help_button = XtVaCreateWidget("helpButton",

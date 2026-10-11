@@ -247,7 +247,7 @@ void			vwr_reset(
 			    Viewer *v
 			);
 
-VNode			vwr_traverse_tree();
+ViewerNode *vwr_traverse_tree(ViewerNode *tree, int (*)(ViewerNode *));
 
 void			vwr_init_elements(
 			    VNode	vnode

@@ -247,7 +247,7 @@ TTmedia_ptype_declareCB(
 	char *		docname)
 {
     Editor *pPad;
-    Tt_message TTdt_message_acceptCB();
+    Tt_message TTdt_message_acceptCB(Tt_message, void *, Tt_message);
     Tt_pattern *ttrc;
     DtEditorContentRec  contentRec;
     DtEditorErrorCode   errorCode;

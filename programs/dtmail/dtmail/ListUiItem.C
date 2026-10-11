@@ -52,10 +52,6 @@ ListUiItem::ListUiItem(Widget w,
 		       DtVirtArray<char *> *alias_list
 		       ):PropUiItem(w, source, search_key)
 {
-#ifdef DEAD_WOOD
-  data_source = source;
-#endif /* DEAD_WOOD */
-  
   if(alias_list != NULL)
      options_list_init(w, alias_list);
 

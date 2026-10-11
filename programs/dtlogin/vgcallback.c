@@ -103,7 +103,7 @@ extern  LogoInfo	logoInfo; /* information about the logo		   */
  *
  ***************************************************************************/
 
-static void PingLost( void ) ;
+static int PingLost( Display *d ) ;
 static SIGVAL PingBlocked( int arg ) ;
 static void ProcessTraversal( Widget w, int direction) ;
 static void _DtShowDialog(DialogType dtype, XmString msg);
@@ -904,11 +904,12 @@ static int	serverDead = FALSE;
 static int	pingInterval = 0;	/* ping interval (sec.)		   */
 static int	pingTimeout;		/* ping timeout (sec.)		   */
 
-static void 
-PingLost( void )
+static int 
+PingLost( Display *d )
 {
     serverDead = TRUE;
     siglongjmp (pingTime, 1);
+    return 0;		/* not reached */
 }
 
 
@@ -924,11 +925,11 @@ PingBlocked( int arg )
 int 
 PingServer( void )
 {
-    int	    (*oldError)();
-    SIGVAL  (*oldSig)();
+    int	    (*oldError)(Display *);
+    SIGVAL  (*oldSig)(int);
     int	    oldAlarm;
 
-    oldError = XSetIOErrorHandler ((XIOErrorHandler)PingLost);
+    oldError = XSetIOErrorHandler (PingLost);
     oldAlarm = alarm (0);
     oldSig = signal (SIGALRM, PingBlocked);
     alarm (pingTimeout * 60);
@@ -1450,10 +1451,8 @@ RespondLangCB( Widget w, XtPointer client, XtPointer call)
 	/** but it does work ok.                          **/
 	/** notice the related code in chooser.c at the   **/
 	/** beginning of main.                            **/
-	char buff[128];
 	if (XmToggleButtonGadgetGetState(w)) {
-	    snprintf(buff, sizeof(buff), "LANG=%s", (char *) client);
-	    putenv(buff);
+	    setenv("LANG", client, 1);
 	    execv(orig_argv[0], orig_argv);
 	}
   } else {

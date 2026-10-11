@@ -342,94 +342,94 @@ static DialogResource resources[] =
 {
    { "show_type", SHOW_TYPE, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, show_type),
-      (XtPointer) SINGLE_DIRECTORY, ShowTypeToString },
+      (XtPointer) SINGLE_DIRECTORY, (WriteResourceProc) ShowTypeToString },
 
    { "tree_files", TREE_FILES, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, tree_files),
-      (XtPointer) TREE_FILES_NEVER, TreeFilesToString },
+      (XtPointer) TREE_FILES_NEVER, (WriteResourceProc) TreeFilesToString },
 
    { "view_single", VIEW, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, view_single),
-      (XtPointer) BY_NAME_AND_ICON, ViewToString },
+      (XtPointer) BY_NAME_AND_ICON, (WriteResourceProc) ViewToString },
 
    { "view_tree", VIEW, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, view_tree),
-      (XtPointer) BY_NAME_AND_SMALL_ICON, ViewToString },
+      (XtPointer) BY_NAME_AND_SMALL_ICON, (WriteResourceProc) ViewToString },
 
    { "order", ORDER, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, order),
-      (XtPointer) ORDER_BY_ALPHABETICAL, OrderToString },
+      (XtPointer) ORDER_BY_ALPHABETICAL, (WriteResourceProc) OrderToString },
 
    { "direction", DIRECTION_RESRC, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, direction),
-      (XtPointer) DIRECTION_ASCENDING, DirectionToString },
+      (XtPointer) DIRECTION_ASCENDING, (WriteResourceProc) DirectionToString },
 
    { "positionEnabled", RANDOM, sizeof(unsigned char),
       XtOffset(FileMgrDataPtr, positionEnabled),
-      (XtPointer) RANDOM_OFF, RandomToString },
+      (XtPointer) RANDOM_OFF, (WriteResourceProc) RandomToString },
 
    { "host", XmRString, sizeof(String),
-      XtOffset(FileMgrDataPtr, host), (XtPointer) NULL, _DtStringToString },
+      XtOffset(FileMgrDataPtr, host), (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 
    { "current_directory", XmRString, sizeof(String),
       XtOffset(FileMgrDataPtr, current_directory),
-      (XtPointer) "~", _DtStringToString },
+      (XtPointer) "~", (WriteResourceProc) _DtStringToString },
 
    { "branch_list", BRANCH_LIST, sizeof(XtPointer),
       XtOffset(FileMgrDataPtr, branch_list),
-      (XtPointer) NULL, BranchListToString },
+      (XtPointer) NULL, (WriteResourceProc) BranchListToString },
 
    { "restricted_directory", XmRString, sizeof(String),
       XtOffset(FileMgrDataPtr, restricted_directory),
-      (XtPointer) NULL, _DtStringToString },
+      (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 
    { "title", XmRString, sizeof(String),
       XtOffset(FileMgrDataPtr, title),
-      (XtPointer) NULL, _DtStringToString },
+      (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 
    { "helpVol", XmRString, sizeof(String),
       XtOffset(FileMgrDataPtr, helpVol),
-      (XtPointer) NULL, _DtStringToString },
+      (XtPointer) NULL, (WriteResourceProc) _DtStringToString },
 
    { "selection_list", SELECTION_LIST, sizeof(XtPointer),
       XtOffset(FileMgrDataPtr, selection_list),
-      (XtPointer) NULL, SelectionListToString },
+      (XtPointer) NULL, (WriteResourceProc) SelectionListToString },
 
    { "show_iconic_path", XmRBoolean, sizeof(Boolean),
       XtOffset(FileMgrDataPtr, show_iconic_path),
-      (XtPointer) True, _DtBooleanToString },
+      (XtPointer) True, (WriteResourceProc) _DtBooleanToString },
 
    { "show_current_directory", XmRBoolean, sizeof(Boolean),
       XtOffset(FileMgrDataPtr, show_current_dir),
-      (XtPointer) False, _DtBooleanToString },
+      (XtPointer) False, (WriteResourceProc) _DtBooleanToString },
 
    { "show_status_line", XmRBoolean, sizeof(Boolean),
       XtOffset(FileMgrDataPtr, show_status_line),
-      (XtPointer) True, _DtBooleanToString },
+      (XtPointer) True, (WriteResourceProc) _DtBooleanToString },
 
    { "fast_cd_enabled", XmRBoolean, sizeof(Boolean),
       XtOffset(FileMgrDataPtr, fast_cd_enabled),
-      (XtPointer) False, _DtBooleanToString },
+      (XtPointer) False, (WriteResourceProc) _DtBooleanToString },
 
    { "toolbox", XmRBoolean, sizeof(Boolean),
       XtOffset(FileMgrDataPtr, toolbox),
-      (XtPointer) False, _DtBooleanToString },
+      (XtPointer) False, (WriteResourceProc) _DtBooleanToString },
 
    { "show_hid_enabled", XmRBoolean, sizeof(Boolean),
       XtOffset(FileMgrDataPtr, show_hid_enabled),
-      (XtPointer) False, _DtBooleanToString },
+      (XtPointer) False, (WriteResourceProc) _DtBooleanToString },
 
    { "secondaryHelpDialogCount", XmRInt, sizeof(int),
       XtOffset(FileMgrDataPtr, secondaryHelpDialogCount),
-      (XtPointer) 0, _DtIntToString },
+      (XtPointer) 0, (WriteResourceProc) _DtIntToString },
 
    { "attr_dialog_count", XmRInt, sizeof(int),
       XtOffset(FileMgrDataPtr, attr_dialog_count),
-      (XtPointer) 0, _DtIntToString },
+      (XtPointer) 0, (WriteResourceProc) _DtIntToString },
 
    { "trashcan", XmRBoolean, sizeof(Boolean),
      XtOffset(FileMgrDataPtr, IsTrashCan),
-     (XtPointer) False, _DtBooleanToString },
+     (XtPointer) False, (WriteResourceProc) _DtBooleanToString },
 };
 
 

@@ -40,9 +40,6 @@
  *
  *+ENOTICE
  */
-#ifndef I_HAVE_NO_IDENT
-#endif
-
 #ifndef _DTMAIL_HH
 #define _DTMAIL_HH
 
@@ -227,9 +224,6 @@ class DtMail {
 				      BusyApplicationCallback,
 				      void * client_data);
 
-#ifdef DEAD_WOOD
-	    void unregisterBusyCallback(DtMailEnv &);
-#endif /* DEAD_WOOD */
 
 	    void setBusyState(DtMailEnv &, DtMailBusyState busy_state);
 
@@ -530,11 +524,6 @@ class DtMail {
 	    virtual BodyPart * newBodyPart(DtMailEnv &,
 					   BodyPart * after) = 0;
 	    
-#ifdef DEAD_WOOD
-	    virtual void newBodyPartOrder(DtMailEnv &,
-					  BodyPart * new_order,
-					  const int bodypart_count) = 0;
-#endif /* DEAD_WOOD */
 
 	    virtual void setFlag(DtMailEnv &,
 				 const DtMailMessageState) = 0;
@@ -699,9 +688,6 @@ class DtMail {
 		virtual char *csFromContentType(DtMailValueSeq & value) = 0;
         // End of For CHARSET
 
-#ifdef DEAD_WOOD
-	    virtual DtMailChecksumState checksum(DtMailEnv &) = 0;
-#endif /* DEAD_WOOD */
 
 	  protected:
 	    BodyPart(DtMailEnv &, Message * parent);
@@ -793,9 +779,6 @@ class DtMail {
 	    virtual void unlock() = 0;
 	    virtual void save() = 0;
 
-#ifdef DEAD_WOOD
-	    virtual int messageCount(DtMailEnv & error) = 0;
-#endif /* DEAD_WOOD */
 
 	    virtual DtMailMessageHandle getFirstMessageSummary(
 					DtMailEnv & error,

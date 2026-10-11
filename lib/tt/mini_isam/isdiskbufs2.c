@@ -62,9 +62,13 @@ extern struct dlink *_isdln_next(), *_isdln_first();
 #define _isdln_isempty(l)  _isdln_base_isempty(base,(l))
 
 /*---------------------- Local data ---------------------------------------*/
-static Bufhdr *_getavail(), *_findblock();
-static void _disk_init(), _commit1buffer(), _rollback1buffer(), _flush1buffer();
-static void _makenodata();
+static Bufhdr *_getavail(void);
+static Bufhdr *_findblock(Fcb *fcb, int unixfd, Blkno blkno);
+static void _disk_init(void);
+static void _commit1buffer(Bufhdr *p);
+static void _rollback1buffer(Bufhdr *p);
+static void _flush1buffer(Bufhdr *p);
+static void _makenodata(Bufhdr *p);
 
 Bufhdr bufhdrs [ISMAXBUFFERS];
 struct dlink  hashhdrs [ISHASHHDRS];	     /* Heads of hashed lists */

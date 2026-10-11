@@ -58,7 +58,7 @@ typedef struct {
         char      *label;         /* PushButton's default Label */
         int       msg_set;        /* set from which PushButton's Label is taken */
         int       msg_num;        /* message number of PushButton's Label */
-        void      (*callback)();  /* pointer to callback routine */
+        void      (*callback)(Widget widget, XtPointer client_data,	XtPointer call_data);  /* pointer to callback routine */
         XtPointer data;           /* client data for callback routine */
 } ActionAreaItem;
 

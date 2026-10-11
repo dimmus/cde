@@ -62,7 +62,7 @@ ACTION Print
         ARG_TYPE        MAN_PAGE
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dtlp -a "%Arg_1%"
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dtlp -a "%Arg_1%"
 }
 
 XCOMM ##########################################################
@@ -114,7 +114,7 @@ ACTION PrintTarList
         WINDOW_TYPE     NO_STDIO
         EXEC_STRING     sh -c ' \
                         tar -tvf "%(File)Arg_1%" | \
-                           /usr/dt/bin/dtlp -u "%|nls-10003-#Archive Li#|"'
+                           CDE_INSTALLATION_TOP/bin/dtlp -u "%|nls-10003-#Archive Li#|"'
 	DESCRIPTION	%|nls-10006-#The TarList#|
 }
 ACTION TarUnpack
@@ -458,13 +458,13 @@ ACTION Tar
 	EXEC_STRING	\
           sh -c ' \
            if [ "%(File)Args%" = "" ] ; then \
-                /usr/dt/bin/dterror.ds \
+                CDE_INSTALLATION_TOP/bin/dterror.ds \
             "%|nls-10036-#The#|" \
             "%|nls-10037-#Invalid#|" \
             "%|nls-6-#OK#|" ; \
            else \
            true %(File)Args%; \
-           /usr/dt/bin/dterror.ds \
+           CDE_INSTALLATION_TOP/bin/dterror.ds \
             "%|nls-10036-#The#|" \
             "%|nls-10037-#Invalid#|" \
             "%|nls-6-#OK#|" \

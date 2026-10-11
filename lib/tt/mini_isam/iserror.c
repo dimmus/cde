@@ -48,7 +48,7 @@
  * Fatal error. Display message and terminate program.
  */
 
-static int (*fatal_error_user_handler)();    /* set by iscntl(..,ISCNTL_FATAL,..) */
+static int (*fatal_error_user_handler)(char *);    /* set by iscntl(..,ISCNTL_FATAL,..) */
 
 void 
 _isfatal_error(char *msg)
@@ -109,10 +109,10 @@ _isam_warning(char *msg)
 }
 
 /* Set user specified fatal_error handler */
-int  _isfatal_error_set_func(int(*func)())
+int  _isfatal_error_set_func(int(*func)(char *))
 {
 #if 0
-    int		(*oldfunc)();
+    int		(*oldfunc)(char *);
 
     oldfunc = fatal_error_user_handler;
 #endif

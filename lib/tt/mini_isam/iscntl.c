@@ -70,7 +70,7 @@
  *
  */
 
-typedef int (* intfunc)();
+typedef int (* intfunc)(char *);
 
 int 
 iscntl(int isfd, int func, ...)

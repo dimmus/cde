@@ -45,9 +45,6 @@
 #ifndef _TEMPLATESLISTUIITEM_HH
 #define _TEMPLATESLISTUIITEM_HH
 
-#ifdef DEAD_WOOD
- extern void handleDoubleSelection(Widget w, XtPointer clientdata, XtPointer calldata);
-#endif /* DEAD_WOOD */
 // CLASS TemplateListUiItem
 // derived class for prop sheet glue items for textfield
 ///////////////////////////////////////////////////////////

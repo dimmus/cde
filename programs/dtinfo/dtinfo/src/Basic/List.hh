@@ -40,6 +40,13 @@
  *                  1315 Dell Avenue, Campbell, CA  95008
  * 
  */
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+
 
 
 

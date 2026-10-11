@@ -31,6 +31,9 @@
  * Copyright (c) 1993 by Sun Microsystems, Inc.
  */
 
+#if HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -38,10 +41,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-#if defined(__linux__)
-# include <sys/poll.h>
-#else
+#if HAVE_POLL_H
 # include <poll.h>
+#elif HAVE_SYS_POLL_H
+# include <sys/poll.h>
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>

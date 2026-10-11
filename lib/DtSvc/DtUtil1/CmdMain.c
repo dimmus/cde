@@ -1178,9 +1178,9 @@ _DtActionCommandInvoke(
         char * execHost,
         char * procId,
         char * tmpFiles,
-        void (*success_proc)(),
+        void (*success_proc)(char *, void *),
         void *success_data,
-        void (*failure_proc)(),
+        void (*failure_proc)(char *, void *),
         void *failure_data)
 {
 	int status;

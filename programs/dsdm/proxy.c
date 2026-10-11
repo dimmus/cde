@@ -183,7 +183,7 @@ extern Window proxy_win;
 extern Atom ATOM_DRAGDROP_INTEREST;
 extern Atom ATOM_WM_STATE;
 
-unsigned char *GetInterestProperty();
+unsigned char *GetInterestProperty(Display *dpy, Window win, unsigned long *nitems);
 
 static int ForwardConversion(XSelectionEvent *event, drop_info_t *drop_info);
 

@@ -97,14 +97,8 @@ class DtMailValue : public DtCPlusPlusAllocator {
     virtual const char * operator= (const char *);
 
     virtual DtMailValueDate toDate(void);
-#ifdef DEAD_WOOD
-    virtual void fromDate(const DtMailValueDate &);
-#endif /* DEAD_WOOD */
 
     virtual DtMailAddressSeq * toAddress(void);
-#ifdef DEAD_WOOD
-    virtual void fromAddress(const DtMailAddressSeq & list);
-#endif /* DEAD_WOOD */
 
     // This method gives the raw format used to store the value.
     //

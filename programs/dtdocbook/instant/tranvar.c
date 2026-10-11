@@ -785,27 +785,27 @@ Find(
     if (StrEq(av[1], "gi")) {
 	DS.gi     = av[2];
 	DS.action = atoi(av[3]);
-	DescendTree(e, tr_find_gi, 0, 0, &DS);
+	DescendTree(e, (void (*)(Element_t *, void *)) tr_find_gi, 0, 0, &DS);
     }
     /* Find elem whose GI is av[2] and whose parent GI is av[3] */
     else if (StrEq(av[1], "gi-parent")) {
 	DS.gi     = av[2];
 	DS.gi2    = av[3];
 	DS.action = atoi(av[4]);
-	DescendTree(e, tr_find_gipar, 0, 0, &DS);
+	DescendTree(e, (void (*)(Element_t *, void *)) tr_find_gipar, 0, 0, &DS);
     }
     /* Find elem whose parent GI is av[2] */
     else if (StrEq(av[0], "parent")) {
 	DS.gi     = av[2];
 	DS.action = atoi(av[3]);
-	DescendTree(e, tr_find_parent, 0, 0, &DS);
+	DescendTree(e, (void (*)(Element_t *, void *)) tr_find_parent, 0, 0, &DS);
     }
     /* Find elem whose attribute av[2] has value av[3] */
     else if (StrEq(av[0], "attr")) {
 	DS.gi     = av[2];
 	DS.gi2    = av[3];
 	DS.action = atoi(av[4]);
-	DescendTree(e, tr_find_attr, 0, 0, &DS);
+	DescendTree(e, (void (*)(Element_t *, void *)) tr_find_attr, 0, 0, &DS);
     }
 }
 

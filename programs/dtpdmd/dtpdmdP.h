@@ -208,44 +208,44 @@ typedef struct
  */
 
 /* dispatch.c */
-extern void dispatch_mgr();
-extern void dispatch_mbox();
-extern void dispatch_targets();
-extern void dispatch_multiple();
-extern void dispatch_timestamp();
-extern void dispatch_not_supported();
+extern void dispatch_mgr(XEvent *report);
+extern void dispatch_mbox(XEvent *report);
+extern void dispatch_targets(XEvent *report);
+extern void dispatch_multiple(XEvent *report);
+extern void dispatch_timestamp(XEvent *report);
+extern void dispatch_not_supported(XEvent *report);
 
 /* dtpdmd.c */
 extern XpPdmGlobals g;
 
 /* mailbox.c */
-extern void mbox_initialize();
-extern void mbox_build();
-extern void mbox_reply();
-extern void mbox_receive();
+extern void mbox_initialize(XEvent *report, XpPdmServiceRec *rec);
+extern void mbox_build(XpPdmServiceRec *rec);
+extern void mbox_reply(XpPdmServiceRec *rec);
+extern void mbox_receive(XpPdmServiceRec *rec, XEvent *report);
 
 /* manager.c */
-extern void mgr_initialize();
-extern void mgr_launch_pdm();
-extern void mgr_fetch_pdm();
-extern void mgr_launch_reply();
-extern void mgr_shutdown_reply();
-extern void mgr_shutdown_scan();
+extern void mgr_initialize(XEvent *report, XpPdmServiceRec *rec);
+extern void mgr_launch_pdm(XpPdmServiceRec *rec);
+extern void mgr_fetch_pdm(XpPdmServiceRec *rec);
+extern void mgr_launch_reply(XpPdmServiceRec *rec );
+extern void mgr_shutdown_reply(XpPdmServiceRec *rec );
+extern void mgr_shutdown_scan(void);
 
 /* records.c */
-extern XpPdmServiceRec *find_rec();
-extern XpPdmServiceRec *find_rec_by_mbox_win();
+extern XpPdmServiceRec *find_rec(Window requestor);
+extern XpPdmServiceRec *find_rec_by_mbox_win(Window window);
 extern void delete_rec( XpPdmServiceRec *rec );
 
 /* setup.c */
-extern Bool _PdmMgrSetup();
+extern Bool _PdmMgrSetup(Display *sel_display, Window sel_window, Bool security_flag);
 
 /* util.c */
 extern jmp_buf xio_quickie_jmp_buf;
-extern int xio_quickie_handler();
-extern char *xpstrdup();
-extern int xpstrspn();
-extern int xpstrcspn();
-extern char *xpstrtok();
-extern void xp_add_argv();
+extern int xio_quickie_handler(Display *dpy);
+extern char *xpstrdup(char *);
+extern int xpstrspn(char *s1, char *s2);
+extern int xpstrcspn(char *s1, char *s2);
+extern char *xpstrtok(char *s1, char *s2);
+extern void xp_add_argv(char ***argv, char *str);
 

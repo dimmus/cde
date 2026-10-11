@@ -35,12 +35,12 @@
 #define ON_DEBUG(x)
 #endif
 
-static Boolean SetValues();
-static void Initialize();
-static void Destroy();
-static void Resize();
-static void ReDisplay();
-static XtGeometryResult QueryGeometry();
+static Boolean SetValues(PixmapWidget current, PixmapWidget request, PixmapWidget new, ArgList args, Cardinal *num_args);
+static void Initialize(PixmapWidget req, PixmapWidget new, ArgList args, Cardinal *nargs);
+static void Destroy(PixmapWidget w);
+static void Resize(PixmapWidget w);
+static void ReDisplay(PixmapWidget w, XExposeEvent *event, struct _XRegion *unused);
+static XtGeometryResult QueryGeometry(PixmapWidget w, XtWidgetGeometry *proposed, XtWidgetGeometry *answer);
 
 /*
 static char *defaultTranslations[] = {""};
@@ -62,7 +62,7 @@ PixmapClassRec  pixmapClassRec = {
     /* class_initialize		*/	NULL,
     /* class_part_initialize	*/	NULL,
     /* class_inited		*/	FALSE,
-    /* initialize		*/	Initialize,
+    /* initialize		*/	(void (*)(struct _WidgetRec *, struct _WidgetRec *, ArgList, Cardinal *)) Initialize,
     /* initialize_hook		*/	NULL,
     /* realize			*/	XtInheritRealize,
     /* actions			*/	NULL,
@@ -74,10 +74,10 @@ PixmapClassRec  pixmapClassRec = {
     /* compress_exposure	*/	FALSE,
     /* compress_enterleave	*/	TRUE,
     /* visible_interest		*/	FALSE,
-    /* destroy			*/	Destroy,
-    /* resize			*/	Resize,
-    /* expose			*/	ReDisplay,
-    /* set_values		*/	SetValues,
+    /* destroy			*/	(XtWidgetProc) Destroy,
+    /* resize			*/	(XtWidgetProc) Resize,
+    /* expose			*/	(void (*)(struct _WidgetRec *, XEvent *, struct _XRegion *)) ReDisplay,
+    /* set_values		*/	(Boolean (*)(Widget, Widget, Widget, ArgList, Cardinal *)) SetValues,
     /* set_values_hook		*/	NULL,
     /* set_values_almost	*/	XtInheritSetValuesAlmost,
     /* get_values_hook		*/	NULL,
@@ -85,7 +85,8 @@ PixmapClassRec  pixmapClassRec = {
     /* version			*/	XtVersion,
     /* callback_private		*/	NULL,
     /* tm_table			*/	0, /* defaultTranslations*/
-    /* query_geometry		*/	QueryGeometry,
+    /* query_geometry		*/	(XtGeometryResult
+(*)(Widget, XtWidgetGeometry *, XtWidgetGeometry *)) QueryGeometry,
     /* display_accelerator	*/	XtInheritDisplayAccelerator,
     /* extension		*/	NULL
   },
@@ -208,7 +209,7 @@ QueryGeometry(PixmapWidget w, XtWidgetGeometry *proposed, XtWidgetGeometry *answ
 #endif
 
 static void
-ReDisplay(PixmapWidget w, XExposeEvent *event)
+ReDisplay(PixmapWidget w, XExposeEvent *event, struct _XRegion *unused)
 {
   ON_DEBUG(fprintf(stderr, "PixmapWidget: EXPOSE\n"));
 

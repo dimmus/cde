@@ -116,7 +116,7 @@
 #if defined(_AIX)
   #define DEF_NLS_DIR	"/usr/lib/nls/loc"
 #else
-  #define DEF_NLS_DIR	CDE_INSTALLATION_TOP "/lib/nls/msg"
+  #define DEF_NLS_DIR	CDE_DATA_TOP "/lib/nls/msg"
 #endif
 
 #if defined(sun)
@@ -657,7 +657,7 @@ extern struct display * FindDisplayBySessionID(
 			CARD32 sessionID) ;
 
 extern void ForEachDisplay(
-			void (*f)()) ;
+			void (*f)(struct display *)) ;
 extern struct display * NewDisplay(
 			char *name,
 			char *class) ;

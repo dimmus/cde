@@ -21,3 +21,16 @@ sheet.C: sheet.yy
 
 token.C: token.ll
 	$(LEX) $(AM_LFLAGS) -P schema -o $@ $<
+
+EXTRA_DIST = \
+    sheet.yy \
+    token.ll
+
+noinst_HEADERS = \
+    agent_desc.h \
+    container_desc.h \
+    desc.h \
+    index_desc.h \
+    inv_desc.h \
+    object_dict.h \
+    stored_object_desc.h

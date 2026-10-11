@@ -61,7 +61,7 @@ ACTION Print
         ARG_TYPE        TEXTFILE
         TYPE            COMMAND
         WINDOW_TYPE     NO_STDIO
-        EXEC_STRING     /usr/dt/bin/dtlp "%Arg_1%"
+        EXEC_STRING     CDE_INSTALLATION_TOP/bin/dtlp "%Arg_1%"
 }
 
 XCOMM ##########################################################################
@@ -83,7 +83,7 @@ ACTION PRINT_DTPAD_TEMPFILE
 {
 	TYPE		COMMAND
 	WINDOW_TYPE	NO_STDIO
-	EXEC_STRING 	/usr/dt/bin/dtlp -u "%(String)Arg_2%" -e "%(File)Arg_1%"
+	EXEC_STRING 	CDE_INSTALLATION_TOP/bin/dtlp -u "%(String)Arg_2%" -e "%(File)Arg_1%"
 }
 
 XCOMM #####################

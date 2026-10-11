@@ -16,3 +16,14 @@ sgml.C: sgml.ll
 
 ps.C: ps.ll
 	$(LEX) $(AM_LFLAGS) -P ps -o $@ $<
+
+EXTRA_DIST = \
+    ps.ll \
+    sgml.ll
+
+noinst_HEADERS = \
+    abs_agent.h \
+    huffman.h \
+    lzss.h \
+    trie.h \
+    zip.h

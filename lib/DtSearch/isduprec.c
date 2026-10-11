@@ -98,7 +98,7 @@ unsigned long   duprec_hashsize = HASHSIZE;
  */
 typedef struct hash_tag {
     struct hash_tag *link;
-    char            recid[2];	/* actual array size varies */
+    char            recid[];	/* C99 flexible array member */
 }               HASHNODE;
 
 

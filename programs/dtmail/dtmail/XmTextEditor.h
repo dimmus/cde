@@ -135,14 +135,6 @@ class XmTextEditor : public Editor
 					 void *, 
 					 void *
 					 );
-#ifdef DEAD_WOOD
-    static void focus_callback(
-			       Widget, 
-			       void *, 
-			       void *
-			      );
-#endif /* DEAD_WOOD */
-
   private:
     struct PSClientData {
 	XmTextEditor *obj;

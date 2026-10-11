@@ -9,9 +9,9 @@ FILES= bomb bomb16 bomb16m bomb32 bomb32m bombm browse.xbm		\
 
 # The last dir level for install is for language, default C
 
-cdir =  $(CDE_INSTALLATION_TOP)/appconfig/icons/C
+cdir =  $(CDE_DATA_TOP)/appconfig/icons/C
 c_DATA = $(FILES)
 
 
-jadir =  $(CDE_INSTALLATION_TOP)/appconfig/icons/ja
+jadir =  $(CDE_DATA_TOP)/appconfig/icons/ja
 ja_DATA = $(FILES)

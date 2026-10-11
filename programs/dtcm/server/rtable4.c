@@ -110,8 +110,8 @@ static Registration_Status_4 csastat2regstat(CSA_return_code stat);
 static Table_Status_4 csastat2tablestat(CSA_return_code stat);
 
 static Table_Res_4 * table_lookup_next(Table_Args_4 *args,
-			struct svc_req *svcrq, caddr_t (* rb_func)(),
-			Appt_4 *(* rp_func)());
+			struct svc_req *svcrq, caddr_t (* rb_func)(Rb_tree *, char *),
+			Appt_4 *(* rp_func)(List_node *, Id_4 *));
 
 static Appt_4 * repeater_next_smaller(List_node *p_lnode, Id_4 *key);
 
@@ -1707,8 +1707,8 @@ static Table_Res_4 *
 table_lookup_next(
 	Table_Args_4 *args,
 	struct svc_req *svcrq,
-	caddr_t (* rb_func)(),
-	Appt_4 *(* rp_func)())
+	caddr_t (* rb_func)(Rb_tree *, char *),
+	Appt_4 *(* rp_func)(List_node *, Id_4 *))
 {
 	static	Table_Res_4 res;
 	CSA_return_code stat;
@@ -1756,7 +1756,7 @@ table_lookup_next(
 		return (&res);
 	}
 
-	p_appt = (Appt_4 *) (*rb_func) (APPT_TREE(cal), &key);
+	p_appt = (Appt_4 *) (*rb_func) (APPT_TREE(cal), (char *) &key);
 	p_appt1 = (*rp_func) (REPT_LIST(cal)->root, &key);
 
 	if (p_appt1 != NULL) {

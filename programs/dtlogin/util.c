@@ -122,9 +122,9 @@ ReadCatalog( int set_num, int msg_num, char *def_str )
       * search paths to current NLSPATH.
       */
       #define NLS_PATH_STRING  CDE_INSTALLATION_TOP "/nls/msg/%L/%N.cat:" \
-                         CDE_INSTALLATION_TOP "/lib/nls/msg/%L/%N.cat:" \
-                         CDE_INSTALLATION_TOP "/lib/nls/msg/%l/%t/%c/%N.cat:" \
-                         CDE_INSTALLATION_TOP "/lib/nls/msg/%l/%c/%N.cat"
+                         CDE_DATA_TOP "/lib/nls/msg/%L/%N.cat:" \
+                         CDE_DATA_TOP "/lib/nls/msg/%l/%t/%c/%N.cat:" \
+                         CDE_DATA_TOP "/lib/nls/msg/%l/%c/%N.cat"
 
       curNlsPath = getenv("NLSPATH");
       if (curNlsPath && strlen(curNlsPath) == 0)

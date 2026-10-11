@@ -60,11 +60,11 @@
 
 /*  Static routine definitions  */
 
-static void Initialize();
-static void ChangeManaged();
-static void Resize();
-static void Realize();
-static XtGeometryResult GeometryManager();
+static void Initialize(RestraintWidget original, RestraintWidget w, ArgList args, Cardinal *num_args);
+static void ChangeManaged(RestraintWidget w);
+static void Resize(RestraintWidget w);
+static void Realize(Widget w, XtValueMask *value_mask, XSetWindowAttributes *attrs);
+static XtGeometryResult GeometryManager(Widget w, XtWidgetGeometry *request, XtWidgetGeometry *reply);
 
 /*  The Restraint class record definition  */
 externaldef(restraintclassrec) RestraintClassRec restraintClassRec =
@@ -89,7 +89,7 @@ externaldef(restraintclassrec) RestraintClassRec restraintClassRec =
       True,                             /* compress_enterleave   */
       False,                            /* visible_interest      */	
       0,				/* destroy               */	
-      Resize,			        /* resize                */	
+      (XtWidgetProc) Resize,			        /* resize                */	
       NULL,			        /* expose                */	
       NULL,				/* set_values	         */	
       NULL,                             /* set_values_hook       */

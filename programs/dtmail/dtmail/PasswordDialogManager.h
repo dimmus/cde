@@ -63,12 +63,6 @@ public:
   
   PasswordDialogManager ( char * );
   void modifyVerify( Widget,XmTextVerifyCallbackStruct * );
-#ifdef DEAD_WOOD
-  char *userName();
-  char *password();
-  void resetPassword();
-#endif /* DEAD_WOOD */
-
 };
 
 extern PasswordDialogManager *thePasswordDialogManager;

@@ -88,9 +88,6 @@ class DtMailGenDialog : public UIComponent {
 
     void	setToTextFieldDialog(char *, char *, int shroud = FALSE);
     void	setToQuestionDialog(char *, char *);
-#ifdef DEAD_WOOD
-    void	setToInfoDialog(char *, char *);
-#endif /* DEAD_WOOD */
     void	setToErrorDialog(char *, char *);
     void	setToWarningDialog(char *, char *);
     void	setToAboutDialog(void);

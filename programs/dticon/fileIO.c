@@ -83,14 +83,15 @@ extern XtPointer _XmStringUngenerate (
 extern Widget   formatMenu_xpm_tb, formatMenu_xbm_tb;
 extern Window tablet_win;
 extern Widget editMenu_deleteHS_pb;
-Boolean Read_File(), Write_File();
+Boolean Read_File(char *fnameIn);
+Boolean Write_File(char *fnameIn);
 Pixmap pix_ret, shape_ret, mask_ret;
 int successFormat, x_hot, y_hot;
 unsigned int width_ret, height_ret;
 extern GC scratch_gc;
 
-extern void PixelTableClear();
-extern void send_tt_saved();
+extern void PixelTableClear(void);
+extern void send_tt_saved(void);
 extern void Display_XPMFile(int, int);
 extern void Display_XBMFile(int, int);
 

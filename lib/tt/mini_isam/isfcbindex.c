@@ -40,7 +40,7 @@
 
 #include "isam_impl.h"
 
-Static int _keypart2cmp();
+Static int _keypart2cmp(struct keypart2 *l, struct keypart2 *r);
 /*
  * _isfcb_primkeyadd(fcb, keydesc2)
  *

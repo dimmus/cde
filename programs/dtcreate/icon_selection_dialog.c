@@ -84,7 +84,7 @@ char    *file_filter_global;
 DtIconGadget **icons_in_container = NULL;
 
 
-int myscandir(char *, struct dirent ***, int (), int ());
+int myscandir(char *, struct dirent ***, int(*)(struct dirent *, char *), int ());
 int get_top_b1_position (int buttoncount);
 int get_top_b2_position (int buttoncount);
 void load_directories_list (char **dirlist);
@@ -127,7 +127,7 @@ Auxiliary code from the Declarations Editor:
 /*  myscandir                                                              */
 /*                                                                         */
 /***************************************************************************/
-int myscandir(char *pszDirName, struct dirent ***NameList, int Select(), int Compare())
+int myscandir(char *pszDirName, struct dirent ***NameList, int Select(struct dirent *, char *), int Compare())
 
 {
   DIR            *dirptr;
@@ -725,7 +725,7 @@ void  update_container_contents (char *filter)
   /******************************************************************/
   n = 0;
   /*
-  XtSetArg(args[n], XmNimageName, "/usr/dt/appconfig/icons/C/Dtactn.m.pm"); n++;
+  XtSetArg(args[n], XmNimageName, CDE_DATA_TOP "/appconfig/icons/C/Dtactn.m.pm"); n++;
   */
   XtSetArg(args[n], XmNimageName, NULL); n++;
   XtSetArg(args[n], XmNfillMode, XmFILL_SELF); n++;
@@ -1954,13 +1954,13 @@ Widget  create_icon_selection_dialog(swidget    _UxUxParent,
         unsigned char   *_Uxname_field_title,
         int     _UxnumberOfBottomButtons,
         unsigned char   *_Uxbottom_button_one_label,
-        void    (*_Uxbottom_button_one_cb)(),
+        void    (*_Uxbottom_button_one_cb)(Widget, XtPointer, XtPointer),
         unsigned char   *_Uxbottom_button_two_label,
-        void    (*_Uxbottom_button_two_cb)(),
+        void    (*_Uxbottom_button_two_cb)(Widget, XtPointer, XtPointer),
         unsigned char   *_Uxbottom_button_three_label,
-        void    (*_Uxbottom_button_three_cb)(),
+        void    (*_Uxbottom_button_three_cb)(Widget, XtPointer, XtPointer),
         unsigned char   *_Uxbottom_button_four_label,
-        void    (*_Uxbottom_button_four_cb)() )
+        void    (*_Uxbottom_button_four_cb)(Widget, XtPointer, XtPointer) )
 
 
 {

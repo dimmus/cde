@@ -39,9 +39,9 @@
 #include "isam_impl.h"
 
 /* Local functions */
-long _fl_getpos();			     /* Get offset in .rec file */
+long _fl_getpos(Fcb *fcb, Recno recnum);			     /* Get offset in .rec file */
 int  _fl_deleted();			     /* 0/1 returns 1 if record is deleted */
-static void remove_from_chain();	     /* used by _flrec_wrrec() */
+static void remove_from_chain(Fcb *fcb, Recno recnum);	     /* used by _flrec_wrrec() */
 
 /*
  * _flrec_write(fcb, record, recnum, reclen)

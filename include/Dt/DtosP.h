@@ -202,13 +202,13 @@ char *alloca();
 	CDE_CONFIGURATION_TOP "/appconfig/icons/C/%B" "%M.bm:"	\
 	CDE_CONFIGURATION_TOP "/appconfig/icons/C/%B:"		\
 								\
-	CDE_INSTALLATION_TOP  "/appconfig/icons/%L/%B" "%M.pm:"	\
-	CDE_INSTALLATION_TOP  "/appconfig/icons/%L/%B" "%M.bm:"	\
-	CDE_INSTALLATION_TOP  "/appconfig/icons/%L/%B:"		\
+	CDE_DATA_TOP  "/appconfig/icons/%L/%B" "%M.pm:"	\
+	CDE_DATA_TOP  "/appconfig/icons/%L/%B" "%M.bm:"	\
+	CDE_DATA_TOP  "/appconfig/icons/%L/%B:"		\
 								\
-	CDE_INSTALLATION_TOP  "/appconfig/icons/C/%B" "%M.pm:"	\
-	CDE_INSTALLATION_TOP  "/appconfig/icons/C/%B" "%M.bm:"	\
-	CDE_INSTALLATION_TOP  "/appconfig/icons/C/%B"
+	CDE_DATA_TOP  "/appconfig/icons/C/%B" "%M.pm:"	\
+	CDE_DATA_TOP  "/appconfig/icons/C/%B" "%M.bm:"	\
+	CDE_DATA_TOP  "/appconfig/icons/C/%B"
 
 #define DTBMSYSDEFAULT						\
         CDE_CONFIGURATION_TOP "/appconfig/icons/%L/%B" "%M.bm:"	\
@@ -219,13 +219,13 @@ char *alloca();
         CDE_CONFIGURATION_TOP "/appconfig/icons/C/%B" "%M.pm:"	\
         CDE_CONFIGURATION_TOP "/appconfig/icons/C/%B:"		\
 								\
-        CDE_INSTALLATION_TOP  "/appconfig/icons/%L/%B" "%M.bm:"	\
-        CDE_INSTALLATION_TOP  "/appconfig/icons/%L/%B" "%M.pm:"	\
-        CDE_INSTALLATION_TOP  "/appconfig/icons/%L/%B:"		\
+        CDE_DATA_TOP  "/appconfig/icons/%L/%B" "%M.bm:"	\
+        CDE_DATA_TOP  "/appconfig/icons/%L/%B" "%M.pm:"	\
+        CDE_DATA_TOP  "/appconfig/icons/%L/%B:"		\
 								\
-        CDE_INSTALLATION_TOP  "/appconfig/icons/C/%B" "%M.bm:"	\
-        CDE_INSTALLATION_TOP  "/appconfig/icons/C/%B" "%M.pm:"	\
-        CDE_INSTALLATION_TOP  "/appconfig/icons/C/%B"
+        CDE_DATA_TOP  "/appconfig/icons/C/%B" "%M.bm:"	\
+        CDE_DATA_TOP  "/appconfig/icons/C/%B" "%M.pm:"	\
+        CDE_DATA_TOP  "/appconfig/icons/C/%B"
 
 
 #ifdef __cplusplus

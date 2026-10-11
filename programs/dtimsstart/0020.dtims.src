@@ -2,7 +2,7 @@ XCOMM!KORNSHELL
 XCOMM ####################################################################
 XCOMM ##  File:              0020.dtims
 XCOMM ##
-XCOMM ##  Default Location:  /usr/dt/config/Xsession.d/
+XCOMM ##  Default Location:  CDE_INSTALLATION_TOP/config/Xsession.d/
 XCOMM ##
 XCOMM ##  Purpose:           Start desktop input method server if required
 XCOMM ##
@@ -11,23 +11,23 @@ XCOMM ##                     This script is invoked by means of the Xsession fil
 XCOMM ##                     at user login. It starts an input method server as
 XCOMM ##                     required for selected locales.
 XCOMM ##
-XCOMM ##  Invoked by:        /usr/dt/bin/Xsession
+XCOMM ##  Invoked by:        CDE_INSTALLATION_TOP/bin/Xsession
 XCOMM ##
 XCOMM ##  Product:           @(#)Common Desktop Environment 1.0
 XCOMM ##
 XCOMM ##  Note:
 XCOMM ##
-XCOMM ##    The /usr/dt/config/Xsession.d/0020.dtims file is a
+XCOMM ##    The CDE_INSTALLATION_TOP/config/Xsession.d/0020.dtims file is a
 XCOMM ##    factory-default file and will be unconditionally overwritten upon
 XCOMM ##    subsequent installation. To customize input method server startup
 XCOMM ##    behavior, copy this file to the configuration directory,
-XCOMM ##    /etc/dt/config/Xsession.d and customize that version
+XCOMM ##    CDE_CONFIGURATION_TOP/config/Xsession.d and customize that version
 XCOMM ##    of the file.
 XCOMM ##
 XCOMM ##    The value of DTSTARTIMS determines whether this file,
-XCOMM ##    /usr/dt/config/Xsession.d/0020.dtims, will start
+XCOMM ##    CDE_INSTALLATION_TOP/config/Xsession.d/0020.dtims, will start
 XCOMM ##    the specified input method server. Should an input method server
-XCOMM ##    be started from /etc/dt/config/Xsession.d/0020.dtims
+XCOMM ##    be started from CDE_CONFIGURATION_TOP/config/Xsession.d/0020.dtims
 XCOMM ##    or should an input method server not be desired, unset DTSTARTIMS
 XCOMM ##    to prevent this file from starting one.
 XCOMM ##
@@ -66,7 +66,7 @@ XCOMM
       zh_CN*    | chinese-s*    )
 
         DTIMS_SCRIPT=0020.dtims
-        DTIMS_CMD="/usr/dt/bin/dtimsstart -env -shell ksh"
+        DTIMS_CMD="CDE_INSTALLATION_TOP/bin/dtimsstart -env -shell ksh"
 
         if [[ -x "${DTIMS_CMD%% *}" ]]; then
 

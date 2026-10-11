@@ -2,7 +2,7 @@ XCOMM!KORNSHELL
 XCOMM ####################################################################
 XCOMM ##  File:              0060.srcsysenv
 XCOMM ##
-XCOMM ##  Default Location:  /usr/dt/config/Xsession.d/
+XCOMM ##  Default Location:  CDE_INSTALLATION_TOP/config/Xsession.d/
 XCOMM ##
 XCOMM ##  Purpose:           Source system-defined environment variables
 XCOMM ##
@@ -10,7 +10,7 @@ XCOMM ##  Description:
 XCOMM ##                     This script is invoked by means of the Xsession
 XCOMM ##                     file at user login.
 XCOMM ##
-XCOMM ##  Invoked by:        /usr/dt/bin/Xsession
+XCOMM ##  Invoked by:        CDE_INSTALLATION_TOP/bin/Xsession
 XCOMM ##
 XCOMM ##  $TOG: 0060.srcsysenv.src /main/1 1998/08/03 18:10:08 devobj $
 XCOMM ##

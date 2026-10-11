@@ -84,19 +84,12 @@ class IndexedOptionMenuUiItem : public PropUiItem {
 public:
   IndexedOptionMenuUiItem(IndexedOptionMenu *iom, int source, char *search_key);
   virtual ~IndexedOptionMenuUiItem(){;}; // we don't alloc any memory
-#ifdef DEAD_WOOD
-  virtual int getType(){ return _INDEXED_OPTIONMENU_ITEM; };
-  virtual int getSource(){ return data_source; };
-#endif /* DEAD_WOOD */
   virtual void writeFromUiToSource();
   virtual void writeFromSourceToUi();
 
 private:
   static void valueChangedCB(Widget, XtPointer, XtPointer);
 
-#ifdef DEAD_WOOD
-  int data_source;
-#endif /* DEAD_WOOD */
   IndexedOptionMenu	*_iom;
 };
 

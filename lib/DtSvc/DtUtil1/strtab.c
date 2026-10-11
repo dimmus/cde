@@ -107,7 +107,7 @@ struct strtab_layout {
 
 static void strtab_layout(DtShmProtoStrtab strlist, struct strtab_layout * l);
 
-static void inc_it  (int * a, int * b, unsigned char * key);
+static void inc_it  (void * a, void * b, unsigned char * key);
 static void build_it(int a, struct strtab_build * ptr, unsigned char * key);
 #if !defined(__linux__)
 extern char * strdup(const char *);
@@ -173,13 +173,18 @@ _DtShmProtoInitStrtab(int sizeguess)
   return((DtShmProtoStrtab) ptr);
 }
 
+static int destroy_hashval(int *ptr, int *unused, unsigned char *unused2) {
+	free(ptr);
+	return 0;
+}
+
 int 
 _DtShmProtoDestroyStrtab(DtShmProtoStrtab strlist)
 {
   strlist_t * ptr = (strlist_t *) strlist;
   
   _DtUtilDestroyHash(ptr->sl_hash, NULL, NULL);
-  _DtUtilDestroyHash(ptr->sl_bosons, (des_func)free, NULL);
+  _DtUtilDestroyHash(ptr->sl_bosons, (DtHashDestroyFunc) destroy_hashval, NULL);
   free(ptr);
   return(0);
 }
@@ -274,7 +279,7 @@ _DtShmProtoCopyStrtab(DtShmProtoStrtab in, void * destination)
   building.tabstart = (strtab_entry_t *) ((unsigned char *) ptr  + ptr->st_taboffset);
   building.strtab = ptr;
 
-  _DtUtilOperateHash(strlist->sl_hash, build_it, & building);
+  _DtUtilOperateHash(strlist->sl_hash, (DtHashOperateFunc) build_it, & building);
   return((DtShmStrtab) destination);
 }
 
@@ -297,8 +302,10 @@ static void build_it(int a, struct strtab_build * ptr, unsigned char * key)
 }
 
 /* ARGSUSED */
-static void inc_it(int * a, int * b, unsigned char * key)
+static void inc_it(void * a, void * b, unsigned char * key)
 {
-  b[0]++;
-  b[1] += strlen((const char *)key) + 1;
+  int * counts = b;
+
+  counts[0]++;
+  counts[1] += strlen((const char *)key) + 1;
 }

@@ -455,7 +455,9 @@ ilThrottlePrivPtr  pPriv = NULL;
       case IL_PIPE_IMAGE:
         pPriv = (ilThrottlePrivPtr)ilAddPipeElement (pipe, IL_FILTER, 
             sizeof (ilThrottlePrivRec), IL_ADD_PIPE_NO_DST, 
-            &srcData, (ilDstElementData *)NULL, ilThrottleInit, IL_NPF, IL_NPF, 
+            &srcData, (ilDstElementData *)NULL,
+            (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilThrottleInit,
+            IL_NPF, IL_NPF, 
             ilProducerThrottleExecute, NULL, 0);
         constantStrip = TRUE;
         break;
@@ -470,7 +472,9 @@ ilThrottlePrivPtr  pPriv = NULL;
       case IL_PIPE_FEED_IMAGE:
         pPriv = (ilThrottlePrivPtr)ilAddPipeElement (pipe, IL_FILTER, 
             sizeof (ilThrottlePrivRec), IL_ADD_PIPE_NO_DST, 
-            &srcData, (ilDstElementData *)NULL, ilThrottleInit, IL_NPF, IL_NPF, 
+            &srcData, (ilDstElementData *)NULL,
+            (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilThrottleInit,
+            IL_NPF, IL_NPF, 
             ilFeedProducerThrottleExecute, NULL, 0);
         if (!pPriv) return FALSE;
         pPriv->imageHeight = info.height;
@@ -494,7 +498,9 @@ ilThrottlePrivPtr  pPriv = NULL;
         if (!constantStrip) {
             pPriv = (ilThrottlePrivPtr)ilAddPipeElement (pipe, IL_FILTER, 
                 sizeof (ilThrottlePrivRec), IL_ADD_PIPE_NO_DST, 
-                &srcData, (ilDstElementData *)NULL, ilThrottleInit, IL_NPF, IL_NPF, 
+                &srcData, (ilDstElementData *)NULL,
+                (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilThrottleInit,
+                IL_NPF, IL_NPF, 
                 ilNonConstantThrottleExecute, NULL, 0);
             }
         else {
@@ -503,7 +509,9 @@ ilThrottlePrivPtr  pPriv = NULL;
                 srcData.minBufferHeight = info.height;
             pPriv = (ilThrottlePrivPtr)ilAddPipeElement (pipe, IL_FILTER, 
                 sizeof (ilThrottlePrivRec), IL_ADD_PIPE_NO_DST, 
-                &srcData, (ilDstElementData *)NULL, ilThrottleInit, IL_NPF, IL_NPF, 
+                &srcData, (ilDstElementData *)NULL,
+                (ilError (*)(ilByte *, ilImageInfo *, ilImageInfo *)) ilThrottleInit,
+                IL_NPF, IL_NPF, 
                 ilConstantThrottleExecute, NULL, 0);
             }
         break;

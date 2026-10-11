@@ -91,23 +91,23 @@ static DialogResource resources[] =
 {
    { "idString", XmRString, sizeof(String),
      XtOffset(HelpDataPtr, idString),
-     (caddr_t) NULL, _DtStringToString },
+     (caddr_t) NULL, (WriteResourceProc) _DtStringToString },
 
    { "volString", XmRString, sizeof(String),
      XtOffset(HelpDataPtr, volString),
-     (caddr_t) NULL, _DtStringToString },
+     (caddr_t) NULL, (WriteResourceProc) _DtStringToString },
 
    { "topicTitle", XmRString, sizeof(String),
      XtOffset(HelpDataPtr, topicTitle),
-     (caddr_t) NULL, _DtStringToString },
+     (caddr_t) NULL, (WriteResourceProc) _DtStringToString },
 
    { "fileType", XmRString, sizeof(String),
      XtOffset(HelpDataPtr, fileType),
-     (caddr_t) NULL, _DtStringToString },
+     (caddr_t) NULL,(WriteResourceProc)  _DtStringToString },
 
    { "helpType", XmRInt, sizeof(int),
       XtOffset(HelpDataPtr, helpType),
-      (caddr_t) DtHELP_TYPE_TOPIC, _DtIntToString },
+      (caddr_t) DtHELP_TYPE_TOPIC, (WriteResourceProc) _DtIntToString },
 };
 
 

@@ -55,8 +55,8 @@ static int fd;
  * forward declaration of functions used within this file
  */
 static boolean_t magic_time(time_t t);
-static boolean_t visit1(caddr_t node, caddr_t d);
-static boolean_t visit2(caddr_t node, caddr_t d);
+static boolean_t visit1(caddr_t d);
+static boolean_t visit2(caddr_t d);
 static void print_file_error(char *file, char *msg);
 
 extern void
@@ -243,7 +243,7 @@ magic_time(time_t t)
 }
 
 static boolean_t
-visit1(caddr_t node, caddr_t d)
+visit1(caddr_t d)
 {
 	boolean_t stop = B_FALSE;
 
@@ -276,7 +276,7 @@ visit1(caddr_t node, caddr_t d)
 }
 
 static boolean_t
-visit2(caddr_t node, caddr_t d)
+visit2(caddr_t d)
 {
 	boolean_t stop = B_FALSE;
 

@@ -99,11 +99,6 @@ class UIComponent : public BasicComponent {
     // Called by widgetDestroyedCallback() if base widget is destroyed
     virtual void widgetDestroyed(); 
     
-#ifdef DEAD_WOOD
-    // Loads component's default resources into database
-    void setDefaultResources ( const Widget , const String *);
-#endif /* DEAD_WOOD */
-    
     // Retrieve resources for this clsss from the resource manager
     void getResources ( const XtResourceList, const int );
     

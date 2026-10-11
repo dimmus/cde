@@ -4,7 +4,8 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = dtcalc
 
-dtcalc_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\"
+dtcalc_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
+	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\"
 
 dtcalc_LDADD = $(LIBHELP) $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB) $(MATHLIB)
 
