@@ -54,6 +54,9 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <strings.h>
+#include <langinfo.h>
 #include <Dt/DtMsgsP.h>
 #include <Dt/HourGlass.h>
 #include "DtWidgetI.h"
@@ -645,6 +648,369 @@ DoReplace(
     return( replaced );
 }
 
+/*
+ * Change All, folded into a few XmTextReplace calls.
+ *
+ * ReplaceAll used to call XmTextReplace once per hit, and each call
+ * updates the whole line table after the hit in Motif: 100k hits in a
+ * 100k-line document took 3.7 s.  FastReplaceAll finds the same hits
+ * on one copy of the text and replaces runs of them at once.  A run
+ * never contains the insertion cursor or a selection end point (a hit
+ * containing one is replaced on its own), so the cursor, the selection
+ * and the pending-delete state change exactly as they did one hit at a
+ * time, and the undo state is then rebuilt hit by hit.
+ *
+ * It handles single-byte and UTF-8 locales, where a byte match is a
+ * character match; it returns -1 for ReplaceAll to do it the old way
+ * otherwise.
+ */
+typedef struct {
+    size_t		byte;	/* offset of the hit in the original text */
+    XmTextPosition	pos;	/* character position there */
+} ReplaceHit;
+
+static Boolean
+IsUtf8Locale(void)
+{
+    const char *cs = nl_langinfo(CODESET);
+
+    return (cs != NULL &&
+	    (strcasecmp(cs, "UTF-8") == 0 || strcasecmp(cs, "utf8") == 0));
+}
+
+/* Length of the character starting at s (valid UTF-8 or single-byte). */
+static size_t
+CharLen(const char *s, Boolean utf8)
+{
+    size_t n = 1;
+
+    if (utf8)
+	while (s[n] != '\0' && ((unsigned char)s[n] & 0xC0) == 0x80)
+	    n++;
+    return n;
+}
+
+/* Start of the character that ends just before s (s > base). */
+static const char *
+PrevChar(const char *base, const char *s, Boolean utf8)
+{
+    s--;
+    if (utf8)
+	while (s > base && ((unsigned char)*s & 0xC0) == 0x80)
+	    s--;
+    return s;
+}
+
+/* Number of characters in the n bytes at s. */
+static XmTextPosition
+CountChars(const char *s, size_t n, Boolean utf8)
+{
+    XmTextPosition count = 0;
+    size_t i;
+
+    if (!utf8)
+	return (XmTextPosition)n;
+    for (i = 0; i < n; i++)
+	if (((unsigned char)s[i] & 0xC0) != 0x80)
+	    count++;
+    return count;
+}
+
+/*
+ * The word test of SearchForString in Spell mode, on the same bytes:
+ * LEAD is the character before the hit (NULL at the start of the text),
+ * TRAIL the one after it (NULL at the end).
+ */
+static Boolean
+IsSpellWord(const char *hit, size_t hitLen, const char *lead, size_t leadLen,
+	    const char *trail, size_t trailLen)
+{
+    char wordBuf[256];
+    char *word = wordBuf;
+    size_t wlen = 0, need = leadLen + hitLen + trailLen + 1;
+    int length;
+    char leadingChar, trailingChar;
+    Boolean ok;
+
+    if (need > sizeof(wordBuf))
+	word = XtMalloc(need);
+    if (lead) {
+	memcpy(word, lead, leadLen);
+	wlen = leadLen;
+    }
+    memcpy(word + wlen, hit, hitLen);
+    wlen += hitLen;
+    if (trail) {
+	memcpy(word + wlen, trail, trailLen);
+	wlen += trailLen;
+    }
+    word[wlen] = '\0';
+
+    if (trail) {
+	length = (int)wlen - 1;
+	trailingChar = word[length];
+    } else {
+	length = (int)wlen;
+	trailingChar = ' ';
+    }
+    leadingChar = lead ? word[0] : ' ';
+
+    ok = ((mblen(word, MB_CUR_MAX) > 1) ||
+	  (isascii(leadingChar) &&
+	   (isspace(leadingChar) || ispunct(leadingChar)))) &&
+	 ((mblen(word + length - 1, MB_CUR_MAX) > 1) ||
+	  (isascii(trailingChar) &&
+	   (isspace(trailingChar) || ispunct(trailingChar))));
+
+    if (word != wordBuf)
+	XtFree(word);
+    return ok;
+}
+
+/* Is position b strictly inside hit h, or between hits h and h+1? */
+#define	INSIDE(b, s, e)		((b) > (s) && (b) < (e))
+#define	BETWEEN(b, e, s)	((b) >= (e) && (b) <= (s))
+/* 0: the hit s..e ends before top t, 1: it reaches it, 2: it is past it */
+#define	TOP_SIDE(s, e, t)	((e) < (t) ? 0 : (s) < (t) ? 1 : 2)
+/* does a hit at s move the bottom b of the view (_XmTextInvalidate)? */
+#define	BOT_SIDE(s, b, d)	((s) < (b) || ((s) == (b) && (d) < 0))
+
+static int
+FastReplaceAll(
+        DtEditorWidget widget,
+        char 	*search_string,
+	char 	*replace_string)
+{
+    Widget text = M_text(widget);
+    Boolean utf8 = False, spell = (M_search_dialogMode(widget) == SPELL);
+    char *orig, *chunk = NULL;
+    size_t origLen, sLen, rLen, in, chunkSize = 0;
+    XmTextPosition sChars, rChars, total, cursor, selLeft, selRight;
+    XmTextPosition bounds[3];
+    int nBounds = 0, b;
+    ReplaceHit *hits = NULL;
+    size_t nHits = 0, maxHits = 0, i, j, k;
+    const char *last = NULL;	/* last character of the output so far */
+    size_t lastLen = 0;
+    XmTextPosition delta, step;
+    DtEditorUndoRec undo;
+    Boolean loading, unread, relines;
+
+    /*
+     * With word wrap, a replacement rewraps lines around it and Motif
+     * moves the view as it goes: one replacement at a time, as before.
+     */
+    if (replace_string == NULL)
+	return -1;
+    {
+	Boolean wrap = False;
+
+	XtVaGetValues(text, XmNwordWrap, &wrap, NULL);
+	if (wrap)
+	    return -1;
+    }
+    if (MB_CUR_MAX > 1) {
+	if (!IsUtf8Locale())
+	    return -1;
+	utf8 = True;
+	if (mbstowcs(NULL, search_string, 0) == (size_t)-1 ||
+	    mbstowcs(NULL, replace_string, 0) == (size_t)-1)
+	    return -1;
+    }
+
+    sLen = strlen(search_string);
+    rLen = strlen(replace_string);
+    sChars = CountChars(search_string, sLen, utf8);
+    rChars = CountChars(replace_string, rLen, utf8);
+
+    orig = XmTextGetString(text);
+    if (orig == NULL)
+	return -1;
+    origLen = strlen(orig);
+    total = CountChars(orig, origLen, utf8);
+    if (total != XmTextGetLastPosition(text)) {
+	/* not a faithful copy (unconvertible characters) */
+	XtFree(orig);
+	return -1;
+    }
+
+    /*
+     * The hits, as ReplaceAll's loop finds them: each search starts
+     * right after the previous replacement, and in Spell mode a hit must
+     * be a word, the character before it being taken from the text as
+     * already changed.
+     */
+    in = 0;
+    while (in + sLen <= origLen) {
+	char *p = memmem(orig + in, origLen - in, search_string, sLen);
+	size_t at;
+
+	if (p == NULL)
+	    break;
+	at = (size_t)(p - orig);
+	for (;;) {
+	    const char *lead = NULL, *trail = NULL;
+	    size_t leadLen = 0, trailLen = 0;
+
+	    if (!spell)
+		break;
+	    if (at > in) {
+		lead = PrevChar(orig, orig + at, utf8);
+		leadLen = (size_t)(orig + at - lead);
+	    } else if (last != NULL) {
+		lead = last;
+		leadLen = lastLen;
+	    }
+	    if (at + sLen < origLen) {
+		trail = orig + at + sLen;
+		trailLen = CharLen(trail, utf8);
+	    }
+	    if (IsSpellWord(orig + at, sLen, lead, leadLen, trail, trailLen))
+		break;
+	    /* not a word: look on from the next character */
+	    p = memmem(orig + at + 1, origLen - at - 1, search_string, sLen);
+	    if (p == NULL)
+		break;
+	    at = (size_t)(p - orig);
+	}
+	if (p == NULL)
+	    break;
+
+	if (nHits == maxHits) {
+	    maxHits = maxHits ? maxHits * 2 : 64;
+	    hits = (ReplaceHit *)XtRealloc((char *)hits,
+					   maxHits * sizeof(ReplaceHit));
+	}
+	hits[nHits].byte = at;
+	hits[nHits].pos = (nHits ? hits[nHits - 1].pos + sChars +
+			   CountChars(orig + hits[nHits - 1].byte + sLen,
+				      at - hits[nHits - 1].byte - sLen, utf8) :
+			   CountChars(orig, at, utf8));
+	nHits++;
+
+	if (rLen > 0) {
+	    last = PrevChar(replace_string, replace_string + rLen, utf8);
+	    lastLen = (size_t)(replace_string + rLen - last);
+	} else if (at > in) {
+	    last = PrevChar(orig, orig + at, utf8);
+	    lastLen = (size_t)(orig + at - last);
+	}
+	in = at + sLen;
+    }
+
+    if (nHits == 0) {
+	XtFree(orig);
+	return 0;
+    }
+
+    /* Positions a run of hits must not contain (original positions). */
+    cursor = XmTextGetInsertionPosition(text);
+    bounds[nBounds++] = cursor;
+    if (XmTextGetSelectionPosition(text, &selLeft, &selRight) &&
+	selLeft < selRight) {
+	bounds[nBounds++] = selLeft;
+	bounds[nBounds++] = selRight;
+    }
+
+    /*
+     * A replacement before the cursor moves it, and Motif scrolls to
+     * keep it in view one replacement at a time; where that can change
+     * which lines are shown (lines added or removed), those hits are
+     * replaced one at a time as before.
+     */
+    relines = strchr(search_string, '\n') != NULL ||
+	      strchr(replace_string, '\n') != NULL;
+
+    /* The undo state before; the replacements below disturb it. */
+    undo = widget->editor.editStuff.undo;
+    if (undo.deletedText != NULL)
+	undo.deletedText = XtNewString(undo.deletedText);
+    loading = M_loadingAllNewData(widget);
+    unread = M_unreadChanges(widget);
+
+    step = rChars - sChars;
+    delta = 0;
+    for (i = 0; i < nHits; i = j) {
+	XmTextPosition from, to;
+	size_t need, len, n;
+
+	/*
+	 * Hits i .. j-1 form a run.  Motif moves the top of the view by
+	 * the size change for a replacement that ends before it, and
+	 * otherwise recomputes it from the line table, so a run also
+	 * keeps to one side of the current top (in current positions),
+	 * and a hit ending at or across it goes alone.
+	 */
+	XmTextPosition topPos = ((XmTextWidget)text)->text.top_character - delta;
+	XmTextPosition botPos = ((XmTextWidget)text)->text.bottom_position - delta;
+	int side = TOP_SIDE(hits[i].pos, hits[i].pos + sChars, topPos);
+	int bside = BOT_SIDE(hits[i].pos, botPos, step);
+
+	j = i + 1;
+	for (b = 0; b < nBounds; b++)
+	    if (INSIDE(bounds[b], hits[i].pos, hits[i].pos + sChars))
+		break;
+	if (b == nBounds && side != 1 &&
+	    !(relines && hits[i].pos < cursor)) {
+	    while (j < nHits) {
+		if (relines && hits[j].pos < cursor)
+		    break;
+		if (TOP_SIDE(hits[j].pos, hits[j].pos + sChars, topPos) != side ||
+		    BOT_SIDE(hits[j].pos, botPos, step) != bside)
+		    break;
+		for (b = 0; b < nBounds; b++)
+		    if (BETWEEN(bounds[b], hits[j - 1].pos + sChars,
+				hits[j].pos) ||
+			INSIDE(bounds[b], hits[j].pos, hits[j].pos + sChars))
+			break;
+		if (b < nBounds)
+		    break;
+		j++;
+	    }
+	}
+
+	need = hits[j - 1].byte + sLen - hits[i].byte +
+	       (j - i) * rLen + 1;
+	if (need > chunkSize) {
+	    chunkSize = need;
+	    chunk = XtRealloc(chunk, chunkSize);
+	}
+	len = 0;
+	for (k = i; k < j; k++) {
+	    if (k > i) {
+		n = hits[k].byte - hits[k - 1].byte - sLen;
+		memcpy(chunk + len, orig + hits[k - 1].byte + sLen, n);
+		len += n;
+	    }
+	    memcpy(chunk + len, replace_string, rLen);
+	    len += rLen;
+	}
+	chunk[len] = '\0';
+
+	from = hits[i].pos + delta;
+	to = hits[j - 1].pos + sChars + delta;
+	XmTextReplace(text, from, to, chunk);
+	delta += (XmTextPosition)(j - i) * step;
+    }
+
+    /* Rebuild the undo state as if each hit had been replaced alone. */
+    _DtEditorResetUndo(widget);
+    widget->editor.editStuff.undo = undo;
+    M_loadingAllNewData(widget) = loading;
+    M_unreadChanges(widget) = unread;
+    for (k = 0; k < nHits; k++) {
+	XmTextPosition at = hits[k].pos + (XmTextPosition)k * step;
+
+	_DtEditorRecordEdit(widget, at, at + sChars, search_string,
+			    replace_string, (int)rLen);
+    }
+
+    XtFree(chunk);
+    XtFree((char *)hits);
+    XtFree(orig);
+    return 1;
+}
+
 /* 
  * ReplaceAll replaces all occurrences of search_string with 
  * replacement_string in widget.
@@ -665,6 +1031,11 @@ ReplaceAll(
      */
     if( search_string && *search_string )
     {
+      int fast = FastReplaceAll(widget, search_string, replace_string);
+
+      if (fast >= 0)
+	return (fast ? True : False);
+
       /*
        * How long is the string we are searching for?
        */

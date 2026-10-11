@@ -261,23 +261,29 @@ DtEditorPasteFromClipboard(
 static void 
 SetUndoDeletionState(
         DtEditorWidget pPriv,
-        XmTextVerifyCallbackStruct *cb)
+        XmTextPosition startPos,
+        XmTextPosition endPos,
+        const char *deleted)
 {
     char *pDeletedText;
 
     /* 
-     * Get the text which will be deleted from the text widget.
+     * Get the text which will be deleted from the text widget, unless
+     * the caller knows it.
      */
-    pDeletedText = (char *)_XmStringSourceGetString( 
+    if (deleted != NULL)
+        pDeletedText = XtNewString(deleted);
+    else
+        pDeletedText = (char *)_XmStringSourceGetString( 
 						(XmTextWidget) M_text(pPriv), 
-						cb->startPos, 
-						cb->endPos, 
+						startPos, 
+						endPos, 
 						False);
 
     if( M_deletedText(pPriv) != (char *)NULL    && 
 	M_insertionLength(pPriv) == 0           &&
-        (cb->startPos == M_deletionStart(pPriv) || 
-	 cb->endPos == M_deletionStart(pPriv))      
+        (startPos == M_deletionStart(pPriv) || 
+	 endPos == M_deletionStart(pPriv))      
       )
     {
         /*
@@ -293,7 +299,7 @@ SetUndoDeletionState(
         size_t addLen = strlen(pDeletedText);
         char *undo = XtRealloc(M_deletedText(pPriv), oldLen + addLen + 1);
     
-        if(cb->startPos == M_deletionStart(pPriv)) {
+        if(startPos == M_deletionStart(pPriv)) {
 	    /*
 	     * deleting forward - deletionStart remains the same.
 	     */
@@ -305,7 +311,7 @@ SetUndoDeletionState(
 	     */
             memmove(undo + addLen, undo, oldLen + 1);
             memcpy(undo, pDeletedText, addLen);
-	    M_deletionStart(pPriv) = cb->startPos;
+	    M_deletionStart(pPriv) = startPos;
         }
         M_deletedText(pPriv) = undo;
     }
@@ -320,8 +326,8 @@ SetUndoDeletionState(
         /* take over the fetched copy instead of copying it again */
         M_deletedText(pPriv) = pDeletedText;
         pDeletedText = NULL;
-        M_deletionStart(pPriv) = cb->startPos;
-	M_insertStart(pPriv) = cb->startPos;
+        M_deletionStart(pPriv) = startPos;
+	M_insertStart(pPriv) = startPos;
 	M_insertionLength(pPriv) = 0;
     }
 
@@ -336,16 +342,18 @@ SetUndoDeletionState(
 static void 
 SetUndoInsertionState(
         DtEditorWidget pPriv,
-        XmTextVerifyCallbackStruct *cb)
+        XmTextPosition startPos,
+        const char *text,
+        int length)
 {
     if(M_insertionLength(pPriv) == 0) {
 	/*
 	 * We've started a new deletion context, so reset the insertion
 	 * context.
 	 */
-	M_insertStart(pPriv) = cb->startPos;
-	M_insertionLength(pPriv) = _DtEditor_CountCharacters(cb->text->ptr,
-						    cb->text->length);
+	M_insertStart(pPriv) = startPos;
+	M_insertionLength(pPriv) = _DtEditor_CountCharacters((char *)text,
+						    length);
     }
     else
     {
@@ -353,9 +361,9 @@ SetUndoInsertionState(
 	 * Determine if we're continuing the current insertion context
 	 * or beginning a new one.
 	 */
-	if(cb->startPos == (M_insertStart(pPriv) + M_insertionLength(pPriv)))
+	if(startPos == (M_insertStart(pPriv) + M_insertionLength(pPriv)))
 	    M_insertionLength(pPriv) += _DtEditor_CountCharacters(
-	  				    cb->text->ptr, cb->text->length);
+	  				    (char *)text, length);
 	else
 	{
 	    /*
@@ -363,9 +371,9 @@ SetUndoInsertionState(
 	     * existing deletion context, and reset the insertion context.
 	     */
 	    _DtEditorResetUndo( pPriv );
-	    M_insertStart(pPriv) = cb->startPos;
+	    M_insertStart(pPriv) = startPos;
 	    M_insertionLength(pPriv) = _DtEditor_CountCharacters(
-					cb->text->ptr, cb->text->length);
+					(char *)text, length);
 	}
     }
 } /* SetUndoInsertionState */
@@ -396,6 +404,27 @@ _DtEditorModifyVerifyCB(
 				(XmTextVerifyCallbackStruct *) call_data;
   DtEditorWidget editor = (DtEditorWidget) client_data;
 
+  _DtEditorRecordEdit(editor, cb->startPos, cb->endPos, NULL,
+		      cb->text->ptr, cb->text->length);
+
+} /* end ModifyVerifyCB */
+
+/*
+ * _DtEditorRecordEdit does the bookkeeping of the modify/verify callback
+ * for replacing STARTPOS..ENDPOS with the LENGTH bytes at TEXT.  DELETED
+ * is the text being replaced, or NULL to fetch it from the text widget
+ * (which must not have changed yet then).  ReplaceAll calls it to account
+ * for each replacement it folded into one XmTextReplace.
+ */
+void
+_DtEditorRecordEdit(
+        DtEditorWidget editor,
+        XmTextPosition startPos,
+        XmTextPosition endPos,
+        const char *deleted,
+        const char *text,
+        int length )
+{
   /*
    * Loading all new data so no need to set up the data for later undos
    */
@@ -420,16 +449,16 @@ _DtEditorModifyVerifyCB(
      * First, account for any data which will be removed by the new data.
      * If text is being deleted, then grab a copy for later undo's.
      */
-    if(cb->endPos > cb->startPos)
-      SetUndoDeletionState(editor, cb);
+    if(endPos > startPos)
+      SetUndoDeletionState(editor, startPos, endPos, deleted);
 
     /*
      * If text is being inserted, then change the undo insertion state.
      */
-    if(cb->text->length > 0)
-	SetUndoInsertionState(editor, cb);
+    if(length > 0)
+	SetUndoInsertionState(editor, startPos, text, length);
 
   } 
 
-} /* end ModifyVerifyCB */
+} /* end _DtEditorRecordEdit */
 

@@ -647,6 +647,13 @@ extern void _DtEditorModifyVerifyCB(
         Widget w,
         caddr_t client_data,
         caddr_t call_data );
+extern void _DtEditorRecordEdit(
+        DtEditorWidget editor,
+        XmTextPosition startPos,
+        XmTextPosition endPos,
+        const char *deleted,
+        const char *text,
+        int length );
 
 /*** library-private functions in SearchCalls.c ***/
 
