@@ -33,6 +33,8 @@
 #include <sys/stat.h>
 #include <sys/param.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <Xm/Xm.h>
 #include <Xm/MwmUtil.h>
@@ -82,6 +84,23 @@ static  int icon_count = 0;
 char    *main_filter;
 char    *file_filter_global;
 DtIconGadget **icons_in_container = NULL;
+
+/* Icons are loaded lazily: a gadget gets its XmNimageName only once it
+ * is (about to be) visible in the scrolled window.  Loading an icon
+ * reads and parses the file and allocates every one of its colours with
+ * a round trip each; a directory such as /usr/dt/appconfig/icons/C has
+ * hundreds of them, of which a dozen are on screen.
+ * pending_images[i] is the file still to be loaded into gadget i. */
+static  char **pending_images = NULL;
+static  int    pending_size = 0;
+static  int    pending_left = 0;
+static  int    icons_used = 0;      /* gadgets managed in the container */
+
+static  char  *placeholder_image (Screen *screen, const char *file);
+static  void   load_icon (int index);
+static  void   load_visible_icons (void);
+static  void   clear_pending_images (void);
+static  void   exposeEH_icon_container (Widget, XtPointer, XEvent *, Boolean *);
 
 
 int myscandir(char *, struct dirent ***, int(*)(struct dirent *, char *), int ());
@@ -701,9 +720,11 @@ void  update_container_contents (char *filter)
   Arg           args[10];
   XmString      xmstring;
   char          *ptr;
+  char          *image;
 
   XtUnmanageChild (icon_scrolled_container);
   /* free_container_contents (); */
+  clear_pending_images ();
 
   path = (char *)calloc (strlen(filter)+1, sizeof(char));
 
@@ -752,6 +773,11 @@ void  update_container_contents (char *filter)
      icons_in_container = (DtIconGadget **)realloc
                                       (icons_in_container,
                                       (icon_count+1) * sizeof(DtIconGadget *));
+     pending_images = (char **)realloc (pending_images,
+                                        icon_count * sizeof(char *));
+     for (lcv = pending_size; lcv < icon_count; lcv++)
+        pending_images[lcv] = NULL;
+     pending_size = icon_count;
      /*memset(&(icons_in_container[icon_count]), 0, sizeof(DtIconGadget *));*/
      for (lcv = old_count; lcv < icon_count; lcv++) {
         icons_in_container[lcv] =
@@ -761,7 +787,7 @@ void  update_container_contents (char *filter)
                             args, n);
           XtAddCallback((Widget) icons_in_container[lcv], XmNcallback,
                        (XtCallbackProc) selectionCB_icon_scrolled_container,
-                       (XtPointer) NULL);
+                       (XtPointer) (XtArgVal) lcv);
 
 #ifdef DEBUG
        if (!icons_in_container[lcv])
@@ -817,10 +843,20 @@ void  update_container_contents (char *filter)
        if (ptr) {
           *ptr = '\0';
        }
+       /* The image is set when the gadget becomes visible
+          (load_visible_icons); until then it has an empty one of the
+          same size. */
+       image = placeholder_image (XtScreen ((Widget) icons_in_container[lcv]),
+                                  iconfile);
+       if (image != iconfile &&
+           (pending_images[lcv] = strdup(iconfile)) != NULL)
+          pending_left++;
+       else
+          image = iconfile;
        xmstring = XmStringCreateLocalized(filelist[lcv]->d_name);
        XtVaSetValues ((Widget) icons_in_container[lcv],
                              XmNstring,        xmstring,
-                             XmNimageName,     iconfile,
+                             XmNimageName,     image,
                              NULL);
        XmStringFree(xmstring);
 
@@ -850,6 +886,7 @@ void  update_container_contents (char *filter)
   if (count < icon_count)
      XtUnmanageChildren ((WidgetList) &icons_in_container[count],
                          icon_count - count);
+  icons_used = count;
   XtManageChildren ((WidgetList) icons_in_container, count);
 
   /******************************************************************/
@@ -863,9 +900,208 @@ void  update_container_contents (char *filter)
   }
 
   XtManageChild (icon_scrolled_container);
+  /* load what the scrolled window shows now; the rest as it is scrolled
+     into view */
+  load_visible_icons ();
   free(path);
   return;
 
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  icon_file_size - the width and height an XPM or XBM file declares     */
+/*  Output: True if FILE starts like one and the size was read             */
+/*                                                                         */
+/***************************************************************************/
+static Boolean icon_file_size (const char *file, int *width, int *height)
+{
+  char    buf[2048], *p, *q;
+  ssize_t n;
+  int     fd;
+
+  fd = open (file, O_RDONLY | O_CLOEXEC);
+  if (fd < 0)
+     return False;
+  n = read (fd, buf, sizeof(buf) - 1);
+  close (fd);
+  if (n <= 0)
+     return False;
+  buf[n] = '\0';
+
+  if (strstr (buf, "XPM")) {
+     /* XPM 3: the first string holds "width height ncolors cpp" */
+     if (!(p = strchr (buf, '{')) || !(p = strchr (p, '"')) ||
+         sscanf (p + 1, "%d %d", width, height) != 2)
+        return False;
+  } else {
+     /* XBM: #define name_width W, #define name_height H */
+     if (!(p = strstr (buf, "_width ")) || !(q = strstr (buf, "_height ")) ||
+         sscanf (p + 7, "%d", width) != 1 || sscanf (q + 8, "%d", height) != 1)
+        return False;
+  }
+  return *width > 0 && *height > 0 && *width <= 1024 && *height <= 1024;
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  blank_image - a cleared 1-bit image                                    */
+/*                                                                         */
+/***************************************************************************/
+static XImage *blank_image (Screen *screen, int width, int height)
+{
+  char   *data = calloc ((size_t) ((width + 7) / 8) * height, 1);
+  XImage *image;
+
+  if (!data)
+     return NULL;
+  image = XCreateImage (DisplayOfScreen (screen), DefaultVisualOfScreen (screen),
+                        1, XYBitmap, 0, data, width, height, 8, 0);
+  if (!image)
+     free (data);
+  return image;
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  placeholder_image - the name of an installed empty image of the size  */
+/*                      of the icon in FILE, with an empty mask            */
+/*  Output: the name (static storage), or FILE itself when the size is    */
+/*          unknown: then the icon is loaded at once, as it always was     */
+/*                                                                         */
+/*  A gadget waiting for its icon shows this one: it has the icon's        */
+/*  geometry, so the column and the rows do not change size as icons are  */
+/*  loaded, and its mask hides it completely.  Motif caches the pixmap of  */
+/*  an installed image: one pixmap per size for all the gadgets.           */
+/*                                                                         */
+/***************************************************************************/
+#define MAX_PLACEHOLDERS 32
+
+static char *placeholder_image (Screen *screen, const char *file)
+{
+  static struct { int width, height; } installed[MAX_PLACEHOLDERS];
+  static int   ninstalled = 0;
+  static char  name[48];
+  char         mask_name[sizeof(name) + 2];
+  XImage       *image, *mask;
+  int          width, height, i;
+
+  if (!icon_file_size (file, &width, &height))
+     return (char *) file;
+  snprintf (name, sizeof(name), "DtcreateBlank%dx%d", width, height);
+  for (i = 0; i < ninstalled; i++)
+     if (installed[i].width == width && installed[i].height == height)
+        return name;
+  if (ninstalled == MAX_PLACEHOLDERS)
+     return (char *) file;
+
+  /* Motif looks for the mask of image NAME under NAME_m */
+  snprintf (mask_name, sizeof(mask_name), "%s_m", name);
+  image = blank_image (screen, width, height);
+  mask = blank_image (screen, width, height);
+  if (image && mask && XmInstallImage (image, name)) {
+     if (XmInstallImage (mask, mask_name)) {
+        installed[ninstalled].width = width;
+        installed[ninstalled].height = height;
+        ninstalled++;
+        return name;
+     }
+     XmUninstallImage (image);
+  }
+  if (image)
+     XDestroyImage (image);
+  if (mask)
+     XDestroyImage (mask);
+  return (char *) file;
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  clear_pending_images - forget the icons not loaded yet                 */
+/*                                                                         */
+/***************************************************************************/
+static void clear_pending_images (void)
+{
+  int lcv;
+
+  for (lcv = 0; lcv < pending_size; lcv++) {
+     free (pending_images[lcv]);
+     pending_images[lcv] = NULL;
+  }
+  pending_left = 0;
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  load_icon - give gadget INDEX its image, if it is still pending        */
+/*                                                                         */
+/***************************************************************************/
+static void load_icon (int index)
+{
+  char *file;
+
+  if (index < 0 || index >= pending_size || !pending_images[index])
+     return;
+  file = pending_images[index];
+  pending_images[index] = NULL;
+  pending_left--;
+  XtVaSetValues ((Widget) icons_in_container[index],
+                 XmNimageName, file,
+                 NULL);
+  free (file);
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  load_visible_icons - load the icons of the gadgets inside the          */
+/*                       scrolled window's clip window                     */
+/*                                                                         */
+/***************************************************************************/
+static void load_visible_icons (void)
+{
+  Widget rc, clip, g;
+  int    top, bottom, lcv, pass, loaded;
+
+  if (!pending_left || !icons_in_container || icons_used <= 0)
+     return;
+  rc = XtParent ((Widget) icons_in_container[0]);
+  if (!XtIsManaged (rc) || !XtIsRealized (rc))
+     return;
+  clip = XtParent (rc);
+
+  /* Loading changes the gadgets' sizes and so what is visible: repeat
+     until nothing new comes into view. */
+  for (pass = 0; pass < 8 && pending_left; pass++) {
+     top = -XtY (rc);
+     bottom = top + (int) XtHeight (clip);
+     loaded = 0;
+     for (lcv = 0; lcv < icons_used && lcv < pending_size; lcv++) {
+        if (!pending_images[lcv])
+           continue;
+        g = (Widget) icons_in_container[lcv];
+        if (XtY (g) + (int) XtHeight (g) <= top || XtY (g) >= bottom)
+           continue;
+        load_icon (lcv);
+        loaded++;
+     }
+     if (!loaded)
+        break;
+  }
+}
+
+/***************************************************************************/
+/*                                                                         */
+/*  exposeEH_icon_container - the container moved (scrolling), was        */
+/*                            resized or exposed: load what is now visible */
+/*                                                                         */
+/***************************************************************************/
+static void exposeEH_icon_container (Widget w, XtPointer client_data,
+                                     XEvent *event, Boolean *cont)
+{
+  (void) w; (void) client_data; (void) cont;
+
+  if (event->type == Expose || event->type == ConfigureNotify)
+     load_visible_icons ();
 }
 
 #ifdef _ICONSELECTOR_DESTROY_ENABLED
@@ -910,6 +1146,8 @@ void  free_container_contents (void)
 #endif
 
   icon_count = 0;
+  icons_used = 0;
+  clear_pending_images ();
 
   return;
 }
@@ -1297,6 +1535,7 @@ static  void    selectionCB_icon_scrolled_container ( Widget UxWidget,
   XmString  xmbasename;
   char     *basename;
 
+  load_icon ((int) (XtArgVal) UxClientData);
   XtVaGetValues (UxWidget, XmNimageName, &filename, NULL);
 #ifdef DEBUG
   printf("In icon callback for '%s'\n", filename);
@@ -1350,6 +1589,9 @@ void    resizeCB_clipWindow( Widget UxWidget,
 
   increment = icon_count > 0 ? (int)height / icon_count : height;
   XtVaSetValues(widvScrollbar, XmNincrement, increment, NULL);
+
+  /* a taller clip window shows more icons */
+  load_visible_icons ();
 
   return;
 
@@ -1410,6 +1652,11 @@ static void focusCB_icon_selection_dialog(Widget UxWidget,
 
   icons_in_container = NULL;
   icon_count = 0;
+  icons_used = 0;
+  clear_pending_images ();
+  free (pending_images);
+  pending_images = NULL;
+  pending_size = 0;
 
   update_container_contents (initial_filter);
 
@@ -1919,6 +2166,12 @@ static Widget   _Uxbuild_icon_selection_dialog(void)
         XtAddCallback( icon_selection_dialog, XmNdestroyCallback,
                       (XtCallbackProc) UxDestroyContextCB,
                       (XtPointer) UxIcon_selection_dialogContext);
+
+        /* scrolling moves the container (ConfigureNotify) and exposes
+           it: load the icons that came into view */
+        XtAddEventHandler( icon_scrolled_container,
+                ExposureMask | StructureNotifyMask, False,
+                exposeEH_icon_container, (XtPointer) NULL );
 
         XtVaGetValues (icon_scrolled_win, XmNclipWindow, &widclipWindow, NULL);
         XtAddCallback( widclipWindow, XmNresizeCallback,
