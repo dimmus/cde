@@ -14,12 +14,12 @@ AM_CPPFLAGS = $(CDE_CPPFLAGS) -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./ob
 dtprintinfo_LDADD = $(LIBHELP) $(LIBSVC) $(XMLIB) $(XTLIB) $(XPMLIB) $(X11LIB)
 
 # libcups for the queue list, queue states and jobs (objects/PrintObj/Cups.C),
-# built in when cups-config is found; without it (or with
-# "make DTPRINTINFO_CUPS_LIBS=") lpstat and lpq are run.  configure does
-# not look for CUPS (GNU make syntax, as in ../dtksh/Makefile.am).
-DTPRINTINFO_CUPS_LIBS := $(if $(shell type cups-config 2>/dev/null),-lcups)
-AM_CPPFLAGS += $(if $(DTPRINTINFO_CUPS_LIBS),-DHAVE_LIBCUPS=1 $(shell cups-config --cflags 2>/dev/null))
-dtprintinfo_LDADD += $(DTPRINTINFO_CUPS_LIBS)
+# when configure found it (cups-config; --without-cups turns it off).
+# Without it lpstat and lpq are run.
+if HAVE_CUPS
+AM_CPPFLAGS += -DHAVE_LIBCUPS=1 $(CUPS_CFLAGS)
+dtprintinfo_LDADD += $(CUPS_LIBS)
+endif
 
 UTIL_SRC = util/Invoke.C util/Invoke.h util/Process.C util/Process.h
 

@@ -23,9 +23,9 @@
 // scheduler with libcups instead of from lpstat and lpq.
 //
 // Built in when HAVE_LIBCUPS is defined (Makefile.am defines it when
-// cups-config is found) and <cups/cups.h> exists.  Used when a CUPS
-// scheduler answered the first request (CupsDeviceList()); otherwise the
-// lpstat and lpq commands are run as before.
+// configure found a usable libcups) and <cups/cups.h> exists.  Used
+// when a CUPS scheduler answered the first request (CupsDeviceList());
+// otherwise the lpstat and lpq commands are run as before.
 
 #ifndef DTPRINTINFO_CUPS_H
 #define DTPRINTINFO_CUPS_H

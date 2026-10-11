@@ -997,6 +997,47 @@ AC_CHECK_LIB(utempter, utempter_add_record,
 
 AM_CONDITIONAL([HAS_UTEMPTER_LIBRARY], [test "x$ac_cv_lib_utempter_utempter_add_record" = "xyes"])
 
+dnl libcups: dtprintinfo reads queues, queue states and jobs from the CUPS
+dnl scheduler with it (objects/PrintObj/Cups.C) instead of running lpstat
+dnl and lpq.  cups-config gives the flags (libcups has no .pc file before
+dnl CUPS 2.5); --without-cups keeps lpstat and lpq.
+AC_ARG_WITH([cups],
+  AS_HELP_STRING([--without-cups],
+    [do not use libcups in dtprintinfo (default: use it when cups-config is found)]),
+  [], [with_cups=check])
+have_cups=no
+CUPS_CFLAGS=""
+CUPS_LIBS=""
+if test "x$with_cups" != xno; then
+   AC_PATH_PROG([CUPS_CONFIG], [cups-config], [no])
+   if test "x$CUPS_CONFIG" != xno; then
+      CUPS_CFLAGS=`$CUPS_CONFIG --cflags`
+      CUPS_LIBS=`$CUPS_CONFIG --libs`
+      AC_MSG_CHECKING([whether libcups can be used])
+      ac_saved_cppflags="$CPPFLAGS"
+      ac_saved_libs="$LIBS"
+      CPPFLAGS="$CPPFLAGS $CUPS_CFLAGS"
+      LIBS="$CUPS_LIBS $LIBS"
+      AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <cups/cups.h>]],
+         [[cups_dest_t *d = cupsGetNamedDest(CUPS_HTTP_DEFAULT, NULL, NULL);
+           cupsFreeDests(d ? 1 : 0, d); return 0;]])],
+         [have_cups=yes])
+      CPPFLAGS="$ac_saved_cppflags"
+      LIBS="$ac_saved_libs"
+      AC_MSG_RESULT([$have_cups])
+   fi
+   if test "x$have_cups" != xyes; then
+      CUPS_CFLAGS=""
+      CUPS_LIBS=""
+      if test "x$with_cups" = xyes; then
+         AC_MSG_ERROR([--with-cups was given, but cups-config or a usable libcups was not found])
+      fi
+   fi
+fi
+AC_SUBST(CUPS_CFLAGS)
+AC_SUBST(CUPS_LIBS)
+AM_CONDITIONAL([HAVE_CUPS], [test "x$have_cups" = xyes])
+
 dnl Figure out TCL (only instant, one of the documentation tools, uses it)
 
 if test "x$enable_doc_tools" != xno; then
