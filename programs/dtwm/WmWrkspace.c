@@ -352,6 +352,10 @@ ChangeToWorkspace(
     MarkNetWmDesktop (pOldWS, True);
     MarkNetWmDesktop (pNewWS, True);
 
+    /* maximized windows in both workspaces fit the struts of this one */
+    if (pSD->numStrutClients)
+	EwmhMarkScreen (pSD, NET_SD_WORKAREA);
+
     if ( (wsContext == F_CONTEXT_ICON &&
 	  ClientInWorkspace (ACTIVE_WS, pWsPCD)) ||
 	
@@ -465,6 +469,8 @@ UpdateWorkspacePresenceProperty(
     unsigned long i;
 
     EwmhMarkClient (pCD, NET_CD_DESKTOP);
+    if (pCD->hasStrut)
+	EwmhMarkScreen (pCD->pSD, NET_SD_WORKAREA);
 
     if (wmGD.useStandardBehavior)
     {

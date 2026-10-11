@@ -1391,6 +1391,9 @@ typedef struct _WmScreenData
     long		netGeometryWritten[2];
     char		*netNamesWritten;	/* _NET_DESKTOP_NAMES */
     int			lenNetNamesWritten;	/* or -1 */
+    int			numStrutClients;	/* clients with hasStrut */
+    long		*workAreaWritten;	/* _NET_WORKAREA, 4 per */
+    int			numWorkAreaWritten;	/* desktop, or -1 */
 } WmScreenData;
 
 typedef struct _WmScreenData *PtrScreenData;
@@ -1759,6 +1762,8 @@ struct _ClientData
     unsigned char maxAxes;			/* MAX_AXIS_* when maximized */
     unsigned char netType;			/* NETTYPE_* */
     unsigned char layer;			/* LAYER_* of its type */
+    long	strut[12];			/* _NET_WM_STRUT_PARTIAL */
+    Boolean	hasStrut;			/* strut[] is set */
 
     /* client window frame graphic data: */
 
@@ -2081,6 +2086,8 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_STATE_[NETSTATE_COUNT];
     Atom	xa__NET_WM_WINDOW_TYPE_[NETTYPE_COUNT];
     Atom	xa__NET_WM_DESKTOP;
+    Atom	xa__NET_WM_STRUT;
+    Atom	xa__NET_WM_STRUT_PARTIAL;
 
     /* EWMH property writer (WmEwmh.c): */
 
@@ -2164,6 +2171,8 @@ typedef struct _WmGlobalData
     Boolean	systemButtonClick2;		/* resource */
     Boolean	useLargeCursors;
     Boolean	useFrontPanel;			/* resource */
+    Boolean	frontPanelStrut;		/* resource: work area */
+						/* excludes the front panel */
     String      helpDirectory;		        /* resource */
     Window	requestContextWin;		/* for WmRequest f.fcns */
     Boolean     dtLite;                        /* resource */

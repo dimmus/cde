@@ -42,6 +42,7 @@
  */
 
 #include "WmError.h"
+#include "WmEwmh.h"
 #include "WmFunction.h"
 #include "WmKeyFocus.h"
 #include "WmMenu.h"
@@ -241,6 +242,10 @@ void SendConfigureNotify (ClientData *pCD)
 {
     XConfigureEvent notifyEvent;
 
+
+    /* the front panel moved: the work area may have changed */
+    if ((pCD->clientFlags & FRONT_PANEL_BOX) && wmGD.frontPanelStrut)
+	EwmhMarkScreen (pCD->pSD, NET_SD_WORKAREA);
 
     /*
      * Send a synthetic ConfigureNotify message:

@@ -581,6 +581,61 @@ static void SetupWindowStateWithEventMask (ClientData *pCD, int newState,
 
 
 
+/*
+ * The maximized geometry of a client: GetMaxInfo's, along the axes that
+ * are maximized (EWMH can maximize one); the client's own along the other.
+ */
+static void GetMaxGeometry (ClientData *pcd, int *pX, int *pY, int *pWidth,
+    int *pHeight)
+{
+    GetMaxInfo (pcd, pX, pY, pWidth, pHeight);
+
+    if (!pcd->fullscreen && !(pcd->maxAxes & MAX_AXIS_HORZ))
+    {
+	*pX = pcd->clientX;
+	*pWidth = pcd->clientWidth;
+    }
+    if (!pcd->fullscreen && !(pcd->maxAxes & MAX_AXIS_VERT))
+    {
+	*pY = pcd->clientY;
+	*pHeight = pcd->clientHeight;
+    }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  RefitMaximizedClient (pcd)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Maximizes a maximized (not full screen) client again if its maximized
+ *  geometry changed, when the work area changes (struts).
+ *
+ *************************************<->***********************************/
+
+void RefitMaximizedClient (ClientData *pcd)
+{
+    int x, y, width, height;
+
+    if (!pcd->maxConfig || pcd->fullscreen ||
+	(pcd->clientState & ~UNSEEN_STATE) == WITHDRAWN_STATE)
+	return;
+
+    pcd->maxConfig = FALSE;		/* not the current geometry */
+    GetMaxGeometry (pcd, &x, &y, &width, &height);
+    if (x == pcd->maxX && y == pcd->maxY &&
+	width == pcd->maxWidth && height == pcd->maxHeight)
+    {
+	pcd->maxConfig = TRUE;
+	return;
+    }
+
+    ConfigureNewState (pcd);		/* maximizes it */
+}
+
+
 /*************************************<->*************************************
  *
  *  ConfigureNewState (pcd)
@@ -626,20 +681,8 @@ void ConfigureNewState (ClientData *pcd)
 	    SetClientOffset (pcd);
 	}
 
-	GetMaxInfo (pcd, &pcd->maxX, &pcd->maxY, &pcd->maxWidth,
-		    &pcd->maxHeight);
-
-	/* maximized along one axis (EWMH): the other one stays */
-	if (!pcd->fullscreen && !(pcd->maxAxes & MAX_AXIS_HORZ))
-	{
-	    pcd->maxX = pcd->clientX;
-	    pcd->maxWidth = pcd->clientWidth;
-	}
-	if (!pcd->fullscreen && !(pcd->maxAxes & MAX_AXIS_VERT))
-	{
-	    pcd->maxY = pcd->clientY;
-	    pcd->maxHeight = pcd->clientHeight;
-	}
+	GetMaxGeometry (pcd, &pcd->maxX, &pcd->maxY, &pcd->maxWidth,
+			&pcd->maxHeight);
 
 	XResizeWindow (DISPLAY, pcd->client,
 			   (unsigned int) pcd->maxWidth, 
@@ -808,6 +851,8 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 
     SetWMStateOnce (pCD, wmState, ICON_FRAME_WIN(pCD));
     EwmhMarkClient (pCD, NET_CD_STATE);	/* _NET_WM_STATE_HIDDEN */
+    if (pCD->hasStrut || (pCD->clientFlags & FRONT_PANEL_BOX))
+	EwmhMarkScreen (pCD->pSD, NET_SD_WORKAREA);
     pCD->clientState = mwmState;
     if (bToUnseen)
 	pCD->clientState |= UNSEEN_STATE;

@@ -231,6 +231,7 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->maxAxes = MAX_AXES_BOTH;
     pCD->netType = NETTYPE_NORMAL;
     pCD->layer = LAYER_NORMAL;
+    pCD->hasStrut = False;
     pCD->iconEntry.nextSibling = NULL;
     pCD->iconEntry.prevSibling = NULL;
     pCD->iconEntry.pCD = NULL;
@@ -3664,6 +3665,9 @@ FindClientPlacement (ClientData *pCD)
         screenHeight = DisplayHeight (DISPLAY, SCREEN_FOR_CLIENT(pCD));
     }
 
+    /* within the work area (the head less the struts) */
+    GetNetWorkArea (pCD, &screenX, &screenY, &screenWidth, &screenHeight);
+
     while (!placed)
     {
 	if ((clientPlacementX - pCD->clientOffset.x + frameWidth)
@@ -4213,6 +4217,10 @@ void GetMaxInfo (ClientData *pCD, int *pX, int *pY, int *pWidth, int *pHeight)
 	width  = DisplayWidth (DISPLAY, SCREEN_FOR_CLIENT (pCD));
 	height = DisplayHeight (DISPLAY, SCREEN_FOR_CLIENT (pCD));
     }
+
+    /* the head less the struts, except to go full screen */
+    if (!pCD->maxConfig && !pCD->fullscreen)
+	GetNetWorkArea (pCD, &x, &y, &width, &height);
 
     FrameToClient (pCD, &x, &y, (unsigned int *) &width,
 		   (unsigned int *) &height);

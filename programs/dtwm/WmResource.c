@@ -960,6 +960,15 @@ XtResource wmGlobalResources[] =
 	XtRImmediate,
 	(XtPointer)True
     },
+    {
+	WmNfrontPanelStrut,
+	WmCFrontPanelStrut,
+	XtRBoolean,
+	sizeof (Boolean),
+        XtOffsetOf(WmGlobalData, frontPanelStrut),
+	XtRImmediate,
+	(XtPointer)False
+    },
 
     {
 	WmNhelpDirectory,

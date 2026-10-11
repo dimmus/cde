@@ -98,6 +98,9 @@ Boolean GetNetWmTypeWorkspaces (ClientData *pCD, WorkspaceID **ppIDs,
 long NetTypeDecoration (ClientData *pCD, long decoration);
 long NetTypeFunctions (ClientData *pCD, long functions);
 void ApplyNetWmTypePlacement (ClientData *pCD);
+void ProcessNetWmStrut (ClientData *pCD, Boolean firstTime);
+void GetNetWorkArea (ClientData *pCD, int *pX, int *pY, int *pWidth,
+    int *pHeight);
 void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     int top, int bottom, int left, int right);
 void ProcessNetWmState (ClientData *pCD, long action,

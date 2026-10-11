@@ -33,6 +33,7 @@
 extern void SetClientState (ClientData *pCD, int newState, Time setTime);
 extern void SetClientStateWithEventMask (ClientData *pCD, int newState, Time setTime, unsigned int event_mask);
 extern void ConfigureNewState (ClientData *pcd);
+extern void RefitMaximizedClient (ClientData *pcd);
 extern void SetClientWMState (ClientData *pCD, int wmState, int mwmState);
 extern void MapClientWindows (ClientData *pCD);
 extern void ShowIconForMinimizedClient (WmWorkspaceData *pWS, ClientData *pCD);

@@ -49,6 +49,16 @@
  *   types       _NET_WM_WINDOW_TYPE: decorations (frame and client
  *               geometry), focus when mapped, workspaces, position, and a
  *               dialog that becomes a transient of its window group
+ *   struts      _NET_WM_STRUT_PARTIAL and _NET_WM_STRUT: _NET_WORKAREA of
+ *               the desktops the window is on, maximized windows (through
+ *               messages and xdotool) within it and refitted when it
+ *               changes, full screen ignoring it, new windows placed in it
+ *               (skipped with -x 'Dtwm*frontPanelStrut: True' and -f)
+ *   xinerama    with two heads side by side (Xvfb +xinerama -screen 0 ...
+ *               -screen 1 ...; skipped otherwise): a strut on the inner
+ *               edge of the left head limits only that head
+ *   panel       with -f, the front panel takes part of the work area if
+ *               and only if -x 'Dtwm*frontPanelStrut: True' is given
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -1046,6 +1056,33 @@ static void test_xdotool(void)
 /* States                                                              */
 /* ------------------------------------------------------------------ */
 
+static int panel_strut(void);
+
+/*
+ * The height of the work area of the first desktop (less than the
+ * screen with Dtwm*frontPanelStrut), once the front panel is up.
+ */
+static int work_height(void)
+{
+	Atom workarea = XInternAtom(dpy, "_NET_WORKAREA", False);
+	unsigned long *v;
+	int n, h = DisplayHeight(dpy, DefaultScreen(dpy));
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+
+	for (;;) {
+		v = get_prop(workarea, XA_CARDINAL, &n);
+		if (n >= 4 && (long)v[3] < h)
+			h = (int)v[3];
+		if (v)
+			XFree(v);
+		if (h < DisplayHeight(dpy, DefaultScreen(dpy)) ||
+		    !panel_strut())
+			return h;
+		if (!wait_notify(rootw, workarea, deadline))
+			fail("no _NET_WORKAREA for the front panel");
+	}
+}
+
 #define REMOVE 0
 #define ADD 1
 #define TOGGLE 2
@@ -1201,6 +1238,7 @@ static void test_states(void)
 	};
 	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
 	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	int wh = work_height();		/* the front panel's strut */
 	int i, j, n, x, y, wd, ht, fx, fy, fw, fh;
 	unsigned long *v;
 	Window a, b, f, m, s;
@@ -1286,7 +1324,7 @@ static void test_states(void)
 	if (has_state(b, state_atom("MAXIMIZED_HORZ")))
 		fail("MAXIMIZED_VERT also maximized horizontally");
 	root_geometry(frame_of(b), &fx, &fy, &fw, &fh);
-	if (fy != 0 || fh != sh || fw >= sw)
+	if (fy != 0 || fh != wh || fw >= sw)
 		fail("maximized vertically, the frame is %dx%d+%d+%d",
 		     fw, fh, fx, fy);
 	root_geometry(b, &i, &j, &n, &fh);
@@ -1296,7 +1334,7 @@ static void test_states(void)
 	expect_state(b, "MAXIMIZED_HORZ", 1);
 	expect_state(b, "MAXIMIZED_VERT", 1);
 	root_geometry(frame_of(b), &fx, &fy, &fw, &fh);
-	if (fx != 0 || fy != 0 || fw != sw || fh != sh)
+	if (fx != 0 || fy != 0 || fw != sw || fh != wh)
 		fail("maximized, the frame is %dx%d+%d+%d", fw, fh, fx, fy);
 	send_state(b, REMOVE, "MAXIMIZED_VERT", NULL);
 	expect_state(b, "MAXIMIZED_VERT", 0);
@@ -1341,7 +1379,7 @@ static void test_states(void)
 		fail("MAXIMIZED_VERT at map also maximized horizontally");
 	root_geometry(frame_of(m), &fx, &fy, &fw, &fh);
 	root_geometry(m, &x, &y, &wd, &ht);
-	if (fy != 0 || fh != sh || wd != 300)
+	if (fy != 0 || fh != wh || wd != 300)
 		fail("maximized vertically at map: frame %dx%d+%d+%d, "
 		     "client %dx%d", fw, fh, fx, fy, wd, ht);
 
@@ -1740,6 +1778,327 @@ static void test_types(void)
 	printf("types: ok\n");
 }
 
+/* ------------------------------------------------------------------ */
+/* Struts and the work area                                            */
+/* ------------------------------------------------------------------ */
+
+static int panel_strut(void)
+{
+	int i;
+
+	if (!front_panel)
+		return 0;
+	for (i = 0; i < nxrm; i++)
+		if (strstr(xrm[i], "frontPanelStrut") &&
+		    (strstr(xrm[i], "True") || strstr(xrm[i], "true")))
+			return 1;
+	return 0;
+}
+
+/* Set a strut: 12 values as _NET_WM_STRUT_PARTIAL, 4 as _NET_WM_STRUT,
+ * none to remove both. */
+static void set_strut(Window w, int n, const long *strut)
+{
+	Atom partial = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False);
+	Atom plain = XInternAtom(dpy, "_NET_WM_STRUT", False);
+
+	if (n == 12)
+		XChangeProperty(dpy, w, partial, XA_CARDINAL, 32,
+				PropModeReplace, (unsigned char *)strut, 12);
+	else if (n == 4)
+		XChangeProperty(dpy, w, plain, XA_CARDINAL, 32,
+				PropModeReplace, (unsigned char *)strut, 4);
+	else {
+		XDeleteProperty(dpy, w, partial);
+		XDeleteProperty(dpy, w, plain);
+	}
+}
+
+struct workarea {
+	int desktop;
+	long x, y, w, h;
+};
+
+static int workarea_is(Window w, Atom prop, const void *arg)
+{
+	const struct workarea *e = arg;
+	unsigned long *v;
+	int n, ok;
+
+	v = get_prop_on(w, prop, XA_CARDINAL, &n);
+	ok = n >= 4 * (e->desktop + 1) &&
+	     (long)v[4 * e->desktop] == e->x &&
+	     (long)v[4 * e->desktop + 1] == e->y &&
+	     (long)v[4 * e->desktop + 2] == e->w &&
+	     (long)v[4 * e->desktop + 3] == e->h;
+	if (v)
+		XFree(v);
+	return ok;
+}
+
+static void expect_workarea(int desktop, long x, long y, long w, long h)
+{
+	struct workarea e = { desktop, x, y, w, h };
+	char what[128];
+
+	snprintf(what, sizeof what, "_NET_WORKAREA of desktop %d = "
+		 "%ld,%ld %ldx%ld", desktop, x, y, w, h);
+	wait_for(XInternAtom(dpy, "_NET_WORKAREA", False), workarea_is, &e,
+		 what);
+}
+
+/* The root geometry of a client's frame. */
+static void frame_geometry(Window w, int *x, int *y, int *wd, int *ht)
+{
+	root_geometry(frame_of(w), x, y, wd, ht);
+}
+
+/* Wait until the frame of w has this bottom edge (and is maximized). */
+static void expect_frame_bottom(Window w, int bottom, const char *what)
+{
+	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
+	int x, y, wd, ht;
+
+	for (;;) {
+		frame_geometry(w, &x, &y, &wd, &ht);
+		if (y + ht == bottom)
+			return;
+		if (bench_now_ns() > deadline)
+			fail("%s: the frame is %dx%d+%d+%d, its bottom is not %d",
+			     what, wd, ht, x, y, bottom);
+		wait_notify(w, a_net_wm_state, bench_now_ns() + 100 * 1e6);
+	}
+}
+
+static void test_struts(void)
+{
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	long bottom40[12] = { 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, sw - 1 };
+	long bottom80[12] = { 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, sw - 1 };
+	long sides[4] = { 30, 10, 20, 0 };
+	long left50[12] = { 50, 0, 0, 0, 0, sh - 1, 0, 0, 0, 0, 0, 0 };
+	Window d, m, m2, f, s, l, p;
+	int i, x, y, wd, ht;
+
+	if (panel_strut()) {
+		printf("struts: skipped (the front panel has a strut)\n");
+		return;
+	}
+	send_msg(rootw, a_number, 4);
+	expect_desktops(4);
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	for (i = 0; i < 4; i++)
+		expect_workarea(i, 0, 0, sw, sh);
+
+	/* a dock along the bottom: on every desktop */
+	d = create_typed("ewmhtest dock", "DOCK", NULL, 0, sh - 40, sw, 40,
+			 None);
+	set_strut(d, 12, bottom40);
+	map_managed(d);
+	for (i = 0; i < 4; i++)
+		expect_workarea(i, 0, 0, sw, sh - 40);
+
+	/* maximized through a message, through xdotool */
+	m = map_managed(create_window("ewmhtest M", None));
+	send_state(m, ADD, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_frame_bottom(m, sh - 40, "maximized M");
+	m2 = map_managed(create_window("ewmhtest M2", None));
+	if (!system("xdotool version >/dev/null 2>&1")) {
+		xdotool("windowstate --add MAXIMIZED_VERT 0x%lx", m2);
+		expect_frame_bottom(m2, sh - 40, "M2 maximized by xdotool");
+	}
+
+	/* full screen covers the strut */
+	f = map_managed(create_window("ewmhtest F", None));
+	send_state(f, ADD, "FULLSCREEN", NULL);
+	expect_frame_bottom(f, sh, "full screen F");
+	frame_geometry(f, &x, &y, &wd, &ht);
+	if (x != 0 || y != 0 || wd != sw)
+		fail("full screen F is %dx%d+%d+%d", wd, ht, x, y);
+	destroy_window(f);
+
+	/* a new window is placed above the strut */
+	p = create_window("ewmhtest tall", None);
+	XResizeWindow(dpy, p, 300, sh - 100);
+	{
+		XSizeHints *hints = XAllocSizeHints();
+
+		hints->flags = PSize;
+		hints->width = 300;
+		hints->height = sh - 100;
+		XSetWMNormalHints(dpy, p, hints);
+		XFree(hints);
+	}
+	map_managed(p);
+	frame_geometry(p, &x, &y, &wd, &ht);
+	if (y + ht > sh - 40)
+		fail("a new window was placed over the strut "
+		     "(frame %dx%d+%d+%d)", wd, ht, x, y);
+	destroy_window(p);
+
+	/* a larger strut, then none: the maximized windows follow */
+	set_strut(d, 12, bottom80);
+	expect_workarea(0, 0, 0, sw, sh - 80);
+	expect_frame_bottom(m, sh - 80, "maximized M, strut 80");
+	set_strut(d, 0, NULL);
+	expect_workarea(0, 0, 0, sw, sh);
+	expect_workarea(3, 0, 0, sw, sh);
+	expect_frame_bottom(m, sh, "maximized M, no strut");
+	set_strut(d, 12, bottom40);
+	expect_workarea(0, 0, 0, sw, sh - 40);
+	expect_frame_bottom(m, sh - 40, "maximized M, strut 40 again");
+
+	/* left, top and right struts (_NET_WM_STRUT) */
+	s = map_managed(create_window("ewmhtest sides", None));
+	set_strut(s, 4, sides);
+	expect_workarea(0, 30, 20, sw - 40, sh - 60);
+	frame_geometry(m, &x, &y, &wd, &ht);
+	if (x != 30 || y != 20 || x + wd != sw - 10 || y + ht != sh - 40)
+		fail("maximized M is %dx%d+%d+%d with struts 30,10,20,40",
+		     wd, ht, x, y);
+	destroy_window(s);
+	expect_workarea(0, 0, 0, sw, sh - 40);
+
+	/* single axis: refitted along that axis only */
+	send_state(m, REMOVE, "MAXIMIZED_HORZ", NULL);
+	expect_state(m, "MAXIMIZED_HORZ", 0);
+	frame_geometry(m, &x, &y, &wd, &ht);
+	set_strut(d, 12, bottom80);
+	expect_frame_bottom(m, sh - 80, "M maximized vertically, strut 80");
+	{
+		int x2, y2, wd2, ht2;
+
+		frame_geometry(m, &x2, &y2, &wd2, &ht2);
+		if (x2 != x || wd2 != wd)
+			fail("refitting M changed its width or x");
+	}
+
+	/* a window with a strut on desktop 1 only */
+	l = create_window("ewmhtest left on 1", None);
+	{
+		long one = 1;
+
+		XChangeProperty(dpy, l, a_wm_desktop, XA_CARDINAL, 32,
+				PropModeReplace, (unsigned char *)&one, 1);
+	}
+	set_strut(l, 12, left50);
+	map_managed(l);
+	expect_workarea(1, 50, 0, sw - 50, sh - 80);
+	expect_workarea(0, 0, 0, sw, sh - 80);
+	expect_workarea(2, 0, 0, sw, sh - 80);
+	XIconifyWindow(dpy, l, DefaultScreen(dpy));	/* not while iconic */
+	expect_workarea(1, 0, 0, sw, sh - 80);
+
+	destroy_all();
+	for (i = 0; i < 4; i++)
+		expect_workarea(i, 0, 0, sw, sh);
+	printf("struts: ok\n");
+}
+
+static void test_xinerama(void)
+{
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	int hw = sw / 2;
+	long inner[12] = { 0, hw + 40, 0, 0, 0, 0, 0, sh - 1, 0, 0, 0, 0 };
+	Window d, left, right;
+	int x, y, wd, ht;
+
+	if (sw != 2 * 1920 || sh != 1080) {
+		printf("xinerama: skipped (not two 1920x1080 heads)\n");
+		return;
+	}
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	/* a dock on the right edge of the left head */
+	d = create_typed("ewmhtest inner dock", "DOCK", NULL, hw - 40, 0,
+			 40, sh, None);
+	set_strut(d, 12, inner);
+	map_managed(d);
+
+	left = map_managed(create_typed("ewmhtest left", NULL, NULL,
+					100, 100, 300, 200, None));
+	right = map_managed(create_typed("ewmhtest right", NULL, NULL,
+					 hw + 100, 100, 300, 200, None));
+	send_state(left, ADD, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	send_state(right, ADD, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_state(left, "MAXIMIZED_HORZ", 1);
+	expect_state(right, "MAXIMIZED_HORZ", 1);
+	XSync(dpy, False);
+	frame_geometry(left, &x, &y, &wd, &ht);
+	if (x != 0 || x + wd != hw - 40 || ht != sh)
+		fail("maximized on the left head: %dx%d+%d+%d", wd, ht, x, y);
+	frame_geometry(right, &x, &y, &wd, &ht);
+	if (x != hw || wd != hw || ht != sh)
+		fail("maximized on the right head: %dx%d+%d+%d", wd, ht, x, y);
+
+	destroy_all();
+	printf("xinerama: ok\n");
+}
+
+static int workarea_short(Window w, Atom prop, const void *arg)
+{
+	unsigned long *v;
+	int n, ok;
+
+	v = get_prop_on(w, prop, XA_CARDINAL, &n);
+	ok = n >= 4 && (long)v[3] < *(const int *)arg;
+	if (v)
+		XFree(v);
+	return ok;
+}
+
+static void test_panel(void)
+{
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	unsigned long *v;
+	int n, x, y, wd, ht;
+	long area[4];
+	Window m;
+
+	if (!front_panel) {
+		printf("panel: skipped (no front panel, -f)\n");
+		return;
+	}
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	if (panel_strut())		/* once the panel is up */
+		wait_for(XInternAtom(dpy, "_NET_WORKAREA", False),
+			 workarea_short, &sh, "_NET_WORKAREA without the "
+			 "front panel");
+	v = get_prop(XInternAtom(dpy, "_NET_WORKAREA", False), XA_CARDINAL,
+		     &n);
+	if (n < 4)
+		fail("no _NET_WORKAREA");
+	for (n = 0; n < 4; n++)
+		area[n] = v[n];
+	XFree(v);
+
+	if (!panel_strut()) {
+		if (area[0] || area[1] || area[2] != sw || area[3] != sh)
+			fail("_NET_WORKAREA is %ld,%ld %ldx%ld without "
+			     "frontPanelStrut", area[0], area[1], area[2],
+			     area[3]);
+		printf("panel: ok (no strut)\n");
+		return;
+	}
+	/* the panel is at the bottom of the screen */
+	if (area[0] || area[1] || area[2] != sw || area[3] >= sh ||
+	    area[3] < sh / 2)
+		fail("_NET_WORKAREA is %ld,%ld %ldx%ld with frontPanelStrut",
+		     area[0], area[1], area[2], area[3]);
+	m = map_managed(create_window("ewmhtest M", None));
+	send_state(m, ADD, "MAXIMIZED_VERT", "MAXIMIZED_HORZ");
+	expect_frame_bottom(m, area[3], "maximized M above the panel");
+	frame_geometry(m, &x, &y, &wd, &ht);
+	destroy_all();
+	printf("panel: ok (strut %ld)\n", sh - area[3]);
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
@@ -1751,6 +2110,9 @@ static const struct {
 	{ "states", test_states },
 	{ "layers", test_layers },
 	{ "types", test_types },
+	{ "struts", test_struts },
+	{ "xinerama", test_xinerama },
+	{ "panel", test_panel },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))

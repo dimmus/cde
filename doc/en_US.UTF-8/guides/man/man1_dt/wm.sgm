@@ -1067,6 +1067,11 @@ window.</para>
 <entry align="left" valign="top">T/F</entry>
 <entry align="left" valign="top">T</entry></row>
 <row>
+<entry align="left" valign="top">frontPanelStrut</entry>
+<entry align="left" valign="top">FrontPanelStrut</entry>
+<entry align="left" valign="top">T/F</entry>
+<entry align="left" valign="top">F</entry></row>
+<row>
 <entry align="left" valign="top">wMenuButtonClick</entry>
 <entry align="left" valign="top">WMenuButtonClick</entry>
 <entry align="left" valign="top">T/F</entry>
@@ -1422,6 +1427,17 @@ this resource is all.</para>
 <listitem>
 <para>This resource enables the display of the front panel if True. If set
 to False, the Front Panel will not be displayed. The default value is True.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term><emphasis>frontPanelStrut</emphasis> (class  <emphasis>FrontPanelStrut</emphasis>)</term>
+<listitem>
+<para>If True, the area of the screen that the front panel takes along
+the edge of the monitor that it touches is reserved like the strut of a
+dock (_NET_WM_STRUT_PARTIAL): maximized windows and new windows placed by
+<emphasis>dtwm</emphasis> do not cover it, and _NET_WORKAREA leaves it out.
+It is not reserved while the front panel is minimized. The default value
+is False.
 </para>
 </listitem>
 </varlistentry>

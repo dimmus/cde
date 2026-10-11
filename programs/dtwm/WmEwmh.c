@@ -23,6 +23,7 @@
  * Floor, Boston, MA 02110-1301 USA
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -58,6 +59,7 @@ static Atom xa__NET_DESKTOP_VIEWPORT;
 static Atom xa__NET_CURRENT_DESKTOP;
 static Atom xa__NET_DESKTOP_NAMES;
 static Atom xa__NET_WM_WINDOW_TYPE;
+static Atom xa__NET_WORKAREA;
 
 /*
  * The atoms, interned together by SetupWmEwmh.  _NET_SUPPORTED lists
@@ -91,6 +93,9 @@ static const struct
 	&wmGD.xa__NET_WM_VISIBLE_ICON_NAME,				True },
     { _XA__NET_WM_FULLSCREEN_MONITORS,
 	&wmGD.xa__NET_WM_FULLSCREEN_MONITORS,				True },
+    { "_NET_WORKAREA",			&xa__NET_WORKAREA,		True },
+    { "_NET_WM_STRUT",			&wmGD.xa__NET_WM_STRUT,		True },
+    { "_NET_WM_STRUT_PARTIAL",		&wmGD.xa__NET_WM_STRUT_PARTIAL,	True },
     { _XA__NET_WM_STATE,		&wmGD.xa__NET_WM_STATE,		True },
 #define NETSTATE(s) \
     { "_NET_WM_STATE_" #s, &wmGD.xa__NET_WM_STATE_[NETSTATE_ ## s],	True }
@@ -322,6 +327,9 @@ void EwmhAddClient (ClientData *pCD)
 
     EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING);
     EwmhMarkClient (pCD, NET_CD_DESKTOP | NET_CD_STATE);
+
+    /* (while the initial property list is known) */
+    ProcessNetWmStrut (pCD, True);
 }
 
 
@@ -367,6 +375,13 @@ void EwmhRemoveClient (ClientData *pCD)
 
     if (!(pCD->netFlags & NET_FLAG_LISTED)) return;
     pCD->netFlags &= ~NET_FLAG_LISTED;
+
+    if (pCD->hasStrut)
+    {
+	pCD->hasStrut = False;
+	--pSD->numStrutClients;
+	EwmhMarkScreen (pSD, NET_SD_WORKAREA);
+    }
 
     if (pCD->netDesktopWritten != NET_DESKTOP_NOT_WRITTEN &&
 	!(pCD->clientFlags & CLIENT_DESTROYED))
@@ -684,6 +699,318 @@ static void FlushNetDesktops (WmScreenData *pSD)
 }
 
 
+/*
+ * Struts.  A strut is kept as _NET_WM_STRUT_PARTIAL says: the widths
+ * reserved at the left, right, top and bottom edges of the root window,
+ * then the ranges along those edges (inclusive) that they cover.
+ */
+enum {
+    STRUT_LEFT, STRUT_RIGHT, STRUT_TOP, STRUT_BOTTOM,
+    STRUT_LEFT_START, STRUT_LEFT_END, STRUT_RIGHT_START, STRUT_RIGHT_END,
+    STRUT_TOP_START, STRUT_TOP_END, STRUT_BOTTOM_START, STRUT_BOTTOM_END
+};
+
+
+/*
+ * The internal strut of the front panel (Dtwm*frontPanelStrut): along
+ * the edge of its head that its frame touches.  Never published.
+ */
+static Boolean FrontPanelStrut (ClientData *pCD, long strut[12])
+{
+    WmScreenData *pSD = pCD->pSD;
+    long rootWidth = pSD->netGeometry[0], rootHeight = pSD->netGeometry[1];
+    long fx = pCD->frameInfo.x, fy = pCD->frameInfo.y;
+    long fw = pCD->frameInfo.width, fh = pCD->frameInfo.height;
+    long hx0 = 0, hy0 = 0, hx1 = rootWidth, hy1 = rootHeight;
+    WmHeadInfo_t *pHead;
+    int i;
+
+    if (!wmGD.frontPanelStrut || !(pCD->clientFlags & FRONT_PANEL_BOX) ||
+	(pCD->dtwmBehaviors & DtWM_BEHAVIOR_SUBPANEL))
+	return False;
+
+    if ((pHead = GetHeadInfo (pCD)))
+    {
+	hx0 = pHead->x_org;
+	hy0 = pHead->y_org;
+	hx1 = hx0 + pHead->width;
+	hy1 = hy0 + pHead->height;
+	free (pHead);
+    }
+
+    for (i = 0; i < 12; ++i) strut[i] = 0;
+    if (fy + fh >= hy1)
+    {
+	strut[STRUT_BOTTOM] = rootHeight - fy;
+	strut[STRUT_BOTTOM_START] = fx;
+	strut[STRUT_BOTTOM_END] = fx + fw - 1;
+    }
+    else if (fy <= hy0)
+    {
+	strut[STRUT_TOP] = fy + fh;
+	strut[STRUT_TOP_START] = fx;
+	strut[STRUT_TOP_END] = fx + fw - 1;
+    }
+    else if (fx <= hx0)
+    {
+	strut[STRUT_LEFT] = fx + fw;
+	strut[STRUT_LEFT_START] = fy;
+	strut[STRUT_LEFT_END] = fy + fh - 1;
+    }
+    else if (fx + fw >= hx1)
+    {
+	strut[STRUT_RIGHT] = rootWidth - fx;
+	strut[STRUT_RIGHT_START] = fy;
+	strut[STRUT_RIGHT_END] = fy + fh - 1;
+    }
+    else
+	return False;
+    return True;
+}
+
+
+/* Whether [start, end] (inclusive) overlaps [from, to) */
+#define OVERLAPS(start, end, from, to) \
+    ((start) <= (end) && (start) < (to) && (end) >= (from))
+
+/*
+ * Shrink an area (x0, y0, x1, y1, exclusive) of a head by a strut: a side
+ * moves when the strut covers part of the head along it and its inner
+ * edge falls inside the head.  So a strut on the inner edge of a head
+ * (between monitors) shrinks that head, not the one it extends over.
+ */
+static void ApplyStrut (WmScreenData *pSD, const long strut[12],
+    const long head[4], long area[4])
+{
+    long edge;
+
+    edge = strut[STRUT_LEFT];
+    if (edge > 0 && edge > head[0] && edge < head[2] &&
+	OVERLAPS (strut[STRUT_LEFT_START], strut[STRUT_LEFT_END],
+		  head[1], head[3]) && edge > area[0])
+	area[0] = edge;
+
+    edge = pSD->netGeometry[0] - strut[STRUT_RIGHT];
+    if (strut[STRUT_RIGHT] > 0 && edge > head[0] && edge < head[2] &&
+	OVERLAPS (strut[STRUT_RIGHT_START], strut[STRUT_RIGHT_END],
+		  head[1], head[3]) && edge < area[2])
+	area[2] = edge;
+
+    edge = strut[STRUT_TOP];
+    if (edge > 0 && edge > head[1] && edge < head[3] &&
+	OVERLAPS (strut[STRUT_TOP_START], strut[STRUT_TOP_END],
+		  head[0], head[2]) && edge > area[1])
+	area[1] = edge;
+
+    edge = pSD->netGeometry[1] - strut[STRUT_BOTTOM];
+    if (strut[STRUT_BOTTOM] > 0 && edge > head[1] && edge < head[3] &&
+	OVERLAPS (strut[STRUT_BOTTOM_START], strut[STRUT_BOTTOM_END],
+		  head[0], head[2]) && edge < area[3])
+	area[3] = edge;
+}
+
+
+/*
+ * The part of a head (x, y, width, height) that windows of a workspace
+ * may use: without the struts of the clients in it that are shown
+ * (normal or maximized), except pcdSelf's own.
+ */
+static void WorkspaceArea (WmWorkspaceData *pWS, ClientData *pcdSelf,
+    long head[4], long area[4])
+{
+    long strut[12];
+    int i, state;
+
+    area[0] = head[0];
+    area[1] = head[1];
+    area[2] = head[2];
+    area[3] = head[3];
+
+    for (i = 0; i < pWS->numClients; ++i)
+    {
+	ClientData *pCD = pWS->ppClients[i];
+
+	state = pCD->clientState & ~UNSEEN_STATE;
+	if (pCD == pcdSelf ||
+	    (state != NORMAL_STATE && state != MAXIMIZED_STATE))
+	    continue;
+
+	if (pCD->hasStrut)
+	    ApplyStrut (pWS->pSD, pCD->strut, head, area);
+	else if (FrontPanelStrut (pCD, strut))
+	    ApplyStrut (pWS->pSD, strut, head, area);
+    }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  GetNetWorkArea (pCD, pX, pY, pWidth, pHeight)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reduces a head (or the screen) to the part of it that the struts leave
+ *  to a client, in the active workspace if the client is in it, else in
+ *  its first one: for maximizing (GetMaxInfo) and placing
+ *  (FindClientPlacement) it.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = the client
+ *  *pX, *pY, *pWidth, *pHeight = the head
+ *
+ *  Outputs:
+ *  -------
+ *  *pX, *pY, *pWidth, *pHeight = its work area
+ *
+ *************************************<->***********************************/
+
+void GetNetWorkArea (ClientData *pCD, int *pX, int *pY, int *pWidth,
+    int *pHeight)
+{
+    WmScreenData *pSD = pCD->pSD;
+    WmWorkspaceData *pWS = pSD->pActiveWS;
+    long head[4], area[4];
+
+    if (!pSD->numStrutClients &&
+	!(wmGD.frontPanelStrut && wmGD.useFrontPanel))
+	return;
+
+    if (!ClientInWorkspace (pWS, pCD) && pCD->numInhabited &&
+	!(pWS = GetWorkspaceData (pSD, pCD->pWsList[0].wsID)))
+	return;
+
+    head[0] = *pX;
+    head[1] = *pY;
+    head[2] = *pX + *pWidth;
+    head[3] = *pY + *pHeight;
+    WorkspaceArea (pWS, pCD, head, area);
+    *pX = area[0];
+    *pY = area[1];
+    *pWidth = area[2] - area[0];
+    *pHeight = area[3] - area[1];
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessNetWmStrut (pCD, firstTime)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reads _NET_WM_STRUT_PARTIAL, or else _NET_WM_STRUT (the edges of the
+ *  root window, all along them), of a listed client: when it is managed
+ *  (only if it has either, HasProperty) and when either changes.
+ *
+ *************************************<->***********************************/
+
+void ProcessNetWmStrut (ClientData *pCD, Boolean firstTime)
+{
+    WmScreenData *pSD = pCD->pSD;
+    Atom actualType;
+    int actualFormat, i;
+    unsigned long nitems, leftover;
+    long *data = NULL, strut[12];
+    Boolean hasStrut = False;
+
+    if (!(pCD->netFlags & NET_FLAG_LISTED) ||
+	(firstTime && !HasProperty (pCD, wmGD.xa__NET_WM_STRUT_PARTIAL) &&
+	 !HasProperty (pCD, wmGD.xa__NET_WM_STRUT)))
+	return;
+
+    if (XGetWindowProperty (DISPLAY, pCD->client,
+	    wmGD.xa__NET_WM_STRUT_PARTIAL, 0L, 12L, False, XA_CARDINAL,
+	    &actualType, &actualFormat, &nitems, &leftover,
+	    (unsigned char **)&data) == Success &&
+	actualType == XA_CARDINAL && actualFormat == 32 && nitems == 12)
+    {
+	for (i = 0; i < 12; ++i) strut[i] = data[i];
+	hasStrut = True;
+    }
+    if (data) XFree (data);
+    data = NULL;
+
+    if (!hasStrut &&
+	XGetWindowProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_STRUT,
+	    0L, 4L, False, XA_CARDINAL, &actualType, &actualFormat, &nitems,
+	    &leftover, (unsigned char **)&data) == Success &&
+	actualType == XA_CARDINAL && actualFormat == 32 && nitems == 4)
+    {
+	for (i = 0; i < 4; ++i) strut[i] = data[i];
+	for (i = 4; i < 12; i += 2)
+	{
+	    strut[i] = 0;
+	    strut[i + 1] = LONG_MAX;
+	}
+	hasStrut = True;
+    }
+    if (data) XFree (data);
+
+    if (hasStrut)
+	for (i = 0; i < 4; ++i)
+	    if (strut[i] < 0) strut[i] = 0;
+
+    if (hasStrut == pCD->hasStrut &&
+	(!hasStrut || !memcmp (strut, pCD->strut, sizeof (strut))))
+	return;
+
+    if (hasStrut != pCD->hasStrut)
+	pSD->numStrutClients += hasStrut ? 1 : -1;
+    pCD->hasStrut = hasStrut;
+    if (hasStrut)
+	memcpy (pCD->strut, strut, sizeof (strut));
+    EwmhMarkScreen (pSD, NET_SD_WORKAREA);
+}
+
+
+/*
+ * _NET_WORKAREA: for each desktop, the root window less the struts of
+ * the clients in it.  A change of the work area refits the maximized
+ * windows.
+ */
+static void FlushNetWorkArea (WmScreenData *pSD)
+{
+    int num = NumNetDesktops (pSD), d, j;
+    long *areas, head[4];
+
+    areas = (long *) XtMalloc (4 * num * sizeof (long));
+    head[0] = head[1] = 0;
+    head[2] = pSD->netGeometry[0];
+    head[3] = pSD->netGeometry[1];
+    for (d = 0; d < num; ++d)
+    {
+	long *area = &areas[4 * d];
+
+	WorkspaceArea (&pSD->pWS[d], NULL, head, area);
+	area[2] -= area[0];
+	area[3] -= area[1];
+    }
+
+    /*
+     * The maximized clients, to the work areas of their heads, first: a
+     * client that sees the new work area sees them refitted.
+     */
+    for (d = 0; d < pSD->numWorkspaces; ++d)
+	for (j = 0; j < pSD->pWS[d].numClients; ++j)
+	    RefitMaximizedClient (pSD->pWS[d].ppClients[j]);
+
+    if (num != pSD->numWorkAreaWritten ||
+	memcmp (areas, pSD->workAreaWritten, 4 * num * sizeof (long)))
+    {
+	XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_WORKAREA,
+	    XA_CARDINAL, 32, PropModeReplace, (unsigned char *)areas, 4 * num);
+	XtFree ((char *)pSD->workAreaWritten);
+	pSD->workAreaWritten = areas;
+	pSD->numWorkAreaWritten = num;
+    }
+    else
+	XtFree ((char *)areas);
+}
+
+
 /* _NET_DESKTOP_NAMES: the workspace titles, in UTF-8. */
 static void FlushNetDesktopNames (WmScreenData *pSD)
 {
@@ -780,7 +1107,7 @@ void EwmhWorkspacesChanged (WmScreenData *pSD)
 	for (j = 0; j < pSD->pWS[i].numClients; ++j)
 	    EwmhMarkClient (pSD->pWS[i].ppClients[j], NET_CD_DESKTOP);
 
-    EwmhMarkScreen (pSD, NET_SD_DESKTOPS | NET_SD_NAMES);
+    EwmhMarkScreen (pSD, NET_SD_DESKTOPS | NET_SD_NAMES | NET_SD_WORKAREA);
 }
 
 
@@ -800,7 +1127,7 @@ void EwmhRootResized (WmScreenData *pSD, int width, int height)
 {
     pSD->netGeometry[0] = width;
     pSD->netGeometry[1] = height;
-    EwmhMarkScreen (pSD, NET_SD_DESKTOPS);
+    EwmhMarkScreen (pSD, NET_SD_DESKTOPS | NET_SD_WORKAREA);
 }
 
 
@@ -1142,6 +1469,7 @@ static Boolean EwmhFlushProc (XtPointer clientData)
 	if (bits & NET_SD_STACKING) FlushNetClientListStacking (pSD);
 	if (bits & NET_SD_DESKTOPS) FlushNetDesktops (pSD);
 	if (bits & NET_SD_NAMES) FlushNetDesktopNames (pSD);
+	if (bits & NET_SD_WORKAREA) FlushNetWorkArea (pSD);
     }
 
     return True;
@@ -1694,6 +2022,6 @@ void SetupWmEwmh (void)
 			(unsigned char *)supported, numSupported);
 
 	EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING | NET_SD_ACTIVE |
-			     NET_SD_DESKTOPS | NET_SD_NAMES);
+			     NET_SD_DESKTOPS | NET_SD_NAMES | NET_SD_WORKAREA);
     }
 }

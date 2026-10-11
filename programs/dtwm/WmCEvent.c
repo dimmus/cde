@@ -950,6 +950,11 @@ void HandleCPropertyNotify (ClientData *pCD, XPropertyEvent *propertyEvent)
 		    DiscardStalePropertyNotify (pCD->client,
 						propertyEvent->atom, serial);
 	    }
+	    else if (propertyEvent->atom == wmGD.xa__NET_WM_STRUT_PARTIAL ||
+		     propertyEvent->atom == wmGD.xa__NET_WM_STRUT)
+	    {
+		ProcessNetWmStrut (pCD, False /*not first time*/);
+	    }
 	    else if (propertyEvent->atom == XA_WM_ICON_NAME ||
 		     propertyEvent->atom == wmGD.xa__NET_WM_ICON_NAME)
 	    {
