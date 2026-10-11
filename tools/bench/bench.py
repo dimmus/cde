@@ -11,6 +11,7 @@
                [--no-pin] [--syscalls] [GROUP...]
   bench.py compare [-t PCT] [--syscall-threshold PCT] BASE.json HEAD.json
   bench.py profile [-o DIR] GROUP [CASE...]
+  bench.py report RUN.json       (Markdown tables, as in README.md)
 
 Groups (default: all but dtfile-perf):
   dtsvc       dtsvcbench   libDtSvc/libDtWidget micro-benchmarks
@@ -394,6 +395,77 @@ def cmd_run(a):
     return 0
 
 
+REPORT_COLUMNS = {
+    "dtsvc": ("n", "ns_per_op", "cpu_ns_per_op", "mallocs_per_op",
+              "requests_per_op", "round_trips_per_op", "syscalls_per_op"),
+    "tt": ("n", "ns_per_op", "cpu_ns_per_op", "mallocs_per_op",
+           "rpcs_per_op", "syscalls_per_op"),
+    "dtwm": ("n", "ns_per_op", "cpu_ns_per_op", "server_cpu_ns_per_op",
+             "mallocs_per_op", "requests_per_op", "round_trips_per_op",
+             "wakeups_per_op", "syscalls_per_op", "server_syscalls_per_op"),
+    "dtterm": ("bytes", "seconds", "mb_per_s", "output_requests",
+               "output_round_trips", "requests_per_screen"),
+    "dtterm-vte": ("screens", "seconds", "screens_per_s",
+                   "requests_per_screen", "round_trips_per_burst"),
+    "dtterm-less": ("pages", "seconds", "requests_per_page",
+                    "round_trips_per_page"),
+    "dtfile": ("map_s", "idle_s", "cpu_s", "mallocs", "requests",
+               "round_trips", "syscalls", "children_syscalls",
+               "idle_wakeups"),
+    "dtfile-copy": ("bytes", "seconds", "mb_per_s", "user_s", "sys_s",
+                    "syscalls"),
+    "dtmail": ("map_s", "idle_s", "seconds", "cpu_s", "mallocs", "requests",
+               "round_trips", "syscalls", "idle_wakeups"),
+}
+
+
+def fmt(v):
+    if v is None or v == "":
+        return "-"
+    if isinstance(v, bool):
+        return str(v)
+    if isinstance(v, int):
+        return "{:,}".format(v)
+    if isinstance(v, float):
+        if v == int(v) and abs(v) >= 1000:
+            return "{:,}".format(int(v))
+        if abs(v) >= 1000:
+            return "{:,.0f}".format(v)
+        if abs(v) >= 100:
+            return "{:.1f}".format(v)
+        return "{:.3g}".format(v) if abs(v) < 1 else "{:.2f}".format(v)
+    return str(v)
+
+
+def cmd_report(a):
+    """Markdown tables of a run, one per group."""
+    with open(a.file) as f:
+        doc = json.load(f)
+    print("Tree `%s`, %s, %s rounds (C benchmarks), %s (scripts), pinned: "
+          "%s, system calls: %s.\n" % (doc.get("tree"), doc.get("date"),
+                                       doc.get("rounds"),
+                                       doc.get("script_rounds"),
+                                       doc.get("pinned"),
+                                       doc.get("syscalls", False)))
+    for g, rows in doc["results"].items():
+        cols = REPORT_COLUMNS.get(g)
+        if g == "loader":
+            rows = sorted(rows, key=lambda r: -(r.get("relocations") or 0))
+            rows = rows[:a.loader_rows]
+            cols = ("dsos", "unused", "exported", "relocations")
+        if not cols or not rows:
+            continue
+        cols = [c for c in cols if any(c in r for r in rows)]
+        print("### %s\n" % g)
+        print("| case | " + " | ".join(cols) + " |")
+        print("|---|" + "---:|" * len(cols))
+        for r in rows:
+            print("| %s | %s |" % (r["name"], " | ".join(fmt(r.get(c))
+                                                       for c in cols)))
+        print()
+    return 0
+
+
 def cmd_profile(a):
     if a.group not in GROUPS or a.group == "loader":
         raise SystemExit("bench.py: cannot profile %s" % a.group)
@@ -514,7 +586,12 @@ def main():
     p.add_argument("--idle-window", type=float, default=0)
     p.add_argument("group")
     p.add_argument("cases", nargs="*")
+    rp = sub.add_parser("report")
+    rp.add_argument("--loader-rows", type=int, default=15)
+    rp.add_argument("file")
     a = ap.parse_args()
+    if a.cmd == "report":
+        return cmd_report(a)
     if a.cmd == "run":
         return cmd_run(a)
     if a.cmd == "profile":
