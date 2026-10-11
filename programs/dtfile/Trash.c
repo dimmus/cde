@@ -192,11 +192,9 @@ typedef struct {
 /* hash index over the trash list (see TrashLookupInit) */
 typedef struct
 {
-   int          *by_name;    /* hash slots over trashCan[].filename */
+   int          *by_name;    /* hash slots over trashCan[].filename, or NULL */
    int          *by_path;    /* hash slots over trashCan[].intNew, or NULL */
-   unsigned int  mask;
-   char         *removed;    /* removed[i]: entry i is gone */
-   int           count;      /* numTrashItems when built */
+   unsigned int  mask;       /* slots - 1 */
 } TrashLookup;
 
 /* callback data MoveToTrash */
@@ -234,6 +232,7 @@ typedef struct
    int *rc;
    Tt_message msg;
    int child;
+   unsigned long info_gen;   /* trashInfoGen when the child was forked */
 } RestoreFromTrashCBData;
 
 /* callback data EmptyTrash */
@@ -251,6 +250,7 @@ typedef struct
    int *rc;
    Tt_message msg;
    int child;
+   unsigned long info_gen;   /* trashInfoGen when the child was forked */
 } EmptyTrashCBData;
 
 
@@ -288,6 +288,25 @@ static Boolean trashDialogPosted;
 
 static char * TrashInfoFileName = NULL;
 static char * NewTrashInfoFileName = NULL;
+
+/*
+ * The restore and remove background processes rewrite the trash
+ * information file themselves (see TrashInfoWrittenByChild), so the
+ * main loop does not format and write all N entries after each
+ * operation.  trashInfoGen counts the changes this process makes to
+ * the trash list or the file; a child's file is kept only if nothing
+ * changed since the child was forked from the list it wrote.
+ */
+static unsigned long trashInfoGen = 0;
+
+/* what a background process did with the trash information file */
+#define TRASH_INFO_UNCHANGED  0    /* nothing removed: not written */
+#define TRASH_INFO_WRITTEN    1    /* written without the removed entries */
+#define TRASH_INFO_FAILED    -1    /* not written: the parent must */
+
+/* which hash indexes TrashLookupInit builds */
+#define TRASH_BY_NAME  1
+#define TRASH_BY_PATH  2
 
 static char ** sacred_dir_list = NULL;   /* list of directories in trash path */
 static int sacred_dir_list_size = 0;
@@ -338,6 +357,14 @@ static void VerifyOk(
                         XtPointer client_data,
                         XtPointer call_data) ;
 static Boolean WriteTrashEntries( void ) ;
+static Boolean WriteTrashEntriesVia(
+                        const char *tmpName) ;
+static int ChildWriteTrashEntries(
+                        int removed) ;
+static Boolean TrashInfoWrittenByChild(
+                        unsigned long info_gen,
+                        int info,
+                        int removed) ;
 static void Select_All(
                         Widget w,
                         XtPointer client_data,
@@ -373,9 +400,11 @@ static void Noop (
                         XtPointer callData) ;
 static void TrashLookupInit(
                         TrashLookup *tl,
-                        Boolean by_path) ;
+                        int which) ;
 static void TrashLookupDone(
                         TrashLookup *tl) ;
+static void TrashIndexAdd(
+                        int i) ;
 static void GrowTrashList( void ) ;
 static void AddToDeleteList(
                         TrashLookup *tl,
@@ -678,6 +707,7 @@ ReadTrashList( void )
            trashCan[numTrashItems].external = external;
            trashCan[numTrashItems].filename = intName;
            numTrashItems++;
+           TrashIndexAdd(numTrashItems - 1);
            dropped--;
          } /* end if file exists */
        }
@@ -713,37 +743,51 @@ ReadTrashList( void )
 static Boolean
 WriteTrashEntries( void )
 {
+   return( WriteTrashEntriesVia(NewTrashInfoFileName) );
+}
+
+/* WriteTrashEntries through the temporary file tmpName */
+static Boolean
+WriteTrashEntriesVia(
+        const char *tmpName )
+{
    FILE * newFile;
    int i;
 
-   newFile = fopen(NewTrashInfoFileName, "w+");
+   newFile = fopen(tmpName, "w+");
    if (newFile)
    {
-      chmod(NewTrashInfoFileName,
+      chmod(tmpName,
             S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
 
       /* Write all remaining entries */
       for (i = 0; i < numTrashItems; i++)
       {
+         if (trashCan[i].filename == NULL)
+            continue;         /* a removed entry (see TrashLookupRemove) */
          if( WriteEntry(newFile, trashCan[i].external, trashCan[i].filename) < 0 )
          {
            fclose(newFile);
-           remove(NewTrashInfoFileName);
+           remove(tmpName);
            return( False );
          }
       }
 
       /* Remove the original information file, and move the new one */
-      (void) fclose(newFile);
-      if(-1 == chown(NewTrashInfoFileName, getuid(), getgid())) {
+      if (fclose(newFile) != 0)
+      {
+         remove(tmpName);
+         return( False );
+      }
+      if(-1 == chown(tmpName, getuid(), getgid())) {
 	  return( False );      
       }
       /* rename() replaces the old file atomically; removing it first
        * would lose the trash information if we stopped in between */
-      if (rename(NewTrashInfoFileName, TrashInfoFileName) != 0)
+      if (rename(tmpName, TrashInfoFileName) != 0)
       {
          (void) remove(TrashInfoFileName);
-         (void) rename(NewTrashInfoFileName, TrashInfoFileName);
+         (void) rename(tmpName, TrashInfoFileName);
       }
       if(-1 == chown(TrashInfoFileName, getuid(), getgid())) {
 	  return( False );      
@@ -752,6 +796,69 @@ WriteTrashEntries( void )
    }
    else
      return( False );
+}
+
+
+/************************************************************************
+ *
+ * ChildWriteTrashEntries
+ *   Called in a restore or remove background process, once it has
+ *   removed from its copy of the trash list the entries that the main
+ *   process will remove when it reads the results (removed of them):
+ *   writes that list as the new trash information file, through a
+ *   temporary file of its own (the main process, or another background
+ *   process, may be writing the shared one).  Returns the
+ *   TRASH_INFO_* code to send back through the pipe.
+ *
+ ************************************************************************/
+
+static int
+ChildWriteTrashEntries(
+        int removed )
+{
+   char *tmpName;
+   Boolean ok;
+
+   if (removed == 0)
+      return TRASH_INFO_UNCHANGED;
+
+   tmpName = XtMalloc(strlen(NewTrashInfoFileName) + 16);
+   sprintf(tmpName, "%s.%ld", NewTrashInfoFileName, (long)getpid());
+   ok = WriteTrashEntriesVia(tmpName);
+   XtFree(tmpName);
+   return ok ? TRASH_INFO_WRITTEN : TRASH_INFO_FAILED;
+}
+
+
+/************************************************************************
+ *
+ * TrashInfoWrittenByChild
+ *   Called in the main process after it has removed, from the trash
+ *   list, removed entries for a background process forked when
+ *   trashInfoGen was info_gen, which reported info (a TRASH_INFO_*
+ *   code).  True if the trash information file already matches the
+ *   list: the child wrote the same list, or neither changed it.
+ *   Otherwise (another operation changed the list or the file in the
+ *   meantime, or the child could not write) the caller rewrites it.
+ *
+ ************************************************************************/
+
+static Boolean
+TrashInfoWrittenByChild(
+        unsigned long info_gen,
+        int info,
+        int removed )
+{
+   Boolean ok;
+
+   if (info == TRASH_INFO_UNCHANGED && removed == 0)
+      ok = True;     /* neither process changed anything */
+   else
+      ok = (info == TRASH_INFO_WRITTEN && info_gen == trashInfoGen);
+
+   if (removed > 0)
+      trashInfoGen++;
+   return ok;
 }
 
 
@@ -2261,7 +2368,7 @@ Remove(
       /* Create the list of things being deleted */
       deleteList = (DeleteList *)XtMalloc(deleteCount * sizeof(DeleteList));
 
-      TrashLookupInit(&tl, False);
+      TrashLookupInit(&tl, TRASH_BY_NAME);
       if (match)
       {
          for (i = 0; i < deleteCount; i++)
@@ -2294,22 +2401,44 @@ Remove(
  * TrashLookup
  *   Finding K files in the trash list of N entries used to be a linear
  *   search per file, and removing an entry shifted the rest of the list
- *   down, so restoring or removing K files cost O(K*N).  A TrashLookup
- *   hashes the list once; entries removed while it is active are only
- *   marked, and TrashLookupDone compacts the list in one pass.
+ *   down, so restoring or removing K files cost O(K*N).
+ *
+ *   The list now keeps hash indexes over the file names and the paths
+ *   in the trash, built when first needed and then kept up to date:
+ *   TrashIndexAdd enters each new entry.  A removed entry becomes a
+ *   hole (its strings are NULL) that keeps its index, so neither the
+ *   other entries nor the hash slots move; TrashLookupDone compacts
+ *   the list (and drops the indexes, to be rebuilt) only once holes
+ *   make up half of it.  An operation on K files thus costs O(K)
+ *   amortized, not O(N).
  *
  *   TrashLookupFind returns the lowest index whose filename (or, if
  *   by_path, whose intNew) equals name and that has not been removed,
- *   or -1: what the linear searches over the shrinking list found.
+ *   or -1: what the linear searches over the shrinking list found
+ *   (linear probing meets equal keys in the order they were entered,
+ *   which is increasing index order).
+ *
+ *   The paths in the trash all start with the trash directory, so the
+ *   path index hashes only their last component (equal paths have
+ *   equal last components).
  *
  ************************************************************************/
 
+static int *trashByName = NULL;        /* slots over trashCan[].filename */
+static int *trashByPath = NULL;        /* slots over trashCan[].intNew */
+static unsigned int trashIndexMask = 0;/* slots - 1; 0: no indexes */
+static int numTrashHoles = 0;          /* removed entries in trashCan */
+
 static unsigned int
 TrashHash(
-   const char *s)
+   const char *s,
+   Boolean path)
 {
    unsigned int h = 2166136261u;      /* FNV-1a */
+   const char *base;
 
+   if (path && (base = strrchr(s, '/')) != NULL)
+      s = base + 1;
    while (*s)
    {
       h ^= (unsigned char)*s++;
@@ -2318,41 +2447,88 @@ TrashHash(
    return h;
 }
 
+/* enter entry i in the hash slots (of trashIndexMask + 1) */
+static void
+TrashHashInsert(
+   int *slots,
+   Boolean path,
+   int i)
+{
+   unsigned int h = TrashHash(path ? trashCan[i].intNew : trashCan[i].filename,
+                              path) & trashIndexMask;
+
+   while (slots[h] >= 0)
+      h = (h + 1) & trashIndexMask;
+   slots[h] = i;
+}
+
 static int *
 TrashHashBuild(
-   unsigned int mask,
    Boolean path)
 {
-   int *slots = (int *)XtMalloc((mask + 1) * sizeof(int));
+   int *slots = (int *)XtMalloc((trashIndexMask + 1) * sizeof(int));
    unsigned int h;
    int i;
 
-   for (h = 0; h <= mask; h++)
+   for (h = 0; h <= trashIndexMask; h++)
       slots[h] = -1;
    for (i = 0; i < numTrashItems; i++)
-   {
-      h = TrashHash(path ? trashCan[i].intNew : trashCan[i].filename) & mask;
-      while (slots[h] >= 0)
-         h = (h + 1) & mask;
-      slots[h] = i;
-   }
+      if (trashCan[i].filename != NULL)
+         TrashHashInsert(slots, path, i);
    return slots;
 }
 
+/* drop the hash indexes: the next TrashLookupInit rebuilds them */
+static void
+TrashIndexDrop( void )
+{
+   XtFree((char *)trashByName);
+   XtFree((char *)trashByPath);
+   trashByName = trashByPath = NULL;
+   trashIndexMask = 0;
+}
+
+/* enter the new entry i (the last one) in the hash indexes */
+static void
+TrashIndexAdd(
+   int i)
+{
+   if (trashIndexMask == 0)
+      return;
+   /* keep the slots at most half full */
+   if (2 * (unsigned int)numTrashItems > trashIndexMask + 1)
+   {
+      TrashIndexDrop();
+      return;
+   }
+   if (trashByName)
+      TrashHashInsert(trashByName, False, i);
+   if (trashByPath)
+      TrashHashInsert(trashByPath, True, i);
+}
+
+/* which: TRASH_BY_NAME and/or TRASH_BY_PATH, the indexes to look in */
 static void
 TrashLookupInit(
    TrashLookup *tl,
-   Boolean by_path)
+   int which)
 {
-   unsigned int size = 16;
+   if (trashIndexMask == 0)
+   {
+      unsigned int size = 16;
 
-   while (size < 2 * (unsigned int)numTrashItems)
-      size <<= 1;
-   tl->mask = size - 1;
-   tl->by_name = TrashHashBuild(tl->mask, False);
-   tl->by_path = by_path ? TrashHashBuild(tl->mask, True) : NULL;
-   tl->removed = XtCalloc(numTrashItems + 1, 1);
-   tl->count = numTrashItems;
+      while (size < 2 * (unsigned int)numTrashItems)
+         size <<= 1;
+      trashIndexMask = size - 1;
+   }
+   if ((which & TRASH_BY_NAME) && trashByName == NULL)
+      trashByName = TrashHashBuild(False);
+   if ((which & TRASH_BY_PATH) && trashByPath == NULL)
+      trashByPath = TrashHashBuild(True);
+
+   tl->by_name = (which & TRASH_BY_NAME) ? trashByName : NULL;
+   tl->by_path = (which & TRASH_BY_PATH) ? trashByPath : NULL;
+   tl->mask = trashIndexMask;
 }
 
 static int
@@ -2362,13 +2538,12 @@ TrashHashFind(
    Boolean path,
    const char *name)
 {
-   unsigned int h = TrashHash(name) & tl->mask;
+   unsigned int h = TrashHash(name, path) & tl->mask;
    int i;
 
-   /* linear probing meets equal keys in increasing index order */
    while ((i = slots[h]) >= 0)
    {
-      if (!tl->removed[i] &&
+      if (trashCan[i].filename != NULL &&
           strcmp(path ? trashCan[i].intNew : trashCan[i].filename, name) == 0)
          return i;
       h = (h + 1) & tl->mask;
@@ -2381,7 +2556,7 @@ TrashLookupFind(
    TrashLookup *tl,
    const char *name)
 {
-   int i = TrashHashFind(tl, tl->by_name, False, name);
+   int i = tl->by_name ? TrashHashFind(tl, tl->by_name, False, name) : -1;
    int j;
 
    if (tl->by_path)
@@ -2393,7 +2568,7 @@ TrashLookupFind(
    return i;
 }
 
-/* free the strings of entry j and mark it removed */
+/* free the strings of entry j and make it a hole */
 static void
 TrashLookupRemove(
    TrashLookup *tl,
@@ -2403,24 +2578,28 @@ TrashLookupRemove(
    XtFree ((char *) trashCan[j].intOrig);
    XtFree ((char *) trashCan[j].external);
    XtFree ((char *) trashCan[j].filename);
-   tl->removed[j] = True;
+   trashCan[j].intNew = trashCan[j].intOrig = NULL;
+   trashCan[j].external = trashCan[j].filename = NULL;
+   numTrashHoles++;
 }
 
-/* compact the trash list (dropping removed entries) and free tl */
+/* end of a lookup: compact the trash list once half of it are holes */
 static void
 TrashLookupDone(
    TrashLookup *tl)
 {
    int i, k;
 
-   for (i = k = 0; i < tl->count; i++)
-      if (!tl->removed[i])
+   if (numTrashHoles == 0 ||
+       (numTrashHoles < numTrashItems && 2 * numTrashHoles < numTrashItems + 32))
+      return;
+
+   for (i = k = 0; i < numTrashItems; i++)
+      if (trashCan[i].filename != NULL)
          trashCan[k++] = trashCan[i];
    numTrashItems = k;
-
-   XtFree((char *)tl->by_name);
-   XtFree((char *)tl->by_path);
-   XtFree(tl->removed);
+   numTrashHoles = 0;
+   TrashIndexDrop();
 }
 
 
@@ -3280,6 +3459,7 @@ MoveToTrashPipeCB(
        trashCan[numTrashItems].filename = XtNewString(baseName);
 
        numTrashItems++;
+       TrashIndexAdd(numTrashItems - 1);
        fileCount++;
 
        /* arrange for the source directory to be updated */
@@ -3368,7 +3548,13 @@ MoveToTrashPipeCB(
    /* Update the trash information file, and the trash window */
    if (fileCount > 0)
    {
-      FILE * trashInfoFileId = fopen(TrashInfoFileName, "a+");
+      FILE * trashInfoFileId;
+
+      /* the list changed: a restore or remove process forked before
+         now writes a file without these entries */
+      trashInfoGen++;
+
+      trashInfoFileId = fopen(TrashInfoFileName, "a+");
       if( trashInfoFileId != NULL )
       {
         for (i = fileCount; i > 0; i--)
@@ -3632,6 +3818,7 @@ RestoreProcess(
    char buf[MAX_PATH];
    short pipe_msg;
    int status;
+   int removed, info;
    TrashLookup tl;
 
    /* get full path name of target directory */
@@ -3645,9 +3832,11 @@ RestoreProcess(
         /* send return codes back trough the pipe */
         pipe_msg = PIPEMSG_DONE;
         rc[0] = -1;
+        info = TRASH_INFO_FAILED;
         DPRINTF(("RestoreProcess: Unable to Resolve local path name\n"));
         write(pipe_fd, &pipe_msg, sizeof(short));
         write(pipe_fd, rc, sizeof(int));
+        write(pipe_fd, &info, sizeof(int));
         return;
       }
    }
@@ -3655,7 +3844,7 @@ RestoreProcess(
       full_dirname = NULL;
 
    /* restore the files */
-   TrashLookupInit(&tl, True);
+   TrashLookupInit(&tl, TRASH_BY_NAME | TRASH_BY_PATH);
    for (i = 0; i < file_count; i++)
    {
       /* Locate file in trash list */
@@ -3710,13 +3899,27 @@ RestoreProcess(
          rc[i] = -1;
    }
 
+   /* remove from this copy of the trash list what RestorePipeCB will
+      remove from the main process's, and write the trash information
+      file from it here */
+   removed = 0;
+   for (i = 0; i < file_count; i++)
+   {
+      if (rc[i] == 0 && (j = TrashLookupFind(&tl, file_list[i])) >= 0)
+      {
+         TrashLookupRemove(&tl, j);
+         removed++;
+      }
+   }
    TrashLookupDone(&tl);
+   info = ChildWriteTrashEntries(removed);
 
    /* send return codes back trough the pipe */
    pipe_msg = PIPEMSG_DONE;
    DPRINTF(("RestoreProcess: sending DONE\n"));
    write(pipe_fd, &pipe_msg, sizeof(short));
    write(pipe_fd, rc, file_count * sizeof(int));
+   write(pipe_fd, &info, sizeof(int));
 
    XtFree(full_dirname);
 }
@@ -3743,6 +3946,7 @@ RestorePipeCB(
    char **ToRestoreList=NULL;
    char **FromRestoreList=NULL;
    char *target_host,*target_dir;
+   int removed = 0, info = TRASH_INFO_FAILED;
    TrashLookup tl;
 
    /* read the next msg from the pipe */
@@ -3772,6 +3976,8 @@ RestorePipeCB(
          return;
       case PIPEMSG_DONE:
          PipeRead(*fd, cb_data->rc, cb_data->file_count * sizeof(int));
+         if (PipeRead(*fd, &info, sizeof(int)) != sizeof(int))
+            info = TRASH_INFO_FAILED;
          break;
 
       default:
@@ -3788,7 +3994,7 @@ RestorePipeCB(
    buf = NULL;
    bufsize = 0;
 
-   TrashLookupInit(&tl, True);
+   TrashLookupInit(&tl, TRASH_BY_NAME | TRASH_BY_PATH);
    for (i = 0; i < cb_data->file_count; i++)
    {
       /* Locate file in trash list */
@@ -3821,6 +4027,7 @@ RestorePipeCB(
 
             /* Remove this entry from the trash list */
             TrashLookupRemove(&tl, j);
+            removed++;
          }
       }
       else
@@ -3838,8 +4045,9 @@ RestorePipeCB(
    }
    TrashLookupDone(&tl);
 
-   /* Update the trash information file */
-   if( ! WriteTrashEntries() )
+   /* Update the trash information file, unless the child did */
+   if( ! TrashInfoWrittenByChild(cb_data->info_gen, info, removed) &&
+       ! WriteTrashEntries() )
    {
      char * tmpStr, * title;
 
@@ -3916,6 +4124,7 @@ RestoreFromTrash(
    RestoreFromTrashCBData *cb_data;
    int pipe_fd[2];
    int pid;
+   TrashLookup tl;
 
    if( !TrashInitialized )
    {
@@ -3933,6 +4142,10 @@ RestoreFromTrash(
    cb_data->target_dir = target_dir;
    cb_data->rc = (int *)XtCalloc(file_count, sizeof(int));
    cb_data->msg = msg;
+   cb_data->info_gen = trashInfoGen;
+
+   /* build the indexes that both processes look in before forking */
+   TrashLookupInit(&tl, TRASH_BY_NAME | TRASH_BY_PATH);
 
    /* create a pipe */
    if(-1 == pipe(pipe_fd)) {
@@ -3999,10 +4212,13 @@ EmptyTrashProcess(
 	int pipe_fd,
 	DeleteList * del_list,
 	int del_count,
+	int removeType,
 	int *rc)
 {
-   int i;
+   int i, j;
    short pipe_msg;
+   int removed, info;
+   TrashLookup tl;
 
    /*
     * Delete all files or directories in the list,
@@ -4014,11 +4230,33 @@ EmptyTrashProcess(
       rc[i] = EraseObject(del_list[i].trash);
    }
 
+   /* remove from this copy of the trash list what EmptyTrashPipeCB will
+      remove from the main process's, and write the trash information
+      file from it here */
+   info = TRASH_INFO_UNCHANGED;
+   if (removeType == TRASH_FILE)
+   {
+      removed = 0;
+      TrashLookupInit(&tl, TRASH_BY_PATH);
+      for (i = 0; i < del_count; i++)
+      {
+         if (rc[i] == 0 &&
+             (j = TrashHashFind(&tl, tl.by_path, True, del_list[i].trash)) >= 0)
+         {
+            TrashLookupRemove(&tl, j);
+            removed++;
+         }
+      }
+      TrashLookupDone(&tl);
+      info = ChildWriteTrashEntries(removed);
+   }
+
    /* send return codes back trough the pipe */
    pipe_msg = PIPEMSG_DONE;
    DPRINTF(("EmptyTrashProcess: sending DONE\n"));
    write(pipe_fd, &pipe_msg, sizeof(short));
    write(pipe_fd, rc, del_count * sizeof(int));
+   write(pipe_fd, &info, sizeof(int));
 }
 
 
@@ -4041,6 +4279,7 @@ EmptyTrashPipeCB(
    String buf;
    int bufsize;
    char *file_name;
+   int removed = 0, info = TRASH_INFO_FAILED;
 
    /* read the next msg from the pipe */
    pipe_msg = -1;
@@ -4069,6 +4308,8 @@ EmptyTrashPipeCB(
 
       case PIPEMSG_DONE:
          PipeRead(*fd, cb_data->rc, cb_data->del_count * sizeof(int));
+         if (PipeRead(*fd, &info, sizeof(int)) != sizeof(int))
+            info = TRASH_INFO_FAILED;
          break;
 
       default:
@@ -4091,7 +4332,7 @@ EmptyTrashPipeCB(
    {
       TrashLookup tl;
 
-      TrashLookupInit(&tl, True);
+      TrashLookupInit(&tl, TRASH_BY_PATH);
       for (i = 0; i < cb_data->del_count; i++)
       {
          /* Locate file in trash list (by its path in the trash) */
@@ -4107,6 +4348,7 @@ EmptyTrashPipeCB(
             {
                /* Remove this entry from the trash list */
                TrashLookupRemove(&tl, j);
+               removed++;
             }
          }
          else
@@ -4129,8 +4371,9 @@ EmptyTrashPipeCB(
       }
       TrashLookupDone(&tl);
 
-      /* Update the trash information file */
-      if( ! WriteTrashEntries() )
+      /* Update the trash information file, unless the child did */
+      if( ! TrashInfoWrittenByChild(cb_data->info_gen, info, removed) &&
+          ! WriteTrashEntries() )
       {
         char * tmpStr, * title;
 
@@ -4237,6 +4480,7 @@ EmptyTrash(
    EmptyTrashCBData *cb_data;
    int pipe_fd[2];
    int pid;
+   TrashLookup tl;
 
    if( !TrashInitialized )
    {
@@ -4256,6 +4500,11 @@ EmptyTrash(
    cb_data->removeType = removeType;
    cb_data->rc = (int *)XtCalloc(del_count, sizeof(int));
    cb_data->msg = msg;
+   cb_data->info_gen = trashInfoGen;
+
+   /* build the index that both processes look in before forking */
+   if (removeType == TRASH_FILE)
+      TrashLookupInit(&tl, TRASH_BY_PATH);
 
    /* create a pipe */
    if(-1 == pipe(pipe_fd)) {
@@ -4282,7 +4531,8 @@ EmptyTrash(
 
       close(pipe_fd[0]);  /* child won't read from the pipe */
 
-      EmptyTrashProcess(pipe_fd[1], del_list, del_count, cb_data->rc);
+      EmptyTrashProcess(pipe_fd[1], del_list, del_count, removeType,
+                        cb_data->rc);
       close(pipe_fd[1]);
 
       DBGFORK(("%s:  child exiting\n", pname));
