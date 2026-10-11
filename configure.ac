@@ -1139,25 +1139,6 @@ lib/DtMrm/Makefile
 lib/csa/Makefile
 
 lib/DtMmdb/Makefile
-lib/DtMmdb/HardCopy/Makefile
-lib/DtMmdb/StyleSheet/Makefile
-lib/DtMmdb/api/Makefile
-lib/DtMmdb/btree/Makefile
-lib/DtMmdb/compression/Makefile
-lib/DtMmdb/diskhash/Makefile
-lib/DtMmdb/dstr/Makefile
-lib/DtMmdb/dti_cc/Makefile
-lib/DtMmdb/dti_excs/Makefile
-lib/DtMmdb/dynhash/Makefile
-lib/DtMmdb/hmphf/Makefile
-lib/DtMmdb/index/Makefile
-lib/DtMmdb/mgrs/Makefile
-lib/DtMmdb/misc/Makefile
-lib/DtMmdb/object/Makefile
-lib/DtMmdb/oliasdb/Makefile
-lib/DtMmdb/schema/Makefile
-lib/DtMmdb/storage/Makefile
-lib/DtMmdb/utility/Makefile
 
 programs/Makefile
 
