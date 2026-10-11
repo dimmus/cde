@@ -579,7 +579,7 @@ find(const char *str, int filter)
  *	Print every entry of every month of the years (default 2024-2028),
  *	each with all its attributes, and of Find "all" for WORD (if given):
  *	what libcsa hands dtcm.  Two builds of rpc.cmsd or libcsa must print
- *	the same.
+ *	the same (the creation and update times are left out).
  */
 static void
 dump_value(CSA_attribute_value *v)
@@ -658,7 +658,12 @@ dump_list(const char *label, CSA_uint32 num, CSA_entry_handle *list)
 		printf("  [%lu]", (unsigned long)i);
 		for (j = 0; j < na; j++) {
 			printf(" %s=", attrs[j].name);
-			dump_value(attrs[j].value);
+			/* when the appointment was written, not what */
+			if (strstr(attrs[j].name, "Date Created") ||
+			    strstr(attrs[j].name, "Last Update"))
+				printf("(time)");
+			else
+				dump_value(attrs[j].value);
 		}
 		printf("\n");
 		csa_free(attrs);

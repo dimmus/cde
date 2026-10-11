@@ -526,6 +526,41 @@ init_alarm(void)
 }
 
 /*
+ * With TZ unset, glibc's localtime() and mktime() stat /etc/localtime on
+ * every call to see whether the zone changed, and the repeat rules make
+ * thousands of such calls per lookup (about 6,000 stats for one month
+ * view of a calendar with 200 repeating appointments).  In that case the
+ * zone is checked once per wakeup instead: TZ is unset and tzset() run
+ * (which re-reads the file if it changed), then TZ names the same file,
+ * which glibc takes as unchanged without looking at it again.  A zone
+ * change is still seen, from the next request on.
+ */
+#if defined(__GLIBC__)
+#define SYSTEM_TZFILE	"/etc/localtime"
+static int tz_from_system;
+
+static void
+tz_init(void)
+{
+	tz_from_system = getenv("TZ") == NULL &&
+			 access(SYSTEM_TZFILE, R_OK) == 0;
+}
+
+static void
+tz_refresh(void)
+{
+	if (!tz_from_system)
+		return;
+	unsetenv("TZ");
+	tzset();
+	setenv("TZ", ":" SYSTEM_TZFILE, 1);
+}
+#else
+static void tz_init(void) {}
+static void tz_refresh(void) {}
+#endif
+
+/*
  * svc_run() with the deferred signal work.  The signals are blocked
  * except while waiting in pselect(), so a signal is never lost between
  * the flag test and the wait.
@@ -557,6 +592,7 @@ run_service(void)
 
 		readfds = svc_fdset;
 		n = pselect(FD_SETSIZE, &readfds, NULL, NULL, NULL, &orig);
+		tz_refresh();
 		if (n < 0) {
 			if (errno == EINTR)
 				continue;
@@ -806,6 +842,8 @@ main(int argc, char **argv)
 	}
 #endif /* AIX */
 
+	tz_init();
+	tz_refresh();
 	init_time();
 	init_alarm();
 	_DtCm_init_hash();
