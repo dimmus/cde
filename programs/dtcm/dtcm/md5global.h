@@ -82,8 +82,10 @@ typedef unsigned char *POINTER;
 /* UINT2 defines a two byte word */
 typedef unsigned short int UINT2;
 
-/* UINT4 defines a four byte word */
-typedef unsigned long int UINT4;
+/* UINT4 defines a four byte word (unsigned long is eight bytes on LP64,
+   where ROTATE_LEFT then keeps the bits shifted out of the low 32) */
+#include <stdint.h>
+typedef uint32_t UINT4;
 
 /* PROTO_LIST is defined depending on how PROTOTYPES is defined above.
    If using PROTOTYPES, then PROTO_LIST returns the list, otherwise it
