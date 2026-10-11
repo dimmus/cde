@@ -27,7 +27,87 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
 #include <security/pam_appl.h>
+
+/*
+ * libpam is loaded on first use instead of being linked into libDtSvc:
+ * only dtlogin and dtsession authenticate, and every other client would
+ * otherwise map libpam (and libaudit and the rest of its dependencies)
+ * at startup for nothing.
+ *
+ * LIBPAM_SONAME can name the library at build time; otherwise the usual
+ * sonames are tried (Linux-PAM, Solaris, FreeBSD/OpenPAM, unversioned).
+ */
+static const char *const libpam_names[] = {
+#ifdef LIBPAM_SONAME
+    LIBPAM_SONAME,
+#endif
+    "libpam.so.0",
+    "libpam.so.1",
+    "libpam.so.6",
+    "libpam.so",
+};
+
+static struct {
+    int (*start)(const char *, const char *, const struct pam_conv *,
+		 pam_handle_t **);
+    int (*end)(pam_handle_t *, int);
+    int (*set_item)(pam_handle_t *, int, const void *);
+    int (*authenticate)(pam_handle_t *, int);
+    int (*open_session)(pam_handle_t *, int);
+    int (*close_session)(pam_handle_t *, int);
+    int (*setcred)(pam_handle_t *, int);
+} pam;
+
+static int pam_state;		/* 0 not tried, 1 loaded, -1 unavailable */
+
+/* POSIX guarantees that a function pointer can hold dlsym()'s result. */
+static int PamSym(void *handle, const char *name, void *field)
+{
+    void *sym = dlsym(handle, name);
+
+    if (!sym)
+	return 0;
+    memcpy(field, &sym, sizeof(sym));
+    return 1;
+}
+
+#define PAM_SYM(field, name) PamSym(handle, name, &pam.field)
+
+static int LoadPam(void)
+{
+    void *handle = NULL;
+    size_t i;
+
+    if (pam_state)
+	return pam_state > 0;
+
+    pam_state = -1;
+
+    for (i = 0; i < sizeof(libpam_names) / sizeof(libpam_names[0]); i++) {
+	/* RTLD_GLOBAL: PAM modules expect to find libpam's symbols. */
+	if ((handle = dlopen(libpam_names[i], RTLD_NOW | RTLD_GLOBAL)))
+	    break;
+    }
+
+    if (!handle)
+	return 0;
+
+    if (PAM_SYM(start, "pam_start") &&
+	PAM_SYM(end, "pam_end") &&
+	PAM_SYM(set_item, "pam_set_item") &&
+	PAM_SYM(authenticate, "pam_authenticate") &&
+	PAM_SYM(open_session, "pam_open_session") &&
+	PAM_SYM(close_session, "pam_close_session") &&
+	PAM_SYM(setcred, "pam_setcred")) {
+	pam_state = 1;
+	return 1;
+    }
+
+    dlclose(handle);
+    return 0;
+}
 
 /*
  * Local function declarations
@@ -50,14 +130,17 @@ static int PamStart(const char *service_name, const char *user,
     int status = PAM_SUCCESS;
     char *colon, *hostname;
 
+    if (!LoadPam())
+	return PAM_SYSTEM_ERR;
+
     if (pamh) {
 	if (service_name)
-	    status = pam_set_item(pamh, PAM_SERVICE, service_name);
+	    status = pam.set_item(pamh, PAM_SERVICE, service_name);
 
-	if (status != PAM_SUCCESS && user) pam_set_item(pamh, PAM_USER, user);
+	if (status != PAM_SUCCESS && user) pam.set_item(pamh, PAM_USER, user);
     }
     else {
-	status = pam_start(service_name, user, &pam_conv, &pamh);
+	status = pam.start(service_name, user, &pam_conv, &pamh);
     }
 
     if (status != PAM_SUCCESS) goto done;
@@ -65,7 +148,7 @@ static int PamStart(const char *service_name, const char *user,
     if (!display_name) goto done;
 
     if (display_name[0] == ':') {
-	status = pam_set_item(pamh, PAM_TTY, display_name);
+	status = pam.set_item(pamh, PAM_TTY, display_name);
 	goto done;
     }
 
@@ -76,12 +159,12 @@ static int PamStart(const char *service_name, const char *user,
 
     if ((colon = strrchr(hostname, ':'))) *colon = '\0';
 
-    status = pam_set_item(pamh, PAM_RHOST, hostname);
+    status = pam.set_item(pamh, PAM_RHOST, hostname);
 
     free(hostname);
 
 done:
-    if (status != PAM_SUCCESS && pamh && pam_end(pamh, status) == PAM_SUCCESS)
+    if (status != PAM_SUCCESS && pamh && pam.end(pamh, status) == PAM_SUCCESS)
 	pamh = NULL;
 
     return status;
@@ -110,7 +193,7 @@ int _DtSvcPamAuthenticate(const char *service_name, const char *user,
 
     saved_user_passwd = (char *) user_passwd;
 
-    return pam_authenticate(pamh, PAM_DISALLOW_NULL_AUTHTOK);
+    return pam.authenticate(pamh, PAM_DISALLOW_NULL_AUTHTOK);
 }
 
 /**
@@ -130,7 +213,7 @@ int _DtSvcPamOpenSession(const char *service_name, const char *user,
     if ((status = PamStart(service_name, user, display_name)) != PAM_SUCCESS)
 	return status;
 
-    return pam_open_session(pamh, 0);
+    return pam.open_session(pamh, 0);
 }
 
 /**
@@ -150,7 +233,7 @@ int _DtSvcPamCloseSession(const char *service_name, const char *user,
     if ((status = PamStart(service_name, user, display_name)) != PAM_SUCCESS)
 	return status;
 
-    return pam_close_session(pamh, 0);
+    return pam.close_session(pamh, 0);
 }
 
 /**
@@ -170,7 +253,7 @@ int _DtSvcPamSetcred(const char *service_name, const char *user,
     if ((status = PamStart(service_name, user, display_name)) != PAM_SUCCESS)
 	return status;
 
-    return pam_setcred(pamh, PAM_ESTABLISH_CRED);
+    return pam.setcred(pamh, PAM_ESTABLISH_CRED);
 }
 
 /*****************************************************************************
