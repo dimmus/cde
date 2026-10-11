@@ -692,6 +692,10 @@ _DtTermPrimBufferGetText
 	    
 	    for (pwc = charInfoFirst.u.pwc; pwc <= charInfoLast.u.pwc; pwc++)
 	    {
+		if (*pwc == TermCELL_CONT)
+		{
+		    continue;
+		}
 		mbLen = wctomb(pChar, *pwc);
 		if (mbLen > 0)
 		{
@@ -701,6 +705,32 @@ _DtTermPrimBufferGetText
 		else
 		{
 		    fprintf(stderr, "_DtTermPrimBufferGetText: invalid wide char.\n");
+		}
+	    }
+	}
+	else if (BYTES_PER_CHAR(tb) > 1)
+	{
+	    /*
+	    ** the first (number of characters) bytes of the wide
+	    ** characters (this is what this has always returned)...
+	    */
+	    short n = 0;
+
+	    for (pwc = charInfoFirst.u.pwc; pwc <= charInfoLast.u.pwc; pwc++)
+	    {
+		if (*pwc != TermCELL_CONT)
+		{
+		    n++;
+		}
+	    }
+	    retLen = 0;
+	    for (pwc = charInfoFirst.u.pwc; retLen < n; pwc++)
+	    {
+		if (*pwc != TermCELL_CONT)
+		{
+		    mbLen = MIN((short) sizeof(wchar_t), n - retLen);
+		    memcpy(buffer + retLen, pwc, mbLen);
+		    retLen += mbLen;
 		}
 	    }
 	}
@@ -853,10 +883,7 @@ _DtTermPrimGetCharacterInfo
     TermCharInfo    charInfo
 )
 {
-    wchar_t    *pwc;
-    short       charWidth;  
     TermLine    line;
-    short       totalWidth;
 
     if (!VALID_ROW(tb, row))
     {
@@ -895,81 +922,26 @@ _DtTermPrimGetCharacterInfo
         charInfo->enh      = 0;
         charInfo->enhLen   = 0;
     }
-    else if (col == 0)
-    {
-        charInfo->u.pwc    = (wchar_t *)BUFFER(line);
-        charInfo->idx      = 0;
-        charInfo->len      = BYTES_PER_CHAR(tb);
-        charInfo->startCol = 0;
-        charInfo->width    = CELL_WIDTH(*((wchar_t *)BUFFER(line)));
-        charInfo->enh      = 0;
-        charInfo->enhLen   = 0;
-    }
     else
     {
         /* 
-        ** not so easy when we're dealing with wchars...
+        ** wide characters: the buffer has a cell per column, the second
+        ** column of a 2 column character holds TermCELL_CONT...
         */
-        if (col <= WIDTH(line) / 2)
+        wchar_t *cells = CELLS(line);
+        short    start = col;
+
+        if ((col > 0) && (cells[col] == TermCELL_CONT))
         {
-            /*
-            ** work from left to right
-            */
-            totalWidth = 0;
-            for (pwc = (wchar_t *)BUFFER(line);
-                 pwc < (wchar_t *)BUFFER(line) + LENGTH(line);
-                 pwc++)
-            {
-                charWidth = CELL_WIDTH(*pwc);
-                totalWidth += charWidth;
-                if (col < totalWidth)
-                {
-                    /* 
-                    ** we've found the character, now fill in the info...
-                    */
-                    charInfo->u.pwc    = pwc;
-                    charInfo->idx      = pwc - (wchar_t *)BUFFER(line);
-                    charInfo->startCol = totalWidth - charWidth;
-                    charInfo->width    = charWidth;
-                    break;
-                }
-            }
+            start = col - 1;
         }
-        else
-        {
-            /*
-            ** work from right to left
-            */
-            totalWidth = WIDTH(line);
-            for (pwc = (wchar_t *)BUFFER(line) + (LENGTH(line) - 1);
-                 pwc >= (wchar_t *)BUFFER(line);
-                 pwc--)
-            {
-                charWidth = CELL_WIDTH(*pwc);
-                totalWidth -= charWidth;
-                if (totalWidth <= col)
-                {
-                    /* 
-                    ** we've found the character, now fill in the info...
-                    */
-                    charInfo->u.pwc = pwc;
-                    charInfo->idx   = pwc - (wchar_t *)BUFFER(line);
-                    if (totalWidth == col)
-                    {
-                        charInfo->startCol = col;
-                    }
-                    else
-                    {
-                        charInfo->startCol = col - 1;
-                    }
-                    charInfo->width = charWidth;
-                    break;
-                }
-            }
-        }
-        charInfo->len    = BYTES_PER_CHAR(tb);
-        charInfo->enh    = 0;
-        charInfo->enhLen = 0;
+        charInfo->u.pwc    = cells + start;
+        charInfo->idx      = start;
+        charInfo->len      = BYTES_PER_CHAR(tb);
+        charInfo->startCol = start;
+        charInfo->width    = IS_WIDE_START(line, start) ? 2 : 1;
+        charInfo->enh      = 0;
+        charInfo->enhLen   = 0;
     }
     return(True);
 }
@@ -1356,16 +1328,22 @@ _DtTermPrimBufferSetLineWidth
         return(True);
     }
 
-    WIDTH(line) = newWidth;
-    if (BYTES_PER_CHAR(tb) == 1)
+    if (BYTES_PER_CHAR(tb) > 1)
     {
 	/*
-	** in single byte locales, we go ahead and set the line length too,
-	** it is the responsibility of wide-character routines to set the
-	** line length themselves...
-	*/ 
-	LENGTH(line) = newWidth; /* works in single byte locales */
+	** keep the cell array whole: new columns are spaces (the wide
+	** character routines have usually filled them in already)...
+	*/
+	wchar_t *pwc;
+
+	for (pwc = CELLS(line) + WIDTH(line); pwc < CELLS(line) + newWidth;
+	     pwc++)
+	{
+	    *pwc = L' ';
+	}
     }
+    WIDTH(line)  = newWidth;
+    LENGTH(line) = newWidth; /* in either kind of buffer */
     
     return(True);
 }
@@ -1398,7 +1376,14 @@ _DtTermPrimBufferGetLineLength
 	    ** a line can not end on column 1 of 2.  Note that we must
 	    ** add 1 to the column index to make it the line length...
 	    */
-	    if ((charInfo.width == 2) && (charInfo.startCol != width - 2)) {
+	    if (BYTES_PER_CHAR(tb) > 1) {
+		/* the length of a cell array is its width... */
+		retLen = width;
+		if ((charInfo.width == 2) && (charInfo.startCol != width - 2)) {
+		    retLen--;
+		}
+	    } else if ((charInfo.width == 2) &&
+		    (charInfo.startCol != width - 2)) {
 		/* only half of charInfo.idx fits in the line, so drop
 		 * it...
 		 */

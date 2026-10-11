@@ -2927,6 +2927,10 @@ Destroy(Widget w)
 	tw->term.tpd->wcBuffer = (wchar_t *) 0;
 	(void) XtFree((char *) tw->term.tpd->wcByteOffsets);
 	tw->term.tpd->wcByteOffsets = (int *) 0;
+	(void) XtFree((char *) tw->term.tpd->renderChars);
+	tw->term.tpd->renderChars = (wchar_t *) 0;
+	(void) XtFree((char *) tw->term.tpd->wcWidths);
+	tw->term.tpd->wcWidths = (signed char *) 0;
 
         if (tw->term.tpd->capsLockKeyCodes)
                  (void) XtFree((char *)tw->term.tpd->capsLockKeyCodes) ;

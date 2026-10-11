@@ -369,6 +369,12 @@ typedef struct termData {
     int *wcByteOffsets;			/* byte offset of each wchar	*/
     int wcBufferLen;			/* size in characters		*/
     Boolean wcBufferInUse;		/* guard against reentrancy	*/
+    wchar_t *renderChars;		/* characters of a chunk of
+					 * cells to draw		*/
+    int renderCharsLen;			/* size in characters		*/
+    signed char *wcWidths;		/* wcwidth() of each character
+					 * of an insert			*/
+    int wcWidthsLen;			/* size in characters		*/
 
     /* frame pacing and deferred rendering (see TermPrimScroll.c)...
      */

@@ -37,6 +37,7 @@
 #endif
 
 #include <stdlib.h>
+#include <string.h>
 #include <wchar.h>
 #include <Xm/Xm.h>
 #include "TermHeader.h"       /* for MIN/MAX */
@@ -45,6 +46,13 @@
 #include "TermPrimBufferP.h"
 #include "TermPrimDebug.h"
 
+
+/*
+** The line buffers of a multibyte locale are cell arrays, one cell per
+** column (see TermPrimBufferP.h).  Column lookups are therefore O(1),
+** and the only widths ever computed are those of new characters.
+*/
+
 static void
 _termBufferValidateLineWc
 (
@@ -52,23 +60,43 @@ _termBufferValidateLineWc
     const short row
 );
 
+static wchar_t *
+_dropContCells
+(
+    wchar_t  *chars,
+    short    *numChars,
+    wchar_t **scratch
+);
+
 static void
 _patchUpChar
 (
     TermBuffer   tb,
     short        row,
-    short       *col,
-    TermCharInfo charInfo
+    short       *col
 );
 
 static void
 _countWidth
 (
           wchar_t *wcBuffer,
+    const signed char *rawWidths,
           short    length,
           short    maxWidth,
           short   *retCount,
-          short   *retWidth 
+          short   *retWidth,
+          unsigned char *widths
+);
+
+static void
+_putChars
+(
+          wchar_t *cells,
+          short    col,
+    const wchar_t *chars,
+          short    numChars,
+          short    width,
+    const unsigned char *widths
 );
 
 static void
@@ -78,10 +106,11 @@ _primBufferInsertWc
     const short       row,
           short      *col,
           wchar_t    *newChars,
+    const signed char *rawWidths,
           short       numChars,
-          short      *lengthInc,
           short      *widthInc,
           short      *widthInsert,  /* width of inserted characters           */
+          unsigned char *widths,    /* room for the width of each character  */
           termChar   *returnChars,  /* pointer to overflow buffer             */
           short      *returnCount   /* count of characters in overflow buffer */
 );
@@ -93,17 +122,18 @@ _primBufferOverwriteWc
     const short       row,
           short      *col,
           wchar_t    *newChars,
+    const signed char *rawWidths,
           short       numChars,
-          short      *lengthInc,
           short      *widthInc,
           short      *widthInsert,  /* width of inserted characters           */
+          unsigned char *widths,    /* room for the width of each character  */
           termChar   *returnChars,  /* pointer to overflow buffer             */
           short      *returnCount   /* count of characters in overflow buffer */
 );
 
 #ifdef USE_SUN_WCWIDTH_PATCH
 #include <limits.h>
-/* 
+/*
 **  A small workaround for systems that don't have wcwidth...
 */
 int
@@ -113,7 +143,7 @@ sun_wcwidth
 )
 {
     int status;
-    char mbstr[MB_LEN_MAX + 1]; 
+    char mbstr[MB_LEN_MAX + 1];
 
     status = wctomb(mbstr, wc);
 
@@ -124,105 +154,117 @@ sun_wcwidth
 }
 #endif /*  USE_SUN_WCWIDTH_PATCH */
 
+/*
+** the number of cells (columns) a character takes: 2 or 1 (see
+** CELL_WIDTH())...
+*/
 int
 _DtTermPrimWcCellWidth(wchar_t wc)
 {
-    return(MAX(1, wcwidth(wc)));
+    return((wcwidth(wc) > 1) ? 2 : 1);
 }
 
-short
-_DtTermPrimBufferGetTextWc
+/*
+** Characters handed to an insert may be the cells of another line (the
+** history and resize code copy lines that way).  Drop the second-column
+** cells of 2 column characters from them; a stray one (one that does not
+** follow a 2 column character) becomes a space.  Returns the characters
+** to insert: chars itself if it has no such cells, else a copy in
+** *scratch, which the caller frees.
+*/
+static wchar_t *
+_dropContCells
 (
-    const TermBuffer      tb,
-    const short           row,
-    const short           col,
-    const short           length,
-          char           *buffer,
-    const Boolean         needWideChar
+    wchar_t  *chars,
+    short    *numChars,
+    wchar_t **scratch
 )
 {
-    short   len;
-    
-    if (!VALID_ROW(tb, row) || !VALID_COL(tb, col))
+    wchar_t *out;
+    short    i;
+    short    n;
+
+    *scratch = NULL;
+    for (i = 0; i < *numChars; i++)
     {
-        return(0);
+	if (chars[i] == TermCELL_CONT)
+	{
+	    break;
+	}
+    }
+    if (i >= *numChars)
+    {
+	return(chars);
     }
 
-    len = MIN(length, LENGTH(LINES(tb)[row]) - col);
-
-    if (length > 0)
+    out = (wchar_t *) XtMalloc(*numChars * sizeof(wchar_t));
+    n = 0;
+    for (i = 0; i < *numChars; i++)
     {
-        memcpy(buffer, BUFFER(LINES(tb)[row]) + col, len);
+	if (chars[i] != TermCELL_CONT)
+	{
+	    out[n++] = chars[i];
+	}
+	else if ((i == 0) || (chars[i - 1] == TermCELL_CONT) ||
+		 (CELL_WIDTH(chars[i - 1]) != 2))
+	{
+	    out[n++] = L' ';
+	}
     }
-    return(len);
+    *numChars = n;
+    *scratch = out;
+    return(out);
 }
 
 /*
 ** this is a helper function, that replaces a 2 column character with
-** two spaces if "col" falls on column 2 of 2...
+** two spaces if "col" falls on column 2 of 2 (and then decrements *col)...
 */
 static void
 _patchUpChar
 (
     TermBuffer   tb,
     short        row,
-    short       *col,
-    TermCharInfo charInfo
+    short       *col
 )
 {
-    TermLine line;
-    
-    line = LINE_OF_TBUF(tb, row);
+    TermLine  line;
+    wchar_t  *cells;
 
-    /*
-    ** make sure we are not trying to overwrite the second column
-    ** of a two column character.
-    */
-    _DtTermPrimGetCharacterInfo(tb, row, *col, charInfo);
-    if ((charInfo->width == 2) &&
-	(charInfo->startCol == *col - 1))
+    line  = LINE_OF_TBUF(tb, row);
+    cells = CELLS(line);
+
+    if ((*col > 0) && (*col < WIDTH(line)) &&
+	(cells[*col] == TermCELL_CONT))
     {
 	/*
 	** we are on the second column of a two column character,
 	** replace the character with 2 spaces before we proceed
-	**
-	** first replace the character with a space, then slide the
-	** characters one to the right and bump the LENGTH
-	** (the width remains constant)
 	*/
-	*charInfo->u.pwc = L' ';
-	memmove(charInfo->u.pwc + 1, charInfo->u.pwc, 
-		(LENGTH(line) - charInfo->idx) * sizeof(wchar_t));
-	LENGTH(line) += 1;
+	cells[*col - 1] = L' ';
+	cells[*col]     = L' ';
 
 	/*
 	** remember the old starting column for later...
 	*/
 	(*col)--;
-	
-	/*
-	** now update the charInfo (since we replaced the 2 column
-	** character with 2 single column spaces)...
-	*/
-	charInfo->startCol++;
-	charInfo->u.pwc++;
-	charInfo->idx++;
-	charInfo->width    = 1;
     }
 }
 
 /*
-** determine how many wide characters in the buffer we can have before the 
+** determine how many wide characters in the buffer we can have before the
 ** maxWidth is exceeded...
 */
 static void
 _countWidth
 (
           wchar_t *wcBuffer, /* buffer of wide characters                     */
+    const signed char *rawWidths, /* their wcwidth()s if known, else NULL     */
           short    wcLen,    /* number of wide chars in buffer                */
           short    maxWidth, /* maximum width desired                         */
           short   *length,   /* max num of chars with total width <= maxWidth */
-          short   *width     /* actual width of the retCount wide chars       */
+          short   *width,    /* actual width of the retCount wide chars       */
+          unsigned char *widths /* the width of each of them                 */
 )
 {
           wchar_t *pwc;
@@ -231,17 +273,20 @@ _countWidth
     *width = 0;
     for (pwc = wcBuffer; pwc < wcBuffer + wcLen; pwc++)
     {
-	/* printable ASCII, the common case... */
-	if (((unsigned long) *pwc) - 0x20UL < 0x5fUL)
+	if (rawWidths)
 	{
-	    if (*width + 1 > maxWidth)
-	    {
-		break;
-	    }
-	    *width += 1;
-	    continue;
+	    charWidth = rawWidths[pwc - wcBuffer];
 	}
-        switch (charWidth = wcwidth(*pwc))
+	else if (((unsigned long) *pwc) - 0x20UL < 0x5fUL)
+	{
+	    /* printable ASCII, the common case... */
+	    charWidth = 1;
+	}
+	else
+	{
+	    charWidth = wcwidth(*pwc);
+	}
+        switch (charWidth)
         {
           case -1:
             /* 
@@ -260,6 +305,7 @@ _countWidth
             charWidth = 1;
 	    break;
           default:
+	    charWidth = (charWidth > 1) ? 2 : 1;
             break;
         }    
 	if (*width + charWidth > maxWidth)
@@ -269,9 +315,43 @@ _countWidth
 	else
 	{
 	    *width += charWidth;
+	    widths[pwc - wcBuffer] = charWidth;
 	}
     }
     *length = pwc - wcBuffer;
+}
+
+/*
+** store numChars characters, width columns wide in all, into the cells
+** starting at col...
+*/
+static void
+_putChars
+(
+          wchar_t *cells,
+          short    col,
+    const wchar_t *chars,
+          short    numChars,
+          short    width,
+    const unsigned char *widths
+)
+{
+    short i;
+
+    if (width == numChars)
+    {
+	/* no 2 column characters... */
+	(void) memcpy(cells + col, chars, numChars * sizeof(wchar_t));
+	return;
+    }
+    for (i = 0; i < numChars; i++)
+    {
+	cells[col++] = chars[i];
+	if (widths[i] == 2)
+	{
+	    cells[col++] = TermCELL_CONT;
+	}
+    }
 }
 
 /*
@@ -285,137 +365,119 @@ _primBufferInsertWc
     const short       row,
           short      *col,
           wchar_t    *newChars,
+    const signed char *rawWidths,
           short       numChars,
-          short      *lengthInc,
           short      *widthInc,
 	  short      *widthInsert,  /* width of inserted characters      */
+          unsigned char *widths,    /* room for the width of each character  */
           termChar   *returnChars,  /* pointer to overflow buffer             */
           short      *returnLength  /* count of characters in overflow buffer */
 )
 {
     short             lengthInsert;
-    short             overflowLength;
     short             overflowWidth;
     short             localCol;
+    short             keep;
+    short             c;
     TermLine          line;
-    wchar_t          *pwc = NULL;
-    TermCharInfoRec   charInfo;
+    wchar_t          *cells;
+    wchar_t          *overflow = (wchar_t *) returnChars;
 
     /*
     ** make a copy of *col because it may be modified by
     ** _patchUpChar()
     */
     localCol = *col;
-    
+
     /*
     ** first decide how many characters we can insert before
     ** running off the end of the line...
     */
-    _countWidth(newChars, numChars, COLS(tb) - localCol, &lengthInsert,
-	        widthInsert);
-	   
+    _countWidth(newChars, rawWidths, numChars, COLS(tb) - localCol,
+	        &lengthInsert, widthInsert, widths);
+
     /*
     ** return any extra characters...
     */
     *returnLength = numChars - lengthInsert;
-	   
+
     if (*returnLength > 0)
     {
         /*
         ** we have some overflow...
 	*/
-	memcpy(returnChars, newChars + lengthInsert,
+	memcpy(overflow, newChars + lengthInsert,
 	       *returnLength * sizeof(wchar_t));
     }
-	
+
     /*
     ** make sure we are not trying to overwrite the second column
     ** of a two column character.
     */
-    _patchUpChar(tb, row, col, &charInfo);
-	   
+    _patchUpChar(tb, row, col);
+
     /*
     ** Decide how many characters we can insert before running off the
     ** end of the buffer...
     */
-    line = LINE_OF_TBUF(tb, row);
+    line  = LINE_OF_TBUF(tb, row);
+    cells = CELLS(line);
+    keep  = WIDTH(line);
     if (WIDTH(line) + *widthInsert <= COLS(tb))
     {
 	/*
 	** there is no overflow, we can insert all "lengthInsert" characters...
 	*/
-	*widthInc      = *widthInsert;
-	*lengthInc     = lengthInsert;
-	overflowLength = 0;
+	*widthInc = *widthInsert;
     }
     else
     {
-	overflowWidth = WIDTH(line) + *widthInsert - COLS(tb);
-	
-	/* 
+	/*
 	** inserting the new characters will overflow the line buffer,
-	** remove as many of the current characters on the line
-	** as necessary to prevent buffer overflow
+	** remove as many of the characters at the end of the line as
+	** necessary to prevent buffer overflow (whole characters, so
+	** this may remove one column more than necessary)...
 	*/
-	if (overflowWidth > 0)
+	overflowWidth = WIDTH(line) + *widthInsert - COLS(tb);
+	while ((overflowWidth > 0) && (keep > localCol))
 	{
-	    *widthInc = *widthInsert - overflowWidth;
-	    
-	    for (pwc = ((wchar_t *)BUFFER(line)) + LENGTH(line) - 1; 
-		 pwc >= charInfo.u.pwc; pwc--)
+	    if ((keep >= 2) && (cells[keep - 1] == TermCELL_CONT))
 	    {
-		overflowWidth -= CELL_WIDTH(*pwc);
-
-		if (overflowWidth <= 0)
-		{
-		    /* 
-		    ** we've removed enough characters, pwc points to the
-		    ** first character to remove...
-		    */
-		    break;
-		}
+		keep          -= 2;
+		overflowWidth -= 2;
 	    }
+	    else
+	    {
+		keep--;
+		overflowWidth--;
+	    }
+	}
+	*widthInc = *widthInsert - (WIDTH(line) - keep);
 
-	    /*
-	    ** final adjustment to widthInc (at this point overflowWidth
-	    ** is either 0 (we removed exactly "overflowWidth" worth of
-	    ** characters) or -1 (we removed "overflowWidth + 1" worth of
-	    ** characters because we removed some 2 column characters)
-	    */
-	    *widthInc += overflowWidth;
-        }
-
-	overflowLength = ((wchar_t *)BUFFER(line)) + LENGTH(line) - pwc; 
-
-	if (overflowLength > 0)
+	/*
+	** copy the displaced characters from the line to the
+	** overflow buffer...
+	*/
+	for (c = keep; c < WIDTH(line); c++)
 	{
-	    *lengthInc = lengthInsert - overflowLength;
-	    
-	    /* 
-	    ** copy the displaced characters from the line to the 
-	    ** overflow buffer...
-	    */
-	    memcpy(returnChars + *returnLength, pwc,
-		   overflowLength * sizeof(wchar_t));
-	    *returnLength += overflowLength;
-        }
+	    if (cells[c] != TermCELL_CONT)
+	    {
+		overflow[(*returnLength)++] = cells[c];
+	    }
+	}
     }
 
-    /* 
+    /*
     ** Any overflow has been taken care of, now it's time to make
     ** room for the new characters...
-    **
-    ** at this point:
-    **      charInfo.pchar points to the character at col
     */
-    memmove(charInfo.u.pwc + lengthInsert, charInfo.u.pwc,
-	    (((LENGTH(line) - charInfo.idx) - overflowLength) * 
-	     sizeof(wchar_t)));
+    memmove(cells + localCol + *widthInsert, cells + localCol,
+	    (keep - localCol) * sizeof(wchar_t));
 
     /*
     ** copy the new characters into the buffer
-    */	   
-    memcpy(charInfo.u.pwc, newChars, lengthInsert * sizeof(wchar_t));
+    */
+    _putChars(cells, localCol, newChars, lengthInsert, *widthInsert, widths);
 }
 
 /*
@@ -429,39 +491,40 @@ _primBufferOverwriteWc
     const short       row,
           short      *col,
           wchar_t    *newChars,
+    const signed char *rawWidths,
           short       numChars,
-          short      *lengthInc,
           short      *widthInc,
           short      *widthInsert,  /* width of inserted characters           */
+          unsigned char *widths,    /* room for the width of each character  */
           termChar   *returnChars,  /* pointer to overflow buffer             */
           short      *returnLength  /* count of characters in overflow buffer */
 )
 {
            short        lengthInsert;
            short        localCol;
+           short        endCol;
            TermLine     line;
-    const  char        *pStart;
-    TermCharInfoRec     charInfo;
-    TermCharInfoRec     startCharInfo;
-	   
-    line = LINE_OF_TBUF(tb, row);
+           wchar_t     *cells;
+
+    line  = LINE_OF_TBUF(tb, row);
+    cells = CELLS(line);
 
     /*
     ** make a copy of *col because it may be modified by
     ** _patchUpChar()
     */
     localCol = *col;
-    
+
     /*
     ** first decide how many characters we can overwrite before
     ** running off the end of the line.
     */
-    _countWidth(newChars, numChars, COLS(tb) - localCol, &lengthInsert,
-	        widthInsert);
-	   
-    /* 
+    _countWidth(newChars, rawWidths, numChars, COLS(tb) - localCol,
+	        &lengthInsert, widthInsert, widths);
+
+    /*
     ** We are overwriting:
-    **      - determine the length and width increments
+    **      - determine the width increment
     **      - put any extra new characters into the overflow buffer
     */
     if (localCol == WIDTH(line))
@@ -470,8 +533,6 @@ _primBufferOverwriteWc
 	** we are appending to the end of the line, this is easy...
 	*/
 	*widthInc  = *widthInsert;
-        *lengthInc = lengthInsert;
-	pStart    = (char *)BUFFER(line) +  (LENGTH(line) * sizeof(wchar_t));
     }
     else
     {
@@ -481,72 +542,41 @@ _primBufferOverwriteWc
 	** make sure we are not trying to overwrite the second column
 	** of a two column character.
 	*/
-	_patchUpChar(tb, row, col, &startCharInfo);
-	
+	_patchUpChar(tb, row, col);
+
 	/*
 	** see if we have to deal with the end of the line...
 	*/
-	if (localCol + *widthInsert < WIDTH(line))
+	endCol = localCol + *widthInsert;
+	if (endCol < WIDTH(line))
 	{
 	    /*
-	    ** the line width will remain constant, but the length may 
-	    ** change...
+	    ** the line width will remain constant...
 	    */
 	    *widthInc = 0;
 
 	    /*
-	    ** make sure we are not trying to overwrite the first column
-	    ** of a two column character.
+	    ** if we overwrite column 1 of a 2 column character, its
+	    ** column 2 becomes a space...
 	    */
-	    _DtTermPrimGetCharacterInfo(tb, row, localCol + *widthInsert,
-					&charInfo);
-	    if ((charInfo.width == 2) &&
-		(charInfo.startCol == localCol + *widthInsert - 1))
+	    if (cells[endCol] == TermCELL_CONT)
 	    {
-		/*
-		** We are about to overwrite column 1 of a 2 column
-		** character.  Replace it with a space before we proceed
-		** (we make adjustments later to make it look like we
-		** replaced the second column with a space).
-		*/
-		*charInfo.u.pwc = L' ';
-	    
-		/*
-		** now update the charInfo (since we replaced the 2 column
-		** character with a single column space)...
-		*/
-		charInfo.width = 1;
-	    }
-
-	    /*
-	    ** at this point, startCharInfo points to the first
-	    ** character to replace, now we want charInfo.u.pwc
-	    ** to point to the character one past the last one
-	    ** we want to replace
-	    */
-	    *lengthInc = lengthInsert - (charInfo.u.pwc - startCharInfo.u.pwc);
-	    
-	    if (*lengthInc != 0)
-	    {
-		memmove(charInfo.u.pwc + *lengthInc, charInfo.u.pwc,
-			(LENGTH(line) - charInfo.idx) * sizeof(wchar_t));
+		cells[endCol] = L' ';
 	    }
 	}
 	else
 	{
 	    /*
-	    ** the line may get wider and longer...
+	    ** the line may get wider...
 	    */
-	    *widthInc  = localCol + *widthInsert - WIDTH(line);
-	    *lengthInc = startCharInfo.idx + lengthInsert - LENGTH(line);
+	    *widthInc  = endCol - WIDTH(line);
 	}
-	pStart = startCharInfo.u.pc;
     }
 
     /*
     ** now insert the new characters...
     */
-    memcpy((void *)pStart, newChars, lengthInsert * sizeof(wchar_t));
+    _putChars(cells, localCol, newChars, lengthInsert, *widthInsert, widths);
 
     /*
     ** put any overflow into the overflow buffer
@@ -564,7 +594,7 @@ _primBufferOverwriteWc
 ** return a count of the number of characters bumped off the end of the line
 ** in 'returnLength' and a pointer to a buffer containing those characters
 ** 'returnChars'.
-** 
+**
 ** The the new column width of the line is returned as the value of the
 ** function.
 **
@@ -583,20 +613,45 @@ _DtTermPrimBufferInsertWc
           Boolean     insertFlag,   /* if TRUE, insert, else overwrite        */
           termChar  **returnChars,  /* pointer to overflow buffer             */
           short      *returnLength  /* count of characters in overflow buffer */
-)   
+)
+{
+    return(_DtTermPrimBufferInsertWcWidths(tb, row, col, newChars, NULL,
+	    numChars, insertFlag, returnChars, returnLength));
+}
+
+/*
+** The same, for a caller that already knows the wcwidth() of each of the
+** characters (rawWidths[i] for newChars[i]), so that they need not be
+** computed again.
+*/
+short
+_DtTermPrimBufferInsertWcWidths
+(
+    const TermBuffer  tb,
+    const short       row,
+    const short       col,
+          wchar_t    *newChars,
+    const signed char *rawWidths,
+          short       numChars,
+          Boolean     insertFlag,   /* if TRUE, insert, else overwrite        */
+          termChar  **returnChars,  /* pointer to overflow buffer             */
+          short      *returnLength  /* count of characters in overflow buffer */
+)
 {
            short    widthInc = 0;       /* incremental change in line width  */
-           short    lengthInc = 0;      /* incremental change in line length */
            short    widthInsert;    /* column width of chars inserted    */
 	   short    localCol;
            TermLine line;
-    
+           wchar_t *scratch;
+           unsigned char widthBuf[256];
+           unsigned char *widths;
+
     if (!VALID_ROW(tb, row) || !VALID_COL(tb, col))
     {
         *returnLength = 0;
         return(0);
     }
-    
+
     if (isDebugFSet('i', 1)) {
 #ifdef	BBA
 #pragma BBA_IGNORE
@@ -606,7 +661,15 @@ _DtTermPrimBufferInsertWc
 
     line     = LINE_OF_TBUF(tb, row);
     localCol = col;
-	  
+    newChars = _dropContCells(newChars, &numChars, &scratch);
+    if (scratch)
+    {
+	/* the widths no longer match the characters... */
+	rawWidths = NULL;
+    }
+    widths   = (numChars <= (short) sizeof(widthBuf)) ? widthBuf :
+	       (unsigned char *) XtMalloc(numChars);
+
     if (WIDTH(line) < col)
     {
         /*
@@ -617,33 +680,32 @@ _DtTermPrimBufferInsertWc
     }
 
     /*
-    ** It doesn't matter if we're overwriting, or inserting at the end 
+    ** It doesn't matter if we're overwriting, or inserting at the end
     ** of the line, the result is the same...
     */
     if (insertFlag == False || col == WIDTH(line))
     {
-	_primBufferOverwriteWc(tb, row, &localCol, newChars, numChars,
-			       &lengthInc, &widthInc, &widthInsert,
+	_primBufferOverwriteWc(tb, row, &localCol, newChars, rawWidths,
+			       numChars,
+			       &widthInc, &widthInsert, widths,
 			       *returnChars, returnLength);
     }
     else
     {
-	_primBufferInsertWc(tb, row, &localCol, newChars, numChars,
-			    &lengthInc, &widthInc, &widthInsert,
+	_primBufferInsertWc(tb, row, &localCol, newChars, rawWidths,
+			    numChars,
+			    &widthInc, &widthInsert, widths,
 			    *returnChars, returnLength);
     }
 
-    /* 
+    /*
     ** Everything's ready:
-    **     - put the characters into the line
-    **     - adjust the line width (_DtTermPrimBufferSetLineWidth won't
-    **       let the line get shorter)...
-    **     - adjust the line length
+    **     - adjust the line width (and length, which is the same)
     **     - update the enhancements
     */
     WIDTH(line)  += widthInc;
-    LENGTH(line) += lengthInc;
-    
+    LENGTH(line)  = WIDTH(line);
+
     /*
     ** fix up the enhancments...
     */
@@ -659,6 +721,14 @@ _DtTermPrimBufferInsertWc
 	(void) _termBufferValidateLineWc(tb, row);
     }
 
+    if (scratch)
+    {
+	XtFree((char *) scratch);
+    }
+    if (widths != widthBuf)
+    {
+	XtFree((char *) widths);
+    }
     return(WIDTH(line));
 }
 
@@ -673,12 +743,14 @@ _DtTermPrimBufferDeleteWc
     short      *returnCount  /* count of bytes in delete buffer */
 )
 {
-    int      copyCount;
-    TermLine line;
-    short    localRow;
-    short    localCol;
-    TermCharInfoRec startCharInfo;
-    TermCharInfoRec stopCharInfo;
+    TermLine  line;
+    wchar_t  *cells;
+    wchar_t  *pwc;
+    short     localRow;
+    short     localCol;
+    short     stopCol;
+    short     c;
+    short     n;
 
     if (!VALID_ROW(tb, *row) || !VALID_COL(tb, *col))
     {
@@ -687,7 +759,7 @@ _DtTermPrimBufferDeleteWc
 	    *returnChars = NULL;
 	    *returnCount = 0;
 	}
-        return;	
+        return;
     }
 
     /*
@@ -696,29 +768,28 @@ _DtTermPrimBufferDeleteWc
     localRow = *row;
     localCol = *col;
     line     = LINE_OF_TBUF(tb, *row);
+    cells    = CELLS(line);
     *width   = MAX(0, MIN(WIDTH(line) - localCol, *width));
 
-    /* 
+    /*
     ** there are 3 cases of deleting a character from a line:
     **     Case 1:
-    **       the cursor is at least 2 positions past the end of the
-    **       line (col - WIDTH(line) > 0)
+    **       the cursor is at or past the end of the line
     **
     **     Case 2:
-    **       the cursor is in the middle of the line (copyCount > 0)
+    **       the cursor is in the middle of the line
     **          - move the remaining characters to the left
     **          - deleteEnhancement
     **          - adjust WIDTH and LENGTH
     **
     **     Case 3:
-    **       the cursor is at the end of the line (copyCount == 0 and
-    **       col == WIDTH(line))
+    **       the deleted columns reach the end of the line
     **          - deleteEnhancement
     **          - adjust WIDTH and LENGTH
     */
     if (localCol >= WIDTH(line) || *width == 0)
     {
-        /* 
+        /*
         ** Handle Case 1...
         */
         if (returnChars)
@@ -730,74 +801,74 @@ _DtTermPrimBufferDeleteWc
     }
 
     /*
-    ** make any necessary adjustments to 2 column characters...
+    ** make any necessary adjustments to 2 column characters (the
+    ** deleted columns can not start or end in the middle of one)...
     */
-    _patchUpChar(tb, *row, col, &startCharInfo);
+    _patchUpChar(tb, *row, col);
 
-    (void) _DtTermPrimGetCharacterInfo(tb, localRow,
-               MIN(WIDTH(line), localCol + *width), &stopCharInfo);
-
-    if ((stopCharInfo.width == 2) && 
-	(stopCharInfo.startCol == localCol + *width - 1))
+    stopCol = MIN(WIDTH(line), localCol + *width);
+    if ((stopCol < WIDTH(line)) && (cells[stopCol] == TermCELL_CONT))
     {
 	/*
 	** do not try to delete column 1 of 2...
 	**
 	** replace the 2 column character with two one column spaces...
 	*/
-	*stopCharInfo.u.pwc = L' ';
-	memmove(stopCharInfo.u.pwc + 1, stopCharInfo.u.pwc,
-		(LENGTH(line) - stopCharInfo.idx) * sizeof(wchar_t));
-
-	/*
-	** now make stopCharInfo point at the new space
-	*/
-	stopCharInfo.width = 1;
-	stopCharInfo.startCol++;
-	stopCharInfo.u.pwc++;
-	stopCharInfo.idx++;
-	LENGTH(line)++;
+	cells[stopCol - 1] = L' ';
+	cells[stopCol]     = L' ';
     }
-    
-    /* 
+
+    /*
     ** Save the current characters before we overwrite them
     ** (if returnChars is non-NULL 0)
     */
     if (returnChars != NULL)
     {
-	*returnCount = (stopCharInfo.idx - startCharInfo.idx) * sizeof(wchar_t);
+	for (n = 0, c = localCol; c < stopCol; c++)
+	{
+	    if (cells[c] != TermCELL_CONT)
+	    {
+		n++;
+	    }
+	}
+	*returnCount = n * sizeof(wchar_t);
 	*returnChars = (termChar *)XtMalloc(*returnCount);
-	memmove(*returnChars, startCharInfo.u.pwc, *returnCount);
+	for (pwc = (wchar_t *) *returnChars, c = localCol; c < stopCol; c++)
+	{
+	    if (cells[c] != TermCELL_CONT)
+	    {
+		*pwc++ = cells[c];
+	    }
+	}
     }
-    
-    /* 
-    ** Cases 2, 3, and 4 require that we delete the enhancement...
+
+    /*
+    ** Cases 2 and 3 require that we delete the enhancement...
     */
     if (DELETE_ENH(tb))
     {
         (*DELETE_ENH(tb))(tb, localRow, localCol, *width);
     }
 
-    copyCount = MAX(0, LENGTH(line) - stopCharInfo.idx);
-    if (copyCount > 0)
+    if (stopCol < WIDTH(line))
     {
-        /* 
+        /*
         ** handle case 2
         */
-        memmove(startCharInfo.u.pwc, stopCharInfo.u.pwc,
-                copyCount * sizeof(wchar_t));
+        memmove(cells + localCol, cells + stopCol,
+                (WIDTH(line) - stopCol) * sizeof(wchar_t));
     }
 
-    /* 
-    ** Cases 2 and 3 require that we decrement the line length...
+    /*
+    ** Cases 2 and 3 require that we decrement the line width...
     */
     WIDTH(line)  -= *width;
-    LENGTH(line) -= (stopCharInfo.idx - startCharInfo.idx);
+    LENGTH(line)  = WIDTH(line);
 
     /*
     ** update info we need to return...
     */
-    *width = stopCharInfo.startCol - startCharInfo.startCol;
+    *width = stopCol - localCol;
 }
 
 /*
@@ -815,7 +886,7 @@ _DtTermPrimBufferPadLineWc
     short       widthInc;
     TermLine    line;
     wchar_t    *pwc;
-    
+
     line = LINE_OF_TBUF(tb, row);
 
     if (isDebugFSet('i', 1)) {
@@ -836,12 +907,9 @@ _DtTermPrimBufferPadLineWc
 
     widthInc = MIN(COLS(tb), width) - WIDTH(line);
 
-    for (i = 0, pwc = (wchar_t *)BUFFER(line) + MAX(0, LENGTH(line));
-         i < widthInc;
-         i++, pwc++)
+    for (i = 0, pwc = CELLS(line) + WIDTH(line); i < widthInc; i++, pwc++)
     {
         *pwc = L' ';
-	LENGTH(line)++;
     }
     if (CLEAR_ENH(tb))
     {
@@ -868,8 +936,6 @@ _DtTermPrimBufferClearLineWc
 )
 {
     TermLine        line;
-    TermCharInfoRec charInfo;
-    short           newLength;
 
     /*
     ** Some simple bounds checking.
@@ -903,31 +969,16 @@ _DtTermPrimBufferClearLineWc
 
     if (newWidth < WIDTH(line))
     {
-	if (newWidth == 0)
+	/*
+	** handle the case of clearing the second column of a two column
+	** character: its first column becomes a space...
+	*/
+	if ((newWidth > 0) && IS_WIDE_START(line, newWidth - 1))
 	{
-	    newLength = 0;
+	    CELLS(line)[newWidth - 1] = L' ';
 	}
-	else
-	{
-	    /*
-	    ** handle the case of clearing the second column of a two column
-	    ** character...
-	    */
-	    _DtTermPrimGetCharacterInfo(tb, row, MAX(0, newWidth - 1),
-					&charInfo);
-	    
-	    if ((charInfo.width == 2 ) && 
-		(charInfo.startCol == MAX(0, newWidth - 1)))
-	    {
-		/*
-		** we are clearing column 2 of 2, replace column 1 of 1 with
-		** a space...
-		*/
-		*charInfo.u.pwc = L' ';
-	    }
-	    newLength = charInfo.idx + 1;
-	}
-	/* 
+
+	/*
 	** Call the helper function if it exists
 	*/
 	if (CLEAR_LINE(tb))
@@ -936,19 +987,17 @@ _DtTermPrimBufferClearLineWc
 	}
 	WRAPPED(line) = False;
 	WIDTH(line)   = newWidth;
-	LENGTH(line)  = newLength;
+	LENGTH(line)  = newWidth;
     }
     return(True);
 }
 
 /*
 ** replace all characters from startCol upto stopCol with spaces,
-**    
+**
 ** NOTE:
-**    we are dealing with double width characters, the width needs
-**    to remain constant, but the length may have to change since we
-**    may replace a double width character with a single width
-**    character.
+**    we are dealing with double width characters: a 2 column character
+**    that is partly in the erased columns becomes 2 spaces.
 */
 void
 _DtTermPrimBufferEraseWc
@@ -959,75 +1008,45 @@ _DtTermPrimBufferEraseWc
     short      stopCol
 )
 {
-    TermCharInfoRec       startCharInfo;
-    TermCharInfoRec       stopCharInfo;
+    TermLine              line;
+    wchar_t              *cells;
     short                 localCol;
-    wchar_t              *pwchar;
-    short                 lengthErase;
-    short                 lengthInc;
-    
+    short                 c;
+
+    line  = LINE_OF_TBUF(tb, row);
+    cells = CELLS(line);
+
+    /*
+    ** only erase columns that are in the line...
+    */
+    stopCol = MIN(stopCol, WIDTH(line) - 1);
+    if (startCol > stopCol)
+    {
+	return;
+    }
+
     /*
     ** make sure we are not trying to erase the second column
     ** of a two column character.
     */
     localCol = startCol;
-    _patchUpChar(tb, row, &localCol, &startCharInfo);
-    
+    _patchUpChar(tb, row, &localCol);
+
     /*
     ** make sure we are not trying to erase the first column
     ** of a two column character.
     */
-    _DtTermPrimGetCharacterInfo(tb, row, stopCol, &stopCharInfo);
-
-    if ((stopCharInfo.width == 2) &&
-	(stopCharInfo.startCol == stopCol))
+    if (IS_WIDE_START(line, stopCol))
     {
-#ifdef	NOTDEF
-	/*
-	** We are about to overwrite column 1 of a 2 column
-	** character.  Replace it with a space before we proceed
-	** (we make adjustments later to make it look like we
-	** replaced the second column with a space).
-	*/
-	*stopCharInfo.u.pwc = L' ';
-	
-	/*
-	** now update the charInfo (since we replaced the 2 column
-	** character with a single column space)...
-	*/
-	stopCharInfo.width = 1;
-#endif	/* NOTDEF */
 	(void) stopCol++;
     }
 
     /*
-    ** at this point, startCharInfo points to the first character
-    ** to erase, and stopCharInfo points to the last character
-    ** we want to erase, make sure there is enough space between
-    ** the two to accommodate the replacement spaces...
-    */
-    lengthErase = stopCol - startCol + 1;
-    lengthInc   = lengthErase - (stopCharInfo.u.pwc - startCharInfo.u.pwc + 1);
-
-    if (lengthInc != 0)
-    {
-	/*
-	** the length will have to change, make the necessary adjustments
-	*/
-	memmove(stopCharInfo.u.pwc + lengthInc, stopCharInfo.u.pwc,
-		(LENGTH(LINE_OF_TBUF(tb, row)) - stopCharInfo.idx) *
-		sizeof(wchar_t));
-	LENGTH(LINE_OF_TBUF(tb, row)) += lengthInc;
-    }
-    
-    /*
     ** replace the characters with spaces...
     */
-    for (pwchar = startCharInfo.u.pwc;
-	 pwchar < startCharInfo.u.pwc + lengthErase;
-	 pwchar++)
+    for (c = startCol; c <= stopCol; c++)
     {
-	*pwchar = L' ';
+	cells[c] = L' ';
     }
 }
 
@@ -1043,12 +1062,30 @@ _termBufferValidateLineWc
 {
     wchar_t    *pwc;
     TermLine    line;
-    
+
     line = LINE_OF_TBUF(tb, row);
-    for (pwc = (wchar_t *)BUFFER(line);
-         pwc < (wchar_t *)BUFFER(line) + LENGTH(line);
-         pwc++)
+    if (LENGTH(line) != WIDTH(line))
     {
+	fprintf(stderr, "_termBufferValidateLineWc: length %d != width %d\n",
+		LENGTH(line), WIDTH(line));
+    }
+    for (pwc = CELLS(line); pwc < CELLS(line) + WIDTH(line); pwc++)
+    {
+	if (*pwc == TermCELL_CONT)
+	{
+	    if ((pwc == CELLS(line)) || (pwc[-1] == TermCELL_CONT) ||
+		(CELL_WIDTH(pwc[-1]) != 2))
+	    {
+		fprintf(stderr, "_termBufferValidateLineWc: stray cell\n");
+	    }
+	    continue;
+	}
+	if ((CELL_WIDTH(*pwc) == 2) &&
+	    ((pwc + 1 >= CELLS(line) + WIDTH(line)) ||
+	     (pwc[1] != TermCELL_CONT)))
+	{
+	    fprintf(stderr, "_termBufferValidateLineWc: missing cell\n");
+	}
         if (wcwidth(*pwc) == -1)
         {
             fprintf(stderr, "_termBufferValidateLineWc: invalid wide char\n");

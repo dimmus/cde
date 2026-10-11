@@ -51,6 +51,21 @@
 #include <limits.h>
 #include <wchar.h>
 
+/*
+** a buffer for at least n characters, for drawing the characters of a
+** chunk of cells that has 2 column characters in it...
+*/
+static wchar_t *
+getRenderChars(struct termData *tpd, int n)
+{
+    if (tpd->renderCharsLen < n) {
+	tpd->renderChars = (wchar_t *) XtRealloc((char *) tpd->renderChars,
+		n * sizeof(wchar_t));
+	tpd->renderCharsLen = n;
+    }
+    return(tpd->renderChars);
+}
+
 void
 _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 	short endColumn, short endRow)
@@ -78,6 +93,10 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
     Pixel tmpPixel;
     XmTextPosition  begin, end;
     TermCharInfoRec startCharInfo;
+    wchar_t *lineEnd = NULL;	/* end of the cells of the line */
+    wchar_t *renderChars;	/* the characters of a chunk to draw */
+    int renderLen;
+    Boolean compact;
     
     DebugF('t', 0, fprintf(stderr, ">>_DtTermPrimRefreshTextWc() starting\n"));
     DebugF('t', 0, fprintf(stderr,
@@ -223,6 +242,8 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 			tpd->lastUsedHistoryRow + lineNum,
 			startColumn, &startCharInfo)) {
 		    thisStartColumn = startCharInfo.startCol;
+		    lineEnd = startCharInfo.u.pwc - startCharInfo.startCol +
+			    lineWidth;
 		} else {
 		    /* past the last character in this line... */
 		    thisStartColumn = startColumn;
@@ -248,6 +269,8 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 		    _DtTermPrimGetCharacterInfo(tBuffer, lineNum, startColumn,
 		    &startCharInfo)) {
 		thisStartColumn = startCharInfo.startCol;
+		lineEnd = startCharInfo.u.pwc - startCharInfo.startCol +
+			lineWidth;
 	    } else {
 		/* past the last character in this line... */
 		thisStartColumn = startColumn;
@@ -306,10 +329,33 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 	     * chunk, and if the end of this chunk is in the middle
 	     * of a wide character, bump the chunkWidth one column.
 	     */
+	    /* (the buffer is a cell array: a 2 column character is
+	     * followed by a TermCELL_CONT cell, which we don't draw)...
+	     */
+	    compact = False;
+	    renderLen = 0;
 	    for (chunkLineWidth = 0, wc = linePtr;
 		    chunkLineWidth < chunkWidth;
-		    chunkLineWidth += i1, wc++) {
-		i1 = CELL_WIDTH(*wc);
+		    chunkLineWidth += i1, wc += i1) {
+		i1 = ((wc + 1 < lineEnd) && (wc[1] == TermCELL_CONT)) ? 2 : 1;
+		if ((i1 == 2) && !compact) {
+		    /* the first 2 column character of the chunk: from here
+		     * on, collect the characters to draw...
+		     */
+		    compact = True;
+		    renderChars = getRenderChars(tpd, chunkWidth + 1);
+		    renderLen = wc - linePtr;
+		    (void) memcpy(renderChars, linePtr,
+			    renderLen * sizeof(wchar_t));
+		}
+		if (compact) {
+		    renderChars[renderLen++] = *wc;
+		}
+	    }
+	    if (!compact) {
+		/* no 2 column characters, draw the cells themselves... */
+		renderChars = linePtr;
+		renderLen = wc - linePtr;
 	    }
 	    /* adjust for a multi-column character that spans the line
 	     * boundary...
@@ -400,9 +446,8 @@ _DtTermPrimRefreshTextWc(Widget w, short startColumn, short startRow,
 						/* x			*/
 		    startRow * tpd->cellHeight + tpd->offsetY,
 						/* y			*/
-		    /*DKS: this probably should be changed... */
-		    (termChar *) linePtr,	/* string		*/
-		    wc - linePtr);		/* width		*/
+		    (termChar *) renderChars,	/* string		*/
+		    renderLen);			/* width		*/
 	    }
 	    chunkStartColumn += chunkWidth;
 	    lineWidth -= chunkWidth;
@@ -586,7 +631,8 @@ _DtTermPrimExposeTextMb(Widget w, int x, int y, int width, int height,
 }
 
 static short
-DoInsertWc(Widget w, wchar_t *wcBuffer, int wcBufferLen, Boolean *wrapped)
+DoInsertWc(Widget w, wchar_t *wcBuffer, signed char *rawWidths,
+	int wcBufferLen, Boolean *wrapped)
 {
     DtTermPrimitiveWidget   tw = (DtTermPrimitiveWidget) w;    
     struct termData        *tpd = tw->term.tpd;
@@ -607,10 +653,11 @@ DoInsertWc(Widget w, wchar_t *wcBuffer, int wcBufferLen, Boolean *wrapped)
     /* insert the text... */
     returnChars = (wchar_t *) _DtTermPrimRenderGetOverflowBuffer(w,
 	    wcBufferLen);
-    newWidth = _DtTermPrimBufferInsertWc(tBuffer,       /* TermBuffer	    */
+    newWidth = _DtTermPrimBufferInsertWcWidths(tBuffer, /* TermBuffer	    */
 	    tpd->topRow + tpd->cursorRow,	        /* row		    */
 	    tpd->cursorColumn,			        /* column	    */
 	    wcBuffer,	                	        /* newChars	    */
+	    rawWidths,				        /* their wcwidth()s */
 	    wcBufferLen,			        /* numChars         */
 	    tpd->insertCharMode != DtTERM_INSERT_CHAR_OFF,  /* insert flag	    */
 	    (termChar **) (&returnChars),	        /* return char ptr  */
@@ -679,6 +726,7 @@ _DtTermPrimInsertTextWc
     short       insertCharCount;
     short       insertCharWidth; /* column width of characters to insert */
     short	thisCharWidth;
+    signed char *rawWidths;
     short       newWidth;
     Boolean     needToRender = False;
     Boolean     wrapped = False;
@@ -701,8 +749,23 @@ _DtTermPrimInsertTextWc
     insertCharCount = 0;
     insertCharWidth = 0;
 
+    /* the wcwidth() of each character, for us and for the buffer... */
+    if (tpd->wcWidthsLen < wcBufLen) {
+	tpd->wcWidths = (signed char *) XtRealloc((char *) tpd->wcWidths,
+		wcBufLen);
+	tpd->wcWidthsLen = wcBufLen;
+    }
+    rawWidths = tpd->wcWidths;
+
     for (i = 0; (i < wcBufLen) && tpd->ptyInputId; i++) {
-	thisCharWidth = CELL_WIDTH(wcBuffer[i]);
+	if (((unsigned long) wcBuffer[i]) - 0x20UL < 0x5fUL) {
+	    /* printable ASCII... */
+	    rawWidths[i] = 1;
+	    thisCharWidth = 1;
+	} else {
+	    rawWidths[i] = wcwidth(wcBuffer[i]);
+	    thisCharWidth = (rawWidths[i] > 1) ? 2 : 1;
+	}
 
 	/* the following code performs two functions.  If we are in
 	 * autowrap, it performs a sanity check on the insert position.
@@ -745,6 +808,7 @@ _DtTermPrimInsertTextWc
 		 */
 		if (insertCharCount) {
 		    newWidth  = DoInsertWc(w, &wcBuffer[insertStartX],
+				           &rawWidths[insertStartX],
 			                   insertCharCount, &wrapped);
 		    tpd->cursorColumn += insertCharWidth;
 		    insertCharCount = 0;
@@ -808,6 +872,7 @@ _DtTermPrimInsertTextWc
 		/* overwrite the last character(s) on the line... */
 		if (insertCharCount > 0) {
 		    newWidth  = DoInsertWc(w, &wcBuffer[insertStartX],
+				           &rawWidths[insertStartX],
 			                   insertCharCount, &wrapped);
 		    tpd->cursorColumn += insertCharWidth;
 		    insertCharCount = 0;
@@ -868,6 +933,7 @@ _DtTermPrimInsertTextWc
 	    tpd->wrapState = WRAPpastRightMargin;
 	}
 	newWidth  = DoInsertWc(w, &wcBuffer[insertStartX],
+				           &rawWidths[insertStartX],
 		               insertCharCount, &wrapped);
         tpd->cursorColumn += insertCharWidth;
 	if (tpd->insertCharMode == DtTERM_INSERT_CHAR_OFF) {

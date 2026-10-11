@@ -95,6 +95,25 @@ extern "C" {
 #define BYTES_PER_CHAR(tb) ((tb)->term_buffer.bytesPerChar)
 
 /*
+** In a multibyte locale (BYTES_PER_CHAR(tb) == sizeof(wchar_t)), the
+** buffer of a line is an array of cells, one per column: a character
+** that is 2 columns wide is stored in the cell of its first column, and
+** the cell of its second column holds TermCELL_CONT.  So column c of a
+** line is always cell c, LENGTH(line) == WIDTH(line), and a cell holds
+** TermCELL_CONT exactly when the cell before it starts a 2 column
+** character.  (wchar_t -1 is no character: the input decoders and
+** mbtowc() produce 0 .. 0x7fffffff.)  Text handed to or returned by the
+** buffer as characters (inserts, overflow, deleted text) never contains
+** TermCELL_CONT; an insert drops the ones that it is given, so that the
+** cells of one line can be inserted into another.
+*/
+#define	TermCELL_CONT		((wchar_t) -1)
+#define	CELLS(l)		((wchar_t *) BUFFER(l))
+/* does the character in column col of line l take 2 columns? */
+#define	IS_WIDE_START(l, col) \
+	(((col) + 1 < WIDTH(l)) && (CELLS(l)[(col) + 1] == TermCELL_CONT))
+
+/*
 ** The number of columns a wide character takes in the buffer: 2 for a
 ** double width character, else 1 (non-printing and zero width characters
 ** take a column of their own).  Printable ASCII is 1 in every locale, so
@@ -195,6 +214,21 @@ _DtTermPrimBufferInsertWc
     const short       row,
     const short       col,
           wchar_t    *newChars,
+          short       numChars,
+          Boolean     insertFlag,
+          termChar  **returnChars,
+          short      *returnLength
+);
+
+extern
+short
+_DtTermPrimBufferInsertWcWidths
+(
+    const TermBuffer  tb,
+    const short       row,
+    const short       col,
+          wchar_t    *newChars,
+    const signed char *rawWidths,
           short       numChars,
           Boolean     insertFlag,
           termChar  **returnChars,
