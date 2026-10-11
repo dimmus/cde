@@ -41,6 +41,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <time.h>
 #include <netinet/in.h>
 #include "util/tt_string.h"
 #include "util/tt_table.h"
@@ -70,6 +71,11 @@ class _Tt_hostname_cache : public _Tt_object {
 		int addr_length;
 
 		_Tt_string_list_ptr addr_list;
+
+		// whether the name resolved, and until when this
+		// entry may be used
+		int	resolved;
+		time_t	expires;
 };
 
 class _Tt_host_equiv : public _Tt_object {
@@ -84,7 +90,11 @@ class _Tt_host_equiv : public _Tt_object {
 		int hostname_equiv(const _Tt_string & host1,
 				   const _Tt_string & host2);
       private:
-		_Tt_hostname_cache_table_ptr _cache_table;
+		_Tt_hostname_cache_ptr lookup(const _Tt_string & host);
+
+		// Shared by all instances (callers create a new
+		// _Tt_host_equiv for nearly every comparison).
+		static _Tt_hostname_cache_table_ptr *_cache_table;
 };
 
 #endif				/* _TT_HOST_EQUIV_H */

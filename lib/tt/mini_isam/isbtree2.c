@@ -231,7 +231,7 @@ insert_key(Btree *btree, char *pkp, int pos, char *key, Blkno blkno)
     /* For non-leaf nodes,  insert block number into table of down pointers. */
     if (level > 0) {
 	
-	memcpy(pkp + ISPAGESIZE - (nkeys + 1) * BLKNOSIZE,
+	memmove(pkp + ISPAGESIZE - (nkeys + 1) * BLKNOSIZE,
 	       pkp + ISPAGESIZE - nkeys * BLKNOSIZE,
 	       (nkeys - pos - 1) * BLKNOSIZE);
 	

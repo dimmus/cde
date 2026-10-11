@@ -56,6 +56,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <poll.h>
 #include <X11/Intrinsic.h>
 #include <X11/Composite.h>
 #include <X11/Shell.h>
@@ -89,16 +90,6 @@
 
 extern Widget	AB_toplevel;
 
-typedef struct
-{
-    XtIntervalId	timerId;
-    BOOL		synced;
-    time_t		start_time;
-    long		timeout_ticks;
-    time_t		last_expose_ticks;
-    Display		*display;
-    Window		window;
-} SyncDataRec, *SyncData;
 
 
 /*************************************************************************
@@ -133,7 +124,6 @@ static void	rubberband_draw(
 **                                                                      **
 **************************************************************************/
 
-static const long sync_notify_value = (long)0x45a55a54;
 
 
 /*
@@ -1057,161 +1047,48 @@ ui_refresh_widget_tree(
 }
 
 
-static Bool		
-event_is_expose(XEvent *event)
-{
-    Bool	is_expose = FALSE;
-
-    switch (event->type)
-    {
-	case CreateNotify:
-	case DestroyNotify:
-	case Expose:
-	case GraphicsExpose:
-	case MapNotify:
-	case MapRequest:
-	case NoExpose:
-	case UnmapNotify:
-	case VisibilityNotify:
-	    is_expose= TRUE;
-	break;
-    }
-
-    return is_expose;
-}
-
-
-static void
-sync_timeout_proc(
-			    XtPointer		clientData,
-			    XtIntervalId	*intervalIdPtr
-)
-{
-    SyncData		syncData = (SyncData)clientData;
-    BOOL		done = FALSE;
-
-    if (syncData->synced)
-    {
-	return;
-    }
-
-    done =
-	((syncData->timeout_ticks - syncData->last_expose_ticks) >= 5);
-
-    if (done)
-    {
-	XEvent	event;
-	Display	*display = syncData->display;
-	Window	window = syncData->window;
-	int	i = 0;
-	int	rc = 0;
-	long	event_mask = 0;
-
-	syncData->synced = TRUE;
-
-	/*
-	 * Fill in the event
-	 */
-	event.type = ClientMessage;
-	event.xclient.display = display;
-	event.xclient.window = window;
-	event.xclient.message_type = 0;
-	event.xclient.format = 32;
-        /* data.l[] can hold only 5 longs */
-	for (i = 0; i < 5; ++i)
-	{
-	    event.xclient.data.l[i] = sync_notify_value;
-	}
-	rc = XSendEvent(display, window, True, event_mask, &event);
-	if (rc == 0)
-	{
-	    util_dprintf(0, "BIG TIME ERROR: send event failed\n");
-	}
-    }
-
-    if (!(syncData->synced))
-    {
-        syncData->timerId = XtAppAddTimeOut(
-		XtWidgetToApplicationContext(AB_toplevel), 100, 
-		sync_timeout_proc, (XtPointer)clientData);
-    }
-
-    ++(syncData->timeout_ticks);
-}
-
+/*
+ * Bring the display up to date before a long, non-interactive operation
+ * (project load/import, module delete): make the server process everything
+ * sent so far (busy cursor, unmapped dialogs), then dispatch the events it
+ * generated, so exposed areas are repainted first.
+ *
+ * Events the window manager generates on our behalf (reparent, map of a
+ * dialog frame) arrive asynchronously, so keep dispatching while more
+ * events turn up within a short quiet interval.  This used to wait for
+ * five quiet 100 ms timer ticks (0.5 s minimum, 5 s maximum).
+ */
+#define SYNC_QUIET_MS	30
+#define SYNC_MAX_ROUNDS	30
 
 int
 ui_sync_display_of_widget(Widget widget)
 {
-    int			return_value = 0;
-    XtAppContext	appContext = 
-				XtWidgetToApplicationContext(widget);
-    XEvent		eventRec, *event = &eventRec;
-    SyncDataRec		syncData;
-    Bool		ignore_event = FALSE;
-    Widget		ancestor = widget;
-    Widget		last_ancestor = ancestor;
-    Widget		sync_widget = NULL;
-    Screen		*screen = NULL;
+    XtAppContext	appContext = XtWidgetToApplicationContext(widget);
+    Display		*display = XtDisplay(widget);
+    struct pollfd	pfd;
+    int			round;
 
-    syncData.timerId = 0;
-    syncData.synced = FALSE;
-    syncData.start_time = time(NULL);
-    syncData.last_expose_ticks = 0;
-    syncData.timeout_ticks = 0;
-    syncData.display = NULL;
-    syncData.window = 0;
-#define last_expose_ticks (syncData.last_expose_ticks)
-#define synced (syncData.synced)
-#define timeout_ticks (syncData.timeout_ticks)
+    pfd.fd = ConnectionNumber(display);
+    pfd.events = POLLIN;
 
-    syncData.display = XtDisplay(widget);
-    screen = XtScreen(widget);
-    syncData.window = RootWindowOfScreen(screen);
-
-    /*
-     * Find topmost parent of this widget that belongs to application.
-     * This is in case this widget is destroyed (common for popups)
-     */
-    last_ancestor = ancestor = widget;
-    while ((ancestor != NULL) && 
-	   (XtWidgetToApplicationContext(ancestor) == appContext))
+    for (round = 0; round < SYNC_MAX_ROUNDS; ++round)
     {
-	last_ancestor = ancestor;
-	ancestor = XtParent(ancestor);
+	XSync(display, False);
+	while (XtAppPending(appContext) & XtIMXEvent)
+	{
+	    XtAppProcessEvent(appContext, XtIMXEvent);
+	}
+	XmUpdateDisplay(widget);
+
+	pfd.revents = 0;
+	if (   (poll(&pfd, 1, SYNC_QUIET_MS) <= 0)
+	    && (XEventsQueued(display, QueuedAfterReading) == 0))
+	{
+	    break;	/* quiet: the display is up to date */
+	}
     }
-    sync_widget = last_ancestor;
-    syncData.window = XtWindow(sync_widget);
-
-    syncData.timerId = XtAppAddTimeOut(appContext, 100, 
-				sync_timeout_proc, (XtPointer)&syncData);
-
-    while (!synced)
-    {
-	XtAppNextEvent(appContext, event);
-	ignore_event = (   (event->type == ClientMessage) 
-			&& (event->xclient.data.l[0] == sync_notify_value));
-	if (!ignore_event)
-	{
-	    XtDispatchEvent(event);
-	}
-	
-	if (event_is_expose(event))
-	{
-	    last_expose_ticks = timeout_ticks;
-	}
-	if (difftime(time(NULL), syncData.start_time) >= 5)
-	{
-	    /* we've done this long enough - give up */
-	    synced = TRUE;
-	}
-    } /* while !synced */
-
-    XtRemoveTimeOut(syncData.timerId); syncData.timerId = 0;
-    return return_value;
-#undef last_expose_ticks
-#undef synced
-#undef timeout_ticks
+    return 0;
 }
 
 /*

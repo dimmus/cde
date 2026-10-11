@@ -124,6 +124,48 @@ static _DtHelpVolume volChain = NULL;	/* Pointer to the head of the chain */
 static const char *Slash  = "/";
 static const char *Period = ".";
 
+/*
+ * Volumes closed for the last time stay loaded for a while, so opening
+ * the same volume again (help dialogs and quick help that come and go,
+ * the index search that opens a volume it has just scanned) does not
+ * parse it again.  A cached volume is reused only if its file still has
+ * the device, inode, size and modification time it had when it was
+ * closed (and its data were then up to date with the file); otherwise
+ * it is unloaded and the file loaded afresh, exactly as before.
+ * Closed volumes are not in volChain, so their handles are not valid.
+ */
+#define	CLOSED_VOL_MAX	12
+
+typedef struct {
+	_DtHelpVolume	vol;
+	dev_t		dev;
+	ino_t		ino;
+	off_t		size;
+	time_t		mtime_sec;
+	long		mtime_nsec;
+} ClosedVolume;
+
+static ClosedVolume ClosedVols[CLOSED_VOL_MAX];	/* [0] = most recent */
+static int          ClosedCnt = 0;
+
+/*
+ * The index of the keyword list of one volume, so that looking up the
+ * topics of each of its keywords in turn (the index display) does not
+ * compare against every keyword before it.  It is built on demand for
+ * the volume being looked at and dropped whenever that volume's
+ * keyword list is freed.
+ */
+#define	KEYWORD_INDEX_MIN	32
+
+static struct {
+	_DtHelpVolume	  vol;
+	char		**keywords;	/* the list it indexes */
+	char		***topics;
+	unsigned int	  mask;		/* buckets - 1 (a power of 2) */
+	int		 *head;		/* first keyword in each bucket */
+	int		 *next;		/* next keyword in the same bucket */
+} KeywordIndex = { NULL, NULL, NULL, 0, NULL, NULL };
+
 /******************************************************************************
  *                             Private Functions
  ******************************************************************************/
@@ -169,6 +211,188 @@ CheckVolList (
 
     _DtHelpProcessUnlock();
     return 0;
+}
+
+/******************************************************************************
+ * Keyword index (call with the process lock held).
+ ******************************************************************************/
+static unsigned int
+KeywordHash (const char *str)
+{
+    unsigned int h = 2166136261u;
+
+    while ('\0' != *str)
+      {
+	h ^= (unsigned char) *str++;
+	h *= 16777619u;
+      }
+    return h;
+}
+
+static void
+DropKeywordIndex (_DtHelpVolume vol)
+{
+    if (NULL != vol && KeywordIndex.vol != vol)
+	return;
+
+    free(KeywordIndex.head);
+    free(KeywordIndex.next);
+    KeywordIndex.vol      = NULL;
+    KeywordIndex.keywords = NULL;
+    KeywordIndex.topics   = NULL;
+    KeywordIndex.mask     = 0;
+    KeywordIndex.head     = NULL;
+    KeywordIndex.next     = NULL;
+}
+
+/*
+ * Returns the index of the first keyword equal to 'keyword', -1 if there
+ * is none, or -2 if the list is not indexed (search it).
+ */
+static int
+FindKeywordIndex (_DtHelpVolume vol, char **keywords, const char *keyword)
+{
+    int		 i;
+    int		 count;
+    unsigned int size;
+
+    if (KeywordIndex.vol != vol || KeywordIndex.keywords != keywords ||
+				KeywordIndex.topics != vol->keywordTopics)
+      {
+	DropKeywordIndex(NULL);
+
+	for (count = 0; NULL != keywords[count]; count++)
+	    ;
+	if (count < KEYWORD_INDEX_MIN)
+	    return -2;
+
+	for (size = 64; size < (unsigned int) count && size < (1u << 30);)
+	    size *= 2;
+
+	KeywordIndex.head = (int *) malloc(sizeof(int) * size);
+	KeywordIndex.next = (int *) malloc(sizeof(int) * count);
+	if (NULL == KeywordIndex.head || NULL == KeywordIndex.next)
+	  {
+	    DropKeywordIndex(NULL);
+	    return -2;
+	  }
+
+	KeywordIndex.mask = size - 1;
+	for (i = 0; i < (int) size; i++)
+	    KeywordIndex.head[i] = -1;
+
+	/*
+	 * insert from the end, so each chain is in list order and its
+	 * first match is the first equal keyword of the list.
+	 */
+	for (i = count - 1; i >= 0; i--)
+	  {
+	    unsigned int b = KeywordHash(keywords[i]) & KeywordIndex.mask;
+
+	    KeywordIndex.next[i] = KeywordIndex.head[b];
+	    KeywordIndex.head[b] = i;
+	  }
+
+	KeywordIndex.vol      = vol;
+	KeywordIndex.keywords = keywords;
+	KeywordIndex.topics   = vol->keywordTopics;
+      }
+
+    for (i = KeywordIndex.head[KeywordHash(keyword) & KeywordIndex.mask];
+				i != -1; i = KeywordIndex.next[i])
+	if (0 == strcmp(keywords[i], keyword))
+	    return i;
+
+    return -1;
+}
+
+/******************************************************************************
+ * Closed volume cache (call with the process lock held).
+ ******************************************************************************/
+static void
+DropClosedVolume (int i)
+{
+    _DtHelpVolume vol = ClosedVols[i].vol;
+
+    ClosedCnt--;
+    memmove(&ClosedVols[i], &ClosedVols[i + 1],
+				sizeof(ClosedVolume) * (ClosedCnt - i));
+    VolumeUnload(vol);
+}
+
+/*
+ * keep 'vol' (whose last close this is) loaded, or unload it.
+ */
+static void
+KeepClosedVolume (_DtHelpVolume vol)
+{
+    struct stat buf;
+
+    if (stat(vol->volFile, &buf) != 0 || buf.st_mtime != vol->check_time)
+      {
+	VolumeUnload(vol);
+	return;
+      }
+
+    /*
+     * the formatted title belongs to the display area that asked for it
+     * (and may be destroyed with it); the next opener formats its own.
+     */
+    if (vol->sdl_flag == True)
+	_DtHelpCeForgetSdlVolTitle((_DtHelpVolumeHdl) vol);
+
+    if (CLOSED_VOL_MAX == ClosedCnt)
+	DropClosedVolume(ClosedCnt - 1);
+
+    memmove(&ClosedVols[1], &ClosedVols[0], sizeof(ClosedVolume) * ClosedCnt);
+    ClosedCnt++;
+
+    vol->nextVol             = NULL;
+    ClosedVols[0].vol        = vol;
+    ClosedVols[0].dev        = buf.st_dev;
+    ClosedVols[0].ino        = buf.st_ino;
+    ClosedVols[0].size       = buf.st_size;
+    ClosedVols[0].mtime_sec  = buf.st_mtim.tv_sec;
+    ClosedVols[0].mtime_nsec = buf.st_mtim.tv_nsec;
+}
+
+/*
+ * a cached volume for 'vol_file' whose file has not changed, taken out
+ * of the cache; or NULL.
+ */
+static _DtHelpVolume
+ReuseClosedVolume (const char *vol_file)
+{
+    int		  i;
+    struct stat	  buf;
+    _DtHelpVolume vol;
+
+    for (i = 0; i < ClosedCnt; i++)
+	if (0 == strcmp(ClosedVols[i].vol->volFile, vol_file))
+	    break;
+
+    if (i == ClosedCnt)
+	return NULL;
+
+    if (stat(vol_file, &buf) != 0 ||
+		ClosedVols[i].dev        != buf.st_dev ||
+		ClosedVols[i].ino        != buf.st_ino ||
+		ClosedVols[i].size       != buf.st_size ||
+		ClosedVols[i].mtime_sec  != buf.st_mtim.tv_sec ||
+		ClosedVols[i].mtime_nsec != buf.st_mtim.tv_nsec)
+      {
+	DropClosedVolume(i);
+	return NULL;
+      }
+
+    vol = ClosedVols[i].vol;
+    ClosedCnt--;
+    memmove(&ClosedVols[i], &ClosedVols[i + 1],
+				sizeof(ClosedVolume) * (ClosedCnt - i));
+
+    vol->openCount = 1;
+    vol->nextVol   = NULL;
+    return vol;
 }
 
 /******************************************************************************
@@ -253,6 +477,7 @@ VolumeUnload (
     
     if (vol != NULL)
       {
+	DropKeywordIndex(vol);
 
 	if (vol->sdl_flag == True)
 	    _DtHelpCeCloseSdlVolume((_DtHelpVolumeHdl) vol);
@@ -300,7 +525,9 @@ RereadVolume (
 {
     int            result;
     char	***topicList;
-    
+
+    DropKeywordIndex(vol);
+
     if (vol->keywords != NULL)
       {
         _DtHelpCeFreeStringArray (vol->keywords);
@@ -384,18 +611,22 @@ GetKeywordTopics (
       }
 
     /* Search the list of keywords for the current one. */
-    nextKey = keywords;
-    while (*nextKey != NULL && strcmp (*nextKey, keyword))
-	nextKey++;
+    index = FindKeywordIndex (vol, keywords, keyword);
+    if (-2 == index)
+      {
+        nextKey = keywords;
+        while (*nextKey != NULL && strcmp (*nextKey, keyword))
+	    nextKey++;
+        index = (*nextKey == NULL) ? -1 : nextKey - keywords;
+      }
 
-    if (*nextKey == NULL)
+    if (-1 == index)
       {
 	errno = CEErrorIllegalKeyword;
 	_DtHelpProcessUnlock();
 	return -1;
       }
 
-    index = nextKey - keywords;
     *retTopics = *(vol->keywordTopics + index);
 
     _DtHelpProcessUnlock();
@@ -554,6 +785,60 @@ GetTopicTitleAndAbbrev (
 }
 
 /*****************************************************************************
+ * Function: static int UncompressToTemp (char *name, char *tmpName)
+ *
+ * Parameters:	name	Specifies the file whose ".Z" form is uncompressed.
+ *		tmpName	Returns the name of the temporary file
+ *			(MAXPATHLEN + 1 bytes).
+ *
+ * Return Value: 0 if successful, -1 if the temporary file could not be
+ *		created or the uncompress failed (the file is then removed),
+ *		1 if out of memory.
+ *
+ * Purpose:	Uncompress name.Z into a new temporary file.  mkstemp()
+ *		creates the file, so unlike tmpnam() there is no window in
+ *		which another user can create or link the name first.
+ *****************************************************************************/
+static int
+UncompressToTemp (
+    char	*name,
+    char	*tmpName )
+{
+    char *inFile;
+    int   fd;
+    int   result;
+
+    inFile = (char *) malloc (strlen (name) + 3);
+    if (inFile == NULL)
+	return 1;
+
+    snprintf (tmpName, MAXPATHLEN + 1, "%s/dthelpXXXXXX", P_tmpdir);
+    fd = mkstemp (tmpName);
+    if (fd == -1)
+      {
+	free (inFile);
+	return -1;
+      }
+    close (fd);
+
+    /*
+     * make the dot Z file name and do the uncompress
+     */
+    strcpy (inFile, name);
+    strcat (inFile, ".Z");
+    result = _DtHelpCeUncompressFile (inFile, tmpName);
+    free (inFile);
+
+    if (result != 0)
+      {
+	unlink (tmpName);
+	return -1;
+      }
+
+    return 0;
+}
+
+/*****************************************************************************
  * Function: static int FileOpenRtnFd (char *name, int *ret_fd)
  *
  * Parameters:	name		Specifies the file to open.
@@ -577,7 +862,6 @@ FileOpenRtnFd (
     char	*name,
     int		*ret_fd )
 {
-    char *inFile = NULL;
     char  tmpName[MAXPATHLEN + 1];
     int   result = 1;
 
@@ -587,49 +871,26 @@ FileOpenRtnFd (
     *ret_fd = open(name, O_RDONLY);
     if (*ret_fd == -1)
       {
-	/*
-	 * get a temporary name
-	 */
-	(void) tmpnam (tmpName);
-
-	/*
-	 * malloc memory for the dot Z file name.
-	 */
-	inFile = (char *) malloc (strlen (name) + 3);
-	if (inFile != NULL)
-	  {
-	    /*
-	     * make the dot Z file
-	     */
-	    strcpy (inFile, name);
-	    strcat (inFile, ".Z");
-
-	    /*
-	     * do the uncompress
-	     */
-	    result = _DtHelpCeUncompressFile (inFile, tmpName);
-	    free (inFile);
-
-	    if (result != 0)
-	      {
-		errno = ENOENT;
-		return -1;
-	      }
-
-	    /*
-	     * now open the uncompressed file
-	     */
-	    *ret_fd = open(tmpName, O_RDONLY);
-	    if (*ret_fd == -1)
-		result = -1;
-	    else
-		unlink(tmpName);
-	  }
-	else
+	result = UncompressToTemp (name, tmpName);
+	if (result == 1)
 	  {
 	    errno = CEErrorMalloc;
 	    return -1;
 	  }
+	if (result != 0)
+	  {
+	    errno = ENOENT;
+	    return -1;
+	  }
+
+	/*
+	 * now open the uncompressed file; it is not needed by name
+	 * afterwards, so remove it even if the open failed
+	 */
+	*ret_fd = open(tmpName, O_RDONLY);
+	if (*ret_fd == -1)
+	    result = -1;
+	unlink(tmpName);
       }
 
     return result;
@@ -1076,7 +1337,6 @@ _DtHelpCeGetUncompressedFileName (
 	char	 *name,
 	char		**ret_name )
 {
-    char *inFile = NULL;
     char  tmpName[MAXPATHLEN + 1];
     int   result = 1;
 
@@ -1086,44 +1346,22 @@ _DtHelpCeGetUncompressedFileName (
     *ret_name = name;
     if (access (name, F_OK) == -1)
       {
-	/*
-	 * get a temporary name
-	 */
-	(void) tmpnam (tmpName);
-
-	/*
-	 * malloc memory for the dot Z file name.
-	 */
-	inFile = (char *) malloc (strlen (name) + 3);
-	if (inFile != NULL)
+	result = UncompressToTemp (name, tmpName);
+	if (result == 1)
 	  {
-	    /*
-	     * make the dot Z file
-	     */
-	    strcpy (inFile, name);
-	    strcat (inFile, ".Z");
-
-	    /*
-	     * do the uncompress
-	     */
-	    result = _DtHelpCeUncompressFile (inFile, tmpName);
-	    free (inFile);
-
-	    if (result != 0)
-	      {
-		errno = ENOENT;
-		return -1;
-	      }
-
-	    *ret_name = strdup (tmpName);
-	    if (*ret_name == NULL)
-	      {
-		errno = CEErrorMalloc;
-		return -1;
-	      }
+	    errno = CEErrorMalloc;
+	    return -1;
 	  }
-	else
+	if (result != 0)
 	  {
+	    errno = ENOENT;
+	    return -1;
+	  }
+
+	*ret_name = strdup (tmpName);
+	if (*ret_name == NULL)
+	  {
+	    unlink (tmpName);
 	    errno = CEErrorMalloc;
 	    return -1;
 	  }
@@ -1603,6 +1841,299 @@ _DtHelpCeGetVolumeName (
 } /* End __DtHelpCeGetVolumeName */
 
 /*****************************************************************************
+ * Decompressed topic cache.
+ *
+ * Every topic of an SDL volume is stored LZW compressed, and showing,
+ * printing or titling a topic decompressed it again each time (about a
+ * quarter of the CPU time of dthelpprint).  The decompressed bytes of
+ * recently read blocks are kept, keyed on the volume file's identity
+ * (device, inode, size, mtime) and the block's offset, so revisiting a
+ * topic, or parsing it after reading its title, skips the decompression.
+ * Readers get a private copy, read through an in-memory BufFile that
+ * returns exactly the bytes and EOF the decompressing reader returned.
+ *****************************************************************************/
+#define	TOPIC_CACHE_MAX_BYTES	(8 * 1024 * 1024)
+#define	TOPIC_CACHE_MAX_BLOCK	(1024 * 1024)	/* larger blocks stream */
+
+typedef struct _topicCacheEntry {
+    struct _topicCacheEntry *next;
+    dev_t	   dev;
+    ino_t	   ino;
+    off_t	   size;
+    time_t	   mtime_sec;
+    long	   mtime_nsec;
+    int		   offset;
+    char	  *data;
+    int		   len;
+    unsigned long  last_use;
+} TopicCacheEntry;
+
+static TopicCacheEntry *TopicCache      = NULL;
+static unsigned long    TopicCacheBytes = 0;
+static unsigned long    TopicCacheTick  = 0;
+
+/*
+ * In-memory BufFile.  'hidden' points at a MemBufInfo; the data is
+ * served from 'data' and, once that is used up, from 'rest' (the rest
+ * of a block too large to read into memory), if any.
+ */
+typedef struct {
+    char	*data;
+    BufFilePtr	 rest;
+    int		 close_rest;
+} MemBufInfo;
+
+static int
+MemBufRead (BufFilePtr f)
+{
+    MemBufInfo *info = (MemBufInfo *) f->hidden;
+    int		c;
+    int		n;
+
+    if (info->rest != NULL)
+      {
+	for (n = 0; n < BUFFILESIZE; n++)
+	  {
+	    c = BufFileGet(info->rest);
+	    if (c == BUFFILEEOF)
+		break;
+	    f->buffer[n] = (BufChar) c;
+	  }
+	if (n > 0)
+	  {
+	    f->bufp = f->buffer + 1;
+	    f->left = n - 1;
+	    return f->buffer[0];
+	  }
+      }
+    f->left = 0;
+    return BUFFILEEOF;
+}
+
+static int
+MemBufSkip (
+    BufFilePtr	f,
+    int		count)
+{
+    int	n = count;
+
+    while (n > 0 && BufFileGet(f) != BUFFILEEOF)
+	n--;
+    return count - n;
+}
+
+static int
+MemBufClose (
+    BufFilePtr	f,
+    int		doClose)
+{
+    MemBufInfo *info = (MemBufInfo *) f->hidden;
+
+    if (info->rest != NULL)
+	_DtHelpCeBufFileClose(info->rest, info->close_rest && doClose);
+    free(info->data);
+    free(info);
+    return 1;
+}
+
+/*
+ * Make a BufFile reading 'len' bytes of 'data' (taken over), then 'rest'.
+ */
+static BufFilePtr
+MemBufFile (
+    char	*data,
+    int		 len,
+    BufFilePtr	 rest,
+    int		 close_rest)
+{
+    MemBufInfo *info = (MemBufInfo *) malloc (sizeof(MemBufInfo));
+    BufFilePtr	f;
+
+    if (info == NULL)
+	return NULL;
+    info->data       = data;
+    info->rest       = rest;
+    info->close_rest = close_rest;
+    f = _DtHelpCeBufFileCreate((char *) info, MemBufRead, MemBufSkip,
+								MemBufClose);
+    if (f == NULL)
+      {
+	free(info);
+	return NULL;
+      }
+    f->bufp = (BufChar *) data;
+    f->left = len;
+    return f;
+}
+
+static char *
+CopyBytes (
+    const char	*data,
+    int		 len)
+{
+    char *copy = (char *) malloc (len > 0 ? len : 1);
+
+    if (copy != NULL && len > 0)
+	memcpy(copy, data, len);
+    return copy;
+}
+
+/*
+ * Look up the block at 'offset' of the file 'st' describes; on a hit
+ * return a private copy of its bytes and their count.
+ */
+static char *
+TopicCacheGet (
+    const struct stat	*st,
+    int			 offset,
+    int			*ret_len)
+{
+    TopicCacheEntry *e;
+    char	    *copy = NULL;
+
+    _DtHelpProcessLock();
+    for (e = TopicCache; e != NULL; e = e->next)
+	if (e->offset == offset && e->ino == st->st_ino &&
+		e->dev == st->st_dev && e->size == st->st_size &&
+		e->mtime_sec == st->st_mtim.tv_sec &&
+		e->mtime_nsec == st->st_mtim.tv_nsec)
+	  {
+	    copy = CopyBytes(e->data, e->len);
+	    if (copy != NULL)
+	      {
+		*ret_len = e->len;
+		e->last_use = ++TopicCacheTick;
+	      }
+	    break;
+	  }
+    _DtHelpProcessUnlock();
+    return copy;
+}
+
+static void
+TopicCachePut (
+    const struct stat	*st,
+    int			 offset,
+    const char		*data,
+    int			 len)
+{
+    TopicCacheEntry  *e, **pp, **oldest;
+
+    e = (TopicCacheEntry *) malloc (sizeof(TopicCacheEntry));
+    if (e == NULL)
+	return;
+    e->data = CopyBytes(data, len);
+    if (e->data == NULL)
+      {
+	free(e);
+	return;
+      }
+    e->dev        = st->st_dev;
+    e->ino        = st->st_ino;
+    e->size       = st->st_size;
+    e->mtime_sec  = st->st_mtim.tv_sec;
+    e->mtime_nsec = st->st_mtim.tv_nsec;
+    e->offset     = offset;
+    e->len        = len;
+
+    _DtHelpProcessLock();
+    e->last_use   = ++TopicCacheTick;
+    e->next       = TopicCache;
+    TopicCache    = e;
+    TopicCacheBytes += len;
+
+    /* evict the least recently used blocks beyond the limit */
+    while (TopicCacheBytes > TOPIC_CACHE_MAX_BYTES && TopicCache->next != NULL)
+      {
+	oldest = NULL;
+	for (pp = &TopicCache; *pp != NULL; pp = &(*pp)->next)
+	    if (*pp != e &&
+		    (oldest == NULL || (*pp)->last_use < (*oldest)->last_use))
+		oldest = pp;
+	if (oldest == NULL)
+	    break;
+	e = *oldest;
+	*oldest = e->next;
+	TopicCacheBytes -= e->len;
+	free(e->data);
+	free(e);
+	e = TopicCache;
+      }
+    _DtHelpProcessUnlock();
+}
+
+/*
+ * Read the decompressing BufFile 'z' into memory (up to the block
+ * limit) and return a BufFile serving the same bytes; caches the block
+ * when it fits.  Takes over 'z'.
+ */
+static BufFilePtr
+ReadCompressedBlock (
+    BufFilePtr		 z,
+    const struct stat	*st,
+    int			 have_stat,
+    int			 offset,
+    int			 close_fd)
+{
+    char       *data = NULL;
+    char       *newData;
+    int		len  = 0;
+    int		max  = 0;
+    int		c;
+    BufFilePtr	f;
+
+    while (len < TOPIC_CACHE_MAX_BLOCK)
+      {
+	c = BufFileGet(z);
+	if (c == BUFFILEEOF)
+	    break;
+	if (len >= max)
+	  {
+	    max = (max == 0) ? 16384 : max * 2;
+	    newData = (char *) realloc (data, max);
+	    if (newData == NULL)
+	      {
+		/* serve what was read, then keep streaming */
+		BufFilePutBack(c, z);
+		f = MemBufFile(data, len, z, close_fd);
+		if (f == NULL)
+		  {
+		    free(data);
+		    _DtHelpCeBufFileClose(z, close_fd);
+		  }
+		return f;
+	      }
+	    data = newData;
+	  }
+	data[len++] = (char) c;
+      }
+
+    if (len >= TOPIC_CACHE_MAX_BLOCK)
+      {
+	/* too big to keep: serve it, then stream the rest */
+	f = MemBufFile(data, len, z, close_fd);
+	if (f == NULL)
+	  {
+	    free(data);
+	    _DtHelpCeBufFileClose(z, close_fd);
+	  }
+	return f;
+      }
+
+    _DtHelpCeBufFileClose(z, close_fd);
+
+    if (have_stat)
+	TopicCachePut(st, offset, data, len);
+
+    if (data == NULL)
+	data = (char *) malloc (1);
+    f = MemBufFile(data, len, NULL, False);
+    if (f == NULL)
+	free(data);
+    return f;
+}
+
+/*****************************************************************************
  * Function: int _DtHelpCeFileOpenAndSeek (char *name, int offset, int fildes,
  *							BufFilePtr *ret_file)
  *
@@ -1685,6 +2216,29 @@ _DtHelpCeFileOpenAndSeek (
 
 	CECompressInfoPtr myInfo;
 	BufFilePtr	  inputRaw;
+	BufFilePtr	  inputZ;
+	struct stat	  st;
+	int		  haveStat = (fstat(tmpFd, &st) == 0);
+	char		 *cached;
+	int		  cachedLen = 0;
+
+	/*
+	 * already decompressed recently?
+	 */
+	if (haveStat &&
+		(cached = TopicCacheGet(&st, offset, &cachedLen)) != NULL)
+	  {
+	    if (fd == -1)
+	        close (tmpFd);
+	    *ret_file = MemBufFile(cached, cachedLen, NULL, False);
+	    if (*ret_file == NULL)
+	      {
+		free(cached);
+		errno = CEErrorMalloc;
+		return -1;
+	      }
+	    return 0;
+	  }
 
 	/*
 	 * allocate the private information
@@ -1718,10 +2272,23 @@ _DtHelpCeFileOpenAndSeek (
 	    return -1;
 	  }
 
-	*ret_file = _DtHelpCeBufFilePushZ(inputRaw);
-	if (*ret_file == NULL)
+	inputZ = _DtHelpCeBufFilePushZ(inputRaw);
+	if (inputZ == NULL)
 	  {
 	    _DtHelpCeBufFileClose(inputRaw, (fd == -1 ? True : False));
+	    return -1;
+	  }
+
+	/*
+	 * decompress the block into memory (and the cache).  The caller
+	 * closes the returned file with doClose = (fd == -1), which then
+	 * closes tmpFd; it is not needed any more, so close it now.
+	 */
+	*ret_file = ReadCompressedBlock(inputZ, &st, haveStat, offset,
+						(fd == -1 ? True : False));
+	if (*ret_file == NULL)
+	  {
+	    errno = CEErrorMalloc;
 	    return -1;
 	  }
       }
@@ -1827,6 +2394,15 @@ _DtHelpOpenVolume (
     if (vol)
       {
 	vol->openCount++;
+        free(volFile);
+      }
+    else if (NULL != (vol = ReuseClosedVolume (volFile)))
+      {
+	/* It was closed recently and has not changed: reuse it. */
+	if (prevVol == NULL)
+	    volChain = vol;
+	else
+	    prevVol->nextVol = vol;
         free(volFile);
       }
     else /* if (vol == NULL) */
@@ -1965,7 +2541,7 @@ _DtHelpCloseVolume (
 	else
 	    prevVol->nextVol = vol->nextVol;
 
-	VolumeUnload (vol);
+	KeepClosedVolume (vol);
       }
 
     _DtHelpProcessUnlock();

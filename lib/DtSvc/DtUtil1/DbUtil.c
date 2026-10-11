@@ -45,6 +45,8 @@
 #endif
 #include <sys/stat.h>
 #include <sys/param.h>		/* MAXPATHLEN, MAXHOSTNAMELEN */
+#include <fcntl.h>
+#include <langinfo.h>
 #include <X11/Xlib.h>
 #include <X11/Intrinsic.h>
 #include <X11/StringDefs.h>
@@ -63,6 +65,7 @@
 #include <Dt/Utility.h>
 
 #include <Dt/ActionDb.h>
+#include <Dt/DtsMM.h>
 
 #ifndef S_ISLNK
 /* This macro is normally defined in stat.h, but not on USL systems. */
@@ -127,14 +130,8 @@ static void __freeLangSubstitutions(
 			void );
 static char *_DtExpandLang(
         		char *string ) ;
-static char _DtIsDir( 
-                        char *path,
-                        char *name) ;
 static void _DtFreeDirVector( 
                         char **dir_vector) ;
-static void __swap( 
-			int i ,
-        		DtDirPaths *data );
 static void _DtSortFiles( 
 			int low,
 			int n, 
@@ -410,59 +407,6 @@ _DtExpandLang(
 }
 
 
-/******************
- *
- * Function Name:  _DtIsDir
- *
- * Description:
- *
- *	This function tests a pathname to see if it is a directory.
- *	The path name is received in two pieces, which makes it easy
- *	for the calling function to test a bunch of files in a directory
- *	to see if any are subdirectories.
- *
- *	This function does NOT handle Softbench-style pathnames with 
- *	embedded hostnames.
- *
- * Synopsis:
- *
- *	dir = _DtIsDir (path, name);
- *
- *	char dir;		Returns 0 if the item is not a directory, 
- *				1 if it is.
- *	char *path;		The first part of the pathname.  Typically
- *				the directory containing the item of interest.
- *	char *name;		The second half of the pathname.  Typically
- *				the name of the item of interest.
- *
- ******************/
-
-static char 
-_DtIsDir(
-        char *path,
-        char *name )
-{
-   struct stat stat_buf;
-   char *stat_name;
-   
-   stat_name = XtMalloc ((Cardinal)(strlen(path) + strlen(name) + 2));
-   (void)strcpy (stat_name, path);
-   (void)strcat (stat_name, "/");
-   (void)strcat (stat_name, name);
-   
-   if(stat (stat_name, &stat_buf))
-   {
-	stat_buf.st_mode = 0;
-   }
-   XtFree (stat_name);
-   
-   if (stat_buf.st_mode & S_IFDIR)
-      return (TRUE);
-   else
-      return (FALSE);
-}
-
-
 /******************************
  *
  * Function Name:  _DtFreeDirVector
@@ -497,49 +441,14 @@ _DtFreeDirVector(
 
 /******************************
  *
- * Function Name:  __swap
- *
- * Description:
- *
- * 	This function exchanges two elements in an array of DtDirPaths.
- *
- * Synoposis:
- *
- *	__swap (i, data);
- *
- *	int i;			The base index to change.
- *	DtDirPaths *data;	The data to change.
- *
- ********************************/
-
-static void
-__swap( 
-	int i ,
-        DtDirPaths *data )
-{
-   char *tmp;
-
-   /* The "names" field of the structure is not touched because
-    * this field is "NULL" for all of the entries.
-    */
-   tmp = data->dirs[i]; 
-   data->dirs[i] = data->dirs[i+1]; data->dirs[i+1] = tmp;
-
-   tmp = data->paths[i]; 
-   data->paths[i] = data->paths[i+1]; data->paths[i+1] = tmp;
-}
-
-
-/******************************
- *
  * Function Name:  _DtSortFiles
  *
  * Description:
  *
- * 	Given an index, an array of "char" data and the number of elements to
- *      sort, this function sorts the data.  The sorting algorithm is based
- *      on a bubble sort because the number of elements is usually less than
- *      ten.
+ * 	Sorts n elements of data (both the "dirs" and the "paths" vectors),
+ *      starting at index low, by "paths", in collation order.  Elements
+ *      that collate equal keep their order.  (This used to be a bubble
+ *      sort, which gives the same order.)
  *
  * Synoposis:
  *
@@ -551,28 +460,59 @@ __swap(
  *
  ********************************/
 
+struct sort_file
+{
+   char *dir;
+   char *path;
+   int  index;
+};
+
+static int
+_DtCompareFiles( const void *a, const void *b )
+{
+   const struct sort_file *fa = a;
+   const struct sort_file *fb = b;
+   int result;
+
+#ifndef NO_MESSAGE_CATALOG
+   result = strcoll (fa->path, fb->path);
+#else
+   result = strcmp (fa->path, fb->path);
+#endif
+   if (result == 0)
+      result = (fa->index > fb->index) - (fa->index < fb->index);
+   return result;
+}
+
 static void
 _DtSortFiles( 
 	int low,
 	int n,
         DtDirPaths *data )
 {
-   int i, j;
-   int high = low + n;  
+   struct sort_file *files;
+   int i;
 
-   /* 
+   /*
     * This sorting routine needs to be able to sort any portion of
     * an array - it does not always start at element '0'.
     */
-
-   for (i = low; i < (high - 1); i++) 
-      for (j = low; j < (high - 1); j++) 
-#ifndef NO_MESSAGE_CATALOG
-         if ((strcoll (data->paths[j], data->paths[j+1])) > 0)
-#else
-         if ((strcmp  (data->paths[j], data->paths[j+1])) > 0)
-#endif
-	    __swap (j, data);
+   files = (struct sort_file *) malloc (n * sizeof (struct sort_file));
+   if (!files)
+      return;
+   for (i = 0; i < n; i++)
+   {
+      files[i].dir = data->dirs[low + i];
+      files[i].path = data->paths[low + i];
+      files[i].index = i;
+   }
+   qsort (files, n, sizeof (struct sort_file), _DtCompareFiles);
+   for (i = 0; i < n; i++)
+   {
+      data->dirs[low + i] = files[i].dir;
+      data->paths[low + i] = files[i].path;
+   }
+   free (files);
 }
 
 
@@ -610,6 +550,75 @@ _DtSortFiles(
  *
  ******************/
 
+/*
+ * Whether name ends in suffix, comparing characters: the last
+ * DtCharCount(suffix) characters of name must be suffix.  In a
+ * single-byte or UTF-8 locale, with an ASCII suffix, that is the same as
+ * comparing the last bytes (an ASCII byte is always a character there),
+ * which is done without counting characters.
+ */
+static Boolean
+_DtSuffixMatches( const char * name, const char * suffix )
+{
+   size_t nameBytes = strlen (name);
+   size_t suffixBytes = strlen (suffix);
+   const unsigned char * c;
+   char * file_suffix;
+   int suffixLen, nameLen;
+
+   if (nameBytes < suffixBytes)
+      return False;
+
+   for (c = (const unsigned char *) suffix; *c && *c < 0x80; c++)
+      ;
+   if (*c == '\0')
+   {
+      const char * codeset = nl_langinfo (CODESET);
+
+      if (MB_CUR_MAX == 1 ||
+          (codeset && (strcmp (codeset, "UTF-8") == 0 ||
+                       strcmp (codeset, "utf8") == 0)))
+         return memcmp (name + nameBytes - suffixBytes, suffix,
+                        suffixBytes) == 0;
+   }
+
+   /* Get the number of chars (not bytes) in each string */
+   suffixLen = DtCharCount((char *) suffix);
+   nameLen = DtCharCount((char *) name);
+   file_suffix = _DtGetNthChar((char *) name, nameLen - suffixLen);
+   return (file_suffix && (strcmp(file_suffix, suffix) == 0));
+}
+
+Boolean
+_DtDbFileMatches( int dirfd, const char * name, unsigned char d_type,
+                  const char * suffix )
+{
+   struct stat stat_buf;
+   mode_t mode;
+
+   if (!_DtSuffixMatches (name, suffix))
+      return False;
+
+   /*
+    * A directory does not match.  This used to be decided by stat()
+    * (which follows symbolic links) and "st_mode & S_IFDIR"; d_type
+    * gives the same answer without the stat() unless the entry is a
+    * symbolic link or of unknown type.  When stat() fails, the entry
+    * is not a directory.
+    */
+#ifdef DTTOIF
+   if (d_type != DT_UNKNOWN && d_type != DT_LNK)
+      mode = DTTOIF (d_type);
+   else
+#endif
+   if (fstatat (dirfd, name, &stat_buf, 0) == 0)
+      mode = stat_buf.st_mode;
+   else
+      mode = 0;
+
+   return (mode & S_IFDIR) ? False : True;
+}
+
 DtDirPaths * 
 _DtFindMatchingFiles(
         DtDirPaths *dirs,
@@ -627,16 +636,11 @@ _DtFindMatchingFiles(
    DIR *dirp;		/* Variables for walking through the directory
 			   	entries. */
    char * next_file;
-   char *file_suffix;
-   int suffixLen, nameLen;
    int nextIndex;
    char * next_path;
    int files_in_this_directory;
    int base;
-
-   _Xreaddirparams dirEntryBuf;
    struct dirent *result;
-   (void) dirEntryBuf; /* unused unless XTHREADS */
 
 /* CODE */   
    if (dirs == NULL)
@@ -653,55 +657,58 @@ _DtFindMatchingFiles(
    while (dirs->paths[nextIndex] != NULL) {
 
       next_path = dirs->paths[nextIndex];
-      dirp = opendir (next_path);
       base = num_found;
-      
       files_in_this_directory = 0;
-      while ((result = _XReaddir(dirp, dirEntryBuf)) != NULL) {
+
+      if ((dirp = opendir (next_path)) == NULL) {
+         nextIndex++;
+         continue;
+      }
+
+      /* (readdir() is thread-safe on a stream of our own.) */
+      while ((result = readdir(dirp)) != NULL) {
 
 	 /* Check the name to see if it matches the suffix and is
 	    a file. */
-	 if (strlen (result->d_name) >= strlen(suffix)) 
+#ifdef DT_UNKNOWN
+         if (_DtDbFileMatches (dirfd (dirp), result->d_name,
+                               result->d_type, suffix))
+#else
+         if (_DtDbFileMatches (dirfd (dirp), result->d_name,
+                               0, suffix))
+#endif
          {
-	    /* Find the end of the name and compare it to the suffix. */
-            /* Get the number of chars (not bytes) in each string */
-            suffixLen = DtCharCount(suffix);
-            nameLen = DtCharCount(result->d_name);
-            file_suffix = _DtGetNthChar(result->d_name, nameLen - suffixLen);
-            if (file_suffix && (strcmp(file_suffix, suffix) == 0) && 
-                !_DtIsDir((char *)next_path, (char *)result->d_name))
-            {
-	       
+	       size_t nameLen = strlen (result->d_name);
+	       size_t len;
+
 	       /* The file is a match.  See if there is room in the array
 		  or whether we need to realloc.  The "-1" is to save room
 		  for the terminating NULL pointer. */
 	       if (num_found == max_files - 1) {
+		  max_files *= 2;
 		  files->dirs = (char **) XtRealloc ((char *)files->dirs, 
-                     (Cardinal)(sizeof(char *) * (max_files + FILE_INCREMENT)));
+                     (Cardinal)(sizeof(char *) * max_files));
 		  files->paths = (char **) XtRealloc ((char *)files->paths, 
-                     (Cardinal)(sizeof(char *) * (max_files + FILE_INCREMENT)));
-		  max_files += FILE_INCREMENT;
+                     (Cardinal)(sizeof(char *) * max_files));
 	       }
 	       
 	       /* Get some memory and copy the filename to the array. */
+	       len = strlen (dirs->dirs[nextIndex]);
                files->dirs[num_found] = next_file = (char *) 
-                   XtMalloc((Cardinal)(strlen(dirs->dirs[nextIndex]) + 
-                             strlen (result->d_name) + 2));
-	       (void)strcpy(next_file, dirs->dirs[nextIndex]);
-	       (void)strcat(next_file, "/");
-	       (void)strcat(next_file, result->d_name);
+                   XtMalloc((Cardinal)(len + nameLen + 2));
+	       memcpy (next_file, dirs->dirs[nextIndex], len);
+	       next_file[len] = '/';
+	       memcpy (next_file + len + 1, result->d_name, nameLen + 1);
 
+	       len = strlen (next_path);
                files->paths[num_found] = next_file = (char *) 
-                   XtMalloc((Cardinal)(strlen(next_path) + 
-                             strlen (result->d_name) + 2));
-	       (void)strcpy(next_file, next_path);
-	       (void)strcat(next_file, "/");
-	       (void)strcat(next_file, result->d_name);
+                   XtMalloc((Cardinal)(len + nameLen + 2));
+	       memcpy (next_file, next_path, len);
+	       next_file[len] = '/';
+	       memcpy (next_file + len + 1, result->d_name, nameLen + 1);
 	
 	       num_found++;
 	       files_in_this_directory++;
-
-	    }
 	 }
       }
       closedir (dirp);
@@ -713,6 +720,24 @@ _DtFindMatchingFiles(
    files->paths[num_found] = NULL;
    return (files);
    
+}
+
+/*
+ * The database search path as _DtGetDatabaseDirPaths() sees it, before
+ * it drops the directories that do not exist: the DTDATABASESEARCHPATH
+ * value (or the default) with %L and friends substituted.  The dtdbcache
+ * file records it.  The caller XtFree()s the result.
+ */
+char *_DtDbGetDataBaseEnv( void );
+
+char *
+_DtDtsMMSearchPath( void )
+{
+   char *tmp = _DtDbGetDataBaseEnv();
+   char *result = _DtExpandLang (tmp);
+
+   XtFree (tmp);
+   return result;
 }
 
 /******************************************************************************

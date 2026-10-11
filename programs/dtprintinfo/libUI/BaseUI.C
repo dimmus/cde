@@ -93,6 +93,7 @@ BaseUI::BaseUI(BaseUI *parent,
       _active = true;
     }
    _update_message = NULL;
+   _update = true;
    _selected = false;
    _parent = parent;
    _children = NULL;

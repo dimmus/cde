@@ -801,13 +801,13 @@ TemplateCmd::doit()
 	    return;
 	}
 
-	if ((unsigned long) SafeRead(fd, mbuf.buffer, (unsigned int)mbuf.size) < mbuf.size) {
+	if (SafeRead(fd, mbuf.buffer, (size_t) mbuf.size) < (ssize_t) mbuf.size) {
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 1, 217, "Mailer"),
 				     CATGETS(DT_catd, 1, 218, "The template appears to be corrupt."));
 	    char * helpId = DTMAILHELPERROR;
 	    dialog->post_and_return(helpId);
 	    SafeClose(fd);
-	    delete (char*) mbuf.buffer;
+	    delete [] (char*) mbuf.buffer;
 	    free(fullpath);
 	    return;
 	}

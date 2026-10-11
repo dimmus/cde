@@ -129,6 +129,8 @@ static void ButtonCB(
                         XtPointer call_data) ;
 static void GetColors( void ) ;
 static void FreeAll( void ) ;
+static Pixmap GetBitmap( int i ) ;
+static Boolean LooksLikeImage( const char *path ) ;
 static void _DtMapCB( 
                         Widget w,
                         XtPointer client_data,
@@ -152,15 +154,18 @@ typedef struct {
     char   **dirList;
     int      dirCount;
     char   **tmpBitmapNames;
+    char    *tmpKnownImage;     /* file header says it is an image */
     int      tmpNumBitmaps;
     int      tmpMaxNumBitmaps;
     char   **bitmapNames;
     char   **bitmapDescs;
-    Pixmap  *bitmaps;
+    Pixmap  *bitmaps;           /* None until first needed */
+    Pixel   *bitmapFg, *bitmapBg; /* colours bitmaps[i] was made with */
     int      numBitmaps;
     int      maxNumBitmaps;
     int      selected;
     GC       gc;
+    Pixmap   gcTile;            /* tile currently set in gc */
     int      width, height;
     int      shadow;
     Pixel    fg, bg;
@@ -383,10 +388,13 @@ CreateBackdropDialog(
     /* initialize backdrop data */
     backdrops.bitmapNames = NULL;
     backdrops.bitmaps = NULL;
+    backdrops.bitmapFg = NULL;
+    backdrops.bitmapBg = NULL;
     backdrops.numBitmaps = 0;
     backdrops.maxNumBitmaps = 100;
     backdrops.selected = -1;
     backdrops.gc = NULL;
+    backdrops.gcTile = None;
     backdrops.errStr = NULL;
     backdrops.shadow = 2;
     backdrops.width = 200 - 2*backdrops.shadow;
@@ -598,6 +606,10 @@ MoreBitmaps( void )
     newSize =  (backdrops.maxNumBitmaps + 100) * sizeof(Pixmap);
     backdrops.bitmaps = (Pixmap *)XtRealloc((char *)backdrops.bitmaps, newSize);
 
+    newSize =  (backdrops.maxNumBitmaps + 100) * sizeof(Pixel);
+    backdrops.bitmapFg = (Pixel *)XtRealloc((char *)backdrops.bitmapFg, newSize);
+    backdrops.bitmapBg = (Pixel *)XtRealloc((char *)backdrops.bitmapBg, newSize);
+
     backdrops.maxNumBitmaps += 100;
 }
 
@@ -606,10 +618,12 @@ MoreBitmaps( void )
  * qsort() sort function, used for sorting bitmap names into alphabetical order
  * can't use strcmp() due to char** rather than char*
  ************************************************************************/
+typedef struct { char *name; char known; } NameEntry;
+
 static int
-cmpstringp(const void *p1, const void *p2)
+cmpnameentry(const void *p1, const void *p2)
 {
-  return strcmp(*(char * const *) p1, *(char * const *) p2);
+  return strcmp(((const NameEntry *) p1)->name, ((const NameEntry *) p2)->name);
 }
 
 /************************************************************************
@@ -629,6 +643,7 @@ static int
   char          *string;
   /* allocate space for temporary bitmap info */
   backdrops.tmpBitmapNames = (char **)XtCalloc(100, sizeof(char *));
+  backdrops.tmpKnownImage = (char *)XtCalloc(100, sizeof(char));
   backdrops.tmpMaxNumBitmaps = 100;
   backdrops.tmpNumBitmaps = 0;
   
@@ -667,8 +682,21 @@ static int
       return 0;
     }
 
-  /* Sort the list into alphanetical order */
-  qsort(backdrops.tmpBitmapNames, backdrops.tmpNumBitmaps, sizeof(char *), cmpstringp);
+  /* Sort the list into alphanetical order (names and flags together) */
+  {
+    NameEntry *e = (NameEntry *)XtMalloc(backdrops.tmpNumBitmaps * sizeof(NameEntry));
+
+    for (i = 0; i < backdrops.tmpNumBitmaps; i++) {
+      e[i].name = backdrops.tmpBitmapNames[i];
+      e[i].known = backdrops.tmpKnownImage[i];
+    }
+    qsort(e, backdrops.tmpNumBitmaps, sizeof(NameEntry), cmpnameentry);
+    for (i = 0; i < backdrops.tmpNumBitmaps; i++) {
+      backdrops.tmpBitmapNames[i] = e[i].name;
+      backdrops.tmpKnownImage[i] = e[i].known;
+    }
+    XtFree((char *)e);
+  }
   
   /* get the fg/bg colors from Dtwm */
   if (backdrops.newColors)
@@ -699,8 +727,12 @@ static int
 
 /************************************************************************
  *   CreatePixmaps()
- *           Create the pixmpas in the backdrop list
-             with workprocs 10 at a time
+ *           Build the list of usable backdrops.  Files whose header shows
+ *           a format XmGetPixmap reads are listed without being loaded;
+ *           their pixmaps are made on first use (GetBitmap).  Anything
+ *           else is only listed if XmGetPixmap can load it, as before.
+ *           (This used to load every backdrop into a server pixmap each
+ *           time the dialog was created.)
  ************************************************************************/
 static Boolean
 CreatePixmaps( void )
@@ -712,14 +744,19 @@ CreatePixmaps( void )
     backdrops.numBitmaps = 0;
 
     /* allocate space for real bitmap info */
-    backdrops.bitmapNames = (char **)XtCalloc(100, sizeof(char *));
-    backdrops.bitmaps = (Pixmap *)XtCalloc(100, sizeof(Pixmap));
+    backdrops.bitmapNames = (char **)XtCalloc(backdrops.maxNumBitmaps, sizeof(char *));
+    backdrops.bitmaps = (Pixmap *)XtCalloc(backdrops.maxNumBitmaps, sizeof(Pixmap));
+    backdrops.bitmapFg = (Pixel *)XtCalloc(backdrops.maxNumBitmaps, sizeof(Pixel));
+    backdrops.bitmapBg = (Pixel *)XtCalloc(backdrops.maxNumBitmaps, sizeof(Pixel));
 
     for (i=0; i<backdrops.tmpNumBitmaps; i++)
     {
-        tmpPixmap = XmGetPixmap (style.screen, 
-                                 backdrops.tmpBitmapNames[i], 
-                                 backdrops.fg, backdrops.bg); 
+        if (backdrops.tmpKnownImage[i])
+            tmpPixmap = None;           /* load it when it is shown */
+        else
+            tmpPixmap = XmGetPixmap (style.screen, 
+                                     backdrops.tmpBitmapNames[i], 
+                                     backdrops.fg, backdrops.bg); 
         if (tmpPixmap != XmUNSPECIFIED_PIXMAP)
         {
             if (backdrops.numBitmaps == backdrops.maxNumBitmaps)
@@ -728,6 +765,8 @@ CreatePixmaps( void )
             backdrops.bitmapNames[backdrops.numBitmaps] = 
                     backdrops.tmpBitmapNames[i];
             backdrops.bitmaps[backdrops.numBitmaps] = tmpPixmap;
+            backdrops.bitmapFg[backdrops.numBitmaps] = backdrops.fg;
+            backdrops.bitmapBg[backdrops.numBitmaps] = backdrops.bg;
  
             backdrops.numBitmaps++;
         }
@@ -738,6 +777,80 @@ CreatePixmaps( void )
     else
         return(False);
 
+}
+
+
+/************************************************************************
+ *   GetBitmap()
+ *           Pixmap for backdrop i in the current colours, made (or
+ *           remade after a colour change) on demand.  May be
+ *           XmUNSPECIFIED_PIXMAP if the file cannot be loaded after all.
+ ************************************************************************/
+static Pixmap
+GetBitmap( int i )
+{
+    Pixmap pix = backdrops.bitmaps[i];
+
+    if (pix != None &&
+        backdrops.bitmapFg[i] == backdrops.fg &&
+        backdrops.bitmapBg[i] == backdrops.bg)
+        return pix;
+
+    if (pix != None && pix != XmUNSPECIFIED_PIXMAP)
+        XmDestroyPixmap(style.screen, pix);
+
+    pix = XmGetPixmap(style.screen, backdrops.bitmapNames[i],
+                      backdrops.fg, backdrops.bg);
+    backdrops.bitmaps[i] = pix;
+    backdrops.bitmapFg[i] = backdrops.fg;
+    backdrops.bitmapBg[i] = backdrops.bg;
+    return pix;
+}
+
+
+/************************************************************************
+ *   LooksLikeImage()
+ *           True if the file starts like an XPM, XBM, PNG or JPEG image.
+ ************************************************************************/
+static Boolean
+LooksLikeImage( const char *path )
+{
+    unsigned char buf[256];
+    FILE *fp;
+    size_t n, i;
+
+    if ((fp = fopen(path, "r")) == NULL)
+        return False;
+    n = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[n] = '\0';
+
+    if (n >= 8 && memcmp(buf, "\211PNG\r\n\032\n", 8) == 0)
+        return True;
+    if (n >= 3 && buf[0] == 0xFF && buf[1] == 0xD8 && buf[2] == 0xFF)
+        return True;
+    if (strncmp((char *)buf, "/* XPM */", 9) == 0)
+        return True;
+
+    /* XBM: "#define", possibly after white space and C comments */
+    i = 0;
+    for (;;)
+    {
+        while (i < n && (buf[i] == ' ' || buf[i] == '\t' ||
+                         buf[i] == '\n' || buf[i] == '\r'))
+            i++;
+        if (i + 1 < n && buf[i] == '/' && buf[i+1] == '*')
+        {
+            char *end = strstr((char *)buf + i + 2, "*/");
+
+            if (end == NULL)
+                return False;
+            i = (end - (char *)buf) + 2;
+            continue;
+        }
+        break;
+    }
+    return strncmp((char *)buf + i, "#define", 7) == 0;
 }
 
 
@@ -829,12 +942,16 @@ ReadBitmapDirectory(
                 newSize =  (backdrops.tmpMaxNumBitmaps + 100) * sizeof(char *);
                 backdrops.tmpBitmapNames = 
                     (char **)XtRealloc((char *)backdrops.tmpBitmapNames, newSize);
+                backdrops.tmpKnownImage = (char *)XtRealloc(
+                    backdrops.tmpKnownImage, backdrops.tmpMaxNumBitmaps + 100);
                 backdrops.tmpMaxNumBitmaps += 100;
             }
 
             backdrops.tmpBitmapNames[backdrops.tmpNumBitmaps] = 
                 (char *) XtMalloc(strlen(name)+1);
             strcpy (backdrops.tmpBitmapNames[backdrops.tmpNumBitmaps], name);
+            backdrops.tmpKnownImage[backdrops.tmpNumBitmaps] =
+                LooksLikeImage(statPath);
 
             backdrops.tmpNumBitmaps++;
         }
@@ -862,32 +979,48 @@ DrawBitmap(
         XtPointer call_data )
 {
     XGCValues     gcValues;
+    Pixmap        tile;
         
-    if (backdrops.selected == -1)
+    if (backdrops.selected == -1 || !XtIsRealized(w))
         return;
 
     if (backdrops.newColors)
     {
+        /* Workspace changed: fetch its colours once.  Pixmaps made with
+           other colours are remade as they are shown (GetBitmap). */
         GetColors();
-
-        /* we could keep track of which tile pixmaps need to be updated
-           since the last workspace change, but for now simply regenerate 
-           each pixmap as it is selected after a workspace change has 
-           occurred */
-
-        /* backdrops.newColors = False; */
+        backdrops.newColors = False;
     }
+
+    tile = GetBitmap(backdrops.selected);
 
     if (backdrops.gc == NULL)
     {
         gcValues.background = backdrops.bg;
         gcValues.foreground = backdrops.fg;
-        gcValues.fill_style = FillTiled;
-        gcValues.tile = backdrops.bitmaps[backdrops.selected];
-
         backdrops.gc = XCreateGC (style.display, XtWindow(w), 
-                                GCForeground | GCBackground | 
-                                GCTile | GCFillStyle, &gcValues);
+                                GCForeground | GCBackground, &gcValues);
+        backdrops.gcTile = None;
+    }
+
+    if (tile != backdrops.gcTile)
+    {
+        if (tile != XmUNSPECIFIED_PIXMAP)
+        {
+            gcValues.fill_style = FillTiled;
+            gcValues.tile = tile;
+            XChangeGC (style.display, backdrops.gc, GCFillStyle | GCTile,
+                       &gcValues);
+        }
+        else
+        {
+            /* could not be loaded: show the background colour */
+            gcValues.fill_style = FillSolid;
+            gcValues.foreground = backdrops.bg;
+            XChangeGC (style.display, backdrops.gc,
+                       GCFillStyle | GCForeground, &gcValues);
+        }
+        backdrops.gcTile = tile;
     }
 
     XFillRectangle (style.display, XtWindow(w), backdrops.gc, backdrops.shadow,
@@ -1009,9 +1142,6 @@ ListCB(
 
     backdrops.selected = cb->item_position - 1;
 
-    XSetTile (style.display, backdrops.gc, 
-	      backdrops.bitmaps[backdrops.selected]);
-
     DrawBitmap (backdrops.drawnButton, NULL, NULL);
 }
 
@@ -1055,7 +1185,7 @@ ButtonCB(
 
           _DtWsmChangeBackdrop(style.display, style.root, 
                              backdrops.bitmapNames[num], 
-                             backdrops.bitmaps[num],
+                             GetBitmap(num),
                              imageType);
           break;
 
@@ -1066,7 +1196,7 @@ ButtonCB(
 
           _DtWsmChangeBackdrop(style.display, style.root,
                              backdrops.bitmapNames[num],
-                             backdrops.bitmaps[num],
+                             GetBitmap(num),
                              imageType);
           XtUnmanageChild(w);
           break;
@@ -1133,21 +1263,10 @@ GetColors( void )
     {
         gcValues.background = backdrops.bg;
         gcValues.foreground = backdrops.fg;
-
-        /* free old pixmap */
-        XmDestroyPixmap(style.screen, 
-                        backdrops.bitmaps[backdrops.selected]);
-
-        /* allocate new pixmap */
-        backdrops.bitmaps[backdrops.selected] = 
-            XmGetPixmap (style.screen, 
-                         backdrops.bitmapNames[backdrops.selected], 
-                         backdrops.fg, backdrops.bg); 
-
-        gcValues.tile = backdrops.bitmaps[backdrops.selected];
-
-        XChangeGC (style.display, backdrops.gc, 
-                   GCForeground | GCBackground | GCTile, &gcValues);
+        XChangeGC (style.display, backdrops.gc,
+                   GCForeground | GCBackground, &gcValues);
+        /* DrawBitmap sets the tile, remade in the new colours */
+        backdrops.gcTile = None;
     }
 }
 
@@ -1169,15 +1288,18 @@ FreeAll( void )
         if (backdrops.tmpBitmapNames[i]) 
             XtFree(backdrops.tmpBitmapNames[i]);
     XtFree ((char *)backdrops.tmpBitmapNames);
+    XtFree (backdrops.tmpKnownImage);
     XtFree ((char *)backdrops.bitmapNames);
 
-    /* free backdrop bitmaps */
+    /* free backdrop bitmaps (the array used to be freed inside this loop) */
     for (i = 0; i < backdrops.numBitmaps; i++) {
-        if (backdrops.bitmaps[i]) 
-            XFreePixmap (style.display, backdrops.bitmaps[i]);
-    if (backdrops.numBitmaps)
-        XtFree((char *)backdrops.bitmaps);  
+        if (backdrops.bitmaps[i] != None &&
+            backdrops.bitmaps[i] != XmUNSPECIFIED_PIXMAP)
+            XmDestroyPixmap (style.screen, backdrops.bitmaps[i]);
     }
+    XtFree((char *)backdrops.bitmaps);
+    XtFree((char *)backdrops.bitmapFg);
+    XtFree((char *)backdrops.bitmapBg);
 
     /* destory widgets (via first parent) */
     XtDestroyWidget (XtParent(style.backdropDialog));

@@ -20,10 +20,10 @@ DTTYPES = autoStart.dt user-prefs.dt uxstd.dt dt.dt develop.dt		\
 	xournal.dt caja.dt engrampa.dt file-roller.dt firestarter.dt	\
 	pgadmin.dt synaptic.dt System.dt virtualbox.dt wicd.dt		\
 	acroread.dt emacs.dt gv.dt kile.dt mgv.dt TeX.dt xdvi.dt	\
-	xournal.dt xpdf.dt
+	xpdf.dt
 
 BUILT_SOURCES = $(DTTYPES) action
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 # we do not want to install 'action'
 typesdir = $(CDE_INSTALLATION_TOP)/appconfig/types/$(LANG)
@@ -35,283 +35,283 @@ MERGE = $(top_builddir)/programs/localized/util/merge
 # This isn't really an action/type - it's an executable placeholder
 # used by and for appmanager.
 action: $(TOP)/types/action action.tmsg
-	$(MERGE) -lang $(LANG) action.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) action.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 autoStart.dt: $(TOP)/types/autoStart.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 user-prefs.dt: $(TOP)/types/user-prefs.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 uxstd.dt: $(TOP)/types/uxstd.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dt.dt: $(TOP)/types/dt.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 develop.dt: $(TOP)/types/develop.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 datatypes.dt: $(TOP)/types/datatypes.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtappman.dt: $(TOP)/types/dtappman.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtfile.dt: $(TOP)/types/dtfile.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtims.dt: $(TOP)/types/dtims.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtinfo.dt: $(TOP)/types/dtinfo.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtpad.dt: $(TOP)/types/dtpad.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xclients.dt: $(TOP)/types/xclients.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dthelp.dt: $(TOP)/types/dthelp.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dthelpprint.dt: $(TOP)/types/dthelpprint.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 print.dt: $(TOP)/types/print.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dthelptag.dt: $(TOP)/types/dthelptag.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtmail.dt: $(TOP)/types/dtmail.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtwm.fp: $(TOP)/types/dtwm.fp _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtscreen.dt: $(TOP)/types/dtscreen.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtcm.dt: $(TOP)/types/dtcm.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dtbuilder.dt: $(TOP)/types/dtbuilder.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 miscActions.dt: $(TOP)/types/miscActions.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 miscImages.dt: $(TOP)/types/miscImages.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 IconBrowse.dt: $(TOP)/types/IconBrowse.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 DisplayImage.dt: $(TOP)/types/DisplayImage.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 DisplayPDF.dt: $(TOP)/types/DisplayPDF.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 DisplayVideo.dt: $(TOP)/types/DisplayVideo.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 DisplayPS.dt: $(TOP)/types/DisplayPS.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 acroread.dt: $(TOP)/types/acroread.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 videoTypes.dt: $(TOP)/types/videoTypes.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 amarok.dt: $(TOP)/types/amarok.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 brasero.dt: $(TOP)/types/brasero.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 caja.dt: $(TOP)/types/caja.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 chromium.dt: $(TOP)/types/chromium.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 dreamchess.dt: $(TOP)/types/dreamchess.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 eboard.dt: $(TOP)/types/eboard.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Education.dt: $(TOP)/types/Education.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 emacs.dt: $(TOP)/types/emacs.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 engrampa.dt: $(TOP)/types/engrampa.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 file-roller.dt: $(TOP)/types/file-roller.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 firefox.dt: $(TOP)/types/firefox.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 firestarter.dt: $(TOP)/types/firestarter.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 fontforge.dt: $(TOP)/types/fontforge.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Games.dt: $(TOP)/types/Games.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 gcompris.dt: $(TOP)/types/gcompris.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 geogebra.dt: $(TOP)/types/geogebra.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 gimp.dt: $(TOP)/types/gimp.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Graphics.dt: $(TOP)/types/Graphics.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 gv.dt: $(TOP)/types/gv.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 inkscape.dt: $(TOP)/types/inkscape.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Internet.dt: $(TOP)/types/Internet.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 k3b.dt: $(TOP)/types/k3b.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 k9copy.dt: $(TOP)/types/k9copy.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 kile.dt: $(TOP)/types/kile.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 ktuberling.dt: $(TOP)/types/ktuberling.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 lbreakout2.dt: $(TOP)/types/lbreakout2.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-base.dt: $(TOP)/types/libreoffice-base.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-calc.dt: $(TOP)/types/libreoffice-calc.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-draw.dt: $(TOP)/types/libreoffice-draw.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-impress.dt: $(TOP)/types/libreoffice-impress.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-main.dt: $(TOP)/types/libreoffice-main.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-math.dt: $(TOP)/types/libreoffice-math.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 libreoffice-writer.dt: $(TOP)/types/libreoffice-writer.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Media_Tools.dt: $(TOP)/types/Media_Tools.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 mgv.dt: $(TOP)/types/mgv.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 nedit.dt: $(TOP)/types/nedit.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 nxclient.dt: $(TOP)/types/nxclient.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Office.dt: $(TOP)/types/Office.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 okular.dt: $(TOP)/types/okular.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 pavucontrol.dt: $(TOP)/types/pavucontrol.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 pgadmin.dt: $(TOP)/types/pgadmin.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 powermanga.dt: $(TOP)/types/powermanga.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 pychess.dt: $(TOP)/types/pychess.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 rhythmbox.dt: $(TOP)/types/rhythmbox.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 rosegarden.dt: $(TOP)/types/rosegarden.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 skype.dt: $(TOP)/types/skype.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 sound-juicer.dt: $(TOP)/types/sound-juicer.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 stellarium.dt: $(TOP)/types/stellarium.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 supertux.dt: $(TOP)/types/supertux.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 synaptic.dt: $(TOP)/types/synaptic.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 System.dt: $(TOP)/types/System.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 TeX.dt: $(TOP)/types/TeX.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 thunderbird.dt: $(TOP)/types/thunderbird.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 tuxpaint.dt: $(TOP)/types/tuxpaint.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 virtualbox.dt: $(TOP)/types/virtualbox.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 vlc.dt: $(TOP)/types/vlc.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 wicd.dt: $(TOP)/types/wicd.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xboard.dt: $(TOP)/types/xboard.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xdvi.dt: $(TOP)/types/xdvi.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xine.dt: $(TOP)/types/xine.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xournal.dt: $(TOP)/types/xournal.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xpdf.dt: $(TOP)/types/xpdf.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 xv.dt: $(TOP)/types/xv.dt _common.dt.tmsg
-	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) _common.dt.tmsg < $< > $@.tmp && mv -f $@.tmp $@

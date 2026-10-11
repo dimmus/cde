@@ -128,6 +128,7 @@ typedef	struct _sdlVolume {
 				   when the title was read              */
     short      minor_no;	/* The minor number of the sdl version */
     short      title_processed;	/* If the title has already been searched for */
+    void      *id_index;	/* hash index of the loids (AccessSDL.c) */
 
 } CESDLVolume;
 

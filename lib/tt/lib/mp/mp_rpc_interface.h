@@ -75,15 +75,15 @@ const int	TT_CONTEXTS_XDR_VERSION		= 3;
 const int	TT_PUSH_ROTATE_XDR_VERSION	= 4;
 
 /* 
- * Default timeout for RPC requests (in seconds).
- * Use a very large value to indicate almost infinity.
- * In addition to accommodating a loaded ttsession, it will also
- * facilitate debugging.  
- * ONE HUNDRED MILLION IS THE MAXIMUM PERMITTED VALUE
- * ON SunOS 4.1.  Use ONE MILLION to leave room for possible weird system
- * dependencies.  That will still allow the sender to wait a patient 11.6 days.
+ * Default timeout for synchronous RPC requests (in seconds).
+ * This used to be 1000000 (11.6 days), so a wedged ttsession hung every
+ * client forever.  ttsession serves these requests without blocking on
+ * anything else, so a bounded wait is enough; a session that does not
+ * answer within it is reported as TT_ERR_NOMP.  Set TT_RPC_TIMEOUT
+ * (seconds) in the environment to wait longer, e.g. while debugging
+ * ttsession.
  */
-#define TT_RPC_TMOUT		1000000
+#define TT_RPC_TMOUT		10
 
 /*
  * RPC procedure numbers

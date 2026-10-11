@@ -39,6 +39,25 @@
 
 #include "db/db_server.h"
 
+//
+// xdr_string() for the strings in these messages.  The server leaves
+// some result strings NULL (a property, otype, file or forward
+// pointer it did not find, a failed netfile mapping).  XDR has no NULL
+// string: some xdr_string() implementations fail the whole reply,
+// others (libtirpc) call strlen(NULL) and crash rpc.ttdbserver.  So
+// encode NULL as "", the only form such a value can take on the wire.
+//
+static bool_t
+xdr_tt_cstring(XDR *xdrs, char **sp, u_int maxsize)
+{
+	if (xdrs->x_op == XDR_ENCODE && *sp == NULL) {
+		char empty[1] = "";
+		char *ep = empty;
+		return xdr_string(xdrs, &ep, maxsize);
+	}
+	return xdr_string(xdrs, sp, maxsize);
+}
+
 bool_t
 xdr_keypart(XDR *xdrs, keypart *objp)
 {
@@ -98,7 +117,7 @@ xdr_Tt_isaddindex_args(XDR *xdrs, _Tt_isaddindex_args *objp)
 bool_t
 xdr_Tt_isbuild_args(XDR *xdrs, _Tt_isbuild_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->path, 1024)) {
+	if (!xdr_tt_cstring(xdrs, &objp->path, 1024)) {
 		return (FALSE);
 	}
 	if (!xdr_int(xdrs, &objp->reclen)) {
@@ -165,7 +184,7 @@ xdr_Tt_isdelrec_args(XDR *xdrs, _Tt_isdelrec_args *objp)
 bool_t
 xdr_Tt_isopen_args(XDR *xdrs, _Tt_isopen_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->path, 1024)) {
+	if (!xdr_tt_cstring(xdrs, &objp->path, 1024)) {
 		return (FALSE);
 	}
 	if (!xdr_int(xdrs, &objp->mode)) {
@@ -288,7 +307,7 @@ xdr_Tt_test_and_set_results(XDR *xdrs, _Tt_test_and_set_results *objp)
 
 bool_t xdr_tt_file_netfile_args(XDR * xdrs, _tt_file_netfile_args * argp)
 {
-        if (!xdr_string(xdrs, &argp->file_or_netfile, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &argp->file_or_netfile, ~0)) {
                 return (FALSE);
         }
 	return (TRUE);
@@ -297,7 +316,7 @@ bool_t xdr_tt_file_netfile_args(XDR * xdrs, _tt_file_netfile_args * argp)
 bool_t
 xdr_tt_file_netfile_results(XDR * xdrs, _tt_file_netfile_results * argp)
 {
-        if (!xdr_string(xdrs, &argp->result_string, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &argp->result_string, ~0)) {
                 return (FALSE);
         }
         if (!xdr_tt_db_results(xdrs, &argp->results)) {
@@ -473,7 +492,7 @@ xdr_tt_db_results(XDR *xdrs, _tt_db_results *objp)
 bool_t
 xdr_tt_string(XDR *xdrs, _tt_string *objp)
 {
-	if (!xdr_string(xdrs, &objp->value, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->value, ~0)) {
 		return (FALSE);
 	}
 	return (TRUE);
@@ -491,7 +510,7 @@ xdr_tt_property_value(XDR *xdrs, _tt_property_value *objp)
 bool_t
 xdr_tt_property(XDR *xdrs, _tt_property *objp)
 {
-	if (!xdr_string(xdrs, &objp->name, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->name, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->values.values_val, (u_int *)&objp->values.values_len, ~0, sizeof(_tt_property_value), (xdrproc_t)xdr_tt_property_value)) {
@@ -527,7 +546,7 @@ xdr_tt_message(XDR *xdrs, _tt_message *objp)
 bool_t
 xdr_tt_create_file_args(XDR *xdrs, _tt_create_file_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->properties.properties_val, (u_int *)&objp->properties.properties_len, ~0, sizeof(_tt_property), (xdrproc_t)xdr_tt_property)) {
@@ -542,13 +561,13 @@ xdr_tt_create_file_args(XDR *xdrs, _tt_create_file_args *objp)
 bool_t
 xdr_tt_create_obj_args(XDR *xdrs, _tt_create_obj_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->otype, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->otype, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->properties.properties_val, (u_int *)&objp->properties.properties_len, ~0, sizeof(_tt_property), (xdrproc_t)xdr_tt_property)) {
@@ -563,7 +582,7 @@ xdr_tt_create_obj_args(XDR *xdrs, _tt_create_obj_args *objp)
 bool_t   
 xdr_tt_remove_file_args(XDR *xdrs, _tt_remove_file_args *objp)
 {
-        if (!xdr_string(xdrs, &objp->file, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
                 return (FALSE);
         }
         if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -575,10 +594,10 @@ xdr_tt_remove_file_args(XDR *xdrs, _tt_remove_file_args *objp)
 bool_t
 xdr_tt_remove_obj_args(XDR *xdrs, _tt_remove_obj_args *objp)
 {
-        if (!xdr_string(xdrs, &objp->objid, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
                 return (FALSE);
         }
-        if (!xdr_string(xdrs, &objp->forward_pointer, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->forward_pointer, ~0)) {
                 return (FALSE);
         }
         if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -590,10 +609,10 @@ xdr_tt_remove_obj_args(XDR *xdrs, _tt_remove_obj_args *objp)
 bool_t
 xdr_tt_move_file_args(XDR *xdrs, _tt_move_file_args *objp)
 {
-        if (!xdr_string(xdrs, &objp->file, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
                 return (FALSE);
         }
-        if (!xdr_string(xdrs, &objp->new_file, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->new_file, ~0)) {
                 return (FALSE);
         }
         if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -605,7 +624,7 @@ xdr_tt_move_file_args(XDR *xdrs, _tt_move_file_args *objp)
 bool_t
 xdr_tt_set_file_prop_args(XDR *xdrs, _tt_set_file_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_property(xdrs, &objp->property)) {
@@ -620,7 +639,7 @@ xdr_tt_set_file_prop_args(XDR *xdrs, _tt_set_file_prop_args *objp)
 bool_t
 xdr_tt_set_file_props_args(XDR *xdrs, _tt_set_file_props_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->properties.properties_val, (u_int *)&objp->properties.properties_len, ~0, sizeof(_tt_property), (xdrproc_t)xdr_tt_property)) {
@@ -635,7 +654,7 @@ xdr_tt_set_file_props_args(XDR *xdrs, _tt_set_file_props_args *objp)
 bool_t
 xdr_tt_add_file_prop_args(XDR *xdrs, _tt_add_file_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_property(xdrs, &objp->property)) {
@@ -653,7 +672,7 @@ xdr_tt_add_file_prop_args(XDR *xdrs, _tt_add_file_prop_args *objp)
 bool_t
 xdr_tt_del_file_prop_args(XDR *xdrs, _tt_del_file_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_property(xdrs, &objp->property)) {
@@ -668,10 +687,10 @@ xdr_tt_del_file_prop_args(XDR *xdrs, _tt_del_file_prop_args *objp)
 bool_t
 xdr_tt_get_file_prop_args(XDR *xdrs, _tt_get_file_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->name, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->name, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -686,7 +705,7 @@ xdr_tt_get_file_prop_args(XDR *xdrs, _tt_get_file_prop_args *objp)
 bool_t
 xdr_tt_get_file_props_args(XDR *xdrs, _tt_get_file_props_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -701,7 +720,7 @@ xdr_tt_get_file_props_args(XDR *xdrs, _tt_get_file_props_args *objp)
 bool_t
 xdr_tt_get_file_objs_args(XDR *xdrs, _tt_get_file_objs_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -716,7 +735,7 @@ xdr_tt_get_file_objs_args(XDR *xdrs, _tt_get_file_objs_args *objp)
 bool_t
 xdr_tt_set_file_access_args(XDR *xdrs, _tt_set_file_access_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->new_access)) {
@@ -731,7 +750,7 @@ xdr_tt_set_file_access_args(XDR *xdrs, _tt_set_file_access_args *objp)
 bool_t
 xdr_tt_get_file_access_args(XDR *xdrs, _tt_get_file_access_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -743,7 +762,7 @@ xdr_tt_get_file_access_args(XDR *xdrs, _tt_get_file_access_args *objp)
 bool_t
 xdr_tt_set_obj_prop_args(XDR *xdrs, _tt_set_obj_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_property(xdrs, &objp->property)) {
@@ -761,7 +780,7 @@ xdr_tt_set_obj_prop_args(XDR *xdrs, _tt_set_obj_prop_args *objp)
 bool_t
 xdr_tt_set_obj_props_args(XDR *xdrs, _tt_set_obj_props_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->properties.properties_val, (u_int *)&objp->properties.properties_len, ~0, sizeof(_tt_property), (xdrproc_t)xdr_tt_property)) {
@@ -779,7 +798,7 @@ xdr_tt_set_obj_props_args(XDR *xdrs, _tt_set_obj_props_args *objp)
 bool_t
 xdr_tt_add_obj_prop_args(XDR *xdrs, _tt_add_obj_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_property(xdrs, &objp->property)) {
@@ -800,7 +819,7 @@ xdr_tt_add_obj_prop_args(XDR *xdrs, _tt_add_obj_prop_args *objp)
 bool_t
 xdr_tt_del_obj_prop_args(XDR *xdrs, _tt_del_obj_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_property(xdrs, &objp->property)) {
@@ -818,10 +837,10 @@ xdr_tt_del_obj_prop_args(XDR *xdrs, _tt_del_obj_prop_args *objp)
 bool_t
 xdr_tt_get_obj_prop_args(XDR *xdrs, _tt_get_obj_prop_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->name, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->name, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -836,7 +855,7 @@ xdr_tt_get_obj_prop_args(XDR *xdrs, _tt_get_obj_prop_args *objp)
 bool_t
 xdr_tt_get_obj_props_args(XDR *xdrs, _tt_get_obj_props_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -851,10 +870,10 @@ xdr_tt_get_obj_props_args(XDR *xdrs, _tt_get_obj_props_args *objp)
 bool_t
 xdr_tt_set_obj_type_args(XDR *xdrs, _tt_set_obj_type_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->otype, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->otype, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -866,7 +885,7 @@ xdr_tt_set_obj_type_args(XDR *xdrs, _tt_set_obj_type_args *objp)
 bool_t
 xdr_tt_get_obj_type_args(XDR *xdrs, _tt_get_obj_type_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -878,10 +897,10 @@ xdr_tt_get_obj_type_args(XDR *xdrs, _tt_get_obj_type_args *objp)
 bool_t
 xdr_tt_set_obj_file_args(XDR *xdrs, _tt_set_obj_file_args *objp)
 {
-        if (!xdr_string(xdrs, &objp->objid, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
                 return (FALSE);
         }
-        if (!xdr_string(xdrs, &objp->file, ~0)) {
+        if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
                 return (FALSE);
         }
         if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -893,7 +912,7 @@ xdr_tt_set_obj_file_args(XDR *xdrs, _tt_set_obj_file_args *objp)
 bool_t
 xdr_tt_get_obj_file_args(XDR *xdrs, _tt_get_obj_file_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -905,7 +924,7 @@ xdr_tt_get_obj_file_args(XDR *xdrs, _tt_get_obj_file_args *objp)
 bool_t
 xdr_tt_set_obj_access_args(XDR *xdrs, _tt_set_obj_access_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->new_access)) {
@@ -920,7 +939,7 @@ xdr_tt_set_obj_access_args(XDR *xdrs, _tt_set_obj_access_args *objp)
 bool_t
 xdr_tt_get_obj_access_args(XDR *xdrs, _tt_get_obj_access_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -932,7 +951,7 @@ xdr_tt_get_obj_access_args(XDR *xdrs, _tt_get_obj_access_args *objp)
 bool_t
 xdr_tt_is_file_in_db_args(XDR *xdrs, _tt_is_file_in_db_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -944,7 +963,7 @@ xdr_tt_is_file_in_db_args(XDR *xdrs, _tt_is_file_in_db_args *objp)
 bool_t
 xdr_tt_is_obj_in_db_args(XDR *xdrs, _tt_is_obj_in_db_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->objid, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->objid, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_access(xdrs, &objp->access)) {
@@ -956,7 +975,7 @@ xdr_tt_is_obj_in_db_args(XDR *xdrs, _tt_is_obj_in_db_args *objp)
 bool_t
 xdr_tt_queue_msg_args(XDR *xdrs, _tt_queue_msg_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->ptypes.values_val, (u_int *)&objp->ptypes.values_len, ~0, sizeof(_tt_string), (xdrproc_t)xdr_tt_string)) {
@@ -971,7 +990,7 @@ xdr_tt_queue_msg_args(XDR *xdrs, _tt_queue_msg_args *objp)
 bool_t
 xdr_tt_dequeue_msgs_args(XDR *xdrs, _tt_dequeue_msgs_args *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_array(xdrs, (char **)&objp->ptypes.values_val, (u_int *)&objp->ptypes.values_len, ~0, sizeof(_tt_string), (xdrproc_t)xdr_tt_string)) {
@@ -1007,10 +1026,10 @@ xdr_tt_auth_level_results(XDR *xdrs, _tt_auth_level_results *objp)
 bool_t
 xdr_tt_file_partition_results(XDR *xdrs, _tt_file_partition_results *objp)
 {
-	if (!xdr_string(xdrs, &objp->partition, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->partition, ~0)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->network_path, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->network_path, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_db_results(xdrs, &objp->results)) {
@@ -1082,7 +1101,7 @@ xdr_tt_obj_prop_results(XDR *xdrs, _tt_obj_prop_results *objp)
 	if (!xdr_tt_property(xdrs, &objp->property)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_int(xdrs, &objp->cache_level)) {
@@ -1100,7 +1119,7 @@ xdr_tt_obj_props_results(XDR *xdrs, _tt_obj_props_results *objp)
 	if (!xdr_array(xdrs, (char **)&objp->properties.properties_val, (u_int *)&objp->properties.properties_len, ~0, sizeof(_tt_property), (xdrproc_t)xdr_tt_property)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_int(xdrs, &objp->cache_level)) {
@@ -1115,7 +1134,7 @@ xdr_tt_obj_props_results(XDR *xdrs, _tt_obj_props_results *objp)
 bool_t
 xdr_tt_obj_type_results(XDR *xdrs, _tt_obj_type_results *objp)
 {
-	if (!xdr_string(xdrs, &objp->otype, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->otype, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_db_results(xdrs, &objp->results)) {
@@ -1127,7 +1146,7 @@ xdr_tt_obj_type_results(XDR *xdrs, _tt_obj_type_results *objp)
 bool_t
 xdr_tt_obj_file_results(XDR *xdrs, _tt_obj_file_results *objp)
 {
-	if (!xdr_string(xdrs, &objp->file, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->file, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_db_results(xdrs, &objp->results)) {
@@ -1163,7 +1182,7 @@ xdr_tt_is_file_in_db_results(XDR *xdrs, _tt_is_file_in_db_results *objp)
 bool_t
 xdr_tt_is_obj_in_db_results(XDR *xdrs, _tt_is_obj_in_db_results *objp)
 {
-	if (!xdr_string(xdrs, &objp->forward_pointer, ~0)) {
+	if (!xdr_tt_cstring(xdrs, &objp->forward_pointer, ~0)) {
 		return (FALSE);
 	}
 	if (!xdr_tt_db_results(xdrs, &objp->results)) {
@@ -1229,7 +1248,7 @@ xdr_tt_delete_session_results(XDR *xdrs, _tt_delete_session_results *objp)
 bool_t
 xdr_tt_delete_session_args(XDR *xdrs, _tt_delete_session_args *objp)
 {
-	return(xdr_string(xdrs, &objp->session.value, ~0));
+	return(xdr_tt_cstring(xdrs, &objp->session.value, ~0));
 }
 
 

@@ -52,7 +52,6 @@ class WXmFileSelectionBox : public WXmSelectionBox {
 public :
    DEFINE_INIT (WXmFileSelectionBox, WXmSelectionBox,
 	        xmFileSelectionBoxWidgetClass)
-inline	Widget	GetChild (unsigned char child) const	{ return XmFileSelectionBoxGetChild (widget, child); }
    DEFINE_GETTER_SETTER (AutoUnmanage,Boolean,"autoUnmanage")
    DEFINE_STRING_GETSET (ListLabelString,"listLabelString")
    DEFINE_STRING_GETSET (ApplyLabelString,"applyLabelString")

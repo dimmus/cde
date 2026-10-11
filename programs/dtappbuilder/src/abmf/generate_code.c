@@ -502,7 +502,7 @@ write_module_files(
     char                uiHeaderDefineName[MAX_PATH_SIZE];
     char                uiCFileName[MAX_PATH_SIZE];
     char                stubsFileName[MAX_PATH_SIZE];
-    char                stubsBakFileName[MAX_PATH_SIZE];
+    char                stubsBakFileName[MAX_PATH_SIZE + 4];	/* + ".BAK" */
     BOOL                needStubsMerge = FALSE;
     STRING              curFileName = NULL;
     ABMF_SKIP_WHY	curFileSkipReason = ABMF_SKIP_UNDEF;
@@ -762,9 +762,9 @@ write_project_files(
     BOOL                needStubsMerge = FALSE;
     char                headerFileName[MAX_PATH_SIZE];
     char                headerDefineName[MAX_PATH_SIZE];
-    char                headerBakFileName[MAX_PATH_SIZE];
+    char                headerBakFileName[MAX_PATH_SIZE + 4];	/* + ".BAK" */
     char                stubsFileName[MAX_PATH_SIZE];
-    char                stubsBakFileName[MAX_PATH_SIZE];
+    char                stubsBakFileName[MAX_PATH_SIZE + 4];	/* + ".BAK" */
     STRING              curFileName = NULL;
     ABMF_SKIP_WHY	curFileSkipReason = ABMF_SKIP_UNDEF;
     File		orgFile = NULL;

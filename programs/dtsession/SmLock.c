@@ -107,6 +107,18 @@
 static XtIntervalId		timerId, lockTimeId, lockDelayId, cycleId, flash_id;
 
 /*
+ * Keyboard/pointer grab retry state.  A grab fails while another client
+ * holds one (an open menu, a drag), so FinishLocking() retries from a
+ * timer instead of sleeping: the session manager stays responsive and the
+ * grab is taken as soon as it is released.
+ */
+#define GRAB_RETRY_MS		100
+#define GRAB_RETRY_LIMIT	50	/* x GRAB_RETRY_MS = 5 s */
+static XtIntervalId		grabRetryId;
+static int			grabRetries;
+static Boolean			kbdGrabbed, pointerGrabbed;
+
+/*
  * Global grab widget
  */
 static Widget			grabWidget;
@@ -148,6 +160,9 @@ static void LockAttemptFailed( XtPointer, XtIntervalId *) ;
 static void RequirePassword( XtPointer, XtIntervalId *) ;
 static void CycleSaver( XtPointer, XtIntervalId *) ;
 static void BlinkCaret( XtPointer, XtIntervalId *) ;
+static Boolean TryGrabs( void ) ;
+static void RetryGrabs( XtPointer, XtIntervalId *) ;
+static void GrabsDone( void ) ;
 
 
 
@@ -189,6 +204,7 @@ LockDisplay(
     int lockDelay;
 
     timerId = lockTimeId = lockDelayId = cycleId = flash_id = (XtIntervalId)0;
+    grabRetryId = (XtIntervalId)0;
 
    /*
     * coverScreen 
@@ -415,8 +431,7 @@ FinishLocking(Widget		wid,
 	      XEvent		*ev,
 	      Boolean		*bl)
 {
-    int i,j;
-    Boolean kbdGrabbed, pointerGrabbed;
+    int i;
     int rc;
 
         if (lockTimeId == (XtIntervalId)0)
@@ -426,7 +441,6 @@ FinishLocking(Widget		wid,
         lockTimeId = (XtIntervalId)0;
         XtRemoveEventHandler(wid, VisibilityChangeMask,
                              False, FinishLocking, NULL);
-        XSync(smGD.display, 0);
 
         i = 0;
         XtSetArg(uiArgs[i], XmNy, &visibleY);i++;
@@ -439,10 +453,10 @@ FinishLocking(Widget		wid,
 	 */
 	RecolorCursor();
 
-        XSync(smGD.display, 0);
-
 	/*
-	 * grab control of the keyboard for the entire display
+	 * grab control of the keyboard for the entire display.  No XSync()
+	 * first: the grab requests wait for their replies, and the server
+	 * handles them after everything queued before.
 	 */
         rc = XtGrabKeyboard(grabWidget, False,
 				     GrabModeAsync, GrabModeAsync,
@@ -468,50 +482,102 @@ FinishLocking(Widget		wid,
 					None, smGD.lockCursor, CurrentTime)
 			  == GrabSuccess);
 
-        {
-          pointerGrabbed = (XtGrabPointer(grabWidget, False,
-                                        ButtonPressMask|PointerMotionMask,
-                                        GrabModeAsync, GrabModeAsync,
-                                        None, smGD.lockCursor, CurrentTime)
-                            == GrabSuccess);
-        }
-
 
 	/*
-	 * If the grab failed - try 3 more times and give up
+	 * If a grab failed, retry it from a timer (see GRAB_RETRY_MS).
 	 */
-	if((kbdGrabbed == False) || (pointerGrabbed == False))
+	grabRetries = 0;
+	if ((kbdGrabbed == False) || (pointerGrabbed == False))
 	{
-	    for(j = 0;(j < 3) && ((pointerGrabbed == False) ||
-				  (kbdGrabbed == False));j++)
-	    {
-		/*
-		 * If a grab fails try one more time and then give up
-		 */
-		if(kbdGrabbed == False)
-		{
-		    sleep(1);
-		    kbdGrabbed = (XtGrabKeyboard(grabWidget, False,
-						 GrabModeAsync, GrabModeAsync,
-						 CurrentTime) == GrabSuccess);
-		}
-
-		if(pointerGrabbed == False)
-		{
-		    sleep(1);
-		    pointerGrabbed = (XtGrabPointer(grabWidget, False,
-						    ButtonPressMask |
-						    PointerMotionMask,
-						    GrabModeAsync,
-						    GrabModeAsync,
-						    None, smGD.lockCursor,
-						    CurrentTime)
-				      == GrabSuccess);
-		}
-	    }
+	    grabRetryId = XtAppAddTimeOut(smGD.appCon, GRAB_RETRY_MS,
+					  RetryGrabs, NULL);
+	    return;
 	}
 
+	GrabsDone();
+}
 
+
+/*************************************<->*************************************
+ *
+ *  TryGrabs ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Retry whichever of the keyboard and pointer grabs has not succeeded yet.
+ *  Returns True once both are held.
+ *
+ *************************************<->***********************************/
+static Boolean
+TryGrabs( void )
+{
+    if (kbdGrabbed == False)
+    {
+	kbdGrabbed = (XtGrabKeyboard(grabWidget, False,
+				     GrabModeAsync, GrabModeAsync,
+				     CurrentTime) == GrabSuccess);
+    }
+
+    if (pointerGrabbed == False)
+    {
+	pointerGrabbed = (XtGrabPointer(grabWidget, False,
+					ButtonPressMask |
+					PointerMotionMask,
+					GrabModeAsync,
+					GrabModeAsync,
+					None, smGD.lockCursor,
+					CurrentTime)
+			  == GrabSuccess);
+    }
+
+    return (kbdGrabbed == True) && (pointerGrabbed == True);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  RetryGrabs ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Timer callback: retry the failed grabs every GRAB_RETRY_MS, giving up
+ *  after GRAB_RETRY_LIMIT attempts.  UnlockDisplay() removes the timer.
+ *
+ *************************************<->***********************************/
+static void
+RetryGrabs(
+        XtPointer client_data,
+        XtIntervalId *id)
+{
+    grabRetryId = (XtIntervalId)0;
+
+    if ((TryGrabs() == False) && (++grabRetries < GRAB_RETRY_LIMIT))
+    {
+	grabRetryId = XtAppAddTimeOut(smGD.appCon, GRAB_RETRY_MS,
+				      RetryGrabs, NULL);
+	return;
+    }
+
+    GrabsDone();
+}
+
+
+/*************************************<->*************************************
+ *
+ *  GrabsDone ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Finish locking once the grabs have succeeded, or report the failure
+ *  and unlock if they could not be taken.
+ *
+ *************************************<->***********************************/
+static void
+GrabsDone( void )
+{
 	/*
 	 * Set status variable to lock if the lock has succeeded
 	 */
@@ -1113,6 +1179,12 @@ UnlockDisplay(
     if(flash_id != (XtIntervalId)0)
     {
         XtRemoveTimeOut(flash_id);
+    }
+
+    if(grabRetryId != (XtIntervalId)0)
+    {
+        XtRemoveTimeOut(grabRetryId);
+        grabRetryId = (XtIntervalId)0;
     }
 
     if(pointerGrabbed == True)

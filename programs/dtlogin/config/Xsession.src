@@ -156,11 +156,21 @@ XCOMM ##########################################################################
     fi
   fi
 
-  [ -f $LOGFILENAME.older ] && rm -f $LOGFILENAME.older
-  [ -f $LOGFILENAME.old ] && mv -f $LOGFILENAME.old $LOGFILENAME.older
+  HASH
+  HASH Rotate the logs.  (mv replaces .older itself; it only needs
+  HASH removing when there is no .old to take its place.)  Files are
+  HASH created by the shell rather than touch: "true >>", not ": >>",
+  HASH since a failed redirection of a special builtin like ":" would
+  HASH end the script.
+  HASH
+  if [ -f $LOGFILENAME.old ]; then
+    mv -f $LOGFILENAME.old $LOGFILENAME.older
+  elif [ -f $LOGFILENAME.older ]; then
+    rm -f $LOGFILENAME.older
+  fi
   [ -f $LOGFILENAME ] && mv -f $LOGFILENAME $LOGFILENAME.old
-  touch $LOGFILENAME
-  [ ! -f $MSGLOGFILENAME ] && touch $MSGLOGFILENAME
+  true >> $LOGFILENAME
+  [ ! -f $MSGLOGFILENAME ] && true >> $MSGLOGFILENAME
 
   if [ -w $LOGFILENAME ]; then
     exec >>$LOGFILENAME 2>&1
@@ -172,7 +182,14 @@ XCOMM ##########################################################################
     echo "--- $1" >>$LOGFILENAME 2>&1
   }
 
-  Log "$(date)"
+  HASH
+  HASH The date, without running date(1) where the shell can format it
+  HASH (ksh93; in the format of date in the C locale).
+  HASH
+  case "$KSH_VERSION" in
+    *" 93"*|*"A 20"*) Log "$(printf '%(%a %b %e %H:%M:%S %Z %Y)T')" ;;
+    *) Log "$(date)" ;;
+  esac
   Log "$0 starting..."
 
 XCOMM ##########################################################################
@@ -219,7 +236,14 @@ XCOMM ##########################################################################
   [ -z "$MAIL" ] && MAIL=cpp_MAIL
   [ -z "$LANG" ] && LANG="C"
   TERM=dtterm
+#ifdef __linux__
+  HASH The node name, as uname -n prints it, without running it.
+  SESSION_SVR=
+  [ -r /proc/sys/kernel/hostname ] && read SESSION_SVR </proc/sys/kernel/hostname
+  [ -z "$SESSION_SVR" ] && SESSION_SVR=`uname -n`
+#else
   SESSION_SVR=`uname -n`
+#endif
 
   export PATH EDITOR MAIL TERM SESSION_SVR LANG
 
@@ -293,11 +317,6 @@ XCOMM ##########################################################################
   dtstart_searchpath="$DT_BINPATH/dtsearchpath -ksh"
   dtstart_ttsession="$DT_BINPATH/ttsession -s"
   dtstart_dtdbcache="$DT_BINPATH/dtdbcache -init"
-  HASH
-  HASH dtdbcache file's directory should match
-  HASH _DTDTSMMTEMPDIR in DtSvc/DtUtil1/DtsMM.h
-  HASH
-  dtdbcacherm="rm -f /tmp/dtdbcache_$DISPLAY"
   dtstart_appgather="$DT_BINPATH/dtappgather &"
 #if defined(sun)
   dtstart_dsdm="$DT_BINPATH/dsdm &"
@@ -319,15 +338,16 @@ XCOMM ##########################################################################
     fi
   fi
 
-  touch $SESSIONLOGFILENAME
-
-  if [ -w $SESSIONLOGFILENAME ]; then
+  HASH
+  HASH Use the session log if it can be written.  (It is truncated when
+  HASH the session starts; it used to be touched and removed here, two
+  HASH processes for a test the shell can make.)
+  HASH
+  if { true >> $SESSIONLOGFILENAME; } 2>/dev/null && [ -w $SESSIONLOGFILENAME ]; then
       dtstart_sessionlogfile="$SESSIONLOGFILENAME"
   else
       dtstart_sessionlogfile="/dev/null"
   fi
-
-  rm -f $SESSIONLOGFILENAME
 
 #ifdef sun
   if [ "$DTXSERVERLOCATION" != "remote" ]
@@ -411,7 +431,12 @@ XCOMM ##########################################################################
       HASH 
       HASH Run custom Xsession scripts for this session.
       HASH 
-      for SCRIPT in $(ls $i/$DT_XSESSION_DIR); do
+      HASH (A glob, sorted like ls, instead of running ls.  The pattern
+      HASH is [!.]* because cpp would take a slash and a star for the
+      HASH start of a comment.)
+      HASH
+      for SCRIPT in $i/$DT_XSESSION_DIR/[!.]*; do
+        SCRIPT=${SCRIPT##*/}
       	if [ -x $i/$DT_XSESSION_DIR/$SCRIPT -a \
 	    \( ! -d $i/$DT_XSESSION_DIR/$SCRIPT \) ]; then
                Log "sourcing $i/$DT_XSESSION_DIR/$SCRIPT..."
@@ -433,18 +458,33 @@ XCOMM
 XCOMM ##########################################################################
 
 XCOMM 
+XCOMM Set the variable named by $1 to the first command in the array
+XCOMM named by $2 that is executable (empty if none).  Unlike $(GetFirst),
+XCOMM this needs no subshell.
+XCOMM 
+SetFirst()
+{
+  eval "$1="
+  let sf_i=0
+  while true; do
+    eval "sf_cmd=\${$2[$sf_i]}"
+    [ -z "$sf_cmd" ] && break
+    if [ -x "${sf_cmd%% *}" ]; then
+      eval "$1=\$sf_cmd"
+      break
+    fi
+    Log "could not start $sf_cmd"
+    let sf_i=$sf_i+1
+  done
+}
+
+XCOMM 
 XCOMM Return first command in array named by $1 that is executable
 XCOMM 
 GetFirst()
 {
-  let i=0
-  while true; do
-    eval "cmd=\${$1[$i]}"
-    [ -z "$cmd" ] && break
-    [ -x "${cmd%% *}" ] && echo "$cmd" && break
-    Log "could not start $cmd"
-    let i=$i+1
-  done
+  SetFirst first_cmd $1
+  [ -n "$first_cmd" ] && echo "$first_cmd"
 }
 
 XCOMM 
@@ -453,7 +493,7 @@ XCOMM $2 is 'eval', command result will be 'eval'ed.
 XCOMM 
 StartFirst()
 {
-  first=$(GetFirst $1)
+  SetFirst first $1
   if [ ! -z "$first" ]; then
     Log "starting $first"
     if [ "$2" = "eval" ]; then
@@ -485,15 +525,15 @@ StartFirst()
   fi
 
   if [ "$SESSIONTYPE" = "xdm" ]; then
-    startup=$(GetFirst xdmstart_session)    # get xdm session client
+    SetFirst startup xdmstart_session       # get xdm session client
     StartFirst xdmstart_hello               # start xdm hello client
   else
-    startup=$(GetFirst dtstart_session)     # get desktop session client
+    SetFirst startup dtstart_session        # get desktop session client
     StartFirst dtstart_hello                # start desktop hello client
     StartFirst dtstart_searchpath eval      # setup desktop search paths
 
-    tooltalk=$(GetFirst dtstart_ttsession)  # get tooltalk client
-    dtdbcache=$(GetFirst dtstart_dtdbcache) # get dtdbcache client
+    SetFirst tooltalk dtstart_ttsession     # get tooltalk client
+    SetFirst dtdbcache dtstart_dtdbcache    # get dtdbcache client
 
 #if defined(sun)
     if [ -z "$SDT_NO_DSDM" ]; then
@@ -540,18 +580,30 @@ StartFirst()
 	dtdbcache="echo could not start $dtstart_dtdbcache"
   fi
 
+  HASH
+  HASH dtdbcache (which brings the actions/datatypes cache up to date)
+  HASH and ttsession do not depend on each other: start them together
+  HASH and wait for dtdbcache (only: the profile may have started jobs
+  HASH of its own) before the session starts.  ttsession puts itself in
+  HASH the background once it is ready.  csh has no "wait pid", so it
+  HASH runs them one after the other, as before.  The cache file is kept
+  HASH for the next session; dtdbcache rebuilds it only if the database
+  HASH changed.
+  HASH
   export DT=true;
   case ${SHELL##*/} in
       sh | bash) $SHELL -c "$source_profile; \
 			   unset DT; \
-			   $dtdbcache; \
+			   $dtdbcache & dtdbcache_pid=\$!; \
                            PATH=$DT_BINPATH:\$PATH $tooltalk;   \
+                           wait \$dtdbcache_pid; \
                            $startup > $dtstart_sessionlogfile 2>&1" ;;
 
       ksh | ksh93 | dtksh) $SHELL -c "$source_profile; \
 			   unset DT; \
-			   $dtdbcache; \
+			   $dtdbcache & dtdbcache_pid=\$!; \
                            PATH=$DT_BINPATH:\$PATH $tooltalk;\
+                           wait \$dtdbcache_pid; \
                            $startup >| $dtstart_sessionlogfile 2>&1" ;;
 
       csh | tcsh) $SHELL -c "unsetenv _ PWD;       \
@@ -562,11 +614,10 @@ StartFirst()
                            $startup  >&! $dtstart_sessionlogfile" ;;
 
       *) unset DT
-	 $dtdbcache
+	 $dtdbcache & dtdbcache_pid=$!
          StartFirst dtstart_ttsession
+         wait $dtdbcache_pid
          $startup >| $dtstart_sessionlogfile 2>&1 ;;
   esac
-
-$dtdbcacherm		# remove the actions/datatypes cachefile
 
 XCOMM ####################         eof      #################################

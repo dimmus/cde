@@ -1702,8 +1702,9 @@ void	xt_start_waiting(void)
     if (!appC)	return;
 
     xt_start_tm = time((time_t) 0);
-    xt_last_timer = XtAppAddTimeOut(appC, (unsigned long) Opt.Interval,
-						xt_timer_cb, (XtPointer)0);
+    xt_last_timer = XtAppAddTimeOut(appC,
+				(unsigned long) next_wait_interval(True),
+				xt_timer_cb, (XtPointer)0);
     /* if (!xt_last_timer)	return; */
 
     DPR(("xt_start_waiting(): EventLoop (interval=%d)\n", Opt.Interval));
@@ -1744,8 +1745,9 @@ static void	xt_timer_cb(XtPointer client_data, XtIntervalId *timer_id)
 	xt_stop_waiting();	/* never returns */
     }
 
-    xt_last_timer = XtAppAddTimeOut(appC, (unsigned long) Opt.Interval,
-						xt_timer_cb, (XtPointer)0);
+    xt_last_timer = XtAppAddTimeOut(appC,
+				(unsigned long) next_wait_interval(False),
+				xt_timer_cb, (XtPointer)0);
     return;
 }
 

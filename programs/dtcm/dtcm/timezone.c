@@ -69,7 +69,7 @@ make_timezone(Calendar *c)
 	XmString xmstr;
 	int ac;
 	Arg args[10];
-	char buf[BUFSIZ], tmp_buf[BUFSIZ] = "";
+	char buf[2 * BUFSIZ], tmp_buf[BUFSIZ] = "";	/* buf: label + zone */
 	char *title;
 	void tz_customtime_cb(), tz_mytime_cb(), 
 			tz_apply_cb(), tz_cancel_cb(), tz_ok_cb();
@@ -296,7 +296,8 @@ make_timezone(Calendar *c)
 	/* Remind - get this from the structure after it's available */
 	cm_strcpy(t->gmttimezone, "");
 	cm_strcpy(t->mytimezone, "US/Pacific");
-	cm_strcpy(tmp_buf, (char*)getenv("TZ"));
+	if (getenv("TZ") != NULL)
+		snprintf(tmp_buf, sizeof(tmp_buf), "%s", getenv("TZ"));
 	cm_strcpy(t->mytimezone, tmp_buf);
 
 	snprintf(buf, sizeof(buf), "%s %s", CATGETS(c->DT_catd, 1, 659, "Time Zone:"),
@@ -376,7 +377,7 @@ tz_customtime_cb(Widget widget, XtPointer client_data, XtPointer call_data)
 void
 tz_set_timezone(Calendar *c, Timezone *t)
 {
-    char *tmp_buf, buf[BUFSIZ], gmt[BUFSIZ];
+    char *tmp_buf, buf[2 * BUFSIZ], gmt[BUFSIZ];	/* buf: label + zone */
     Widget text;
 
     t->timezone_type = t->edit_timezone_type;
@@ -408,8 +409,8 @@ tz_set_timezone(Calendar *c, Timezone *t)
     {
 	XtVaGetValues(t->gmtcombo, XmNtextField, &text, NULL);
         tmp_buf = XmTextGetString(text);
-	cm_strcpy(t->gmttimezone, tmp_buf);
-	sprintf(gmt, "GMT%s", tmp_buf);
+	snprintf(t->gmttimezone, sizeof(t->gmttimezone), "%s", tmp_buf);
+	snprintf(gmt, sizeof(gmt), "GMT%s", tmp_buf);
 	set_timezone(gmt);
 	snprintf(buf, sizeof(buf), "%s %s", CATGETS(c->DT_catd, 1, 659, "Time Zone:"), gmt);
     }

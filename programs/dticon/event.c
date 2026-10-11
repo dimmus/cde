@@ -130,7 +130,7 @@ ProcessTabletEvent(
   int i;
 #endif
   int x, y, width, height, xGrid, yGrid;
-  char tmpstr[20];
+  char tmpstr[24];  /* "%dx%d" */
   XmString str;
 
   if (num_params == 3)
@@ -310,7 +310,7 @@ Do_ButtonOp(
   Window lwin;
   int e_type, x, y, i, j;
   XRectangle box;
-  char tmpstr[20];
+  char tmpstr[24];  /* "%dx%d" */
   XmString str;
 
   e_type = xptr->type;

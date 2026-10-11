@@ -55,6 +55,7 @@
 #include <Xm/TextP.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <Xm/TextF.h>
 #include <Xm/LabelG.h>
 #include <Dt/HourGlass.h>
@@ -255,33 +256,31 @@ LoadFile(
 char *
 GetTempFile(void)
 {
-    char *tempname = (char *)XtMalloc(L_tmpnam); /* Temporary file name. */
-    FILE *tfp;
+    static const char *dirs[] = { P_tmpdir, "/usr/tmp", "/tmp" };
+    char *tempname = XtMalloc(256);   /* Temporary file name. */
+    int i, fd;
+    mode_t mask = umask(0);
 
-    (void)tmpnam(tempname);
-    if ((tfp = fopen(tempname, "w")) == NULL)
+    umask(mask);
+
+    /*
+     * mkstemp() creates the file, so nobody else can create the name
+     * first (as tmpnam() and fopen() allowed).  Try a couple of
+     * directories if necessary.
+     */
+    for (i = 0; i < (int) XtNumber(dirs); i++)
     {
-        pid_t pid;
-        /*
-         * If tmpnam fails, then try to create our own temp name.
-         * Try a couple of different names if necessary.
-         */
-        XtFree(tempname);
-        tempname = XtMalloc(256);
-        pid = getpid();
-        sprintf(tempname, "/usr/tmp/editor%ld", (long)pid);
-        if ((tfp = fopen(tempname, "w")) == NULL)
+        snprintf(tempname, 256, "%s/dtpadXXXXXX", dirs[i]);
+        if ((fd = mkstemp(tempname)) != -1)
         {
-            sprintf(tempname, "/tmp/editor%ld", (long)pid);
-            if ((tfp = fopen(tempname, "w")) == NULL)
-            {
-                XtFree(tempname);
-                return (char *)NULL;
-            }
+            /* The mode fopen() gave it: a print spooler may read it */
+            fchmod(fd, 0666 & ~mask);
+            close(fd);
+            return tempname;
         }
     }
-    fclose(tfp);
-    return tempname;
+    XtFree(tempname);
+    return (char *)NULL;
 }
 
 
@@ -298,29 +297,27 @@ static char *
 AddPound(
         char *nameBuf)
 {
-    char tempBuf[512];
-    static char returnBuf[512];
+    char tempBuf[PATH_MAX];	/* nameBuf may be returnBuf */
+    static char returnBuf[PATH_MAX];
 
-    if (nameBuf != (char *)NULL && nameBuf[0] != (char) '\0') {
-        char *baseName;
-	strcpy(tempBuf, nameBuf);
-        baseName = MbStrrchr(tempBuf, '/');
-	if (baseName != (char *)NULL) {
-		strncpy(returnBuf, tempBuf, (baseName - tempBuf) + 1);
-		returnBuf[(baseName - tempBuf) + 1] = (char)'\0';
-		baseName++;
-		strcat(returnBuf, "#");
-		strcat(returnBuf, baseName);
-	        if (returnBuf[strlen(returnBuf) - 1] != (char)'#')
-		    strcat(returnBuf, "#");
-	} else {
-	    snprintf(returnBuf, sizeof(returnBuf), "#%s", tempBuf);
-	    if(strlen(returnBuf) && returnBuf[strlen(returnBuf) - 1] != (char)'#')
-		strcat(returnBuf, "#");
-	}
-    } else {
-	sprintf(returnBuf, "#%s#", GETMESSAGE(5, 21, "UNTITLED"));
+    if (nameBuf != (char *)NULL && nameBuf[0] != (char) '\0' &&
+	snprintf(tempBuf, sizeof(tempBuf), "%s", nameBuf) < (int) sizeof(tempBuf)) {
+        char *baseName = MbStrrchr(tempBuf, '/');
+	int dirLen = baseName != (char *)NULL ? (int)(baseName - tempBuf) + 1 : 0;
+	int len;
+
+	/* <dir/>#<base>, then a "#" unless that already ends in one */
+	baseName = tempBuf + dirLen;
+	len = snprintf(returnBuf, sizeof(returnBuf), "%.*s#%s%s",
+		       dirLen, tempBuf, baseName,
+		       (baseName[0] == (char)'\0' ||
+			baseName[strlen(baseName) - 1] == (char)'#') ? "" : "#");
+	if (len >= 0 && len < (int) sizeof(returnBuf))
+	    return returnBuf;
+	/* too long for a path: fall back to the untitled name */
     }
+    snprintf(returnBuf, sizeof(returnBuf), "#%s#",
+	     GETMESSAGE(5, 21, "UNTITLED"));
     return returnBuf;
 }
 

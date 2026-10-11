@@ -202,6 +202,50 @@ static char * get_tmp_dir (
    return (NULL);
 }
 
+/****************************************************************************
+ *
+ * make_logfile - create a new, empty logfile and return its name.
+ *    The directory is chosen as tempnam(3) chose it: $TMPDIR if it
+ *    is a directory, else 'dir' if it is one, else P_tmpdir.
+ *    mkstemp() creates the file, so (unlike tempnam()) nobody can
+ *    create or link the name before the channel opens it.
+ *
+ * Return Value:
+ *
+ *    char *	-  the malloc'ed name, or NULL on failure.
+ *
+ ****************************************************************************/
+
+static char * make_logfile (
+	const char *dir)
+{
+   const char	*d;
+   char		*name;
+   struct stat	st;
+   int		fd;
+
+   d = getenv ("TMPDIR");
+   if (d == NULL || *d == '\0' || stat (d, &st) != 0 || !S_ISDIR (st.st_mode)) {
+      d = dir;
+      if (d == NULL || stat (d, &st) != 0 || !S_ISDIR (st.st_mode))
+         d = P_tmpdir;
+   }
+
+   name = malloc (strlen (d) + sizeof ("/SPCXXXXXX"));
+   if (!name)
+      return (NULL);
+
+   (void) sprintf (name, "%s/SPCXXXXXX", d);
+   fd = mkstemp (name);
+   if (fd == -1) {
+      free (name);
+      return (NULL);
+   }
+   (void) close (fd);
+
+   return (name);
+}
+
 /*
  ***
  *** Method definitions for noio channel objects
@@ -230,12 +274,12 @@ SPC_Channel_Ptr open_noio_channel_object(SPC_Channel_Ptr channel,
   if(IS_SPCIO_USE_LOGFILE(iomode)) {
 
     _DtSvcProcessLock();
-    /* Storage from tempnam() freed in remove_logfile_local_channel_object */
+    /* Storage from make_logfile() freed in remove_logfile_local_channel_object */
     if (SPCD_Authentication_Dir != NULL)
-      channel->logfile=tempnam(SPCD_Authentication_Dir,"SPC");
+      channel->logfile=make_logfile(SPCD_Authentication_Dir);
     else {
       temp_dir_name = get_tmp_dir ();
-      channel->logfile=tempnam(temp_dir_name,"SPC");
+      channel->logfile=make_logfile(temp_dir_name);
       free(temp_dir_name);
     }
 

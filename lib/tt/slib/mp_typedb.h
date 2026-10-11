@@ -65,6 +65,7 @@ class _Tt_typedb : public _Tt_object {
 	int				abort_write();
 	int				begin_write(_Tt_typedbLevel db);
 	int				end_write();
+	int				break_stale_lock();
 	Tt_status			write(const _Tt_string &outfile);
 	Tt_status			write(FILE *outfile);
 
@@ -86,7 +87,6 @@ class _Tt_typedb : public _Tt_object {
 	static Tt_status		merge_from(XDR *xdrs,
 						   _Tt_typedb_ptr &tdb,
 						   int &version);
-	static Tt_status		ce2xdr();
 	static _Tt_typedbLevel		level( const _Tt_string &level_name );
 	static const char	       *level_name( _Tt_typedbLevel db );
 	static _Tt_string_list	       *tt_path();
@@ -103,12 +103,6 @@ class _Tt_typedb : public _Tt_object {
 	_Tt_string			network_db;
 	_Tt_typedbLevel			ceDB2Use;
       private:
-#ifdef OPT_CLASSING_ENGINE
-	void				*make_ce_entry(_Tt_ptype_ptr &pt);
-	void				*make_ce_entry(_Tt_otype_ptr &ot);
-	void				*make_ce_entry(_Tt_signature_ptr &st);
-	_Tt_string			_ce_dir;
-#endif				/* OPT_CLASSING_ENGINE */
 	int				write_ce_header(const _Tt_ostream& os) const;
 	int				_flags;
 	_Tt_string			_lock_file;

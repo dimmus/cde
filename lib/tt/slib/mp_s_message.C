@@ -1044,33 +1044,23 @@ deliver(const _Tt_msg_trace &trace, int deliver_to_observers)
 	// don't specify an op field. If most patterns do contain an
 	// op field then we don't incur a linear scan of all the
 	// patterns.
-	_Tt_pattern_list_ptr		pats2match;
 	_Tt_s_pattern_ptr		best_pattern;
 	_Tt_procid_ptr			handler_procid;
 	_Tt_s_procid_ptr		dummy;
 	int				found_observer = 0;
 
+	// The opless patterns are matched first, then the ones for
+	// this op, with the matching state carried from one list to
+	// the next exactly as if they were one list.  (This used to
+	// build that list by copying both, on every delivery attempt
+	// of every message whenever any opless pattern existed.)
+	_Tt_pattern_list_ptr		no_pats;
 	_Tt_patlist_ptr opful_pats = _tt_s_mp->opful_pats->lookup(_op);
-	if (opful_pats.is_null()) {
-		pats2match = _tt_s_mp->opless_pats;
-	} else {
-		if (_tt_s_mp->opless_pats->count() > 0) {
-			//
-			// XXX The price you pay for opless patterns:
-			// we create a new list and copy both lists into it.
-			//
-			pats2match =
-				new _Tt_pattern_list( *_tt_s_mp->opless_pats );
-			pats2match->append( opful_pats->patterns );
-		} else {
-			pats2match = opful_pats->patterns;
-		}
-	}
-	if (! pats2match.is_null()) {
-		found_observer = match_patterns( pats2match,
-						  trace, best_pattern,
-						  deliver_to_observers);
-	}
+	found_observer = match_patterns( _tt_s_mp->opless_pats,
+					 (opful_pats.is_null()
+					  ? no_pats : opful_pats->patterns),
+					 trace, best_pattern,
+					 deliver_to_observers);
 	if (! best_pattern.is_null()) {
 		handler_procid = best_pattern->procid();
 		if (best_pattern->category() == TT_HANDLE_ROTATE) {
@@ -1157,14 +1147,16 @@ deliver(const _Tt_msg_trace &trace, int deliver_to_observers)
 // patterns.
 // 
 int _Tt_s_message::
-match_patterns(_Tt_pattern_list_ptr &patterns, const _Tt_msg_trace &trace,
+match_patterns(_Tt_pattern_list_ptr &patterns,
+	       _Tt_pattern_list_ptr &more_patterns,
+	       const _Tt_msg_trace &trace,
 	       _Tt_pattern_ptr &best_pattern, int deliver_to_observers)
 {
 	int			found_observer = 0;
 	unsigned int		best_timestamp = 0;
 	Tt_category		best_category = TT_CATEGORY_UNDEFINED;
 	int			best_match = 0;
-	_Tt_pattern_list_cursor	pcursor(patterns);
+	_Tt_pattern_list_cursor	pcursor;
 
 	//
 	// Point-to-point messages aren't pattern-matched.
@@ -1172,14 +1164,23 @@ match_patterns(_Tt_pattern_list_ptr &patterns, const _Tt_msg_trace &trace,
 	if (paradigm() == TT_HANDLER) {
 		return 0;
 	}
+	for (int pass = 0; pass < 2; pass++) {
+	_Tt_pattern_list_ptr &plist = (pass == 0) ? patterns : more_patterns;
+	if (plist.is_null()) {
+		continue;
+	}
+	pcursor.reset(plist);
 	while (pcursor.next()) {
 		_Tt_s_procid_ptr registrant = (_Tt_s_procid *)
 			pcursor->procid().c_pointer();
+		// Skip patterns of absent or inactive procids.  (This
+		// used to return, so one such pattern stopped matching
+		// against every pattern after it in the list.)
 		if (registrant.is_null()) {
-			return(0);
+			continue;
 		}
 		if (! registrant->is_active()) {
-			return(0);
+			continue;
 		}
 		const _Tt_s_pattern *spat;
 		switch (pcursor->category()) {
@@ -1224,6 +1225,7 @@ match_patterns(_Tt_pattern_list_ptr &patterns, const _Tt_msg_trace &trace,
 		      default:
 			continue;
 		}
+	}
 	}
 	if (! best_pattern.is_null()) {
 		set_pattern_id( best_pattern->id() );

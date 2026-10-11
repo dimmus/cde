@@ -482,6 +482,7 @@ extern int	wakeupInterval;
 extern char	*fpHead;
 extern char	*fpTail;
 extern int      langListTimeout;
+extern int	restartDelay;
 #ifdef DEF_NETWORK_DEV
 extern char	*networkDev;
 #endif

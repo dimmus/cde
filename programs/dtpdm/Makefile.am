@@ -1,10 +1,12 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = dtpdm
 
-dtpdm_CFLAGS = -DI18N_MSG -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\"
+dtpdm_CFLAGS = $(CDE_CFLAGS) -DI18N_MSG -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\"
 
-dtpdm_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtpdm_LDADD = $(LIBPRINT) $(LIBHELP) $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 if SOLARIS
 dtpdm_LDADD += -lintl -lgen -lresolv

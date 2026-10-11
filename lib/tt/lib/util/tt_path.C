@@ -245,13 +245,26 @@ _tt_isdir(const _Tt_string &path)
  */
 _Tt_string _tt_local_network_path(const _Tt_string &path)
 {
+	if (path.len()) {
+		return _tt_real_local_network_path(_tt_realpath(path));
+	}
+	return _Tt_string();
+}
+
+/*
+ * As _tt_local_network_path(), for a path that has already been through
+ * _tt_realpath() (which costs at least one realpath(3) per component
+ * that does not exist).
+ */
+_Tt_string _tt_real_local_network_path(const _Tt_string &resolved_path)
+{
 	_Tt_string network_path;
 
-	if (path.len()) {
-		_Tt_string real_path = _tt_realpath(path);
+	if (resolved_path.len()) {
+		_Tt_string real_path = resolved_path;
 		_Tt_file_system file_system;
 		_Tt_file_system_entry_ptr entry =
-			file_system.bestMatchToPath(real_path);
+			file_system.bestMatchToRealPath(real_path);
 
 		_Tt_string hostname = entry->getHostname();
 		_Tt_string loop_back_mount_point =

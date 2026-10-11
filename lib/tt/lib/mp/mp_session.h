@@ -156,6 +156,9 @@ class _Tt_session : public _Tt_object {
 	_Tt_rpc_client_ptr		_rpc_client;
 	int				_rpc_program;
 	int				_rpc_version;
+	// TCP port of the server, from the optional 8th field of the
+	// address string (0: unknown, ask the portmapper).
+	int				_rpc_port;
 	pid_t				_server_num;
 	uid_t				_server_uid;
 	_Tt_string			_type;

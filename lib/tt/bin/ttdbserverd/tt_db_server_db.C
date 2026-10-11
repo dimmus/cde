@@ -207,6 +207,32 @@ _Tt_db_server_db::~_Tt_db_server_db ()
 {
 }
 
+//
+// Stores a file path, NUL terminated, in a file table record and sets
+// the record length to cover it.  The path key indexes only the first
+// TT_DB_MAX_KEY_LENGTH bytes; a longer path lives in the variable part
+// of the record, which was never written because the length stayed at
+// the minimum, so paths of TT_DB_MAX_KEY_LENGTH bytes or more were
+// stored truncated and could never be found again.
+//
+static void setFilePath (const _Tt_isam_record_ptr &record,
+			 const _Tt_string          &path)
+{
+  record->setBytes(TT_DB_FILE_PATH_OFFSET, path);
+
+  int length = TT_DB_FILE_PATH_OFFSET + path.len() + 1;
+  if (length > record->getMaxLength()) {
+    length = record->getMaxLength();
+  }
+  else {
+    ((char *)record->getRecord())[length - 1] = '\0';
+  }
+  if (length < record->getMinLength()) {
+    length = record->getMinLength();
+  }
+  record->setLength(length);
+}
+
 _Tt_db_results _Tt_db_server_db::createFile (const _Tt_string        &file,
 					     const _Tt_db_access_ptr &access)
 {
@@ -214,7 +240,7 @@ _Tt_db_results _Tt_db_server_db::createFile (const _Tt_string        &file,
 
   _Tt_isam_record_ptr record_ptr = fileTable->getEmptyRecord();
   record_ptr->setKeyPartValue(0, 0, file_key->binary());
-  record_ptr->setBytes(TT_DB_FILE_PATH_OFFSET, file);
+  setFilePath(record_ptr, file);
 
   int results = fileTable->writeRecord(record_ptr);
   dbLastFileAccessed = fileTable->getName();
@@ -697,17 +723,19 @@ _Tt_db_server_db::setFileFile (const _Tt_string        &file,
   int results = fileTable->getErrorStatus();
 
   if (!results) {
-    // Get a clean record
+    // Build the replacement in a clean record: writing the new path
+    // over the old record left the tail of a longer old path behind
+    // it, and kept the old record length.
     _Tt_isam_record_ptr new_record = fileTable->getEmptyRecord();
 
     // Put the file key into the new record
-    record_ptr->setKeyPartValue(0, 0, file_key);
+    new_record->setKeyPartValue(0, 0, file_key);
 
     // Put the new file into the record
-    record_ptr->setBytes(TT_DB_FILE_PATH_OFFSET, new_file);
+    setFilePath(new_record, new_file);
 
     // Update the current file table record with the new info
-    results = fileTable->updateCurrentRecord(record_ptr);
+    results = fileTable->updateCurrentRecord(new_record);
   }
 
   if (results) {
@@ -737,7 +765,11 @@ _Tt_db_server_db::getFileChildren (const _Tt_string    &file,
   if (dbResults == TT_DB_OK) {
     children->append(file);
   }
-  else if (dbResults == TT_DB_ERR_NO_SUCH_FILE) {
+  // Position at the first child even when the file itself was found:
+  // reading on from the file's own record stopped at a sibling such
+  // as "/d.old" or "/d-x", which sorts before "/d/...".
+  if ((dbResults == TT_DB_OK) || (dbResults == TT_DB_ERR_NO_SUCH_FILE)) {
+    bool_t file_found = (dbResults == TT_DB_OK);
     dbResults = TT_DB_OK;
 
     // Position the file at the first record that has the file name
@@ -754,7 +786,9 @@ _Tt_db_server_db::getFileChildren (const _Tt_string    &file,
     dbLastFileAccessed = fileTable->getName();
 
     if (results == ENOREC) {
-      dbResults = TT_DB_ERR_NO_SUCH_FILE;
+      // No children: the file itself, if found, is the whole list
+      dbResults = (file_found ? TT_DB_OK : TT_DB_ERR_NO_SUCH_FILE);
+      return dbResults;
     }
     else if (results) {
       dbResults = TT_DB_ERR_CORRUPT_DB;
@@ -1202,6 +1236,144 @@ _Tt_db_server_db::verifyAccess (const _Tt_string        &key,
   return dbResults;
 }
 
+// The cache level of a file or object is a property with a single
+// sizeof(int) value in the property table.
+enum { CACHE_LEVEL_READ, CACHE_LEVEL_READ_OR_CREATE, CACHE_LEVEL_INCREMENT };
+
+_Tt_db_results
+_Tt_db_server_db::getFileCacheLevel (const _Tt_string        &file,
+				     const _Tt_db_access_ptr &access,
+				     int                     &cache_level)
+{
+  cache_level = -1;
+
+  _Tt_string file_key;
+  if ((getFileKey(file, file_key) != TT_DB_OK) ||
+      (verifyAccess(file_key, access) != TT_DB_OK)) {
+    return dbResults;
+  }
+  return cacheLevel(file_key, CACHE_LEVEL_READ_OR_CREATE, cache_level);
+}
+
+_Tt_db_results
+_Tt_db_server_db::incrementFileCacheLevel (const _Tt_string        &file,
+					   const _Tt_db_access_ptr &access,
+					   int                     &cache_level)
+{
+  cache_level = -1;
+
+  // A read check is enough: the separate get and set this replaces
+  // checked read and then write access, and verifyAccess() grants
+  // write access wherever it grants read access.
+  _Tt_string file_key;
+  if ((getFileKey(file, file_key) != TT_DB_OK) ||
+      (verifyAccess(file_key, access) != TT_DB_OK)) {
+    return dbResults;
+  }
+  return cacheLevel(file_key, CACHE_LEVEL_INCREMENT, cache_level);
+}
+
+_Tt_db_results
+_Tt_db_server_db::getObjectCacheLevel (const _Tt_string        &objid,
+				       const _Tt_db_access_ptr &access,
+				       int                     &cache_level)
+{
+  cache_level = -1;
+
+  _Tt_string object_key = getObjectKey(objid);
+  if (verifyObjectAccess(object_key, access) != TT_DB_OK) {
+    return dbResults;
+  }
+  return cacheLevel(object_key, CACHE_LEVEL_READ, cache_level);
+}
+
+_Tt_db_results
+_Tt_db_server_db::incrementObjectCacheLevel (const _Tt_string        &objid,
+					     const _Tt_db_access_ptr &access,
+					     int                     &cache_level)
+{
+  cache_level = -1;
+
+  _Tt_string object_key = getObjectKey(objid);
+  if (verifyObjectAccess(object_key, access) != TT_DB_OK) {
+    return dbResults;
+  }
+  return cacheLevel(object_key, CACHE_LEVEL_INCREMENT, cache_level);
+}
+
+//
+// Reads the cache level stored under key.  CACHE_LEVEL_INCREMENT adds
+// one and rewrites the record in place; a missing level is created at
+// 0 by CACHE_LEVEL_INCREMENT and CACHE_LEVEL_READ_OR_CREATE and is
+// TT_DB_ERR_NO_SUCH_PROPERTY for CACHE_LEVEL_READ.
+//
+_Tt_db_results _Tt_db_server_db::cacheLevel (const _Tt_string &key,
+					     int               mode,
+					     int              &cache_level)
+{
+  dbResults = TT_DB_OK;
+  cache_level = -1;
+
+  _Tt_isam_record_ptr record_ptr = propertyTable->getEmptyRecord();
+  record_ptr->setKeyPartValue(0, 0, key);
+  record_ptr->setKeyPartValue(0, 1, TT_DB_PROPS_CACHE_LEVEL_PROPERTY);
+
+  int results = propertyTable->findStartRecord(propertyTablePropertyKey,
+					       0,
+					       record_ptr,
+					       ISEQUAL);
+  dbLastFileAccessed = propertyTable->getName();
+
+  if (results == ENOREC) {
+    if (mode == CACHE_LEVEL_READ) {
+      return (dbResults = TT_DB_ERR_NO_SUCH_PROPERTY);
+    }
+    int level = 0;
+    _Tt_string value(sizeof(int));
+    memcpy((char *)value, (char *)&level, sizeof(int));
+    if (addPropertyValue(key, TT_DB_PROPS_CACHE_LEVEL_PROPERTY, value) ==
+	TT_DB_OK) {
+      cache_level = level;
+    }
+    return dbResults;
+  }
+  else if (results) {
+    return (dbResults = TT_DB_ERR_CORRUPT_DB);
+  }
+
+  record_ptr = propertyTable->readRecord(ISNEXT);
+  if (propertyTable->getErrorStatus()) {
+    return (dbResults = TT_DB_ERR_CORRUPT_DB);
+  }
+
+  // The value is sizeof(int) bytes; read a shorter one as if padded
+  // with zeros, as the old get/set pair effectively did.
+  char *buffer = (char *)record_ptr->getRecord();
+  int value_length = record_ptr->getLength() - TT_DB_PROPERTY_VALUE_OFFSET;
+  if (value_length < 0) {
+    value_length = 0;
+  }
+  else if (value_length > (int)sizeof(int)) {
+    value_length = sizeof(int);
+  }
+  int level = 0;
+  memcpy((char *)&level, buffer + TT_DB_PROPERTY_VALUE_OFFSET, value_length);
+
+  if (mode == CACHE_LEVEL_INCREMENT) {
+    level++;
+    memcpy(buffer + TT_DB_PROPERTY_VALUE_OFFSET, (char *)&level, sizeof(int));
+    if (record_ptr->getLength() < TT_DB_PROPERTY_VALUE_OFFSET+(int)sizeof(int)) {
+      record_ptr->setLength(TT_DB_PROPERTY_VALUE_OFFSET+sizeof(int));
+    }
+    if (propertyTable->updateCurrentRecord(record_ptr)) {
+      return (dbResults = TT_DB_ERR_CORRUPT_DB);
+    }
+  }
+
+  cache_level = level;
+  return dbResults;
+}
+
 _Tt_db_results _Tt_db_server_db::getFileKey (const _Tt_string &file,
 					     _Tt_string       &file_key)
 {
@@ -1210,12 +1382,16 @@ _Tt_db_results _Tt_db_server_db::getFileKey (const _Tt_string &file,
   _Tt_isam_record_ptr record_ptr = fileTable->getEmptyRecord();
   record_ptr->setKeyPartValue(1, 0, file);
 
-  // Position file just before record with specified file path in the
-  // file table
+  // Look the path up by the whole TT_DB_MAX_KEY_LENGTH-byte key.  Keys
+  // are NUL padded (records start out zeroed) and the path index allows
+  // no duplicates, so at most one record can match: the file itself or,
+  // for a longer path, the one file that shares its first
+  // TT_DB_MAX_KEY_LENGTH bytes.  Searching by the path's length instead
+  // matched every path it is a prefix of (a directory matches all the
+  // files under it), and a miss then read on to the end of the table.
   int results =
     fileTable->findStartRecord(fileTableFilePathKey,
-			       ((file.len() < TT_DB_MAX_KEY_LENGTH) ?
-				file.len() : TT_DB_MAX_KEY_LENGTH),
+			       0,
 			       record_ptr,
 			       ISEQUAL);
   dbLastFileAccessed = fileTable->getName();
@@ -1227,36 +1403,30 @@ _Tt_db_results _Tt_db_server_db::getFileKey (const _Tt_string &file,
     dbResults = TT_DB_ERR_CORRUPT_DB;
   }
   else {
-    for (;;) {
-      // Read the next record
-      record_ptr = fileTable->readRecord(ISNEXT);
-      results = fileTable->getErrorStatus();
+    // Read the record and make the current record of the file table
+    // (setFileFile() rewrites it)
+    record_ptr = fileTable->readRecord(ISNEXT);
+    results = fileTable->getErrorStatus();
 
-      if (!results) {
-	// Extract the full file path from the record
-	_Tt_string temp_file = (char *)
-                               record_ptr->getBytes(TT_DB_FILE_PATH_OFFSET, 0);
+    if (!results) {
+      // Extract the full file path from the record
+      _Tt_string temp_file = (char *)
+                             record_ptr->getBytes(TT_DB_FILE_PATH_OFFSET, 0);
 
-	// If the record file path matchs the specified file, then
-	// we found our file, therefore break out of the loop...
-	if (file == temp_file) {
-	  break;
-	}
-      }
-      // No more records left, our file doesn't exist...
-      else if ((results == ENOREC) || (results == EENDFILE)) {
-	dbResults = TT_DB_ERR_NO_SUCH_FILE;
-	break;
+      if (file == temp_file) {
+	// Extract the file key
+	file_key = record_ptr->getKeyPartValue(0, 0);
       }
       else {
-	dbResults = TT_DB_ERR_CORRUPT_DB;
-	break;
+	dbResults = TT_DB_ERR_NO_SUCH_FILE;
       }
     }
-
-    if (dbResults == TT_DB_OK) {
-      // Extract the file key
-      file_key = record_ptr->getKeyPartValue(0, 0);
+    // No more records left, our file doesn't exist...
+    else if ((results == ENOREC) || (results == EENDFILE)) {
+      dbResults = TT_DB_ERR_NO_SUCH_FILE;
+    }
+    else {
+      dbResults = TT_DB_ERR_CORRUPT_DB;
     }
   }
 

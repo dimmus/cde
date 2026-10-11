@@ -47,7 +47,7 @@
 #include <grp.h>
 
 #include <string.h>
-#include <libgen.h>			/* basename() */
+#include <fcntl.h>			/* open() */
 #include <sys/param.h>			/* MAXPATHLEN */
 
 #include <bms/bms.h>
@@ -490,6 +490,41 @@ int Client_Abort(protocol_request_ptr prot)
 
 #define FREE_USER_PASS(a, b) free(a); free(b);
 
+/*
+ * make_auth_suffix: the random part of the authentication file name
+ * (size - 1 letters and digits).  The client creates the file, so only
+ * a name nobody can guess in advance is needed.  /dev/urandom is used
+ * when it can be read; time, pid and random() otherwise.
+ */
+static void make_auth_suffix(char *buf, size_t size)
+{
+  static const char chars[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  unsigned char rnd[32];
+  size_t have = 0, i;
+  int fd;
+
+  if (size > sizeof(rnd))
+    size = sizeof(rnd);
+
+  fd = open("/dev/urandom", O_RDONLY);
+  if (fd != -1) {
+    ssize_t n = read(fd, rnd, size);
+    if (n > 0)
+      have = (size_t) n;
+    close(fd);
+  }
+  if (have < size) {
+    srandom((unsigned) time(NULL) ^ ((unsigned) getpid() << 16));
+    for (i = have; i < size; i++)
+      rnd[i] = (unsigned char) random();
+  }
+
+  for (i = 0; i + 1 < size; i++)
+    buf[i] = chars[rnd[i] % (sizeof(chars) - 1)];
+  buf[i] = '\0';
+}
+
 /*----------------------------------------------------------------------+*/
 int Client_Register(protocol_request_ptr prot)
 /*----------------------------------------------------------------------+*/
@@ -506,7 +541,7 @@ int Client_Register(protocol_request_ptr prot)
   int free_netfile = 0;
   char *spc_prefix = "/.SPC_";
   char *spc_suffix;
-  char tmpnam_buf[L_tmpnam + 1];
+  char suffix_buf[17];
   size_t buffsize;
 
   print_protocol_request((XeString)"--> REGISTER", prot);
@@ -558,10 +593,11 @@ int Client_Register(protocol_request_ptr prot)
      * given or the TMPDIR envirnoment variable.  Because of these side
      * effects, the function may return "/tmp/.SPC_xxxxxx" and ignore
      * tmppath.  The protocol will fail when this occurs.  The fix is
-     * to construct the tmpfile name.
+     * to construct the tmpfile name.  The client creates the file, so
+     * only its name is made here (tmpnam(3) was used for that).
      */
-    tmpnam(tmpnam_buf);
-    spc_suffix = basename(tmpnam_buf); /* Don't free result - not alloc'd! */
+    make_auth_suffix(suffix_buf, sizeof(suffix_buf));
+    spc_suffix = suffix_buf;
 
     /* Allocate space for tmppath, spc_prefix, and spc_suffix. */
     buffsize = strlen(tmppath) + strlen(spc_prefix) + strlen(spc_suffix) + 1;

@@ -60,19 +60,63 @@ typedef	int	DtDtsMMIndexOffset;
 typedef	int	DtDtsMMNameIndex;
 typedef	int	DtDtsMMPathHash;
 
+/*
+ * The dtdbcache file starts with this header.
+ *
+ * The first word of the old (version 1) format was a "path hash", a sum
+ * of bytes, which readers compared first, rejecting the file on a
+ * mismatch.  DTDTSMM_MAGIC is negative, which that sum never
+ * is, so those readers reject the files written now; readers now reject
+ * any file without the magic number and version.
+ *
+ * Version 2:
+ *   - the file list (files_offset) is DtDtsMMStamp entries: the
+ *     database directories in search path order, each followed by its
+ *     database files, with their mtimes and ctimes in nanoseconds;
+ *   - searchpath is the expanded DTDATABASESEARCHPATH it was built from;
+ *   - the string table (strtab.c) hashes with FNV-1a into twice as many
+ *     buckets as strings, and links entries with 32-bit indices; the
+ *     name index tables (inttab.c) link with 32-bit indices.
+ */
+#define	DTDTSMM_MAGIC		(-0x2824353B)	/* 0xD7DBCAC5 */
+#define	DTDTSMM_VERSION		2
+
 typedef	struct
 {
-	DtDtsMMPathHash		pathhash;	/* hash of dir. we visit */
+	int			magic;		/* DTDTSMM_MAGIC */
+	int			version;	/* DTDTSMM_VERSION */
+	int			size;		/* bytes in the file */
+	DtShmBoson		searchpath;	/* expanded search path */
 	DtDtsMMDataBaseCount	num_db;		/* number of databases */
 	DtDtsMMDataBaseStart	db_offset;	/* index to databases */
 	DtDtsMMNameIndex	name_list_offset;	/* index to name list */
 	DtDtsMMNameIndex	no_name_offset;		/* index to nonunique names */
 	DtDtsMMNameIndex	buffer_start_index;	/* index to list of buffers */
 	DtDtsMMIndexOffset	str_tbl_offset;		/* index to table of strings */
-	DtDtsMMIndexOffset	files_count;		/* number of loaded files */
-	DtDtsMMIndexOffset	files_offset;		/* index to list of loaded files */
-	DtDtsMMIndexOffset	mtimes_offset;	/* index to modified times of files */
+	DtDtsMMIndexOffset	files_count;		/* number of DtDtsMMStamps */
+	DtDtsMMIndexOffset	files_offset;		/* index to the DtDtsMMStamps */
 } DtDtsMMHeader;
+
+/* What a directory or database file was like when the cache was built. */
+typedef	struct
+{
+	DtShmBoson		path;		/* absolute path name */
+	int			is_dir;		/* a database directory */
+	int			error;		/* errno of stat(), or 0 */
+	int			size;		/* st_size (low 32 bits) */
+	int			mtime[3];	/* st_mtim: seconds (low, high), ns */
+	int			ctime[3];	/* st_ctim: likewise */
+} DtDtsMMStamp;
+
+struct stat;
+void	_DtDtsMMFillStamp(DtDtsMMStamp *stamp, const struct stat *st, int error);
+char *	_DtDtsMMSearchPath(void);
+
+/*
+ * The override argument of _DtDtsMMCreateDb(): replace the cache file
+ * named, but if that fails use a private one (rather than fail).
+ */
+#define	DTDTSMM_SHARED_OR_PRIVATE	2
 
 /* one set of attribute/pair */
 typedef	struct
@@ -119,9 +163,12 @@ int			_DtDtsMMGetPtrSize(int index);
 int			_DtDtsMMInit(int);
 void			_DtDtsMMPrint(FILE *org_fd);
 int			_DtDtsMMCreateDb(DtDirPaths *dirs, const char *CacheFile, int override);
-int			_DtDtsMMCreateFile(DtDirPaths *dirs, const char *CacheFile);
+int			_DtDtsMMCreateFile(DtDirPaths *dirs, const char *CacheFile, int fallback);
 char *			_DtDtsMMCacheName(int);
 int			_DtDtsMMapDB(const char *CacheFile);
+int			_DtDtsMMapFd(int fd);
+int			_DtDtsMMapNewFd(int fd);
+void			_DtDtsMMStampDirs(DtDirPaths *dirs);
 
 const char *		_DtDtsMMBosonToString(DtShmBoson boson);
 DtShmBoson		_DtDtsMMStringToBoson(const char *string);
@@ -165,8 +212,22 @@ extern	DtDtsMMRecord	*_DtDtsMMGetRecordByName(DtDtsMMDatabase *database,
 
 
 char *	_DtDtsMMExpandValue(const char *value);
+/*
+ * Like _DtDtsMMExpandValue(), but when VALUE (a string from the mapped
+ * database) has nothing to expand, VALUE itself is returned instead of a
+ * copy.  The result is read-only and must be released with
+ * _DtDtsMMSafeFree().
+ */
+char *	_DtDtsMMExpandValueNoCopy(const char *value);
 void	_DtDtsMMSafeFree(char *value);
 int	_DtDtsMMIsMemory(const char *value);
+
+/*
+ * A number that changes whenever the database is mapped or unmapped.
+ * Callers caching bosons or pointers into the mapping compare it with
+ * the value they saw when they filled their cache.
+ */
+unsigned int	_DtDtsMMGeneration(void);
 
 extern	DtShmBoson	_DtDtsMMNameStringToBoson(const char *string);
 

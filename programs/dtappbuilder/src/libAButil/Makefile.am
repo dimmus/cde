@@ -8,7 +8,7 @@ noinst_LIBRARIES = libAButil.a
 
 #noinst_PROGRAMS = util_test istr_test
 
-libAButil_a_CFLAGS = $(EXTRA_DEFINES) -I$(ABINCLUDES)
+libAButil_a_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES)
 
 libAButil_a_SOURCES = abio.c          \
 		      abio_path.c     \

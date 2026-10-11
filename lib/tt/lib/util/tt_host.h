@@ -51,7 +51,8 @@ class _Tt_host : public _Tt_object {
 	virtual ~_Tt_host();
 	int			init_byaddr(_Tt_string addr);
 	int			init_byname(_Tt_string name);
-	int			init_bystringaddr(_Tt_string addr);
+	int			init_bystringaddr(_Tt_string addr,
+						  int resolve_name = 1);
 	const _Tt_string &	name()	      const {return _name;};
 	const _Tt_string &	netname()     const {return _netname;};
 	const _Tt_string &	addr()	      const {return _addr;};

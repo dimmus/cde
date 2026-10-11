@@ -1893,13 +1893,13 @@ setup_range(CSA_attribute **attrs, CSA_enum **ops, int *count, time_t start,
 	memset(op_ptr, 0, o_size);
 
 	initialize_entry_attr(CSA_ENTRY_ATTR_START_DATE_I, &attr_ptr[0], appt_write, version);
-	attr_ptr[0].value->item.string_value = malloc(BUFSIZ);
+	attr_ptr[0].value->item.string_value = calloc(1, BUFSIZ);
 	_csa_tick_to_iso8601(start, attr_ptr[0].value->item.string_value);
 
 	op_ptr[0] = CSA_MATCH_GREATER_THAN_OR_EQUAL_TO;
 
 	initialize_entry_attr(CSA_ENTRY_ATTR_START_DATE_I, &attr_ptr[1], appt_write, version);
-	attr_ptr[1].value->item.string_value = malloc(BUFSIZ);
+	attr_ptr[1].value->item.string_value = calloc(1, BUFSIZ);
 	_csa_tick_to_iso8601(stop, attr_ptr[1].value->item.string_value);
 	op_ptr[1] = CSA_MATCH_LESS_THAN_OR_EQUAL_TO;
 
@@ -1940,6 +1940,120 @@ free_range(CSA_attribute **attrs, CSA_enum **ops, int count) {
 
 	free(*ops);
 	*ops = NULL;
+}
+
+/*
+ * Fetch the events starting in [start, stop] with one call.  Any range
+ * that covers all the sub-ranges asked for later will do: entries are
+ * handed out by their own start time.
+ */
+extern void
+CmRangeListInit(CmRangeList *rl, CSA_session_handle cal, int version,
+		time_t start, time_t stop)
+{
+	CSA_attribute		*range_attrs;
+	CSA_enum		*ops;
+	int			i, n;
+	CSA_return_code		stat;
+	Dtcm_appointment	*appt;
+
+	memset(rl, 0, sizeof(CmRangeList));
+	rl->cal = cal;
+	rl->version = version;
+
+	/* the margin can reach before 1970 when printing from get_bot();
+	 * a negative tick cannot be converted for the server
+	 */
+	if (start < 0)
+		start = 0;
+
+	setup_range(&range_attrs, &ops, &n, start, stop, CSA_TYPE_EVENT, 0,
+		    B_FALSE, version);
+	stat = csa_list_entries(cal, n, range_attrs, ops, &rl->total,
+				&rl->list, NULL);
+	free_range(&range_attrs, &ops, n);
+	if (stat != CSA_SUCCESS)
+		return;
+
+	if (rl->total > 0) {
+		rl->ticks = (time_t *)malloc(rl->total * sizeof(time_t));
+		rl->slice = (CSA_entry_handle *)malloc(rl->total *
+						sizeof(CSA_entry_handle));
+		appt = allocate_appt_struct(appt_read, version,
+					    CSA_ENTRY_ATTR_START_DATE_I, NULL);
+		if (rl->ticks == NULL || rl->slice == NULL || appt == NULL) {
+			if (appt)
+				free_appt_struct(&appt);
+			CmRangeListFree(rl);
+			return;
+		}
+		for (i = 0; i < rl->total; i++) {
+			if (query_appt_struct(cal, rl->list[i], appt)
+			    != CSA_SUCCESS ||
+			    _csa_iso8601_to_tick(
+				appt->time->value->item.date_time_value,
+				&rl->ticks[i]) != 0) {
+				free_appt_struct(&appt);
+				CmRangeListFree(rl);
+				return;
+			}
+		}
+		free_appt_struct(&appt);
+	}
+
+	rl->valid = B_TRUE;
+}
+
+/*
+ * The events starting in [lo, hi], in the order the server returned
+ * them, which is what csa_list_entries() for [lo, hi] returns.  The
+ * array stays valid until the next call or CmRangeListFree().
+ */
+extern CSA_uint32
+CmRangeListGet(CmRangeList *rl, time_t lo, time_t hi, CSA_entry_handle **out)
+{
+	CSA_attribute	*range_attrs;
+	CSA_enum	*ops;
+	CSA_uint32	i, n;
+	int		count;
+
+	if (rl->valid) {
+		for (i = 0, n = 0; i < rl->total; i++)
+			if (rl->ticks[i] >= lo && rl->ticks[i] <= hi)
+				rl->slice[n++] = rl->list[i];
+		*out = rl->slice;
+		return (n);
+	}
+
+	if (rl->sub) {
+		csa_free(rl->sub);
+		rl->sub = NULL;
+	}
+	setup_range(&range_attrs, &ops, &count, lo, hi, CSA_TYPE_EVENT, 0,
+		    B_FALSE, rl->version);
+	if (csa_list_entries(rl->cal, count, range_attrs, ops, &n, &rl->sub,
+	    NULL) != CSA_SUCCESS) {
+		rl->sub = NULL;
+		n = 0;
+	}
+	free_range(&range_attrs, &ops, count);
+	*out = rl->sub;
+	return (n);
+}
+
+extern void
+CmRangeListFree(CmRangeList *rl)
+{
+	if (rl->list)
+		csa_free(rl->list);
+	if (rl->sub)
+		csa_free(rl->sub);
+	free(rl->ticks);
+	free(rl->slice);
+	rl->list = rl->sub = rl->slice = NULL;
+	rl->ticks = NULL;
+	rl->total = 0;
+	rl->valid = B_FALSE;
 }
 
 /*
@@ -2005,6 +2119,10 @@ CmDataListAdd(CmDataList *list, void *data, int position)
 	item = CmDataItemCreate();
 	item->data = data;
 
+	/* Appending keeps the positions before it; anything else moves them */
+	if (position != 0 && position <= list->count)
+		list->cursor_pos = 0;
+
 	/* Insert node into list at appropriate spot */
 	if (list->head == NULL) {
 		list->head = item;
@@ -2020,6 +2138,7 @@ CmDataListAdd(CmDataList *list, void *data, int position)
 			;
 
 		if (p == NULL) {
+			free(item);
 			return -1;
 		}
 
@@ -2068,6 +2187,8 @@ CmDataListDeletePos(CmDataList *list, int position, int free_data)
 	if (position == 0) {
 		position = list->count;
 	}
+
+	list->cursor_pos = 0;
 
 	if (list->head == NULL) {
 		return NULL;
@@ -2134,6 +2255,8 @@ CmDataListDeleteAll(CmDataList *list, int free_data)
 	list->count = 0;
 	list->head = NULL;
 	list->tail = NULL;
+	list->cursor = NULL;
+	list->cursor_pos = 0;
 
 	return;
 }
@@ -2154,12 +2277,25 @@ CmDataListGetData(CmDataList *list, int position)
 	} else if (position == 0) {
 		data = list->tail->data;
 	} else {
-		for (n = 1, p = list->head; p != NULL && n < position;
-		     p = p->next, n++)
+		/*
+		 * Lists are walked in order (1, 2, 3, ...), so start from
+		 * the item found last time when possible; starting from
+		 * the head made a full walk O(n^2).
+		 */
+		if (list->cursor_pos > 0 && list->cursor_pos <= position) {
+			n = list->cursor_pos;
+			p = list->cursor;
+		} else {
+			n = 1;
+			p = list->head;
+		}
+		for (; p != NULL && n < position; p = p->next, n++)
 			;
 		if (p == NULL) {
 			return NULL;
 		}
+		list->cursor = p;
+		list->cursor_pos = n;
 		data = p->data;
 	}
 

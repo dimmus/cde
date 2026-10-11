@@ -23,14 +23,47 @@ AC_PREREQ([2.69])
 AC_CANONICAL_HOST
 AC_CANONICAL_BUILD
 
-C_STD="c99"
+dnl Language standards.  C is GNU C11 (C99 plus the C11 additions and
+dnl the GNU extensions the code base already relies on); C++ is pinned to
+dnl GNU C++17 so that it does not silently follow the compiler default.
+C_STD="gnu11"
+CXX_STD="gnu++17"
 AC_SUBST(C_STD)
+AC_SUBST(CXX_STD)
 
 dnl These must be up here for the compiler search list to actually work
 AC_PROG_CC([cc gcc clang])
 AC_PROG_CXX([c++ g++ clang++])
 
-LT_INIT
+dnl Link-time optimisation (--enable-lto).  Archives of LTO objects must
+dnl be made by the gcc-ar/gcc-ranlib/gcc-nm wrappers, which load the LTO
+dnl plugin, so this comes before LT_INIT, which picks AR, RANLIB and NM.
+AC_ARG_ENABLE([lto],
+        AS_HELP_STRING([--enable-lto], [Build with link-time optimisation, -flto=auto -fno-semantic-interposition (default=no)]),
+        [], [enable_lto=no]
+)
+LTO_CFLAGS=""
+LTO_CXXFLAGS=""
+LTO_LDFLAGS=""
+if test "x$enable_lto" != xno; then
+   CDE_CHECK_CFLAG([-flto=auto], [LTO_CFLAGS])
+   CDE_CHECK_CXXFLAG([-flto=auto], [LTO_CXXFLAGS])
+   CDE_CHECK_LDFLAG([-flto=auto], [LTO_LDFLAGS])
+   if test -z "$LTO_CFLAGS" || test -z "$LTO_CXXFLAGS" || test -z "$LTO_LDFLAGS"; then
+      AC_MSG_ERROR([--enable-lto: the compilers or the linker do not support -flto=auto])
+   fi
+   CDE_CHECK_CFLAG([-fno-semantic-interposition], [LTO_CFLAGS])
+   CDE_CHECK_CXXFLAG([-fno-semantic-interposition], [LTO_CXXFLAGS])
+   if test "x$GCC" = xyes; then
+      AC_CHECK_TOOL([AR], [gcc-ar])
+      AC_CHECK_TOOL([RANLIB], [gcc-ranlib])
+      AC_CHECK_TOOL([NM], [gcc-nm])
+   fi
+fi
+
+dnl Shared libraries only: nothing links the static archives, and
+dnl building both compiles every libtool object twice.
+LT_INIT([disable-static])
 AC_PREFIX_DEFAULT(/usr/dt)
 
 PKG_PROG_PKG_CONFIG
@@ -95,8 +128,11 @@ supports_pam=no
 case "${build_os}" in
 	linux*)
 		build_linux=yes
-                SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -D_POSIX_SOURCE \
--D_DEFAULT_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE"
+                dnl _DEFAULT_SOURCE replaces the deprecated _BSD_SOURCE and
+                dnl _SVID_SOURCE (and implies _POSIX_SOURCE).  It is still
+                dnl needed: many files define _XOPEN_SOURCE or _POSIX_SOURCE
+                dnl themselves, which would otherwise hide the BSD/SVID API.
+                SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -D_DEFAULT_SOURCE"
                 supports_pam=yes
                  ;;
 	freebsd*)
@@ -177,28 +213,14 @@ AM_CONDITIONAL([I386], [test "$is_i386" = yes])
 AM_CONDITIONAL([X86_64], [test "$is_x86_64" = yes])
 AM_CONDITIONAL([ARM], [test "$is_arm" = yes])
 AM_CONDITIONAL([SPARC], [test "$is_sparc" = yes])
-AM_CONDITIONAL([MIPS], [test "is_mips" = yes])
-AM_CONDITIONAL([PPC], [test "is_ppc" = yes])
-AM_CONDITIONAL([RISCV], [test "is_riscv" = yes])
-AM_CONDITIONAL([AARCH64], [test "is_aarch64" = yes])
+AM_CONDITIONAL([MIPS], [test "$is_mips" = yes])
+AM_CONDITIONAL([PPC], [test "$is_ppc" = yes])
+AM_CONDITIONAL([RISCV], [test "$is_riscv" = yes])
+AM_CONDITIONAL([AARCH64], [test "$is_aarch64" = yes])
 
-dnl our main libraries
-dnl we use single quotes so that $top_buildir is evaluated in the makefiles,
-dnl not here.
-AC_SUBST(LIBTT, '$(top_builddir)/lib/tt/lib/libtt.la')
-AC_SUBST(LIBXIN, '$(top_builddir)/lib/DtXinerama/libDtXinerama.la')
-AC_SUBST(LIBWIDGET, '$(top_builddir)/lib/DtWidget/libDtWidget.la')
-AC_SUBST(LIBTERM, '$(top_builddir)/lib/DtTerm/libDtTerm.la')
-AC_SUBST(LIBSVC, '$(top_builddir)/lib/DtSvc/libDtSvc.la')
-AC_SUBST(LIBSEARCH, '$(top_builddir)/lib/DtSearch/libDtSearch.la')
-AC_SUBST(LIBPRINT, '$(top_builddir)/lib/DtPrint/libDtPrint.la')
-AC_SUBST(LIBMRM, '$(top_builddir)/lib/DtMrm/libDtMrm.la')
-AC_SUBST(LIBMMDB, '$(top_builddir)/lib/DtMmdb/libDtMmdb.la')
-AC_SUBST(LIBHELP, '$(top_builddir)/lib/DtHelp/libDtHelp.la')
-AC_SUBST(LIBCSA, '$(top_builddir)/lib/csa/libcsa.la')
-
-AC_SUBST(DTCLIENTLIBS, '$(LIBPRINT) $(LIBHELP) $(LIBWIDGET) $(LIBSVC) \
-$(LIBTT) $(LIBXIN)')
+dnl The in-tree libraries ($(LIBSVC), $(LIBTT), ...) are defined in
+dnl build-aux/cde-libs.am, which the Makefile.am files that link them
+dnl include, so that automake makes the programs depend on them.
 
 dnl set up come convenience replacements for global include dirs
 AC_SUBST(DT_INCDIR, '-I$(top_builddir)/include/Dt')
@@ -208,56 +230,115 @@ AC_SUBST(XM_INCDIR, '-I$(top_builddir)/include/Xm')
 AC_SUBST(CSA_INCDIR, '-I$(top_builddir)/include/csa')
 AC_SUBST(SPC_INCDIR, '-I$(top_builddir)/include/SPC')
 
-dnl language enables
+dnl language enables.  AC_ARG_ENABLE sets enable_<feature> to "yes" for
+dnl --enable-<feature> and to "no" for --disable-<feature>, so the
+dnl action-if-given is left empty and only the default is filled in.
 
 AC_ARG_ENABLE([german],
         AS_HELP_STRING([--enable-german], [Build German locale (default=no)]),
-        [enable_de="yes"], [enable_de=""]
+        [], [enable_german=no]
 )
-AM_CONDITIONAL([GERMAN], [test -n "$enable_de"])
+AM_CONDITIONAL([GERMAN], [test "x$enable_german" != xno])
 
 AC_ARG_ENABLE([italian],
         AS_HELP_STRING([--enable-italian], [Build Italian locale (default=no)]),
-        [enable_it="yes"], [enable_it=""]
+        [], [enable_italian=no]
 )
-AM_CONDITIONAL([ITALIAN], [test -n "$enable_it"])
+AM_CONDITIONAL([ITALIAN], [test "x$enable_italian" != xno])
 
 AC_ARG_ENABLE([french],
         AS_HELP_STRING([--enable-french], [Build French locale (default=no)]),
-        [enable_fr="yes"], [enable_fr=""]
+        [], [enable_french=no]
 )
-AM_CONDITIONAL([FRENCH], [test -n "$enable_fr"])
+AM_CONDITIONAL([FRENCH], [test "x$enable_french" != xno])
 
 AC_ARG_ENABLE([spanish],
         AS_HELP_STRING([--enable-spanish], [Build Spanish locale (default=no)]),
-        [enable_es="yes"], [enable_es=""]
+        [], [enable_spanish=no]
 )
-AM_CONDITIONAL([SPANISH], [test -n "$enable_es"])
+AM_CONDITIONAL([SPANISH], [test "x$enable_spanish" != xno])
 
 AC_ARG_ENABLE([japanese],
         AS_HELP_STRING([--enable-japanese], [Build Japanese locale (default=no)]),
-        [enable_ja="yes"], [enable_ja=""]
+        [], [enable_japanese=no]
 )
-AM_CONDITIONAL([JAPANESE], [test -n "$enable_ja"])
+AM_CONDITIONAL([JAPANESE], [test "x$enable_japanese" != xno])
 
 dnl interface font
 AC_ARG_ENABLE([misc-fixed],
         AS_HELP_STRING([--enable-misc-fixed], [Set interface font to misc-fixed (default=no)]),
-        [enable_misc_fixed="yes"], [enable_misc_fixed=""]
+        [], [enable_misc_fixed=no]
 )
-AM_CONDITIONAL([MISC_FIXED], [test -n "$enable_misc_fixed"])
+AM_CONDITIONAL([MISC_FIXED], [test "x$enable_misc_fixed" != xno])
 
-dnl Build the help and dtinfo docs?
+dnl Documentation: the help volumes, the man pages and the dtinfo
+dnl information library.  --disable-docs changes the default of the three
+dnl switches below it, which can still turn a part back on.
 AC_ARG_ENABLE([docs],
-        AS_HELP_STRING([--disable-docs], [Disable building help/dtinfo docs (default=no)]),
-        [disable_docs="yes"], [disable_docs=""]
+        AS_HELP_STRING([--disable-docs], [Do not build the help volumes, the man pages or the dtinfo library (default=build them)]),
+        [], [enable_docs=yes]
 )
-AM_CONDITIONAL([BUILD_DOCS], [test -z "$disable_docs"])
+AC_ARG_ENABLE([help-docs],
+        AS_HELP_STRING([--disable-help-docs], [Do not build the help volumes (default=as --enable-docs)]),
+        [], [enable_help_docs=$enable_docs]
+)
+AC_ARG_ENABLE([man-pages],
+        AS_HELP_STRING([--disable-man-pages], [Do not build the man pages (default=as --enable-docs)]),
+        [], [enable_man_pages=$enable_docs]
+)
+AC_ARG_ENABLE([infolib],
+        AS_HELP_STRING([--disable-infolib], [Do not build the dtinfo information library (default=as --enable-docs)]),
+        [], [enable_infolib=$enable_docs]
+)
+AM_CONDITIONAL([BUILD_HELP_DOCS], [test "x$enable_help_docs" != xno])
+AM_CONDITIONAL([BUILD_MAN_PAGES], [test "x$enable_man_pages" != xno])
+AM_CONDITIONAL([BUILD_INFOLIB], [test "x$enable_infolib" != xno])
+build_any_docs=no
+if test "x$enable_help_docs" != xno || test "x$enable_man_pages" != xno ||
+   test "x$enable_infolib" != xno; then
+   build_any_docs=yes
+fi
+AM_CONDITIONAL([BUILD_DOCS], [test "x$build_any_docs" = xyes])
+
+dnl The tools that build the documentation, which are also installed for
+dnl writing new help volumes and information libraries: the help tag
+dnl compilers (dthelptag), the DocBook tools (instant, dtdocbook2sdl,
+dnl dtdocbook2man, dtdocbook2infolib) and the DtSearch index tools
+dnl (dtsrcreate, dtsrload, dtsrindex, ...).  They need Tcl and onsgmls.
+AC_ARG_ENABLE([doc-tools],
+        AS_HELP_STRING([--enable-doc-tools], [Build and install the documentation tools (default=only when building documentation)]),
+        [], [enable_doc_tools=$build_any_docs]
+)
+if test "x$build_any_docs" = xyes && test "x$enable_doc_tools" = xno; then
+   AC_MSG_ERROR([building documentation needs the documentation tools; drop --disable-doc-tools or add --disable-docs])
+fi
+AM_CONDITIONAL([BUILD_DOC_TOOLS], [test "x$enable_doc_tools" != xno])
 
 dnl Xrender usage
 AC_ARG_ENABLE([xrender],
-        AS_HELP_STRING([--disable-xrender], [Disable use of the Xrender extension (default=auto)]),
-        [disable_xrender="yes"], [disable_xrender=""]
+        AS_HELP_STRING([--disable-xrender], [Do not use the Xrender extension (default=auto)]),
+        [], [enable_xrender=auto]
+)
+
+dnl assert() checks.  A release build defines NDEBUG.
+AC_ARG_ENABLE([debug],
+        AS_HELP_STRING([--enable-debug], [Keep the assert() checks (default=no, build with -DNDEBUG)]),
+        [], [enable_debug=no]
+)
+
+dnl Hardening: _FORTIFY_SOURCE, stack protector, stack clash protection
+dnl and full RELRO.
+AC_ARG_ENABLE([hardening],
+        AS_HELP_STRING([--disable-hardening], [Do not build with _FORTIFY_SOURCE, -fstack-protector-strong, -fstack-clash-protection and -z relro -z now (default=enabled)]),
+        [], [enable_hardening=yes]
+)
+
+dnl Export maps: each library exports only the symbols listed in
+dnl build-aux/symbols/lib<name>.sym (see build-aux/gen-exports.py, which
+dnl needs a tree built with --disable-export-maps to regenerate them).
+AC_ARG_ENABLE([export-maps],
+        AS_HELP_STRING([--disable-export-maps], [Export every global symbol of the CDE libraries, not only those in build-aux/symbols (default=enabled)]),
+        [], [enable_export_maps=yes]
 )
 
 dnl copied from xdm...
@@ -336,8 +417,6 @@ dnl do.  This is not a replacement for cpp, used at runtime by
 dnl software such as tt_type_comp.
 AC_SUBST(GENCPP, '$(top_builddir)/util/tradcpp/tradcpp')
 
-LT_INIT
-
 dnl make sure it's installed
 AC_PROG_YACC
 if test -z "$ac_cv_prog_YACC"; then
@@ -372,21 +451,162 @@ AC_PATH_X
 AC_PATH_XTRA
 
 dnl check some compiler flags
-C_FLAG_CHECK([-Wall])
-CXX_FLAG_CHECK([-Wall])
+CDE_CHECK_CFLAG([-Wall])
+CDE_CHECK_CXXFLAG([-Wall])
 
-C_FLAG_CHECK([-Wno-format-truncation])
-CXX_FLAG_CHECK([-Wno-format-truncation])
+dnl C++ only: string literals passed as char * all over the old C++ code.
+CDE_CHECK_CXXFLAG([-Wno-write-strings])
 
-C_FLAG_CHECK([-fno-strict-aliasing])
-CXX_FLAG_CHECK([-fno-strict-aliasing])
+CDE_CHECK_CFLAG([-Wno-unused-result])
+CDE_CHECK_CXXFLAG([-Wno-unused-result])
 
-C_FLAG_CHECK([-Wno-write-strings])
-CXX_FLAG_CHECK([-Wno-write-strings])
+dnl -fno-strict-aliasing stays tree-wide: the old code type-puns in ways
+dnl -Wstrict-aliasing does not report (e.g. lib/DtHelp/GifUtils.c fills a
+dnl char * array and reads it back through pixel **, which with strict
+dnl aliasing only shows up as a bogus -Wmaybe-uninitialized), so it cannot
+dnl be limited to the places the warning finds.
+CDE_CHECK_CFLAG([-fno-strict-aliasing])
+CDE_CHECK_CXXFLAG([-fno-strict-aliasing])
 
-C_FLAG_CHECK([-Wno-unused-result])
-CXX_FLAG_CHECK([-Wno-unused-result])
+dnl Hardening flags (--enable-hardening, the default)
+HARDEN_CPPFLAGS=""
+HARDEN_CFLAGS=""
+HARDEN_CXXFLAGS=""
+HARDEN_LDFLAGS=""
+FORTIFY_SOURCE_2=""
+FORTIFY_SOURCE_1=""
+if test "x$enable_hardening" != xno; then
+   dnl _FORTIFY_SOURCE needs optimisation (see build-aux/cde-fortify.h).
+   dnl Level 3 needs GCC 12 and glibc 2.34; older glibc treats it as
+   dnl level 2.
+   AC_MSG_CHECKING([whether _FORTIFY_SOURCE can be used])
+   AC_LANG_PUSH([C])
+   ac_saved_cppflags="$CPPFLAGS"
+   CPPFLAGS="$CPPFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3"
+   ac_saved_ccflags="$CFLAGS"
+   CFLAGS="-O2 -Werror"
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <string.h>
+#include <stdio.h>]], [[char b[4]; snprintf(b, sizeof(b), "%d", 1); return (int)strlen(b);]])],
+      [fortify=yes], [fortify=no])
+   CPPFLAGS="$ac_saved_cppflags"
+   CFLAGS="$ac_saved_ccflags"
+   AC_LANG_POP([C])
+   AC_MSG_RESULT([$fortify])
+   if test "$fortify" = yes; then
+      dnl build-aux/cde-fortify.h defines _FORTIFY_SOURCE=3 only when
+      dnl optimising (single quotes: make expands $(top_srcdir))
+      HARDEN_CPPFLAGS='-U_FORTIFY_SOURCE -include $(top_srcdir)/build-aux/cde-fortify.h'
+      dnl for targets whose code trips level 3's -Wformat-overflow checks
+      dnl until it is fixed (added to their _CFLAGS/_CXXFLAGS)
+      FORTIFY_SOURCE_2="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2"
+      dnl for code that uses %n in a format string built at run time,
+      dnl which level 2 and above abort on
+      FORTIFY_SOURCE_1="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=1"
+   fi
+   CDE_CHECK_CFLAG([-fstack-protector-strong], [HARDEN_CFLAGS])
+   CDE_CHECK_CXXFLAG([-fstack-protector-strong], [HARDEN_CXXFLAGS])
+   CDE_CHECK_CFLAG([-fstack-clash-protection], [HARDEN_CFLAGS])
+   CDE_CHECK_CXXFLAG([-fstack-clash-protection], [HARDEN_CXXFLAGS])
+   CDE_CHECK_LDFLAG([-Wl,-z,relro], [HARDEN_LDFLAGS])
+   CDE_CHECK_LDFLAG([-Wl,-z,now], [HARDEN_LDFLAGS])
+fi
+AC_SUBST(FORTIFY_SOURCE_2)
+AC_SUBST(FORTIFY_SOURCE_1)
+dnl for code built by its own build system (ksh93)
+AC_SUBST(HARDEN_CFLAGS)
 
+dnl Linking.  Programs and libraries drop the libraries they do not use
+dnl (--as-needed; older libtool releases move it after the libraries on a
+dnl shared library's link line, where it does nothing, so each library's
+dnl _LIBADD still names exactly what it uses).  The libraries must record
+dnl every library they use (-no-undefined -Wl,-z,defs, CDE_LIB_LDFLAGS),
+dnl or --as-needed on a program could drop a library that only a CDE
+dnl library needs.
+LINK_LDFLAGS=""
+CDE_CHECK_LDFLAG([-Wl,-O1], [LINK_LDFLAGS])
+CDE_CHECK_LDFLAG([-Wl,--as-needed], [LINK_LDFLAGS])
+CDE_CHECK_LDFLAG([-Wl,--sort-common], [LINK_LDFLAGS])
+CDE_LIB_LDFLAGS="-no-undefined"
+CDE_CHECK_LDFLAG([-Wl,-z,defs], [CDE_LIB_LDFLAGS])
+AC_SUBST(CDE_LIB_LDFLAGS)
+
+dnl Another linker (--with-linker=mold, lld, gold or bfd): -fuse-ld=NAME.
+dnl mold and lld link much faster than GNU ld, which shows in the ~100
+dnl links (and libtool relinks at install time) of the tree.
+AC_ARG_WITH([linker],
+        AS_HELP_STRING([--with-linker=NAME], [Link with the linker NAME (mold, lld, gold, bfd) through -fuse-ld=NAME (default: the compiler's default linker)]),
+        [], [with_linker=no]
+)
+if test "x$with_linker" != xno && test "x$with_linker" != xyes; then
+   fuse_ld=""
+   CDE_CHECK_LDFLAG([-fuse-ld=$with_linker], [fuse_ld])
+   if test -z "$fuse_ld"; then
+      AC_MSG_ERROR([--with-linker=$with_linker: $CC cannot link with -fuse-ld=$with_linker])
+   fi
+   LINK_LDFLAGS="$fuse_ld $LINK_LDFLAGS"
+elif test "x$with_linker" = xyes; then
+   AC_MSG_ERROR([--with-linker needs the name of a linker, e.g. --with-linker=mold])
+fi
+
+dnl Build-tree paths out of the objects (__FILE__, the debug information):
+dnl the tree's directory is recorded as ".", which makes the build
+dnl reproducible and lets ccache share objects between trees (with its
+dnl base_dir set).  A debugger then finds the sources from the top of the
+dnl tree, or through its source path ("directory" in gdb).
+AC_ARG_ENABLE([file-prefix-map],
+        AS_HELP_STRING([--disable-file-prefix-map], [Record the absolute build directory in the objects and debug information (default=record "." through -ffile-prefix-map)]),
+        [], [enable_file_prefix_map=yes]
+)
+FILE_PREFIX_CFLAGS=""
+FILE_PREFIX_CXXFLAGS=""
+if test "x$enable_file_prefix_map" != xno; then
+   prefix_map_c=""
+   prefix_map_cxx=""
+   CDE_CHECK_CFLAG([-ffile-prefix-map=/=/], [prefix_map_c])
+   CDE_CHECK_CXXFLAG([-ffile-prefix-map=/=/], [prefix_map_cxx])
+   dnl (single quotes: make expands the directories)
+   prefix_map='-ffile-prefix-map=$(abs_top_srcdir)=. -ffile-prefix-map=$(abs_top_builddir)=.'
+   if test -n "$prefix_map_c"; then
+      FILE_PREFIX_CFLAGS="$prefix_map"
+   fi
+   if test -n "$prefix_map_cxx"; then
+      FILE_PREFIX_CXXFLAGS="$prefix_map"
+   fi
+fi
+
+dnl export maps need a linker that takes GNU version scripts
+if test "x$enable_export_maps" != xno; then
+   AC_MSG_CHECKING([if the linker supports version scripts])
+   AC_LANG_PUSH([C])
+   ac_saved_ldflags="$LDFLAGS"
+   echo '{ global: main; local: *; };' > conftest.ver
+   LDFLAGS="$LDFLAGS -Wl,--version-script=conftest.ver"
+   AC_LINK_IFELSE([AC_LANG_PROGRAM([])], [ld_vscript=yes], [ld_vscript=no])
+   LDFLAGS="$ac_saved_ldflags"
+   rm -f conftest.ver
+   AC_LANG_POP([C])
+   AC_MSG_RESULT([$ld_vscript])
+   if test "$ld_vscript" != yes; then
+      if test "x$enable_export_maps" = xyes; then
+         AC_MSG_WARN([the linker does not take version scripts; the libraries export every global symbol])
+      fi
+      enable_export_maps=no
+   fi
+fi
+AM_CONDITIONAL([EXPORT_MAPS], [test "x$enable_export_maps" != xno])
+
+dnl assert() checks (--enable-debug).  A release build defines NDEBUG.
+dnl Code that is not ready for that yet (asserts guarding the only use of
+dnl a variable, assert(0) in place of a return, its own NDEBUG-keyed
+dnl assert macro) adds $(KEEP_ASSERTS) to its _CPPFLAGS, _CFLAGS or
+dnl _CXXFLAGS, after $(CDE_CPPFLAGS), and keeps its checks.
+DEBUG_CPPFLAGS=""
+KEEP_ASSERTS=""
+if test "x$enable_debug" = xno; then
+   DEBUG_CPPFLAGS="-DNDEBUG"
+   KEEP_ASSERTS="-UNDEBUG"
+fi
+AC_SUBST(KEEP_ASSERTS)
 
 dnl Add X11 goodies here
 EXTRA_LIBS="${X_LIBS} ${EXTRA_LIBS}"
@@ -455,9 +675,11 @@ AC_CHECK_PROGS(GENCAT, gencat)
 if test -z "$ac_cv_prog_GENCAT"; then
    MISSING_PROGS="gencat ${MISSING_PROGS}"
 fi
-AC_CHECK_PROGS(ONSGMLS, onsgmls)
-if test -z "$ac_cv_prog_ONSGMLS"; then
-   MISSING_PROGS="ONSGMLS ${MISSING_PROGS}"
+if test "x$enable_doc_tools" != xno; then
+   AC_CHECK_PROGS(ONSGMLS, onsgmls)
+   if test -z "$ac_cv_prog_ONSGMLS"; then
+      MISSING_PROGS="onsgmls ${MISSING_PROGS}"
+   fi
 fi
 AC_CHECK_PROGS(SESSREG, sessreg)
 if test -z "$ac_cv_prog_SESSREG"; then
@@ -471,27 +693,46 @@ dnl headers
 AC_CHECK_HEADERS([locale.h security/pam_appl.h utempter.h])
 
 dnl Xrender header
-AC_CHECK_HEADERS([X11/extensions/Xrender.h], [],
-    [ disable_xrender="yes"], [#include <X11/Xlib.h>])
+if test "x$enable_xrender" != xno; then
+   AC_CHECK_HEADERS([X11/extensions/Xrender.h], [],
+       [if test "x$enable_xrender" = xyes; then
+           AC_MSG_ERROR([--enable-xrender was given but X11/extensions/Xrender.h was not found])
+        fi
+        enable_xrender=no], [#include <X11/Xlib.h>])
+fi
 
 dnl libraries
-AC_CHECK_LIB(m, cosf)
+dnl libm and libcrypt go only to the targets that use them ($(MATHLIB),
+dnl $(CRYPTLIB)), not into LIBS, which every library and program links.
+MATHLIB=""
+AC_CHECK_LIB(m, cosf, [MATHLIB="-lm"])
+AC_SUBST(MATHLIB)
 AC_SEARCH_LIBS(dlopen, [dl dld], [], [])
 
-AC_CHECK_LIB(crypt, crypt)
+CRYPTLIB=""
+AC_CHECK_LIB(crypt, crypt, [CRYPTLIB="-lcrypt"])
+AC_SUBST(CRYPTLIB)
 dnl this should be configurable, for now it is required
 AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
-                [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XINERAMA"],
+                [SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XINERAMA";
+                 XINERAMALIB="-lXinerama"],
                 [AC_MSG_ERROR([libXinerama not found])], $X_LIBS)
 
-dnl Special check for tirpc...
-AC_CHECK_LIB(tirpc, svc_register,
-      [CFLAGS="${CFLAGS} -DOPT_TIRPC -I/usr/include/tirpc";
-       CXXFLAGS="${CXXFLAGS} -DOPT_TIRPC -I/usr/include/tirpc";
-       TIRPCLIB=-ltirpc])
+dnl Sun RPC: libtirpc where the C library has none (glibc 2.32 and
+dnl later), found through pkg-config, with a plain library check as a
+dnl fallback for systems without libtirpc.pc.
+TIRPC_CPPFLAGS=""
+TIRPCLIB=""
+PKG_CHECK_MODULES([TIRPC], [libtirpc],
+      [TIRPC_CPPFLAGS="-DOPT_TIRPC ${TIRPC_CFLAGS}"; TIRPCLIB="${TIRPC_LIBS}"],
+      [AC_CHECK_LIB(tirpc, svc_register,
+            [TIRPC_CPPFLAGS="-DOPT_TIRPC -I/usr/include/tirpc";
+             TIRPCLIB=-ltirpc])])
 AC_SUBST(TIRPCLIB)
 
 dnl see if the rpc_inline_t type exists
+save_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${CPPFLAGS} ${TIRPC_CPPFLAGS}"
 AC_CHECK_TYPE(rpc_inline_t, [],
    [AC_DEFINE_UNQUOTED([rpc_inline_t], [int32_t],
        [Define to int32_t if not defined by including rpc/rpc.h])],
@@ -499,6 +740,7 @@ AC_CHECK_TYPE(rpc_inline_t, [],
 AC_INCLUDES_DEFAULT
 #include <rpc/rpc.h>
 ])
+CPPFLAGS="${save_CPPFLAGS}"
 
 dnl check sizeof time_t for RPC
 AC_CHECK_SIZEOF([int])
@@ -515,45 +757,62 @@ AC_CHECK_MEMBERS([struct tm.tm_gmtoff],,,
 dnl jpeg
 AC_CHECK_LIB(jpeg, jpeg_read_header, [JPEGLIB="-ljpeg"],
              [AC_MSG_ERROR([libjpeg not found, please install it])],
-             [${EXTRA_INCS} ${EXTRA_LIBS}])
+             [${EXTRA_LIBS}])
 AC_SUBST(JPEGLIB)
 
 dnl lmdb
 AC_CHECK_LIB(lmdb, mdb_version, [LMDBLIB="-llmdb"],
              [AC_MSG_ERROR([liblmdb not found, please install it])],
-             [${EXTRA_INCS} ${EXTRA_LIBS}])
+             [${EXTRA_LIBS}])
 AC_SUBST(LMDBLIB)
 
 dnl Setup XTOOLLIB - we do it in this specific order to avoid ordering
-dnl issues
+dnl issues.  XTOOLLIB is every X library.  The CDE libraries and programs
+dnl name the ones they use with the single-library variables (X11LIB,
+dnl XTLIB, XMLIB, ...).
 XTOOLLIB=""
-AC_CHECK_LIB(X11, XOpenDisplay, [XTOOLLIB="-lX11"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(Xext, XextFindDisplay, [XTOOLLIB="-lXext ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-if test "x$disable_xrender" != "xyes" ; then
+AC_CHECK_LIB(X11, XOpenDisplay, [XTOOLLIB="-lX11"; X11LIB="-lX11"], ,
+                  [${EXTRA_LIBS}])
+AC_CHECK_LIB(Xext, XextFindDisplay, [XTOOLLIB="-lXext ${XTOOLLIB}"; XEXTLIB="-lXext"], ,
+                  [${EXTRA_LIBS}])
+if test "x$enable_xrender" != "xno" ; then
    AC_CHECK_LIB(Xrender, XRenderComposite,
-                         [XTOOLLIB="-lXrender ${XTOOLLIB}";
-                          SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XRENDER"], ,
-                         [${EXTRA_INCS} ${EXTRA_LIBS}])
+                         [XTOOLLIB="-lXrender ${XTOOLLIB}"; XRENDERLIB="-lXrender";
+                          SOURCE_CPP_DEFINES="${SOURCE_CPP_DEFINES} -DUSE_XRENDER"],
+                         [if test "x$enable_xrender" = xyes; then
+                             AC_MSG_ERROR([--enable-xrender was given but libXrender was not found])
+                          fi],
+                         [${EXTRA_LIBS}])
 fi
-AC_CHECK_LIB(Xau, XauReadAuth, [XTOOLLIB="-lXau ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(Xpm, XpmLibraryVersion, [XTOOLLIB="-lXpm ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(Xt, XtInitialize, [XTOOLLIB="-lXt ${XTOOLLIB}"], ,
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(Xmu, XmuMakeAtom, [XTOOLLIB="-lXmu ${XTOOLLIB}"], ,
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"], ,
-                  [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"], ,
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
-AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"],
+AC_CHECK_LIB(Xau, XauReadAuth, [XTOOLLIB="-lXau ${XTOOLLIB}"; XAULIB="-lXau"], ,
+                  [${EXTRA_LIBS}])
+AC_CHECK_LIB(Xpm, XpmLibraryVersion, [XTOOLLIB="-lXpm ${XTOOLLIB}"; XPMLIB="-lXpm"], ,
+                  [${EXTRA_LIBS}])
+AC_CHECK_LIB(Xt, XtInitialize, [XTOOLLIB="-lXt ${XTOOLLIB}"; XTLIB="-lXt"], ,
+                 [${EXTRA_LIBS}])
+AC_CHECK_LIB(Xmu, XmuMakeAtom, [XTOOLLIB="-lXmu ${XTOOLLIB}"; XMULIB="-lXmu"], ,
+                 [${EXTRA_LIBS}])
+AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"; ICELIB="-lICE"], ,
+                  [${EXTRA_LIBS}])
+AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"; SMLIB="-lSM"], ,
+                 [${EXTRA_LIBS}])
+AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"; XMLIB="-lXm"],
                  [AC_MSG_ERROR([libXm (Motif) not found, please install it])],
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
-XTOOLLIB="${EXTRA_INCS} ${EXTRA_LIBS} ${X_EXTRA_LIBS} ${XTOOLLIB}"
+                 [${EXTRA_LIBS}])
+XTOOLLIB="${EXTRA_LIBS} ${X_EXTRA_LIBS} ${XTOOLLIB}"
 AC_SUBST([XTOOLLIB])
+X11LIB="${X_EXTRA_LIBS} ${X11LIB}"
+AC_SUBST([X11LIB])
+AC_SUBST([XEXTLIB])
+AC_SUBST([XRENDERLIB])
+AC_SUBST([XAULIB])
+AC_SUBST([XPMLIB])
+AC_SUBST([XTLIB])
+AC_SUBST([XMULIB])
+AC_SUBST([ICELIB])
+AC_SUBST([SMLIB])
+AC_SUBST([XMLIB])
+AC_SUBST([XINERAMALIB])
 
 dnl Motif headers, the resource manager (libDtMrm) and the UIL compiler
 dnl library (dtbuilder)
@@ -574,7 +833,7 @@ AC_CHECK_LIB(Uil, Uil, [:],
 
 dnl only needed by dtlogin
 AC_CHECK_LIB(Xdmcp, XdmcpFlush, [XDMCPLIB="-lXdmcp"], [XDMCPLIB=""],
-                 [${EXTRA_INCS} ${EXTRA_LIBS}])
+                 [${EXTRA_LIBS}])
 AC_SUBST(XDMCPLIB)
 
 dnl iconv - part of libc on glibc, musl and the BSDs, a separate libiconv
@@ -629,10 +888,12 @@ AC_CHECK_LIB(utempter, utempter_add_record,
 
 AM_CONDITIONAL([HAS_UTEMPTER_LIBRARY], [test "x$ac_cv_lib_utempter_utempter_add_record" = "xyes"])
 
-dnl Figure out TCL
+dnl Figure out TCL (only instant, one of the documentation tools, uses it)
 
-SC_PATH_TCLCONFIG
-SC_LOAD_TCLCONFIG
+if test "x$enable_doc_tools" != xno; then
+   SC_PATH_TCLCONFIG
+   SC_LOAD_TCLCONFIG
+fi
 
 dnl check MISSING_PROGS - error out here if there's stuff in it.
 
@@ -640,15 +901,32 @@ if test -n "$MISSING_PROGS"; then
    AC_MSG_ERROR([Please install the following REQUIRED programs: ${MISSING_PROGS}])
 fi
 
-dnl set CPPFLAGS, CFLAGS, and CXXFLAGS.
-dnl The Autoconf manual says that these are user variables and
-dnl shouldn't be modified.  It suggests that you create a special
-dnl variable and presumably add those to your Makefile.am files.  We
-dnl have 192 of these currently, so... The user will just have to
-dnl deal, or modify them here directly.
-CPPFLAGS="${CPPFLAGS} ${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS}"
-CFLAGS="${CFLAGS} -std=$C_STD ${C_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
-CXXFLAGS="${CXXFLAGS} ${CXX_COMPILER_FLAGS} ${EXTRA_INCS} ${PTHREAD_CFLAGS}"
+dnl Project compiler and linker flags.  CPPFLAGS, CFLAGS, CXXFLAGS and
+dnl LDFLAGS belong to the user (make CFLAGS=-O0, sanitizers, PGO), so the
+dnl flags the build needs go to CDE_CPPFLAGS, CDE_CFLAGS, CDE_CXXFLAGS and
+dnl CDE_LDFLAGS instead.  They reach every Makefile through AM_CPPFLAGS,
+dnl AM_CFLAGS, AM_CXXFLAGS and AM_LDFLAGS, which are substituted below;
+dnl a Makefile.am that sets one of those, or a per-target _CPPFLAGS,
+dnl _CFLAGS, _CXXFLAGS or _LDFLAGS (which replace the AM_ ones), starts it
+dnl with the matching $(CDE_...) variable.
+CDE_CPPFLAGS="${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
+CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS} ${LTO_CFLAGS} ${FILE_PREFIX_CFLAGS}"
+CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS} ${LTO_CXXFLAGS} ${FILE_PREFIX_CXXFLAGS}"
+CDE_LDFLAGS="${HARDEN_LDFLAGS} ${LINK_LDFLAGS} ${LTO_LDFLAGS}"
+dnl squeeze the whitespace
+CDE_CPPFLAGS=`echo ${CDE_CPPFLAGS}`
+CDE_CFLAGS=`echo ${CDE_CFLAGS}`
+CDE_CXXFLAGS=`echo ${CDE_CXXFLAGS}`
+CDE_LDFLAGS=`echo ${CDE_LDFLAGS}`
+AC_SUBST(CDE_CPPFLAGS)
+AC_SUBST(CDE_CFLAGS)
+AC_SUBST(CDE_CXXFLAGS)
+AC_SUBST(CDE_LDFLAGS)
+AC_SUBST([AM_CPPFLAGS], ['$(CDE_CPPFLAGS)'])
+AC_SUBST([AM_CFLAGS], ['$(CDE_CFLAGS)'])
+AC_SUBST([AM_CXXFLAGS], ['$(CDE_CXXFLAGS)'])
+AC_SUBST([AM_LDFLAGS], ['$(CDE_LDFLAGS)'])
+
 LIBS="${EXTRA_LIBS} ${LIBS} ${PTHREAD_LIBS}"
 
 dnl All of the makefiles we need to generate go here...
@@ -676,7 +954,6 @@ lib/tt/lib/util/Makefile
 lib/tt/bin/Makefile
 lib/tt/bin/shell/Makefile
 lib/tt/bin/ttauth/Makefile
-lib/tt/bin/scripts/Makefile
 lib/tt/bin/tttar/Makefile
 lib/tt/bin/tt_type_comp/Makefile
 lib/tt/bin/tttrace/Makefile
@@ -742,20 +1019,18 @@ programs/dthelp/dthelpview/Makefile
 programs/dthelp/dthelpgen/Makefile
 programs/dthelp/dthelpprint/Makefile
 programs/dthelp/parser/Makefile
+programs/dthelp/parser/util/Makefile
 programs/dthelp/parser/pass1/Makefile
-programs/dthelp/parser/pass1/util/Makefile
 programs/dthelp/parser/pass1/build/Makefile
 programs/dthelp/parser/pass1/eltdef/Makefile
 programs/dthelp/parser/pass1/helptag/Makefile
 programs/dthelp/parser/pass1/parser/Makefile
 programs/dthelp/parser/canon1/Makefile
-programs/dthelp/parser/canon1/util/Makefile
 programs/dthelp/parser/canon1/build/Makefile
 programs/dthelp/parser/canon1/eltdef/Makefile
 programs/dthelp/parser/canon1/helptag/Makefile
 programs/dthelp/parser/canon1/parser/Makefile
 programs/dthelp/parser/pass2/Makefile
-programs/dthelp/parser/pass2/util/Makefile
 programs/dthelp/parser/pass2/build/Makefile
 programs/dthelp/parser/pass2/eltdef/Makefile
 programs/dthelp/parser/pass2/htag2/Makefile
@@ -964,7 +1239,6 @@ programs/localized/ja_JP.UTF-8/appmanager/Makefile
 
 doc/Makefile
 
-doc/en_US.UTF-8/Makefile
 doc/en_US.UTF-8/help/Makefile
 doc/en_US.UTF-8/help/common/Desktop.hf
 doc/en_US.UTF-8/help/common/DesktopIntro.hf
@@ -972,31 +1246,26 @@ doc/en_US.UTF-8/man/Makefile
 doc/en_US.UTF-8/guides/Makefile
 doc/en_US.UTF-8/m-guides/Makefile
 
-doc/de_DE.UTF-8/Makefile
 doc/de_DE.UTF-8/guides/Makefile
 doc/de_DE.UTF-8/help/Makefile
 doc/de_DE.UTF-8/help/common/Desktop.hf
 doc/de_DE.UTF-8/help/common/DesktopIntro.hf
 
-doc/es_ES.UTF-8/Makefile
 doc/es_ES.UTF-8/guides/Makefile
 doc/es_ES.UTF-8/help/Makefile
 doc/es_ES.UTF-8/help/common/Desktop.hf
 doc/es_ES.UTF-8/help/common/DesktopIntro.hf
 
-doc/fr_FR.UTF-8/Makefile
 doc/fr_FR.UTF-8/guides/Makefile
 doc/fr_FR.UTF-8/help/Makefile
 doc/fr_FR.UTF-8/help/common/Desktop.hf
 doc/fr_FR.UTF-8/help/common/DesktopIntro.hf
 
-doc/it_IT.UTF-8/Makefile
 doc/it_IT.UTF-8/guides/Makefile
 doc/it_IT.UTF-8/help/Makefile
 doc/it_IT.UTF-8/help/common/Desktop.hf
 doc/it_IT.UTF-8/help/common/DesktopIntro.hf
 
-doc/ja_JP.UTF-8/Makefile
 doc/ja_JP.UTF-8/guides/Makefile
 doc/ja_JP.UTF-8/help/Makefile
 doc/ja_JP.UTF-8/help/common/Desktop.hf
@@ -1006,8 +1275,32 @@ include/Makefile
 
 copyright
 doc/common/help/HELPEnt.sgm
-include/Dt/Dt.h
 lib/tt/bin/ttauth/ttauth.man
+])
+
+dnl include/Dt/Dt.h carries the version and is included by most of the
+dnl tree.  Write it only when its content changes, so that rerunning
+dnl configure does not rebuild everything that includes it.  (The
+dnl top-level Makefile has the same rule for when Dt.h.in changes.)
+AC_CONFIG_COMMANDS([include/Dt/Dt.h], [
+  cde_dt_h_tmp=include/Dt/Dt.h.tmp
+  sed -e "s|@CDE_VERSION_MAJOR@|$cde_version_major|g" \
+      -e "s|@CDE_VERSION_MINOR@|$cde_version_minor|g" \
+      -e "s|@CDE_VERSION_MICRO@|$cde_version_micro|g" \
+      -e "s|@CDE_VERSION_DEV@|$cde_version_dev|g" \
+      "$cde_srcdir/include/Dt/Dt.h.in" > "$cde_dt_h_tmp" || exit 1
+  if cmp -s "$cde_dt_h_tmp" include/Dt/Dt.h; then
+    AC_MSG_NOTICE([include/Dt/Dt.h is unchanged])
+    rm -f "$cde_dt_h_tmp"
+  else
+    mv -f "$cde_dt_h_tmp" include/Dt/Dt.h || exit 1
+  fi
+], [
+  cde_srcdir="$srcdir"
+  cde_version_major="$CDE_VERSION_MAJOR"
+  cde_version_minor="$CDE_VERSION_MINOR"
+  cde_version_micro="$CDE_VERSION_MICRO"
+  cde_version_dev="$CDE_VERSION_DEV"
 ])
 
 AC_OUTPUT

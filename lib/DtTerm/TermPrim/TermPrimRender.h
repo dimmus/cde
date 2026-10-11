@@ -52,6 +52,7 @@ extern void _DtTermPrimDestroyFont(
 );
 
 extern void _DtTermPrimBell(Widget w);
+extern void _DtTermPrimBellDestroy(Widget w);
 extern void _termSetRenderFont(Widget w, TermFont *termFont);
 extern void _termSetBufferSize(Widget w, int width, int height,
 	int xOffset, int yOffset);
@@ -61,6 +62,9 @@ extern void _DtTermPrimRefreshText(Widget w,
 	short endColumn, short endRow);
 extern void _DtTermPrimExposeText(Widget w, int startX, int startY, int endX,
 	int endY, Boolean isExposeEvent);
+extern void _DtTermPrimRenderFlushDirty(Widget w);
+extern void _DtTermPrimRenderDirtyToRefreshRows(Widget w);
+extern void _DtTermPrimRenderFreeDirty(Widget w);
 extern int _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length);
 extern int _DtTermPrimInsertTextWc(Widget w, wchar_t *buffer, int length);
 extern void _DtTermPrimRefreshTextWc(Widget w, short startColumn,

@@ -80,6 +80,7 @@
 #include <Dt/Utility.h>
 
 #include <Dt/DtsDb.h>
+#include <Dt/DtsMM.h>
 #include <Dt/Dts.h>
 
 #include "myassertP.h"
@@ -235,6 +236,7 @@ _DtDtsMMCreateDb(DtDirPaths *dirs, const char *CacheFile, int override)
 	static	int	beenCalled = 0;
 	char		**list;
 	int		i;
+	int		fd;
 
 	_DtSvcProcessLock();
 
@@ -287,6 +289,9 @@ _DtDtsMMCreateDb(DtDirPaths *dirs, const char *CacheFile, int override)
 	recordDescriptions[2].converters = actionConverters;
 
 
+	/* Note what the files are like before reading them. */
+	_DtDtsMMStampDirs(dirs);
+
 	_DtDbRead(dirs, ".dt", recordDescriptions, 3);
 
 	_DtSortActionDb();
@@ -294,18 +299,18 @@ _DtDtsMMCreateDb(DtDirPaths *dirs, const char *CacheFile, int override)
 	/* 
          * we may eventually want to return a count of the new records.
          * for now we return a non-zero value to register success.
+         *
+         * Without override the cache is private: an unlinked file.
+         * (CacheFile used to be written, mapped and unlinked.)  With
+         * DTDTSMM_SHARED_OR_PRIVATE, CacheFile is replaced if possible.
          */
-
-	if ((!_DtDtsMMCreateFile(dirs, CacheFile)) ||
-	    (!_DtDtsMMapDB(CacheFile)))
+	fd = _DtDtsMMCreateFile(dirs, override ? CacheFile : NULL,
+				override == DTDTSMM_SHARED_OR_PRIVATE);
+	if (fd == -1 || !_DtDtsMMapNewFd(fd))
 	{
 		_DtSvcProcessUnlock();
 		return(0);
 	}
-	if(!override)
-	{
-		unlink(CacheFile);
-	}	
 
 	/* now that we have built the databases delete the tmp Db memory
 	   used for it (Too, bad we can't delete the memory associcated

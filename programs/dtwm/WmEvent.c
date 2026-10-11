@@ -63,6 +63,7 @@
 #include "WmResParse.h"
 #include "WmParse.h"
 #include "WmParseP.h"
+#include "WmMultiHead.h"
 #include "Dt/Wsm.h"
 
 #include <Xm/RowColumnP.h> /* for MS_LastManagedMenuTime */
@@ -130,6 +131,9 @@ void InitEventHandling (void)
 
     /* handle entry of root window */
     base_mask |= EnterWindowMask | LeaveWindowMask;
+
+    /* notice root size changes (RandR), which change the heads */
+    base_mask |= StructureNotifyMask;
 
     for (scr=0; scr<wmGD.numScreens; scr++)
     {
@@ -957,6 +961,16 @@ Boolean WmDispatchWsEvent (XEvent *event)
 
 	case FocusOut:
 	{
+	    break;
+	}
+
+	case ConfigureNotify:
+	{
+	    /* the root window changed size: the heads may have changed */
+	    if (event->xconfigure.window == event->xconfigure.event)
+	    {
+		InvalidateHeadInfo ();
+	    }
 	    break;
 	}
 
@@ -2454,6 +2468,48 @@ void HandleWsFocusIn (XFocusInEvent *focusEvent)
 
 /*************************************<->*************************************
  *
+ *  InitServerTimeCounter ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Find the SERVERTIME system counter of the SYNC extension, which
+ *  GetTimestamp reads.
+ *
+ *
+ *  Outputs:
+ *  -------
+ *  wmGD.serverTimeCounter = the counter, or None
+ *
+ *************************************<->***********************************/
+
+void InitServerTimeCounter (void)
+{
+    XSyncSystemCounter *counters;
+    int eventBase, errorBase, major, minor, count, i;
+
+    wmGD.serverTimeCounter = None;
+    if (!XSyncQueryExtension (DISPLAY, &eventBase, &errorBase) ||
+	!XSyncInitialize (DISPLAY, &major, &minor) ||
+	!(counters = XSyncListSystemCounters (DISPLAY, &count)))
+    {
+	return;
+    }
+    for (i = 0; i < count; i++)
+    {
+	if (counters[i].name && !strcmp (counters[i].name, "SERVERTIME"))
+	{
+	    wmGD.serverTimeCounter = counters[i].counter;
+	    break;
+	}
+    }
+    XSyncFreeSystemCounterList (counters);
+
+} /* END OF FUNCTION InitServerTimeCounter */
+
+
+/*************************************<->*************************************
+ *
  *  GetTimestamp ()
  *
  *
@@ -2470,7 +2526,12 @@ void HandleWsFocusIn (XFocusInEvent *focusEvent)
  *
  *  Comment: 
  *  --------
- *  This costs a server round-trip
+ *  This costs a server round-trip.  The time is read from the SYNC
+ *  extension's SERVERTIME counter, whose low 32 bits are the server time
+ *  in milliseconds that it stamps events with.  Without it, append
+ *  nothing to a property and pick the PropertyNotify event out of the
+ *  queue, which means a scan of the whole queue: that is long when many
+ *  clients map at once.
  *
  *************************************<->***********************************/
 
@@ -2480,6 +2541,13 @@ Time GetTimestamp (void)
     WmScreenData *pSD = ACTIVE_PSD;
     XEvent event;
     long property = 0;
+    XSyncValue now;
+
+    if ((wmGD.serverTimeCounter != None) &&
+	XSyncQueryCounter (DISPLAY, wmGD.serverTimeCounter, &now))
+    {
+	return ((Time) XSyncValueLow32 (now));
+    }
 
     /*
      * Do zero-length append to our own WM_STATE
@@ -2526,12 +2594,13 @@ Time GetTimestamp (void)
 
 /*************************************<->*************************************
  *
- *  PullExposureEvents ()
+ *  PullQueuedExposureEvents ()
  *
  *
  *  Description:
  *  -----------
- *  Pull in and process all outstanding exposure events 
+ *  Process the exposure events that have already arrived, without a
+ *  round trip to the server.
  *
  *
  *  Inputs:
@@ -2542,19 +2611,18 @@ Time GetTimestamp (void)
  *
  *  Comments:
  *  --------
- *  Useful for cleaning up display after menu popdown
+ *  XCheckMaskEvent flushes the output buffer and reads whatever the
+ *  server has sent, so exposures caused by requests made a little
+ *  earlier are handled; those caused by the latest requests may not
+ *  have arrived yet.  Interactive move and resize call this for every
+ *  pointer step and PullExposureEvents once the pointer stops.
  * 
  *************************************<->***********************************/
-void PullExposureEvents (void)
+void PullQueuedExposureEvents (void)
 {
     XEvent	event;
     Boolean	dispatchEvent;
 
-    /* 
-     * Force the exposure events into the queue
-     */
-    XSync (DISPLAY, False);
-    XSync (DISPLAY1, False);
     /*
      * Selectively extract the exposure events
      */
@@ -2593,6 +2661,40 @@ void PullExposureEvents (void)
 	    XtDispatchEvent (&event);
 	}
     }
+
+} /* END OF FUNCTION PullQueuedExposureEvents */
+
+
+/*************************************<->*************************************
+ *
+ *  PullExposureEvents ()
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Pull in and process all outstanding exposure events 
+ *
+ *
+ *  Inputs:
+ *  ------
+ * 
+ *  Outputs:
+ *  -------
+ *
+ *  Comments:
+ *  --------
+ *  Useful for cleaning up display after menu popdown
+ * 
+ *************************************<->***********************************/
+void PullExposureEvents (void)
+{
+    /* 
+     * Force the exposure events into the queue
+     */
+    XSync (DISPLAY, False);
+    XSync (DISPLAY1, False);
+
+    PullQueuedExposureEvents ();
 
 } /* END OF FUNCTION PullExposureEvents */
 

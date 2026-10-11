@@ -356,6 +356,13 @@ void			_DtTtMessageUpdate(
 				Tt_message		msg,
 				Tt_message_callback	cb
 			);
+int			_DtTempFile(
+				const char *		prefix,
+				char **			path
+			);
+char *			_DtTempFifo(
+				const char *		prefix
+			);
 void			_DtOpen(
 				Widget			label,
 				const char *		cmd,

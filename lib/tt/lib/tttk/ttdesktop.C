@@ -96,8 +96,10 @@ _ttDesktopMessageCreate(
 		_handler = tt_message_sender( commission );
 		fuse = (caddr_t)_handler;
 	}
+	// (handler used to be passed here, so the commissioner was
+	// never addressed.)
 	return _ttDtPMessageCreate( commission, theClass, TT_SESSION,
-				    handler, op, toolkitCB,
+				    _handler, op, toolkitCB,
 				    clientCB, clientData );
 }
 
@@ -902,16 +904,16 @@ _ttdt_do_wm_state(
 					attribs.screen );
 			CALLX11(XWithdrawWindow)( dpy, win, screen );
 		}
-		// Fall through, to see if it worked
+		// Fall through, to report the resulting state
 	    case TTDT_GET_MAPPED:
 		CALLX11(XGetWindowAttributes)( dpy, win, &attribs );
 		mapped = attribs.map_state != IsUnmapped;
-		if (   (op == TTDT_SET_ICONIFIED)
-		    && (*iconified_or_mapped != mapped))
-		{
-			tttk_message_fail( msg, TT_ERR_ACCESS, 0, 0 );
-			return 0;
-		}
+		// Set_Mapped is not failed when the state read back
+		// differs (the test here used to compare op with
+		// TTDT_SET_ICONIFIED, so it never fired): under a window
+		// manager, mapping a top-level window is redirected to it
+		// and completes asynchronously, so a successful request
+		// would often read back as still unmapped.
 		*iconified_or_mapped = mapped;
 		break;
 	    default:
@@ -1500,14 +1502,19 @@ ttdt_Get_Locale(
 	int                 send
 )
 {
+	// As documented, and as in ttdt_Get_Situation(): with no handler,
+	// address the sender of the commission.
+	const char *_handler = handler;
+	_TttkItem2Free sender_fuse;
 	if ((handler == 0) && (commission != 0)) {
-		(void)tt_message_sender( commission );
+		_handler = tt_message_sender( commission );
+		sender_fuse = (caddr_t)_handler;
 	}
 	if (clientCB == 0) {
 		clientCB = _ttDtApplyLocale;
 	}
 	Tt_message msg = _ttDtPMessageCreate( commission, TT_REQUEST,
-				TT_SESSION, handler,
+				TT_SESSION, _handler,
 				TTDT_GET_LOCALE, _ttDtGetLocaleCB, (void *)clientCB,
 				clientData );
 	Tt_status status = tt_ptr_error( msg );

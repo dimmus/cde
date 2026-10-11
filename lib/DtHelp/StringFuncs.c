@@ -53,6 +53,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <locale.h>  /* getlocale(), LOCALE_STATUS, LC_xxx */
+#include <langinfo.h>
 
 #if defined(_AIX) || defined(CSRG_BASED) || defined(__linux__)
 #include <ctype.h>
@@ -287,6 +288,32 @@ _DtHelpCeStrspn (
 }
 
 /******************************************************************************
+ * Function: int _DtHelpCeAsciiIsSingleByte (void)
+ *
+ * Returns:	True if, in the current locale, every byte 0x01-0x7f at the
+ *		start of a character is a complete character, so mblen()
+ *		need not be called for it: the encoding is stateless (all
+ *		encodings glibc accepts for a locale are ASCII supersets).
+ *
+ * Purpose:	Lets the parsers skip one mblen() per ASCII byte.  The
+ *		answer is cached per codeset.
+ *****************************************************************************/
+int
+_DtHelpCeAsciiIsSingleByte (void)
+{
+    static const char *lastCodeset = NULL;
+    static int         lastResult  = 0;
+    const char        *codeset     = nl_langinfo(CODESET);
+
+    if (codeset != lastCodeset)
+      {
+	lastResult  = (MB_CUR_MAX == 1 || mblen(NULL, 0) == 0);
+	lastCodeset = codeset;
+      }
+    return lastResult;
+}
+
+/******************************************************************************
  * Function: _DtHelpCeStrchr (char *s1, char *value, max_len, ret_ptr)
  *
  *	Returns in 'ret_ptr' the address of the first occurence of 'value'
@@ -307,6 +334,7 @@ _DtHelpCeStrchr (
 {
     int      len;
     int      valLen;
+    int      ascii;
     const char *p1;
 
     *ret_ptr = NULL;
@@ -323,13 +351,20 @@ _DtHelpCeStrchr (
       }
 
     p1 = s1;
-    valLen = mblen(value, max_len);
+    ascii = _DtHelpCeAsciiIsSingleByte();
+    if (ascii && *value != '\0' && ((unsigned char) *value) < 0x80)
+	valLen = 1;
+    else
+        valLen = mblen(value, max_len);
     if (valLen < 1)
 	return -1;
 
     while (*p1 != '\0')
       {
-	len = mblen (p1, max_len);
+	if (ascii && ((unsigned char) *p1) < 0x80)
+	    len = 1;
+	else
+	    len = mblen (p1, max_len);
 	if (len == -1)
 	    return -1;
 	if (len == valLen && strncmp(p1, value, len) == 0)
@@ -364,6 +399,7 @@ _DtHelpCeStrrchr (
 {
     int      len;
     int      valLen;
+    int      ascii;
     const char *p1;
 
     *ret_ptr = NULL;
@@ -380,13 +416,20 @@ _DtHelpCeStrrchr (
       }
 
     p1 = s1;
-    valLen = mblen(value, max_len);
+    ascii = _DtHelpCeAsciiIsSingleByte();
+    if (ascii && *value != '\0' && ((unsigned char) *value) < 0x80)
+	valLen = 1;
+    else
+        valLen = mblen(value, max_len);
     if (valLen < 1)
 	return -1;
 
     while (*p1 != '\0')
       {
-	len = mblen (p1, max_len);
+	if (ascii && ((unsigned char) *p1) < 0x80)
+	    len = 1;
+	else
+	    len = mblen (p1, max_len);
 	if (len == -1)
 	    return -1;
 	if (len == valLen && strncmp(p1, value, len) == 0)

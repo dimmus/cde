@@ -35,6 +35,7 @@
  */
 #include "WmGlobal.h"	/* This should be the first include */
 #include <X11/X.h>
+#include <poll.h>
 
 #define XK_MISCELLANY
 #include <X11/keysymdef.h>
@@ -65,9 +66,22 @@
 #define ABS(x) ((x)>0?(x):(-(x)))
 #endif /* ABS */
 
-/* number of times to poll before blocking on a config event */
+/*
+ * With freezeOnConfig off the server is not grabbed, so the XOR outline
+ * is never left on the screen: it is drawn and erased repeatedly while
+ * waiting for input.  These are the on and off times in milliseconds.
+ */
 
-#define CONFIG_POLL_COUNT	300
+#define FLASH_ON_MS		30
+#define FLASH_OFF_MS		20
+
+/*
+ * MoveOpaque and WindowOutline handle only the exposures that have
+ * already arrived; this records that some may still be on their way,
+ * so that GetConfigEvent keeps handling them while it waits for input.
+ */
+
+static Boolean configExposePending = False;
 
 /* mask for all buttons */
 #define ButtonMask	\
@@ -1384,8 +1398,13 @@ void MoveOpaque (ClientData *pcd, int x, int y,
 	
     }
     
-    /* cleanup exposed frame parts */
-    PullExposureEvents ();
+    /*
+     * Clean up exposed frame parts.  Without a round trip: the
+     * exposures of this step are handled at the next one, or by
+     * GetConfigEvent as they arrive while it waits for input.
+     */
+    PullQueuedExposureEvents ();
+    configExposePending = True;
     
 } /* END OF FUNCTION MoveOpaque */
 
@@ -1512,6 +1531,7 @@ void MoveOutline (int x, int y, unsigned int width, unsigned int height)
  *  --------
  *  o get display, root window ID, and xorGC out of global data.  
  *  o draw on root and erase "atomically"
+ *  o GetConfigEvent keeps flashing the outline while it waits for input.
  * 
  *************************************<->***********************************/
 void FlashOutline (int x, int y, unsigned int width, unsigned int height)
@@ -1532,20 +1552,135 @@ void FlashOutline (int x, int y, unsigned int width, unsigned int height)
     memcpy ( (char *) &outline[SEGS_PER_DRAW], (char *) &outline[0], 
 	SEGS_PER_DRAW*sizeof(XSegment));
 
-    /*
-     * Flash the outline at least once, then as long as there's 
-     * nothing else going on
-     */
     DrawSegments(DISPLAY, ACTIVE_ROOT, ACTIVE_PSD->xorGC,
 			outline, SEGS_PER_FLASH);
-    XSync(DISPLAY, FALSE);
+    XFlush(DISPLAY);
 
-    while (!XtAppPending(wmGD.mwmAppContext)) {
-    	DrawSegments(DISPLAY, ACTIVE_ROOT, ACTIVE_PSD->xorGC, 
-			outline, SEGS_PER_FLASH);
-	XSync(DISPLAY, FALSE);
-    }
 } /* END OF FUNCTION  FlashOutline */
+
+
+
+/*************************************<->*************************************
+ *
+ *  WaitForConfigEvent (display, window, mask, x, y, width, height, pev)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Block until an event matching mask arrives for window.  If an outline
+ *  is given, flash it (draw, wait, erase, wait) while waiting, so that it
+ *  is visible but never left on the screen when we return.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  display	- pointer to display
+ *  window	- window to get event relative to
+ *  mask	- event mask - acceptable events to return
+ *  x, y, width, height - outline to flash, or all zero for none
+ *
+ *  Outputs:
+ *  -------
+ *  *pev	- event returned.
+ *
+ *************************************<->***********************************/
+static void
+WaitForConfigEvent (Display *display, Window window, unsigned long mask,
+		    int x, int y, unsigned int width, unsigned int height,
+		    XEvent *pev)
+{
+    XSegment outline[SEGS_PER_DRAW];
+    struct pollfd pfd;
+
+    if (x == 0 && y == 0 && width == 0 && height == 0)
+    {
+	XWindowEvent (display, window, mask, pev);
+	return;
+    }
+
+    SetOutline (outline, x, y, width, height, OUTLINE_WIDTH);
+    pfd.fd = ConnectionNumber (display);
+    pfd.events = POLLIN;
+
+    /*
+     * XCheckWindowEvent reads whatever the server has sent, so poll()
+     * only has to wake us up for new input; the timeouts drive the
+     * flashing.  Events for other windows stay queued and do not wake
+     * us up again.
+     */
+    while (!XCheckWindowEvent (display, window, mask, pev))
+    {
+	DrawSegments (display, ACTIVE_ROOT, ACTIVE_PSD->xorGC,
+		      outline, SEGS_PER_DRAW);
+	XFlush (display);
+	(void) poll (&pfd, 1, FLASH_ON_MS);
+
+	DrawSegments (display, ACTIVE_ROOT, ACTIVE_PSD->xorGC,
+		      outline, SEGS_PER_DRAW);
+	XFlush (display);
+
+	if (XCheckWindowEvent (display, window, mask, pev))
+	    break;
+	(void) poll (&pfd, 1, FLASH_OFF_MS);
+    }
+
+} /* END OF FUNCTION WaitForConfigEvent */
+
+
+
+/*************************************<->*************************************
+ *
+ *  WaitForConfigEventExposing (display, window, mask, pev)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Block until an event matching mask arrives for window, handling
+ *  exposure events (on both display connections) as they arrive.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  display	- pointer to display
+ *  window	- window to get event relative to
+ *  mask	- event mask - acceptable events to return
+ *
+ *  Outputs:
+ *  -------
+ *  *pev	- event returned.
+ *
+ *  Comments:
+ *  --------
+ *  Used while moving opaquely or with window outlines: those steps do
+ *  not wait for the exposures they cause, so the frames uncovered by
+ *  the last step are repainted here once the exposures come in.
+ *
+ *************************************<->***********************************/
+static void
+WaitForConfigEventExposing (Display *display, Window window,
+			    unsigned long mask, XEvent *pev)
+{
+    struct pollfd pfd[2];
+
+    pfd[0].fd = ConnectionNumber (display);
+    pfd[0].events = POLLIN;
+    pfd[1].fd = ConnectionNumber (DISPLAY1);
+    pfd[1].events = POLLIN;
+
+    /*
+     * Both XCheckWindowEvent and PullQueuedExposureEvents read whatever
+     * the server has sent, so poll() only has to wake us up for new
+     * input.  Other events stay queued for the main loop.
+     */
+    while (!XCheckWindowEvent (display, window, mask, pev))
+    {
+	PullQueuedExposureEvents ();
+	if (XCheckWindowEvent (display, window, mask, pev))
+	    break;
+	(void) poll (pfd, 2, -1);
+    }
+
+} /* END OF FUNCTION WaitForConfigEventExposing */
 
 
 /*************************************<->*************************************
@@ -1662,9 +1797,11 @@ CreateOutlineWindows (WmScreenData *pSD)
  *
  *  Comments:
  *  --------
- *  Always unmap during move/resize of outline windows to let saveunder
- *  stuff work. HP server's toss saveunder stuff for windows that
- *  configure themselves while mapped.
+ *  The outline windows stay mapped while they move, so that only the
+ *  area they leave is exposed.  (They used to be unmapped and remapped
+ *  at every step for the sake of save-unders on old HP servers, which
+ *  exposed everything under them twice per step; current X servers do
+ *  not implement save-unders.)
  * 
  *************************************<->***********************************/
 void WindowOutline (int x, int y, unsigned int width, unsigned int height)
@@ -1688,13 +1825,13 @@ void WindowOutline (int x, int y, unsigned int width, unsigned int height)
 	return;		/* no change */
     }
 
-    XUnmapWindow(DISPLAY, pSD->woN);
-    XUnmapWindow(DISPLAY, pSD->woS);
-    XUnmapWindow(DISPLAY, pSD->woE);
-    XUnmapWindow(DISPLAY, pSD->woW);
-
     if ((width == 0) && (height == 0))
     {
+	XUnmapWindow(DISPLAY, pSD->woN);
+	XUnmapWindow(DISPLAY, pSD->woS);
+	XUnmapWindow(DISPLAY, pSD->woE);
+	XUnmapWindow(DISPLAY, pSD->woW);
+
 	lastOutlineWidth = lastOutlineHeight = 0;
 	lastOutlineX = lastOutlineY = 0;
     }
@@ -1742,8 +1879,12 @@ void WindowOutline (int x, int y, unsigned int width, unsigned int height)
 	XMapRaised (DISPLAY, pSD->woE);
 	XMapRaised (DISPLAY, pSD->woW);
 
-	/* cleanup exposed frame parts */
-	PullExposureEvents ();
+	/*
+	 * Clean up exposed frame parts, without a round trip (see
+	 * MoveOpaque).
+	 */
+	PullQueuedExposureEvents ();
+	configExposePending = True;
     }
 
 } /* END OF FUNCTION  WindowOutline */
@@ -2657,6 +2798,12 @@ Boolean DoGrabs (Window grab_win, Cursor cursor, unsigned int pmask, Time grabTi
 	if (!pCD || ((pCD->pSD->moveOpaque && alwaysGrab) ||
 	           (!(pCD->pSD->moveOpaque))))
 	{
+	    /*
+	     * Repaint what earlier requests uncovered (a menu that was
+	     * just unposted to start this move or resize, for instance)
+	     * while the server still serves everyone.
+	     */
+	    PullExposureEvents ();
 	    XGrabServer(DISPLAY);
         }
     }
@@ -2691,6 +2838,7 @@ void UndoGrabs (void)
     /* erase outline */
     MoveOutline(0, 0, 0, 0);
     XSync (DISPLAY, FALSE /*don't discard events*/);
+    configExposePending = False;	/* the main loop handles the rest */
 
     /* give up grabs */
     if (wmGD.freezeOnConfig) {
@@ -3586,8 +3734,6 @@ void GetConfigEvent (Display *display, Window window, unsigned long mask, int cu
     Window root_ret, child_ret;
     int root_x, root_y, win_x, win_y;
     unsigned int mask_ret;
-    Boolean polling;
-    int pollCount;
     Boolean gotEvent;
     Boolean eventToReturn = False;
 
@@ -3604,127 +3750,64 @@ void GetConfigEvent (Display *display, Window window, unsigned long mask, int cu
 		break;
 	}
 
-	/*
-	 * Only poll if we are warping the pointer. 
-	 * (uses PointerMotionHints exclusively).
-	 */
-	polling = wmGD.enableWarp;
-	pollCount = CONFIG_POLL_COUNT;
-
-	if (!gotEvent && (polling || !wmGD.freezeOnConfig))
+	if (!gotEvent)
 	{
 	    /*
-             * poll for events and flash the frame outline 
-	     * if not move opaque
+	     * Block until the next event.  The pointer is grabbed with
+	     * PointerMotionHintMask, so a motion hint arrives as soon as
+	     * the pointer moves; there is no need to poll its position.
+	     * If the server is not grabbed, flash the XOR frame outline
+	     * while waiting, unless the outline is shown with windows or
+	     * a window is being moved opaquely (resizing and placement
+	     * always use the outline).
 	     */
 
-	    while (True)
-	    {
-		if (XCheckWindowEvent(display, window, 
-				      (mask & ~PointerMotionMask), pev))
-		{
-		    gotEvent = True;
-		    break;
-		}
-		
-		if (!wmGD.freezeOnConfig && !wmGD.pActiveSD->moveOpaque)
-		{
-                    /* flash the outline if server is not grabbed */
-		    MoveOutline (oX, oY, oWidth, oHeight);
-		}
-
-		if (!XQueryPointer (display, window, &root_ret, &child_ret, 
-			&root_x, &root_y, &win_x, &win_y, &mask_ret))
-		{
-		    continue;	/* query failed, try again */
-		}
-
-		if ((root_x != curX) || (root_y != curY))
-		{
-		    /* 
-		     * Pointer moved to a new position.
-		     * Cobble a motion event together. 
-		     * NOTE: SOME FIELDS NOT SET !!! 
-		     */
-
-		    pev->type = MotionNotify;
-		    /* pev->xmotion.serial = ??? */
-		    pev->xmotion.send_event = False;
-		    pev->xmotion.display = display;
-		    pev->xmotion.window = root_ret;
-		    pev->xmotion.subwindow = child_ret;
-		    pev->xmotion.time = CurrentTime;		/* !!! !!! */
-		    pev->xmotion.x = root_x;
-		    pev->xmotion.y = root_y;
-		    pev->xmotion.x_root = root_x;
-		    pev->xmotion.y_root = root_y;
-		    /* pev->xmotion.state = ??? */
-		    /* pev->xmotion.is_hint  = ???? */
-		    /* pev->xmotion.same_screen = ??? */
-
-		    eventToReturn = True;
-		    break;	/* from while loop */
-		}
-		else if (wmGD.freezeOnConfig)
-		{
-		    if (!(--pollCount))
-		    {
-			/* 
-			 * No pointer motion in some time. Stop polling
-			 * and wait for next event.
-			 */
-			polling = False;
-			break; /* from while loop */ 
-		    }
-		}
-	    }  /* end while */
+	    if (!wmGD.freezeOnConfig && !wmGD.useWindowOutline &&
+		!(wmGD.pActiveSD->moveOpaque &&
+		  wmGD.configAction == MOVE_CLIENT))
+		WaitForConfigEvent (display, window, mask,
+				    oX, oY, oWidth, oHeight, pev);
+	    else if (configExposePending)
+		WaitForConfigEventExposing (display, window, mask, pev);
+	    else
+		XWindowEvent (display, window, mask, pev);
 	}
 
-	if (!gotEvent && !polling && wmGD.freezeOnConfig) 
+	eventToReturn = True;
+	if (pev->type == MotionNotify &&
+	    pev->xmotion.is_hint == NotifyHint)
 	{
 	    /* 
-	     * Wait for next event on window 
+	     * "Ack" the motion notify hint.  This also asks the server
+	     * for the next hint.
 	     */
-
-	    XWindowEvent (display, window, mask, pev);
-	    gotEvent = True;
-	}
-
-	if (gotEvent)
-	{
-	    eventToReturn = True;
-	    if (pev->type == MotionNotify &&
-		pev->xmotion.is_hint == NotifyHint)
+	    if ((XQueryPointer (display, window, &root_ret, 
+		    &child_ret, &root_x, &root_y, &win_x, 
+		    &win_y, &mask_ret)) &&
+		((root_x != curX) ||
+		 (root_y != curY)))
 	    {
-		/* 
-		 * "Ack" the motion notify hint 
+		/*
+		 * The query pointer values say that the pointer
+		 * moved to a new location.
 		 */
-		if ((XQueryPointer (display, window, &root_ret, 
-			&child_ret, &root_x, &root_y, &win_x, 
-			&win_y, &mask_ret)) &&
-		    ((root_x != curX) ||
-		     (root_y != curY)))
-		{
-		    /*
-		     * The query pointer values say that the pointer
-		     * moved to a new location.
-		     */
-		    pev->xmotion.window = root_ret;
-		    pev->xmotion.subwindow = child_ret;
-		    pev->xmotion.x = root_x;
-		    pev->xmotion.y = root_y;
-		    pev->xmotion.x_root = root_x;
-		    pev->xmotion.y_root = root_y;
+		pev->xmotion.window = root_ret;
+		pev->xmotion.subwindow = child_ret;
+		pev->xmotion.x = root_x;
+		pev->xmotion.y = root_y;
+		pev->xmotion.x_root = root_x;
+		pev->xmotion.y_root = root_y;
 
-		}
-		else {
-		    /*
-		     * Query failed. Change curX to force position
-		     * to be returned on first sucessful query.
-		     */
-		    eventToReturn = False;
-		    curX++;
-		}
+	    }
+	    else {
+		/*
+		 * Query failed or the pointer did not move: wait
+		 * for the next event.  Change curX to force the
+		 * position to be returned on the first successful
+		 * query.
+		 */
+		eventToReturn = False;
+		curX++;
 	    }
 	}
     } /* end while */

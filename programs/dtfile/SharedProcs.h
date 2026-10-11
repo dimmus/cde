@@ -109,6 +109,9 @@ extern void _DtBuildPath(
                         char         *path,
                         char         *directory,
                         char         *fileName) ;
+extern TypeInfo * _DtGetTypeInfo(
+                        char         *type) ;
+extern void _DtFlushTypeInfo( void ) ;
 extern PixmapData * _DtRetrievePixmapData(
                         char         *dataType,
                         char         *fileName,
@@ -119,6 +122,8 @@ extern void _DtCheckAndFreePixmapData(
                         char         *dataType,
                         Widget        shell,
                         DtIconGadget  iconGadget,
+                        PixmapData   *pixmapData) ;
+extern void _DtFreePixmapData(
                         PixmapData   *pixmapData) ;
 extern Boolean _DtCheckForDataTypeProperty(
                         char *dataType,
@@ -190,6 +195,21 @@ extern Boolean _DtSpacesInFileNames(
 extern char * _DtResolveAppManPath(
                         char *path,
                         char *restricted_dir) ;
+
+extern void * PtrMapGet(
+                        PtrMap *m,
+                        void *key) ;
+extern void PtrMapPut(
+                        PtrMap *m,
+                        void *key,
+                        void *val) ;
+extern void PtrMapRemove(
+                        PtrMap *m,
+                        void *key) ;
+extern void PtrMapClear(
+                        PtrMap *m) ;
+extern void PtrMapFree(
+                        PtrMap *m) ;
 
 /********    End Public Function Declarations    ********/
 

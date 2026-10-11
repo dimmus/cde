@@ -1,5 +1,6 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
+SUBDIRS = build eltdef htag2 parser
 
-SUBDIRS = util build eltdef htag2 parser
+# headers, and util sources that the pass #includes
+EXTRA_DIST = util

@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 dist_bin_SCRIPTS = dtopen
 
 LOCAL_CPP_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) \

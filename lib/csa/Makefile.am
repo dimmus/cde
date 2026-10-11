@@ -1,24 +1,39 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 csadir = $(includedir)/csa
 
 MAINTAINERCLEANFILES = Makefile.in
 
 lib_LTLIBRARIES = libcsa.la
 
-libcsa_la_CFLAGS = -DRFC_MIME -DLINE_COUNT -DV2 -DOW_I18N \
+libcsa_la_CFLAGS = $(CDE_CFLAGS) -DRFC_MIME -DLINE_COUNT -DV2 -DOW_I18N \
 		   $(CSA_INCDIR)
 
-libcsa_la_LIBADD = $(XTOOLLIB) $(TIRPCLIB)
+# XtAppAddInput (and nothing else from X) in agent.c
+libcsa_la_LIBADD = $(XTLIB) $(TIRPCLIB)
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libcsa_la_LDFLAGS = -version-info 2:1:0
+libcsa_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libcsa_la_LDFLAGS = -version-info 3:0:1
+libcsa_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+# export only the symbols in build-aux/symbols/libcsa.sym
+if EXPORT_MAPS
+libcsa_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libcsa-exports.ver
+EXTRA_libcsa_la_DEPENDENCIES = $(VSCRIPT_DIR)/libcsa-exports.ver
+endif
+$(VSCRIPT_DIR)/libcsa-exports.ver: $(EXPORTS_DIR)/libcsa.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
 
 if LINUX
 else
-libcsa_la_LIBADD += $(LIBSVC) $(XTOOLLIB)
+libcsa_la_LIBADD += $(LIBSVC)
 endif
 
 AM_YFLAGS = -d

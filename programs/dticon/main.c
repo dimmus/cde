@@ -513,23 +513,27 @@ if (tt_message_status(msg) == TT_WRN_START_MESSAGE) tt_message_reply(msg);
              }
              else
              {
-                (void) tmpnam(start_file);
-                if( (buf) && (!strncmp((char *)buf, "/* XPM */", 9)) )
+                /* mkstemp, not tmpnam: no /tmp race (and no linker warning) */
+                snprintf(start_file, 256, "%s/dticonXXXXXX",
+                         getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+                tt_tmpfile_fd = mkstemp(start_file);
+                if (tt_tmpfile_fd < 0)
+                {
+                   start_file[0] = '\0';
+                   tt_message_fail(msg);
+                   edit_notifier(NULL, 0, 1);
+                }
+                else if( (buf) && (!strncmp((char *)buf, "/* XPM */", 9)) )
                 {
                    /* Format XPM */
-                   tt_tmpfile_fd =
-                           open(start_file,
-                                O_CREAT | O_WRONLY | O_NDELAY,
-                                0666);
-                   if (tt_tmpfile_fd && (wlen =
-                                 write(tt_tmpfile_fd,
-                                       buf, blen)) == blen)
+                   if ((wlen = write(tt_tmpfile_fd, buf, blen)) == blen)
                    {
                       (void) close(tt_tmpfile_fd);
                       param_flag[AUTO_FILE] = True;
                       argsNeedProcessed = True;
                    }
                    else {
+                           (void) close(tt_tmpfile_fd);
                            tt_message_fail(msg);
                            edit_notifier(NULL, 0, 1);
                         }
@@ -537,19 +541,20 @@ if (tt_message_status(msg) == TT_WRN_START_MESSAGE) tt_message_reply(msg);
                 else
                 {
                    /* Format XBM */
-                   /* assume two buffers.... */
-                   tmp = strchr((char *)buf, ';');
-                   tmp ++;
-                   tmplen=blen - strlen(tmp);
+                   /* assume two buffers, the bitmap and then the mask,
+                    * the first one ending at its first ';' */
+                   tmp = buf ? strchr((char *)buf, ';') : NULL;
+                   if (tmp)
+                   {
+                      tmp ++;
+                      tmplen = blen - strlen(tmp);
+                   }
+                   else
+                      tmplen = blen;      /* no ';': all of it, no mask */
 
                      /* read XBM file first*/
                      /* Grab the first buffer. */
-                     tt_tmpfile_fd =
-                             open(start_file,
-                                  O_CREAT | O_WRONLY | O_NDELAY,
-                                  0666);
-
-                     if (tt_tmpfile_fd && (wlen =
+                     if (tmplen >= 0 && (wlen =
                                    write(tt_tmpfile_fd,
                                          buf, tmplen)) == tmplen)
                      {
@@ -559,34 +564,41 @@ if (tt_message_status(msg) == TT_WRN_START_MESSAGE) tt_message_reply(msg);
                      }
                      else
                      {
-                             tt_message_fail(msg);
+                            (void) close(tt_tmpfile_fd);
+                            tt_message_fail(msg);
                             edit_notifier(NULL, 0, 1);
                      }
 
                    /* Try to find the second buffer. */
-                   tmp ++;
-                   if(tmp) tmp1=strchr(tmp, ';');
+                   tmp1 = NULL;
+                   if (tmp && *tmp)
+                   {
+                      tmp ++;
+                      tmp1 = strchr(tmp, ';');
+                   }
 
                    if (tmp1)
                    {
                       /* we have a mask */
                       /* construct the name of the mask file */
-                      strcpy(mask_file, start_file);
-                      strcat(mask_file, "_m\0");
+                      snprintf(mask_file, sizeof(mask_file), "%s_m",
+                               start_file);
                       tt_tmpMaskfile_fd =
                             open(mask_file,
-                            O_CREAT | O_WRONLY | O_NDELAY,
-                            0666);
+                            O_CREAT | O_EXCL | O_WRONLY | O_NDELAY,
+                            0600);
                       /* Read the mask fro the seconf buffer. */
-                      if (tt_tmpMaskfile_fd && (wlen =
+                      if (tt_tmpMaskfile_fd >= 0 && (wlen =
                       write(tt_tmpMaskfile_fd,
-                            tmp, strlen(tmp))) == strlen(tmp))
+                            tmp, strlen(tmp))) == (int)strlen(tmp))
                       {
                          (void) close(tt_tmpMaskfile_fd);
                          param_flag[AUTO_FILE] = True;
                          argsNeedProcessed = True;
                       }
                       else {
+                              if (tt_tmpMaskfile_fd >= 0)
+                                 (void) close(tt_tmpMaskfile_fd);
                               tt_message_fail(msg);
                               edit_notifier(NULL, 0, 1);
                            }
@@ -692,15 +704,22 @@ send_tt_saved(void)
 
         /* Read the base file regardless of format */
         fd = open(last_fname, O_RDONLY | O_NDELAY);
-        len = lseek(fd, 0, SEEK_END);
-        (void) lseek(fd, 0, SEEK_SET);
+        len = fd >= 0 ? lseek(fd, 0, SEEK_END) : 0;
+        if (len < 0)
+            len = 0;
         Fbuffer = XtMalloc(len + 1);
-        if ((rlen = read(fd, Fbuffer, len)) != len)
+        if (fd >= 0)
         {
-        /* didn't read whole file! */
-        printf("dtcreate: Only read %d of %d bytes of icon file!\n", rlen, len);
+            (void) lseek(fd, 0, SEEK_SET);
+            if ((rlen = read(fd, Fbuffer, len)) != len)
+            {
+            /* didn't read whole file! */
+            printf("dtcreate: Only read %d of %d bytes of icon file!\n", rlen, len);
+            if (rlen < 0) rlen = 0;
+            len = rlen;
+            }
+            (void) close(fd);
         }
-        (void) close(fd);
         Fbuffer[len]='\0';
 
         rlen = 0;
@@ -709,17 +728,24 @@ send_tt_saved(void)
         {
            /* Read the mask file if one exists */
            fdm = open(dummy, O_RDONLY | O_NDELAY);
-           Mlen = lseek(fdm, 0, SEEK_END);
-           (void) lseek(fdm, 0, SEEK_SET);
+           Mlen = fdm >= 0 ? lseek(fdm, 0, SEEK_END) : 0;
+           if (Mlen < 0)
+               Mlen = 0;
            Mbuffer = XtMalloc(Mlen + 1);
-           if ((rlen = read(fdm, Mbuffer, Mlen)) != Mlen)
+           if (fdm >= 0)
            {
-               /* didn't read whole file! */
-               printf(
-		"dtcreate: Only read %d of %d bytes of icon file!\n",
-		rlen, Mlen);
+               (void) lseek(fdm, 0, SEEK_SET);
+               if ((rlen = read(fdm, Mbuffer, Mlen)) != Mlen)
+               {
+                   /* didn't read whole file! */
+                   printf(
+		    "dtcreate: Only read %d of %d bytes of icon file!\n",
+		    rlen, Mlen);
+                   if (rlen < 0) rlen = 0;
+                   Mlen = rlen;
+               }
+               (void) close(fdm);
            }
-           (void) close(fdm);
            Mbuffer[Mlen] ='\0';
 
            /* Double buffer the base and mask */
@@ -727,15 +753,13 @@ send_tt_saved(void)
            strcpy(buffer, Fbuffer);
            buffer[strlen(Fbuffer)] ='\0';
            strcat(buffer, Mbuffer);
-           buffer[strlen(Fbuffer)+strlen(Mbuffer)+1] ='\0';
            XtFree(Mbuffer);
         }
         else
         {
            /* No mask/bm just pass the pm file */
              buffer = XtMalloc(len + 1);
-             strcpy(buffer, Fbuffer);
-             buffer[len+1] ='\0';
+             memcpy(buffer, Fbuffer, len + 1);
         }
 
         tt_message_barg_add(msg, TT_IN, tt_message_arg_type(local_msg, 0),

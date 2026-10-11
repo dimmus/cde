@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libCliSrv.a
 
-libCliSrv_a_CXXFLAGS = $(DT_INCDIR)
+libCliSrv_a_CXXFLAGS = $(CDE_CXXFLAGS) $(DT_INCDIR)
 
 if SOLARIS
 libCliSrv_a_CXXFLAGS += -DIOSTREAMSWORKS

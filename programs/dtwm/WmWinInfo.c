@@ -143,6 +143,11 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->clientID = ++(pSD->clientCounter);
     pCD->clientFlags = WM_INITIALIZATION;
     pCD->iconFlags = 0;
+    pCD->hintIconPixmap = None;
+    pCD->hintIconMask = None;
+    pCD->wmStateWritten = -1;
+    pCD->wmStateIconWritten = None;
+    pCD->stackRank = 0;
     pCD->thisIconBox = NULL;
     pCD->pECD = NULL;
     pCD->pPRCD = NULL;
@@ -215,6 +220,9 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->fullscreenAuto = True;
 
     pCD->instantTitle = NULL;
+    pCD->titleWidthString = NULL;
+    pCD->titleFromNetWmName = False;
+    pCD->iconTitleFromNetWmName = False;
 
     for (i = 0; i < STRETCH_COUNT; ++i) pCD->clientStretchWin[i] = (Window)0L;
 
@@ -365,14 +373,14 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
      * property contains the window title NOT the window resource name):
      */
 
-    ProcessWmWindowTitle (pCD, TRUE);
+    ProcessWmWindowTitle (pCD, TRUE, None);
 
 
     /*
      * Retrieve and process WM_ICON_NAME client window property info:
      */
 
-    ProcessWmIconTitle (pCD, TRUE);
+    ProcessWmIconTitle (pCD, TRUE, None);
 
 
     /*
@@ -855,7 +863,8 @@ ProcessSmClientID (ClientData *pCD)
 	pCD->smClientID = (String)NULL;
     }
 
-    if ((XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_SM_CLIENT_ID,
+    if (HasProperty (pCD, wmGD.xa_SM_CLIENT_ID) &&
+	(XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_SM_CLIENT_ID,
 			    0L, (long)1000000, False, AnyPropertyType,
 			    &actualType, &actualFormat, &nitems,
 			    &leftover, (unsigned char **)&clientID)
@@ -902,7 +911,8 @@ ProcessWmSaveHint (ClientData *pCD)
     unsigned long nitems, leftover;
     BITS32 *saveHintFlags = (BITS32 *)NULL;
 
-    if ((XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_WMSAVE_HINT,
+    if (HasProperty (pCD, wmGD.xa_WMSAVE_HINT) &&
+	(XGetWindowProperty(DISPLAY, pCD->client, wmGD.xa_WMSAVE_HINT,
 			    0L, (long)1000000, False, AnyPropertyType,
 			    &actualType, &actualFormat, &nitems,
 			    &leftover, (unsigned char **)&saveHintFlags)
@@ -1139,6 +1149,8 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
 		         */
 
 		        pCD->iconFlags |= ICON_HINTS_PIXMAP;
+			pCD->hintIconPixmap = pXWMHints->icon_pixmap;
+			pCD->hintIconMask = iconMask;
 		    }
 		    else
 		    {
@@ -1262,7 +1274,18 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
 	    iconMask = (flags & IconMaskHint)?
                        pXWMHints->icon_mask : (Pixmap) NULL;
 
-	    if ((iconPixmap = 
+	    /*
+	     * WM_HINTS changes for other reasons (the urgency or the input
+	     * hint): when the client names the pixmap and mask that the
+	     * icon image was made from, there is nothing to remake.
+	     */
+	    if ((pCD->iconFlags & ICON_HINTS_PIXMAP) && pCD->iconPixmap &&
+		(pXWMHints->icon_pixmap == pCD->hintIconPixmap) &&
+		(iconMask == pCD->hintIconMask))
+	    {
+		/* unchanged */
+	    }
+	    else if ((iconPixmap = 
 		 MakeClientIconPixmap (pCD, pXWMHints->icon_pixmap, 
 					     iconMask)) != None)
 	    {
@@ -1289,6 +1312,8 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
                 }
 		
                 pCD->iconPixmap = iconPixmap;
+		pCD->hintIconPixmap = pXWMHints->icon_pixmap;
+		pCD->hintIconMask = iconMask;
 		
                 /*
                  * Display new icon image if the icon is showing:
@@ -1350,6 +1375,12 @@ ProcessWmHints (ClientData *pCD, Boolean firstTime)
  *
  *************************************<->***********************************/
 
+/*
+ * Set by ProcessWmNormalHintsNoMaxSize: process the hints as if their
+ * maximum size were "unlimited" (-1, which means the size of the head).
+ */
+static Boolean normalHintsNoMaxSize = False;
+
 void 
 ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
 {
@@ -1372,6 +1403,13 @@ ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
     pNormalHints = GetNormalHints (pCD);
 
     pCD->icccVersion = pNormalHints->icccVersion;
+
+    if (normalHintsNoMaxSize)
+    {
+	pNormalHints->flags |= P_MAX_SIZE;
+	pNormalHints->max_width = -1;
+	pNormalHints->max_height = -1;
+    }
 
 
     /*
@@ -2021,6 +2059,33 @@ ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
 
 } /* END OF FUNCTION ProcessWmNormalHints */
 
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessWmNormalHintsNoMaxSize (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reprocess WM_NORMAL_HINTS as if they set no maximum size, so that the
+ *  limit becomes the size of the head with the current decorations.
+ *  Used when _MOTIF_WM_HINTS change the decorations (e.g. a client that
+ *  removes them to go full screen).  The client's property is left
+ *  alone; its own maximum size applies again when it next changes
+ *  WM_NORMAL_HINTS.
+ *
+ *************************************<->***********************************/
+
+void 
+ProcessWmNormalHintsNoMaxSize (ClientData *pCD)
+{
+    normalHintsNoMaxSize = True;
+    ProcessWmNormalHints (pCD, FALSE /*not first time*/, 0);
+    normalHintsNoMaxSize = False;
+
+} /* END OF FUNCTION ProcessWmNormalHintsNoMaxSize */
+
 
 /*************************************<->*************************************
  *
@@ -2125,33 +2190,68 @@ WmICCCMToXmString (XTextProperty *wmNameProp)
  *  firstTime	- false if the window is already managed and the title
  *                is being changed.
  *
+ *  changed	- when not firstTime, the property that changed
+ *		  (WM_NAME or _NET_WM_NAME)
+ *
  * 
  *  Outputs:
  *  -------
- *  pCD		- clientTitle, iconTitle
+ *  pCD		- clientTitle, iconTitle, titleFromNetWmName
+ *
+ *
+ *  Comments:
+ *  --------
+ *  A valid _NET_WM_NAME takes precedence over WM_NAME.  Whether the
+ *  title came from it is remembered, so that a change of the property
+ *  that is not in use costs no round trip.
  * 
  *************************************<->***********************************/
 
 void 
-ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime)
+ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime, Atom changed)
 {
     char *netStr;
     XTextProperty wmNameProp;
     XmString title_xms = NULL;
     Window win = pCD->client;
-    Boolean hasWmName = HasProperty (pCD, XA_WM_NAME);
-    Boolean hasNetWmName = HasProperty (pCD, wmGD.xa__NET_WM_NAME);
+    Boolean readWmName, readNetWmName;
+
+    if (firstTime)
+    {
+	readWmName = HasProperty (pCD, XA_WM_NAME);
+	readNetWmName = HasProperty (pCD, wmGD.xa__NET_WM_NAME);
+    }
+    else if (changed == wmGD.xa__NET_WM_NAME)
+    {
+	readWmName = readNetWmName = True;
+    }
+    else if (pCD->titleFromNetWmName)
+    {
+	/* the title is from _NET_WM_NAME, which did not change */
+	return;
+    }
+    else
+    {
+	/*
+	 * _NET_WM_NAME is absent or unusable, and has not changed since
+	 * it was last looked at
+	 */
+	readWmName = True;
+	readNetWmName = False;
+    }
 
     if ((pCD->clientDecoration & MWM_DECOR_TITLE) &&
-	(!firstTime || hasWmName || hasNetWmName))
+	(readWmName || readNetWmName))
     {
-	if ((!firstTime || hasNetWmName) &&
+	pCD->titleFromNetWmName = False;
+	if (readNetWmName &&
 	    (netStr = GetUtf8String (DISPLAY, win, wmGD.xa__NET_WM_NAME)))
 	{
 	    title_xms = XmStringCreateLocalized (netStr);
 	    XFree (netStr);
+	    pCD->titleFromNetWmName = True;
 	}
-	else if ((!firstTime || hasWmName) &&
+	else if (readWmName &&
 		 XGetWMName(DISPLAY, win, &wmNameProp))
 	{
 	    title_xms = WmICCCMToXmString(&wmNameProp);
@@ -2178,6 +2278,7 @@ ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime)
       }
 
       pCD->clientTitle = title_xms;
+      pCD->titleWidthString = NULL;
       pCD->clientFlags |= CLIENT_HINTS_TITLE;
 
       if (!firstTime)
@@ -2200,6 +2301,7 @@ ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime)
         {
 	    pCD->clientTitle = wmGD.clientDefaultTitle;
         }
+	pCD->titleWidthString = NULL;
     }
 
     if (firstTime && pCD->instantTitle == NULL &&
@@ -2207,6 +2309,7 @@ ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime)
 	(netStr = GetUtf8String (DISPLAY, win, wmGD.xa__NET_WM_VISIBLE_NAME)))
     {
 	pCD->instantTitle = XmStringCreateLocalized (netStr);
+	pCD->titleWidthString = NULL;
 	XFree (netStr);
     }
 
@@ -2230,7 +2333,7 @@ ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime)
 	/*
 	 * Calculations derived from GetTextBox() and GetFramePartInfo()
 	 */
-	minWidth = XmStringWidth(fontList, CLIENT_DISPLAY_TITLE(pCD)) +
+	minWidth = GetClientTitleWidth(pCD, fontList) +
 	    ((pCD->dtwmBehaviors & DtWM_BEHAVIOR_SUBPANEL) ? 4 : 0) +
 			    ((decor & MWM_DECOR_MENU) ? boxdim : 0) +
 			    ((decor & MWM_DECOR_MINIMIZE) ? boxdim : 0) +
@@ -2359,34 +2462,58 @@ FixSubpanelEmbeddedClientGeometry (ClientData *pCD)
  *  firstTime	- false if the window is already managed and the title
  *                is being changed.
  *
+ *  changed	- when not firstTime, the property that changed
+ *		  (WM_ICON_NAME or _NET_WM_ICON_NAME)
+ *
  * 
  *  Outputs:
  *  -------
- *  pCD		- iconTitle
+ *  pCD		- iconTitle, iconTitleFromNetWmName
  * 
  *************************************<->***********************************/
 
 void 
-ProcessWmIconTitle (ClientData *pCD, Boolean firstTime)
+ProcessWmIconTitle (ClientData *pCD, Boolean firstTime, Atom changed)
 {
   char *netStr;
   XTextProperty wmIconNameProp;
   XmString icon_xms = NULL;
   Window win = pCD->client;
-  Boolean hasWmIconName = HasProperty (pCD, XA_WM_ICON_NAME);
-  Boolean hasNetWmIconName = HasProperty (pCD, wmGD.xa__NET_WM_ICON_NAME);
+  Boolean readWmIconName, readNetWmIconName;
+
+  if (firstTime)
+  {
+    readWmIconName = HasProperty (pCD, XA_WM_ICON_NAME);
+    readNetWmIconName = HasProperty (pCD, wmGD.xa__NET_WM_ICON_NAME);
+  }
+  else if (changed == wmGD.xa__NET_WM_ICON_NAME)
+  {
+    readWmIconName = readNetWmIconName = True;
+  }
+  else if (pCD->iconTitleFromNetWmName)
+  {
+    /* the icon title is from _NET_WM_ICON_NAME, which did not change */
+    return;
+  }
+  else
+  {
+    readWmIconName = True;
+    readNetWmIconName = False;
+  }
 
   if ((pCD->clientFunctions & MWM_FUNC_MINIMIZE) &&
       (pCD->transientLeader == NULL) &&
-      (!firstTime || hasWmIconName || hasNetWmIconName))
+      (readWmIconName || readNetWmIconName))
   {
-    if ((!firstTime || hasNetWmIconName) &&
+    pCD->iconTitleFromNetWmName = False;
+    if (readNetWmIconName &&
 	(netStr = GetUtf8String (DISPLAY, win, wmGD.xa__NET_WM_ICON_NAME)))
     {
       icon_xms = XmStringCreateLocalized (netStr);
       XFree (netStr);
+      pCD->iconTitleFromNetWmName = True;
     }
-    else if ((!firstTime || hasWmIconName) &&
+    else if (readWmIconName &&
 	     XGetWMIconName (DISPLAY, win, &wmIconNameProp))
     {
       icon_xms = WmICCCMToXmString(&wmIconNameProp);

@@ -1,10 +1,12 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = dticon
 
-dticon_CFLAGS = -D__TOOLTALK
+dticon_CFLAGS = $(CDE_CFLAGS) -D__TOOLTALK
 
-dticon_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dticon_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(XMLIB) $(XTLIB) $(XPMLIB) $(X11LIB)
 
 dticon_SOURCES = dtIconShell.c event.c event.h fileIO.c fileIO.h	\
                  fileIODialog.c globals.c graphics.c graphics.h		\

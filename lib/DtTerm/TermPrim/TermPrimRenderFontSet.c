@@ -38,7 +38,70 @@ typedef struct _TermFontSetRec {
     int ascent;
     int height;
     int width;
+    /* the logical height of a run of text is the largest ascent plus the
+     * largest descent of the fonts used to draw it (Xlib's generic
+     * output method), so it lies between these two...
+     */
+    int minRunHeight;		/* smallest ascent + descent of a font	*/
+    int maxRunHeight;		/* largest ascent + largest descent	*/
+    int asciiRunHeight;		/* that of a run of ASCII characters	*/
 } TermFontSetRec, *TermFontSet;
+
+/* Text height may be smaller than cellHeight (happens when using font
+ * sets).  In this case we need to fill the background manually and then
+ * use X*DrawString instead of X*DrawImageString.  Decide from the fonts
+ * in the set when we can (always the case with a single font), so that
+ * we need not measure every run: 1 if every run is shorter than a cell,
+ * 0 if none is, and -1 if it depends on the run...
+ */
+static int
+runsNeedFill(TermFontSet termFontSet, int cellHeight)
+{
+    if (termFontSet->minRunHeight <= 0) {
+	/* we don't know the fonts... */
+	return(-1);
+    }
+    if (termFontSet->maxRunHeight < cellHeight) {
+	return(1);
+    }
+    if (termFontSet->minRunHeight >= cellHeight) {
+	return(0);
+    }
+    return(-1);
+}
+
+/* With fonts of different heights in the set (the usual case with a
+ * UTF-8 locale's font set: the JIS X 0208 font is a pixel shorter),
+ * whether a run needs the fill depends on the fonts it uses.  ASCII text
+ * is all drawn with one font, whose height we measured: so we only need
+ * to measure the runs that are not all ASCII...
+ */
+static int
+runNeedsFill(TermFontSet termFontSet, int cellHeight, int mbCurMax,
+	unsigned char *string, int len)
+{
+    int i;
+
+    if (termFontSet->asciiRunHeight <= 0) {
+	return(-1);
+    }
+    if (mbCurMax == 1) {
+	for (i = 0; i < len; i++) {
+	    if (string[i] & 0x80) {
+		return(-1);
+	    }
+	}
+    } else {
+	wchar_t *wcs = (wchar_t *) string;
+
+	for (i = 0; i < len; i++) {
+	    if ((wcs[i] < 0) || (wcs[i] >= 0x80)) {
+		return(-1);
+	    }
+	}
+    }
+    return(termFontSet->asciiRunHeight < cellHeight);
+}
 
 static void
 FontSetRenderFunction(
@@ -58,9 +121,10 @@ FontSetRenderFunction(
     XGCValues values;
     unsigned long valueMask;
     TermFontSet termFontSet = (TermFontSet) font->fontInfo;
-    int escapement;
+    int escapement = 0;
     XRectangle extents;
     Boolean fixExtents;
+    int needFill;
 
     /* set the renderGC... */
     valueMask = (unsigned long) 0;
@@ -77,16 +141,33 @@ FontSetRenderFunction(
      */
     tpd->renderGC.fid = (Font) 0;
 
-    escapement = (tpd->mbCurMax == 1) ?
-        XmbTextExtents(termFontSet->fontSet, (char *) string, len,
-		       NULL, &extents) :
-        XwcTextExtents(termFontSet->fontSet, (wchar_t*) string, len,
-		       NULL, &extents);
-
     /* Text height may be smaller than cellHeight (happens when using font sets).
        In this case we need to fill background manually and then use X*DrawString
        instead of X*DrawImageString */
-    fixExtents = extents.height < tpd->cellHeight;
+    needFill = runsNeedFill(termFontSet, tpd->cellHeight);
+    if (needFill < 0) {
+	needFill = runNeedsFill(termFontSet, tpd->cellHeight, tpd->mbCurMax,
+		string, len);
+    }
+    if ((needFill < 0) || isDebugFSet('t', 1)) {
+	/* measure this run... */
+	escapement = (tpd->mbCurMax == 1) ?
+	    XmbTextExtents(termFontSet->fontSet, (char *) string, len,
+			   NULL, &extents) :
+	    XwcTextExtents(termFontSet->fontSet, (wchar_t*) string, len,
+			   NULL, &extents);
+	fixExtents = extents.height < tpd->cellHeight;
+    } else {
+	fixExtents = (needFill > 0);
+	if (fixExtents || TermIS_UNDERLINE(flags)) {
+	    /* we need the width... */
+	    escapement = (tpd->mbCurMax == 1) ?
+		XmbTextEscapement(termFontSet->fontSet, (char *) string,
+			len) :
+		XwcTextEscapement(termFontSet->fontSet, (wchar_t *) string,
+			len);
+	}
+    }
 
     if (fixExtents) {
       /* set background color as foreground if needed*/
@@ -272,6 +353,47 @@ _DtTermPrimRenderFontSetCreate(
     termFontSet->height = fontSetExtents->max_logical_extent.height;
     termFontSet->ascent = -fontSetExtents->max_logical_extent.y;
     termFont->fontInfo = (XtPointer) termFontSet;
+
+    /* the range of run heights (see runsNeedFill())... */
+    {
+	XFontStruct **fonts;
+	char **fontNames;
+	int numFonts;
+	int maxAscent = 0;
+	int maxDescent = 0;
+	int i;
+
+	termFontSet->minRunHeight = 0;
+	numFonts = XFontsOfFontSet(fontSet, &fonts, &fontNames);
+	for (i = 0; i < numFonts; i++) {
+	    if (!fonts[i]) {
+		/* not loaded (yet).  We will measure every run... */
+		termFontSet->minRunHeight = 0;
+		break;
+	    }
+	    if ((i == 0) || (fonts[i]->ascent + fonts[i]->descent <
+		    termFontSet->minRunHeight)) {
+		termFontSet->minRunHeight =
+			fonts[i]->ascent + fonts[i]->descent;
+	    }
+	    maxAscent = MAX(maxAscent, fonts[i]->ascent);
+	    maxDescent = MAX(maxDescent, fonts[i]->descent);
+	}
+	termFontSet->maxRunHeight = maxAscent + maxDescent;
+    }
+
+    /* the height of a run of ASCII characters (see runNeedsFill())... */
+    {
+	static char ascii[] = " !\"#$%&'()*+,-./0123456789:;<=>?@"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`"
+		"abcdefghijklmnopqrstuvwxyz{|}~";
+	XRectangle extents;
+
+	extents.height = 0;
+	(void) XmbTextExtents(fontSet, ascii, sizeof(ascii) - 1, NULL,
+		&extents);
+	termFontSet->asciiRunHeight = extents.height;
+    }
 
     return(termFont);
 }

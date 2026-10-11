@@ -91,25 +91,20 @@ DtWsmGetWorkspaceList(
     unsigned long leftover, items, length;
     int rcode;
     Atom property;
-    Window wmWindow;
     _DtSvcDisplayToAppContext(display);
 
     _DtSvcAppLock(app);
 
-    if ((rcode=_DtGetMwmWindow (display, root, &wmWindow)) == Success)
+    property = XmInternAtom(display, _XA_DT_WORKSPACE_LIST, False); 
+    length = BUFSIZ;
+
+    *ppWorkspaceList = NULL;
     {
-
-	property = XmInternAtom(display, _XA_DT_WORKSPACE_LIST, False); 
-	length = BUFSIZ;
-
-	*ppWorkspaceList = NULL;
-	if ((rcode=XGetWindowProperty(
+	if ((rcode=_DtGetMwmWindowProperty(
 			display,
-			wmWindow,
+			root,
 			property,
-			0L, 				/* offset */
 			length,
-			False,				/* delete */
 			XA_ATOM,			/* req_type */
 			&actualType,
 			&actualFormat,
@@ -178,24 +173,19 @@ DtWsmGetCurrentWorkspace (
     unsigned long leftover, items, length;
     int rcode;
     Atom property;
-    Window wmWindow;
     Atom *paTemp;
     _DtSvcDisplayToAppContext(display);
 
     _DtSvcAppLock(app);
-    if ((rcode=_DtGetMwmWindow (display, root, &wmWindow)) == Success)
+    property = XmInternAtom(display, _XA_DT_WORKSPACE_CURRENT, False); 
+    length = 1;
+
     {
-
-	property = XmInternAtom(display, _XA_DT_WORKSPACE_CURRENT, False); 
-	length = 1;
-
-	if ((rcode=XGetWindowProperty(
+	if ((rcode=_DtGetMwmWindowProperty(
 			display,
-			wmWindow,
+			root,
 			property,
-			0L, 				/* offset */
 			length,
-			False,				/* delete */
 			XA_ATOM,			/* req_type */
 			&actualType,
 			&actualFormat,

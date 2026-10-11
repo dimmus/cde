@@ -1,7 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
-
 noinst_PROGRAMS = eltdef
 
 HTAG2       = ..
@@ -11,12 +9,13 @@ SDLELTDEFSRC = $(HTAG2)/eltdef
 SDLDTDFILE   = $(HTAG2SRC)/sdl.dtd
 SDLUTILSRC   = $(HTAG2)/util
 SDLBUILDSRC  = $(HTAG2)/build
-SDLUTILLIB   = $(HTAG2)/util/libutil.a
+SDLUTILLIB   = $(HTAG2)/../util/libhelputil.a
+SDLCONTEXT   = $(HTAG2)/../util/context
 SDLIFFILE    = $(HTAG2SRC)/sdl.if
 
 eltdef_LDADD = $(SDLUTILLIB)
 
-eltdef_CFLAGS = -I$(SDLUTILSRC) -I$(SDLBUILDSRC)
+eltdef_CFLAGS = $(CDE_CFLAGS) -I$(SDLUTILSRC) -I$(SDLBUILDSRC)
 
 eltdef_SOURCES = eltdef.c eltutil.c entity.c scan.c
 
@@ -40,15 +39,18 @@ $(CPRODS): CDONE
 
 $(EPRODS): EDONE
 
+# eltdef includes the CPRODS (case.c, context.h, delim.h): make them first.
+$(eltdef_OBJECTS): CDONE
+
 
 EDONE: eltdef  $(SDLIFFILE)
 	$(RM) $(EPRODS) $(ETRASH)
 	./eltdef $(SDLIFFILE)
 	touch EDONE
 
-CDONE:  $(SDLUTILSRC)/context $(HTAG2SRC)/delim.elt context.dat
+CDONE:  $(SDLCONTEXT) $(HTAG2SRC)/delim.elt context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HTAG2SRC)/delim.elt delim.dat  # appl.-specific delim.dat
-	$(SDLUTILSRC)/context
+	$(SDLCONTEXT)
 	touch CDONE
 

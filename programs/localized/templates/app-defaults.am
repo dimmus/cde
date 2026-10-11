@@ -1,12 +1,13 @@
 # process the app-defaults files...
+# (not Dtudcfonted: dtudcfonted is not built)
 
 
 
 BUILT_SOURCES = Dthelpview Dtimsstart Dtlogin Dthello Dtsession		\
 	Dtscreen Dtwm Dtfile Dtstyle Dtpad Dticon Dtcreate Dtcalc	\
-	Dtcm Dtterm Dtmail Dtbuilder Dtudcfonted Dt Dtinfo
+	Dtcm Dtterm Dtmail Dtbuilder Dt Dtinfo
 
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 appdefdir = $(CDE_INSTALLATION_TOP)/app-defaults/$(LANG)
 dist_appdef_DATA = $(BUILT_SOURCES)
@@ -17,62 +18,59 @@ MERGE = $(top_builddir)/programs/localized/util/merge
 
 
 Dthelpview: $(TOP)/dthelp/dthelpview/Dthelpview Dthelpview.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtimsstart: $(TOP)/dtimsstart/Dtimsstart Dtimsstart.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtlogin: $(TOP)/dtlogin/config/Dtlogin Dtlogin.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dthello: $(TOP)/dthello/Dthello Dthello.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtsession: $(TOP)/dtsession/Dtsession Dtsession.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtscreen: $(TOP)/dtscreen/Dtscreen Dtscreen.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtwm: $(TOP)/dtwm/Dtwm.defs Dtwm.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtfile: $(TOP)/dtfile/Dtfile Dtfile.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtstyle: $(TOP)/dtstyle/Dtstyle Dtstyle.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtpad: $(TOP)/dtpad/Dtpad Dtpad.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dticon: $(TOP)/dticon/Dticon Dticon.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtcreate: $(TOP)/dtcreate/Dtcreate Dtcreate.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtcalc: $(TOP)/dtcalc/Dtcalc Dtcalc.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtcm: $(TOP)/dtcm/dtcm/Dtcm.ad Dtcm.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtterm: $(TOP)/dtterm/Dtterm.ad Dtterm.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtmail: $(TOP)/dtmail/dtmail/Dtmail Dtmail.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtbuilder: $(TOP)/dtappbuilder/src/ab/Dtbuilder.ad Dtbuilder.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dtinfo: $(TOP)/dtinfo/dtinfo/src/Dtinfo Dtinfo.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
-
-Dtudcfonted: $(TOP)/dtudcfonted/resource/Dtudcfonted Dtudcfonted.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 
 Dt: $(DTSVCSRC)/DtUtil2/Dt.ad Dt.tmsg
-	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) $@.tmsg < $< > $@.tmp && mv -f $@.tmp $@
 

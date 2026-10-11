@@ -356,6 +356,44 @@ typedef struct termData {
     */
     OnTheSpotData onthespot;
 
+    /*
+    ** Output processing buffers, allocated once and reused...
+    */
+    unsigned char *readBuffer;		/* pty read buffer (with room
+					 * in front for a partial
+					 * multibyte character)		*/
+    Boolean isUtf8;			/* locale codeset is UTF-8	*/
+    termChar *overflowBuffer;		/* overflow from buffer inserts	*/
+    int overflowBufferLen;		/* size in bytes		*/
+    wchar_t *wcBuffer;			/* multibyte to wide conversion	*/
+    int *wcByteOffsets;			/* byte offset of each wchar	*/
+    int wcBufferLen;			/* size in characters		*/
+    Boolean wcBufferInUse;		/* guard against reentrancy	*/
+
+    /* frame pacing and deferred rendering (see TermPrimScroll.c)...
+     */
+    long lastPaintSec;			/* when output was last painted	*/
+    long lastPaintNsec;			/*   (CLOCK_MONOTONIC)		*/
+    XtIntervalId frameTimerId;		/* deferred end of output paint	*/
+    Boolean deferRender;		/* record refreshes as dirty
+					 * spans instead of drawing	*/
+    Boolean dirtyRows;			/* some row has a dirty span	*/
+    short dirtyRowsAlloc;		/* size of the dirty arrays	*/
+    short *dirtyStartCol;		/* per row: first dirty column,
+					 * or -1 if the row is clean	*/
+    short *dirtyEndCol;			/* per row: last dirty column	*/
+
+    /* cursor blinking and input method spot updates (see
+     * TermPrimCursor.c), and the bell (see TermPrimRender.c).  Times
+     * are _DtTermPrimMonotonicMs() values...
+     */
+    unsigned long cursorOnMs;			/* cursor last turned on	*/
+    unsigned long cursorActiveMs;		/* last output, key or focus in	*/
+    unsigned long imSpotSentMs;			/* IM spot location last set	*/
+    XtIntervalId imSpotTimerId;		/* deferred IM spot update	*/
+    unsigned long bellMs;			/* last bell rung		*/
+    XtIntervalId bellTimerId;		/* undo of the visual bell	*/
+
 } DtTermPrimDataRec, *DtTermPrimData;
 
 

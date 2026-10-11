@@ -1,10 +1,14 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 CLEANFILES = TermLineData.c
 
 noinst_LTLIBRARIES = libTerm.la
 
-libTerm_la_CFLAGS = -I../TermPrim @DT_INCDIR@
+libTerm_la_CFLAGS = $(CDE_CFLAGS) -I../TermPrim @DT_INCDIR@
 
 TermLineData.c: TermLineData.data
 	$(RM) $@

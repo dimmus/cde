@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libmp.la
 
-libmp_la_CXXFLAGS = -I../../lib -I../../mini_isam
+libmp_la_CXXFLAGS = $(CDE_CXXFLAGS) -I../../lib -I../../mini_isam
 
 libmp_la_SOURCES = mp_arg.C            mp_arg_utils.C          mp_auth.C \
         mp_auth_functions.C mp_c_file.C \

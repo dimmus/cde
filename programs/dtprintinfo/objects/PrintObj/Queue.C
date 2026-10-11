@@ -31,7 +31,10 @@
 #include "Queue.h"
 #include "PrintJob.h"
 #include "ParseJobs.h"
+#include "PrintSubSys.h"
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 extern "C" {
 #include <Dt/DtNlUtils.h>
@@ -63,6 +66,7 @@ const char *START_QUEUE_CMD = "/usr/sbin/accept %s";
 const char *STOP_QUEUE_CMD = "/usr/sbin/reject %s";
 const char *START_PRINTING_CMD = "enable %s";
 const char *STOP_PRINTING_CMD = "disable %s";
+
 #endif
 
 // Object Class Name
@@ -134,19 +138,111 @@ Queue::~Queue()
    delete remote_printer;
 }
 
+#ifndef aix
+// Split an awk record into its first max_fields fields (in place).
+static int SplitFields(char *line, char **field, int max_fields)
+{
+   int nf = 0;
+   while (nf < max_fields)
+    {
+      while (*line && isspace((unsigned char)*line))
+	 line++;
+      if (!*line)
+	 break;
+      field[nf++] = line;
+      while (*line && !isspace((unsigned char)*line))
+	 line++;
+      if (*line)
+	 *line++ = '\0';
+    }
+   return nf;
+}
+
+// What the GET_ATTRS command prints for queue name, computed from the
+// "lpstat -v" output of all queues instead of from "lpstat -v name".
+static char *DeviceAttributes(const char *device_list, const char *name)
+{
+   char *list = strdup(device_list);
+   if (!list)
+      return NULL;
+   size_t name_len = strlen(name);
+   const char *device = "", *rhost = "", *rp = "";
+   char *line, *next;
+   for (line = list; line && *line; line = next)
+    {
+      if ((next = strchr(line, '\n')))
+	 *next++ = '\0';
+      boolean is_device = strstr(line, "device for") ? true : false;
+      boolean is_system = strstr(line, "system for") ? true : false;
+      if (!is_device && !is_system)
+	 continue;
+      char *field[7];
+      int nf = SplitFields(line, field, 7);
+      // "lpstat -v name" lists only name: "device for name: ..."
+      if (nf < 3 || strncmp(field[2], name, name_len) ||
+	  strcmp(field[2] + name_len, ":"))
+	 continue;
+      for (; nf < 7; nf++)
+	 field[nf] = (char *)"";
+      if (is_device)
+	 device = field[3];
+      if (is_system)
+       {
+	 rhost = field[3];
+	 char *paren = strchr(field[6], ')');
+	 if (paren)
+	  {
+	    *paren = '\0';
+	    rp = field[6];
+	  }
+	 else
+	  {
+	    char *colon = strchr(field[2], ':');
+	    if (colon)
+	       *colon = '\0';
+	    rp = colon ? field[2] : "";
+	  }
+       }
+    }
+   char *output = (char *)malloc(strlen(device) + strlen(rhost) +
+				 strlen(rp) + 4);
+   if (output)
+      sprintf(output, "%s:%s:%s\n", device, rhost, rp);
+   free(list);
+   return output;
+}
+#endif
+
 void Queue::LoadAttributes(int /*n_attrs*/, Attribute **attrs)
 {
-   char *command = new char[500];
-   sprintf(command, GET_ATTRS, Name());
-   char *output;
-   RunCommand(command, &output);
-   delete [] command;
+   char *output = NULL;
+#ifndef aix
+   if (Parent() && !strcmp(Parent()->ObjectClassName(), PRINTSUBSYSTEM))
+    {
+      const char *device_list = ((PrintSubSystem *)Parent())->DeviceList();
+      if (device_list)
+	 output = DeviceAttributes(device_list, Name());
+    }
+#endif
+   if (!output)
+    {
+      char *command = new char[500];
+      snprintf(command, 500, GET_ATTRS, Name());
+      RunCommand(command, &output);
+      delete [] command;
+    }
 
    char *s = output, *s1;
    char *dollar[3];
    int i;
    for (i = 0; i < 3; i++)
     {
+      // Missing fields are empty (the output may be empty)
+      if (!s)
+       {
+	 dollar[i] = (char *)"";
+	 continue;
+       }
       if ((s1 = strchr(s, ':')))
          *s1++ = '\0';
       else if ((s1 = strchr(s, '\n')))
@@ -230,7 +326,7 @@ void Queue::LoadAttributes(int /*n_attrs*/, Attribute **attrs)
        }
       _loaded_attributes = true;
     }
-   delete output;
+   free(output);
 }
 
 #ifdef aix
@@ -334,7 +430,7 @@ int Queue::StartPrint(BaseObj *obj, char **output, BaseObj * /*requestor*/)
    char *command = new char[100];
    int rc;
 
-   sprintf(command, STOP_PRINTING_CMD, queue->Name());
+   snprintf(command, 100, START_PRINTING_CMD, queue->Name());
    rc = queue->RunCommand(command, NULL, output);
    delete [] command;
    return rc;
@@ -415,6 +511,22 @@ void Queue::ParseOutput(char *job_list, int n_jobs)
     }
 }
 
+#ifdef HAVE_LOCAL_PRINT_JOBS_COMMAND
+void Queue::ParseLocalStatus(char *output)
+{
+   SetInitChildren();
+   DeleteChildren();
+   if (_loaded_attributes == false)
+      ReadAttributes();
+
+   char *job_list;
+   int n_jobs;
+   ParseLocalPrintJobs((char *)Name(), output ? output : (char *)"",
+		       &job_list, &n_jobs);
+   ParseOutput(job_list, n_jobs);
+}
+#endif
+
 void Queue::ParseRemoteStatus(char *output)
 {
    SetInitChildren();
@@ -444,3 +556,179 @@ const char *Queue::Server()
       ReadAttributes();
    return remote_server;
 }
+
+#ifndef aix
+
+// One "lpstat -a -p" for the state of all queues (or of the one queue
+// name, if not NULL) replaces running GET_QUEUE_STATUS and
+// GET_DEVICE_STATUS for every queue.  free() the result.
+char *QueueStatusCommand(const char *name)
+{
+   const char *all = "LANG=C LC_ALL=C lpstat -a -p";
+   if (!name)
+      return strdup(all);
+
+   // -a'name' -p'name', with any ' in name quoted as '\''
+   size_t quotes = 0;
+   const char *s;
+   for (s = name; *s; s++)
+      if (*s == '\'')
+	 quotes++;
+   size_t qlen = strlen(name) + 3 * quotes + 2;
+   char *quoted = (char *)malloc(qlen + 1);
+   char *cmd = (char *)malloc(strlen(all) + 2 * qlen + 1);
+   if (!quoted || !cmd)
+    {
+      free(quoted);
+      free(cmd);
+      return strdup(all);
+    }
+   char *q = quoted;
+   *q++ = '\'';
+   for (s = name; *s; s++)
+    {
+      if (*s == '\'')
+       {
+	 memcpy(q, "'\\''", 4);
+	 q += 4;
+       }
+      else
+	 *q++ = *s;
+    }
+   *q++ = '\'';
+   *q = '\0';
+   sprintf(cmd, "LANG=C LC_ALL=C lpstat -a%s -p%s", quoted, quoted);
+   free(quoted);
+   return cmd;
+}
+
+static boolean Word(const char *word, const char *s, size_t len)
+{
+   return (s && strlen(word) == len && !strncmp(word, s, len)) ? true : false;
+}
+
+// Parses the output of QueueStatusCommand().  For every queue it gives the
+// result of the old per-queue commands:
+//   GET_QUEUE_STATUS   "lpstat -aQ | awk '{if ($2 == "not") {exit 1} ...}'"
+//                      down if the second word of Q's first line is "not";
+//   GET_DEVICE_STATUS  "lpstat -pQ | awk '/disabled/ {exit 1}'"
+//                      down if any line of Q's "printer Q ..." entry
+//                      contains "disabled".
+// A queue that is not listed is up, as with the old commands.
+QueueStatusTable::QueueStatusTable(const char *output)
+{
+   entries = NULL;
+   n_entries = 0;
+   _text = strdup(output ? output : "");
+   if (!_text)
+      return;
+
+   int max_entries = 0;
+   int current = -1;     // the "printer Q" entry that continuation lines extend
+   char *line, *next;
+   for (line = _text; line && *line; line = next)
+    {
+      if ((next = strchr(line, '\n')))
+	 *next++ = '\0';
+      if (isspace((unsigned char)*line))
+       {
+	 // continuation of the previous entry, e.g. "\treason unknown"
+	 if (current >= 0 && strstr(line, "disabled"))
+	    entries[current].device_up = false;
+	 continue;
+       }
+      current = -1;
+
+      // First three words
+      const char *word[3] = { NULL, NULL, NULL };
+      size_t len[3] = { 0, 0, 0 };
+      const char *s = line;
+      int nw;
+      for (nw = 0; nw < 3; nw++)
+       {
+	 while (*s && isspace((unsigned char)*s))
+	    s++;
+	 if (!*s)
+	    break;
+	 word[nw] = s;
+	 while (*s && !isspace((unsigned char)*s))
+	    s++;
+	 len[nw] = s - word[nw];
+       }
+      if (nw == 0)
+	 continue;
+
+      // "printer Q is idle.  enabled since ..." / "printer Q disabled ..."
+      // rather than the -a lines of queues called "printer":
+      // "printer accepting requests ..." / "printer not accepting ..."
+      boolean is_printer = (Word("printer", word[0], len[0]) && word[1] &&
+	    !(Word("accepting", word[1], len[1]) &&
+	      Word("requests", word[2], len[2])) &&
+	    !(Word("not", word[1], len[1]) &&
+	      Word("accepting", word[2], len[2]))) ? true : false;
+      int which = is_printer ? 1 : 0;
+
+      int i;
+      for (i = 0; i < n_entries; i++)
+	 if (strlen(entries[i].name) == len[which] &&
+	     !strncmp(entries[i].name, word[which], len[which]))
+	    break;
+      if (i == n_entries)
+       {
+	 if (n_entries == max_entries)
+	  {
+	    int n = max_entries ? 2 * max_entries : 16;
+	    QueueStatusEntry *tmp = (QueueStatusEntry *)
+	       realloc(entries, n * sizeof(QueueStatusEntry));
+	    if (!tmp)
+	       break;
+	    entries = tmp;
+	    max_entries = n;
+	  }
+	 // Names point into _text; terminate them there
+	 ((char *)word[which])[len[which]] = '\0';
+	 entries[i].name = word[which];
+	 entries[i].queue_up = true;
+	 entries[i].device_up = true;
+	 entries[i].have_queue = false;
+	 n_entries++;
+       }
+      if (is_printer)
+       {
+	 current = i;
+	 // The terminator written above may have cut "disabled" off;
+	 // test the text after the name as well as before it.
+	 if (strstr(word[2] ? word[2] : "", "disabled") ||
+	     strstr(line, "disabled"))
+	    entries[i].device_up = false;
+       }
+      else if (entries[i].have_queue == false)
+       {
+	 entries[i].have_queue = true;
+	 entries[i].queue_up = Word("not", word[1], len[1]) ? false : true;
+       }
+    }
+}
+
+QueueStatusTable::~QueueStatusTable()
+{
+   free(entries);
+   free(_text);
+}
+
+void QueueStatusTable::Lookup(const char *name, boolean *queue_up,
+			      boolean *device_up)
+{
+   *queue_up = true;
+   *device_up = true;
+   int i;
+   for (i = 0; i < n_entries; i++)
+      if (!strcmp(entries[i].name, name))
+       {
+	 *queue_up = entries[i].queue_up;
+	 *device_up = entries[i].device_up;
+	 return;
+       }
+}
+
+#endif // aix

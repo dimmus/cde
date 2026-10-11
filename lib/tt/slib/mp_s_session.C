@@ -177,10 +177,8 @@ u_rpc_init()
 Tt_status _Tt_s_session::
 s_init()
 {
-	_Tt_session		rsession;
 	Tt_status		status;
-	_Tt_string		h;
-	_Tt_desktop_lock_ptr	dt_lock;
+	_Tt_string		seen_addr;
 
 	// this is the server session for this session
 	_is_server = 1;
@@ -200,16 +198,19 @@ s_init()
 		_tt_s_mp->xfd = _desktop->notify_fd();
 
 		//
-		// Grab the X server.  The grab is in effect until
-		// dt_lock goes out of scope (i.e., when we return).
-		// For proper test-and-set, the grab needs to start
-		// before check_for_live_session() and end after
-		// advertise_address().
+		// Check for a session already running.  This used to
+		// be done with the X server grabbed, and the grab was
+		// held until the address was advertised: across the
+		// RPC to the old session, the portmapper registration
+		// and the ~/.TTauthority lock, which froze the whole
+		// display at login (for 20 s or more with a stale
+		// lock).  Now the check runs ungrabbed and remembers
+		// the address it saw; advertise_address() grabs the
+		// server only to re-read the property and, if nobody
+		// advertised in between, write ours (a compare and
+		// swap), so the test-and-set is still atomic.
 		//
-		dt_lock = new _Tt_desktop_lock( _desktop );
-
-		// check for a session already running
-		switch (status = check_for_live_session()) {
+		switch (status = check_for_live_session(seen_addr)) {
 		    case TT_OK:
 		    case TT_ERR_NOMP:
 			// Muscle in on dead ttsessions
@@ -244,6 +245,7 @@ s_init()
 	}
 	_rpc_program = _rpc_server->program();
 	_rpc_version = _rpc_server->version();
+	_rpc_port = _rpc_server->port();
 
 	// initializes our local host object which allows us to
 	// inquire our host address so we can then advertise it to
@@ -267,7 +269,7 @@ s_init()
 		// advertise our address according to the type of
 		// session environment that we are in.
 
-		if ((status = advertise_address()) == TT_OK) {
+		if ((status = advertise_address(seen_addr)) == TT_OK) {
 #ifdef OPT_UNIX_SOCKET_RPC
 			// open a unix domain socket for connection
 			// requests and set the unix_fd field in the
@@ -278,6 +280,12 @@ s_init()
 #endif	// OPT_UNIX_SOCKET_RPC
 			return(TT_OK);
 		} else {
+			if (status == TT_ERR_SESSION) {
+				// Lost the race to another ttsession:
+				// take our program number back out of
+				// the portmapper.
+				_rpc_server = (_Tt_rpc_server *)0;
+			}
 			return(status);
 		}
 	} else {
@@ -296,24 +304,28 @@ s_init()
 //  methods for session environments that return whether this check is
 //  necessary. 
 //
+// The advertised address found (empty if none) is returned in seen,
+// for advertise_address() to check that it is still there.
+//
 // Returns:
 //	TT_OK		Found no session
 //	TT_ERR_SESSION	Found a live session (diagnostic emitted)
 //	TT_ERR_NOMP	Found a dead session (diagnostic emitted)
 // 
 Tt_status _Tt_s_session::
-check_for_live_session()
+check_for_live_session(_Tt_string &seen)
 {
 	_Tt_session		rsession;
 	Tt_status		status;
 
-
+	seen = (char *)0;
 	if (env() != _TT_ENV_X11) {
 		return(TT_OK);
 	}
 
 	// try to find the address of an advertised session
 	if (find_advertised_address(rsession._address_string) == TT_OK) {
+		seen = rsession._address_string;
 		// found another server id, check to see that it's
 		// running. 
 		
@@ -380,9 +392,21 @@ check_for_live_session()
 // 
 // Advertises a session procid so that any clients that come up within
 // the appropiate domain will find the session id.
+//
+// For an X session, seen is the address check_for_live_session()
+// found advertised (empty if none).  The property is written only if
+// it still holds that address, tested and set under a server grab; if
+// another ttsession advertised itself in the meantime, it is checked
+// for life again.
+//
+// Returns:
+//	TT_OK
+//	TT_ERR_SESSION	Another live session advertised itself first
+//			(diagnostic emitted)
+//	TT_ERR_INTERNAL	Could not advertise
 // 
 Tt_status _Tt_s_session::
-advertise_address()
+advertise_address(_Tt_string seen)
 {
 	_Tt_string	s;
 	_Tt_string	prop(TT_XATOM_NAME);
@@ -394,13 +418,46 @@ advertise_address()
 		// advertise our address by setting a special property
 		// on our desktop session.
 
-		if (_desktop->set_prop(cde_prop, _address_string) &&
-		    _desktop->set_prop(prop, _address_string))  {
-			s = xdisp.cat("=").cat(_displayname);
-			(void)putenv(strdup((char *)s));
-			return(TT_OK);
+		for (int tries = 0; ; tries++) {
+			_Tt_string	now;
+			int		ok;
+
+			{
+				// The grab lasts until dt_lock goes
+				// out of scope: a few requests, no
+				// RPC, no file locking.
+				_Tt_desktop_lock_ptr dt_lock =
+					new _Tt_desktop_lock(_desktop);
+
+				(void)find_advertised_address(now);
+				// After a few rounds of other sessions
+				// advertising themselves and dying, stop
+				// checking and muscle in, as the
+				// original code did with any dead session.
+				if (now == seen || tries >= 10) {
+					ok = _desktop->set_prop(cde_prop,
+							  _address_string) &&
+					     _desktop->set_prop(prop,
+							  _address_string);
+					if (! ok) {
+						return(TT_ERR_INTERNAL);
+					}
+					break;
+				}
+			}
+			switch (check_for_live_session(seen)) {
+			    case TT_OK:
+			    case TT_ERR_NOMP:
+				continue;
+			    case TT_ERR_SESSION:
+				return TT_ERR_SESSION;
+			    default:
+				return TT_ERR_INTERNAL;
+			}
 		}
-		return(TT_ERR_INTERNAL);
+		s = xdisp.cat("=").cat(_displayname);
+		(void)putenv(strdup((char *)s));
+		return(TT_OK);
 	      case _TT_ENV_PROCESS_TREE:
 		// advertise our address by exporting a special
 		// environment variable.
@@ -562,3 +619,11 @@ queued_messages()
 	return(_queued_messages);
 }
 
+
+void _Tt_s_session::
+unregister_rpc()
+{
+	if (! _rpc_server.is_null()) {
+		_rpc_server->unset();
+	}
+}

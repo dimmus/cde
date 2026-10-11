@@ -37,6 +37,7 @@ extern int smAckState;
 extern Boolean CheckForButtonAction (XButtonEvent *buttonEvent, 
 				     Context context, Context subContext, 
 				     ClientData *pCD);
+extern void InitServerTimeCounter (void);
 extern Time GetTimestamp (void);
 extern Boolean HandleKeyPress (XKeyEvent *keyEvent, KeySpec *keySpecs, 
 			       Boolean checkContext, Context context, 
@@ -56,6 +57,7 @@ extern void ProcessClickBPress (XButtonEvent *buttonEvent, ClientData *pCD,
 extern void ProcessClickBRelease (XButtonEvent *buttonEvent, ClientData *pCD, 
 				  Context context, Context subContext);
 extern void PullExposureEvents (void);
+extern void PullQueuedExposureEvents (void);
 extern int SetupKeyBindings (KeySpec *keySpecs, Window grabWindow, 
 			     int keyboardMode, long context);
 extern Boolean WmDispatchMenuEvent (XButtonEvent *event);

@@ -644,14 +644,174 @@ ManageSession( struct display *d )
 }
 
 
+/*
+ * Serialising an Xrm database into the RESOURCE_MANAGER format, the
+ * resource file syntax that XrmPutFileDatabase() writes.
+ */
+struct rmBuffer {
+    char	*data;
+    size_t	len;
+    size_t	size;
+    int		failed;
+};
+
+static void
+rmAppend(struct rmBuffer *b, const char *s, size_t n)
+{
+    if (b->failed)
+	return;
+    if (b->len + n > b->size) {
+	size_t	size = b->size ? b->size : 4096;
+	char	*data;
+
+	while (b->len + n > size)
+	    size *= 2;
+	if ((data = realloc(b->data, size)) == NULL) {
+	    b->failed = 1;
+	    return;
+	}
+	b->data = data;
+	b->size = size;
+    }
+    memcpy(b->data + b->len, s, n);
+    b->len += n;
+}
+
+static Bool
+rmDumpEntry(XrmDatabase *db, XrmBindingList bindings, XrmQuarkList quarks,
+	    XrmRepresentation *type, XrmValue *value, XPointer closure)
+{
+    struct rmBuffer	*b = (struct rmBuffer *) closure;
+    const char		*s;
+    unsigned int	i;
+    Bool		first = True;
+    char		oct[5];
+
+    if (*type != XrmPermStringToQuark("String"))
+	return False;			/* only strings come from files */
+
+    for (; *quarks != NULLQUARK; bindings++, quarks++) {
+	if (*bindings == XrmBindLoosely)
+	    rmAppend(b, "*", 1);
+	else if (!first)
+	    rmAppend(b, ".", 1);
+	first = False;
+	s = XrmQuarkToString(*quarks);
+	rmAppend(b, s, strlen(s));
+    }
+    rmAppend(b, ":\t", 2);
+
+    s = (const char *) value->addr;
+    i = value->size;
+    if (i)
+	i--;				/* the terminating NUL */
+    if (i && (*s == ' ' || *s == '\t'))
+	rmAppend(b, "\\", 1);		/* keep leading white space */
+    for (; i; i--, s++) {
+	unsigned char	c = (unsigned char) *s;
+
+	if (c == '\n')
+	    rmAppend(b, i > 1 ? "\\n\\\n" : "\\n", i > 1 ? 4 : 2);
+	else if (c == '\\')
+	    rmAppend(b, "\\\\", 2);
+	else if ((c < ' ' && c != '\t') || (c >= 0x7f && c < 0xa0)) {
+	    snprintf(oct, sizeof(oct), "\\%03o", c);
+	    rmAppend(b, oct, 4);
+	}
+	else
+	    rmAppend(b, (const char *) s, 1);
+    }
+    rmAppend(b, "\n", 1);
+    return False;
+}
+
+/*
+ * Replaces the RESOURCE_MANAGER property with the contents of db, as
+ * "xrdb -load" of the database written to a file did: the resources
+ * go into RESOURCE_MANAGER on the root window of screen 0, and the
+ * SCREEN_RESOURCES properties are removed (the resources are the same
+ * for every screen).  Returns 0, or -1 if it ran out of memory.
+ */
+static int
+SetResourceManager(Display *disp, XrmDatabase db)
+{
+    struct rmBuffer	b = { NULL, 0, 0, 0 };
+    XrmQuark		empty = NULLQUARK;
+    Atom		screenResources;
+    int			i;
+
+    XrmEnumerateDatabase(db, &empty, &empty, XrmEnumAllLevels,
+			 rmDumpEntry, (XPointer) &b);
+    if (b.failed) {
+	free(b.data);
+	return -1;
+    }
+
+    if (b.len > 0)
+	XChangeProperty(disp, RootWindow(disp, 0), XA_RESOURCE_MANAGER,
+			XA_STRING, 8, PropModeReplace,
+			(unsigned char *) b.data, (int) b.len);
+    else
+	XDeleteProperty(disp, RootWindow(disp, 0), XA_RESOURCE_MANAGER);
+
+    screenResources = XInternAtom(disp, "SCREEN_RESOURCES", False);
+    for (i = 0; i < ScreenCount(disp); i++)
+	XDeleteProperty(disp, RootWindow(disp, i), screenResources);
+
+    /* The greeter started next must see the new resources. */
+    XSync(disp, False);
+    free(b.data);
+    return 0;
+}
+
+/*
+ * Loads the greeter resources with the xrdb program, the way it was
+ * always done before they were loaded in-process.  Used only when the
+ * display cannot be opened here.
+ */
+static int
+LoadXloginResourcesXrdb(struct display *d)
+{
+    char	cmd[1024];
+    char	*authority = "";
+    char	*auth_key = "";
+    char	tmpname[32];
+    int		fd;
+    int		ret = 0;
+
+    if (d->authFile && strlen(d->authFile) > 0) {
+	authority = d->authFile;
+	auth_key = "XAUTHORITY=";
+    }
+
+    strcpy(tmpname, "/var/dt/dtlogin_XXXXXX");
+    if ((fd = mkstemp(tmpname)) == -1) {
+	Debug("LoadXloginResources - mkstemp() failed: %s\n", strerror(errno));
+	return -1;
+    }
+    close(fd);
+    XrmPutFileDatabase(XresourceDB, tmpname);
+
+    /* The file has been through cpp once already: skip it this time. */
+    snprintf(cmd, sizeof(cmd), "%s%s %s -nocpp -display %s -load %s",
+	     auth_key, authority, d->xrdb, d->name, tmpname);
+    Debug("Loading resource file: %s\n", cmd);
+
+    if (-1 == system(cmd)) {
+	Debug("system() failed on cmd '%s'\n", cmd);
+	ret = -1;
+    }
+
+    if (debugLevel <= 10)
+	if (unlink(tmpname) == -1)
+	    Debug("unlink() on %s failed\n", tmpname);
+    return ret;
+}
+
 int
 LoadXloginResources( struct display *d )
 {
-    char	cmd[1024];
-    char	*authority="";
-    char	*auth_key="";
     char        *resources = NULL;
-    char	tmpname[32];
 
     if (d->resources && d->resources[0]) { 
         resources = _ExpandLang(d->resources, d->language);
@@ -671,11 +831,6 @@ LoadXloginResources( struct display *d )
             }
         }
 
-	if (d->authFile && strlen(d->authFile) > 0 ) {
-		authority = d->authFile;
-		auth_key = "XAUTHORITY=";
-	}
-
 	Debug("LoadXloginResources - loading resource db from %s\n", resources);
 	if((XresourceDB = XrmGetFileDatabase(resources)) == NULL)
           Debug("LoadXloginResources - Loading resource db from %s failed\n",
@@ -683,23 +838,39 @@ LoadXloginResources( struct display *d )
 
 	LoadAltDtsResources(d); 
 
-        strcpy(tmpname,"/var/dt/dtlogin_XXXXXX");
-        (void) mktemp(tmpname);
+	/*
+	 * Load the merged database into RESOURCE_MANAGER directly.  It
+	 * used to be written to a file and loaded with system("xrdb"),
+	 * which ran sh, xrdb and cpp on every greeter cycle (and let cpp
+	 * rewrite words such as "unix" or "linux" in resource values).
+	 * The session (ManageSession) has the display open already; the
+	 * chooser does not, so it opens it for the occasion.
+	 */
+	if (XresourceDB == NULL) {
+	    /* Nothing was loaded; xrdb failed and left the property alone. */
+	    Debug("LoadXloginResources - no resources to load\n");
+	}
+	else {
+	    Display	*disp = dpy;
 
-        XrmPutFileDatabase(XresourceDB, tmpname);
-
-	sprintf (cmd, "%s%s %s -display %s -load %s",
-			auth_key, authority, d->xrdb, d->name, tmpname);
-	Debug ("Loading resource file: %s\n", cmd);
-
-	if(-1 == system (cmd)) {
-	    Debug ("system() failed on cmd '%s'\n", cmd);
-            return -1;
-        }
-
-	if (debugLevel <= 10)
-	  if (unlink (tmpname) == -1)
-	    Debug ("unlink() on %s failed\n", tmpname);
+	    if (disp == NULL)
+		disp = XOpenDisplay(d->name);
+	    if (disp == NULL) {
+		Debug("LoadXloginResources - cannot open %s, using xrdb\n",
+		      d->name);
+		if (LoadXloginResourcesXrdb(d) == -1) {
+		    free(resources);
+		    return -1;
+		}
+	    }
+	    else {
+		Debug("LoadXloginResources - setting RESOURCE_MANAGER\n");
+		if (SetResourceManager(disp, XresourceDB) == -1)
+		    Debug("LoadXloginResources - out of memory\n");
+		if (disp != dpy)
+		    XCloseDisplay(disp);
+	    }
+	}
     }
 
     if (resources) free (resources);
@@ -794,11 +965,14 @@ LoadAltDtsResources(struct display *d)
                 if ((strcmp(dp->d_name, DOT)    != 0) &&
                     (strcmp(dp->d_name, DOTDOT) != 0)) {
 
-                    snprintf(res_file, sizeof(res_file), "%s%s", dirname[j], dp->d_name);
+                    if (snprintf(res_file, sizeof(res_file), "%s%s",
+                                 dirname[j], dp->d_name)
+                        >= (int) sizeof(res_file))
+                        continue;	/* the path does not fit */
                     if ((access (res_file, R_OK)) != 0)
 		    {
                         Debug("LoadAltDtsResources- cant access %s.\n",
-			      resources);
+			      res_file);
                         Debug("\t %s.\n", strerror(errno));
                         continue;
 		    }

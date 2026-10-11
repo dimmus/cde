@@ -2023,17 +2023,16 @@ QueryGeometry(
     if (Fields(w))
       {
 	int i;
-	if (Fields(w)->draw_fields)
-	  {
+	/* No draw_fields array means every field is drawn (see Resize) */
+	if (!Fields(w)->draw_fields)
+	    show_fields = True;
+	else
 	    for (i = 0; i < Fields(w)->n_fields; i++)
 		if (Fields(w)->draw_fields[i])
 		  {
 		    show_fields = True;
 		    break;
 		  }
-		else
-		    show_fields = True;
-	  }
       }
     if (ResizeWidth(w) == False || show_fields)
 	desired->width = XtWidth(w);

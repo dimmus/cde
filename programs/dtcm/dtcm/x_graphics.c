@@ -2890,6 +2890,8 @@ x_print_multi_appts(void *gInfoP,
 	lines = lines->next;
       }
       if (pos < start) {
+	destroy_lines(lp);
+	lp = NULL;
 	continue;
       }
     }
@@ -2945,7 +2947,9 @@ x_print_multi_appts(void *gInfoP,
 	lines = lines->next;
       }
     }
+    /* lp must not be freed again by a later return or after the loop */
     destroy_lines(lp);
+    lp = NULL;
     if (view == weekGlance)
       cm_week_sched_update(gInfo, appt, pr);
     new_appt = FALSE;
@@ -2964,7 +2968,8 @@ x_finish_printer(void *gInfoP)
 
   if (inDebugMode(gInfo->c))
     tmpSpin(w);
-  else
+#else
+  (void) gInfoP;
 #endif
 #if 0 && defined(PRINTING_SUPPORTED)
     XpEndPage(XtDisplay(w));
@@ -3963,6 +3968,7 @@ x_print_month_appts(void *gInfoP, CSA_entry_handle *list,
       line_counter++;
       if ((line_counter > lines_per_box) && (lines != NULL))
       {
+	destroy_lines(lines);
 	free_appt_struct(&appt);
 	return(False);
       }

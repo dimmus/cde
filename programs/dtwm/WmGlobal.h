@@ -52,6 +52,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/sync.h>
 #include <X11/IntrinsicP.h>
 #include <X11/Intrinsic.h>
 #include <X11/StringDefs.h>
@@ -1392,6 +1393,10 @@ typedef struct _WmBackdropData
     String		image;			/* resource */
     Atom		nameAtom;
     Pixmap		imagePixmap;
+    Boolean		imagePixmapOwned;	/* created here, not in the
+						   Xm pixmap cache */
+    Boolean		imagePixmapShareable;	/* made at startup from image,
+						   colors and imageType only */
     int			colorSet;		/* resource */
     Pixel 		background;		/* resource */
     Pixel 		foreground;		/* resource */
@@ -1438,6 +1443,7 @@ typedef struct _SlideOutRec
     SlideDirection	direction;
     Boolean		mapping;
     Widget		wSubpanel;
+    unsigned long	lastTick;	/* ms, monotonic clock */
 } SlideOutRec;
 
 /*
@@ -1681,6 +1687,11 @@ typedef struct _ClientData
     int		fullscreenWidth;		/* fullscreen width */
     int		fullscreenHeight;		/* fullscreen height */
     XmString	instantTitle;			/* instant title */
+    XmString	titleWidthString;		/* title the width is for, */
+    XmFontList	titleWidthFont;			/* in this font list, */
+    Dimension	titleWidth;			/* is cached here */
+    Boolean	titleFromNetWmName;		/* title is _NET_WM_NAME */
+    Boolean	iconTitleFromNetWmName;		/* ... _NET_WM_ICON_NAME */
 
     /* client window frame graphic data: */
 
@@ -1713,6 +1724,11 @@ typedef struct _ClientData
     XmString	iconTitle;			/* WM_ICON_NAME field */
     Pixmap	iconPixmap;			/* WM_HINTS field */
     Pixmap	iconMask;			/* WM_HINTS field */
+    Pixmap	hintIconPixmap;		/* WM_HINTS icon_pixmap and icon_mask */
+    Pixmap	hintIconMask;		/* iconPixmap was made from */
+    int		stackRank;		/* scratch: see ChangeToWorkspace */
+    int		wmStateWritten;		/* WM_STATE last set, or -1 */
+    Window	wmStateIconWritten;
     Window	iconWindow;			/* WM_HINTS field */
 
     RList	*piconTopShadows;		/* these change to 	*/
@@ -2049,6 +2065,7 @@ typedef struct _WmGlobalData
     Boolean	enforceKeyFocus;		/* resource */
     Boolean	freezeOnConfig;			/* resource - testing */
     Boolean	useWindowOutline;		/* resource */
+    Boolean	slideSubpanels;			/* resource */
     Boolean	iconAutoPlace;			/* resource */
     Boolean	iconClick;			/* resource */
     Boolean	interactivePlacement;		/* resource */
@@ -2097,6 +2114,7 @@ typedef struct _WmGlobalData
 
     Boolean     hasShape;                /* server supports Shape extension */
     int         shapeEventBase, shapeErrorBase;
+    XSyncCounter serverTimeCounter;      /* SYNC SERVERTIME, or None */
     /* Need to replay enter notify events on windows with the
        pointer that used to be modalized.  This is for pointer focus. */
     int         replayEnterEvent;

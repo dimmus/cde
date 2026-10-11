@@ -58,6 +58,20 @@ typedef struct
    char *iconFileName;
 } PixmapData;
 
+/* Attributes of a data type that do not depend on the file (see
+   _DtGetTypeInfo); the strings belong to the cache. */
+typedef struct _TypeInfo
+{
+   struct _TypeInfo *next;
+   char          *type;
+   char          *host;              /* DATA_HOST attribute, or NULL */
+   char          *icon;              /* ICON attribute, or NULL */
+   unsigned char  drop_ops;          /* XmDROP_MOVE/COPY/LINK from the
+                                        MOVE/COPY/LINK_TO_ACTION attributes */
+   Boolean        has_instance_icon; /* has an INSTANCE_ICON attribute */
+   Boolean        invisible;         /* PROPERTIES lists "invisible" */
+} TypeInfo;
+
 typedef struct _TypesToggleInfo {
    String name;
    Boolean  selected;

@@ -281,6 +281,8 @@ termFuncErase
 	(void) _DtTermPrimRefreshText(w, 0, tpd->cursorRow,
 		    tpd->cursorColumn + 1 + (tpd->mbCurMax > 1 ? 1:0),
                     tpd->cursorRow);
+	break;
+
       case eraseCharCount:
 	_DtTermBufferErase(((DtTermPrimitiveWidget)w)->term.tpd->termBuffer, 
 			   tpd->cursorRow + tpd->topRow, tpd->cursorColumn,

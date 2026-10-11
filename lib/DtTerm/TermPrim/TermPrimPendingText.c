@@ -28,6 +28,8 @@
  */
 
 #include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <X11/Intrinsic.h>
 #include "TermHeader.h"
 #include "TermPrimDebug.h"
@@ -92,6 +94,7 @@ mallocChunk(int len)
     */
     newChunk->bufPtr = newChunk->buffer;
     newChunk->len   = 0;
+    newChunk->logged = False;
     newChunk->next  = (PendingTextChunk)NULL;
     newChunk->prev  = (PendingTextChunk)NULL;
     return(newChunk);
@@ -162,6 +165,37 @@ _DtTermPrimPendingTextAppendChunk
 #endif /* RECYCLE_CHUNKS */
 }
 
+/*
+** Append an XtMalloc()ed buffer to the list as a single chunk, without
+** copying it.  The list owns the buffer from now on.
+*/
+PendingTextChunk
+_DtTermPrimPendingTextAppendBuffer
+(
+    PendingText     list,
+    unsigned char  *buffer,
+    int             len
+)
+{
+    PendingTextChunk    newChunk;
+
+    newChunk = (PendingTextChunk) XtMalloc(sizeof(PendingTextChunkRec));
+    newChunk->buffer  = buffer;
+    newChunk->buffLen = len;
+    newChunk->bufPtr  = buffer;
+    newChunk->len     = len;
+    newChunk->logged  = False;
+    newChunk->next    = list->tail;
+    newChunk->prev    = list->tail->prev;
+    list->tail->prev->next = newChunk;
+    list->tail->prev  = newChunk;
+    return(newChunk);
+}
+
+/*
+** Replace the text of a chunk with an XtMalloc()ed buffer, without
+** copying it.  The chunk owns the buffer from now on.
+*/
 void
 _DtTermPrimPendingTextReplace
 (
@@ -170,13 +204,13 @@ _DtTermPrimPendingTextReplace
     int bufferLen
 )
 {
-
-    chunk->buffer = (unsigned char *) XtRealloc((char *) chunk->buffer,
-	    bufferLen);
+    if (chunk->buffer != buffer) {
+	(void) XtFree((char *) chunk->buffer);
+    }
+    chunk->buffer = buffer;
     chunk->buffLen = bufferLen;
     chunk->bufPtr = chunk->buffer;
     chunk->len = bufferLen;
-    (void) memmove(chunk->buffer, buffer, bufferLen);
 }
 
 /* 
@@ -303,7 +337,7 @@ _DtTermPrimPendingTextAppend
     while (len > 0)
     {
         newChunk = _DtTermPrimPendingTextAppendChunk(list,
-		(len > DEFAULT_CHUNK_BUF_SIZE) ? DEFAULT_CHUNK_BUF_SIZE : len);
+		(len > PENDING_CHUNK_MAX) ? PENDING_CHUNK_MAX : len);
         if (!newChunk)
         {
             /* 
@@ -322,13 +356,17 @@ _DtTermPrimPendingTextAppend
         */
         newChunk->len = MIN(len, newChunk->buffLen);
         (void)memcpy(newChunk->buffer, text, newChunk->len);
-        len -= newChunk->buffLen;
+        text += newChunk->len;
+        len -= newChunk->len;
     }    
     return(True);
 }
 
 /* 
-** Write a pending text chunk from the head of the list.
+** Write pending text from the head of the list.  On a non-blocking fd,
+** keep writing MAX_PTY_WRITE sized pieces until the fd stops taking
+** whole pieces or PTY_WRITE_BUDGET bytes have been written; on a
+** blocking fd write a single piece, so that we never block here.
 */
 void
 _DtTermPrimPendingTextWrite
@@ -338,43 +376,60 @@ _DtTermPrimPendingTextWrite
 )
 {
     int                 bytesWritten = 0;
+    int                 toWrite;
+    int                 budget = MAX_PTY_WRITE;
+    int                 flags;
     PendingTextChunk	chunk;
 
     Debug('q', fprintf(stderr, ">>_DtTermPrimPendingTextWrite() starting\n"));
 #ifdef    DEBUG
     walkPendingText(list);
 #endif /* DEBUG  */
-    chunk = list->head->next;
-    Debug('q', fprintf(stderr, ">>       len: %3.3d\n", chunk->len));
-    Debug('q', fprintf(stderr, ">>    bufPtr: <%*.*s>\n", 
-		       chunk->len, chunk->len, chunk->bufPtr));
 
-    bytesWritten = write(fd, chunk->bufPtr, chunk->len <= MAX_PTY_WRITE ?
-			 chunk->len : MAX_PTY_WRITE);
+    flags = fcntl(fd, F_GETFL, 0);
+    if ((flags != -1) && (flags & O_NONBLOCK)) {
+	budget = PTY_WRITE_BUDGET;
+    }
 
-    if (bytesWritten < 0) {
+    while ((budget > 0) && (list->head->next != list->tail)) {
+	chunk = list->head->next;
+	Debug('q', fprintf(stderr, ">>       len: %3.3d\n", chunk->len));
+	Debug('q', fprintf(stderr, ">>    bufPtr: <%*.*s>\n", 
+			   chunk->len, chunk->len, chunk->bufPtr));
 
+	toWrite = MIN(chunk->len, MAX_PTY_WRITE);
+	bytesWritten = write(fd, chunk->bufPtr, toWrite);
+
+	if (bytesWritten < 0) {
+	    if (errno == EINTR) {
+		continue;
+	    }
 #ifdef DEBUG       
-        fprintf(stderr, "_DtTermPrimPendingTextWrite: write failed\n");
+	    fprintf(stderr, "_DtTermPrimPendingTextWrite: write failed\n");
 #endif
-       bytesWritten = 0;
-    }
+	    break;
+	}
 
-    if ((chunk->len -= bytesWritten) <= 0) {
-        /* 
-	** All text in this chunk has been written,
-	** remove it from the list.
-	*/
-        _DtTermPrimPendingTextRemoveChunk(list, chunk);
-    }
-    else {
-	/* 
-	** only some of the text in this chunk was written,
-	** simply adjust the write pointer...
-	** (list->head->len was adjusted above)
-	*/
-	chunk->bufPtr += bytesWritten;
-	
+	budget -= bytesWritten;
+	if ((chunk->len -= bytesWritten) <= 0) {
+	    /* 
+	    ** All text in this chunk has been written,
+	    ** remove it from the list.
+	    */
+	    _DtTermPrimPendingTextRemoveChunk(list, chunk);
+	}
+	else {
+	    /* 
+	    ** only some of the text in this chunk was written,
+	    ** simply adjust the write pointer...
+	    */
+	    chunk->bufPtr += bytesWritten;
+	}
+
+	if (bytesWritten < toWrite) {
+	    /* the pty is full, wait for the next write select... */
+	    break;
+	}
     }
 }
 

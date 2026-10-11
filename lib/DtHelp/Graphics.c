@@ -220,6 +220,7 @@ static int		Do_Direct(
 				int      screen,
 				XWDFileHeader *header,
 				Colormap colormap,
+				Visual  *visual,
 				int ncolors,
 				XColor *colors,
 				enum _DtGrColorModel 	force,
@@ -231,6 +232,7 @@ static int		Do_Pseudo(
 				Display *dpy,
 				int	 screen,
 				Colormap colormap,
+				Visual  *visual,
 				int ncolors,
 				XColor *colors,
 				enum _DtGrColorModel	force,
@@ -594,12 +596,19 @@ GreyScale (
   for (j=0, x = 0; j<height; j++)
     for (i=0; i<width; i++, x++) {
       n = XGetPixel(in_image, i, j);
-      if (rshift)
+      /*
+       * Do_Direct passes the (non-zero) masks, Do_Pseudo zeros; a
+       * shift of 0 (red in the low bits) is still a direct image.
+       * Out of range indexes (a corrupt file) don't index the map.
+       */
+      if (rmask)
 	{
 	  ret_color.red   = (n >> rshift) & rmask;
 	  ret_color.green = (n >> gshift) & gmask;
 	  ret_color.blue  = (n >> bshift) & bmask;
-	  if (ncolors)
+	  if (ncolors && ret_color.red < (unsigned) ncolors
+		&& ret_color.green < (unsigned) ncolors
+		&& ret_color.blue < (unsigned) ncolors)
 	    {
 	      ret_color.red   = colors[ret_color.red  ].red;
 	      ret_color.green = colors[ret_color.green].green;
@@ -615,9 +624,11 @@ GreyScale (
           value = (((int)(ret_color.red*299) + (int)(ret_color.green*587) +
 				(int)(ret_color.blue*114)) / 1000) >> 8;
 	}
-      else
+      else if (n < (Pixel) ncolors)
           value = (((int)(colors[n].red*299) + (int)(colors[n].green*587) +
 				(int)(colors[n].blue*114)) / 1000) >> 8;
+      else
+          value = 0;
       grey_scale[x] = value;
       valueArray[value]++;
      } /* for(i...) */
@@ -810,11 +821,30 @@ Perform_Dither(
 }
 
 
+/*
+ * Get the pixel for "color" the way XAllocColor would.  Returns 0 on
+ * failure, 1 if the pixel was allocated in the server (and must be freed
+ * with XFreeColors) and 2 if it was computed locally (TrueColor; never
+ * free it).
+ */
+static int
+AllocColor(
+    Display  *dpy,
+    Colormap  colormap,
+    Visual   *visual,
+    XColor   *color)
+{
+    if (_ilXComputeColor(dpy, colormap, visual, color))
+	return 2;
+    return XAllocColor(dpy, colormap, color) ? 1 : 0;
+}
+
 static int
 Do_Pseudo(
     Display *dpy,
     int	     screen,
     Colormap colormap,
+    Visual  *visual,
     int ncolors,
     XColor *colors,
     enum _DtGrColorModel force,
@@ -828,8 +858,15 @@ Do_Pseudo(
     int      result = 0;
     Pixel    pixel;
 
+    /*
+     * flags != 0: the entry has a pixel; pad != 0: that pixel was
+     * allocated in the server (rather than computed) and must be freed.
+     */
     for (i = 0; i < ncolors; i++)
+      {
 	colors[i].flags = 0;
+	colors[i].pad   = 0;
+      }
 
     *ret_colors = NULL;
     *ret_number = 0;
@@ -837,9 +874,9 @@ Do_Pseudo(
     /*
      * beware 'result'.
      * It is set to one upon entering this routine.
-     * The only way it can be modified is by the call to XAllocColor.
+     * The only way it can be modified is by the call to AllocColor.
      */
-    if (force == _DtGrCOLOR)
+    if (force == _DtGrCOLOR && ncolors > 0)
 	result = 1;
 
     for (y = 0; result && y < in_image->height; y++)
@@ -847,15 +884,20 @@ Do_Pseudo(
         for (x = 0; result && x < in_image->width; x++)
 	  {
 	    pixel = XGetPixel(in_image, x, y);
+	    if (pixel >= (Pixel) ncolors)
+		pixel = 0;	/* corrupt image; don't index past the map */
 	    color = &colors[pixel];
 	    if (!color->flags)
 	      {
 		color->flags = DoRed | DoGreen | DoBlue;
-		result = XAllocColor(dpy, colormap, color);
+		result = AllocColor(dpy, colormap, visual, color);
 		if (!result)
 		    color->flags = 0;
-		else
+		else if (result == 1)
+		  {
+		    color->pad = 1;
 		    colorCount++;
+		  }
 	      }
 	    if (result)
 	        XPutPixel(out_image, x, y, color->pixel);
@@ -872,32 +914,37 @@ Do_Pseudo(
 	  {
 	    for (i = 0; i < ncolors; i++)
 	      {
-	        if (colors[i].flags)
-	          {
+	        if (colors[i].pad)
 	            XFreeColors (dpy, colormap, &(colors[i].pixel), 1, 0);
-		    colors[i].flags = 0;
-	          }
+		colors[i].flags = 0;
+		colors[i].pad   = 0;
 	      }
 	  }
 	result = GreyScale (dpy, screen, colormap, in_image, out_image, colors,
 			ncolors, force, 0, 0, 0, 0, 0, 0);
       }
-    else if (colorCount)
+    else
       {
 	result = GR_SUCCESS;
-        *ret_colors = (unsigned long *) malloc (
-					sizeof (unsigned long) * colorCount);
-	if (*ret_colors == NULL)
+	if (colorCount)
 	  {
-	    colorCount = 0;
-	    result = GR_ALLOC_ERR;
+	    *ret_colors = (unsigned long *) malloc (
+					sizeof (unsigned long) * colorCount);
+	    if (*ret_colors == NULL)
+	      {
+		for (i = 0; i < ncolors; i++)
+		    if (colors[i].pad)
+			XFreeColors (dpy, colormap, &(colors[i].pixel), 1, 0);
+		colorCount = 0;
+		result = GR_ALLOC_ERR;
+	      }
+
+	    for (i = 0, x = 0; i < ncolors && x < colorCount; i++)
+		if (colors[i].pad)
+		    (*ret_colors)[x++] = colors[i].pixel;
+
+	    *ret_number = colorCount;
 	  }
-
-        for (i = 0, x = 0; i < ncolors && x < colorCount; i++)
-	    if (colors[i].flags)
-	        (*ret_colors)[x++] = colors[i].pixel;
-
-	*ret_number = colorCount;
       }
 
     /*
@@ -907,12 +954,18 @@ Do_Pseudo(
     return result;
 }
 
+/*
+ * Hash an XWD pixel value (Do_Direct's source-pixel to X-pixel map).
+ */
+#define DIRECT_HASH(p, size)	((unsigned long)((p) * 2654435761UL) & ((size) - 1))
+
 static int
 Do_Direct(
     Display *dpy,
     int      screen,
     XWDFileHeader *header,
     Colormap colormap,
+    Visual  *visual,
     int ncolors,
     XColor *colors,
     enum _DtGrColorModel force,
@@ -925,66 +978,74 @@ Do_Direct(
     XColor color;
     unsigned long rmask, gmask, bmask;
     int   rshift = 0, gshift = 0, bshift = 0;
-    int   i;
     int   result;
-    int   pixMax = 256;
-    int   pixI   = 0;
+    int   status;
+    Boolean ok;
     Pixel pix;
-    Pixel *oldPixels;
-    Pixel *newPixels;
+    /* source pixel -> X pixel map (open addressing) */
+    unsigned long hashSize = 1024, hashCount = 0, h, i;
+    Pixel   *hashKey;
+    Pixel   *hashVal;
+    char    *hashUsed;
+    /* pixels allocated in the server (to return / free) */
+    int    allocMax = 256;
+    int    allocCount = 0;
+    Pixel *allocPixels;
 
-    oldPixels = (Pixel *) malloc (sizeof (Pixel) * pixMax);
-    newPixels = (Pixel *) malloc (sizeof (Pixel) * pixMax);
-
-    if (oldPixels == NULL || newPixels == NULL)
-      {
-	if (oldPixels)
-	    free (oldPixels);
-	if (newPixels)
-	    free (newPixels);
-
-	return GR_ALLOC_ERR;
-      }
+    *ret_colors = NULL;
+    *ret_number = 0;
 
     rmask = header->red_mask;
+    gmask = header->green_mask;
+    bmask = header->blue_mask;
+    if (!rmask || !gmask || !bmask)
+	return GR_HEADER_ERR;
     while (!(rmask & 1)) {
 	rmask >>= 1;
 	rshift++;
     }
-    gmask = header->green_mask;
     while (!(gmask & 1)) {
 	gmask >>= 1;
 	gshift++;
     }
-    bmask = header->blue_mask;
     while (!(bmask & 1)) {
 	bmask >>= 1;
 	bshift++;
     }
-    if (in_image->depth <= 12)
-	pix = 1 << in_image->depth;
 
-    if (force == _DtGrCOLOR)
-        color.flags = DoRed | DoGreen | DoBlue;
-    else
-	color.flags = 0;
-
-    for (y = 0; color.flags && y < in_image->height; y++)
+    hashKey     = (Pixel *) malloc (sizeof (Pixel) * hashSize);
+    hashVal     = (Pixel *) malloc (sizeof (Pixel) * hashSize);
+    hashUsed    = (char *)  calloc (hashSize, 1);
+    allocPixels = (Pixel *) malloc (sizeof (Pixel) * allocMax);
+    if (!hashKey || !hashVal || !hashUsed || !allocPixels)
       {
-	for (x = 0; color.flags && x < in_image->width; x++)
+	free (hashKey);
+	free (hashVal);
+	free (hashUsed);
+	free (allocPixels);
+	return GR_ALLOC_ERR;
+      }
+
+    ok = (force == _DtGrCOLOR);
+    result = GR_SUCCESS;
+    for (y = 0; ok && y < in_image->height; y++)
+      {
+	for (x = 0; ok && x < in_image->width; x++)
 	  {
 	    pix = XGetPixel(in_image, x, y);
 
-	    i = 0;
-	    while (i < pixI && oldPixels[i] != pix)
-		i++;
+	    h = DIRECT_HASH(pix, hashSize);
+	    while (hashUsed[h] && hashKey[h] != pix)
+		h = (h + 1) & (hashSize - 1);
 
-	    if (i == pixI)
+	    if (!hashUsed[h])
 	      {
 		color.red = (pix >> rshift) & rmask;
 		color.green = (pix >> gshift) & gmask;
 		color.blue = (pix >> bshift) & bmask;
-		if (ncolors) {
+		if (ncolors && color.red < (unsigned) ncolors
+			&& color.green < (unsigned) ncolors
+			&& color.blue < (unsigned) ncolors) {
 		    color.red = colors[color.red].red;
 		    color.green = colors[color.green].green;
 		    color.blue = colors[color.blue].blue;
@@ -993,72 +1054,104 @@ Do_Direct(
 		    color.green = ((unsigned long)color.green * 65535) / gmask;
 		    color.blue = ((unsigned long)color.blue * 65535) / bmask;
 		}
-		if (!XAllocColor(dpy, colormap, &color))
-		    color.flags = 0;
-		else 
+		color.flags = DoRed | DoGreen | DoBlue;
+		status = AllocColor(dpy, colormap, visual, &color);
+		if (!status)
 		  {
-		    if (pixI >= pixMax)
-		      {
-			pixMax += 128;
-			oldPixels = (Pixel *) realloc ((void *) oldPixels,
-					(sizeof (Pixel) * pixMax));
-			newPixels = (Pixel *) realloc ((void *) newPixels,
-					(sizeof (Pixel) * pixMax));
-
-			/*
-			 * check the realloc
-			 */
-			if (oldPixels == NULL || newPixels == NULL)
-			  {
-			    if (oldPixels)
-				free (oldPixels);
-
-			    if (newPixels)
-			      {
-				XFreeColors(dpy, colormap, newPixels, pixI, 0);
-				free (newPixels);
-			      }
-
-			    return GR_ALLOC_ERR;
-			  }
-		      }
-		    oldPixels[pixI]   = pix;
-		    newPixels[pixI++] = color.pixel;
+		    ok = False;
+		    break;
 		  }
+		if (status == 1)
+		  {
+		    if (allocCount >= allocMax)
+		      {
+			Pixel *np = (Pixel *) realloc ((void *) allocPixels,
+					sizeof (Pixel) * (allocMax * 2));
+			if (np == NULL)
+			  {
+			    XFreeColors(dpy, colormap, &color.pixel, 1, 0);
+			    ok = False;
+			    result = GR_ALLOC_ERR;
+			    break;
+			  }
+			allocPixels = np;
+			allocMax *= 2;
+		      }
+		    allocPixels[allocCount++] = color.pixel;
+		  }
+
+		hashUsed[h] = 1;
+		hashKey[h]  = pix;
+		hashVal[h]  = color.pixel;
+
+		/* keep the table at most half full */
+		if (++hashCount * 2 > hashSize)
+		  {
+		    unsigned long newSize = hashSize * 2;
+		    Pixel *nk = (Pixel *) malloc (sizeof (Pixel) * newSize);
+		    Pixel *nv = (Pixel *) malloc (sizeof (Pixel) * newSize);
+		    char  *nu = (char *)  calloc (newSize, 1);
+
+		    if (!nk || !nv || !nu)
+		      {
+			free (nk);
+			free (nv);
+			free (nu);
+			XPutPixel(out_image, x, y, color.pixel);
+			ok = False;
+			result = GR_ALLOC_ERR;
+			break;
+		      }
+		    for (i = 0; i < hashSize; i++)
+			if (hashUsed[i])
+			  {
+			    unsigned long j = DIRECT_HASH(hashKey[i], newSize);
+			    while (nu[j])
+				j = (j + 1) & (newSize - 1);
+			    nu[j] = 1;
+			    nk[j] = hashKey[i];
+			    nv[j] = hashVal[i];
+			  }
+		    free (hashKey);
+		    free (hashVal);
+		    free (hashUsed);
+		    hashKey  = nk;
+		    hashVal  = nv;
+		    hashUsed = nu;
+		    hashSize = newSize;
+		  }
+		XPutPixel(out_image, x, y, color.pixel);
 	      }
-	    if (color.flags)
-	        XPutPixel(out_image, x, y, newPixels[i]);
+	    else
+	        XPutPixel(out_image, x, y, hashVal[h]);
 	  }
       }
-    if (color.flags)
+
+    free (hashKey);
+    free (hashVal);
+    free (hashUsed);
+
+    if (ok)
       {
-	result = GR_SUCCESS;
-        if (pixI < pixMax)
+	if (allocCount)
 	  {
-	    newPixels = (Pixel *) realloc ((void *) newPixels,
-					(sizeof (Pixel) * pixI));
-	    if (newPixels == NULL)
-	        result = GR_ALLOC_ERR;
+	    *ret_colors = allocPixels;
+	    *ret_number = allocCount;
 	  }
-
-	free (oldPixels);
-
-        *ret_colors = newPixels;
-        *ret_number = pixI;
+	else
+	    free (allocPixels);
+	return GR_SUCCESS;
       }
-    else
-      {
-	if (pixI)
-	    XFreeColors (dpy, colormap, newPixels, pixI, 0);
 
-        free (oldPixels);
-        free (newPixels);
+    if (allocCount)
+	XFreeColors (dpy, colormap, allocPixels, allocCount, 0);
+    free (allocPixels);
 
-	result = GreyScale(dpy, screen, colormap, in_image, out_image, colors,
+    if (result == GR_ALLOC_ERR)
+	return result;
+
+    return GreyScale(dpy, screen, colormap, in_image, out_image, colors,
 			ncolors, force, rshift, gshift, bshift, rmask, gmask, bmask);
-      }
-
-    return result;
 }
 
 static unsigned int
@@ -1101,10 +1194,7 @@ XwdFileToPixmap (
     int ncolors;
     Bool rawbits = False;
     XColor *colors = NULL;
-#ifdef __alpha
-/* Use a different structure for compatibility with 32-bit platform */
     XWDColor   xwd_color;
-#endif /* __alpha */
      XWDFileHeader header;
 
     /* Reset the pointer to the beginning of the stream */
@@ -1169,10 +1259,10 @@ XwdFileToPixmap (
 	    return GR_ALLOC_ERR;
 	  }
 
-#ifdef __alpha
-/* Use XWDColor instead of XColor. Byte-swapping if it is necessary.
- * Move values back into Xcolor structure.
- */
+	/*
+	 * The file holds XWDColor records (12 bytes); XColor is larger on
+	 * LP64, so read and convert each record.
+	 */
         for (i = 0; i < ncolors; i++) {
             if (_DtGrRead( (char *) &xwd_color, sizeof(XWDColor), 1 , stream)  != 1 )
             {
@@ -1190,21 +1280,8 @@ XwdFileToPixmap (
             colors[i].green = xwd_color.green;
             colors[i].blue  = xwd_color.blue;
             colors[i].flags = xwd_color.flags;
+            colors[i].pad   = 0;
         }
-#else
-	if(_DtGrRead((char *) colors, sizeof(XColor), ncolors, stream) != ncolors)
-	  {
-	    XFree ((char *) colors);
-	    return GR_FILE_ERR;
-	  }
-
-	if (*(char *) &swaptest) {
-	    for (i = 0; i < ncolors; i++) {
-		_swaplong((char *) &colors[i].pixel, sizeof(long));
-		_swapshort((char *) &colors[i].red, 3 * sizeof(short));
-	    }
-	}
-#endif /* __alpha */
     }
 
     /*
@@ -1252,17 +1329,19 @@ XwdFileToPixmap (
 
 	if ((header.visual_class == TrueColor) ||
 		   (header.visual_class == DirectColor))
-	    result = Do_Direct(dpy, screen, &header, colormap, ncolors, colors,
+	    result = Do_Direct(dpy, screen, &header, colormap, visual,
+			ncolors, colors,
 			color_model,
 		      &in_image, out_image, ret_colors, ret_number);
 	else
-	    result = Do_Pseudo(dpy, screen, colormap, ncolors, colors, color_model,
+	    result = Do_Pseudo(dpy, screen, colormap, visual, ncolors, colors,
+			color_model,
 			&in_image, out_image, ret_colors, ret_number);
     }
 
     if (result != GR_ALLOC_ERR)
 
-    _XmPutScaledImage(dpy, pixmap, gc, out_image,
+    _ilXPutScaledImage(dpy, pixmap, gc, out_image,
 		      src_x, src_y, dst_x, dst_y,
 		      in_image.width, in_image.height,
 		      width, height);
@@ -1360,7 +1439,7 @@ static enum _DtGrLoadStatus processBitmap(
 
 	scaled_pixmap = XCreatePixmap (dpy, drawable, (*in_out_width),
 				       (*in_out_height), depth);
-       _XmPutScaledImage(dpy, scaled_pixmap, gc, &ximage,0, 0, 0, 0,
+       _ilXPutScaledImage(dpy, scaled_pixmap, gc, &ximage,0, 0, 0, 0,
 			 width,height,(*in_out_width),(*in_out_height));
        XFree((char *)data);
        *ret_pixmap = scaled_pixmap;
@@ -1623,7 +1702,9 @@ static enum _DtGrLoadStatus processXwd(
 	    *ret_pixmap = pixmap;
             return (_DtGrSUCCESS);
         }
-        else if (result == GR_HEADER_ERR)
+
+        XFreePixmap (dpy, pixmap);
+        if (result == GR_HEADER_ERR)
             return (_DtGrFILE_INVALID);
         else if (result == GR_FILE_ERR)
             return (_DtGrFILE_INVALID);
@@ -1747,7 +1828,7 @@ myXpmReadFileToPixmap(
             XSetBackground (display, gc, fg);
             XSetForeground (display, gc, bg);
 	  }
-        _XmPutScaledImage(display, *pixmap_return, gc, image, 
+        _ilXPutScaledImage(display, *pixmap_return, gc, image, 
 			  0, 0, 0, 0,
 			  image->width, image->height,
 			  scaledWidth, scaledHeight);
@@ -1993,8 +2074,21 @@ static enum _DtGrLoadStatus processGIF(
                                      in_out_width, in_out_height, 
                                      g.f_black, g.f_white, ratio);
 
-    /* Set the returned colors parameters */
-    if (*ret_pixmap != 0)
+    /*
+    ** Set the returned colors parameters.  On a TrueColor visual the
+    ** pixels were computed rather than allocated (_ilXComputeColor is
+    ** all-or-nothing for a colormap), so there is nothing to free.
+    */
+    if (*ret_pixmap != 0 && g.f_color_map_constructed)
+    {
+        XColor probe;
+
+        probe.red = probe.green = probe.blue = 0;
+        probe.flags = DoRed | DoGreen | DoBlue;
+        if (_ilXComputeColor (display, colormap, visual, &probe))
+            g.f_color_map_constructed = 0;
+    }
+    if (*ret_pixmap != 0 && g.f_color_map_constructed)
     {
         if (g.f_do_visual == DO_COLOR)
 	{
@@ -2118,7 +2212,8 @@ static enum _DtGrLoadStatus processJPEG(
 
 	    out_image->data = (char *) malloc(Image_Size(out_image));
 
-            result = Do_Pseudo(dpy, screen_num, colormap, ncolors, colors, 
+            result = Do_Pseudo(dpy, screen_num, colormap, visual, ncolors,
+                               colors, 
                                color_model, in_image, out_image, 
                                ret_colors, ret_num_colors);
 	}
@@ -2148,7 +2243,7 @@ static enum _DtGrLoadStatus processJPEG(
 		** Copy the XImage into the pixmap and set the other
                 ** return parameters.
                 */
-                _XmPutScaledImage(dpy, *ret_pixmap, gc, out_image, 0, 0, 0, 0, 
+                _ilXPutScaledImage(dpy, *ret_pixmap, gc, out_image, 0, 0, 0, 0, 
 				  out_image->width, out_image->height, 
 		                  scaledWidth, scaledHeight); 
 

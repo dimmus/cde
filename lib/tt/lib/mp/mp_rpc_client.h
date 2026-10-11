@@ -45,10 +45,13 @@ class _Tt_rpc_client : public _Tt_object {
 	_Tt_rpc_client(int conn_socket = RPC_ANYSOCK);
 	virtual ~_Tt_rpc_client();
 	// create client connection to host,program,version
+	// port, if not 0, is the server's TCP port as advertised in
+	// the session address; it saves asking the portmapper.
 	int			init(_Tt_host_ptr &host,
 				     int program, int version,
 				     uid_t servuid,
-				     _Tt_auth &auth);
+				     _Tt_auth &auth,
+				     int port = 0);
 	int			socket();
 	// invoke rpc procedure
 	clnt_stat		call(int procnum,
@@ -58,11 +61,17 @@ class _Tt_rpc_client : public _Tt_object {
 				     char *out,
 				     int timeout);
 	CLIENT			*rpc_handle() { return _client; };
+	// 1 if the advertised port turned out to belong to some other
+	// RPC program, i.e. the session that advertised it is gone.
+	int			stale_port() const { return _stale_port; };
       private:
 	_Tt_host_ptr		_host;
 	int			_program;
 	int			_version;
 	int			_socket;
+	int			_own_socket;
+	int			_port;
+	int			_stale_port;
 	uid_t			_server_uid;
 	_Tt_auth		_auth;
 	char			_servername[MAXNETNAMELEN];

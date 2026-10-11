@@ -1,26 +1,20 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 TT_VERSION = "CDE Version @CDE_VERSION_MAJOR@.@CDE_VERSION_MINOR@.@CDE_VERSION_MICRO@@CDE_VERSION_DEV@"
 TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
 bin_PROGRAMS = rpc.ttdbserver
 
-rpc_ttdbserver_CXXFLAGS = -I../../slib -I../../lib -I../../mini_isam \
-			$(TIRPC_DEFINES) $(TT_VERSION_DEFINE)
+rpc_ttdbserver_CXXFLAGS = $(CDE_CXXFLAGS) -I../../slib -I../../lib -I../../mini_isam \
+			$(TT_VERSION_DEFINE)
 
-rpc_ttdbserver_LDADD = $(LIBTT) ${TIRPCLIB} $(X_LIBS) ../../slib/libstt.a \
+rpc_ttdbserver_LDADD = $(LIBTT) $(TIRPCLIB) ../../slib/libstt.a \
 		       ../../mini_isam/libisam.a
 
-if LINUX
-rpc_ttdbserver_LDADD += $(TIRPCLIB) $(XTOOLLIB)
-endif
-
 if SOLARIS
-rpc_ttdbserver_LDADD += $(XTOOLLIB) -lintl -lsocket -lnsl
-endif
-
-if BSD
-rpc_ttdbserver_LDADD += $(XTOOLLIB)
+rpc_ttdbserver_LDADD += -lintl -lsocket -lnsl
 endif
 
 rpc_ttdbserver_SOURCES = db_server_functions.C \

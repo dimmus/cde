@@ -51,6 +51,9 @@
 #include <Xm/List.h>
 #include <ctype.h>
 #include <limits.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <Dt/DtMsgsP.h>
 #include <Dt/HourGlass.h>
 #include "DtWidgetI.h"
@@ -90,24 +93,43 @@ static void DestroyThisWidgetCB(
 	XtPointer client,
 	XtPointer call);
 
+/* Write all of len bytes to fd; False on error. */
+static Boolean
+WriteAll(int fd, const char *buf, size_t len)
+{
+    while (len > 0) {
+	ssize_t n = write(fd, buf, len);
+
+	if (n < 0) {
+	    if (errno == EINTR)
+		continue;
+	    return False;
+	}
+	buf += n;
+	len -= n;
+    }
+    return True;
+}
+
 
 DtEditorErrorCode
 DtEditorInvokeSpellDialog(
 	Widget widget)
 {
     DtEditorWidget pPriv = (DtEditorWidget) widget;
-    char fileName[L_tmpnam], com[L_tmpnam + 7], *string, newline[1];
+    char fileName[64], *com, *string;
     char *line;
     FILE *fp;           /* pipe to read words from */
+    int fd;
+    Boolean written;
     int len = 0;        /* length of line read in */
     int maxLen = 0;     /* max length of the line buffer */
-    XmString word;      /* processed word ready to add to list */
+    XmString *words = NULL;	/* misspelled words, added in one go */
+    int numWords = 0, maxWords = 0;
 
     DtEditorErrorCode error = DtEDITOR_NO_TMP_FILE;
     _DtWidgetToAppContext(widget);
     _DtAppLock(app);
-
-    newline[0]='\n';
 
     if (!IsValidFilter(pPriv)) {
        error = DtEDITOR_SPELL_FILTER_FAILED;
@@ -117,31 +139,43 @@ DtEditorInvokeSpellDialog(
        _DtTurnOnHourGlass(M_topLevelShell(pPriv));
 
        /* 
-        * Write out to a tmp file, getting the name back
+        * Write out to a tmp file, in the directory tmpnam() used
+	* (mkstemp: tmpnam() was open to races)
         */
-       (void)tmpnam(fileName);
-       if((fp = fopen(fileName, "w")) != (FILE *)NULL) 
+       snprintf(fileName, sizeof(fileName), "%s/dtspellXXXXXX", P_tmpdir);
+       if((fd = mkstemp(fileName)) >= 0)
        {
           /* 
 	   * Temporary file created sucessfully so write out contents of
 	   * widget in preparation of feeding it to the 'spell' filter.
 	   */
           string = (char *)XmTextGetString(M_text(pPriv));
-          fwrite(string, sizeof(char), strlen(string), fp);
+          written = WriteAll(fd, string, strlen(string));
           XtFree(string);
           /* 
      	   * Tack on a final newline (\n) cuz spell(1) does not spell-check 
    	   * lines which do not terminate with a newline.
 	   */
-          fwrite(newline, sizeof(char), 1, fp);
+          if (written)
+             written = WriteAll(fd, "\n", 1);
 
-          fclose(fp);
+          if (close(fd) != 0)
+             written = False;
 
-          /* start spell command */
-          sprintf(com, "%s %s", M_spellFilter(pPriv), fileName);
-          fp = popen(com, "r");
+          /* start spell command (the buffer used to be fixed-size,
+	   * whatever the length of the filter) */
+          fp = NULL;
+          if (written) {
+             com = XtMalloc(strlen(M_spellFilter(pPriv)) +
+			    strlen(fileName) + 2);
+             sprintf(com, "%s %s", M_spellFilter(pPriv), fileName);
+             fp = popen(com, "r");
+             XtFree(com);
+          }
 
-          if ( fp == (FILE *)NULL )
+          if (!written)
+            error = DtEDITOR_NO_TMP_FILE;
+          else if ( fp == (FILE *)NULL )
             error = DtEDITOR_SPELL_FILTER_FAILED;
           else {
             error = DtEDITOR_NO_ERRORS;
@@ -175,9 +209,12 @@ DtEditorInvokeSpellDialog(
                   if (line[len - 1] == '\n')
  	          {
                      line[len - 1] = '\0';
-                     word = XmStringCreateLocalized(line);
-                     XmListAddItemUnselected(M_search_spellList(pPriv), word, 0);
-                     XmStringFree(word);
+		     if (numWords == maxWords) {
+			maxWords = maxWords ? 2 * maxWords : 64;
+			words = (XmString *) XtRealloc((char *) words,
+					sizeof(XmString) * maxWords);
+		     }
+                     words[numWords++] = XmStringCreateLocalized(line);
 		     len = 0;
                   }
 	          else
@@ -188,9 +225,19 @@ DtEditorInvokeSpellDialog(
 	       }
             }
 
-            /* clean up and display the results */
+            /* clean up and display the results: one list update
+	     * instead of one per word */
 	    XtFree(line);
             pclose(fp);
+	    if (numWords > 0) {
+	       int i;
+
+	       XmListAddItemsUnselected(M_search_spellList(pPriv),
+					words, numWords, 0);
+	       for (i = 0; i < numWords; i++)
+		  XmStringFree(words[i]);
+	    }
+	    XtFree((char *) words);
             _DtEditorSearch(pPriv, True, False);
             _DtTurnOffHourGlass(M_search_dialog(pPriv));
          } /* end start the spell filter */
@@ -719,6 +766,10 @@ DtEditorChange(
         {
     	   _DtTurnOnHourGlass( M_topLevelShell(editor) );
 
+	   /*
+	    * One redisplay at the end instead of one per replacement.
+	    */
+	   XmTextDisableRedisplay( M_text(editor) );
 
 	   if ( findChangeStrings != (DtEditorChangeValues *) NULL )
              returnVal = ReplaceAll( editor, findChangeStrings->find, 
@@ -726,6 +777,8 @@ DtEditorChange(
 	   else
              returnVal = ReplaceAll( editor, M_search_string(editor), 
 		 	             M_replace_string(editor) );
+
+	   XmTextEnableRedisplay( M_text(editor) );
 
     	   _DtTurnOffHourGlass( M_topLevelShell( editor ) );
 

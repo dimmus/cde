@@ -113,6 +113,7 @@ extern XtPointer _XmStringUngenerate (
 
 #include "Help.hh"
 #include "DtMailHelp.hh"
+#include "XmCompat.h"
 
 extern nl_catd	DtMailMsgCat;
 
@@ -216,11 +217,19 @@ AttachArea::initialize()
 			xmFormWidgetClass, _parent, 
 			NULL);
 
-    // Get pixel data.
-    XmeGetColorObjData(XtScreen(_parent), &colorUse, pixels, XmCO_NUM_COLORS,
-		       &act, &inact, &prim, &second, &text);
-    _foreground = pixels[text].fg;
-    _background = pixels[text].sc;
+    // Get pixel data. Without a color server (no dtsession) there is
+    // none, and the returned palette index is garbage.
+    if (XmeGetColorObjData(XtScreen(_parent), &colorUse, pixels,
+			   XmCO_NUM_COLORS, &act, &inact, &prim, &second,
+			   &text)) {
+	_foreground = pixels[text].fg;
+	_background = pixels[text].sc;
+    }
+    else
+	XtVaGetValues(_w,
+		      XmNforeground, &_foreground,
+		      XmNbackground, &_background,
+		      NULL);
 
     parWid = _myOwner->textEditor()->get_text_width();
 
@@ -296,7 +305,12 @@ AttachArea::initialize()
 		    XmNwidth,	     parWid,
 		    XmNheight,	     parHeight,
 		    NULL);
-    XmScrolledWindowSetAreas(_sw, NULL, _vsb, _clipWindow);
+    // What XmScrolledWindowSetAreas(_sw, NULL, _vsb, _clipWindow) did
+    // (it sets only the areas it is given; both widgets exist here).
+    XtVaSetValues(_sw,
+		  XmNverticalScrollBar, _vsb,
+		  XmNworkWindow, _clipWindow,
+		  NULL);
 
     XtManageChild(_clipWindow);
     XtManageChild(_vsb);
@@ -559,15 +573,12 @@ void AttachArea::activateDeactivate()
     if(getIconSelectedCount() > 0) {
 	if(getFsDialog())
 	    XtSetSensitive(
-		XmSelectionBoxGetChild( 
-		    getFsDialog(), XmDIALOG_OK_BUTTON), TRUE
+		XmCompatOkButton(getFsDialog()), TRUE
 		);
     } else {
 	if(getFsDialog())
 	    XtSetSensitive(
-		XmSelectionBoxGetChild( 
-		    getFsDialog(), XmDIALOG_OK_BUTTON
-		), 
+		XmCompatOkButton(getFsDialog()), 
 		(getFsState() == SAVEAS) ? FALSE : TRUE
 	    );
     }

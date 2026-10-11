@@ -162,7 +162,8 @@ prompt_for_line(char *prompt, char *defval, char *buffer)
 
 static void
 prompt_for_insert(Props *p) {
-	char		date_str[BUFSIZ], what_buffer[BUFSIZ], buf[BUFSIZ], *timecopy;
+	char		date_str[BUFSIZ], what_buffer[BUFSIZ], *timecopy;
+	char		buf[BUFSIZ + sizeof(cm_start)];	/* "date start" */
 	int		index, next, valid = FALSE;
 	DisplayType	dt = get_int_prop(p, CP_DEFAULTDISP);
 

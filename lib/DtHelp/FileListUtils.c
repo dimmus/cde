@@ -475,7 +475,8 @@ Boolean _DtHelpFileListAddFile (
    }
    addFile.fileName = fileName;
 
-   /* if an info proc, use it, otherwise make due */
+   /* if an info proc, use it, otherwise make due (as
+      _DtHelpFileListGetMatch does, so the keys of both agree) */
    if (infoProc) 
    {
       (*infoProc)(pDisplayArea,fullFilePath,
@@ -483,6 +484,8 @@ Boolean _DtHelpFileListAddFile (
                        &addFile.docId,&addFile.timeStamp,&addFile.nameKey,
                        io_fontList,ret_mod);
    }
+   else
+      addFile.nameKey = _DtHelpCeStrHashToKey(addFile.fileName);
 
    /* look for prior existence and position */
    next = prev = NULL;

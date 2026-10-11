@@ -59,6 +59,40 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include <string.h>
+#include <unordered_set>
+
+// Return the first p in [from, last] at which the n bytes of needle
+// start, or NULL. This is what the parsers' per-byte strncmp loops did
+// (a match may begin at `last` and run past it), but the part of the
+// range that can hold a whole match is searched with memmem.
+//
+inline const char *
+RFCScanFor(const char * from, const char * last,
+	   const char * needle, size_t n)
+{
+    if (from > last || n == 0) {
+	return(NULL);
+    }
+
+    size_t span = (size_t)(last - from) + 1;
+    if (span >= n) {
+	const char * hit = (const char *)memmem(from, span, needle, n);
+	if (hit) {
+	    return(hit);
+	}
+	from = last - n + 2;	// First start whose match runs past last.
+    }
+
+    for (; from <= last; from++) {
+	if (strncmp(from, needle, n) == 0) {
+	    return(from);
+	}
+    }
+
+    return(NULL);
+}
+
 #if defined(NEED_MMAP_WRAPPER)
 extern "C" {
 #endif
@@ -247,6 +281,7 @@ class RFCMessage : public DtMail::Message {
     void parseMIMEMessageSubtype(DtMailEnv &, const char * subtype);
     void parseMIMEMessageExternalBody(DtMailEnv &);
     void parseMIMEMultipartMixed(DtMailEnv &, const char * boundary);
+    DtMailBoolean hasMultipleParts(DtMailEnv &);
     void parseMIMEMultipartAlternative(DtMailEnv &, const char * boundary);
     void parseV3Bodies(DtMailEnv &);
 
@@ -306,6 +341,13 @@ class RFCEnvelope : public DtMail::Envelope {
     //
     int dirty(void) { return _dirty; }
 
+    // Record a value the parser derived rather than read, such as the
+    // computed Content-Length of a message that had none. getHeader()
+    // sees it, but it dirties neither the envelope nor the message, so
+    // it is only written out if the message is rewritten anyway.
+    //
+    void setDerivedHeader(DtMailEnv &, const char * name, const char * val);
+
     void adjustHeaderLocation(char * headerStart, int headerLength);
   
     char *writeHeaders(char *buf);
@@ -353,6 +395,10 @@ class RFCEnvelope : public DtMail::Envelope {
 			    const char * name,
 			    DtMailValueSeq & value);
 
+    // An envelope parsed on its own (MIMEPartial) has no message.
+    DtMail::Session * parentSession(void)
+	{ return _parent ? _parent->session() : NULL; }
+
     DtMailBoolean matchName(const ParsedHeader &, const char *);
 
     void parseUnixFrom(DtMailEnv &,
@@ -376,6 +422,10 @@ class RFCEnvelope : public DtMail::Envelope {
 			    DtMailBoolean allnet);
 
     void parseHeaders(void);
+
+    void storeHeader(DtMailEnv &, const char * name,
+		     const DtMailBoolean replace, const char * val,
+		     const DtMailBoolean mark_dirty);
 
     int lookupHeader(const char * name, DtMailBoolean real_only = DTM_FALSE);
     const char * mapName(const char * name);
@@ -677,6 +727,8 @@ class RFCMailBox : public DtMail::MailBox
     struct MessageCache : public DtCPlusPlusAllocator {
 	RFCMessage	*message;
 	DtMailBoolean	delete_pending;
+	int		slot;		// Hint: index in _msg_list.
+	DtMailBoolean	partial_type;	// Content-Type: message/partial
     };
 
     // Methods below this point are specific to RFCMailBox.
@@ -733,6 +785,13 @@ class RFCMailBox : public DtMail::MailBox
     DtMailServer		*_mra_server;
     char			*_mra_serverpw;
     DtVirtArray<MessageCache *>	 _msg_list;
+    // Every MessageCache in _msg_list. Message handles given to clients
+    // are MessageCache pointers; this lets handleSlot() validate one
+    // without dereferencing it and then use its slot hint, instead of
+    // scanning _msg_list for every lookup.
+    std::unordered_set<const MessageCache *> _live_handles;
+    int				 _last_msg_slot; // lookupByMsg() cursor.
+    int				 _partial_msgs;	 // # with partial_type set
     _partialData		**_partialList;
     unsigned int		 _partialListCount;
     struct stat			 _stinfo;
@@ -781,6 +840,16 @@ class RFCMailBox : public DtMail::MailBox
 		longLock(DtMailEnv &);
     void	longUnlock(DtMailEnv &);
     int		lookupByMsg(RFCMessage * msg);
+    int		handleSlot(DtMailMessageHandle handle);
+    void	appendMessage(MessageCache *mc);
+    void	destroyMessage(int slot);
+    int		destroyMessagesIf(
+			DtMailBoolean (*doomed)(RFCMailBox *, MessageCache *));
+    static DtMailBoolean
+		isDeletedPartial(RFCMailBox *, MessageCache *);
+    static DtMailBoolean
+		isDeletePending(RFCMailBox *, MessageCache *);
+    void	renumberSlots(int from);
     void	mailboxAccessHide(char *prefix);
     void	mailboxAccessShow(time_t mtime, char *prefix);
     void	makeHeaderLine(DtMailEnv & error, 
@@ -801,7 +870,8 @@ class RFCMailBox : public DtMail::MailBox
     void	unlockFile(DtMailEnv &, int fd);
     void	waitForMsgs(int needed);
     void	writeMailBox(DtMailEnv&, DtMailBoolean);
-    void	writeToDumpFile(const char* format, ...);
+    void	writeToDumpFile(const char* format, ...)
+		    __attribute__((format(printf, 2, 3)));
 };
 
 class RFCTransport : public DtMail::Transport {

@@ -96,7 +96,7 @@ class _Tt_trace_optobj : public _Tt_object {
 	
 	_Tt_string	envstr();
 
-	// Name of named pipe returned by tempnam
+	// Name of the named pipe (made by mkfifo)
 
 	_Tt_string&	pipe_name();
 

@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 fontaliasesconfdir = $(sysconfdir)/$(PACKAGE_TARNAME)/fontaliases
 fontaliasesdatadir = $(pkgdatadir)/fontaliases
 
@@ -9,7 +13,7 @@ CLEANFILES = $(BUILT_SOURCES)
 
 mk_fonts_alias_SOURCES = mk_fonts_alias.c
 test_fonts_alias_SOURCES = test_fonts_alias.c
-test_fonts_alias_LDADD = $(XTOOLLIB)
+test_fonts_alias_LDADD = $(X11LIB)
 noinst_PROGRAMS = mk_fonts_alias test_fonts_alias
 
 if MISC_FIXED

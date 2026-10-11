@@ -52,9 +52,6 @@ _Tt_isam_file::_Tt_isam_file (const _Tt_string &file, int mode)
   else {
     getStatusInfo();
   }
-
-  maxRecordLength = 0;
-  minRecordLength = 0;
 }
 
 _Tt_isam_file
@@ -85,9 +82,6 @@ _Tt_isam_file
     currentRecordLength = -1;
     currentRecordNumber = -1;
   }
-
-  maxRecordLength = 0;
-  minRecordLength = 0;
 }
 
 void _Tt_isam_file::setTtISAMFileDefaults ()
@@ -97,6 +91,11 @@ void _Tt_isam_file::setTtISAMFileDefaults ()
   fileMode = 0;
   keyDescriptorList = new _Tt_isam_key_descriptor_list;
   newFlag = FALSE;
+  // Set here, before the constructors call getISAMFileInfo().  They
+  // used to zero these afterwards, so every record buffer was 1 byte
+  // long and each record read or write overflowed the heap.
+  maxRecordLength = 0;
+  minRecordLength = 0;
 
   if (!isamFatalErrorHandlerSet) {
     isamFatalErrorHandlerSet = TRUE;

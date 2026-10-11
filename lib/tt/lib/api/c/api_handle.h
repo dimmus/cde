@@ -128,7 +128,18 @@ class _Tt_api_handle_table : public _Tt_object {
 						      Tt_message mh);
 	void			print(FILE *fs = stdout) const;
       private:
+	// Pattern handles.
 	_Tt_api_handle_list_ptr	content;
+	// Message handles, hashed on the message id.  (Messages used to
+	// share "content" with the patterns, so every message received
+	// and every tt_message_destroy() scanned every live handle.)
+	_Tt_api_handle_list_ptr	*mbuckets;
+	int			mbucket_count;
+	int			mcount;
+	_Tt_api_handle_list_ptr	&mbucket(int id) const {
+		return mbuckets[(unsigned int)id % (unsigned int)mbucket_count];
+	}
+	void			madd(_Tt_api_handle_ptr &h, int id);
 	_Tt_api_handle_ptr	last_mhandle;
 	_Tt_string		last_pat_id;
 	_Tt_pattern_ptr		last_pattern;

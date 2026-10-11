@@ -309,14 +309,17 @@ void _DtUtilDestroyHash(DtHashTbl t, int (*ptr)(), void * usr_arg)
   free(tbl);
 }
 
+/*
+ * FNV-1a.  (The old hash, result += *s++ << i++, shifted by 32 or more
+ * for strings that long, which is undefined behaviour.)
+ */
 static int hash_string(const unsigned char * s, int modulo)
 {
-	unsigned result = 0;
-	int i=1;
+	unsigned int result = 2166136261u;
 
  	while(*s!=0)
-	  result += (*s++ << i++);
+	  result = (result ^ *s++) * 16777619u;
 
- 	return(result % modulo); 
+ 	return(result % (unsigned int)modulo); 
 }
 

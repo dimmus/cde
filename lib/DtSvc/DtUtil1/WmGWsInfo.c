@@ -91,7 +91,10 @@ DtWsmGetWorkspaceInfo(
 {
     int rcode;
     Atom aProperty;
-    Window wmWindow;
+    Atom actualType;
+    int actualFormat;
+    unsigned long nitems, leftover;
+    unsigned char *value;
     DtWsmWorkspaceInfo *pWsInfo;
     char *pchName, *pch;
     int  iLen;
@@ -103,6 +106,7 @@ DtWsmGetWorkspaceInfo(
     _DtSvcDisplayToAppContext(display);
 
     _DtSvcAppLock(app);
+    *ppWsInfo = NULL;
     /* 
      * Construct atom name
      */
@@ -123,19 +127,36 @@ DtWsmGetWorkspaceInfo(
     /* 
      * Get window where property is 
      */
-    if ((rcode=_DtGetMwmWindow (display, root, &wmWindow)) == Success)
+    /*
+     * Read it the way XGetTextProperty does, from the (cached) window
+     * manager window.
+     */
+    if ((rcode=_DtGetMwmWindowProperty (display, root, aProperty,
+			1000000L, AnyPropertyType, &actualType, &actualFormat,
+			&nitems, &leftover, &value)) == Success)
     {
-	if ((rcode=XGetTextProperty(
-			display,
-			wmWindow,
-			&tp,
-			aProperty))>=Success)
+	/*
+	 * XmbTextPropertyToTextList returns Success, a count of
+	 * unconvertible characters, or a negative error.  The old code
+	 * compared XGetTextProperty's Status and this with Success and
+	 * stored the comparison, so a missing property or a failed
+	 * conversion returned Success with a NULL *ppWsInfo.
+	 */
+	if (actualType == None)
 	{
+	    rcode = BadAtom;	/* no such property */
+	}
+	else
+	{
+	    tp.value = value;
+	    tp.encoding = actualType;
+	    tp.format = actualFormat;
+	    tp.nitems = nitems;
 	    if ((rcode=XmbTextPropertyToTextList (
 				display,
 				&tp,
 				&ppchList,
-				&count) >= Success))
+				&count)) >= Success)
 	    {
 		pWsInfo = (DtWsmWorkspaceInfo *)
 			XtCalloc(1, sizeof(DtWsmWorkspaceInfo));
@@ -223,6 +244,9 @@ DtWsmGetWorkspaceInfo(
 		/* pass back ptr to filled in structure */
 		*ppWsInfo = pWsInfo;
 
+		/* (a positive count of unconvertible characters is Success) */
+		rcode = Success;
+
 		/* free the converted data */
 		XFreeStringList (ppchList);
 	    }
@@ -237,7 +261,12 @@ DtWsmGetWorkspaceInfo(
 	}
     }
 	
-    if (rcode >= Success) rcode=Success;
+    /*
+     * Success only with *ppWsInfo filled in.  (This used to map every
+     * rcode >= Success to Success, so BadAtom for a missing property,
+     * or BadWindow with no window manager, returned Success with a NULL
+     * *ppWsInfo, which callers then dereference.)
+     */
 
     _DtSvcAppUnlock(app);
     return(rcode);

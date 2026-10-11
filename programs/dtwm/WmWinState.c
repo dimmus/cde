@@ -35,6 +35,7 @@
  */
 
 #include "WmGlobal.h"
+#include <time.h>
 #include "WmICCC.h"
 #include "WmProtocol.h"
 #include "WmIPC.h"
@@ -644,26 +645,26 @@ void ConfigureNewState (ClientData *pcd)
 	}
     }
 
-    UpdateNetWmState (pcd->client, hints, sizeof(hints) / sizeof(hints[0]),
-		      _NET_WM_STATE_REMOVE);
-
-    if (pcd->maxConfig)
     {
-	unsigned long offset, nhints;
+	unsigned long offset = 0, nhints = 0;
 
-	if (pcd->fullscreen)
+	if (pcd->maxConfig)
 	{
-	    offset = 0;
-	    nhints = 1;
-	}
-	else
-	{
-	    offset = 1;
-	    nhints = 2;
+	    if (pcd->fullscreen)
+	    {
+		offset = 0;
+		nhints = 1;
+	    }
+	    else
+	    {
+		offset = 1;
+		nhints = 2;
+	    }
 	}
 
-	UpdateNetWmState (pcd->client, &hints[offset], nhints,
-			  _NET_WM_STATE_ADD);
+	ReplaceNetWmStates (pcd->client,
+			    hints, sizeof(hints) / sizeof(hints[0]),
+			    &hints[offset], nhints);
     }
 
     SendConfigureNotify (pcd);
@@ -763,6 +764,22 @@ static void UnmapClients (ClientData *pCD, unsigned int event_mask)
  *
  *************************************<->***********************************/
 
+/*
+ * Set the WM_STATE property of a client unless it already holds this
+ * state and icon: hiding and showing a client for a workspace change
+ * keeps it in the normal or iconic state.
+ */
+static void SetWMStateOnce (ClientData *pCD, int wmState, Window icon)
+{
+    if ((pCD->wmStateWritten != wmState) ||
+	(pCD->wmStateIconWritten != icon))
+    {
+	SetWMState (pCD->client, wmState, icon);
+	pCD->wmStateWritten = wmState;
+	pCD->wmStateIconWritten = icon;
+    }
+}
+
 void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 {
     ClientData *pNext;
@@ -781,7 +798,7 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 	}
 
         SetClientWsIndex (pNext);
-	SetWMState (pNext->client, wmState, ICON_FRAME_WIN(pNext));
+	SetWMStateOnce (pNext, wmState, ICON_FRAME_WIN(pNext));
 	if (pNext->maxConfig && mwmState == NORMAL_STATE)
 	{
 	    pNext->clientState = MAXIMIZED_STATE;
@@ -799,7 +816,7 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 	pNext = pNext->transientSiblings;
     }
 
-    SetWMState (pCD->client, wmState, ICON_FRAME_WIN(pCD));
+    SetWMStateOnce (pCD, wmState, ICON_FRAME_WIN(pCD));
     pCD->clientState = mwmState;
     if (bToUnseen)
 	pCD->clientState |= UNSEEN_STATE;
@@ -808,7 +825,37 @@ void SetClientWMState (ClientData *pCD, int wmState, int mwmState)
 
 #define SLIDE_UP_PERCENTAGE	5
 #define SLIDE_UP_DIVISOR	(100/SLIDE_UP_PERCENTAGE)
-#define SLIDE_UP_INTERVAL	15
+#define SLIDE_UP_INTERVAL	15	/* ms between steps */
+#define SLIDE_UP_DURATION	75	/* ms for a whole slide */
+
+/*
+ * The slide runs at a speed that makes a whole slide take
+ * SLIDE_UP_DURATION, whatever the height of the window, and each step
+ * moves by the time elapsed since the previous one: a late timer (a
+ * busy server) makes bigger steps, not a longer slide.
+ */
+static unsigned long
+SlideNowMs (void)
+{
+    struct timespec ts;
+
+    clock_gettime (CLOCK_MONOTONIC, &ts);
+    return ((unsigned long) ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+static Dimension
+SlideStep (ClientData *pCD, unsigned long elapsed)
+{
+    unsigned long step;
+
+    step = ((unsigned long) pCD->frameInfo.height * elapsed) /
+	   SLIDE_UP_DURATION;
+    if (step < 1)
+	step = 1;
+    if (step > pCD->frameInfo.height)
+	step = pCD->frameInfo.height;
+    return ((Dimension) step);
+}
 
 /******************************<->*************************************
  *
@@ -834,12 +881,17 @@ SlideOutTimerProc ( XtPointer client_data, XtIntervalId *id)
 {
     SlideOutRec *pSOR = (SlideOutRec *) client_data;
     Boolean bDone = False;
+    unsigned long now;
 
     if (pSOR)
     {
 	/*
 	 * compute next increment;
 	 */
+	now = SlideNowMs ();
+	pSOR->incHeight = SlideStep (pSOR->pCD, now - pSOR->lastTick);
+	pSOR->lastTick = now;
+
 	switch (pSOR->direction)
 	{
 	    case SLIDE_NORTH:
@@ -937,10 +989,9 @@ SlideOutTimerProc ( XtPointer client_data, XtIntervalId *id)
 	}
 	else
 	{
-	    /* re-arm the timer */
+	    /* re-arm the timer (Xt flushes the output before waiting) */
 	    XtAppAddTimeOut(wmGD.mwmAppContext, pSOR->interval,
 			    SlideOutTimerProc, (XtPointer)pSOR);
-	    XSync (DISPLAY, False);
 	}
     }
 
@@ -1019,7 +1070,7 @@ SlideWindowOut (ClientData *pCD)
 			SCREEN_FOR_CLIENT(pCD))/SLIDE_UP_DIVISOR);
     }
 
-    if ((pCD->slideDirection != SLIDE_NOT) && pSOR &&
+    if ((pCD->slideDirection != SLIDE_NOT) && pSOR && wmGD.slideSubpanels &&
 	(pSOR->incHeight < pCD->frameInfo.height))
     {
 	XSetWindowAttributes window_attribs;
@@ -1031,6 +1082,8 @@ SlideWindowOut (ClientData *pCD)
 	 */
 	pSOR->pCD = pCD;
 	pSOR->interval = SLIDE_UP_INTERVAL;
+	pSOR->incHeight = SlideStep (pCD, SLIDE_UP_INTERVAL);
+	pSOR->lastTick = SlideNowMs ();
 	pSOR->direction = pCD->slideDirection;
 	pSOR->mapping = True;
 	pSOR->wSubpanel = NULL;
@@ -1089,7 +1142,6 @@ SlideWindowOut (ClientData *pCD)
 	    pSOR->currX, pSOR->currY, pSOR->currWidth, pSOR->currHeight);
 	XMapWindow (DISPLAY, pSOR->coverWin);
 	XMapWindow (DISPLAY, pCD->clientFrameWin);
-	XSync (DISPLAY, False);
 
 	XtAppAddTimeOut(wmGD.mwmAppContext, pSOR->interval,
 			SlideOutTimerProc, (XtPointer)pSOR);
@@ -1182,7 +1234,7 @@ SlideSubpanelBackIn (ClientData *pCD, Widget wSubpanel)
 		SCREEN_FOR_CLIENT(pCD))/SLIDE_UP_DIVISOR);
     }
 
-    if ((pCD->slideDirection != SLIDE_NOT) && pSOR &&
+    if ((pCD->slideDirection != SLIDE_NOT) && pSOR && wmGD.slideSubpanels &&
 	(pSOR->incHeight < pCD->frameInfo.height))
     {
 	XSetWindowAttributes window_attribs;
@@ -1194,6 +1246,8 @@ SlideSubpanelBackIn (ClientData *pCD, Widget wSubpanel)
 	 */
 	pSOR->pCD = pCD;
 	pSOR->interval = SLIDE_UP_INTERVAL;
+	pSOR->incHeight = SlideStep (pCD, SLIDE_UP_INTERVAL);
+	pSOR->lastTick = SlideNowMs ();
 	pSOR->direction = pCD->slideDirection;
 	pSOR->mapping = False;
 	pSOR->wSubpanel = wSubpanel;
@@ -1255,8 +1309,6 @@ SlideSubpanelBackIn (ClientData *pCD, Widget wSubpanel)
 	    XMoveResizeWindow (DISPLAY, pSOR->coverWin, 
 		pSOR->currX, pSOR->currY, 
 		pSOR->currWidth, pSOR->currHeight);
-
-	    XSync (DISPLAY, False);
 	}
 
 	XtAppAddTimeOut(wmGD.mwmAppContext, pSOR->interval,

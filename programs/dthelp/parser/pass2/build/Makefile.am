@@ -1,7 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
-
 noinst_PROGRAMS = build
 
 HTAG2       = ..
@@ -11,12 +9,13 @@ SDLELTDEFSRC = $(HTAG2)/eltdef
 SDLDTDFILE   = $(HTAG2SRC)/sdl.dtd
 SDLUTILSRC   = $(HTAG2)/util
 SDLBUILDSRC  = $(HTAG2)/build
-SDLUTILLIB   = $(HTAG2)/util/libutil.a
+SDLUTILLIB   = $(HTAG2)/../util/libhelputil.a
+SDLCONTEXT   = $(HTAG2)/../util/context
 SDLIFFILE    = $(HTAG2SRC)/help.if
 
-build_CFLAGS = -I$(SDLUTILSRC)
+build_CFLAGS = $(CDE_CFLAGS) -I$(SDLUTILSRC)
 
-build_LDADD = ../util/libutil.a
+build_LDADD = $(SDLUTILLIB)
 
 build_SOURCES = build.c buildutl.c eltree.c except.c fsa.c out.c param.c \
 		scan.c sref.c tree.c
@@ -44,15 +43,18 @@ $(BPRODS): BDONE
 
 $(CPRODS): CDONE
 
+# build includes the CPRODS (case.c, context.h, delim.h): make them first.
+$(build_OBJECTS): CDONE
+
 # build the BRPODS
 BDONE: ./build $(SDLDTDFILE)
 	$(RM) $(BPRODS) $(BTRASH) && ./build < $(SDLDTDFILE) && touch BDONE
 
 
 # build the CRPODS
-CDONE: $(SDLUTILSRC)/context $(HTAG2SRC)/delim.bld context.dat
+CDONE: $(SDLCONTEXT) $(HTAG2SRC)/delim.bld context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HTAG2SRC)/delim.bld delim.dat # appl.-specific delim.dat
-	$(SDLUTILSRC)/context sparse
+	$(SDLCONTEXT) sparse
 	touch CDONE
 

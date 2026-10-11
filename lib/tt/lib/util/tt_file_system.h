@@ -52,6 +52,9 @@ class _Tt_file_system : public _Tt_allocated
 
 	_Tt_file_system_entry_ptr bestMatchToPath (const _Tt_string&);
 
+	// Same, for a path that has already been through _tt_realpath().
+	_Tt_file_system_entry_ptr bestMatchToRealPath (const _Tt_string&);
+
 	_Tt_file_system_entry_ptr findMountEntry (const _Tt_string&);
 
 	static void flush ();

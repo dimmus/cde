@@ -46,6 +46,7 @@ extern _Tt_string_list_ptr _tt_dir_entries(const _Tt_string &path,
 extern _Tt_string _tt_realpath(const _Tt_string &path);
 extern int _tt_isdir(const _Tt_string &path);
 extern _Tt_string _tt_local_network_path(const _Tt_string &path);
+extern _Tt_string _tt_real_local_network_path(const _Tt_string &real_path);
 extern _Tt_string _tt_network_path_to_local_path(const _Tt_string &path);
 extern bool_t _tt_is_network_path(const _Tt_string &path);
 extern _Tt_string _tt_user_path (_Tt_string file,

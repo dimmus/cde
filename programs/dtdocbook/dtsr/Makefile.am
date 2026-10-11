@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 include ../dtdocbook.am
 
 dtsrdir = $(dtdocbookdatadir)/dtsr
@@ -22,8 +26,8 @@ noinst_PROGRAMS = mkdbd
 
 dtsearch = ../../../lib/DtSearch
 
-mkdbd_CPPFLAGS = -DBASE_FILE_NAME=\"dtsearch\"
-mkdbd_CFLAGS = $(DT_INCDIR) -I$(dtsearch)/raima
+mkdbd_CPPFLAGS = $(CDE_CPPFLAGS) -DBASE_FILE_NAME=\"dtsearch\"
+mkdbd_CFLAGS = $(CDE_CFLAGS) $(DT_INCDIR) -I$(dtsearch)/raima
 
 CLEANFILES = dtsearch.dbd mkdbd.c
 

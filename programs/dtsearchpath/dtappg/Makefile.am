@@ -2,9 +2,11 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtappgather
 
-dtappgather_CXXFLAGS = -I../libCliSrv $(DT_INCDIR)
+dtappgather_CXXFLAGS = $(CDE_CXXFLAGS) -I../libCliSrv $(DT_INCDIR)
 
-dtappgather_LDADD = ../libCliSrv/libCliSrv.a $(DTCLIENTLIBS) $(XTOOLLIB)
+# It needs none of the desktop and X libraries (and is setuid root:
+# the fewer libraries it loads the better).
+dtappgather_LDADD = ../libCliSrv/libCliSrv.a
 
 if SOLARIS
 dtappgather_LDADD += -lintl

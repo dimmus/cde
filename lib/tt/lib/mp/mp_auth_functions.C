@@ -52,6 +52,8 @@ Author: Ralph Mor, X Consortium
 
 #include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <X11/Xos.h>
 #include "mp/mp_auth_functions.h"
@@ -125,13 +127,28 @@ _tt_AuthFileName ()
 
 
 
+/*
+ * Same "-c"/"-l" link protocol as IceLockAuthFile(), so it interoperates
+ * with other ICE clients, and the same overall patience (retries x
+ * timeout seconds), but the lock is polled every _TT_AUTH_LOCK_POLL_MS
+ * instead of every timeout seconds, and a lock older than "dead" seconds
+ * is broken whenever it is seen, not only on the first attempt.  The
+ * "-c" file is opened without O_TRUNC so that waiting does not refresh
+ * the ctime that staleness is judged by.
+ */
+#define _TT_AUTH_LOCK_POLL_MS	100
+
 int
 _tt_LockAuthFile(char *file_name, int retries, int timeout, long dead)
 {
     char	creat_name[1025], link_name[1025];
     struct stat	statb;
     Time_t	now;
-    int		creat_fd = -1;
+    int		created = 0;
+    int		first = 1;
+    int		fd;
+    long	waited_ms = 0;
+    long	budget_ms;
 
     if ((int) strlen (file_name) > 1022)
 	return (_tt_AuthLockError);
@@ -141,45 +158,53 @@ _tt_LockAuthFile(char *file_name, int retries, int timeout, long dead)
     strcpy (link_name, file_name);
     strcat (link_name, "-l");
 
-    if (stat (creat_name, &statb) != -1)
-    {
-	now = time ((Time_t *) 0);
+    budget_ms = (retries > 0 && timeout > 0) ? (long) retries * timeout * 1000
+					     : 0;
 
-	/*
-	 * NFS may cause ctime to be before now, special
-	 * case a 0 deadtime to force lock removal
-	 */
-
-	if (dead == 0 || now - statb.st_ctime > dead)
-	{
-	    unlink (creat_name);
-	    unlink (link_name);
-	}
-    }
-    
     while (retries > 0)
     {
-	if (creat_fd == -1)
+	if (stat (creat_name, &statb) != -1)
 	{
-	    creat_fd = creat (creat_name, 0666);
+	    now = time ((Time_t *) 0);
 
-	    if (creat_fd == -1)
+	    /*
+	     * NFS may cause ctime to be before now, special
+	     * case a 0 deadtime to force lock removal
+	     */
+
+	    if (dead == 0 ? first : now - statb.st_ctime > dead)
+	    {
+		unlink (creat_name);
+		unlink (link_name);
+		created = 0;
+	    }
+	}
+	first = 0;
+
+	if (!created)
+	{
+	    fd = open (creat_name, O_WRONLY | O_CREAT, 0666);
+
+	    if (fd == -1)
 	    {
 		if (errno != EACCES)
 		    return (_tt_AuthLockError);
 	    }
 	    else
-		close (creat_fd);
+	    {
+		close (fd);
+		created = 1;
+	    }
 	}
 
-	if (creat_fd != -1)
+	if (created)
 	{
 	    if (link (creat_name, link_name) != -1)
 		return (_tt_AuthLockSuccess);
 
 	    if (errno == ENOENT)
 	    {
-		creat_fd = -1;	/* force re-creat next time around */
+		created = 0;	/* force re-creat next time around */
 		continue;
 	    }
 
@@ -187,8 +212,15 @@ _tt_LockAuthFile(char *file_name, int retries, int timeout, long dead)
 		return (_tt_AuthLockError);
 	}
 
-	sleep ((unsigned) timeout);
-	--retries;
+	if (budget_ms > 0)
+	{
+	    if (waited_ms >= budget_ms)
+		break;
+	    poll (NULL, 0, _TT_AUTH_LOCK_POLL_MS);
+	    waited_ms += _TT_AUTH_LOCK_POLL_MS;
+	}
+	else
+	    --retries;
     }
 
     return (_tt_AuthLockTimeout);

@@ -66,6 +66,7 @@ SOFTWARE.
 #include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <sys/time.h>
 #include <Xm/GadgetP.h>
 #include <Xm/ManagerP.h>
 #include "ClockP.h"
@@ -305,6 +306,37 @@ WidgetClass dtClockGadgetClass = (WidgetClass) &dtClockClassRec;
 */
 
 /*-------------------------------------------------------------
+**	ClockTickDelay
+**		Milliseconds until the next update: the next multiple of
+**		the interval within the hour (the next minute for the
+**		default 60 s), so that the hands move when the minute
+**		changes rather than up to an interval later.  A little
+**		after the boundary, so that the time read then is past it.
+*/
+static unsigned long
+ClockTickDelay (
+	int	interval )
+{
+	struct timeval	tv;
+	struct tm	tm;
+	unsigned long	period, into;
+
+	if (interval <= 0)
+		interval = 60;
+	period = (unsigned long) interval * 1000;
+
+	if (3600 % interval != 0 ||
+	    gettimeofday (&tv, NULL) != 0 ||
+	    !localtime_r (&tv.tv_sec, &tm))
+		return (period);
+
+	into = ((unsigned long) (tm.tm_min * 60 + tm.tm_sec) * 1000 +
+		(unsigned long) tv.tv_usec / 1000) % period;
+	return (period - into + 20);
+}
+
+
+/*-------------------------------------------------------------
 **	ClockTick
 **		Clock timeout.
 */
@@ -324,7 +356,7 @@ ClockTick(
 		w->clock.interval_id =
 			XtAppAddTimeOut (
 				XtWidgetToApplicationContext ((Widget) w),
-				G_ClockInterval (w)*1000, ClockTick,
+				ClockTickDelay (G_ClockInterval (w)), ClockTick,
 				(XtPointer)w );
 	(void) time (&time_value);
 	tm = *localtime (&time_value);
@@ -677,7 +709,7 @@ SetValues(
 			new->clock.interval_id =
 				XtAppAddTimeOut (
 					XtWidgetToApplicationContext (new_w),
-					G_ClockInterval (new)*1000,
+					ClockTickDelay (G_ClockInterval (new)),
 					(XtTimerCallbackProc) ClockTick, 
 					(XtPointer)new_w);
 	}

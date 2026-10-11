@@ -51,6 +51,7 @@
 
 #include <EUSCompat.h>
 #include <errno.h>
+#include <time.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -67,6 +68,9 @@
 #include <sys/systeminfo.h>
 #endif
 #include <sys/wait.h>
+#if defined(__linux__)
+#include <sys/vfs.h>
+#endif
 #include <Dt/DtPStrings.h>
 
 #include <assert.h>
@@ -147,6 +151,24 @@ extern "C" {
       STATUSVARIABLE = STATEMENT;
 
 #endif
+
+// Fill name with <path>XXXXXX made unique by mkstemp().  The file is
+// created and closed; the callers remove it (with the privileges the
+// directory needs) and then create the lock file with O_EXCL, as they
+// did with the name mktemp() returned.
+//
+static int
+makeTempLockName(char *name, const char *path)
+{
+  int fd;
+
+  sprintf(name, "%sXXXXXX", path);
+  fd = mkstemp(name);
+  if (fd == -1)
+    return -1;
+  (void) close(fd);
+  return 0;
+}
 
 #define GET_DUMPFILE_NAME(dfn) \
     snprintf(dfn, sizeof(dfn), "%s/%s/dtmail.dump", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY)
@@ -295,6 +317,8 @@ _mappings(4), _msg_list(128)
     _uniqueLockIdLength = strlen(_uniqueLockId);
     _lockFileName = (char *)0;
     _dirty = 0;
+    _last_msg_slot = 0;
+    _partial_msgs = 0;
 
     _mr_allowed = DTM_TRUE;
     _mra_server = NULL;
@@ -393,11 +417,10 @@ RFCMailBox::~RFCMailBox(void)
 
 	// Next we tear down the message structures.
 	//
+	// Remove from the end: removing slot 0 shifts the whole list.
+	//
 	while (_msg_list.length()) {
-	    MessageCache * mc = _msg_list[0];
-	    delete mc->message;
-	    delete mc;
-	    _msg_list.remove(0); // Won't actually touch the object.
+	    destroyMessage(_msg_list.length() - 1);
 	}
 
 	// Finally we need to get rid of the mapping. There are
@@ -959,9 +982,9 @@ RFCMailBox::getFirstMessageSummary(DtMailEnv & error,
 	return(NULL);
     }
 
-    makeHeaderLine(error, 0, request, summary);
+    makeHeaderLine(error, slot, request, summary);
 
-    return(_msg_list[0]);
+    return(_msg_list[slot]);
 }
 
 DtMailMessageHandle
@@ -983,7 +1006,7 @@ RFCMailBox::getNextMessageSummary(DtMailEnv & error,
 
 	error.clear();
 
-    int slot = _msg_list.indexof((MessageCache *)last);
+    int slot = handleSlot(last);
     if (slot < 0) {
 	return(NULL);
     }
@@ -1017,7 +1040,7 @@ RFCMailBox::getMessageSummary(DtMailEnv & error,
 
 	error.clear();
 
-    int slot = _msg_list.indexof((MessageCache *)handle);
+    int slot = handleSlot(handle);
     if (slot < 0 || slot >= _msg_list.length()) {
 	error.setError(DTME_ObjectInvalid);
 	return;
@@ -1045,7 +1068,7 @@ RFCMailBox::getMessage(DtMailEnv & error, DtMailMessageHandle hnd)
 
     error.clear();
 
-    int slot = _msg_list.indexof((MessageCache *)hnd);
+    int slot = handleSlot(hnd);
     if (slot < 0) {
 	error.setError(DTME_ObjectInvalid);
 	return(NULL);
@@ -1864,7 +1887,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
   // reason fails, then fall back to method #2.
   //
 
-  char *mmap_format_string = "%s(%d): mmap(0, map_size=%ld, prot=0x%04x, flags=0x%04x, fd=%d(%s), %x) == map_region=%x, errno == %d\n";
+#define MMAP_FORMAT_STRING "%s(%d): mmap(0, map_size=%lu, prot=0x%04x, flags=0x%04x, fd=%d(%s), %lx) == map_region=%p, errno == %d\n"
 
   map->map_region = (char *)-1;
   
@@ -1890,16 +1913,18 @@ RFCMailBox::mapFile(DtMailEnv & error,
       DEBUG_PRINTF(
         ("mapFile: Error mmap(1) == %p, errno = %d\n", map->map_region, errno));
 
-      if (_errorLogging)
+      if (_errorLogging) {
         writeToDumpFile(
-	    mmap_format_string,
+	    MMAP_FORMAT_STRING,
 	    pname, err_phase,
 	    map->map_size, PROT_READ, flags, _fd, _real_path, map->offset,
 	    map->map_region, errno);
-      writeToDumpFile(
-	    "%s(%d): statbuf: ino=%d, dev=%d, nlink=%d, size=%ld\n",
+        writeToDumpFile(
+	    "%s(%d): statbuf: ino=%lu, dev=%lu, nlink=%lu, size=%ld\n",
 	    pname, err_phase,
-	    statbuf.st_ino, statbuf.st_dev, statbuf.st_nlink, statbuf.st_size);
+	    (unsigned long) statbuf.st_ino, (unsigned long) statbuf.st_dev,
+	    (unsigned long) statbuf.st_nlink, (long) statbuf.st_size);
+      }
 
       if (map->map_region == (char *) -1)
       {
@@ -1919,7 +1944,7 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	    if (map->map_region[i] == '\0') cnt++;
 
 	  writeToDumpFile(
-	      "%s(%d):  mmap failed: %d NULLs in map from byte %d to %d:\n",
+	      "%s(%d):  mmap failed: %d NULLs in map from byte %ld to %lu:\n",
 	      pname, err_phase,
 	      cnt, offset_from_map, map->file_size+offset_from_map);
 	}
@@ -1993,13 +2018,15 @@ RFCMailBox::mapFile(DtMailEnv & error,
       {
         error.logError(
 	  DTM_TRUE,
-	  mmap_format_string,
+	  MMAP_FORMAT_STRING,
 	  pname, err_phase,
-	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero, errno);
+	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero,
+	  map->offset, map->map_region, errno);
         writeToDumpFile(
-	  mmap_format_string,
+	  MMAP_FORMAT_STRING,
 	  pname, err_phase,
-	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero, errno);
+	  map->map_size, PROT_READ|PROT_WRITE, flags, fd, devzero,
+	  map->offset, map->map_region, errno);
       }
       if (already_locked == DTM_FALSE) {
         DEBUG_PRINTF( ("%s:  unlocking mailbox\n", pname) );
@@ -2045,15 +2072,17 @@ RFCMailBox::mapFile(DtMailEnv & error,
 	    (map->map_region[offset_from_map+map->file_size-1] == '\0'))
        ) {
 
-      if (_errorLogging)
+      if (_errorLogging) {
         writeToDumpFile(
-	    "%s(%d):  SafeRead(%d(%s), 0x%08lx, %d) == %d, errno == %d\n",
-	    pname, err_phase, _fd, _real_path, map->map_region, bytesToRead,
-	    readResults, errno);
-      writeToDumpFile(
-	    "%s(%d):  stat buf: ino=%d, dev=%d, nlink=%d, size=%ld\n",
-	    pname, err_phase, statbuf.st_ino, statbuf.st_dev,
-	    statbuf.st_nlink, statbuf.st_size);
+	    "%s(%d):  SafeRead(%d(%s), %p, %lu) == %ld, errno == %d\n",
+	    pname, err_phase, _fd, _real_path, map->map_region,
+	    (unsigned long) bytesToRead, (long) readResults, errno);
+        writeToDumpFile(
+	    "%s(%d):  stat buf: ino=%lu, dev=%lu, nlink=%lu, size=%ld\n",
+	    pname, err_phase, (unsigned long) statbuf.st_ino,
+	    (unsigned long) statbuf.st_dev,
+	    (unsigned long) statbuf.st_nlink, (long) statbuf.st_size);
+      }
 
       if (readResults > 0) {
         if (_errorLogging)
@@ -2180,14 +2209,163 @@ RFCMailBox::prevNotDel(const int cur)
 int
 RFCMailBox::lookupByMsg(RFCMessage * msg)
 {
-    for (int slot = 0; slot < _msg_list.length(); slot++) {
+    int count = _msg_list.length();
+
+    // Callers walk the list in order (getNextMessage), so try the
+    // slot found last time and the one after it before scanning.
+    //
+    for (int hint = _last_msg_slot; hint <= _last_msg_slot + 1; hint++) {
+	if (hint >= 0 && hint < count && _msg_list[hint]->message == msg) {
+	    _last_msg_slot = hint;
+	    return(hint);
+	}
+    }
+
+    for (int slot = 0; slot < count; slot++) {
 	MessageCache * mc = _msg_list[slot];
 	if (mc->message == msg) {
+	    _last_msg_slot = slot;
 	    return(slot);
 	}
     }
 
     return(-1);
+}
+
+// Map a message handle (a MessageCache pointer) to its slot in
+// _msg_list, or -1 if it is not a live handle. The handle is only
+// dereferenced once it is known to be live; its slot hint is checked
+// against the list and repaired if a removal has moved it.
+//
+int
+RFCMailBox::handleSlot(DtMailMessageHandle handle)
+{
+    MessageCache * mc = (MessageCache *)handle;
+
+    if (mc == NULL || _live_handles.find(mc) == _live_handles.end()) {
+	return(-1);
+    }
+
+    int slot = mc->slot;
+    if (slot >= 0 && slot < _msg_list.length() && _msg_list[slot] == mc) {
+	return(slot);
+    }
+
+    slot = _msg_list.indexof(mc);
+    mc->slot = slot;
+    return(slot);
+}
+
+void
+RFCMailBox::appendMessage(MessageCache * mc)
+{
+    DtMailEnv error;
+
+    // Remember whether this is a message/partial, so that parseFile()
+    // need not look at the Content-Type of every message again.
+    //
+    mc->partial_type =
+	mc->message->flagIsSet(error, DtMailMessagePartial);
+    if (mc->partial_type == DTM_TRUE) {
+	_partial_msgs += 1;
+    }
+
+    mc->slot = _msg_list.append(mc);
+    _live_handles.insert(mc);
+}
+
+// Free the message in a slot and remove it from the list. The slot
+// hints of later messages are left stale; call renumberSlots() after
+// a batch of removals.
+//
+void
+RFCMailBox::destroyMessage(int slot)
+{
+    MessageCache * mc = _msg_list[slot];
+
+    _live_handles.erase(mc);
+    if (mc->partial_type == DTM_TRUE) {
+	_partial_msgs -= 1;
+    }
+    delete mc->message;
+    delete mc;
+    _msg_list.remove(slot);
+}
+
+// Free and remove, in one pass over the list, every message doomed()
+// picks, and renumber the slots of the rest. Removing them one at a
+// time would shift the list once per message. Returns the number of
+// messages removed.
+//
+int
+RFCMailBox::destroyMessagesIf(
+	DtMailBoolean (*doomed)(RFCMailBox *, MessageCache *))
+{
+    int count = _msg_list.length();
+    int kept = 0;
+
+    for (int slot = 0; slot < count; slot++) {
+	MessageCache * mc = _msg_list[slot];
+
+	if ((*doomed)(this, mc) == DTM_TRUE) {
+	    _live_handles.erase(mc);
+	    if (mc->partial_type == DTM_TRUE) {
+		_partial_msgs -= 1;
+	    }
+	    delete mc->message;
+	    delete mc;
+	    continue;
+	}
+
+	if (kept != slot) {
+	    _msg_list.replace(kept, mc);
+	}
+	mc->slot = kept;
+	kept += 1;
+    }
+
+    _msg_list.truncate(kept);
+    if (_last_msg_slot >= kept) {
+	_last_msg_slot = 0;
+    }
+
+    return(count - kept);
+}
+
+// IBM code for message/partial: a message/partial message that is not
+// pending deletion but carries a delete time (it has been reassembled
+// into a new message, see _assemblePartial(), or was deleted before)
+// must go. Otherwise writeMailBox() would crash on it.
+//
+DtMailBoolean
+RFCMailBox::isDeletedPartial(RFCMailBox *, MessageCache * mc)
+{
+    if (mc->partial_type == DTM_FALSE || mc->delete_pending == DTM_TRUE) {
+	return(DTM_FALSE);
+    }
+
+    DtMailEnv error;
+    DtMailValueSeq value;
+    DtMail::Envelope * env = mc->message->getEnvelope(error);
+
+    env->getHeader(error, RFCDeleteHeader, DTM_FALSE, value);
+    return(error.isSet() ? DTM_FALSE : DTM_TRUE);
+}
+
+DtMailBoolean
+RFCMailBox::isDeletePending(RFCMailBox *, MessageCache * mc)
+{
+    return(mc->delete_pending);
+}
+
+void
+RFCMailBox::renumberSlots(int from)
+{
+    int count = _msg_list.length();
+
+    for (int slot = from < 0 ? 0 : from; slot < count; slot++) {
+	_msg_list[slot]->slot = slot;
+    }
 }
 
 void *
@@ -2230,9 +2408,8 @@ RFCMailBox::parseFile(DtMailEnv & error, int map_slot)
     // We will give the kernel a clue what we are up to and perhaps
     // help our parsing time in the process.
     //
-#if !defined(__linux__) && !defined(sun)
+#if !defined(sun)
     unsigned long pagelimit = _mappings[map_slot]->map_size;
-    // no madvise; don't use optimization
     madvise(
 	(char *)_mappings[map_slot]->map_region,
 	(size_t) pagelimit, MADV_SEQUENTIAL);
@@ -2305,76 +2482,45 @@ RFCMailBox::parseFile(DtMailEnv & error, int map_slot)
 		cache->message = _assemblePartial(error, cache->message);
 
 		if (error.isNotSet()) {
-		  _msg_list.append(cache);
+		  appendMessage(cache);
 		  continue;
 		}
 	      }
 	    }
 	  }
 //#endif // MESSAGE_PARTIAL
-	  _msg_list.append(cache);
+	  appendMessage(cache);
 	}
 	else {
 	    error.clear();
+	    delete cache->message;
+	    delete cache;
 	}
     } while (parse_loc <= end);
 
     // At this point we most likely will see random behavior. We will
     // tell the kernel to pull in the minimum number of extra pages.
     //
-#if !defined(__linux__) && !defined(sun)
-    // no madvise; don't use optimization
+#if defined(__linux__)
+    // Linux reads nothing ahead for MADV_RANDOM, which would make
+    // every later body access fault in a single page: go back to the
+    // default instead.
+    madvise(
+	(char *)_mappings[map_slot]->map_region,
+	(size_t) pagelimit, MADV_NORMAL);
+#elif !defined(sun)
     madvise(
 	(char *)_mappings[map_slot]->map_region,
 	(size_t) pagelimit, MADV_RANDOM);
 #endif
-    // IBM code for message/partial vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-    // we need delete those messages if they are satisfied the
-    // following two conditions
-    // (1) marked for delete  and
-    // (2) it is a message/partial message
+    // Drop the message/partial messages that were reassembled into a
+    // new message (isDeletedPartial()). Only messages whose
+    // Content-Type is message/partial can qualify, and appendMessage()
+    // counts those, so a mailbox without any is not walked at all.
     //
-    // Otherwise, we will get segmentation error when the method
-    //  writeMailBox is invoked because a new message were
-    //  generated by assembling partial messages
-    //
-    for (int msg = 0; msg < _msg_list.length(); msg++) {
-        MessageCache * mc = _msg_list[msg];
-        if (mc->delete_pending == DTM_FALSE) {
-            DtMail::Envelope * env = mc->message->getEnvelope(error);
-
-            DtMailValueSeq value;
-            char           *type=NULL;
-            static const char       * partial = "message/partial";
-            static const char       * contentType = "content-type";
-        // get content-type
-          env->getHeader(error, contentType , DTM_FALSE, value);
-          if (error.isNotSet()) {
-              type = strdup(*(value[0]));
-             }
-             else{
-              error.clear();
-           }
-          if(type != NULL) {
-            if (error.isNotSet()) {
-                env->getHeader(error, RFCDeleteHeader, DTM_FALSE, value);
-
-               if (!error.isSet() && (strncasecmp(type, partial, 15) == 0)) {
-                 delete mc->message;         // remove message storage
-                 delete mc;                  // remove message cache storage
-                 _msg_list.remove(msg);      // remove message from message list
-                 msg -= 1;                   // next message is where we are at now
-                 continue;
-                  }
-              else {
-                error.clear();
-                 }
-            }
-	    free(type);
-          }
-        }
+    if (_partial_msgs > 0) {
+	destroyMessagesIf(isDeletedPartial);
     }
-   //IBM code for message/partial ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     _at_eof.setTrue();
     error.clear();
@@ -2634,6 +2780,43 @@ RFCMailBox::PollEntry(void * client_data)
     return(DTM_TRUE);
 }
 
+// Is the file open on fd on a local file system? SafeGuaranteedStat()
+// opens, reads and closes the file to get past NFS attribute caching;
+// a local file system needs none of that. Only file systems known to
+// be local qualify; anything else (NFS, SMB, FUSE, ...) is treated as
+// remote.
+//
+static DtMailBoolean
+isLocalFileSystem(int fd)
+{
+#if defined(__linux__)
+    struct statfs fs;
+
+    if (fstatfs(fd, &fs) < 0) {
+	return(DTM_FALSE);
+    }
+
+    switch ((unsigned long) fs.f_type) {
+      case 0xEF53UL:		// ext2/ext3/ext4
+      case 0x58465342UL:	// xfs
+      case 0x9123683EUL:	// btrfs
+      case 0x01021994UL:	// tmpfs
+      case 0xF2F52010UL:	// f2fs
+      case 0x3153464AUL:	// jfs
+      case 0x52654973UL:	// reiserfs
+      case 0x2FC12FC1UL:	// zfs
+      case 0xCA451A4EUL:	// bcachefs
+      case 0x794C7630UL:	// overlayfs
+	return(DTM_TRUE);
+      default:
+	return(DTM_FALSE);
+    }
+#else
+    (void) fd;
+    return(DTM_FALSE);
+#endif
+}
+
 void
 RFCMailBox::NewMailEvent(
     const DtMailBoolean already_locked
@@ -2649,7 +2832,16 @@ RFCMailBox::NewMailEvent(
     if (!_object_valid->state()) return;
     if (!_mr_allowed) return;
 
-    _session->setBusyState(error1, DtMailBusyState_NewMail);
+    // Only say "Checking for new mail" (busy cursor on every window)
+    // when there is real work to do: retrieving from a server or a
+    // getmail command, or incorporating a mailbox that has grown. A
+    // mailbox that has not changed is checked silently.
+    //
+    DtMailBoolean busy = DTM_FALSE;
+    if (NULL != _mra_server || NULL != _mra_command) {
+	_session->setBusyState(error1, DtMailBusyState_NewMail);
+	busy = DTM_TRUE;
+    }
 
     op = retrieveNewMail(error);
     if (error.isSet())
@@ -2669,12 +2861,14 @@ RFCMailBox::NewMailEvent(
 
 	// longUnlock(error);
 	_session->writeEventData(error, &event, sizeof(event));
-        _session->setBusyState(error1, DtMailBusyState_NotBusy);
+        if (busy) _session->setBusyState(error1, DtMailBusyState_NotBusy);
         return;
     }
 
     if ((SafeFStat(_fd, &tempStatbuf) < 0) ||
-        (SafeGuaranteedStat(_real_path, &statbuf) == -1))
+        (isLocalFileSystem(_fd) == DTM_TRUE ?
+	 SafeStat(_real_path, &statbuf) :
+	 SafeGuaranteedStat(_real_path, &statbuf)) == -1)
     {
 	longUnlock(error);
         _mail_box_writable = DTM_FALSE;
@@ -2688,7 +2882,7 @@ RFCMailBox::NewMailEvent(
 
         error.setError(DTME_ObjectAccessFailed);
 	_session->writeEventData(error, &event, sizeof(event));
-        _session->setBusyState(error1, DtMailBusyState_NotBusy);
+        if (busy) _session->setBusyState(error1, DtMailBusyState_NotBusy);
         return;
     }
 
@@ -2709,7 +2903,7 @@ RFCMailBox::NewMailEvent(
 
         error.setError(DTME_MailboxInodeChanged);
 	_session->writeEventData(error, &event, sizeof(event));
-        _session->setBusyState(error1, DtMailBusyState_NotBusy);
+        if (busy) _session->setBusyState(error1, DtMailBusyState_NotBusy);
         return;
     }
   
@@ -2748,7 +2942,7 @@ RFCMailBox::NewMailEvent(
 	event.event_time = time(NULL);
 
 	_session->writeEventData(error, &event, sizeof(event));
-        _session->setBusyState(error1, DtMailBusyState_NotBusy);
+        if (busy) _session->setBusyState(error1, DtMailBusyState_NotBusy);
         return;
     }
 
@@ -2756,7 +2950,7 @@ RFCMailBox::NewMailEvent(
 
     if ((unsigned long) size == _file_size)
     {
-        _session->setBusyState(error1, DtMailBusyState_NotBusy);
+        if (busy) _session->setBusyState(error1, DtMailBusyState_NotBusy);
         if (_hide_access_events!=DTM_TRUE && info.st_atime<=info.st_mtime)
 	  mailboxAccessShow(info.st_mtime, "NewMailEvent: file_size unchanged");
 
@@ -2764,6 +2958,10 @@ RFCMailBox::NewMailEvent(
     }
     else if ((unsigned long) size > _file_size)
     {
+	if (busy == DTM_FALSE) {
+	    _session->setBusyState(error1, DtMailBusyState_NewMail);
+	    busy = DTM_TRUE;
+	}
 	incorporate(error, already_locked);
         if (_hide_access_events!=DTM_TRUE && info.st_atime<=info.st_mtime)
 	  mailboxAccessShow(info.st_mtime, "NewMailEvent: file_size grew");
@@ -2800,7 +2998,7 @@ RFCMailBox::NewMailEvent(
 	ThreadExit(1);
     }
 
-    _session->setBusyState(error1, DtMailBusyState_NotBusy);
+    if (busy) _session->setBusyState(error1, DtMailBusyState_NotBusy);
     return;
 }
 
@@ -3352,16 +3550,9 @@ RFCMailBox::writeMailBox(DtMailEnv &error, DtMailBoolean hide_access)
 
   // Flush all deleted messages (if any were previously detected)
   //
-  if (deletesPending)
-    for (msg = 0; msg < _msg_list.length(); msg++) {
-      MessageCache * mc = _msg_list[msg];
-      if (mc->delete_pending == DTM_TRUE) {
-	delete mc->message;		// remove message storage
-	delete mc;			// remove message cache storage
-	_msg_list.remove(msg);		// remove message from message list
-	msg -= 1; 			// next message is where we are at now
-      }
-    }
+  if (deletesPending) {
+    destroyMessagesIf(isDeletePending);
+  }
 
   // spin through all "written messages" and fixup their pointers so they
   // point into the new region
@@ -3888,6 +4079,25 @@ RFCMailBox::linkLockFile(DtMailEnv & error, char *tempLockFileName)
   return(0);
 }
 
+// Sleep before the next attempt to take the mailbox .lock file: 10 ms
+// the first time, then twice as long each time, up to 1 s.
+//
+static void
+lockBackoff(long & delayMs)
+{
+  delayMs = delayMs <= 0 ? 10 : delayMs * 2;
+  if (delayMs > 1000) {
+    delayMs = 1000;
+  }
+
+  struct timespec req;
+  req.tv_sec = delayMs / 1000;
+  req.tv_nsec = (delayMs % 1000) * 1000000L;
+  while (nanosleep(&req, &req) < 0 && errno == EINTR) {
+    continue;
+  }
+}
+
 void
 RFCMailBox::lockFile(DtMailEnv & error)
 {
@@ -3928,12 +4138,11 @@ RFCMailBox::lockFile(DtMailEnv & error)
   
   // Create the temporary mail lock file name
   // It has the form <_lockfilename><XXXXXX> or mailbox.lockXXXXXX
-  // mktemp then creates a unique temporary file for the template
+  // makeTempLockName then creates a unique temporary file for the template
   //
   assert(_lockFileName != NULL);
   char *tempLockFileName = new char[MAXPATHLEN];
-  sprintf(tempLockFileName, "%sXXXXXX", _real_path);
-  mktemp(tempLockFileName);
+  PRIV_ENABLED(return_status,makeTempLockName(tempLockFileName, _real_path));
   PRIV_ENABLED(return_status,SafeRemove(tempLockFileName));
 
   // loop through attempting to create the temporary lock file,
@@ -3944,6 +4153,15 @@ RFCMailBox::lockFile(DtMailEnv & error)
   //
   int statFailed = 0;
   struct stat sbuf;
+
+  // Wait between attempts with an exponential backoff, from 10 ms up
+  // to 1 s, instead of a flat 5 s: a lock held briefly (sendmail
+  // delivering one message) is usually picked up within a few tens of
+  // milliseconds. The 5 minute staleness rule is unchanged, and a lock
+  // file that keeps vanishing is still given about 30 s.
+  //
+  long backoffMs = 0;
+  struct timespec statFailedSince = {0, 0};
   
   for (;;) {
     // Attempt to create a temporary file and link it to the intended lock file
@@ -3983,13 +4201,18 @@ RFCMailBox::lockFile(DtMailEnv & error)
     // so many times before punting
     //
     if (SafeStat(_lockFileName, &sbuf) == -1) {
-      if (statFailed++ > 5) {
+      struct timespec now;
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      if (statFailed++ == 0) {
+	statFailedSince = now;
+      }
+      else if (statFailed > 6 && now.tv_sec - statFailedSince.tv_sec >= 30) {
 	error.vSetError(DTME_CannotCreateMailboxLockFile,
 			DTM_FALSE, NULL, _lockFileName, error.errnoMessage());
         delete [] tempLockFileName;
 	return;
       }
-      sleep(5);
+      lockBackoff(backoffMs);
       continue;
     }
 
@@ -4002,7 +4225,7 @@ RFCMailBox::lockFile(DtMailEnv & error)
     //
     statFailed = 0;
     if (t < (sbuf.st_ctime + 300)) {
-      sleep(5);
+      lockBackoff(backoffMs);
       continue;
     }
 
@@ -4142,8 +4365,7 @@ RFCMailBox::dotDtmailLock(DtMailEnv & error)
   // operating on the same mailbox.
   
   // Create the temporary mail lock file name.
-  sprintf(tempLockFileName, "%sXXXXXX", _real_path);
-  mktemp(tempLockFileName);
+  PRIV_ENABLED(return_status,makeTempLockName(tempLockFileName, _real_path));
   PRIV_ENABLED(return_status,SafeRemove(tempLockFileName));
 
   // Attempt to create the temporary file.
@@ -4460,6 +4682,8 @@ RFCMailBox::writeToDumpFile(const char *format, ...)
 
   GET_DUMPFILE_NAME(dumpfilename);
   FILE *df = fopen(dumpfilename, "a");
+  if (df == NULL)
+    return;
   
   const time_t clockTime = (const time_t) time(NULL);
   memset((void*) &ctime_buf, 0, sizeof(_Xctimeparams));

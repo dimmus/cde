@@ -53,6 +53,21 @@ extern void LocalPrintJobs(
    char **return_job_list,
    int *return_n_jobs);
 
+#if defined(__linux__) || defined(CSRG_BASED)
+// The local job list comes from a command (lpq), so it can be read
+// asynchronously: run LocalPrintJobsCommand() and hand its output to
+// ParseLocalPrintJobs().
+#define HAVE_LOCAL_PRINT_JOBS_COMMAND 1
+
+extern void LocalPrintJobsCommand(const char *printer, char *buf, int len);
+
+extern void ParseLocalPrintJobs(
+   char *printer,
+   char *output,
+   char **return_job_list,
+   int *return_n_jobs);
+#endif
+
 extern int RemotePrintJobs(
    char *server,
    char *printer,

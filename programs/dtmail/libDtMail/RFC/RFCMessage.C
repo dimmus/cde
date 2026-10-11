@@ -484,6 +484,10 @@ RFCMessage::flagIsSet(DtMailEnv & error, const DtMailMessageState flag)
 	}
 	break;
 
+      case DtMailMessageHasMultipleParts:
+	answer = hasMultipleParts(error);
+	break;
+
       default:
 	break;
     }
@@ -769,20 +773,25 @@ RFCMessage::parseMsg(DtMailEnv & error,
     //
     const char *hdr_end;
     for (hdr_end = _msg_start; hdr_end <= end_of_file; hdr_end++) {
-	if (*hdr_end == '\n') {
-	    int blanks_only = 1;
-	    for (const char * blanks = hdr_end + 1; 
-		 *blanks != '\n' && blanks <= end_of_file; blanks++) {
-		if (!isspace((unsigned char)*blanks)) {
-		    blanks_only = 0;
-		    break;
-		}
-	    }
+	hdr_end = (const char *)memchr(hdr_end, '\n',
+				       end_of_file - hdr_end + 1);
+	if (hdr_end == NULL) {
+	    hdr_end = end_of_file + 1;
+	    break;
+	}
 
-	    if (blanks_only) {
-		// Found the end of the headers.
+	int blanks_only = 1;
+	for (const char * blanks = hdr_end + 1; 
+	     *blanks != '\n' && blanks <= end_of_file; blanks++) {
+	    if (!isspace((unsigned char)*blanks)) {
+		blanks_only = 0;
 		break;
 	    }
+	}
+
+	if (blanks_only) {
+	    // Found the end of the headers.
+	    break;
 	}
     }
 
@@ -799,15 +808,10 @@ RFCMessage::parseMsg(DtMailEnv & error,
 	// Oops! We need to find the next "From " line if possible to at least
 	// let the rest of the parsing proceed.
 	//
-	const char *next_from;
-	for (next_from = hdr_end + 1;
-	     next_from <= (end_of_file - 6); next_from++) {
-	    if (strncmp(next_from, "\nFrom ", 6) == 0) {
-		break;
-	    }
-	}
+	const char *next_from = RFCScanFor(hdr_end + 1, end_of_file - 6,
+					   "\nFrom ", 6);
 	const char * new_end;
-	if (next_from > (end_of_file - 6)) {
+	if (next_from == NULL) {
 	    new_end = end_of_file + 1;
 	}
 	else {
@@ -854,6 +858,7 @@ RFCMessage::findMsgEnd(DtMailEnv & error, const char * eof)
     // See if we have a content length. If so, then will try it first.
     //
     long content_length;
+    DtMailBoolean had_length = DTM_FALSE;
 
     error.clear();
 
@@ -862,6 +867,7 @@ RFCMessage::findMsgEnd(DtMailEnv & error, const char * eof)
     DtMailValueSeq	value;
     _envelope->getHeader(error, "content-length", DTM_FALSE, value);
     if (error.isNotSet()) {
+	had_length = DTM_TRUE;
 	content_length = atol(*(value[0]));
 
 	// Look forward content_length amount and see if we are at
@@ -953,11 +959,15 @@ RFCMessage::findMsgEnd(DtMailEnv & error, const char * eof)
 
 	int lcnt = 0;
 	for (_msg_end = _body_start; _msg_end <= eof; _msg_end++) {
-	    if (*_msg_end == '\n') {
-		lcnt += 1;
-		if (lcnt == xlines) {
-		    break;
-		}
+	    _msg_end = (const char *)memchr(_msg_end, '\n',
+					    eof - _msg_end + 1);
+	    if (_msg_end == NULL) {
+		_msg_end = eof + 1;
+		break;
+	    }
+	    lcnt += 1;
+	    if (lcnt == xlines) {
+		break;
 	    }
 	}
     }
@@ -967,10 +977,9 @@ RFCMessage::findMsgEnd(DtMailEnv & error, const char * eof)
 	// folder until we hit the end of file, or we hit a "From " at
 	// the start of a line.
 	//
-	for (_msg_end = _body_start - 1; _msg_end <= (eof - 6); _msg_end++) {
-	    if (strncmp(_msg_end, "\nFrom ", 6) == 0) {
-		break;
-	    }
+	_msg_end = RFCScanFor(_body_start - 1, eof - 6, "\nFrom ", 6);
+	if (_msg_end == NULL) {
+	    _msg_end = eof;	// No next message: this one runs to the eof.
 	}
     }
 
@@ -980,6 +989,16 @@ RFCMessage::findMsgEnd(DtMailEnv & error, const char * eof)
     if (_msg_end > (eof - 6)) {
 	real_end = eof + 1;
 	_msg_end = eof;
+
+	// A blank line at the end of the file separates this message
+	// from the next one to be appended, just as the blank line
+	// before a "From " line does above, so it is not part of the
+	// message. Counting it in made each rewrite of the mailbox add
+	// another newline after the last message.
+	//
+	if (*eof == '\n' && eof - 1 >= _body_start && *(eof - 1) == '\n') {
+	    _msg_end = eof - 1;
+	}
     }
     else {
         // Again, protect against NULL messages with 1 blank line
@@ -988,15 +1007,27 @@ RFCMessage::findMsgEnd(DtMailEnv & error, const char * eof)
 	    _msg_end = backcrlf(_msg_end);
     }
 
-    // Let's put a content length on this thing so we won't have to go
-    // through this silliness again!
+    // Record the real content length; the message list shows it and
+    // sorts by it.
     //
     content_length = _msg_end - _body_start + 1;
     content_length = content_length < 0 ? 0 : content_length;
 
     char buf[20];
     sprintf(buf, "%lu", content_length);
-    _envelope->setHeader(error, "Content-Length", DTM_TRUE, buf);
+    if (had_length == DTM_TRUE) {
+	// A wrong Content-Length is corrected in the file, as before,
+	// so that it does not mislead the next reader.
+	//
+	_envelope->setHeader(error, "Content-Length", DTM_TRUE, buf);
+    }
+    else {
+	// A message without one is left as it is on disk. Persisting a
+	// synthetic header used to dirty every such message, and so
+	// rewrite (and fsync) the whole mailbox after opening it.
+	//
+	((RFCEnvelope *)_envelope)->setDerivedHeader(error, "Content-Length", buf);
+    }
 
     return(real_end);
 }
@@ -1355,12 +1386,16 @@ RFCMessage::parseMIMEMultipartAlternative(DtMailEnv & error, const char * bounda
   
   int bndry_len = strlen(boundary);
 
-  for (; body <= _msg_end; body++) {
-    if (*body == '-' &&
-	*(body + 1) == '-' &&
-	strncmp(body + 2, boundary, bndry_len) == 0) {
-      break;
+  {
+    char * dash_boundary = (char *)malloc(bndry_len + 3);
+    dash_boundary[0] = '-';
+    dash_boundary[1] = '-';
+    memcpy(dash_boundary + 2, boundary, bndry_len + 1);
+    body = RFCScanFor(body, _msg_end, dash_boundary, bndry_len + 2);
+    if (body == NULL) {
+      body = _msg_end + 1;
     }
+    free(dash_boundary);
   }
 
   if (body > _msg_end ||
@@ -1442,12 +1477,16 @@ RFCMessage::parseMIMEMultipartMixed(DtMailEnv & error, const char * boundary)
   
   int bndry_len = strlen(boundary);
 
-  for (; body <= _msg_end; body++) {
-    if (*body == '-' &&
-	*(body + 1) == '-' &&
-	strncmp(body + 2, boundary, bndry_len) == 0) {
-      break;
+  {
+    char * dash_boundary = (char *)malloc(bndry_len + 3);
+    dash_boundary[0] = '-';
+    dash_boundary[1] = '-';
+    memcpy(dash_boundary + 2, boundary, bndry_len + 1);
+    body = RFCScanFor(body, _msg_end, dash_boundary, bndry_len + 2);
+    if (body == NULL) {
+      body = _msg_end + 1;
     }
+    free(dash_boundary);
   }
 
   if (body > _msg_end ||
@@ -1485,6 +1524,127 @@ RFCMessage::parseMIMEMultipartMixed(DtMailEnv & error, const char * boundary)
     
   } while (body <= _msg_end);
   return;
+}
+
+// hasMultipleParts -- does the message have more than one body part?
+// Returns:
+//  DTM_TRUE if getBodyCount() is, or would be, greater than one;
+//  DTM_FALSE if it is one, or if that cannot be told cheaply.
+// Description:
+//  The message list shows an attachment glyph for multipart messages
+//  with more than one body part. Parsing every body of every such
+//  message to count them defeats the lazy body parsing and touches
+//  every page of every attachment. For multipart types that
+//  parseMIMEMultipartMixed() handles, follow the same steps it and
+//  MIMEBodyPart take to the start of the second part, using only the
+//  first part's headers and the two delimiters. multipart/alternative
+//  (the count is that of the last alternative) and Sun V3 messages
+//  are left to the caller's full parse.
+//
+DtMailBoolean
+RFCMessage::hasMultipleParts(DtMailEnv & error)
+{
+  error.clear();
+
+  if (_bp_cache.length() > 0) {
+    return(_bp_cache.length() > 1 ? DTM_TRUE : DTM_FALSE);
+  }
+
+  if (!_msg_start || !_envelope) {
+    return(DTM_FALSE);
+  }
+
+  DtMailValueSeq value;
+  _envelope->getHeader(error, "Content-Type", DTM_FALSE, value);
+  if (error.isSet()) {
+    error.clear();
+    return(DTM_FALSE);
+  }
+
+  // Any "multipart/..." content type takes the MIME path in
+  // parseBodies(), because it contains a '/'.
+  //
+  const char * content_type = *(value[0]);
+  if (strncasecmp(content_type, "multipart/", 10) != 0 ||
+      strncasecmp(content_type + 9, "/alternative", 12) == 0) {
+    return(DTM_FALSE);
+  }
+
+  char * boundary = extractBoundary(content_type + 9);
+  if (!boundary) {
+    return(DTM_FALSE);
+  }
+
+  DtMailBoolean answer = DTM_FALSE;
+  size_t bndry_len = strlen(boundary);
+  char * delimiter = (char *)malloc(bndry_len + 4);
+  delimiter[0] = '\n';
+  delimiter[1] = '-';
+  delimiter[2] = '-';
+  memcpy(delimiter + 3, boundary, bndry_len + 1);
+
+  const char * end = _msg_end;
+
+  // The first part starts at the first "--boundary" (as in
+  // parseMIMEMultipartMixed); "--boundary--" there means one part.
+  //
+  const char * part = RFCScanFor(_body_start, end, delimiter + 1, bndry_len + 2);
+  if (part == NULL || *(part + bndry_len + 2) == '-') {
+    goto done;
+  }
+
+  {
+    // Skip the delimiter line (as MIMEBodyPart does).
+    //
+    const char * scan = (const char *)memchr(part, '\n', end - part + 1);
+    if (scan == NULL || scan + 1 > end) {
+      goto done;
+    }
+    scan += 1;
+
+    // Skip the part's headers, up to the blank line that ends them.
+    //
+    if (!(*scan == '\n' || (*scan == '\r' && *(scan + 1) == '\n'))) {
+      for (; scan <= end; scan++) {
+	if (*scan == '\n') {
+	  int blank_only = 1;
+	  for (const char * blank = scan + 1;
+	       blank <= end && *blank != '\n'; blank++) {
+	    if (!isspace((unsigned char)*blank)) {
+	      blank_only = 0;
+	      break;
+	    }
+	  }
+	  if (blank_only) {
+	    break;
+	  }
+	}
+      }
+      scan += 1;
+    }
+
+    // Skip the rest of that line; the body starts after it.
+    //
+    for (; scan <= end && *scan != '\n'; scan++) {
+      continue;
+    }
+    scan += 1;
+
+    // A second part exists if the next delimiter is not the closing one.
+    //
+    const char * next = RFCScanFor(scan, end, delimiter, bndry_len + 3);
+    if (next != NULL && next + 1 <= end) {
+      const char * after = next + 3 + bndry_len;
+      if (!(*after == '-' && *(after + 1) == '-')) {
+	answer = DTM_TRUE;
+      }
+    }
+  }
+
+done:
+  free(delimiter);
+  free(boundary);
+  return(answer);
 }
 
 void

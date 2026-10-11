@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <unistd.h>
 #include "tt_options.h"
 #include "mp/mp_auth.h"
@@ -77,6 +78,9 @@ _Tt_rpc_client::
 _Tt_rpc_client(int conn_socket)
 {
 	_socket = conn_socket;
+	_own_socket = 0;
+	_port = 0;
+	_stale_port = 0;
 	_client = (CLIENT *)0;
 	_program = 0;
 	_version = 0;
@@ -120,22 +124,33 @@ socket()
  */
 int _Tt_rpc_client::
 init(_Tt_host_ptr &host, int program, int version,
-     uid_t servuid, _Tt_auth &auth)
+     uid_t servuid, _Tt_auth &auth, int port)
 {
 	int		optval;
 
-	optval = (_socket == RPC_ANYSOCK);
 	_auth = auth;
 	_host = host;
 	_program = program;
 	_version = version;
 	_server_uid = servuid;
+	_port = _stale_port ? 0 : port;
 	if (_client != (CLIENT *)0) {
 		if (_auth.auth_level() == _TT_AUTH_UNIX) {
 			auth_destroy(_client->cl_auth);
 		}
 		clnt_destroy(_client);
+		_client = (CLIENT *)0;
+		if (_own_socket) {
+			// clnt_destroy() closed the socket the RPC
+			// library opened for us.  Rebinding used to hand
+			// that stale descriptor number back to
+			// clnttcp_create(), which then talked RPC over
+			// whatever the number had been reused for.
+			_socket = RPC_ANYSOCK;
+		}
 	}
+	optval = (_socket == RPC_ANYSOCK);
+	_own_socket = optval;
 #if defined(OPT_SECURE_RPC)
 	if (_auth.auth_level() == _TT_AUTH_DES) {
 		if (_server_uid == 0) {
@@ -149,16 +164,29 @@ init(_Tt_host_ptr &host, int program, int version,
 
 	memset(&_server_addr, 0, sizeof(_server_addr));
 	_server_addr.sin_family = AF_INET;
-	_server_addr.sin_port = htons((optval) ? 0 : 4000);
+	// Port 0 makes clnttcp_create() ask the portmapper.  When the
+	// session address names the port, connect to it directly; if
+	// that fails (a stale address), fall back to the portmapper.
+	_server_addr.sin_port = htons((optval) ? _port : 4000);
 
 	if (!inet_aton((char *)(_host->stringaddr()), &_server_addr.sin_addr))
 		return 0;
 
 	_client = clnttcp_create(&_server_addr, _program,
 			         _version, &_socket, 4000, 4000);
+	if (_client == 0 && optval && _port != 0) {
+		_port = 0;
+		_socket = RPC_ANYSOCK;
+		_server_addr.sin_port = 0;
+		_client = clnttcp_create(&_server_addr, _program,
+					 _version, &_socket, 4000, 4000);
+	}
 	if (_client == 0) {
 		// XXX only when in some kind of debug mode
 		//clnt_pcreateerror("_Tt_rpc_client::init(): clnttcp_create()");
+		if (optval) {
+			_socket = RPC_ANYSOCK;
+		}
 		return 0;
 	}
 	if (_auth.auth_level() == _TT_AUTH_UNIX) {
@@ -236,10 +264,9 @@ clnt_stat _Tt_rpc_client::
 call(int procnum, xdrproc_t inproc, char *in,
      xdrproc_t outproc, char *out, int timeout)
 {
-	fd_set		bogus;
-	timeval		tmout;
 	timeval		total_timeout;
-	struct sigaction curr_action;
+	struct sigaction ign_action;
+	struct sigaction prev_action;
 	int		need2reset_sigpipe = 0;
 	_Tt_auth_iceauth_args  args;
 
@@ -285,13 +312,15 @@ call(int procnum, xdrproc_t inproc, char *in,
 	}
 	
 	if (timeout == 0) {
-		FD_ZERO(&bogus);
-		FD_SET(_socket, &bogus);
-		tmout.tv_sec = 0;
-		tmout.tv_usec = 0;
-		select(FD_SETSIZE, &bogus, 0, 0, &tmout);
+		// A one-way call: don't send if the connection already
+		// shows input (EOF or an error: the server went away).
+		// (This used an fd_set, which _socket can be beyond.)
+		pollfd	p;
 
-		if (FD_ISSET(_socket, &bogus)) {
+		p.fd = _socket;
+		p.events = POLLIN;
+		p.revents = 0;
+		if (poll(&p, 1, 0) > 0 && p.revents != 0) {
 			return(RPC_CANTSEND);
 		}
 	}
@@ -299,19 +328,24 @@ call(int procnum, xdrproc_t inproc, char *in,
 	//
 	// tcp write errors (when the rpc_server on the other end dies)
 	// cause a SIGPIPE.  We need to make sure the SIGPIPE is caught,
-	// or the process dies.
+	// or the process dies.  Ignore it for the call if its action
+	// is the default.  One sigaction() both installs SIG_IGN and
+	// fetches the previous action (this used to take a query plus
+	// two signal() calls per RPC); an application's own handler is
+	// put straight back and stays in charge during the call, as
+	// before.
 	//
-	if (sigaction(SIGPIPE, 0, &curr_action) != 0) {
+	memset(&ign_action, 0, sizeof(ign_action));
+	ign_action.sa_handler = SIG_IGN;
+	sigemptyset(&ign_action.sa_mask);
+	if (sigaction(SIGPIPE, &ign_action, &prev_action) != 0) {
 		_tt_syslog( 0, LOG_ERR, "sigaction(): %m" );
-	}
-#if defined(OPT_BUG_SUNOS_5)
-	if ((SIG_TYP)curr_action.sa_handler == SIG_DFL)
-#else
-	if (curr_action.sa_handler == SIG_DFL)
-#endif
-	{
+	} else if (prev_action.sa_flags & SA_SIGINFO) {
+		sigaction(SIGPIPE, &prev_action, 0);
+	} else if (prev_action.sa_handler == SIG_DFL) {
 		need2reset_sigpipe = 1;
-		signal(SIGPIPE, SIG_IGN);
+	} else if (prev_action.sa_handler != SIG_IGN) {
+		sigaction(SIGPIPE, &prev_action, 0);
 	}
 
 	if (_TT_AUTH_ICEAUTH == _auth.auth_level()) {
@@ -333,7 +367,7 @@ call(int procnum, xdrproc_t inproc, char *in,
 			           total_timeout);
 	}
 	if (need2reset_sigpipe) {
-		signal(SIGPIPE, SIG_DFL);
+		sigaction(SIGPIPE, &prev_action, 0);
 	}
 #if !defined(OPT_BUG_RPCINTR)
 	if (_clnt_stat == RPC_INTR) {
@@ -342,6 +376,21 @@ call(int procnum, xdrproc_t inproc, char *in,
 #endif	
 	if (_auth.auth_level() == _TT_AUTH_DES) {
 		auth_destroy(_client->cl_auth);
+	}
+
+	if (_clnt_stat == RPC_PROGUNAVAIL && _port != 0 && _own_socket) {
+		// We connected straight to the advertised port, and
+		// whoever listens there now is not our session (the
+		// session died and the port was reused).  Ask the
+		// portmapper instead, as clients always used to.
+		_Tt_host_ptr	host = _host;
+		_Tt_auth	auth = _auth;
+
+		_stale_port = 1;
+		if (! init(host, _program, _version, _server_uid, auth, 0)) {
+			return(RPC_CANTRECV);
+		}
+		return call(procnum, inproc, in, outproc, out, timeout);
 	}
 
 	return(_clnt_stat);

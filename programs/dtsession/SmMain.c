@@ -274,15 +274,10 @@ main (int argc, char **argv)
     if(smGD.compatMode == False)
     {
      /*
-      * Load session resources.
+      * Load session resources (dtsession_res, or the cached result of
+      * the last identical run - see SmResCache.c).
       */
-      RestoreResources(False,
-                       "-load",
-                       "-system",
-                       "-xdefaults",
-                       smGD.resourcePath[0] != '\0' ? "-file" : NULL,
-                       smGD.resourcePath,
-                       NULL);
+      RestoreSessionResources(smGD.resourcePath);
     }
 
     /*

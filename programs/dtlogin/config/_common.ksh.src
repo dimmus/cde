@@ -35,7 +35,11 @@
 #if defined(__OpenBSD__) || defined(__NetBSD__)
   pexec=$(LC_TIME=C ps -p $PPID | awk 'NR==2 {print $5}')
 #elif defined(__linux__)
-  pexec=$(LC_TIME=C /bin/ps -p $PPID 2>/dev/null | awk 'NR==2 {print $4}')
+  HASH The command name of the parent, as ps prints it, without ps or awk.
+  pexec=
+  [ -r /proc/$PPID/comm ] && read pexec </proc/$PPID/comm
+  [ -z "$pexec" ] && \
+    pexec=$(LC_TIME=C /bin/ps -p $PPID 2>/dev/null | awk 'NR==2 {print $4}')
 #elif defined(__FreeBSD__)
   pexec=$(LC_TIME=C /bin/ps -o comm= -p $PPID 2>/dev/null)
 #else
@@ -128,9 +132,46 @@ ADDFONTPATH() {
       fi
 
 
+#if defined(cpp_Xsetup) && (defined(__linux__) || defined(CSRG_BASED))
+      HASH
+      HASH Add the X server's font directories in the same xset call.  If
+      HASH the server rejects the combined path (all or nothing), add the
+      HASH two parts separately, as before.
+      HASH
+      sysfontpath=
+#if defined(__linux__)
+      FONTLIB=/usr/share/fonts/X11
+#elif defined(__FreeBSD__)
+      FONTLIB=/usr/local/lib/X11/fonts
+#elif defined(__OpenBSD__)
+      FONTLIB=/usr/X11R6/lib/X11/fonts
+#elif defined(__NetBSD__)
+      FONTLIB=/usr/X11R7/lib/X11/fonts
+#endif
+      for i in misc 75dpi 100dpi Speedo Type1 PJE
+      do
+	 if [ -f $FONTLIB/$i/fonts.dir ];  then
+	     if [ ! -z "$sysfontpath" ]; then
+		sysfontpath=$sysfontpath,$FONTLIB/$i/
+	     else
+		sysfontpath=$FONTLIB/$i/
+	     fi
+	 fi
+      done
+
+      if [ ! -z "$fontpath" ] && [ ! -z "$sysfontpath" ]; then
+        if ! $XDIR/xset fp+ $fontpath,$sysfontpath 2>/dev/null; then
+          $XDIR/xset fp+ $fontpath
+          $XDIR/xset fp+ $sysfontpath
+        fi
+      elif [ ! -z "$fontpath$sysfontpath" ]; then
+        $XDIR/xset fp+ $fontpath$sysfontpath
+      fi
+#else
       if [ ! -z "$fontpath" ]; then
         $XDIR/xset fp+ $fontpath
       fi
+#endif
 
     else
       HASH
@@ -279,56 +320,3 @@ SetKeyboardMap()
   fi
 #endif
 #endif
-
-#if defined(__linux__)
-#ifdef cpp_Xsetup
-    if [ "$DTXSERVERLOCATION" != "remote" ]; then
-      fontpath=
-      FONTLIB=/usr/share/fonts/X11
-      for i in misc 75dpi 100dpi Speedo Type1 PJE
-      do
-	 if [ -f $FONTLIB/$i/fonts.dir ];  then
-	     if [ ! -z "$fontpath" ]; then
-		fontpath=$fontpath,$FONTLIB/$i/
-	     else
-		fontpath=$FONTLIB/$i/
-	     fi
-	 fi
-      done
-
-      if [ ! -z "$fontpath" ]; then
-        $XDIR/xset fp+ $fontpath
-      fi
-    fi
-#endif
-#endif
-
-#if defined(CSRG_BASED)
-#ifdef cpp_Xsetup
-    if [ "$DTXSERVERLOCATION" != "remote" ]; then
-      fontpath=
-#if defined(__FreeBSD__)
-      FONTLIB=/usr/local/lib/X11/fonts
-#elif defined(__OpenBSD__)
-      FONTLIB=/usr/X11R6/lib/X11/fonts
-#elif defined(__NetBSD__)
-      FONTLIB=/usr/X11R7/lib/X11/fonts
-#endif
-      for i in misc 75dpi 100dpi Speedo Type1 PJE
-      do
-	 if [ -f $FONTLIB/$i/fonts.dir ];  then
-	     if [ ! -z "$fontpath" ]; then
-		fontpath=$fontpath,$FONTLIB/$i/
-	     else
-		fontpath=$FONTLIB/$i/
-	     fi
-	 fi
-      done
-
-      if [ ! -z "$fontpath" ]; then
-        $XDIR/xset fp+ $fontpath
-      fi
-    fi
-#endif
-#endif
-

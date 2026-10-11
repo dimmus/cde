@@ -132,8 +132,5 @@ private:
 
   _DtCvSegment* top_container();
 
-  UAS_String    f_def_key;
-  unsigned long f_def_val;
-  Dict<UAS_String, unsigned long> f_color_dict;
   void comp_pixel_values_traverse(_DtCvSegment*, Display*, Colormap&);
 };

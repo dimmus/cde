@@ -43,11 +43,16 @@
  ****************************************************************************
  ************************************<+>*************************************/
 #include <stdio.h>
+#include <stdlib.h>
+#include <X11/Xlibint.h>	/* XESetCloseDisplay; defines XTHREADS */
+#include <X11/IntrinsicP.h>	/* XtProcessLock, used when XTHREADS is set */
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <Xm/MwmUtil.h>
 #include <Xm/Xm.h>
 #include <Xm/AtomMgr.h>
+#include <Dt/WsmP.h>
+#include "DtSvcLock.h"
 
 
 
@@ -209,4 +214,280 @@ _DtGetMwmWindow(
 
     xa_MWM_INFO = XmInternAtom (display, _XA_MWM_INFO, False);
     return (_GetMwmWindow (display, root, pMwmWindow, xa_MWM_INFO));
+}
+
+
+/*************************************<->*************************************
+ *
+ *  Cached window manager window
+ *
+ *  _DtGetMwmWindow costs two round trips (the _MOTIF_WM_INFO property
+ *  on the root, then XQueryTree of the root to check that the window it
+ *  names still exists), and every DtWsm* query used to pay them before
+ *  its own XGetWindowProperty on that window.
+ *
+ *  _DtGetMwmWindowProperty remembers the validated window per display
+ *  and root, and reads the property straight from it, trapping
+ *  BadWindow.  If the window has gone (the window manager exited or was
+ *  restarted) or does not carry the property, the cache entry is dropped
+ *  and the read is redone the old way, so the results are those of
+ *  _DtGetMwmWindow plus XGetWindowProperty, in one round trip instead
+ *  of three when the cache is good.
+ *
+ *  Entries are removed when their display is closed.
+ *
+ *************************************<->***********************************/
+
+typedef struct _MwmWindowCache {
+    Display			*display;
+    Window			root;
+    Window			wmWindow;
+    struct _MwmWindowCache	*next;
+} MwmWindowCache;
+
+typedef struct _MwmDisplay {
+    Display			*display;
+    struct _MwmDisplay		*next;
+} MwmDisplay;
+
+static MwmWindowCache	*mwmCache = NULL;
+static MwmDisplay	*mwmDisplays = NULL;	/* close hook installed */
+
+static int
+MwmCacheCloseDisplay(Display *display, XExtCodes *codes)
+{
+    MwmWindowCache **pp, *p;
+    MwmDisplay **dpp, *dp;
+
+    _DtSvcProcessLock();
+    for (pp = &mwmCache; (p = *pp) != NULL; )
+    {
+	if (p->display == display)
+	{
+	    *pp = p->next;
+	    free(p);
+	}
+	else
+	    pp = &p->next;
+    }
+    for (dpp = &mwmDisplays; (dp = *dpp) != NULL; dpp = &dp->next)
+    {
+	if (dp->display == display)
+	{
+	    *dpp = dp->next;
+	    free(dp);
+	    break;
+	}
+    }
+    _DtSvcProcessUnlock();
+    return 0;
+}
+
+static Window
+MwmCacheLookup(Display *display, Window root)
+{
+    MwmWindowCache *p;
+    Window w = None;
+
+    _DtSvcProcessLock();
+    for (p = mwmCache; p; p = p->next)
+    {
+	if (p->display == display && p->root == root)
+	{
+	    w = p->wmWindow;
+	    break;
+	}
+    }
+    _DtSvcProcessUnlock();
+    return w;
+}
+
+static void
+MwmCacheStore(Display *display, Window root, Window wmWindow)
+{
+    MwmWindowCache *p;
+    MwmDisplay *dp;
+
+    _DtSvcProcessLock();
+    for (dp = mwmDisplays; dp; dp = dp->next)
+	if (dp->display == display)
+	    break;
+    if (dp == NULL)
+    {
+	XExtCodes *codes;
+
+	/* Without the close hook a reused Display address could see a
+	 * stale entry, so cache nothing if it cannot be installed. */
+	if ((dp = malloc(sizeof(*dp))) == NULL ||
+	    (codes = XAddExtension(display)) == NULL)
+	{
+	    free(dp);
+	    _DtSvcProcessUnlock();
+	    return;
+	}
+	XESetCloseDisplay(display, codes->extension, MwmCacheCloseDisplay);
+	dp->display = display;
+	dp->next = mwmDisplays;
+	mwmDisplays = dp;
+    }
+
+    for (p = mwmCache; p; p = p->next)
+	if (p->display == display && p->root == root)
+	    break;
+    if (p == NULL)
+    {
+	if ((p = malloc(sizeof(*p))) == NULL)
+	{
+	    _DtSvcProcessUnlock();
+	    return;
+	}
+	p->display = display;
+	p->root = root;
+	p->next = mwmCache;
+	mwmCache = p;
+    }
+    p->wmWindow = wmWindow;
+    _DtSvcProcessUnlock();
+}
+
+static void
+MwmCacheForget(Display *display, Window root)
+{
+    MwmWindowCache **pp, *p;
+
+    _DtSvcProcessLock();
+    for (pp = &mwmCache; (p = *pp) != NULL; pp = &p->next)
+    {
+	if (p->display == display && p->root == root)
+	{
+	    *pp = p->next;
+	    free(p);
+	    break;
+	}
+    }
+    _DtSvcProcessUnlock();
+}
+
+/*
+ * BadWindow trap for one request.  Any other error, and errors from
+ * other requests that are processed while we wait for our reply, go to
+ * the handler that was installed before.
+ */
+static Display		*trapDisplay;
+static unsigned long	trapSerial;
+static Bool		trapHit;
+static XErrorHandler	trapPrevHandler;
+
+static int
+MwmTrapHandler(Display *display, XErrorEvent *event)
+{
+    if (display == trapDisplay && event->serial == trapSerial &&
+	event->error_code == BadWindow)
+    {
+	trapHit = True;
+	return 0;
+    }
+    return trapPrevHandler ? (*trapPrevHandler)(display, event) : 0;
+}
+
+/*
+ * XGetWindowProperty that turns a BadWindow error into a BadWindow
+ * return instead of calling the application's error handler.
+ */
+static int
+GetPropertyTrapped(
+        Display *display,
+        Window window,
+        Atom property,
+        long length,
+        Atom reqType,
+        Atom *pActualType,
+        int *pActualFormat,
+        unsigned long *pItems,
+        unsigned long *pLeftover,
+        unsigned char **pData)
+{
+    int rcode;
+
+    _DtSvcProcessLock();
+    trapDisplay = display;
+    trapHit = False;
+    trapPrevHandler = XSetErrorHandler(MwmTrapHandler);
+    trapSerial = NextRequest(display);
+    *pData = NULL;
+    rcode = XGetWindowProperty(display, window, property, 0L, length,
+			       False, reqType, pActualType, pActualFormat,
+			       pItems, pLeftover, pData);
+    XSetErrorHandler(trapPrevHandler);
+    trapDisplay = NULL;
+    if (trapHit)
+    {
+	rcode = BadWindow;
+	*pActualType = None;
+	*pData = NULL;
+    }
+    _DtSvcProcessUnlock();
+    return rcode;
+}
+
+/*************************************<->*************************************
+ *
+ *  int _DtGetMwmWindowProperty (display, root, property, length, reqType,
+ *		pActualType, pActualFormat, pItems, pLeftover, pData)
+ *
+ *  Description:
+ *  -----------
+ *  Same as _DtGetMwmWindow followed, on success, by XGetWindowProperty
+ *  (offset 0, no delete) on the window manager window.
+ *
+ *  Return: the status of _DtGetMwmWindow if that failed, else the status
+ *  of XGetWindowProperty (BadWindow if the window went away meanwhile).
+ *  *pActualType is None and *pData NULL when nothing was read.
+ *
+ *************************************<->***********************************/
+int
+_DtGetMwmWindowProperty(
+        Display *display,
+        Window root,
+        Atom property,
+        long length,
+        Atom reqType,
+        Atom *pActualType,
+        int *pActualFormat,
+        unsigned long *pItems,
+        unsigned long *pLeftover,
+        unsigned char **pData)
+{
+    Window wmWindow;
+    int rcode;
+
+    *pActualType = None;
+    *pData = NULL;
+
+    wmWindow = MwmCacheLookup(display, root);
+    if (wmWindow != None)
+    {
+	rcode = GetPropertyTrapped(display, wmWindow, property, length,
+				   reqType, pActualType, pActualFormat,
+				   pItems, pLeftover, pData);
+	if (rcode == Success && *pActualType != None)
+	    return Success;
+
+	/* Gone, or no such property: forget it and do it the long way. */
+	if (*pData)
+	    XFree(*pData);
+	*pActualType = None;
+	*pData = NULL;
+	MwmCacheForget(display, root);
+    }
+
+    if ((rcode = _DtGetMwmWindow(display, root, &wmWindow)) != Success)
+	return rcode;
+
+    rcode = GetPropertyTrapped(display, wmWindow, property, length,
+			       reqType, pActualType, pActualFormat,
+			       pItems, pLeftover, pData);
+    if (rcode == Success)
+	MwmCacheStore(display, root, wmWindow);
+    return rcode;
 }

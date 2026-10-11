@@ -183,6 +183,40 @@ extern ilBool ilQueryXWC (
 #endif
     );
 
+    /*  Copy (src_x,src_y,src_width,src_height) of "src_image" to
+        (dest_x,dest_y,dest_width,dest_height) of drawable "d", scaling with
+        nearest-neighbour sampling when the sizes differ.  Replaces Motif's
+        private _XmPutScaledImage(), whose signature is not stable across
+        Motif versions.
+    */
+    /*  If the pixel for a read-only colour can be computed without a server
+        round trip (a TrueColor visual), store in *pColor exactly what
+        XAllocColor() would return (pixel and actual RGB) and return true.
+        Otherwise return false; the caller must use XAllocColor().
+        A computed pixel is not allocated: never pass it to XFreeColors().
+    */
+extern ilBool _ilXComputeColor (
+    Display                *display,
+    Colormap                colormap,
+    Visual                 *visual,
+    XColor                 *pColor
+    );
+
+extern void _ilXPutScaledImage (
+    Display                *display,
+    Drawable                d,
+    GC                      gc,
+    XImage                 *src_image,
+    int                     src_x,
+    int                     src_y,
+    int                     dest_x,
+    int                     dest_y,
+    unsigned int            src_width,
+    unsigned int            src_height,
+    unsigned int            dest_width,
+    unsigned int            dest_height
+    );
+
 
 #ifdef __cplusplus
 }                                /* for C++ V2.0 */

@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 SUBDIRS = il
 
 cfgdir = $(CDE_INSTALLATION_TOP)/config/svc
@@ -8,12 +10,13 @@ dist_cfg_DATA = CDE.lcx
 
 lib_LTLIBRARIES = libDtHelp.la
 
-libDtHelp_la_CFLAGS = -I./il -I./jpeg -I../DtSvc/DtUtil2 -DDTLIB \
+libDtHelp_la_CFLAGS = $(CDE_CFLAGS) -I./il -I./jpeg -I../DtSvc/DtUtil2 -DDTLIB \
 		      -DCDE_INSTALLATION_TOP='"$(CDE_INSTALLATION_TOP)"' \
 		      -DCDE_CONFIGURATION_TOP='"$(CDE_CONFIGURATION_TOP)"' \
 		      @DT_INCDIR@ @DTI_INCDIR@
 
-libDtHelp_la_LIBADD = $(JPEGLIB) il/libil.la $(LTLIBICONV)
+libDtHelp_la_LIBADD = il/libil.la $(LIBSVC) $(XMLIB) $(XTLIB) $(XPMLIB) \
+		      $(X11LIB) $(JPEGLIB) $(LTLIBICONV) $(MATHLIB)
 
 if SOLARIS
 libDtHelp_la_LIBADD += -lw -lgen
@@ -38,11 +41,19 @@ libDtHelp_la_SOURCES = Actions.c       AsciiSpc.c      Callbacks.c \
 		       bufio.c         decompress.c    HelpXlate.c  \
 		       Canvas.c        CanvasOs.c      CvString.c \
 		       Layout.c        LayoutUtil.c    LinkMgr.c \
-		       Selection.c     VirtFuncs.c
+		       Selection.c     VirtFuncs.c     GraphicCache.c
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtHelp_la_LDFLAGS = -version-info 2:1:0
+libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libDtHelp_la_LDFLAGS = -version-info 3:0:1
+libDtHelp_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+# export only the symbols in build-aux/symbols/libDtHelp.sym
+if EXPORT_MAPS
+libDtHelp_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtHelp-exports.ver
+EXTRA_libDtHelp_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtHelp-exports.ver
+endif
+$(VSCRIPT_DIR)/libDtHelp-exports.ver: $(EXPORTS_DIR)/libDtHelp.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)

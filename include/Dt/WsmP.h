@@ -371,6 +371,26 @@ _DtGetMwmWindow(
                         Window root,
                         Window *pMwmWindow) ;
 
+/*
+ * _DtGetMwmWindow followed by XGetWindowProperty (offset 0, no delete)
+ * on the window manager window, with the window cached per display and
+ * root: one round trip instead of three while the window manager runs.
+ * Returns the failing _DtGetMwmWindow status, or the XGetWindowProperty
+ * status (BadWindow if the window went away).
+ */
+extern int
+_DtGetMwmWindowProperty(
+                        Display *display,
+                        Window root,
+                        Atom property,
+                        long length,
+                        Atom reqType,
+                        Atom *pActualType,
+                        int *pActualFormat,
+                        unsigned long *pItems,
+                        unsigned long *pLeftover,
+                        unsigned char **pData) ;
+
 
 /*************************************<->*************************************
  *

@@ -28,7 +28,8 @@
 
   -1 is an illegal key
 
-  Tables are limited to 64K entries
+  Entries are linked by 32-bit indices (they were 16-bit, which limited
+  a table to 64K entries; see DTDTSMM_VERSION in DtsMM.h).
 
   */
 
@@ -49,8 +50,8 @@ static int build_it(int * data, void * usr_arg, int key);
 typedef struct inttab {
   int key;
   int data;
-  unsigned short first;
-  unsigned short next;
+  unsigned int first;
+  unsigned int next;
 } inttab_t;
 
 typedef struct intlist {
@@ -156,7 +157,7 @@ static int build_it(int * data, void * usr_arg, int key)
   builder_t * ptr = (builder_t *) usr_arg;
   inttab_t * a;
   inttab_t * b;
-  unsigned short * add_ptr;
+  unsigned int * add_ptr;
 
   int bucket = key % (ptr->intlist_ptr->num_entries) + 1;
  

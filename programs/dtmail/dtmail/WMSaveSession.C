@@ -708,7 +708,10 @@ SendMsgDialog::smpSaveSessionLocal(void)
 	return;
     
     // Create a dead letter if this one is currently in use
-    if ((save_filename = tempnam(_auto_save_path, "session")) == NULL) 
+    int save_fd = SafeMkstemp(_auto_save_path, "session", &save_filename);
+    if (save_fd >= 0)
+	SafeClose(save_fd);	// doAutoSave() rewrites it
+    else
     {
         for (int suffix = 1; ; suffix++) {
             save_filename = (char*) malloc((size_t) MAXPATHLEN + 1);

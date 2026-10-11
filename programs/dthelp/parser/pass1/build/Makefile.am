@@ -2,8 +2,6 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_PROGRAMS = build
 
-.NOTPARALLEL:
-
 HELPTAG       = ..
 HELPTAGSRC    = $(HELPTAG)/helptag
 HELPPARSERSRC = $(HELPTAG)/parser
@@ -11,11 +9,12 @@ HELPELTDEFSRC = $(HELPTAG)/eltdef
 HELPDTDFILE   = $(HELPTAGSRC)/hptag.dtd
 HELPUTILSRC   = $(HELPTAG)/util
 HELPBUILDSRC  = $(HELPTAG)/build
-HELPUTILLIB   = $(HELPTAG)/util/libutil.a
+HELPUTILLIB   = $(HELPTAG)/../util/libhelputil.a
+HELPCONTEXT   = $(HELPTAG)/../util/context
 
-build_CFLAGS = -I$(HELPUTILSRC)
+build_CFLAGS = $(CDE_CFLAGS) -I$(HELPUTILSRC)
 
-build_LDADD = ../util/libutil.a
+build_LDADD = $(HELPUTILLIB)
 
 build_SOURCES = build.c buildutl.c eltree.c except.c fsa.c out.c param.c \
 		scan.c sref.c tree.c
@@ -43,15 +42,18 @@ $(BPRODS): BDONE
 
 $(CPRODS): CDONE
 
+# build includes the CPRODS (case.c, context.h, delim.h): make them first.
+$(build_OBJECTS): CDONE
+
 # build the BRPODS
 BDONE: ./build $(HELPDTDFILE)
 	$(RM) $(BPRODS) $(BTRASH) && ./build < $(HELPDTDFILE) && touch BDONE
 
 
 # build the CRPODS
-CDONE: $(HELPUTILSRC)/context $(HELPTAGSRC)/delim.bld context.dat
+CDONE: $(HELPCONTEXT) $(HELPTAGSRC)/delim.bld context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HELPTAGSRC)/delim.bld delim.dat # appl.-specific delim.dat
-	$(HELPUTILSRC)/context sparse
+	$(HELPCONTEXT) sparse
 	touch CDONE
 

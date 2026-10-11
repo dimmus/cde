@@ -269,15 +269,14 @@ DtSR_SearchEngine::~DtSR_SearchEngine()
 DtSR_SearchEngine::DtSR_SearchEngine()
     : f_dbnames(NULL), f_dbcount(0), f_valid_bc_map(0)
 {
-    string ocf_tmpl = "/tmp/.DtSR_XXXXXX";
-    int len = ocf_tmpl.size();
-    char* ocf_path = new char [len + 1];
-    *((char *) memcpy(ocf_path, ocf_tmpl.c_str(), len) + len) = '\0';
-    ocf_path = mktemp(ocf_path);
+    // mkstemp() creates the file, so nobody can create or link the
+    // name first (mktemp() only returned a name)
+    char ocf_path[] = "/tmp/.DtSR_XXXXXX";
+    int fd = mkstemp(ocf_path);
+    if (fd == -1)
+	throw(CASTEXCEPT Exception());
+    close(fd);
     f_config_path = ocf_path;
-
-    if (ocf_path)
-	free(ocf_path);
 
     ofstream dtiocf((char*)f_config_path, ios::out);  // TODO
     if (! dtiocf) // could not open ocf_path in specified mode

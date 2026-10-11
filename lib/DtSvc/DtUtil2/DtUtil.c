@@ -169,6 +169,8 @@ DtBigInitialize(
 
    /* Preserve the pre-Dt environ and add Dt-specifics to environ */
    (void) _DtEnvControl (DT_ENV_SET); 
+   /* Look SESSION_MANAGER up on this display, not on a new connection. */
+   _DtEnvSessionManagerDisplay (display);
 
    /* Initialize a bunch of miscellaneous things. */
    DtNlInitialize();

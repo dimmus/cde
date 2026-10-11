@@ -37,12 +37,13 @@ XCOMM before the display is closed...
 XCOMM
 
 XCOMM
-XCOMM  Update action types for any printers created during the session  
-XCOMM
+XCOMM  Update action types for any printers created during the session.
+XCOMM  In the background: it runs lpstat and awk for every queue, and the
+XCOMM  next login screen does not need to wait for it.
 
 if [ -x CDE_INSTALLATION_TOP/bin/dtprintinfo ]
 then
-   CDE_INSTALLATION_TOP/bin/dtprintinfo -populate
+   CDE_INSTALLATION_TOP/bin/dtprintinfo -populate </dev/null &
 fi
 
 XCOMM
@@ -59,21 +60,9 @@ then
 fi
 
 XCOMM
-XCOMM If Xsession did not exit gracefully for this user, the dtdbcache
-XCOMM file will still be left around.  Remove it if this user owns it.
+XCOMM The dtdbcache file (/tmp/dtdbcache_$DISPLAY) is kept for this user's
+XCOMM next session; Xstartup removes it if someone else logs in.
 XCOMM
-
-XCOMM dtdbcache file's directory should match
-XCOMM _DTDTSMMTEMPDIR in DtSvc/DtUtil1/DtsMM.h
-DTDBFILE=/tmp/dtdbcache_$DISPLAY
-if [ -f $DTDBFILE ]
-then
-  DTDBFILEOWNER=`/bin/ls -l $DTDBFILE | /bin/awk '{print $3}'`
-  if [ $USER = $DTDBFILEOWNER ]
-  then
-    /bin/rm -f $DTDBFILE
-  fi
-fi
 
 #ifdef WTMP_FLAG
 wtmp_flag=WTMP_FLAG

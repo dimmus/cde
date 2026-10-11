@@ -83,6 +83,7 @@ extern void SetSystemReady();
 extern void SmExit ( int exitStatus);
 extern void UndoSetSavePath ( );
 extern void SetSIGPIPEToDefault ( );
+extern void SmMarkCloseOnExec ( int start_fd );
 extern void FixPath ( char * the1stPath );
 
 #endif /*_smglobals_h*/

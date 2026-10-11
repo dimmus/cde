@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libCommon.a
 
-libCommon_a_CXXFLAGS = -I../../include -I../../include/utils -I$(srcdir)/lib \
+libCommon_a_CXXFLAGS = $(CDE_CXXFLAGS) -I../../include -I../../include/utils -I$(srcdir)/lib \
 		       -DDL_NOT_DYNAMIC -DUSE_SOCKSTREAM
 
 if SOLARIS

@@ -198,11 +198,17 @@ _DtCm_process_updates(void)
 #if defined(CSRG_BASED) || defined(__linux__)
         int     i, nfd;
         fd_set  rpc_bits;
+        struct timeval  tv;
 
         while (B_TRUE) {
           rpc_bits = svc_fdset;
 
-          nfd = select(FD_SETSIZE, &rpc_bits, NULL, NULL, NULL);
+          /* poll and return right away, as the poll() version below
+           * does; a NULL timeout blocked csa_call_callbacks() forever
+           */
+          tv.tv_sec = 0;
+          tv.tv_usec = 0;
+          nfd = select(FD_SETSIZE, &rpc_bits, NULL, NULL, &tv);
 
           if (nfd <= 0)
             /* done */

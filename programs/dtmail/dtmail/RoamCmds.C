@@ -142,6 +142,7 @@ extern XtPointer _XmStringUngenerate (
 
 
 #include <sys/file.h>
+#include "XmCompat.h"
 
 
 extern void forceUpdate( Widget );
@@ -1835,24 +1836,26 @@ PrintCmd::printit( int silent )
     
     // Create tmp file.
     snprintf(tmpdir, MAXPATHLEN+1, "%s/%s", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY);
-    if ((p = tempnam(tmpdir, "dtmail")) == NULL) {
-	delete [] tmpdir;
-	return;
-    }
+    // The file is created empty; copySelected() opens it as a mailbox.
+    int fd = SafeMkstemp(tmpdir, "dtmail", &p);
     delete [] tmpdir;
+    if (fd < 0)
+	return;
+    SafeClose(fd);
     
     mail_error.clear();
     list = _parent->list();
     
     // Copy selected messages to a temp file
     int status = list->copySelected(mail_error, p, FALSE, TRUE);
-    if (mail_error.isSet())
+    if (mail_error.isSet() || 0 != status)
     {
-	_parent->postErrorDialog(mail_error);
+	if (mail_error.isSet())
+	    _parent->postErrorDialog(mail_error);
+	unlink(p);
 	free(p);
 	return;
     }
-    if (0 != status) return;
     
 
     DmxPrintJob *pjob = new DmxPrintJob(p,
@@ -2454,7 +2457,9 @@ SaveAsTextCmd::writeTextFromScrolledList(int fd)
     //
     char *tmpdir = new char[MAXPATHLEN+1];
     snprintf(tmpdir, MAXPATHLEN+1, "%s/%s", getenv("HOME"), DtPERSONAL_TMP_DIRECTORY);
-    if ((tmppath = tempnam(tmpdir, "dtmail")) == NULL) {
+    // The file is created empty; copySelected() opens it as a mailbox.
+    int tmpfd = SafeMkstemp(tmpdir, "dtmail", &tmppath);
+    if (tmpfd < 0) {
 	snprintf(buf, sizeof(buf), CATGETS(DT_catd, 3, 51, "Unable to create %s."), tmpdir);
 	_genDialog->setToErrorDialog(CATGETS(DT_catd, 3, 52, "Mailer"), buf);
         helpId = DTMAILHELPNOCREATE;        
@@ -2462,6 +2467,7 @@ SaveAsTextCmd::writeTextFromScrolledList(int fd)
 	delete [] tmpdir;
 	return;
     }
+    SafeClose(tmpfd);
     delete [] tmpdir;
 
     mail_error.clear();
@@ -2471,12 +2477,13 @@ SaveAsTextCmd::writeTextFromScrolledList(int fd)
     // Copy the selected messages to a temp file.
     //
     int status = list->copySelected(mail_error, tmppath, FALSE, TRUE);
-    if (mail_error.isSet()) {
-        _roam_menu_window->postErrorDialog(mail_error);
+    if (mail_error.isSet() || 0 != status) {
+        if (mail_error.isSet())
+            _roam_menu_window->postErrorDialog(mail_error);
+        unlink(tmppath);
         free(tmppath);
         return;
     }
-    if (0 != status) return;
 
     mailbox = new DmxMailbox(tmppath);
     mailbox->loadMessages();
@@ -2540,7 +2547,7 @@ SaveAsTextCmd::doit()
 	(list = _roam_menu_window->list()) &&
 	(listW = list->get_scrolling_list()))
     {
-        if (!XmListGetSelectedPos(listW, &pos_list, &pos_count))
+        if (!XmCompatListGetSelectedPos(listW, &pos_list, &pos_count))
           return;
 
         if (0 == pos_count)
@@ -2695,7 +2702,7 @@ RenameAttachCmd::RenameAttachCmd (
 		  NULL);
 
     XmStringFree(ok_str);
-    XtUnmanageChild(XmSelectionBoxGetChild(renameDialog, XmDIALOG_HELP_BUTTON));
+    XtUnmanageChild(XmCompatHelpButton(renameDialog));
 
     _parent->get_editor()->attachArea()->setRenameDialog(renameDialog);
     XtAddCallback(renameDialog, XmNcancelCallback, 
@@ -3313,6 +3320,8 @@ VacationCmd::VacationCmd(
     _subject = NULL;
     _body = NULL;
     _msg = NULL;
+    _msgBuffer = NULL;
+    _msgMapSize = 0;
     _dialog = NULL;
 
     // Check if a .forward file exists.  
@@ -3334,6 +3343,14 @@ VacationCmd::~VacationCmd()
     
     if (NULL != _msg)
       delete _msg;
+
+    // The message was parsed in place, so its buffer goes after it.
+    if (NULL != _msgBuffer) {
+	if (_msgMapSize)
+	  munmap((char *) _msgBuffer, _msgMapSize);
+	else
+	  delete [] (char *) _msgBuffer;
+    }
 }
 
 void
@@ -3649,7 +3666,7 @@ VacationCmd::handleForwardFile()
 	if (lastchar != '\n') {
 	    lseek(fwd_fd, 0, SEEK_END);
 	    char *txt = "\n";
-	    if ((size_t) SafeWrite(fwd_fd, txt, strlen(txt)) < strlen(txt)) {
+	    if (SafeWrite(fwd_fd, txt, strlen(txt)) < (ssize_t) strlen(txt)) {
 		// error
 	        delete [] buf;
     	        delete [] messagefile;
@@ -3666,8 +3683,8 @@ VacationCmd::handleForwardFile()
 	char *append_buf1 = new char[1024*2];
 	sprintf(append_buf1, "|\" /usr/bin/vacation %s\"\n", pw.pw_name);
 
-	if ((size_t) SafeWrite(fwd_fd, append_buf1, strlen(append_buf1)) < 
-	    strlen(append_buf1)) {
+	if (SafeWrite(fwd_fd, append_buf1, strlen(append_buf1)) < 
+	    (ssize_t) strlen(append_buf1)) {
 	    // error
 	    delete [] buf;
     	    delete [] messagefile;
@@ -3705,8 +3722,8 @@ VacationCmd::handleForwardFile()
 
 	char *end_text = "User not using forward file\n";
 
-	if ((size_t) SafeWrite(bkup_fd, end_text, strlen(end_text)) < 
-	    strlen(end_text)) {
+	if (SafeWrite(bkup_fd, end_text, strlen(end_text)) < 
+	    (ssize_t) strlen(end_text)) {
 	    // error
 	    delete [] buf;
     	    delete [] messagefile;
@@ -3731,8 +3748,8 @@ VacationCmd::handleForwardFile()
 
 	sprintf(append_buf2, "\\%s, |\" /usr/bin/vacation %s\"\n", 
 	        pw.pw_name, pw.pw_name);
-	if ((size_t) SafeWrite(fwd_fd, append_buf2, strlen(append_buf2)) <
-	    strlen(append_buf2)) {
+	if (SafeWrite(fwd_fd, append_buf2, strlen(append_buf2)) <
+	    (ssize_t) strlen(append_buf2)) {
 	    // error
 	    SafeClose(bkup_fd);
 	    SafeClose(fwd_fd);
@@ -3818,8 +3835,9 @@ VacationCmd::recoverForwardFile(
 	    return(-1);
 	}
 	
-	buf[sizeof file -1] = '\0';
-	while (SafeRead(fd, buf, BUFSIZ) != 0) {
+	ssize_t nread;
+	while ((nread = SafeRead(fd, buf, BUFSIZ)) > 0) {
+		buf[nread] = '\0';
 		if (strstr(buf, "User not using forward file")) {
 			unlink(file);
 			break;
@@ -3923,7 +3941,8 @@ VacationCmd::parseVacationMessage()
 
     mbuf.size = buf.st_size;
     mbuf.buffer = mmap(0, map_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mbuf.buffer == (char *)-1) {
+    int mapped = (mbuf.buffer != (char *)-1);
+    if (!mapped) {
 	mbuf.buffer = new char[mbuf.size];
 	if (mbuf.buffer == NULL) {
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 3, 59, "No Memory"),
@@ -3938,13 +3957,13 @@ VacationCmd::parseVacationMessage()
 	    return;
 	}
 
-	if ((unsigned long) SafeRead(fd, mbuf.buffer, (unsigned int)mbuf.size) < mbuf.size) {
+	if (SafeRead(fd, mbuf.buffer, (size_t) mbuf.size) < (ssize_t) mbuf.size) {
 	    dialog->setToErrorDialog(CATGETS(DT_catd, 3, 61, "Mailer"),
 				     CATGETS(DT_catd, 3, 62, "The existing .vacation.msg file appears to be corrupt."));
 	    helpId = DTMAILHELPCORRUPTVACATION;
 	    dialog->post_and_return(helpId);
 	    SafeClose(fd);
-	    delete (char*) mbuf.buffer;
+	    delete [] (char*) mbuf.buffer;
 	    _subject = NULL;
 	    _body = NULL;
 
@@ -3964,6 +3983,10 @@ VacationCmd::parseVacationMessage()
     SafeClose(fd);
 
     if (error.isSet()) {
+	if (mapped)
+	  munmap((char *) mbuf.buffer, map_size);
+	else
+	  delete [] (char *) mbuf.buffer;
 	_subject = NULL;
 	_body = NULL;
 	_msg = NULL;
@@ -3976,11 +3999,19 @@ VacationCmd::parseVacationMessage()
 	char * name;
 	DtMailValueSeq value;
 
+	// The message is parsed in place: keep its buffer until it is
+	// deleted.
+	_msgBuffer = mbuf.buffer;
+	_msgMapSize = mapped ? map_size : 0;
+
 	for (hnd = env->getFirstHeader(error, &name, value);
 	    error.isNotSet() && hnd;
 	    hnd = env->getNextHeader(error, hnd, &name, value)) {
 
 	    if (strcmp(name, "Subject")) {
+		// getNextHeader() appends to value; drop this header's.
+		free(name);
+		value.clear();
 		continue;
 	    }
 	    else {

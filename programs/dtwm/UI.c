@@ -72,6 +72,9 @@
 #include "DataBaseLoad.h"
 #include "PopupMenu.h"
 #include "UI.h"
+#include "WmGlobal.h"
+#include "WmWrkspace.h"
+#include "WmIconBox.h"	/* WmXmStringToString */
 
 
 
@@ -2020,17 +2023,39 @@ SwitchCreate (BoxData * box_data)
       switch_data->switch_names = 
          (char **) XtMalloc (sizeof(char *) * switch_count);
 
+      /*  The front panel is part of the window manager: take the     */
+      /*  titles from its workspace data rather than reading each     */
+      /*  workspace's info property back from the server (about three */
+      /*  round trips per workspace).                                  */
+
+      int screen = XScreenNumberOfScreen (XtScreen (box_data->switch_form));
+      WmScreenData * pSD = NULL;
+
+      if (screen >= 0 && screen < wmGD.numScreens &&
+          wmGD.Screens[screen].managed)
+         pSD = &wmGD.Screens[screen];
+
       for (i = 0; i < switch_count; i++)
       {
-         DtWsmWorkspaceInfo * workspace_info;
-	 
-         DtWsmGetWorkspaceInfo (XtDisplay (box_data->switch_form),
-                                RootWindowOfScreen (XtScreen (box_data->switch_form)),
-                                atom_names[i], &workspace_info);
-									 
-         switch_data->switch_names[i] = XtNewString (workspace_info->pchTitle);
+         WmWorkspaceData * pWS = pSD ? GetWorkspaceData (pSD, atom_names[i]) : NULL;
+         String title = pWS ? WmXmStringToString (pWS->title) : NULL;
 
-         DtWsmFreeWorkspaceInfo (workspace_info);
+         if (title != NULL)
+         {
+            switch_data->switch_names[i] = title;
+         }
+         else
+         {
+            DtWsmWorkspaceInfo * workspace_info;
+
+            DtWsmGetWorkspaceInfo (XtDisplay (box_data->switch_form),
+                                   RootWindowOfScreen (XtScreen (box_data->switch_form)),
+                                   atom_names[i], &workspace_info);
+
+            switch_data->switch_names[i] = XtNewString (workspace_info->pchTitle);
+
+            DtWsmFreeWorkspaceInfo (workspace_info);
+         }
 
          if (atom_names[i] == current_workspace_atom)
 	    current_workspace = i;

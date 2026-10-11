@@ -68,6 +68,12 @@ extern Widget handle_to_widget(
                         char *handle) ;
 extern wtab_t * widget_to_wtab( 
                         Widget w) ;
+extern void wtab_map_add( 
+                        wtab_t *w,
+                        int index) ;
+extern void wtab_map_remove( 
+                        Widget w,
+                        int index) ;
 extern void get_new_wtab( 
                         wtab_t **w,
                         char *name) ;

@@ -40,5 +40,9 @@ extern void _DtTermPrimScrollText(Widget w, short lines);
 extern void _DtTermPrimScrollTextTo(Widget w, short topRow);
 extern void _DtTermPrimScrollTextArea(Widget w, short scrollStart,
 	short scrollLength, short scrollDistance);
+extern Boolean _DtTermPrimFrameDue(Widget w);
+extern unsigned long _DtTermPrimFrameRemainingMs(Widget w);
+extern void _DtTermPrimNoteFramePainted(Widget w);
+extern void _DtTermPrimPaintFrame(Widget w);
 #endif	/* _Dt_TermPrimScroll_h */
 /* DON'T ADD ANYTHING AFTER THIS #endif... */

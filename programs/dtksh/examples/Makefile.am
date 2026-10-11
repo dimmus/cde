@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 noinst_SCRIPTS = CallbackTest2 CallDataTest4 crMovesText1 DtCursorTest2 \
 		 DtWsTest1 EventHandlerTest ListBounds1 ListItemPos1 PopupTest \
 		 SelBoxResTest SessionTest TextCutBuf1 TextDisp1 TextFXYPos1 \

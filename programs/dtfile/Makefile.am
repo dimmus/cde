@@ -1,3 +1,9 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 configdir = $(CDE_INSTALLATION_TOP)/config/C
 
 SUBDIRS = dtcopy
@@ -11,14 +17,15 @@ dist_config_DATA = dtfile.config
 
 dist_bin_SCRIPTS = dtfile_error dterror.ds
 
-dtfile_CPPFLAGS = -I./dtcopy -DSHAPE -D_ILS_MACROS -DSUN_PERF \
+dtfile_CPPFLAGS = $(CDE_CPPFLAGS) -I./dtcopy -DSHAPE -D_ILS_MACROS -DSUN_PERF \
 		-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
 		-DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
 		-DKORNSHELL=\"$(KSH)\"
 
 dtfile_LDADD = dtcopy/sharedFuncs.o \
 	dtcopy/fsrtns.o \
-	$(DTCLIENTLIBS) $(TIRPCLIB) $(XTOOLLIB) 
+	$(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(LIBXIN) $(TIRPCLIB) \
+	$(XMLIB) $(XTLIB) $(XEXTLIB) $(X11LIB)
 
 if OPENBSD
 dtfile_CPPFLAGS += -DFILE_MAP_OPTIMIZE

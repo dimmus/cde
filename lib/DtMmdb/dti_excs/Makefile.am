@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libdti_excs.la
 
-libdti_excs_la_CXXFLAGS = -DNATIVE_EXCEPTIONS
+libdti_excs_la_CXXFLAGS = $(CDE_CXXFLAGS) -DNATIVE_EXCEPTIONS
 
 if SOLARIS
 libdti_excs_la_CXXFLAGS += -DHAS_TERMINATE

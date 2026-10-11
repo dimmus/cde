@@ -104,6 +104,7 @@ class _Tt_s_message : public _Tt_message {
 	int			match_observer(const _Tt_signature &pat,
 					const _Tt_msg_trace &trace);
 	int			match_patterns(_Tt_pattern_list_ptr &patterns,
+					_Tt_pattern_list_ptr &more_patterns,
 					const _Tt_msg_trace &trace,
 					_Tt_pattern_ptr &best_pattern,
 					int deliver_to_observers);

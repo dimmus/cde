@@ -1956,49 +1956,54 @@ t_make_todo(Calendar *c)
 **  External functions
 **
 *******************************************************************************/
-extern void
-add_to_todo_list(CSA_entry_handle entry, ToDo *t) {
-	char			*buf;
+/*
+ * Make the list item for one entry, using 'appt' as scratch space.
+ * Returns NULL if the entry could not be read.
+ */
+static XmString
+make_todo_item(CSA_entry_handle entry, ToDo *t, Dtcm_appointment *appt) {
 	Lines			*lines;
 	XmString		str;
 	CSA_return_code		stat;
-	Dtcm_appointment	*appt;
 
-	appt = allocate_appt_struct(appt_read, 
-				    	t->cal->general->version,
-					CSA_ENTRY_ATTR_SUMMARY_I, 
-					NULL);
 	stat = query_appt_struct(t->cal->cal_handle, entry, appt);
 	backend_err_msg(t->frame, t->cal->view->current_calendar, stat,
 			((Props_pu *)t->cal->properties_pu)->xm_error_pixmap);
-	if (stat != CSA_SUCCESS) {
-		free_appt_struct(&appt);
-		return;
-	}
+	if (stat != CSA_SUCCESS)
+		return (NULL);
 
 	lines = text_to_lines(appt->what->value->item.string_value, 1);
-	if (lines && lines->s) {
-		buf = (char *)ckalloc(cm_strlen(lines->s) + 1);
-		strcpy(buf, lines->s);
-	} else {
-		buf = (char *)ckalloc(1);
-		buf[0] = '\0';
-	}
-
-	if(lines) {
+	str = XmStringCreateLocalized((lines && lines->s) ? lines->s : "");
+	if (lines)
 		destroy_lines(lines);
-	}
 
-	str = XmStringCreateLocalized(buf);
-	XmListAddItem(t->todo_list, str, 0);
+	return (str);
+}
+
+static Dtcm_appointment *
+allocate_list_appt(ToDo *t) {
+	return (allocate_appt_struct(appt_read, 
+				     t->cal->general->version,
+				     CSA_ENTRY_ATTR_SUMMARY_I, 
+				     NULL));
+}
+
+extern void
+add_to_todo_list(CSA_entry_handle entry, ToDo *t) {
+	XmString		str;
+	Dtcm_appointment	*appt;
+
+	appt = allocate_list_appt(t);
+	if ((str = make_todo_item(entry, t, appt)) != NULL) {
+		XmListAddItem(t->todo_list, str, 0);
+		XmStringFree(str);
+	}
 	free_appt_struct(&appt);
-	XmStringFree(str);
-	free(buf);
 }
 
 extern void
 add_all_todo(ToDo *t) {
-	int		i;
+	int		i, n;
 	CSA_uint32	count;
 	char		*date, date_str[MAXNAMELEN];
 	Tick		tick;
@@ -2006,6 +2011,8 @@ add_all_todo(ToDo *t) {
 	Props		*p;
 	OrderingType	o;
 	SeparatorType	s;
+	XmString	*items;
+	Dtcm_appointment *appt;
 
 	if (!todo_showing(t))
 		return;
@@ -2035,8 +2042,24 @@ add_all_todo(ToDo *t) {
 		csa_free((CSA_buffer) t->todo_head);
 	t->todo_head = entry_list;
 	t->todo_count = count;
-	for (i = 0; i < count; i++)
-		add_to_todo_list(entry_list[i], t);
+
+	/* one list update for all items, and one scratch appointment */
+	if (count > 0 &&
+	    (items = (XmString *)malloc(count * sizeof(XmString)))) {
+		appt = allocate_list_appt(t);
+		for (i = 0, n = 0; i < count; i++)
+			if ((items[n] = make_todo_item(entry_list[i], t, appt)))
+				n++;
+		free_appt_struct(&appt);
+		if (n > 0)
+			XmListAddItems(t->todo_list, items, n, 0);
+		for (i = 0; i < n; i++)
+			XmStringFree(items[i]);
+		free(items);
+	} else {
+		for (i = 0; i < count; i++)
+			add_to_todo_list(entry_list[i], t);
+	}
 	if (count <= 0)
 		XtSetSensitive(t->todo_list, False);
 	else

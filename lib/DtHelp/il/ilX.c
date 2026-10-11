@@ -42,7 +42,9 @@
 #include "ilX.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 #include <X11/Xutil.h>
+#include <X11/Xlibint.h>          /* XESetCloseDisplay() */
 #include "ilpipelem.h"
 #include "ilerrors.h"
 
@@ -223,6 +225,259 @@ int            allocValue;
 }
 
 
+    /*  ------------------------ _ilXComputeColor ------------------------- */
+    /*  TrueColor colormaps are static: the pixel XAllocColor() returns for an
+        RGB value is a pure function of the visual.  Computing it locally
+        saves one server round trip per colour (256 per XWC for TIFFs, 64 per
+        GIF, one per distinct colour for XWDs).
+        The computation replicates the sample server (Xorg, Xvfb, Xwayland,
+        Xephyr): miResolveColor() truncates each component to bits_per_rgb
+        bits, then AllocColor() picks the nearest entry (lowest index on a
+        tie) of that channel's map, whose entries miInitializeColormap()
+        sets to ((((i * 65535) / lim) >> shift) * 65535) / rgbLim.
+        It is enabled for a (display, colormap, visual) only after a few real
+        XAllocColor() calls returned exactly the computed pixels and RGB
+        values, so a server that resolves colours differently keeps using
+        XAllocColor().
+    */
+typedef struct _ilXTCRec {
+    struct _ilXTCRec   *pNext;
+    Display            *display;
+    Colormap            colormap;
+    Visual             *visual;
+    ilBool              usable;
+    unsigned long       alpha;          /* bits the server ORs into pixels */
+    int                 offset[3];      /* R, G, B */
+    unsigned long       lim[3];         /* mask >> offset */
+    unsigned short     *pEntries[3];    /* the channel maps, lim + 1 each */
+    int                 rgbShift;       /* 16 - bits_per_rgb */
+    unsigned long       rgbLim;         /* (1 << bits_per_rgb) - 1 */
+    } ilXTCRec, *ilXTCPtr;
+
+static void ilXTCFree (
+    ilXTCPtr                pTC
+    )
+{
+    free (pTC->pEntries[0]);
+    free (pTC->pEntries[1]);
+    free (pTC->pEntries[2]);
+    free (pTC);
+}
+
+static ilXTCPtr ilXTCList = (ilXTCPtr)NULL;
+
+static int ilXTCCloseDisplay (
+    Display                *display,
+    XExtCodes              *codes
+    )
+{
+ilXTCPtr                   *ppTC, pTC;
+
+    (void)codes;
+    for (ppTC = &ilXTCList; (pTC = *ppTC); ) {
+        if (pTC->display == display) {
+            *ppTC = pTC->pNext;
+            ilXTCFree (pTC);
+            }
+        else ppTC = &pTC->pNext;
+        }
+    return 0;
+}
+
+    /*  Index of the entry of channel map "pEntries" (n entries, ascending)
+        nearest to "value"; the lowest such index on a tie.
+    */
+static unsigned long ilXTCNearest (
+    const unsigned short   *pEntries,
+    unsigned long           n,
+    unsigned long           value
+    )
+{
+unsigned long               lo, hi, mid, best;
+
+    lo = 0;                             /* first entry >= value */
+    hi = n;
+    while (lo < hi) {
+        mid = (lo + hi) / 2;
+        if (pEntries[mid] < value)
+            lo = mid + 1;
+        else hi = mid;
+        }
+    if (lo == n)
+        best = n - 1;
+    else if (lo == 0)
+        return 0;
+    else if ((value - pEntries[lo - 1]) <= (pEntries[lo] - value))
+        best = lo - 1;
+    else return lo;                     /* lo is the first of its value */
+    while ((best > 0) && (pEntries[best - 1] == pEntries[best]))
+        best--;
+    return best;
+}
+
+static void ilXTCResolve (
+    ilXTCPtr                pTC,
+    XColor                 *pColor
+    )
+{
+unsigned short             *pValue[3];
+unsigned long               index, value;
+int                         i;
+
+    pValue[0] = &pColor->red;
+    pValue[1] = &pColor->green;
+    pValue[2] = &pColor->blue;
+    pColor->pixel = pTC->alpha;
+    for (i = 0; i < 3; i++) {
+        value = (((unsigned long)*pValue[i] >> pTC->rgbShift) * 65535UL)
+              / pTC->rgbLim;
+        index = ilXTCNearest (pTC->pEntries[i], pTC->lim[i] + 1, value);
+        pColor->pixel |= index << pTC->offset[i];
+        *pValue[i] = pTC->pEntries[i][index];
+        }
+}
+
+static ilXTCPtr ilXTCLookup (
+    Display                *display,
+    Colormap                colormap,
+    Visual                 *visual
+    )
+{
+static const unsigned short samples[][3] = {
+    { 0, 0, 0 }, { 65535, 65535, 65535 }, { 0x8000, 0x4000, 0xc000 },
+    { 0x1234, 0xabcd, 0x7fff }, { 0x0101, 0xfeff, 0x8080 },
+    { 0xffff, 0x0000, 0x00ff }, { 0x3333, 0x9999, 0xcccc },
+    { 0x0420, 0x0841, 0xc400 }, { 0x7bef, 0x8410, 0x3def } };
+#define IL_X_NSAMPLES ((int)(sizeof (samples) / sizeof (samples[0])))
+ilXTCPtr                    pTC;
+unsigned long               masks[3], allocated[IL_X_NSAMPLES];
+int                         i, j, nAllocated, depth, haveDisplay;
+XColor                      real, computed;
+XExtCodes                  *codes;
+Screen                     *screen;
+
+    haveDisplay = FALSE;
+    for (pTC = ilXTCList; pTC; pTC = pTC->pNext) {
+        if ((pTC->display == display) && (pTC->colormap == colormap)
+         && (pTC->visual == visual))
+            return pTC;
+        if (pTC->display == display)
+            haveDisplay = TRUE;
+        }
+
+    pTC = (ilXTCPtr)calloc (1, sizeof (ilXTCRec));
+    if (!pTC)
+        return (ilXTCPtr)NULL;
+    pTC->display = display;
+    pTC->colormap = colormap;
+    pTC->visual = visual;
+    pTC->usable = FALSE;
+
+    if (!haveDisplay) {             /* forget this display when it closes */
+        codes = XAddExtension (display);
+        if (!codes) {
+            free (pTC);
+            return (ilXTCPtr)NULL;
+            }
+        XESetCloseDisplay (display, codes->extension, ilXTCCloseDisplay);
+        }
+    pTC->pNext = ilXTCList;
+    ilXTCList = pTC;
+
+    if ((visual->class != TrueColor)
+     || (visual->bits_per_rgb < 1) || (visual->bits_per_rgb > 16))
+        return pTC;                                     /* unusable; EXIT */
+
+        /*  Find the depth of the visual, for the alpha bits. */
+    depth = 0;
+    for (i = 0; !depth && (i < ScreenCount (display)); i++) {
+        screen = ScreenOfDisplay (display, i);
+        for (j = 0; j < screen->ndepths; j++) {
+            int k;
+            for (k = 0; k < screen->depths[j].nvisuals; k++)
+                if (&screen->depths[j].visuals[k] == visual)
+                    depth = screen->depths[j].depth;
+            }
+        }
+    if (!depth)
+        return pTC;                                     /* unusable; EXIT */
+
+    masks[0] = visual->red_mask;
+    masks[1] = visual->green_mask;
+    masks[2] = visual->blue_mask;
+    pTC->rgbShift = 16 - visual->bits_per_rgb;
+    pTC->rgbLim = (1UL << visual->bits_per_rgb) - 1;
+    for (i = 0; i < 3; i++) {
+        if (!masks[i])
+            return pTC;                                 /* unusable; EXIT */
+        pTC->offset[i] = 0;
+        while (!((masks[i] >> pTC->offset[i]) & 1))
+            pTC->offset[i]++;
+        pTC->lim[i] = masks[i] >> pTC->offset[i];
+            /*  Need a contiguous mask of at most 16 bits. */
+        if ((pTC->lim[i] & (pTC->lim[i] + 1)) || (pTC->lim[i] > 65535)
+         || (pTC->lim[i] < 1))
+            return pTC;                                 /* unusable; EXIT */
+        pTC->pEntries[i] = (unsigned short *)
+            malloc ((pTC->lim[i] + 1) * sizeof (unsigned short));
+        if (!pTC->pEntries[i])
+            return pTC;                                 /* unusable; EXIT */
+        for (j = 0; j <= (int)pTC->lim[i]; j++)
+            pTC->pEntries[i][j] = (unsigned short)
+                (((((unsigned long)j * 65535UL) / pTC->lim[i])
+                  >> pTC->rgbShift) * 65535UL / pTC->rgbLim);
+        }
+    pTC->alpha = (depth < 32) ? 0
+               : (~(masks[0] | masks[1] | masks[2]) & 0xffffffffUL);
+
+        /*  Check against the server. */
+    pTC->usable = TRUE;
+    nAllocated = 0;
+    for (i = 0; i < IL_X_NSAMPLES; i++) {
+        real.red = computed.red = samples[i][0];
+        real.green = computed.green = samples[i][1];
+        real.blue = computed.blue = samples[i][2];
+        real.flags = computed.flags = DoRed | DoGreen | DoBlue;
+        if (!XAllocColor (display, colormap, &real)) {
+            pTC->usable = FALSE;
+            break;
+            }
+        allocated[nAllocated++] = real.pixel;
+        ilXTCResolve (pTC, &computed);
+        if ((real.pixel != computed.pixel) || (real.red != computed.red)
+         || (real.green != computed.green) || (real.blue != computed.blue)) {
+            pTC->usable = FALSE;
+            break;
+            }
+        }
+    if (nAllocated)
+        XFreeColors (display, colormap, allocated, nAllocated, 0);
+    return pTC;
+#undef IL_X_NSAMPLES
+}
+
+    /*  Public function; see ilX.h. */
+ilBool _ilXComputeColor (
+    Display                *display,
+    Colormap                colormap,
+    Visual                 *visual,
+    XColor                 *pColor
+    )
+{
+ilXTCPtr                    pTC;
+
+    if (!display || !colormap || !visual || !pColor)
+        return FALSE;
+    if ((visual->class != TrueColor))
+        return FALSE;
+    pTC = ilXTCLookup (display, colormap, visual);
+    if (!pTC || !pTC->usable)
+        return FALSE;
+    ilXTCResolve (pTC, pColor);
+    return TRUE;
+}
+
+
         /*  --------------------- ilAllocateXDitherColors ------------------ */
         /*  Internal function to ilCreateXWC().  Attempts to allocate enough 
 	    colors in pXWC->i.colormap to support the visual as a 484 
@@ -358,6 +613,12 @@ double          spreadFactor;
         pColor = &pXWC->pGrays [i];
         pColor->red = pColor->green = pColor->blue = 
 	    ilGammaCorrect (X_COLOR_MAX, i, nGrays);
+        pColor->flags = DoRed | DoGreen | DoBlue;
+        if (_ilXComputeColor (pXWC->i.display, pXWC->i.colormap,
+                              pXWC->i.visual, pColor)) {
+            pColor->pad = FALSE;            /* not allocated: never free */
+            continue;
+            }
         if (!XAllocColor (pXWC->i.display, pXWC->i.colormap, pColor)) {
             pColor->pad = FALSE;
             ilFreeColorData (pXWC, IL_FREE_XGRAYS);
@@ -443,13 +704,18 @@ ilContext       context;
         pColor->red = pColor->green = pColor->blue = 
             ilGammaCorrect (X_COLOR_MAX, i, nLevels);
         pColor->flags = DoRed | DoGreen | DoBlue;
-        if (!XAllocColor (pXWC->i.display, pXWC->i.colormap, pColor)) {
-            ilFreeColorData (pXWC, IL_FREE_XCOLORS);
-            if (nLevels <= MIN_DIRECT_LEVELS)
-                return FALSE;
-            else return ilAllocateXDirectColors (pXWC, nLevels / 2);
+        if (_ilXComputeColor (pXWC->i.display, pXWC->i.colormap,
+                              pXWC->i.visual, pColor))
+            pColor->pad = FALSE;            /* not allocated: never free */
+        else {
+            if (!XAllocColor (pXWC->i.display, pXWC->i.colormap, pColor)) {
+                ilFreeColorData (pXWC, IL_FREE_XCOLORS);
+                if (nLevels <= MIN_DIRECT_LEVELS)
+                    return FALSE;
+                else return ilAllocateXDirectColors (pXWC, nLevels / 2);
+                }
+            pColor->pad = TRUE;                     /* mark as alloc'd */
             }
-        pColor->pad = TRUE;                         /* mark as alloc'd */
         pixel = pColor->pixel;
         red = (pixel >> 16) & 0xff;
         green = (pixel >> 8) & 0xff;
@@ -873,7 +1139,7 @@ int                         scaledX, scaledY;
     scaledHeight = ((nSrcLines + pPriv->linesDone) * ratio + 0.5) 
 	- scaledY;
 
-    _XmPutScaledImage (pXWC->i.display, pPriv->drawable, 
+    _ilXPutScaledImage (pXWC->i.display, pPriv->drawable, 
                        pXWC->i.gc, pXImage, 
 		       0, 0, scaledX, scaledY,
 		       pXImage->width, nSrcLines,
@@ -956,7 +1222,7 @@ int scaledX, scaledY ;
     scaledX = pPriv->x * ratio  ;
     scaledY = (pPriv->y + pPriv->linesDone)* ratio  ;
 
-    _XmPutScaledImage (pXWC->i.display, pPriv->drawable, pXWC->i.gc, pXImage, 
+    _ilXPutScaledImage (pXWC->i.display, pPriv->drawable, pXWC->i.gc, pXImage, 
 		       0, 0, scaledX, scaledY,
 		       pXImage->width, nSrcLines,
 	               scaledWidth,scaledHeight);
@@ -964,6 +1230,85 @@ int scaledX, scaledY ;
     pPriv->linesDone += nSrcLines;
 
     return IL_OK;
+}
+
+
+        /*  ----------------------- _ilXPutScaledImage --------------------- */
+        /*  Public function; see ilX.h.
+        */
+void _ilXPutScaledImage (
+    Display                *display,
+    Drawable                d,
+    GC                      gc,
+    XImage                 *src_image,
+    int                     src_x,
+    int                     src_y,
+    int                     dest_x,
+    int                     dest_y,
+    unsigned int            src_width,
+    unsigned int            src_height,
+    unsigned int            dest_width,
+    unsigned int            dest_height
+    )
+{
+XImage                     *pDst;
+unsigned int               *xmap;
+unsigned int                x, y, sy, prevSy;
+size_t                      nBytes;
+
+    if (!src_width || !src_height || !dest_width || !dest_height)
+        return;
+
+    if (src_width == dest_width && src_height == dest_height) {
+        XPutImage (display, d, gc, src_image, src_x, src_y, dest_x, dest_y,
+                   src_width, src_height);
+        return;
+        }
+
+        /*  Build a destination image of the same format and depth, and fill
+            it by nearest-neighbour sampling of the source.
+        */
+    pDst = XCreateImage (display, (Visual *)NULL, src_image->depth,
+                         src_image->format, 0, (char *)NULL,
+                         dest_width, dest_height, src_image->bitmap_pad, 0);
+    if (!pDst)
+        return;
+    pDst->red_mask   = src_image->red_mask;
+    pDst->green_mask = src_image->green_mask;
+    pDst->blue_mask  = src_image->blue_mask;
+    nBytes = (size_t)pDst->bytes_per_line * dest_height;
+    if (pDst->format == XYPixmap)
+        nBytes *= pDst->depth;
+    pDst->data = (char *)malloc (nBytes);
+    xmap = (unsigned int *)malloc (dest_width * sizeof (unsigned int));
+    if (!pDst->data || !xmap) {
+        free (xmap);
+        XDestroyImage (pDst);           /* frees pDst->data */
+        return;
+        }
+
+    for (x = 0; x < dest_width; x++)
+        xmap[x] = src_x + (unsigned int)(((unsigned long)x * src_width) / dest_width);
+
+    prevSy = (unsigned int)-1;
+    for (y = 0; y < dest_height; y++) {
+        sy = src_y + (unsigned int)(((unsigned long)y * src_height) / dest_height);
+        if (sy == prevSy && pDst->format != XYPixmap) {
+                /* same source row as the previous line: copy it */
+            memcpy (pDst->data + (size_t)y * pDst->bytes_per_line,
+                    pDst->data + (size_t)(y - 1) * pDst->bytes_per_line,
+                    pDst->bytes_per_line);
+            continue;
+            }
+        prevSy = sy;
+        for (x = 0; x < dest_width; x++)
+            XPutPixel (pDst, x, y, XGetPixel (src_image, xmap[x], sy));
+        }
+
+    XPutImage (display, d, gc, pDst, 0, 0, dest_x, dest_y,
+               dest_width, dest_height);
+    free (xmap);
+    XDestroyImage (pDst);
 }
 
 

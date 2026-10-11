@@ -112,7 +112,7 @@ static void	display_header(Calendar *);
 static void	quick_button_cb(Widget, XtPointer, XtPointer);
 static Boolean	print_month ( Calendar *, int,
 			     void *, Tick, Props *, Boolean);
-static int	count_month_pages(Calendar *, Tick, int);
+static int	count_month_pages(Calendar *, Tick, int, CmRangeList *);
 static void	paint_daynames(Calendar *, XRectangle *);
 static void	paint_month(Calendar *, Tick, XRectangle *);
 static void	unmanage_children(Calendar *);
@@ -334,7 +334,7 @@ paint_month(Calendar *c, Tick key, XRectangle *rect)
 
                 day = nextday(day);
                 x++;
-                if ((x > 6) & (i != m->ndays)) {
+                if ((x > 6) && (i != m->ndays)) {
                         x = 0;
                         y++;
                 }
@@ -486,7 +486,7 @@ layout_month(
 		m->button_loc[i-1].y = box_origin_y + 3;
 
 		x++;
-		if ((x > 6) & (i != m->ndays)) {
+		if ((x > 6) && (i != m->ndays)) {
 			x = 0;
 			y++;
 		}
@@ -685,17 +685,16 @@ month_event(XEvent *event)
 }
  
 static int
-count_month_pages(Calendar *c, Tick start_date, int lines_per_box)
+count_month_pages(Calendar *c, Tick start_date, int lines_per_box,
+		  CmRangeList *rl)
 {
-        int 			i, j;
+        int 			i;
         int 			rows, pages;
         struct 	tm 		tm;
         int 			day, ndays, num_appts, max = 0;
 	CSA_uint32 		a_total;
 	time_t 			start, stop;
         CSA_entry_handle 	*list;
-	CSA_attribute 		*range_attrs;
-	CSA_enum 		*ops;
 	_Xltimeparams		localtime_buf;
 	(void) localtime_buf;	/* unused unless XTHREADS */
 
@@ -722,19 +721,13 @@ count_month_pages(Calendar *c, Tick start_date, int lines_per_box)
                 /* setup a time limit for appts searched */
                 start = (time_t) lowerbound (day);
                 stop = (time_t) next_ndays(day, 1) - 1;
-		setup_range(&range_attrs, &ops, &j, start, stop,
-			    CSA_TYPE_EVENT, 0, B_FALSE,
-			    c->general->version);
-		csa_list_entries(c->cal_handle, j, range_attrs, ops,
-				 &a_total, &list, NULL);
-		free_range(&range_attrs, &ops, j);
+		a_total = CmRangeListGet(rl, start, stop, &list);
 
                 num_appts = count_month_appts(list, a_total, c);
                 if (num_appts > max)
                         max = num_appts;
  
                 day = nextday(day);
-                csa_free(list);
         }
  
  
@@ -754,7 +747,7 @@ print_month ( Calendar *c,
     Props *p,
     Boolean first)
 {
-        int 		rows, i, j, lines_per_box;
+        int 		rows, i, lines_per_box;
         time_t 		lo_hour, hi_hour;
         char 		buf[50];
         int 		ndays, num_appts;
@@ -762,9 +755,8 @@ print_month ( Calendar *c,
         Tick 		day;
 	OrderingType 	ot = get_int_prop(p, CP_DATEORDERING);
         CSA_entry_handle *list;
-        CSA_attribute 	*range_attrs;
-	CSA_enum 	*ops;
         CSA_uint32 	a_total;
+	CmRangeList	rl;
         static Tick 	tick = 0;
 	static int	total_pages;
 
@@ -783,12 +775,17 @@ print_month ( Calendar *c,
 	x_init_month(xp, rows);
 	lines_per_box = x_get_month_lines_per_page(xp);
 
-	if (num_page == 1)
-	  total_pages = (lines_per_box > 0) ?
-	    count_month_pages(c, tick, lines_per_box) : 1;
-
 	day = first_dom(tick);
 	ndays = monthlength(tick);
+
+	/* one call for the month instead of one per day (twice) */
+	CmRangeListInit(&rl, c->cal_handle, c->general->version,
+			(time_t)lowerbound(day) - daysec,
+			(time_t)next_ndays(day, ndays + 1));
+
+	if (num_page == 1)
+	  total_pages = (lines_per_box > 0) ?
+	    count_month_pages(c, tick, lines_per_box, &rl) : 1;
  
 	/* print month & year on top */
 	format_date(tick, ot, buf, 0, 0, 0);
@@ -802,11 +799,7 @@ print_month ( Calendar *c,
 	  /* setup a time limit for appts searched */
 	  lo_hour = (time_t)lowerbound (day);
 	  hi_hour = (time_t) next_ndays(day, 1) - 1;
-	  setup_range(&range_attrs, &ops, &j, lo_hour, hi_hour,
-		      CSA_TYPE_EVENT, 0, B_FALSE, c->general->version);
-	  csa_list_entries(c->cal_handle, j, range_attrs,
-			   ops, &a_total, &list, NULL);
-	  free_range(&range_attrs, &ops, j);
+	  a_total = CmRangeListGet(&rl, lo_hour, hi_hour, &list);
 	  num_appts = count_month_appts(list, a_total, c);
 	  if ((lines_per_box > 0) &&
 	      (num_appts > (lines_per_box * num_page)))
@@ -826,8 +819,8 @@ print_month ( Calendar *c,
 	    all_done = False;
 
 	  day = nextday(day);
-	  csa_free(list);
 	}
+	CmRangeListFree(&rl);
 
 	/* paint miniature previous & next month */
 	x_print_little_months(xp, tick);

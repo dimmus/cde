@@ -43,6 +43,8 @@
 #include "TermPrimSelectP.h"
 #include "TermPrimMessageCatI.h"
 #include <limits.h>
+#include <string.h>
+#include <wchar.h>
 
 #ifdef	DKS
 void
@@ -106,43 +108,245 @@ _termSetRenderFont(Widget w, TermFont *termFont)
 }
 #endif	/* DKS */
 
+/* rings closer together than this are ignored (a "yes ^G" or a binary
+ * catted by mistake would otherwise keep the server busy beeping or
+ * flashing).  This is xterm's default bellSuppressTime...
+ */
+#define	BELL_SUPPRESS_MS	200
+/* how long the visual bell keeps the screen flashed... */
+#define	VISUAL_BELL_MS		100
+
+/* XOR the text area with fg ^ bg, which swaps the foreground and
+ * background colours...
+ */
+static void
+flashTextArea(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+
+    /* the speed of this operation is not critical, so we will just
+     * use the standard text rendering GC and restore it after we
+     * are done...
+     */
+    if (tpd->renderGC.foreground !=
+	    (tw->primitive.foreground ^ tw->core.background_pixel)) {
+	tpd->renderGC.foreground =
+		tw->primitive.foreground ^ tw->core.background_pixel;
+	(void) XSetForeground(XtDisplay(w), tpd->renderGC.gc,
+		tpd->renderGC.foreground);
+    }
+    (void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXxor);
+    (void) XFillRectangle(XtDisplay(w),		/* Display		*/
+	    XtWindow(w),			/* Drawable		*/
+	    tpd->renderGC.gc,			/* GC			*/
+	    tpd->offsetX,			/* x			*/
+	    tpd->offsetY,			/* y			*/
+	    tw->term.columns * tpd->cellWidth,	/* width		*/
+	    tw->term.rows * tpd->cellHeight);	/* height		*/
+    /* restore the GC... */
+    (void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXcopy);
+}
+
+/* the visual bell has been showing for VISUAL_BELL_MS.  Repaint the text
+ * area from the buffer (rather than XOR it back: text may have been
+ * painted or scrolled in the meantime), the way an expose would...
+ */
+/*ARGSUSED*/
+static void
+visualBellTimeout(XtPointer client_data, XtIntervalId *id)
+{
+    Widget w = (Widget) client_data;
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    Boolean cursorWasOn = (CURSORoff != tpd->cursorState);
+
+    tpd->bellTimerId = (XtIntervalId) 0;
+    if (!XtIsRealized(w) || !tpd->termBuffer) {
+	return;
+    }
+    (void) _DtTermPrimCursorOff(w);
+    (void) _DtTermPrimExposeText(w, tpd->offsetX, tpd->offsetY,
+	    tw->term.columns * tpd->cellWidth,
+	    tw->term.rows * tpd->cellHeight, False);
+    if (cursorWasOn) {
+	(void) _DtTermPrimCursorOn(w);
+    }
+}
+
 void
 _DtTermPrimBell(Widget w)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    int i;
+    unsigned long now;
+
+    /* rate limit... */
+    now = _DtTermPrimMonotonicMs();
+    if (tpd->bellMs && (now - tpd->bellMs < BELL_SUPPRESS_MS)) {
+	return;
+    }
+    tpd->bellMs = now;
 
     if (tw->term.visualBell) {
-	/* the speed of this operation is not critical, so we will just
-	 * use the standard text rendering GC and restore it after we
-	 * are done...
+	if (tpd->bellTimerId || !XtIsRealized(w) || !tpd->renderGC.gc) {
+	    /* still flashing, or nothing to flash yet... */
+	    return;
+	}
+
+	/* flash what is really in the buffer... */
+	(void) _DtTermPrimRenderFlushDirty(w);
+
+	/* flash the screen now and repaint it when the flash is over (we
+	 * used to flash it twice with an XSync after each, which is two
+	 * round trips and too quick to see on a local server)...
 	 */
-	if (tpd->renderGC.foreground !=
-		(tw->primitive.foreground ^ tw->core.background_pixel)) {
-	    tpd->renderGC.foreground = 
-		    tw->primitive.foreground ^ tw->core.background_pixel;
-	    (void) XSetForeground(XtDisplay(w), tpd->renderGC.gc,
-		    tpd->renderGC.foreground);
-	}
-	(void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXxor);
-	for (i = 0; i < 2; i++) {
-	    (void) XFillRectangle(XtDisplay(w),	/* Display		*/
-		    XtWindow(w),		/* Drawable		*/
-		    tpd->renderGC.gc,		/* GC			*/
-		    tpd->offsetX,		/* x			*/
-		    tpd->offsetY,		/* y			*/
-		    tw->term.columns * tpd->cellWidth,
-						/* width		*/
-		    tw->term.rows * tpd->cellHeight);
-						/* height		*/
-	    (void) XSync(XtDisplay(w), 0);
-	}
-	/* restore the GC... */
-	(void) XSetFunction(XtDisplay(w), tpd->renderGC.gc, GXcopy);
+	(void) flashTextArea(w);
+	tpd->bellTimerId = XtAppAddTimeOut(XtWidgetToApplicationContext(w),
+		VISUAL_BELL_MS, visualBellTimeout, (XtPointer) w);
     } else {
 	(void) XBell(XtDisplay(w), 0);
     }
+}
+
+/* the widget is being destroyed... */
+void
+_DtTermPrimBellDestroy(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    if (tpd->bellTimerId) {
+	(void) XtRemoveTimeOut(tpd->bellTimerId);
+	tpd->bellTimerId = (XtIntervalId) 0;
+    }
+}
+
+/*
+** Deferred rendering.
+**
+** While output is processed in jump scroll mode, readPty() sets
+** tpd->deferRender, and _DtTermPrimRefreshText() only records the area
+** it was asked to paint as a span of dirty columns in each row.  The
+** spans are painted by _DtTermPrimRenderFlushDirty() once per frame: when
+** the cursor is turned back on, before anything is moved with a copy
+** area, and when a frame is due while output keeps coming.  Text that is
+** overwritten several times within a frame (progress bars, spinners,
+** full screen applications redrawing a line piece by piece) is then
+** drawn once.
+**
+** The spans are in screen coordinates, so they are only valid as long
+** as nothing moves on the screen.  When a jump scroll is queued, they
+** are turned into scrollRefreshRows flags (which are scrolled along with
+** the queued scroll) by _DtTermPrimRenderDirtyToRefreshRows().  While a
+** jump scroll is queued, the scrollRefreshRows flags are used instead,
+** so there are never spans and a queued scroll at the same time.
+*/
+static void
+recordDirty(Widget w, short startColumn, short startRow, short endColumn,
+	short endRow)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    short row;
+
+    if (tpd->dirtyRowsAlloc < tw->term.rows) {
+	tpd->dirtyStartCol = (short *) XtRealloc((char *) tpd->dirtyStartCol,
+		tw->term.rows * sizeof(short));
+	tpd->dirtyEndCol = (short *) XtRealloc((char *) tpd->dirtyEndCol,
+		tw->term.rows * sizeof(short));
+	for (row = tpd->dirtyRowsAlloc; row < tw->term.rows; row++) {
+	    tpd->dirtyStartCol[row] = -1;
+	    tpd->dirtyEndCol[row] = -1;
+	}
+	tpd->dirtyRowsAlloc = tw->term.rows;
+    }
+
+    for (row = startRow; row <= endRow; row++) {
+	if (tpd->dirtyStartCol[row] < 0) {
+	    tpd->dirtyStartCol[row] = startColumn;
+	    tpd->dirtyEndCol[row] = endColumn;
+	} else {
+	    if (startColumn < tpd->dirtyStartCol[row])
+		tpd->dirtyStartCol[row] = startColumn;
+	    if (endColumn > tpd->dirtyEndCol[row])
+		tpd->dirtyEndCol[row] = endColumn;
+	}
+    }
+    tpd->dirtyRows = True;
+}
+
+/* paint (and forget) the dirty spans... */
+void
+_DtTermPrimRenderFlushDirty(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    Boolean saveDeferRender;
+    short startColumn;
+    short endColumn;
+    short row;
+
+    if (!tpd->dirtyRows) {
+	return;
+    }
+    tpd->dirtyRows = False;
+
+    saveDeferRender = tpd->deferRender;
+    tpd->deferRender = False;
+    for (row = 0; row < tpd->dirtyRowsAlloc; row++) {
+	if (tpd->dirtyStartCol[row] < 0) {
+	    continue;
+	}
+	startColumn = tpd->dirtyStartCol[row];
+	endColumn = tpd->dirtyEndCol[row];
+	tpd->dirtyStartCol[row] = -1;
+	if (row < tw->term.rows) {
+	    (void) _DtTermPrimRefreshText(w, startColumn, row, endColumn, row);
+	}
+    }
+    tpd->deferRender = saveDeferRender;
+    (void) _DtTermPrimNoteFramePainted(w);
+}
+
+/* a jump scroll is about to be queued: hand the dirty rows over to the
+ * scrollRefreshRows flags, which will be scrolled with it...
+ */
+void
+_DtTermPrimRenderDirtyToRefreshRows(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    short row;
+
+    if (!tpd->dirtyRows) {
+	return;
+    }
+    tpd->dirtyRows = False;
+
+    for (row = 0; row < tpd->dirtyRowsAlloc; row++) {
+	if (tpd->dirtyStartCol[row] >= 0) {
+	    tpd->dirtyStartCol[row] = -1;
+	    if (row < tw->term.rows) {
+		tpd->scrollRefreshRows[row] = True;
+	    }
+	}
+    }
+}
+
+/* forget the dirty spans (the whole window is going to be repainted, or
+ * the widget is being destroyed)...
+ */
+void
+_DtTermPrimRenderFreeDirty(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    (void) XtFree((char *) tpd->dirtyStartCol);
+    tpd->dirtyStartCol = (short *) 0;
+    (void) XtFree((char *) tpd->dirtyEndCol);
+    tpd->dirtyEndCol = (short *) 0;
+    tpd->dirtyRowsAlloc = 0;
+    tpd->dirtyRows = False;
 }
 
 void
@@ -170,6 +374,23 @@ _DtTermPrimRefreshText(Widget w, short startColumn, short startRow,
     DebugF('t', 0, fprintf(stderr,
 	    ">>_DtTermPrimRefreshText() startCol=%hd  startRow=%hd  endCol=%hd  endRow=%hd\n",
 	    startColumn, startRow, endColumn, endRow));
+
+    if (tpd->deferRender && tw->term.jumpScroll &&
+	    !tpd->scroll.jump.scrolled) {
+	/* just remember what needs to be painted (see recordDirty())... */
+	if (startColumn < 0)
+	    startColumn = 0;
+	if (startRow < 0)
+	    startRow = 0;
+	if (endColumn >= tw->term.columns)
+	    endColumn = tw->term.columns - 1;
+	if (endRow >= tw->term.rows)
+	    endRow = tw->term.rows - 1;
+	if ((startColumn <= endColumn) && (startRow <= endRow)) {
+	    (void) recordDirty(w, startColumn, startRow, endColumn, endRow);
+	}
+	return;
+    }
 
     if (tpd->mbCurMax > 1)
     {
@@ -485,7 +706,7 @@ _DtTermPrimRefreshText(Widget w, short startColumn, short startRow,
 			    tpd->cellHeight - 1,
 						/* Y1			*/
 			    (chunkStartColumn + chunkWidth) * tpd->cellWidth +
-			    tpd->offsetX,	/* X2			*/
+			    tpd->offsetX - 1,	/* X2			*/
 			    startRow * tpd->cellHeight + tpd->offsetY +
 			    tpd->cellHeight - 1);
 						/* Y2			*/
@@ -647,6 +868,20 @@ _DtTermPrimExposeText(Widget w, int x, int y, int width, int height,
 	    ">>             offsetX=%d  offsetY=%d  cellHeight=%d  cellWidth=%d\n",
 	    tpd->offsetX, tpd->offsetY, tpd->cellHeight, tpd->cellWidth));
 
+    /* The area is damaged where it is on the screen now.  If a jump
+     * scroll is queued, the text there will be copied somewhere else
+     * when the scroll is performed, and the scrollRefreshRows flags we
+     * would set below are for the rows after the scroll.  So instead,
+     * have the queued scroll repaint its whole region...
+     */
+    if (((DtTermPrimitiveWidget) w)->term.jumpScroll &&
+	    tpd->scroll.jump.scrolled && (tpd->scroll.jump.scrollLines != 0)) {
+	int regionRows = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
+
+	tpd->scroll.jump.scrollLines = (tpd->scroll.jump.scrollLines > 0) ?
+		regionRows : -regionRows;
+    }
+
     /* The following "hack" takes care of the problem of an exposure event
      * from the server and a copy area from the client crossing.  The
      * combination of these two events can cause a race condition which
@@ -802,6 +1037,21 @@ _DtTermPrimFillScreenGap(Widget w)
 			termChar *overflowChars;
 			short overflowCount;
 
+			/* the cheap way: give the line itself to the history
+			 * buffer, and the active buffer the unused history
+			 * line, which is cleared when it is moved to the
+			 * bottom below (its selection flag has to be clear
+			 * before that, or we would release the selection)...
+			 */
+			if (_DtTermPrimBufferSwapLines(tpd->historyBuffer,
+				tpd->lastUsedHistoryRow, tBuffer, i1)) {
+			    (void) _DtTermPrimBufferSetInSelectionFlag(
+				tBuffer, i1, (TermLineSelection) 0);
+			    (void) tpd->lastUsedHistoryRow++;
+			    (void) linesCopied++;
+			    continue;
+			}
+
 			/* get the line from the active buffer... */
 			length = _DtTermPrimBufferGetLineLength(tBuffer,
 				i1);
@@ -932,6 +1182,84 @@ _DtTermPrimFillScreenGap(Widget w)
     }
 }
 
+/*
+** The overflow buffer for buffer inserts.  An insert of n characters
+** can push out at most n plus a line's worth of characters, and the
+** insert-with-wrap path inserts those into the next line, which can
+** push out another line's worth.  Size for wchar_t so that both the
+** single byte and the wide character inserts can use it.
+*/
+termChar *
+_DtTermPrimRenderGetOverflowBuffer(Widget w, int numChars)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    int needed;
+
+    needed = numChars + 2 * _DtTermPrimBufferGetCols(tpd->termBuffer) + 2;
+    if (needed < BUFSIZ)
+	needed = BUFSIZ;
+    needed *= sizeof(wchar_t);
+
+    if (tpd->overflowBufferLen < needed) {
+	tpd->overflowBuffer = (termChar *)
+		XtRealloc((char *) tpd->overflowBuffer, needed);
+	tpd->overflowBufferLen = needed;
+    }
+    return(tpd->overflowBuffer);
+}
+
+/*
+** Decode one UTF-8 character from s (n > 0 bytes available).  This
+** accepts exactly what glibc's UTF-8 locales accept: 1 to 6 byte forms
+** up to 0x7fffffff, with no overlong forms and no UTF-16 surrogates.
+** Returns the length of the character and stores it in *pwc, -1 if s
+** does not start with a valid character (the first byte should be
+** skipped), or -2 if the n bytes are a valid but incomplete prefix.
+*/
+static int
+utf8Decode(const unsigned char *s, int n, wchar_t *pwc)
+{
+    unsigned int c = s[0];
+    unsigned int v;
+    unsigned int min;
+    int need;
+    int k;
+
+    if (c < 0x80) {
+	*pwc = (wchar_t) c;
+	return(1);
+    }
+    if (c < 0xc2) {
+	/* continuation byte, or an always-overlong 2-byte lead... */
+	return(-1);
+    } else if (c < 0xe0) {
+	need = 2; v = c & 0x1f; min = 0x80;
+    } else if (c < 0xf0) {
+	need = 3; v = c & 0x0f; min = 0x800;
+    } else if (c < 0xf8) {
+	need = 4; v = c & 0x07; min = 0x10000;
+    } else if (c < 0xfc) {
+	need = 5; v = c & 0x03; min = 0x200000;
+    } else if (c < 0xfe) {
+	need = 6; v = c & 0x01; min = 0x4000000;
+    } else {
+	return(-1);
+    }
+
+    for (k = 1; k < need; k++) {
+	if (k >= n)
+	    return(-2);
+	if ((s[k] & 0xc0) != 0x80)
+	    return(-1);
+	v = (v << 6) | (s[k] & 0x3f);
+    }
+    if ((v < min) || ((v >= 0xd800) && (v <= 0xdfff)))
+	return(-1);
+    *pwc = (wchar_t) v;
+    return(need);
+}
+
 static short
 DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
 {
@@ -951,7 +1279,7 @@ DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
     }
 
     /* insert the text... */
-    returnChars = (termChar *) XtMalloc(BUFSIZ * sizeof (termChar));
+    returnChars = _DtTermPrimRenderGetOverflowBuffer(w, length);
     newWidth = _DtTermPrimBufferInsert(tBuffer,	/* TermBuffer		*/
 	    tpd->topRow + tpd->cursorRow,		/* row			*/
 	    tpd->cursorColumn,			/* column		*/
@@ -963,7 +1291,6 @@ DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
 	    &returnCount);			/* return count ptr	*/
 
     if ((tpd->insertCharMode != DtTERM_INSERT_CHAR_ON_WRAP) || (returnCount <= 0)) {
-        (void) XtFree((char *) returnChars);
 	return(newWidth);
     }
 
@@ -1000,7 +1327,6 @@ DoInsert(Widget w, unsigned char *buffer, int length, Boolean *wrapped)
 	    &returnCount);		/* return count ptr	*/
 
     (void) XtFree((char *) buffer);
-    (void) XtFree((char *) returnChars);
     return(newWidth);
 }
 
@@ -1013,7 +1339,7 @@ _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length)
     int i;
     short renderStartX;
     short renderEndX;
-    short insertStartX;
+    int insertStartX;
     short insertCharCount;
     short newWidth;
     Boolean needToRender = False;
@@ -1022,88 +1348,87 @@ _DtTermPrimInsertText(Widget w, unsigned char *buffer, int length)
 
     if (tpd->mbCurMax > 1)
     {
-        short    wcBufferLen;
-        wchar_t *wcBuffer;
-        wchar_t *pwc;
-        int      i;
-        int      mbLen;
-        char    *pmb;        
-#ifdef    NOCODE
+        wchar_t   *wcBuffer;
+        int       *byteOffsets;	/* byte offset of each wide char */
+        int        wcBufferLen = 0;
+        int        pos = 0;
+        int        mbLen;
+        int        inserted;
+        wchar_t    wc;
+        mbstate_t  state;
+        Boolean    shared = !tpd->wcBufferInUse;
+
         /* 
-        ** It would be nice if the calling function supplied us with a count
-        ** of the number of mb characters in the buffer, then we wouldn't
-        ** have to count them again.
+        ** convert to wide characters, remembering where each one
+        ** started so that the count of characters inserted can be
+        ** mapped back to a byte count.  Use the widget's buffers unless
+        ** we have been called recursively...
         */
-        /* 
-        ** we could use this if the multi-byte buffer was null terminated
-        */
-        wcBufferLen = mbstowcs((wchar_t *)NULL, (char *)buffer, length);
-#else  /* NOCODE */
-        i           = 0;
-        pmb         = (char *)buffer;
-        /* 
-        ** we should never need more than length * sizeof(wchar_t)
-        ** bytes to store the wide char equivalent of the incoming mb string
-        */
-        wcBuffer    = (wchar_t *)XtMalloc(length * sizeof(wchar_t));                                                
-        pwc         = wcBuffer;
-        wcBufferLen = 0;
-        while (i < length)
+        if (shared) {
+            if (tpd->wcBufferLen < length) {
+                tpd->wcBufferLen = MAX(length, BUFSIZ);
+                tpd->wcBuffer = (wchar_t *) XtRealloc(
+                        (char *) tpd->wcBuffer,
+                        tpd->wcBufferLen * sizeof(wchar_t));
+                tpd->wcByteOffsets = (int *) XtRealloc(
+                        (char *) tpd->wcByteOffsets,
+                        tpd->wcBufferLen * sizeof(int));
+            }
+            wcBuffer = tpd->wcBuffer;
+            byteOffsets = tpd->wcByteOffsets;
+            tpd->wcBufferInUse = True;
+        } else {
+            wcBuffer = (wchar_t *) XtMalloc(MAX(length, 1) * sizeof(wchar_t));
+            byteOffsets = (int *) XtMalloc(MAX(length, 1) * sizeof(int));
+        }
+
+        (void) memset(&state, '\0', sizeof(state));
+        while (pos < length)
         {
-            switch (mbLen = mbtowc(pwc, pmb, MIN(((int)MB_CUR_MAX), length - i)))
-            {
-              case -1:
-                if ((int)MB_CUR_MAX <= length - i) {
-                    /* we have a bogus multi-byte character.  Throw away
-                     * the first byte and rescan (TM 12/14/93)...
-                     */
+            if (buffer[pos] < 0x80 && tpd->isUtf8) {
+                /* ASCII... */
+                wc = buffer[pos];
+                mbLen = 1;
+            } else if (tpd->isUtf8) {
+                mbLen = utf8Decode(buffer + pos, length - pos, &wc);
+            } else {
+                mbLen = (int) mbrtowc(&wc, (char *) buffer + pos,
+                        MIN((int) MB_CUR_MAX, length - pos), &state);
+                if (mbLen == 0) {
                     /* 
-                    ** in this case, we move the remaining length - i - 1 
-                    ** bytes one byte to the left (to overwrite the bogus
-                    ** byte)
+                    ** treat null character same as any other character...
                     */
-                    memmove(pmb, pmb + 1, length - i - 1);
-                    length--;
-                    continue;
+                    mbLen = 1;
+                } else if (mbLen < 0) {
+                    (void) memset(&state, '\0', sizeof(state));
                 }
-                break;
-              case  0:
-                /* 
-                ** treat null character same as any other character...
-                */
-                mbLen = 1;
-              default:
-                i   += mbLen;
-                pmb += mbLen;
-                pwc++;
-                wcBufferLen++;
             }
+            if (mbLen < 0) {
+                /* we have a bogus or truncated multi-byte character.
+                 * Throw away the first byte and rescan (TM 12/14/93)...
+                 */
+                pos++;
+                continue;
+            }
+            byteOffsets[wcBufferLen] = pos;
+            wcBuffer[wcBufferLen++] = wc;
+            pos += mbLen;
         }
-#endif /* NOCODE */
-        i = _DtTermPrimInsertTextWc(w, wcBuffer, wcBufferLen);
+
+        inserted = _DtTermPrimInsertTextWc(w, wcBuffer, wcBufferLen);
+
 	/* convert back from a wide character count to a multibyte
-	 * character count...
+	 * byte count.  Bytes we threw away count as inserted...
 	 */
-        pmb         = (char *)buffer;
-        wcBufferLen = i;
-	i           = 0;
-        while (i < wcBufferLen)
-        {
-            switch (mbLen = mblen(pmb, MIN(((int)MB_CUR_MAX), length - i)))
-            {
-	      case -1:
-              case  0:
-                /* 
-                ** treat null character same as any other character...
-                */
-                mbLen = 1;
-              default:
-                i   ++;
-                pmb += mbLen;
-            }
+        pos = (inserted < wcBufferLen) ? byteOffsets[inserted] : length;
+
+        if (shared) {
+            tpd->wcBufferInUse = False;
+        } else {
+            XtFree((char *) wcBuffer);
+            XtFree((char *) byteOffsets);
         }
-        XtFree((char *)wcBuffer);
-        return(pmb - (char *) buffer);
+        return(pos);
     }
 
     /* turn off the cursor... */
@@ -1323,9 +1648,9 @@ _DtTermPrimParseInput
     DtTermPrimitiveClassPart	 *termClassPart = &(((DtTermPrimitiveClassRec *)
 	    (tw->core.widget_class))->term_primitive_class);
     int i;
-    short insertStart;
-    short insertByteCount;
-    short returnLen;
+    int insertStart;
+    int insertByteCount;
+    int returnLen;
     Boolean turnCursorOn = False;
     unsigned char *tmpBuffer = (unsigned char *) 0;
     int mbCharLen = 1;
@@ -1368,53 +1693,92 @@ _DtTermPrimParseInput
 
 
     for (i = 0; (i < len) && tpd->ptyInputId; ) {
-	if (tpd->mbCurMax > 1) {
-            switch (mbCharLen = 
-                    mblen((char *) &buffer[i], MIN(((int)MB_CUR_MAX), len - i)))
-            {
-              case -1:
-		if ((int)MB_CUR_MAX <= len - i)
-                {
-		    /* we have a bogus multi-byte character.  Throw away
-		     * the first byte and rescan (TM 12/14/93)...
-		     */
-		    /* dump what we know we want to insert... */
-		    if (insertByteCount > 0) {
-			returnLen = (*(termClassPart->term_insert_proc))(w,
-				&buffer[insertStart], insertByteCount);
-			if (returnLen != insertByteCount) {
-			    (void) buildDangleBuffer(buffer, len,
-					tpd->mbPartialChar,
-					&tpd->mbPartialCharLen,
-					insertStart + returnLen,
-					dangleBuffer, dangleBufferLen);
+	/* the common case: a run of plain text while the parser is in
+	 * its start state.  Queue up the whole run at once...
+	 */
+	if (!tpd->parserNotInStartState) {
+	    int j = i;
 
-			    insertByteCount = 0;
-			    break;
-			}
-			insertByteCount = 0;
-		    }
-		    /* skip over the bogus char's first byte... */
-		    (void) i++;
-		    insertStart = i;
-		    continue;
-		} else {
-		    /* we have a dangling partial multi-byte character... */
-		    (void) memmove(tpd->mbPartialChar, &buffer[i], len - i);
-		    tpd->mbPartialCharLen = len - i;
-		    /* remove the partial char from the buffer and adjust
-		     * the buffer len...
-		     */
-		    len = i;
-		    continue;
+	    if (tpd->mbCurMax == 1) {
+		while ((j < len) && !preParseTable[buffer[j]])
+		    j++;
+	    } else if (tpd->isUtf8) {
+		/* printable ASCII (and DEL, which is not a control
+		 * code here either)...
+		 */
+		while ((j < len) && (buffer[j] >= 0x20) && (buffer[j] < 0x80))
+		    j++;
+	    }
+	    if (j > i) {
+		insertByteCount += j - i;
+		i = j;
+		continue;
+	    }
+	}
+
+	if (tpd->mbCurMax > 1) {
+	    Boolean bogus = False;
+	    Boolean partial = False;
+
+	    if (tpd->isUtf8) {
+		wchar_t wc;
+
+		mbCharLen = (buffer[i] < 0x80) ? 1 :
+			utf8Decode(&buffer[i], len - i, &wc);
+		if (mbCharLen == -1) {
+		    bogus = True;
+		} else if (mbCharLen == -2) {
+		    partial = True;
 		}
-                break;
-              case 0:
-                mbCharLen = 1;
-                /* fall through */
-              default:
-                break;
-            }
+	    } else {
+		mbCharLen = mblen((char *) &buffer[i],
+			MIN(((int)MB_CUR_MAX), len - i));
+		if (mbCharLen == -1) {
+		    if ((int)MB_CUR_MAX <= len - i) {
+			bogus = True;
+		    } else {
+			partial = True;
+		    }
+		} else if (mbCharLen == 0) {
+		    mbCharLen = 1;
+		}
+	    }
+
+	    if (bogus) {
+		/* we have a bogus multi-byte character.  Throw away
+		 * the first byte and rescan (TM 12/14/93)...
+		 */
+		/* dump what we know we want to insert... */
+		if (insertByteCount > 0) {
+		    returnLen = (*(termClassPart->term_insert_proc))(w,
+			    &buffer[insertStart], insertByteCount);
+		    if (returnLen != insertByteCount) {
+			(void) buildDangleBuffer(buffer, len,
+				    tpd->mbPartialChar,
+				    &tpd->mbPartialCharLen,
+				    insertStart + returnLen,
+				    dangleBuffer, dangleBufferLen);
+
+			insertByteCount = 0;
+			break;
+		    }
+		    insertByteCount = 0;
+		}
+		/* skip over the bogus char's first byte... */
+		(void) i++;
+		insertStart = i;
+		continue;
+	    }
+	    if (partial) {
+		/* we have a dangling partial multi-byte character... */
+		(void) memmove(tpd->mbPartialChar, &buffer[i], len - i);
+		tpd->mbPartialCharLen = len - i;
+		/* remove the partial char from the buffer and adjust
+		 * the buffer len...
+		 */
+		len = i;
+		continue;
+	    }
 	}
 
 	if (((mbCharLen == 1) && preParseTable[buffer[i]]) ||

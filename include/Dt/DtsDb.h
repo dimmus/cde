@@ -80,6 +80,15 @@ typedef	struct
 	int			recordCount;
 	DtDtsDbRecord		**recordList;
         unsigned long           ActionSequenceNumber;
+	/*
+	 * While the database is unsorted, _DtDtsDbGetRecordByName() finds
+	 * records through this table (record name -> first record of that
+	 * name).  It holds recordList[0 .. nameIndexed-1], is brought up to
+	 * date when used, and is dropped when records are deleted or
+	 * sorted.  Private to DtsDb.c.
+	 */
+	struct _DtDtsDbNameIndex	*nameIndex;
+	int			nameIndexed;
 } DtDtsDbDatabase;
 
 /* for the mmaped database this the use_in_memory_db variable is used

@@ -67,12 +67,29 @@ _Tt_string	_tt_gethostname(void);
 int	_tt_getdtablesize(void);
 int	_tt_zoomdtablesize(void);
 int	_tt_restoredtablesize(void);
+void	_tt_close_fds_from(int lowfd, int maxfds);
 long	_tt_gethostid(void);
 int	_tt_sigset(int sig, SIG_PF handler);
 char   *_tt_putenv(const char *variable, const char *value);
 char   *_tt_get_first_set_env_var(int i_num_names, ...);
 int	_tt_put_all_env_var (int i_num_names, const char* pc_val, ...);
 void	_tt_openlog(const char *prefix, int logopt, int facility);
+
+//
+// Retry helpers: a monotonic clock in milliseconds, and a sleep of
+// *delay_ms (capped at max_ms and at the time left before deadline_ms)
+// that doubles *delay_ms for the next round.  _tt_backoff() returns 0,
+// without sleeping, once the deadline has passed.
+//
+long long _tt_monotonic_ms(void);
+int	_tt_backoff(int *delay_ms, int max_ms, long long deadline_ms);
+
+//
+// Timeout in seconds for synchronous RPCs to ttsession or rpc.ttdbserverd:
+// default_secs, unless TT_RPC_TIMEOUT holds a positive number of seconds
+// (useful when a server is being debugged).
+//
+int	_tt_rpc_timeout(int default_secs);
 
 //
 // Log to sink, or use syslog() if sink is 0

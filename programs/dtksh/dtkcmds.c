@@ -486,6 +486,7 @@ WtabDestroy(
                 }
                 XtFree(W[i]->envar);
          }
+         wtab_map_remove(W[i]->w, i);
          W[i]->type = TAB_EMPTY;
          Wtab_free++;
       }
@@ -520,6 +521,7 @@ set_up_w(
 	w->widid = strdup(widid);
 	w->w = wid;
 	w->mask = 0;
+	wtab_map_add(w, atoi(&widid[1]));	/* widid is "W<index>" */
 	XtAddCallback(wid, XtNdestroyCallback, (XtCallbackProc)PendingDestroy, 
                       (caddr_t)w);
 	return(w);

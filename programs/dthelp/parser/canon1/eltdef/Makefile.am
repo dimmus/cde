@@ -1,7 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-.NOTPARALLEL:
-
 noinst_PROGRAMS = eltdef
 
 HELPTAG       = ..
@@ -11,13 +9,14 @@ HELPELTDEFSRC = $(HELPTAG)/eltdef
 HELPDTDFILE   = $(HELPTAGSRC)/hptag.dtd
 HELPUTILSRC   = $(HELPTAG)/util
 HELPBUILDSRC  = $(HELPTAG)/build
-HELPUTILLIB   = $(HELPTAG)/util/libutil.a
+HELPUTILLIB   = $(HELPTAG)/../util/libhelputil.a
+HELPCONTEXT   = $(HELPTAG)/../util/context
 HELPIFFILE    = $(HELPTAGSRC)/help.if
 HELPTSSFILE   = $(HELPTAGSRC)/htag.tss
 
 eltdef_LDADD = $(HELPUTILLIB)
 
-eltdef_CFLAGS = -I$(HELPUTILSRC) -I$(HELPBUILDSRC)
+eltdef_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) -I$(HELPUTILSRC) -I$(HELPBUILDSRC)
 
 eltdef_SOURCES = eltdef.c eltutil.c entity.c scan.c
 
@@ -41,15 +40,18 @@ $(CPRODS): CDONE
 
 $(EPRODS): EDONE
 
+# eltdef includes the CPRODS (case.c, context.h, delim.h): make them first.
+$(eltdef_OBJECTS): CDONE
+
 
 EDONE: eltdef  $(HELPIFFILE) $(HELPTSSFILE)
 	$(RM) $(EPRODS) $(ETRASH)
 	./eltdef $(HELPIFFILE)
 	touch EDONE
 
-CDONE:  $(HELPUTILSRC)/context $(HELPTAGSRC)/delim.elt context.dat
+CDONE:  $(HELPCONTEXT) $(HELPTAGSRC)/delim.elt context.dat
 	$(RM) $(CPRODS) $(CTRASH)
 	$(CP) $(HELPTAGSRC)/delim.elt delim.dat  # appl.-specific delim.dat
-	$(HELPUTILSRC)/context
+	$(HELPCONTEXT)
 	touch CDONE
 

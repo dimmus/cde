@@ -417,7 +417,7 @@ externaldef(vtclassrec) DtTermClassRec dtTermClassRec =
 	/* num_resources	*/	XtNumber(resources),
 	/* xrm_class		*/	NULLQUARK,
 	/* compress_motion	*/	TRUE,
-	/* compress_exposure	*/	FALSE,
+	/* compress_exposure	*/	XtExposeCompressMultiple,
 	/* compress_enterlv	*/	TRUE,
 	/* visible_interest	*/	TRUE,
 	/* destroy		*/	Destroy,
@@ -996,8 +996,18 @@ TextInsertProc
     DtTermData		  td = tw->vt.td;
     int			  partialLen = 0;
     int			  holdFont;
+    int			  charLen = 1;
 
     if (td->singleShiftPending) {
+	/* the single shift applies to one character, which may be more
+	 * than one byte long...
+	 */
+	if (tpd->mbCurMax > 1) {
+	    charLen = mblen((char *) buffer, MIN((int) MB_CUR_MAX, length));
+	    if (charLen < 1)
+		charLen = 1;
+	}
+
 	/* save away the active GL font... */
 	holdFont = *td->GL;
 	/* make it the single shift font... */
@@ -1007,7 +1017,7 @@ TextInsertProc
 		enhFont, *td->GL);
 
 	/* insert the first character... */
-	partialLen = _DtTermPrimInsertText(w, buffer, 1);
+	partialLen = _DtTermPrimInsertText(w, buffer, charLen);
 
 	/* restore the active GL font... */
 	*td->GL = holdFont;
@@ -1015,14 +1025,14 @@ TextInsertProc
 		tpd->topRow + tpd->cursorRow, tpd->cursorColumn,
 		enhFont, *td->GL);
 
-	if (partialLen == 1) {
+	if (partialLen == charLen) {
 	    /* successful insert...
 	     */
 	    /* clear the pending flag... */
 	    td->singleShiftPending = False;
 	    /* skip over the character... */
-	    (void) buffer++;
-	    (void) length--;
+	    buffer += charLen;
+	    length -= charLen;
 	} else {
 	    return(partialLen);
 	}

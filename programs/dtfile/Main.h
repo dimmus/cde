@@ -784,6 +784,8 @@ extern void DeselectAllFiles(
                         FileMgrData *file_mgr_data) ;
 extern void SelectAllFiles(
                         FileMgrData *file_mgr_data) ;
+extern void FileIconStateInvalidate(
+                        Widget w) ;
 extern void SetToSelectColors(
                         Widget widget,
                         Widget file_window,

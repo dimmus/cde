@@ -126,10 +126,13 @@ The message text can also be specified with the \fBstring\fR (class
 .TP 8
 .BI \-timeout " num_seconds"
 This option specifies the timeout value in seconds.
-\fIDthello\fP sets a timer and then waits for the \fBReparentNotify\fP event
-that signals that the window manager is up. If the timer expires,
+\fIDthello\fP sets a timer and then waits for the window manager to
+come up: for the \fBReparentNotify\fP event on its probe window, for a
+window manager to take the ICCCM \fBWM_S\fP\fIn\fP selection, or for
+\fIdtsession\fP to set the \fB_DT_SM_WM_READY\fP property on the root
+window when it stops waiting for the window manager. If the timer expires,
 \fIdthello\fP stops waiting on the window manager and terminates
-immediately. The default value is 240 seconds. The equivalent resource
+immediately. The default value is 15 seconds. The equivalent resource
 is \fBtimeout\fR (class \fBTimeout\fR).
 .PP  
 .SH ENVIRONMENT

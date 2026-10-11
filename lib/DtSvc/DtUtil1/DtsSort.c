@@ -62,11 +62,42 @@
 extern	char	*strdup(const char *);
 #endif
 
+/*
+ * The field names the comparison functions look at, quarked once (they
+ * run O(n log n) times per sort, and quarking a name means hashing it
+ * and taking the Xrm lock).
+ */
+enum
+{
+	SQ_PATH_PATTERN, SQ_NAME_PATTERN, SQ_MODE, SQ_LINK_PATH, SQ_LINK_NAME,
+	SQ_CONTENT, SQ_DATA_ATTRIBUTES_NAME, SQ_DA_IS_SYNTHETIC, SQ_COUNT
+};
+static XrmQuark	sort_quark[SQ_COUNT];
+
+static const XrmQuark *
+sort_quarks(void)
+{
+	if (!sort_quark[SQ_COUNT - 1])
+	{
+		sort_quark[SQ_PATH_PATTERN] = XrmStringToQuark(DtDTS_PATH_PATTERN);
+		sort_quark[SQ_NAME_PATTERN] = XrmStringToQuark(DtDTS_NAME_PATTERN);
+		sort_quark[SQ_MODE] = XrmStringToQuark(DtDTS_MODE);
+		sort_quark[SQ_LINK_PATH] = XrmStringToQuark(DtDTS_LINK_PATH);
+		sort_quark[SQ_LINK_NAME] = XrmStringToQuark(DtDTS_LINK_NAME);
+		sort_quark[SQ_CONTENT] = XrmStringToQuark(DtDTS_CONTENT);
+		sort_quark[SQ_DATA_ATTRIBUTES_NAME] =
+			XrmStringToQuark(DtDTS_DATA_ATTRIBUTES_NAME);
+		sort_quark[SQ_DA_IS_SYNTHETIC] =
+			XrmStringToQuark(DtDTS_DA_IS_SYNTHETIC);
+	}
+	return sort_quark;
+}
+
 static char *
-get_value(DtDtsDbRecord *ce_entry, char *value)
+get_value(DtDtsDbRecord *ce_entry, int which)
 {
 	int	i=0;
-	XrmQuark	tmp = XrmStringToQuark (value);
+	XrmQuark	tmp = sort_quarks()[which];
 
 	for(i = 0; i < ce_entry->fieldCount; i++)
 	{
@@ -77,6 +108,10 @@ get_value(DtDtsDbRecord *ce_entry, char *value)
 	}
 	return(NULL);
 }
+
+/* mblen(), but without the call for an ASCII byte (always 1 byte). */
+#define	PAT_MBLEN(c)	((unsigned char)*(c) < 0x80 ? (*(c) != '\0') : \
+			 mblen((c), MB_CUR_MAX))
 
 void
 parts_of_pattern(char *c, int *spec, int *count, int *front)
@@ -91,7 +126,7 @@ parts_of_pattern(char *c, int *spec, int *count, int *front)
 
 	while(*c)
 	{
-                if((len = mblen(c, MB_CUR_MAX)) > 1) {
+                if((len = PAT_MBLEN(c)) > 1) {
                     (*count) += len;
                     if(!found)
                         (*front) += len;
@@ -128,7 +163,7 @@ parts_of_pattern(char *c, int *spec, int *count, int *front)
 		case	'\\':
 			if(!nested)
 			{
-                            if((len = mblen(c + 1, MB_CUR_MAX)) > 1) {
+                            if((len = PAT_MBLEN(c + 1)) > 1) {
                                 (*count) += len + 1;
                                 c += len;
                             }
@@ -289,10 +324,10 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 	char           *value1, *value2;
 	int		val;
 
-	test1 |= get_value(item1, DtDTS_CONTENT) ? 2 : 0;
-	test2 |= get_value(item2, DtDTS_CONTENT) ? 2 : 0;
+	test1 |= get_value(item1, SQ_CONTENT) ? 2 : 0;
+	test2 |= get_value(item2, SQ_CONTENT) ? 2 : 0;
 
-	value1 = get_value(item1, DtDTS_NAME_PATTERN);
+	value1 = get_value(item1, SQ_NAME_PATTERN);
 	if (value1)
 	{
 		if ((strlen(value1) == 1) && (*value1 == '*'))
@@ -305,7 +340,7 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 		}
 	}
 
-	value2 = get_value(item2, DtDTS_NAME_PATTERN);
+	value2 = get_value(item2, SQ_NAME_PATTERN);
 	if (value2)
 	{
 		if ((strlen(value2) == 1) && (*value2 == '*'))
@@ -320,11 +355,11 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 
 	if (!(test1 & 1))
 	{
-		test1 |= get_value(item1, DtDTS_PATH_PATTERN) ? 1 : 0;
+		test1 |= get_value(item1, SQ_PATH_PATTERN) ? 1 : 0;
 	}
 	if (!(test2 & 1))
 	{
-		test2 |= get_value(item2, DtDTS_PATH_PATTERN) ? 1 : 0;
+		test2 |= get_value(item2, SQ_PATH_PATTERN) ? 1 : 0;
 	}
 
 	switch (test1)
@@ -366,14 +401,14 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 
 	if (loc1 == 2)		/* loc1 == loc2 */
 	{
-		val = check_pattern(get_value(item1, DtDTS_PATH_PATTERN),
-					get_value(item2, DtDTS_PATH_PATTERN));
+		val = check_pattern(get_value(item1, SQ_PATH_PATTERN),
+					get_value(item2, SQ_PATH_PATTERN));
 		if(val)
 		{
 			return(val);
 		}
-		val = check_pattern(get_value(item1, DtDTS_NAME_PATTERN),
-					get_value(item2, DtDTS_NAME_PATTERN));
+		val = check_pattern(get_value(item1, SQ_NAME_PATTERN),
+					get_value(item2, SQ_NAME_PATTERN));
 		if(val)
 		{
 			return(val);
@@ -382,8 +417,8 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 
 	if( loc1 == 3)
 	{
-		val = check_content(get_value(item1, DtDTS_CONTENT),
-					get_value(item2, DtDTS_CONTENT));
+		val = check_content(get_value(item1, SQ_CONTENT),
+					get_value(item2, SQ_CONTENT));
 		if(val)
 		{
 			return(val);
@@ -399,8 +434,8 @@ sfe(DtDtsDbRecord * item1, DtDtsDbRecord * item2)
 		return (item2->fieldCount - item1->fieldCount);
 	}
 
-	val =   mode_count(get_value(item2, DtDTS_MODE)) -
-		mode_count(get_value(item1, DtDTS_MODE));
+	val =   mode_count(get_value(item2, SQ_MODE)) -
+		mode_count(get_value(item1, SQ_MODE));
 	if(val)
 	{
 		return(val);
@@ -433,21 +468,23 @@ cde_dc_compare(DtDtsDbRecord ** a, DtDtsDbRecord ** b)
 static int
 cde_ft_field_value(XrmQuark  name_quark)
 {
-	if (name_quark == XrmStringToQuark(DtDTS_PATH_PATTERN))
+	const XrmQuark	*q = sort_quarks();
+
+	if (name_quark == q[SQ_PATH_PATTERN])
 		return (1);
-	else if (name_quark == XrmStringToQuark(DtDTS_NAME_PATTERN))
+	else if (name_quark == q[SQ_NAME_PATTERN])
 		return (2);
-	else if (name_quark == XrmStringToQuark(DtDTS_MODE))
+	else if (name_quark == q[SQ_MODE])
 		return (3);
-	else if (name_quark == XrmStringToQuark(DtDTS_LINK_PATH))
+	else if (name_quark == q[SQ_LINK_PATH])
 		return (4);
-	else if (name_quark == XrmStringToQuark(DtDTS_LINK_NAME))
+	else if (name_quark == q[SQ_LINK_NAME])
 		return (5);
-	else if (name_quark == XrmStringToQuark(DtDTS_CONTENT))
+	else if (name_quark == q[SQ_CONTENT])
 		return (6);
-	else if (name_quark == XrmStringToQuark(DtDTS_DATA_ATTRIBUTES_NAME))
+	else if (name_quark == q[SQ_DATA_ATTRIBUTES_NAME])
 		return (7);
-	else if (name_quark == XrmStringToQuark(DtDTS_DA_IS_SYNTHETIC))
+	else if (name_quark == q[SQ_DA_IS_SYNTHETIC])
 		return (8);
 	else
 		return (9);

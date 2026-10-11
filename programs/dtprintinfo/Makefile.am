@@ -1,11 +1,13 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = dtprintinfo
 
-AM_CPPFLAGS = -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./objects	\
+AM_CPPFLAGS = $(CDE_CPPFLAGS) -I./UI -I./libUI -I./util -I./libUI/MotifUI -I./objects	\
 	-I./objects/PrintObj -DKORNSHELL=\"$(KSH)\"
 
-dtprintinfo_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtprintinfo_LDADD = $(LIBHELP) $(LIBSVC) $(XMLIB) $(XTLIB) $(XPMLIB) $(X11LIB)
 
 UTIL_SRC = util/Invoke.C util/Invoke.h util/Process.C util/Process.h
 

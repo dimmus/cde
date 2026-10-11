@@ -60,6 +60,7 @@
 #include "MemUtils.hh"
 #include "MailMsg.h"
 #include "DtMailGenDialog.hh"
+#include "XmCompat.h"
 
 
 UndelMsgScrollingList::UndelMsgScrollingList (RoamMenuWindow *rmw, Widget w,
@@ -94,7 +95,7 @@ UndelMsgScrollingList::deleteSelected(Boolean)
                    XmNitemCount, &num_msgs,
                    NULL );
  
-    any_selected = XmListGetSelectedPos(_w,
+    any_selected = XmCompatListGetSelectedPos(_w,
                                         &position_list,
                                         &position_count);
  
@@ -173,41 +174,56 @@ UndelMsgScrollingList::loadMsgs(
 {
     MsgStruct *tmpMS;
     XmString *msg_hdrs;
-    int i;
-    DtMailHeaderLine info;
+    int i, nhdrs;
     DtMail::Message * msg;
 
+    if (count <= 0) return;
 
     msg_hdrs = (XmString *)malloc(sizeof(XmString) * count);
-    memset(msg_hdrs, 0, sizeof(XmString) * count);    
 
     DtMail::MailBox * mbox = this->parent()->mailbox();
 
-    for (i = 0; i < count; i ++) {
+    // Format every row first and add them to the list in one go, then
+    // scroll once. A message that cannot be read is left out of both
+    // the list and _msgs, so the two stay in step, and the error is
+    // passed back.
+    for (i = nhdrs = 0; i < count; i ++) {
+	DtMailEnv error;
+	DtMailHeaderLine info;
+
+	info.number_of_names = 0;
+	info.header_values = NULL;
+
 	tmpMS = deleted_msgs->at(i);
-	_msgs->append(tmpMS);
-	
-	mbox->getMessageSummary(mail_error,
+
+	mbox->getMessageSummary(error,
 			    tmpMS->message_handle, 
 			    _header_info, 
 			    info);
+	msg = NULL;
+	if (error.isNotSet())
+	  msg = mbox->getMessage(error, tmpMS->message_handle);
 
-	msg =  mbox->getMessage(mail_error, tmpMS->message_handle);
-
-	if (mail_error.isSet()) {
-	    return;
+	if (error.isSet() || msg == NULL) {
+	    mbox->clearMessageSummary(info);
+	    mail_error.setError(error.isSet() ? (DTMailError_t) error :
+						DTME_ObjectInvalid);
+	    continue;
 	}
 
-	msg_hdrs[i] = formatHeader(info,
+	_msgs->append(tmpMS);
+	msg_hdrs[nhdrs++] = formatHeader(info,
 				tmpMS->sessionNumber,
 				show_with_attachments(msg),
-				msg->flagIsSet(mail_error, DtMailMessageNew));
+				msg->flagIsSet(error, DtMailMessageNew));
+	mbox->clearMessageSummary(info);
     }
 
-    XmListAddItems(_w, msg_hdrs, count, 0);
+    if (nhdrs > 0)
+      XmListAddItems(_w, msg_hdrs, nhdrs, 0);
 
     // Free the strings we added to the header array.
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < nhdrs; i++) {
 	XmStringFree(msg_hdrs[i]);
     }
 
@@ -457,7 +473,7 @@ UndelFromListDialog::undelSelected()
     int position_count;
     Boolean any_selected = FALSE;
 
-    any_selected = XmListGetSelectedPos(_list->get_scrolling_list(),
+    any_selected = XmCompatListGetSelectedPos(_list->get_scrolling_list(),
 					&position_list,
 					&position_count);
 

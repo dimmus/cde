@@ -42,10 +42,20 @@ XCOMM
 
 XCOMM dtdbcache file's directory should match
 XCOMM _DTDTSMMTEMPDIR in DtSvc/DtUtil1/DtsMM.h
+XCOMM
+XCOMM The actions/datatypes cache file of the display is kept from one
+XCOMM session to the next (dtdbcache -init rebuilds it only if the
+XCOMM database changed), but only for the same user: remove anything
+XCOMM else found under its name (a file left by another user, or not a
+XCOMM plain file).
 DTDBFILE=/tmp/dtdbcache_$DISPLAY
-if [ -f $DTDBFILE ]
+if [ -f $DTDBFILE -o -h $DTDBFILE ]
 then
-  /bin/rm -f $DTDBFILE
+  if [ -h $DTDBFILE ] || \
+     [ -z "$(find $DTDBFILE -prune -type f -user "$USER" 2>/dev/null)" ]
+  then
+    /bin/rm -f $DTDBFILE
+  fi
 fi
 
 

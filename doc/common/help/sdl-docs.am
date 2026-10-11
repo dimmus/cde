@@ -18,7 +18,15 @@ DTHELP_HTAG2 = $(top_builddir)/programs/dthelp/parser/pass2/parser/dthelp_htag2
 # let's try a rule here.  I don't like the backticks for running basename
 # but the $(basename...) seems to add a space for some reason
 
-%.sdl:
+# Every volume also reads the locale's common entities.  The tools are
+# order-only prerequisites: they are relinked or regenerated whenever a
+# library or configure changes, and that should not rebuild every volume.
+SDL_COMMON = common/ProdEnt.sgm common/glossary.sgm
+
+# Delete a volume whose build failed instead of keeping it half-written.
+.DELETE_ON_ERROR:
+
+%.sdl: $(SDL_COMMON) | $(DTHELP_HTAG2)
 	SGML_SEARCH_PATH=".:.." \
 		$(KSH) $(DTDOCBOOK) -H $(DTHELP_HTAG2) -L $(LANG) \
 			-o $@ `basename $@ .sdl`/book.sgm

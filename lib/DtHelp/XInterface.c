@@ -72,9 +72,11 @@ extern int errno;
 #include "FontAttrI.h"
 #include "FontI.h"
 #include "GraphicsI.h"
+#include "GraphicCacheI.h"
 #include "RegionI.h"
 #include "StringFuncsI.h"
 #include "XInterfaceI.h"
+#include "Lock.h"
 
 #include <X11/bitmaps/root_weave>
 
@@ -810,25 +812,43 @@ ResolveFont (
     DtHelpDispAreaStruct *pDAS = (DtHelpDispAreaStruct *) client_data;
     XrmName	xrmList[_DtHelpFontQuarkNumber];
 
+    /*
+     * this runs for every chunk of text: look the constant quarks up
+     * once.
+     */
+    static XrmQuark qM = NULLQUARK, qItalic, qBold, qSerif, qSymbol, qC;
+
+    _DtHelpProcessLock();
+    if (NULLQUARK == qM)
+      {
+	qItalic = XrmStringToQuark("italic");
+	qBold   = XrmStringToQuark("bold");
+	qSerif  = XrmStringToQuark("serif");
+	qSymbol = XrmStringToQuark("symbol");
+	qC      = XrmStringToQuark("C");
+	qM      = XrmStringToQuark("m");
+      }
+    _DtHelpProcessUnlock();
+
     _DtHelpCopyDefaultList(xrmList);
 
     if (font_attr.spacing != _DtHelpFontSpacingProp)
-        xrmList[_DT_HELP_FONT_SPACING] = XrmStringToQuark("m");
+        xrmList[_DT_HELP_FONT_SPACING] = qM;
 
     sprintf(buffer, "%d", font_attr.pointsz);
     xrmList[_DT_HELP_FONT_SIZE]    = XrmStringToQuark(buffer);
 
     if (font_attr.slant != _DtHelpFontSlantRoman)
       {
-        xrmList[_DT_HELP_FONT_ANGLE]  = XrmStringToQuark("italic");
+        xrmList[_DT_HELP_FONT_ANGLE]  = qItalic;
 	if (font_attr.xlfdi != NULL)
 	    xlfdSpec = font_attr.xlfdi;
       }
 
     if (font_attr.weight == _DtHelpFontWeightBold)
       {
-        xrmList[_DT_HELP_FONT_WEIGHT] = XrmStringToQuark("bold");
-	if (xrmList[_DT_HELP_FONT_ANGLE] == XrmStringToQuark("italic"))
+        xrmList[_DT_HELP_FONT_WEIGHT] = qBold;
+	if (xrmList[_DT_HELP_FONT_ANGLE] == qItalic)
 	  {
 	    if (font_attr.xlfdib != NULL)
 	        xlfdSpec = font_attr.xlfdib;
@@ -838,11 +858,11 @@ ResolveFont (
       }
 
     if (font_attr.style == _DtHelpFontStyleSerif)
-        xrmList[_DT_HELP_FONT_TYPE] = XrmStringToQuark("serif");
+        xrmList[_DT_HELP_FONT_TYPE] = qSerif;
     else if (font_attr.style == _DtHelpFontStyleSymbol)
-        xrmList[_DT_HELP_FONT_TYPE] = XrmStringToQuark("symbol");
+        xrmList[_DT_HELP_FONT_TYPE] = qSymbol;
 
-    xrmList[_DT_HELP_FONT_LANG_TER] = XrmStringToQuark ("C");
+    xrmList[_DT_HELP_FONT_LANG_TER] = qC;
     if (lang != NULL)
 	xrmList[_DT_HELP_FONT_LANG_TER] = XrmStringToQuark(lang);
 
@@ -1066,9 +1086,14 @@ DADrawString (
 	     */
 	    if (pSCD->fg_pixel == (unsigned long)-1)
 	      {
+		/*
+		 * keep the pixel: this runs on every redraw, and the
+		 * colour was allocated (and leaked) again each time.
+		 */
 		if (XAllocNamedColor(dpy, pDAS->colormap, pSCD->fg_color,
 							&screen, &exact))
 		  {
+		    pSCD->fg_pixel = screen.pixel;
 		    XSetForeground(dpy, drawGC, screen.pixel);
 		    XSetBackground(dpy, fillGC, screen.pixel);
 		  }
@@ -1103,6 +1128,7 @@ DADrawString (
 		if (XAllocNamedColor(dpy, pDAS->colormap, pSCD->bg_color,
 							&screen, &exact))
 		  {
+		    pSCD->bg_pixel = screen.pixel;
 		    XSetBackground(dpy, drawGC, screen.pixel);
 		    XSetForeground(dpy, fillGC, screen.pixel);
 		  }
@@ -1847,6 +1873,15 @@ _DtHelpDAResolveSpc (
 
     result = ResolveFont(client_data, lang, newSet, font_attr, &fontIdx);
 
+    /*
+     * If not even the default special character has a font, draw it in
+     * the default font (fontIdx), as every later request does (a quark
+     * list that found no font is remembered with the default font).
+     * The callers ignore a failure, and the region would be left unset.
+     */
+    if (result != 0 && spc_symbol == DefaultStr)
+	result = 0;
+
     if (result == 0)
       {
 	long		 spcLstIdx = 0;
@@ -2000,6 +2035,8 @@ _DtHelpDALoadGraphic (
     char		 *fileName = file_xid;        
     Screen               *retScr;
     int                  screen;
+    int                  cached;
+    _DtHelpGrCacheKey    key;
 
     pGS  = (DtHelpGraphicStruct *) malloc (sizeof(DtHelpGraphicStruct));
     pReg = (_DtHelpDARegion     *) malloc (sizeof(_DtHelpDARegion));
@@ -2029,6 +2066,7 @@ _DtHelpDALoadGraphic (
 	if (fileName == NULL)
 	  {
 	    free(pGS);
+	    free(pReg);
 	    return -1;
 	  }
 
@@ -2045,9 +2083,32 @@ _DtHelpDALoadGraphic (
      * Find out if this is a X Pixmap graphic and set flag if it is.
      * This will be used later when/if colors need to be freed.
      */
+    pGS->used = 0;
     if (fileName != NULL && _DtHelpCeStrrchr(fileName, ".", MB_CUR_MAX, &extptr) != -1)
     	if (strcmp (extptr, ".xpm") == 0 || strcmp (extptr, ".pm") == 0)
 		pGS->used = -1;
+
+    /*
+     * Reuse the pixmap if this graphic was loaded before with the
+     * same colors (it is shared, and released in _DtHelpDADestroyGraphic).
+     */
+    key.dpy              = XtDisplay(pDAS->dispWid);
+    key.screen           = XScreenNumberOfScreen(XtScreen(pDAS->dispWid));
+    key.depth            = pDAS->depth;
+    key.colormap         = pDAS->colormap;
+    key.visual           = pDAS->visual;
+    key.fg               = pDAS->foregroundColor;
+    key.bg               = pDAS->backgroundColor;
+    key.media_resolution = pDAS->media_resolution;
+    key.path             = fileName;
+    cached = _DtHelpGrCacheLookup (&key, &(pGS->pix), &(pGS->mask),
+					&(pGS->width), &(pGS->height));
+    if (cached == 1)
+      {
+	pGS->pixels     = NULL;
+	pGS->num_pixels = 0;
+	goto have_graphic;
+      }
 
     if (pDAS->context == NULL)
     {
@@ -2078,6 +2139,20 @@ _DtHelpDALoadGraphic (
         pDAS->context = NULL;
     }
 
+    /*
+     * Hand a newly decoded graphic (not the "missing graphic" default)
+     * to the cache; it then owns the pixmap, mask and colors.
+     */
+    if (cached == 0 && pGS->pix != 0 && pGS->pix != pDAS->def_pix &&
+	_DtHelpGrCacheAdd (&key, pGS->pix, pGS->mask, pGS->width,
+			pGS->height, pGS->pixels, pGS->num_pixels,
+			(pGS->used != -1) ? True : False))
+      {
+	pGS->pixels     = NULL;
+	pGS->num_pixels = 0;
+      }
+
+have_graphic:
     if (fileName != file_xid)
 	free (fileName);
 
@@ -2127,6 +2202,15 @@ _DtHelpDADestroyGraphic (
     DtHelpDispAreaStruct *pDAS = (DtHelpDispAreaStruct *) client_data;
     DtHelpGraphicStruct	 *pGS  = (DtHelpGraphicStruct *)     graphic_ptr;
     Display		 *dpy  = XtDisplay(pDAS->dispWid);
+
+    /*
+     * A graphic shared through the cache just drops its reference.
+     */
+    if (pGS->pix != pDAS->def_pix && _DtHelpGrCacheRelease(dpy, pGS->pix))
+      {
+	free((char *) pGS);
+	return;
+      }
 
     if (pGS->pix != pDAS->def_pix)
 	XFreePixmap(dpy, pGS->pix);

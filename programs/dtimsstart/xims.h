@@ -79,6 +79,8 @@
 #define	MAXIMSENT		32	/* max # of ims for each locale */
 
 #define	MIN_INTERVAL		100	/* msec */
+#define	FIRST_INTERVAL		20	/* msec; first wait-for-IMS poll ... */
+#define	MAX_FAST_INTERVAL	250	/* msec; ... doubled up to this (or the interval) */
 #define	DEFAULT_INTERVAL	1000	/* msec */
 #define	MIN_TIMEOUT		1	/* sec */
 #define	DEFAULT_TIMEOUT		180	/* sec */

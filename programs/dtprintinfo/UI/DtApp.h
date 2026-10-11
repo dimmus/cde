@@ -52,12 +52,14 @@ extern const char *PRINTERS_DIR;
 class DtApp : public Application
 {
 
-   friend void InitQueueDetails(BaseUI *obj, void *data);
+   friend void StatusTimerCB(XtPointer, XtIntervalId *);
+   friend void StatusOutputCB(BaseUI *obj, char *output, int rc);
+   friend void CatchUpCB(XtPointer, XtIntervalId *);
+   friend void LocalStatusCB(BaseUI *obj, char *output, int rc);
    friend void RemoteStatusCB(BaseUI *obj, char *output, int rc);
    friend void TurnOffHourGlass(BaseUI *obj, void *data);
    friend void OpenClose(void *data, BaseUI *obj);
    friend void ActionCB(void *data, BaseUI *obj, char *actionReferenceName);
-   friend void UpdatePrintJobs(BaseUI *obj, void *data);
    friend void PreferenceCB(void *data, PreferenceRequest req, char *value);
    friend void FilterCB(void *data);
    friend void ModifyCB(void *data);
@@ -68,12 +70,14 @@ class DtApp : public Application
 
  private:
 
-   static void InitQueueDetails(BaseUI *obj, void *data);
+   static void StatusTimerCB(XtPointer, XtIntervalId *);
+   static void StatusOutputCB(BaseUI *obj, char *output, int rc);
+   static void CatchUpCB(XtPointer, XtIntervalId *);
+   static void LocalStatusCB(BaseUI *obj, char *output, int rc);
    static void RemoteStatusCB(BaseUI *obj, char *output, int rc);
    static void TurnOffHourGlass(BaseUI *obj, void *data);
    static void OpenClose(void *data, BaseUI *obj);
    static void ActionCB(void *data, BaseUI *obj, char *actionReferenceName);
-   static void UpdatePrintJobs(BaseUI *obj, void *data);
    static void PreferenceCB(void *data, PreferenceRequest req, char *value);
    static void FilterCB(void *data);
    static void ModifyCB(void *data);
@@ -95,6 +99,18 @@ class DtApp : public Application
    boolean ShowUserJob(DtPrtJobIcon *_job, char *user_name);
    void ShowUserJobs(BaseUI *queue, char *user_name, boolean flag);
    void HandleShowOnlyMinePreferenceRequest(boolean flag);
+
+   // Status polling: one timer for the whole application; each tick runs
+   // one asynchronous command for the status of all queues and refreshes
+   // the job lists of the open queues.
+   void StartStatusTimer();
+   void StartStatusPoll();
+   void RefreshOpenQueues();
+   void ShellVisibilityChanged(boolean visible);
+   XtIntervalId status_timer;
+   boolean status_running;  // a status command is running
+   boolean status_pending;  // run it again when it is done
+   boolean status_stale;    // a tick was skipped while we were not visible
 
    int connect_timeout; // connect timeout to contact server
    long Frequency;
@@ -118,6 +134,8 @@ class DtApp : public Application
    char *SessionPath() { return printer_dir; }
    char *GetBottomString(BaseObj *job, boolean need_details);
    void ActionCB(BaseUI *obj, char *actionReferenceName);
+   // Refresh the status flags of the queues soon
+   void RequestStatusUpdate();
 
 };
 

@@ -37,6 +37,7 @@
 #endif
 
 #include "userinc.h"
+#include "lzw.h"
 #include "globdec.h"
 
 static char *operantLocale;
@@ -1215,80 +1216,31 @@ pLoidsEnd = pNewId;
 */
 static int Compress(char *fileName, char *zFileName, LOGICAL doCompress)
 {
-       char cmd[BUFSIZ];
-       int  errStatus;
-       int  errCode;
-static char sysStr[] = "system()";
+FILE *in, *out;
+char *inName  = doCompress ? fileName : zFileName;
+char *outName = doCompress ? zFileName : fileName;
+int   status;
 
-if (doCompress)
-    sprintf(cmd, "compress -f < %s > %s", fileName, zFileName);
-else
-    sprintf(cmd, "compress -d < %s > %s", zFileName, fileName);
-errStatus = system(cmd);
-if (errStatus)
+if (!(in = fopen(inName, "rb")) || !(out = fopen(outName, "wb")))
     {
-    fprintf(stderr, "%s: error executing \"%s\"\n", progName, cmd);
+    fprintf(stderr, "%s: cannot open \"%s\": %s\n",
+	    progName, in ? outName : inName, strerror(errno));
     if (m_errfile && (m_errfile != stderr))
-	fprintf(m_errfile, "%s: error executing \"%s\"\n", progName, cmd);
-    if (errStatus == -1)
-	{
-	perror(sysStr);
-	if (m_errfile && (m_errfile != stderr))
-	    fprintf(m_errfile, "%s: %s", sysStr, strerror(errno));
-	}
-    else
-	{
-	if (WIFEXITED(errStatus))
-	    {
-	    if ((errCode = WEXITSTATUS(errStatus)) == 127)
-		{
-		fprintf(stderr,
-			"%s: %s\n",
-			sysStr,
-			"error executing command language interpreter");
-		if (m_errfile && (m_errfile != stderr))
-		    fprintf(m_errfile,
-			    "%s: %s\n",
-			    sysStr,
-			    "error executing command language interpreter");
-		}
-	    else
-		{
-		fprintf(stderr, "%s: exited with status %d\n", cmd, errCode);
-		if (m_errfile && (m_errfile != stderr))
-		    fprintf(m_errfile,
-			    "%s: exited with status %d\n",
-			    cmd,
-			    errCode);
-		}
-	    }
-	else if (WIFSIGNALED(errStatus))
-	    {
-	    errCode = WTERMSIG(errStatus);
-	    fprintf(stderr, "%s: exited due to signal %d\n", cmd, errCode);
-	    if (m_errfile && (m_errfile != stderr))
-		fprintf(m_errfile,
-			"%s: exited due to signal %d\n",
-			cmd,
-			errCode);
-	    if (WCOREDUMP(errStatus))
-		{
-		fputs("core dumped\n", stderr);
-		if (m_errfile && (m_errfile != stderr))
-		    fputs("core dumped\n", m_errfile);
-		}
-	    }
-	else if (WIFSTOPPED(errStatus))
-	    {
-	    errCode = WSTOPSIG(errStatus);
-	    fprintf(stderr, "%s: stopped due to signal %d\n", cmd, errCode);
-	    if (m_errfile && (m_errfile != stderr))
-		fprintf(m_errfile,
-			"%s: stopped due to signal %d\n",
-			cmd,
-			errCode);
-	    }
-	}
+	fprintf(m_errfile, "%s: cannot open \"%s\": %s\n",
+		progName, in ? outName : inName, strerror(errno));
+    exit(1);
+    }
+status = doCompress ? LzwCompress(in, out) : LzwDecompress(in, out);
+fclose(in);
+if (fclose(out) != 0)
+    status = -1;
+if (status < 0)
+    {
+    fprintf(stderr, "%s: error %scompressing \"%s\"\n",
+	    progName, doCompress ? "" : "de", inName);
+    if (m_errfile && (m_errfile != stderr))
+	fprintf(m_errfile, "%s: error %scompressing \"%s\"\n",
+		progName, doCompress ? "" : "de", inName);
     exit(1);
     }
 if (doCompress)

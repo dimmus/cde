@@ -82,7 +82,7 @@ DtFindSet::DtFindSet(DtMainW *parent, char *name, CallerCallback _callback)
     }
    if (_thread->status || n_dirs == 0)
     {
-      delete [] output;
+      free(output);
       struct passwd * pwInfo;
       char *home = getenv("HOME");
       if (home == NULL || strlen(home) == 0)
@@ -90,7 +90,7 @@ DtFindSet::DtFindSet(DtMainW *parent, char *name, CallerCallback _callback)
          pwInfo = getpwuid(getuid());
          home = pwInfo->pw_dir;
        }
-      output = new char[strlen(home) + 80];
+      output = (char *) malloc(strlen(home) + 80);
       n_dirs = 3;
       sprintf(output, "%s/.dt/icons\n"
                       "/usr/dt/appconfig/icons/C\n"
@@ -111,7 +111,7 @@ DtFindSet::DtFindSet(DtMainW *parent, char *name, CallerCallback _callback)
       filenames[i]->read_it = true;
       filenames[i]->n_icons = 0;
     }
-   delete [] output;
+   free(output);
    delete _thread;
 
    comboBox = new ComboBoxObj(this, ComboBoxCB, MESSAGE(IconFoldersL), dirs,
@@ -323,7 +323,7 @@ void DtFindSet::ComboBoxCB(ComboBoxObj *obj, char *dir, int position)
 	  }
        }
       delete _thread;
-      delete output;
+      free(output);
       filenames->read_it = false;
     }
    else

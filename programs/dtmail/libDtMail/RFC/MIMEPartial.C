@@ -422,8 +422,9 @@ RFCMailBox::_assemblePartial(DtMailEnv	& error,
 		endHeader = const_cast <char *> (strstr((const char *)contents, "\n\n"));
 
 		if (endHeader != NULL) {
+		  // Its values belong to the session of part 1.
 		  RFCEnvelope	embEnv(error,
-				       (DtMail::Message *)NULL,
+				       (DtMail::Message *)messages[0],
 				       (const char *)contents,
 				       (int)((unsigned long)endHeader
 					     - (unsigned long)contents));
@@ -526,9 +527,11 @@ RFCMailBox::_assemblePartial(DtMailEnv	& error,
 		free(newMessage);
 		newMessage = (char *)msgResults;
 
+		// The end is the last byte of the message, not the NUL
+		// after it (which used to be written to the mailbox).
 		msg = new RFCMessage(error, this,
 				     (const char **)&msgResults,
-				     (const char *)newMessage + messageSize);
+				     (const char *)newMessage + messageSize - 1);
 
 		for (offset = 0; offset < totalParts ; offset++) {
 		  //

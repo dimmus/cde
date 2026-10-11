@@ -135,8 +135,10 @@ parse_path(_Tt_string path)
 	if (use_cpp) {
 		_Tt_string deps =_file_name.cat(".deps");
 		unlink((char *)deps);
-		deps = _Tt_string("SUNPRO_DEPENDENCIES=").cat(deps).cat(" ");
-		putenv((char *)deps);
+		// setenv() copies; putenv() of this temporary string
+		// left a dangling pointer in environ after it was freed.
+		deps = deps.cat(" ");
+		setenv("SUNPRO_DEPENDENCIES", (char *)deps, 1);
 		char command[MAXPATHLEN+32];
 		sprintf(command,
 			OPT_CPP_PATH " " OPT_CPP_OPTIONS " %s %s",

@@ -75,6 +75,7 @@ extern nl_catd catd;
 
 extern "C" {
 #include <Dt/HourGlass.h>
+#include "XmCompat.h"
 }
 
 extern "C" {
@@ -213,7 +214,7 @@ void SelectFileCmd::doit()
 		      this);
 
 	XtSetSensitive(
-	    XmFileSelectionBoxGetChild(_fileBrowser, XmDIALOG_HELP_BUTTON),
+	    XmCompatHelpButton(_fileBrowser),
 	    False);
 
 	_DtTurnOffHourGlass(_parentWidget);

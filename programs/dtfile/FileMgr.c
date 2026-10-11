@@ -3936,6 +3936,8 @@ GetFileData(
    int new_dir_count;
    int new_file_count;
    ObjectPtr position_info;
+   FileViewData *found;
+   PtrMap by_file_data = { NULL, NULL, 0, 0 };
    int i;
    int j;
    int k;
@@ -3989,6 +3991,13 @@ GetFileData(
       new_view_data = new_dir_set[j]->file_view_data;
       new_file_count = new_dir_set[j]->file_count;
 
+      /* index the new file list by FileData (the first entry wins) */
+      PtrMapClear(&by_file_data);
+      for (k = 0; k < new_file_count; k++)
+         if (PtrMapGet(&by_file_data, new_view_data[k]->file_data) == NULL)
+            PtrMapPut(&by_file_data, new_view_data[k]->file_data,
+                      new_view_data[k]);
+
       /* loop throught the old file list */
       for (j = 0; j < directory_set[i]->file_count; j++)
       {
@@ -3998,51 +4007,48 @@ GetFileData(
          /*
           * Find a file by the same name in the new file list.
           */
-         for (k = 0; k < new_file_count; k++)
+         found = (FileViewData *)
+                    PtrMapGet(&by_file_data, file_view_data->file_data);
+         if (found != NULL)
          {
-            if (new_view_data[k]->file_data == file_view_data->file_data)
+            /* Fix for defect 5029    */
+            if(file_mgr_data->popup_menu_icon && file_view_data->file_data==
+                    file_mgr_data->popup_menu_icon->file_data)
+               new_popup_menu_icon = found;
+
+            /* Fix for defect 5703 */
+            if ( file_mgr_data->drag_file_view_data &&
+                 file_mgr_data->drag_file_view_data->file_data ==
+                   file_view_data->file_data)
+               new_drag_file_view_data = found;
+
+            if (file_view_data == file_mgr_data->renaming)
+              new_renaming = found;
+
+            /* re-use the old widgets */
+            found->widget = file_view_data->widget;
+            found->treebtn = file_view_data->treebtn;
+            found->registered = file_view_data->registered;
+
+            /* preserve ndir, nfile counts */
+            found->ndir = file_view_data->ndir;
+            found->nfile = file_view_data->nfile;
+
+            /* preserve the position info */
+            if (position_info)
             {
-                /* Fix for defect 5029    */
-               if(file_mgr_data->popup_menu_icon && file_view_data->file_data==
-                       file_mgr_data->popup_menu_icon->file_data)
-                  new_popup_menu_icon = new_view_data[k];
-
-               /* Fix for defect 5703 */
-                if ( file_mgr_data->drag_file_view_data &&
-                   file_mgr_data->drag_file_view_data->file_data ==
-                     file_view_data->file_data)
-                   new_drag_file_view_data = new_view_data[k];
-
-               if (file_view_data == file_mgr_data->renaming)
-                 new_renaming = new_view_data[k];
-
-               /* re-use the old widgets */
-               new_view_data[k]->widget = file_view_data->widget;
-               new_view_data[k]->treebtn = file_view_data->treebtn;
-               new_view_data[k]->registered = file_view_data->registered;
-
-               /* preserve ndir, nfile counts */
-               new_view_data[k]->ndir = file_view_data->ndir;
-               new_view_data[k]->nfile = file_view_data->nfile;
-
-               /* preserve the position info */
-               if (position_info)
-               {
-                  new_view_data[k]->position_info = position_info;
-                  position_info->file_view_data = new_view_data[k];
-               }
-
-               /* preserve icon_mtime */
-               new_view_data[k]->icon_mtime = file_view_data->icon_mtime;
-
-               break;
+               found->position_info = position_info;
+               position_info->file_view_data = found;
             }
+
+            /* preserve icon_mtime */
+            found->icon_mtime = file_view_data->icon_mtime;
          }
 
          /* if no file by the same name was found in the new file list,
             the file must have gone away ... lets eliminate the
             position infomation */
-         if (position_info && k == new_file_count)
+         if (position_info && found == NULL)
          {
             for (k = 0; k < file_mgr_data->num_objects; k++)
             {
@@ -4078,28 +4084,30 @@ GetFileData(
    UpdateBranchList(file_mgr_data, NULL);
 
    /*  Update the selection list */
+   PtrMapClear(&by_file_data);
+   if (file_mgr_data->selected_file_count > 0)
+   {
+      /* index all new entries by FileData (the first entry wins) */
+      for (i = 0; i < new_dir_count; i++)
+         for (k = 0; k < new_dir_set[i]->file_count; k++)
+         {
+            file_view_data = new_dir_set[i]->file_view_data[k];
+            if (PtrMapGet(&by_file_data, file_view_data->file_data) == NULL)
+               PtrMapPut(&by_file_data, file_view_data->file_data,
+                         file_view_data);
+         }
+   }
    j = 0;
    while (j < file_mgr_data->selected_file_count)
    {
       file_view_data = file_mgr_data->selection_list[j];
 
       /*  See if the selected file is still around */
-      match = False;
-      for (i = 0; !match && i < new_dir_count; i++)
-      {
-         for (k = 0; k < new_dir_set[i]->file_count; k++)
-         {
-            if (file_view_data->file_data ==
-                new_dir_set[i]->file_view_data[k]->file_data)
-            {
-                match = True;
-                file_view_data =
-                   file_mgr_data->selection_list[j] =
-                      new_dir_set[i]->file_view_data[k];
-                break;
-            }
-         }
-      }
+      found = (FileViewData *)
+                 PtrMapGet(&by_file_data, file_view_data->file_data);
+      match = (found != NULL);
+      if (match)
+         file_view_data = file_mgr_data->selection_list[j] = found;
       /* Keep the file selected only if it was found in the new
        * directory set and if it is not filtered */
       if (match && !file_view_data->filtered)
@@ -4107,6 +4115,8 @@ GetFileData(
       else
          DeselectFile (file_mgr_data, file_view_data, False);
    }
+
+   PtrMapFree(&by_file_data);
 
    /* free the old directory set */
    FreeLayoutData(file_mgr_data->layout_data);

@@ -45,6 +45,7 @@
 #include "util/tt_path.h"
 #include "api/c/api_error.h"
 #include <errno.h>
+#include <poll.h>
 #include <sys/resource.h>
 #include <stdlib.h>
 #include "tt_options.h"
@@ -259,7 +260,10 @@ find_session(_Tt_string id, _Tt_session_ptr &sp,
 void _Tt_mp::
 save_session_fd(int fd)
 {
-	FD_SET(fd, &_session_fds);
+	// (A descriptor beyond the fd_set is simply not checked.)
+	if (fd >= 0 && fd < FD_SETSIZE) {
+		FD_SET(fd, &_session_fds);
+	}
 }
 
 
@@ -280,36 +284,53 @@ find_session_by_fd(int fd, _Tt_session_ptr &sp)
 }
 
 
+//
+// Pings the sessions whose connection shows a sign of having gone away
+// (readable, i.e. EOF or stray data, hung up or in error) and forgets
+// those that do not answer.  This used to select() the connections for
+// writing, which an idle connection always is, so every known session
+// was pinged by every file-scoped send; it also passed select() the
+// descriptor table size, which can exceed FD_SETSIZE.
+//
 void _Tt_mp::
 check_if_sessions_alive()
 {
-	fd_set			s_fds;
-	int			fd, maxfds, n;
-	timeval			tmout;
+	struct pollfd		pfds[64];
+	int			fd, nfds, n, i;
 	_Tt_session_ptr		s;
 	_Tt_string		id;
 
-	tmout.tv_sec = 0;
-	tmout.tv_usec = 0;
-	s_fds = _session_fds;
-	maxfds = _tt_getdtablesize();
-	n = select(maxfds, (fd_set *) 0, &s_fds, (fd_set *) 0, &tmout);
-
-	if (n < 0) {
-		return;
-	}
 	fd = 0;
-	while (n > 0) {
-		if (FD_ISSET(fd, &s_fds)) {
-			if (! find_session_by_fd(fd, s)) {
-				FD_CLR(fd, &_session_fds);
+	while (fd < FD_SETSIZE) {
+		// Poll up to 64 tracked descriptors at a time.
+		for (nfds = 0; fd < FD_SETSIZE && nfds < 64; fd++) {
+			if (FD_ISSET(fd, &_session_fds)) {
+				pfds[nfds].fd = fd;
+				pfds[nfds].events = POLLIN;
+				pfds[nfds].revents = 0;
+				nfds++;
+			}
+		}
+		if (nfds == 0) {
+			continue;
+		}
+		n = poll(pfds, nfds, 0);
+		if (n <= 0) {
+			continue;
+		}
+		for (i = 0; i < nfds; i++) {
+			if (pfds[i].revents == 0) {
+				continue;
+			}
+			if (pfds[i].revents & POLLNVAL) {
+				FD_CLR(pfds[i].fd, &_session_fds);
+			} else if (! find_session_by_fd(pfds[i].fd, s)) {
+				FD_CLR(pfds[i].fd, &_session_fds);
 			} else if (s->ping() != TT_OK) {
 				id = s->process_tree_id();
 				_tt_mp->remove_session(id);
-				FD_CLR(fd, &_session_fds);
+				FD_CLR(pfds[i].fd, &_session_fds);
 			}
-			n--;
 		}
-		fd++;
 	}
 }

@@ -80,27 +80,50 @@ c_init()
 	_Tt_string	start_ttcmd;
 	int		tried = 0;
 	Tt_status	status;
+	// Retries used to sleep whole seconds: 1 s between pings, 2 s after
+	// another ttsession won the autostart race and 1 s between later
+	// attempts.  Back off from 10 ms instead, within the same overall
+	// patience (about 11 s of waiting, at least 10 attempts).
+	long long	retry_deadline = _tt_monotonic_ms() + 11000;
+	int		retry_delay = 10;
 
 	if (env() == _TT_ENV_X11) {
 		if (_displayname.len() == 0) {
 			_displayname = _tt_global->xdisplayname;
 		}
 	}
-	while (tried < 10) {
+	while (tried < 10 || _tt_monotonic_ms() < retry_deadline) {
 		_is_dead = 0;
 		status = client_session_init();
 		switch (status) {
-			int pings;
-		    case TT_OK:
+		    case TT_OK: {
 			// We try to ping the session to give it
 			// reasonable time to start up.
-			for (pings = 1; pings <= OPT_PING_TRIES; pings++) {
+			long long ping_deadline = _tt_monotonic_ms() +
+				OPT_PING_TRIES * OPT_PING_SLEEP * 1000;
+			int ping_delay = 10;
+			do {
 				status = ping();
 				if (status != TT_ERR_NOMP) {
 					// Fatal error or TT_OK
 					return status;
 				}
-				sleep(OPT_PING_SLEEP);
+				if (! _rpc_client.is_null() &&
+				    _rpc_client->stale_port()) {
+					break;	// see below
+				}
+			} while (_tt_backoff(&ping_delay, 250, ping_deadline));
+		    }
+
+			// The advertised address named a TCP port, and
+			// another RPC program owns it now, while the
+			// portmapper knows nothing of the session: it is
+			// gone.  Carry on as if the portmapper had said so
+			// at once (as it did when clients always asked it).
+			if (! _rpc_client.is_null() &&
+			    _rpc_client->stale_port()) {
+				if (tried > 0) _address_string = (char *) 0;
+				break;
 			}
 
 			// Session could not be pinged.  If this is an
@@ -118,10 +141,14 @@ c_init()
 				    desktop_addr == _address_string) {
 
 					// Bogus session xprop found -- re-initialize
-					// trying the TT_XATOM_NAME xprop.
+					// trying the TT_XATOM_NAME xprop, unless
+					// it names the same session (now that
+					// RPCs time out, a wedged session would
+					// otherwise be pinged ten times over).
 
 					if (_desktop->get_prop(TT_XATOM_NAME,
-							       _address_string)) {
+							       _address_string) &&
+					    _address_string != desktop_addr) {
 						// Continue the initialization
 						// loop WITHOUT attempting to start
 						// a new ttsession
@@ -205,9 +232,8 @@ c_init()
 				// address.
 				_address_string = (char *)0;
 
-				// Since the other ttsession was just started,
-				// let it have a chance to initialize
-				sleep(2);
+				// The other ttsession was just started; the
+				// ping loop above gives it time to initialize.
 
 				// fall through
 			    case 0:
@@ -217,7 +243,7 @@ c_init()
 				return TT_ERR_NOMP;
 			}
 		} else {
-			sleep(1);
+			(void)_tt_backoff(&retry_delay, 250, retry_deadline);
 		}
 		tried++;
 	}

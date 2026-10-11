@@ -868,7 +868,7 @@ _tt_obj_props_results *_tt_set_obj_props_1 (_tt_set_obj_props_args *args,
 							  access,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -938,7 +938,7 @@ _tt_obj_props_results *_tt_set_obj_prop_1 (_tt_set_obj_prop_args *args,
 							  access,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -1005,7 +1005,7 @@ _tt_obj_props_results *_tt_add_obj_prop_1 (_tt_add_obj_prop_args *args,
 							  access,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }
@@ -1102,7 +1102,7 @@ _tt_obj_props_results *_tt_delete_obj_prop_1 (_tt_del_obj_prop_args *args,
 							  access,
 							  properties);
     
-    if (results.results != TT_DB_OK) {
+    if (temp_results != TT_DB_OK) {
       properties = (_Tt_db_property_list *)NULL;
       results.results = temp_results;
     }

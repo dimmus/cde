@@ -466,9 +466,7 @@ get_variable (
 		int bracketSeen,
 		char *var)
 {
-   char **ppchar;
    int i;
-   extern char **environ;  
    char *tmp;
 
    _DtSvcProcessLock();
@@ -488,23 +486,27 @@ get_variable (
    {
    /* 
     * The variable name was not found in the variable list, so look
-    * for it in the environment data.
+    * for it in the environment data.  (This used to scan environ and
+    * split each entry at its *last* '=', so variables whose values
+    * contain '=' were never found.)
     */
-       for (i=0, ppchar = environ; *ppchar; ppchar++, i++) 
+       char  name_buf[128];
+       char  *name = name_buf;
+
+       if (key_len < 0)
        {
-	  if ((tmp = (char *) DtStrrchr (*ppchar, '=')) != NULL)
-	  {
-	     int  evar_len = tmp - *ppchar;
-	     if ( (key_len == evar_len) 
-	       && (strncmp (key, *ppchar, key_len) == 0)) 
-	     {
-		*value = tmp + 1;
-		return (True);
-	     }
-	  }
+	  *value = NULL;
+	  return(False);
        }
-	*value = NULL;
-	return(False);
+       if ((size_t)key_len >= sizeof(name_buf))
+	  name = malloc((size_t)key_len + 1);
+       memcpy(name, key, (size_t)key_len);
+       name[key_len] = '\0';
+       tmp = getenv(name);
+       if (name != name_buf)
+	  free(name);
+       *value = tmp;
+       return (tmp != NULL);
    }
    else
    {
@@ -609,13 +611,21 @@ clean_line (
    /*
     * Don't search \ by "byte by byte"
     * \ may be in the 2nd of IBM-932 char.
+    *
+    * Escapes are only removed when not building the cache (the cache
+    * keeps them; they are removed when a value is looked up), and only
+    * a line holding a '\' byte can have one, so skip the character
+    * scan unless both hold.  The scan still ignores a '\' that is the
+    * second byte of a character.
     */
+   _found = 0;
+   if (!use_in_memory_db && strchr(ret_string, '\\') != NULL)
    {
       int _i;
       int _clen;
+      int _len = strlen( ret_string );
 
-      _found = 0;
-      for( _i = 0; _i < strlen( ret_string ); _i += _clen ) {
+      for( _i = 0; _i < _len; _i += _clen ) {
           _clen = mblen( &(ret_string[_i]), MB_CUR_MAX );
           /*
 	   * If found invalid char, go ahead.
@@ -783,7 +793,12 @@ _DtDbFillVariables (
 
    start = *line;
    lineLen = strlen (*line)+1;
-   lineSize = MAX_LINE_LENGTH;
+   /*
+    * The buffer holds at least MAX_LINE_LENGTH bytes, and at least the
+    * string.  (Assuming MAX_LINE_LENGTH for a longer string made
+    * ResolveVariableReference() shrink the buffer below the string.)
+    */
+   lineSize = lineLen > MAX_LINE_LENGTH ? lineLen : MAX_LINE_LENGTH;
 
    while (*start != '\0') 
    {
@@ -1426,7 +1441,9 @@ ResolveVariableReference(
           * leftover portion of the variable reference.
           */
          (void)strncpy(*buf + start, value, (size_t)valueLen);
-         (void)strcpy(*buf + start + valueLen, *buf + start + len);
+         /* the ranges overlap: memmove, not strcpy */
+         (void)memmove(*buf + start + valueLen, *buf + start + len,
+                       strlen(*buf + start + len) + 1);
          *buf_len -= (len - valueLen);
       }
       else
@@ -1458,7 +1475,8 @@ ResolveVariableReference(
    }
 
    /* If no match is found, then replace the reference with nothing */
-   (void)strcpy(*buf + start, *buf + start + len);
+   (void)memmove(*buf + start, *buf + start + len,
+                 strlen(*buf + start + len) + 1);
    *buf_len -= len;
    XtFree((char *) var);
 }

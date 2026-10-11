@@ -333,7 +333,7 @@ void LocalPrintJobs(char *printer, char **job_list, int *n_jobs)
    SETEUID(getuid());
 
    delete [] cmd;
-   delete output;
+   free(output);
    delete _thread;
 }
 #endif
@@ -701,7 +701,30 @@ do \
     *rest++ = '\0'; \
 } while (NULL != line && 0 == *line);
 
+void LocalPrintJobsCommand(const char *printer, char *buf, int len)
+{
+#if defined(__linux__) || defined(__OpenBSD__) || defined(__NetBSD__)
+   snprintf(buf, len, "LANG=C lpq -P%s", printer);
+#elif defined(__FreeBSD__)
+   snprintf(buf, len, "LANG=C /usr/local/bin/lpq -P%s", printer);
+#endif
+}
+
 void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
+{
+   char buf[1000];
+   char *output;
+
+   LocalPrintJobsCommand(printer, buf, sizeof(buf));
+   Invoke cmd(buf, &output);
+   ParseLocalPrintJobs(printer, output, return_job_list, return_n_jobs);
+   free(output);
+}
+
+// Parse the output of the LocalPrintJobsCommand() command; output is
+// modified, but not freed.
+void ParseLocalPrintJobs(char *printer, char *output, char **return_job_list,
+			 int *return_n_jobs)
 {
    char *buf = new char[1000];
    char *s, *s1;
@@ -711,7 +734,6 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    char *owner;
    char *month;
    char *date;
-   char *output;
    char *stime;
    char *jsize;
    char *hostname;
@@ -721,14 +743,6 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
 
    static char *job_list = NULL;
    static int prev_buf_size = 0;
-
-#if defined(__linux__) || defined(__OpenBSD__) || defined(__NetBSD__)
-   snprintf(buf, 1000, "LANG=C lpq -P%s", printer);
-#elif defined(__FreeBSD__)
-   snprintf(buf, 1000, "LANG=C /usr/local/bin/lpq -P%s", printer);
-#endif
-
-   new Invoke(buf, &output);
 
    if (prev_buf_size == 0)
    {
@@ -742,6 +756,14 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
 
    s1 = output;
    NEXT_OUTPUT_LINE(s,s1);
+
+   // Nothing to parse, e.g. lpq is not installed
+   if (s == NULL)
+    {
+      *return_job_list = job_list;
+      delete [] buf;
+      return;
+    }
 
    //
    // Parse the optional "Requests on" line of output to verify printer name.
@@ -786,10 +808,11 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    //
    {
        char *no_entries_line = "no entries";
-       if (0 == strncmp(s, no_entries_line, strlen(no_entries_line)))
+       if (s == NULL ||
+           0 == strncmp(s, no_entries_line, strlen(no_entries_line)))
        {
            *return_job_list = job_list;
-           free(output);
+           delete [] buf;
 	   return;
        }
    }
@@ -802,7 +825,7 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
        char *buffer = new char[128];
        char *opt_status_line = buffer;
 
-       sprintf(buffer, "%s is ready and printing via ", printer);
+       snprintf(buffer, 128, "%s is ready and printing via ", printer);
        if (0 == strncmp(s, opt_status_line, strlen(opt_status_line)))
        {
            qname = strtok(s, " \t");
@@ -825,37 +848,40 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    //   or
    //   "Rank Pri Owner Job Files Total Size"
    //
+   if (s)
    {
+#define LEGEND_IS(tmp, column) ((tmp) && 0 == strcmp((tmp), (column)))
        char *tmp;
 
        tmp = strtok(s, " ");
-       if (strcmp(tmp, "Rank"))
-         fprintf(stderr, "Unexpected legend column: %s != Rank\n", tmp);
+       if (!LEGEND_IS(tmp, "Rank"))
+         fprintf(stderr, "Unexpected legend column: %s != Rank\n", tmp ? tmp : "(null)");
 
        tmp = strtok(NULL, " ");
-       if (0 == strcmp(tmp, "Pri"))
+       if (LEGEND_IS(tmp, "Pri"))
        {
            has_pri = TRUE;
            tmp = strtok(NULL, " ");
        }
-       if (strcmp(tmp, "Owner"))
-         fprintf(stderr, "Unexpected legend column: %s != Owner\n", tmp);
+       if (!LEGEND_IS(tmp, "Owner"))
+         fprintf(stderr, "Unexpected legend column: %s != Owner\n", tmp ? tmp : "(null)");
        
        tmp = strtok(NULL, " ");
-       if (strcmp(tmp, "Job"))
-         fprintf(stderr, "Unexpected legend column: %s != Job\n", tmp);
+       if (!LEGEND_IS(tmp, "Job"))
+         fprintf(stderr, "Unexpected legend column: %s != Job\n", tmp ? tmp : "(null)");
        
        tmp = strtok(NULL, " ");
-       if (strcmp(tmp, "Files"))
-         fprintf(stderr, "Unexpected legend column: %s != Files\n", tmp);
+       // CUPS calls the column "File(s)"
+       if (!LEGEND_IS(tmp, "Files") && !LEGEND_IS(tmp, "File(s)"))
+         fprintf(stderr, "Unexpected legend column: %s != Files\n", tmp ? tmp : "(null)");
        
        tmp = strtok(NULL, " ");
-       if (strcmp(tmp, "Total"))
-         fprintf(stderr, "Unexpected legend column: %s != Total\n", tmp);
+       if (!LEGEND_IS(tmp, "Total"))
+         fprintf(stderr, "Unexpected legend column: %s != Total\n", tmp ? tmp : "(null)");
        
        tmp = strtok(NULL, " \n");
-       if (strcmp(tmp, "Size"))
-         fprintf(stderr, "Unexpected legend column: %s != Size\n", tmp);
+       if (!LEGEND_IS(tmp, "Size"))
+         fprintf(stderr, "Unexpected legend column: %s != Size\n", tmp ? tmp : "(null)");
    }
 
 
@@ -886,16 +912,17 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
       if (NULL == qname)
 	qname = printer;
 
+      // glibc prints "(null)" for the fields the date line did not have
+#define FIELD(field) ((field) ? (field) : "(null)")
       if (hostname && strcmp(qname, hostname))
-         sprintf(buf, "%s|%s|%s|%s@%s|%s %s|%s|%s\n", qname, jname, jnumber,
-                 owner, hostname, month, date, stime, jsize);
+         snprintf(buf, 1000, "%s|%s|%s|%s@%s|%s %s|%s|%s\n", qname, jname,
+                  jnumber, owner, hostname, FIELD(month), FIELD(date),
+                  FIELD(stime), jsize);
       else
-         sprintf(buf, "%s|%s|%s|%s|%s %s|%s|%s\n", qname, jname, jnumber,
-                 owner, month, date, stime, jsize);
-
-      printf("qname, jname, jnumber, owner, ");
-      printf("hostname, month, date, stime, jsize\n");
-      printf("%s\n", buf);
+         snprintf(buf, 1000, "%s|%s|%s|%s|%s %s|%s|%s\n", qname, jname,
+                  jnumber, owner, FIELD(month), FIELD(date), FIELD(stime),
+                  jsize);
+#undef FIELD
 
       len = strlen(buf);
       if (prev_buf_size < (current_size + len + 1))
@@ -911,7 +938,6 @@ void LocalPrintJobs(char *printer, char **return_job_list, int *return_n_jobs)
    *(job_list + current_size) = '\0';
    prev_buf_size = prev_buf_size > current_size ? prev_buf_size : current_size;
    *return_job_list = job_list;
-   free(output);
    delete [] buf;
 }
 #endif        // Linux local parser

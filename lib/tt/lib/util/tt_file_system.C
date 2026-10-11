@@ -45,6 +45,8 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #if defined(__linux__)
@@ -138,6 +140,114 @@ extern "C" {
 
 time_t				_Tt_file_system::lastMountTime		= 0;
 
+#if defined(__linux__)
+//
+// Linux: /etc/mtab is a symlink to /proc/self/mounts, which stats with
+// st_size 0 and an mtime that says nothing about mount activity, so the
+// classic stat()-and-reread logic below re-read the table (and slept
+// 100 ms in the automounter workaround) on every API call.  Instead keep
+// one descriptor on /proc/self/mounts for the life of the process and
+// re-read only when the kernel reports a mount table change, which it
+// does by flagging the descriptor with POLLPRI (see proc(5)).
+//
+#define TT_PROC_MOUNTS	"/proc/self/mounts"
+
+static int	procMountsFd	= -1;	// persistent descriptor
+static pid_t	procMountsPid;		// process that opened it
+static dev_t	procMountsDev;		// identity of the open file, to
+static ino_t	procMountsIno;		// notice if someone closed our fd
+static int	procMountsForce	= 1;	// re-read on next update
+static int	procMountsFailed;	// /proc unusable; use the old code
+static char    *procMountsBuf;
+static size_t	procMountsBufSize;
+
+//
+// Returns 1 and a snapshot of the mount table in procMountsBuf/len when
+// the cached entries must be rebuilt, 0 when they are still current,
+// and -1 when /proc/self/mounts cannot be used.
+//
+static int
+procMountsSnapshot(size_t &len)
+{
+	pid_t		pid = getpid();
+	struct stat	st;
+
+	if (procMountsFd != -1) {
+		if (fstat(procMountsFd, &st) != 0 ||
+		    st.st_dev != procMountsDev ||
+		    st.st_ino != procMountsIno) {
+			// Someone closed our descriptor (and the number
+			// may have been reused, e.g. by a child that
+			// closed every descriptor after fork()); it is
+			// no longer ours, so it must not be closed.
+			procMountsFd = -1;
+		} else if (procMountsPid != pid) {
+			// Forked: the open file (and its change marker) is
+			// shared with the parent, so get our own.
+			close(procMountsFd);
+			procMountsFd = -1;
+		}
+	}
+	if (procMountsFd == -1) {
+		procMountsFd = open(TT_PROC_MOUNTS, O_RDONLY | O_CLOEXEC);
+		if (procMountsFd == -1) {
+			return -1;
+		}
+		if (fstat(procMountsFd, &st) != 0) {
+			close(procMountsFd);
+			procMountsFd = -1;
+			return -1;
+		}
+		procMountsPid = pid;
+		procMountsDev = st.st_dev;
+		procMountsIno = st.st_ino;
+		procMountsForce = 1;
+	}
+
+	if (!procMountsForce) {
+		struct pollfd pfd;
+
+		pfd.fd = procMountsFd;
+		pfd.events = POLLPRI;
+		pfd.revents = 0;
+		if (poll(&pfd, 1, 0) == 0) {
+			return 0;	// no mount table change
+		}
+		// Changed, or poll failed: re-read to be safe.
+	}
+
+	len = 0;
+	for (;;) {
+		if (procMountsBufSize - len < 4096) {
+			size_t	newsize = procMountsBufSize ?
+					  2 * procMountsBufSize : 16384;
+			char   *newbuf = (char *)realloc(procMountsBuf, newsize);
+			if (newbuf == NULL) {
+				procMountsForce = 1;
+				return -1;
+			}
+			procMountsBuf = newbuf;
+			procMountsBufSize = newsize;
+		}
+		ssize_t n = pread(procMountsFd, procMountsBuf + len,
+				  procMountsBufSize - len, (off_t)len);
+		if (n < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			procMountsForce = 1;
+			return -1;
+		}
+		if (n == 0) {
+			break;
+		}
+		len += n;
+	}
+	procMountsForce = 0;
+	return 1;
+}
+#endif /* __linux__ */
+
 _Tt_file_system::
 _Tt_file_system ()
 {
@@ -153,6 +263,11 @@ _Tt_file_system ()
 _Tt_file_system::
 ~_Tt_file_system ()
 {
+#if defined(TT_PROC_MOUNTS)
+	// The /proc/self/mounts cache is persistent; the fallback below
+	// keeps the historical behaviour.
+	if (procMountsFailed)
+#endif
 	lastMountTime = 0;
 }
 
@@ -249,7 +364,13 @@ createFileSystemEntry(TtMntEntry entry)
 _Tt_file_system_entry_ptr _Tt_file_system::
 bestMatchToPath (const _Tt_string &path)
 {
-	_Tt_string real_path = _tt_realpath(path);
+	return bestMatchToRealPath(_tt_realpath(path));
+}
+
+_Tt_file_system_entry_ptr _Tt_file_system::
+bestMatchToRealPath (const _Tt_string &resolved_path)
+{
+	_Tt_string real_path = resolved_path;
 
 	updateFileSystemEntries();
 
@@ -401,6 +522,42 @@ updateFileSystemEntries ()
                 }
         }
 
+#if defined(TT_PROC_MOUNTS)
+	if (!procMountsFailed) {
+		size_t	len = 0;
+		int	rc = procMountsSnapshot(len);
+
+		if (rc == 0) {
+			firsttime = 0;
+			return;
+		}
+		if (rc == 1) {
+			_tt_global->fileSystemEntries->flush();
+			FILE *table = len ? fmemopen(procMountsBuf, len, "r") : 0;
+			if (table) {
+				TtMntEntry entry;
+				while ((entry = getmntent(table))) {
+					_Tt_file_system_entry_ptr fse =
+						createFileSystemEntry(entry);
+					if (!fse.is_null()) {
+						_tt_global->fileSystemEntries->append(fse);
+					}
+				}
+				fclose(table);
+			} else if (len) {
+				procMountsForce = 1;	// try again next time
+			}
+			firsttime = 0;
+			return;
+		}
+		if (procMountsFd == -1) {
+			// /proc is not mounted; fall back to MOUNTED for good.
+			procMountsFailed = 1;
+		}
+		// Otherwise a transient failure: use MOUNTED this time.
+	}
+#endif
+
 // AIX  doesn\'t have a mount table file as such.
 #ifdef TtMntTab
 
@@ -418,6 +575,9 @@ updateFileSystemEntries ()
 	// XXX Due to bug #1126575 - MNTTAB temporarily goes to
 	//     size 0 during automounter updates.  The file stats
 	//     OK, but has no data in it.
+#if !defined(__linux__)
+	// (Not on Linux, where a size of 0 just means that MOUNTED is,
+	// or links to, a /proc file.)
 	struct pollfd poll_fd;
 	while (mount_table_stat.st_size == 0) {
 		(void)poll (&poll_fd, 0, 100);
@@ -426,6 +586,7 @@ updateFileSystemEntries ()
 			return;
 		}
 	}
+#endif
 
 	FILE *mount_table = ttOpenMntTbl(TtMntTab, "r");
 
@@ -552,6 +713,9 @@ flush ()
 	}
 
 	lastMountTime = 0;
+#if defined(TT_PROC_MOUNTS)
+	procMountsForce = 1;
+#endif
 }
 /* Local Variables : */
 /* c++-indent-level: 2 */

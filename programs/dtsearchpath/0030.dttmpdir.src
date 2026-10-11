@@ -44,7 +44,8 @@ then
 
       if [[ ${DTAPPDIR_HOST_COMPONENT} = "" ]]
       then
-	   DTAPPDIR_HOST_COMPONENT=`uname -n`
+	   HASH Xsession has set SESSION_SVR to the output of uname -n.
+	   DTAPPDIR_HOST_COMPONENT=${SESSION_SVR:-`uname -n`}
       fi
     
     HASH

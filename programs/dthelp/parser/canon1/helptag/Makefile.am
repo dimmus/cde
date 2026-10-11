@@ -1,10 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-# Due to the wierd interdepencencies between helptag and parser,
-# disable parallel builds here.  This is some really horrible code and
-# design - not surprising since it dates to 1989.
-.NOTPARALLEL:
-
 HELPTAG       = ..
 HELPTAGSRC    = $(HELPTAG)/helptag
 HELPPARSERSRC = $(HELPTAG)/parser
@@ -12,18 +7,30 @@ HELPELTDEFSRC = $(HELPTAG)/eltdef
 HELPDTDFILE   = $(HELPTAGSRC)/hptag.dtd
 HELPUTILSRC   = $(HELPTAG)/util
 HELPBUILDSRC  = $(HELPTAG)/build
-HELPUTILLIB   = $(HELPTAG)/util/libutil.a
+HELPUTILLIB   = $(HELPTAG)/../util/libhelputil.a
+HELPCONTEXT   = $(HELPTAG)/../util/context
 HELPIFFILE    = $(HELPTAGSRC)/help.if
 HELPTSSFILE   = $(HELPTAGSRC)/htag.tss
 
-XDONE:
-	cd ../parser; $(MAKE) CDONE
+# The helptag library includes headers that ../parser generates (its
+# CDONE step), and the parser directory is built after this one.  Ask
+# ../parser to bring them up to date on every run; XDONE, and with it the
+# objects here, are remade only when they did change.
+XDONE: ../parser/CDONE
 	touch XDONE
+
+../parser/CDONE: FORCE
+	cd ../parser && $(MAKE) $(AM_MAKEFLAGS) CDONE
+
+FORCE:
+.PHONY: FORCE
+
+$(libhelptag_a_OBJECTS): XDONE
 
 BUILT_SOURCES = XDONE
 CLEANFILES = $(BUILT_SOURCES)
 
-AM_CPPFLAGS = -I$(HELPPARSERSRC) -I$(HELPUTILSRC) \
+AM_CPPFLAGS = $(CDE_CPPFLAGS) $(KEEP_ASSERTS) -I$(HELPPARSERSRC) -I$(HELPUTILSRC) \
 	    -I$(HELPELTDEFSRC) $(DT_INCDIR)
 
 # needed by parser/

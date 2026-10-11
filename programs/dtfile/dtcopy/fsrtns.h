@@ -92,6 +92,14 @@ extern void fsCopy(char *source, char *target, int replace, int *rcP);
 extern void fsCopyLink(char *source, char *target, int replace, int *rcP);
 
 /*
+ *  fsCopyData:
+ *    Copies the rest of the open file src to tgt.  Returns 0, an errno
+ *    value, or -1 if periodicCallback aborted the copy.  *readErrP (if
+ *    readErrP is not NULL) tells whether reading the source failed.
+ */
+extern int fsCopyData(int src, int tgt, int *readErrP);
+
+/*
  *  fsErase:
  *    Deletes a file or directory.
  */

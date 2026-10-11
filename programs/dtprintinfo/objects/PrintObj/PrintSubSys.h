@@ -40,13 +40,26 @@ extern const char *PRINTSUBSYSTEM;
 // List Children command;
 extern const char *LIST_QUEUES;
 
+// Sorted queue names, one per line; free() the result.  The exit status of
+// the listing command is stored in *status when status is not NULL.  If
+// device_list is not NULL, *device_list gets a copy of the raw
+// "lpstat -v" output (NULL where there is none); free() it.
+extern char *ListPrintQueues(int *status = NULL, char **device_list = NULL);
+
 class PrintSubSystem : public BaseObj {
 
  protected:
 
+   char *_device_list;
+
    void InitChildren();
 
  public:
+
+   // "lpstat -v" output for all queues, read when the queues were listed,
+   // or NULL.  Queue::LoadAttributes() uses it instead of running
+   // "lpstat -v QUEUE" for every queue.
+   const char *DeviceList() { return _device_list; }
 
    PrintSubSystem(BaseObj *parent);
    virtual ~PrintSubSystem();

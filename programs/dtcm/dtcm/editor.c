@@ -1072,39 +1072,53 @@ e_make_editor(Calendar *c)
 **  External functions
 **
 *******************************************************************************/
-extern void
-add_to_appt_list(CSA_entry_handle entry, Editor *e) {
+/*
+ * Make the list item for one entry, using 'appt' as scratch space.
+ * Returns NULL if the entry could not be read.
+ */
+static XmString
+make_appt_item(CSA_entry_handle entry, Editor *e, Dtcm_appointment *appt) {
 	char			buf[DEFAULT_APPT_LEN];
 	Props			*p = (Props *)e->cal->properties;
-	XmString		str;
 	CSA_return_code		status;
 	DisplayType		dt = get_int_prop(p, CP_DEFAULTDISP);
-	Dtcm_appointment	*appt;
 
-	appt = allocate_appt_struct(appt_read,
-				    e->cal->general->version,
-				    CSA_ENTRY_ATTR_START_DATE_I,
-				    CSA_ENTRY_ATTR_SUMMARY_I,
-				    CSA_X_DT_ENTRY_ATTR_SHOWTIME_I,
-				    NULL);
 	status = query_appt_struct(e->cal->cal_handle, entry, appt);
 	backend_err_msg(e->frame, e->cal->view->current_calendar, status,
 			((Props_pu *)e->cal->properties_pu)->xm_error_pixmap);
-	if (status != CSA_SUCCESS) {
-		free_appt_struct(&appt);
-		return;
-	}
+	if (status != CSA_SUCCESS)
+		return (NULL);
 
 	format_appt(appt, buf, dt, DEFAULT_APPT_LEN);
-	str = XmStringCreateLocalized(buf);
-	XmListAddItem(e->appt_list, str, 0);
-	XmStringFree(str);
+	return (XmStringCreateLocalized(buf));
+}
+
+static Dtcm_appointment *
+allocate_list_appt(Editor *e) {
+	return (allocate_appt_struct(appt_read,
+				     e->cal->general->version,
+				     CSA_ENTRY_ATTR_START_DATE_I,
+				     CSA_ENTRY_ATTR_SUMMARY_I,
+				     CSA_X_DT_ENTRY_ATTR_SHOWTIME_I,
+				     NULL));
+}
+
+extern void
+add_to_appt_list(CSA_entry_handle entry, Editor *e) {
+	XmString		str;
+	Dtcm_appointment	*appt;
+
+	appt = allocate_list_appt(e);
+	if ((str = make_appt_item(entry, e, appt)) != NULL) {
+		XmListAddItem(e->appt_list, str, 0);
+		XmStringFree(str);
+	}
 	free_appt_struct(&appt);
 }
 
 extern void
 add_all_appt(Editor *e) {
-	int		i;
+	int		i, n;
 	CSA_uint32	j;
 	char		*date;
 	Tick		tick;
@@ -1112,6 +1126,8 @@ add_all_appt(Editor *e) {
 	CSA_entry_handle	*entry_list;
 	OrderingType	o;
 	SeparatorType	s;
+	XmString	*items;
+	Dtcm_appointment *appt;
 
 	if (!editor_showing(e))
 		return;
@@ -1132,8 +1148,23 @@ add_all_appt(Editor *e) {
 		csa_free(e->appt_head); 
 	e->appt_head = entry_list;
 	e->appt_count = j;
-	for (i = 0; i < j; i++)
-		add_to_appt_list(entry_list[i], e);
+
+	/* one list update for all items, and one scratch appointment */
+	if (j > 0 && (items = (XmString *)malloc(j * sizeof(XmString)))) {
+		appt = allocate_list_appt(e);
+		for (i = 0, n = 0; i < j; i++)
+			if ((items[n] = make_appt_item(entry_list[i], e, appt)))
+				n++;
+		free_appt_struct(&appt);
+		if (n > 0)
+			XmListAddItems(e->appt_list, items, n, 0);
+		for (i = 0; i < n; i++)
+			XmStringFree(items[i]);
+		free(items);
+	} else {
+		for (i = 0; i < j; i++)
+			add_to_appt_list(entry_list[i], e);
+	}
 	if (j <= 0)
 		XtSetSensitive(e->appt_list, False);
 	else

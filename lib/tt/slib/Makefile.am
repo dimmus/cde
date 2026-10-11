@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LIBRARIES = libstt.a
 
-libstt_a_CXXFLAGS = $(TIRPC_DEFINES) -I../lib
+libstt_a_CXXFLAGS = $(CDE_CXXFLAGS) -I../lib
 
 libstt_a_SOURCES = mp_ce_attrs.C mp_observer.C mp_observer_utils.C  \
 mp_otype.C              mp_otype_utils.C           mp_ptype.C           \

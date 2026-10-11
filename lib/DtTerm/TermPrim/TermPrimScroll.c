@@ -33,6 +33,149 @@
 #include "TermPrimI.h"
 #include "TermPrimData.h"
 #include "TermPrimBuffer.h"
+#include <time.h>
+
+/* Frame pacing.
+ *
+ * In jump scroll mode, output used to be painted every time a screenful
+ * of lines had been queued for scrolling, however fast it came in.  Now,
+ * a full queue is only painted if FRAME_INTERVAL_NS have passed since the
+ * last paint; otherwise the queue becomes a repaint of the whole scroll
+ * region, and further lines are just added to the buffer.  The rest is
+ * painted when the output stops (readPty(), _DtTermPrimCursorOn()) or
+ * when the frame is due while output keeps coming.
+ */
+#define	FRAME_INTERVAL_NS	(16L * 1000L * 1000L)	/* 16 ms */
+
+static long
+frameAgeNs(struct termData *tpd)
+{
+    struct timespec now;
+    long sec;
+
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    sec = now.tv_sec - tpd->lastPaintSec;
+    if (sec > 1) {
+	/* long enough, and no risk of overflow... */
+	return(2L * 1000L * 1000L * 1000L);
+    }
+    return(sec * 1000L * 1000L * 1000L + (now.tv_nsec - tpd->lastPaintNsec));
+}
+
+Boolean
+_DtTermPrimFrameDue(Widget w)
+{
+    return(frameAgeNs(((DtTermPrimitiveWidget) w)->term.tpd) >=
+	    FRAME_INTERVAL_NS);
+}
+
+/* milliseconds (at least 1) until the next frame is due... */
+unsigned long
+_DtTermPrimFrameRemainingMs(Widget w)
+{
+    long ns = FRAME_INTERVAL_NS -
+	    frameAgeNs(((DtTermPrimitiveWidget) w)->term.tpd);
+
+    if (ns <= 0) {
+	return(1);
+    }
+    return((unsigned long) (ns / (1000L * 1000L)) + 1);
+}
+
+void
+_DtTermPrimNoteFramePainted(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+    struct timespec now;
+
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    tpd->lastPaintSec = now.tv_sec;
+    tpd->lastPaintNsec = now.tv_nsec;
+}
+
+/* paint everything that has been queued: a queued jump scroll and any
+ * deferred text...
+ */
+void
+_DtTermPrimPaintFrame(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll && tpd->scroll.jump.scrolled) {
+	(void) _DtTermPrimScrollWait(w);
+    }
+    (void) _DtTermPrimRenderFlushDirty(w);
+}
+
+/* queue up lines for a jump scroll of the region scrollTopRow through
+ * scrollBottomRow (which the caller has already set)...
+ */
+static void
+queueJumpScroll(Widget w, int lines)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    int regionRows = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
+    int queued;
+    int i;
+
+    if (tpd->scroll.jump.scrolled &&
+	    ((tpd->scroll.jump.scrollLines >= regionRows) ||
+	    (tpd->scroll.jump.scrollLines <= -regionRows))) {
+	/* the whole region will be repainted anyway, so there is nothing
+	 * to keep track of...
+	 */
+	return;
+    }
+
+    /* text not yet painted is now flagged by row, so that it scrolls
+     * with the rest...
+     */
+    (void) _DtTermPrimRenderDirtyToRefreshRows(w);
+
+    /* more than a screenful is the same as a screenful: everything in
+     * the region gets repainted...
+     */
+    queued = tpd->scroll.jump.scrollLines + lines;
+    if (queued > regionRows) {
+	queued = regionRows;
+    } else if (queued < -regionRows) {
+	queued = -regionRows;
+    }
+    tpd->scroll.jump.scrollLines = queued;
+    tpd->scroll.jump.scrolled = True;
+
+    /* scroll out the scrollRefreshRows flags now... */
+    /* NOTE: we loose the refresh flag for all rows that are scrolled
+     * off.  The result of this is that if we do a scroll up followed
+     * by a scroll down, we will (at a minimum) refresh the top and
+     * bottom lines.  One workaround would be to tripple the buffer
+     * and keep the lines that get scrolled off the top or bottom.
+     * This would probably break something, since there are times
+     * that the scrolled off line gets modified or even cleared (such
+     * as delete line off of the top of the display), so this might
+     * not be a very good idea.
+     */
+    if (lines > 0) {
+	/* scroll them up... */
+	for (i = tpd->scrollTopRow; i <= tpd->scrollBottomRow - lines; i++) {
+	    tpd->scrollRefreshRows[i] = tpd->scrollRefreshRows[i + lines];
+	}
+	/* set the rest... */
+	for (; i <= tpd->scrollBottomRow; i++) {
+	    tpd->scrollRefreshRows[i] = True;
+	}
+    } else {
+	/* remember, lines is negative... */
+	for (i = tpd->scrollBottomRow; i >= tpd->scrollTopRow + -lines; i--) {
+	    tpd->scrollRefreshRows[i] = tpd->scrollRefreshRows[i - -lines];
+	}
+	for (; i >= tpd->scrollTopRow; i--) {
+	    tpd->scrollRefreshRows[i] = True;
+	}
+    }
+}
 
 static void
 waitOnCopyArea(Widget w)
@@ -41,9 +184,23 @@ waitOnCopyArea(Widget w)
     struct termData *tpd = tw->term.tpd;
     XEvent event;
     XEvent *ev = &event;
+    Boolean synced = False;
 
     while (tpd->scrollInProgress) {
-	(void) XWindowEvent(XtDisplay(w), XtWindow(w), ExposureMask, ev);
+	/* the copy area's GraphicsExpose or NoExpose events may already
+	 * be here.  If they aren't, one round trip brings them in.  If
+	 * they still aren't there after that, something else has taken
+	 * them off the queue and we must not wait for them forever...
+	 */
+	if (!XCheckWindowEvent(XtDisplay(w), XtWindow(w), ExposureMask, ev)) {
+	    if (synced) {
+		tpd->scrollInProgress = False;
+		break;
+	    }
+	    (void) XSync(XtDisplay(w), False);
+	    synced = True;
+	    continue;
+	}
 	switch (ev->type) {
 	case Expose:
 	    Debug('e', fprintf(stderr,
@@ -105,16 +262,39 @@ _DtTermPrimScrollWait(Widget w)
     int i;
     int exposeY;
     int exposeHeight;
+    int regionRows;
+    Boolean saveDeferRender;
 
     Debug('s', fprintf(stderr, ">>_DtTermPrimScrollWait() starting\n"));
     Debug('s', fprintf(stderr,
-	    ">>_DtTermPrimScrollWait() scrollLines=%d, scrollsPending=%d\n",
-	    tpd->scroll.jump.scrollLines, tpd->scroll.jump.scrollsPending));
+	    ">>_DtTermPrimScrollWait() scrollLines=%d\n",
+	    tpd->scroll.jump.scrollLines));
 
     /* make sure the cursor is off... */
     (void) _DtTermPrimCursorOff(w);
 
+    /* this is the frame: paint it now rather than deferring it, starting
+     * with anything that is still waiting to be drawn where it is now...
+     */
+    (void) _DtTermPrimRenderFlushDirty(w);
+    saveDeferRender = tpd->deferRender;
+    tpd->deferRender = False;
+
     if (tpd->scroll.jump.scrollLines != 0) {
+	/* We don't wait for the exposure events of a copy area any more,
+	 * they are handled when they arrive (see handleNonMaskableEvents()).
+	 * But they are relative to the screen as it was after that copy
+	 * area, so we can't do another one before we have them all.
+	 * Handling them while a scroll is queued turns it into a full
+	 * repaint (see _DtTermPrimExposeText()), so check again after...
+	 */
+	regionRows = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
+	if (tpd->scrollInProgress &&
+		(tpd->scroll.jump.scrollLines < regionRows) &&
+		(tpd->scroll.jump.scrollLines > -regionRows)) {
+	    (void) waitOnCopyArea(w);
+	}
+
 	/* flush so that we can be sure the output was visible before we
 	 * scroll it off...
 	 */
@@ -238,7 +418,7 @@ _DtTermPrimScrollWait(Widget w)
 	/* refresh any lines above the expose zone that have their
 	 * scrollRefreshRows flag set...
 	 */
-	for (i = 0; i < (exposeY - tpd->offsetX) / tpd->cellHeight; i++) {
+	for (i = 0; i < (exposeY - tpd->offsetY) / tpd->cellHeight; i++) {
 	    if (tpd->scrollRefreshRows[i]) {
 		(void) _DtTermPrimRefreshText(w, 0, i, tw->term.columns, i);
 	    }
@@ -254,15 +434,12 @@ _DtTermPrimScrollWait(Widget w)
 	/* refresh any lines below the expose zone that have their
 	 * scrollRefreshRows flag set...
 	 */
-	for (i = (exposeY - tpd->offsetX + exposeHeight) / tpd->cellHeight;
+	for (i = (exposeY - tpd->offsetY + exposeHeight) / tpd->cellHeight;
 		i < tw->term.rows; i++) {
 	    if (tpd->scrollRefreshRows[i]) {
 		(void) _DtTermPrimRefreshText(w, 0, i, tw->term.columns, i);
 	    }
 	}
-
-	if (tpd->scrollHeight > 0)
-	    tpd->scroll.jump.scrollsPending++;
 
 	(void) _DtTermPrimCursorUpdate(w);
     } else {
@@ -288,10 +465,8 @@ _DtTermPrimScrollWait(Widget w)
 	}
     }
 
-    while (tpd->scroll.jump.scrollsPending > 0) {
-	(void) waitOnCopyArea(w);
-	tpd->scroll.jump.scrollsPending--;
-    }
+    tpd->deferRender = saveDeferRender;
+    (void) _DtTermPrimNoteFramePainted(w);
 
     Debug('s', fprintf(stderr, ">>_DtTermPrimScrollWait() finished\n"));
 }
@@ -306,6 +481,9 @@ doActualScroll(Widget w, int lines)
 
     /* make sure the cursor is off... */
     (void) _DtTermPrimCursorOff(w);
+
+    /* paint anything still waiting to be drawn before we move it... */
+    (void) _DtTermPrimRenderFlushDirty(w);
 
     /* figure out the height of the copy area... */
     if (lines > 0) {
@@ -484,6 +662,14 @@ _DtTermPrimScrollText(Widget w, short lines)
 	if (newTopRow > (tpd->lastUsedRow - tpd->scrollLockTopRow)) {
 	    newTopRow = tpd->lastUsedRow - tpd->scrollLockTopRow;
 	}
+	/* ...but if the whole scroll region is below the lastUsedRow, there
+	 * is nothing to scroll.  (Without this, newTopRow ended up above
+	 * topRow, and even negative, and the lock area moves below read and
+	 * wrote line pointers in front of the buffer's line array.)
+	 */
+	if (newTopRow < oldTopRow) {
+	    newTopRow = oldTopRow;
+	}
     } else {
 	if (tpd->useHistoryBuffer) {
 	    if ((tpd->topRow + tpd->lastUsedHistoryRow) >= -lines)
@@ -518,7 +704,17 @@ _DtTermPrimScrollText(Widget w, short lines)
 	    (tpd->scrollBottomRow != tpd->scrollLockBottomRow)) {
 	/* scroll out the queued up jump scroll lines... */
 	if (tpd->scroll.jump.scrollLines != 0) {
-	    (void) _DtTermPrimScrollWait(w);
+	    if (tw->term.jumpScroll &&
+		    (tpd->scrollTopRow == tpd->scrollLockTopRow) &&
+		    (tpd->scrollBottomRow == tpd->scrollLockBottomRow) &&
+		    !_DtTermPrimFrameDue(w)) {
+		/* the queue is full, but we painted a moment ago.  Don't
+		 * paint again yet, queueJumpScroll() will turn the queue
+		 * into a repaint of the region...
+		 */
+	    } else {
+		(void) _DtTermPrimScrollWait(w);
+	    }
 	}
     }
 
@@ -619,44 +815,9 @@ _DtTermPrimScrollText(Widget w, short lines)
 	/* jump scroll...
 	 */
 	/* queue up the lines for scrolling... */
-	tpd->scroll.jump.scrollLines += lines;
-	tpd->scroll.jump.scrolled = True;
 	tpd->scrollTopRow = tpd->scrollLockTopRow;
 	tpd->scrollBottomRow = tpd->scrollLockBottomRow;
-
-	/* scroll out the scrollRefreshRows flags now... */
-	/* NOTE: we loose the refresh flag for all rows that are scrolled
-	 * off.  The result of this is that if we do a scroll up followed
-	 * by a scroll down, we will (at a minimum) refresh the top and
-	 * bottom lines.  One workaround would be to tripple the buffer
-	 * and keep the lines that get scrolled off the top or bottom.
-	 * This would probably break something, since there are times
-	 * that the scrolled off line gets modified or even cleared (such
-	 * as delete line off of the top of the display), so this might
-	 * not be a very good idea.
-	 */
-	if (lines > 0) {
-	    /* scroll them up... */
-	    for (i = tpd->scrollTopRow;
-		    i <= tpd->scrollBottomRow - lines; i++) {
-		tpd->scrollRefreshRows[i] =
-			tpd->scrollRefreshRows[i + lines];
-	    }
-	    /* set the rest... */
-	    for (; i <= tpd->scrollBottomRow; i++) {
-		tpd->scrollRefreshRows[i] = True;
-	    }
-	} else {
-	    /* remember, lines is negative... */
-	    for (i = tpd->scrollBottomRow;
-		    i >= tpd->scrollTopRow + -lines; i--) {
-		tpd->scrollRefreshRows[i] =
-			tpd->scrollRefreshRows[i - -lines];
-	    }
-	    for (; i >= tpd->scrollTopRow; i--) {
-		tpd->scrollRefreshRows[i] = True;
-	    }
-	}
+	(void) queueJumpScroll(w, lines);
     } else {
 	/* non jump-scroll...
 	 */
@@ -716,7 +877,6 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    int i;
 
 #ifdef	NOTDEF
     if (scrollDistance > 0) {
@@ -749,7 +909,16 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 	    (tpd->scrollBottomRow != scrollStart + scrollLength - 1))) {
 	/* scroll out the queued up jump scroll lines... */
 	if (tpd->scroll.jump.scrolled != 0) {
-	    (void) _DtTermPrimScrollWait(w);
+	    if ((tpd->scrollTopRow == scrollStart) &&
+		    (tpd->scrollBottomRow == scrollStart + scrollLength - 1) &&
+		    !_DtTermPrimFrameDue(w)) {
+		/* the queue is full, but we painted a moment ago.  Don't
+		 * paint again yet, queueJumpScroll() will turn the queue
+		 * into a repaint of the region...
+		 */
+	    } else {
+		(void) _DtTermPrimScrollWait(w);
+	    }
 	}
     }
 
@@ -757,33 +926,9 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 	/* jump scroll...
 	 */
 	/* queue up the lines for scrolling... */
-	tpd->scroll.jump.scrollLines += scrollDistance;
-	tpd->scroll.jump.scrolled = True;
 	tpd->scrollTopRow = scrollStart;
 	tpd->scrollBottomRow = scrollStart + scrollLength - 1;
-
-	/* scroll out the scrollRefreshRows flags now... */
-	if (scrollDistance > 0) {
-	    /* scroll them up... */
-	    for (i = tpd->scrollTopRow;
-		    i <= tpd->scrollBottomRow - scrollDistance; i++) {
-		tpd->scrollRefreshRows[i] =
-			tpd->scrollRefreshRows[i + scrollDistance];
-	    }
-	    /* set the rest... */
-	    for (; i <= tpd->scrollBottomRow; i++) {
-		tpd->scrollRefreshRows[i] = True;
-	    }
-	} else {
-	    for (i = tpd->scrollBottomRow;
-		    i >= tpd->scrollTopRow + -scrollDistance; i--) {
-		tpd->scrollRefreshRows[i] =
-			tpd->scrollRefreshRows[i - -scrollDistance];
-	    }
-	    for (; i >= tpd->scrollTopRow; i--) {
-		tpd->scrollRefreshRows[i] = True;
-	    }
-	}
+	(void) queueJumpScroll(w, scrollDistance);
     } else {
 	/* non jump scroll...
 	 */
@@ -808,8 +953,10 @@ _DtTermPrimScrollTextArea(Widget w, short scrollStart, short scrollLength,
 	/* no scroll in progress, let's scroll it... */
 	tpd->scrollTopRow = scrollStart;
 	tpd->scrollBottomRow = scrollStart + scrollLength - 1;
+	/* (this sets scrollInProgress if it does a copy area.  If it
+	 * doesn't, no NoExpose will come, so we must not set it...)
+	 */
 	(void) doActualScroll(w, scrollDistance);
-	tpd->scrollInProgress = True;
     }
 }
 
@@ -856,6 +1003,8 @@ _DtTermPrimScrollComplete(Widget w, Boolean flush)
 			">>_DtTermPrimScrollComplete() calling _DtTermPrimScrollWait()\n"));
 		(void) _DtTermPrimScrollWait(w);
 	    }
+	    /* and paint any text we have been holding back... */
+	    (void) _DtTermPrimRenderFlushDirty(w);
 	}
     } else {
 	/* non-jump scroll...
@@ -877,9 +1026,10 @@ _DtTermPrimScrollComplete(Widget w, Boolean flush)
 	    tpd->scrollBottomRow = tpd->scroll.nojump.pendingScrollBottomRow;
 	    (void) doActualScroll(w, tpd->scroll.nojump.pendingScrollLines);
 
-	    /* no lines pending, but there is a scroll in progress... */
+	    /* no lines pending, but there is a scroll in progress (if
+	     * doActualScroll() did a copy area, it set scrollInProgress)...
+	     */
 	    tpd->scroll.nojump.pendingScrollLines = 0;
-	    tpd->scrollInProgress = True;
 	    tpd->scroll.nojump.pendingScroll = False;
 
 	    if (flush) {
@@ -913,15 +1063,19 @@ _DtTermPrimScrollCompleteIfNecessary(Widget w, short scrollTopRow,
     }
 
     if (tw->term.jumpScroll) {
+	/* flush the queued jump scroll if adding these lines would
+	 * overflow the scroll region...
+	 */
 	maxJumpScrollLines = tpd->scrollBottomRow - tpd->scrollTopRow + 1;
-	if ((lines + tpd->scroll.jump.scrollLines > maxJumpScrollLines) ||
-		(lines + tpd->scroll.jump.scrollLines < -maxJumpScrollLines))
+	if (((lines + tpd->scroll.jump.scrollLines > maxJumpScrollLines) ||
+		(lines + tpd->scroll.jump.scrollLines < -maxJumpScrollLines)) &&
+		_DtTermPrimFrameDue(w)) {
+	    /* (if the frame is not due yet, the queue just becomes a
+	     * repaint of the region, see queueJumpScroll())...
+	     */
 	    (void) _DtTermPrimScrollComplete(w, True);
-	return;
-    } else {
-	if (!tw->term.jumpScroll && tpd->scroll.nojump.pendingScroll) {
-	    (void) _DtTermPrimScrollComplete(w, True);
-	    return;
 	}
+    } else if (tpd->scroll.nojump.pendingScroll) {
+	(void) _DtTermPrimScrollComplete(w, True);
     }
 }

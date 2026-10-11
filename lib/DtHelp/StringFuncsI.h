@@ -235,6 +235,7 @@ extern	int	_DtHelpCeStrNCaseCmpLatin1(
 			const char	*s1,
 			const char	*s2,
 			size_t		 n);
+extern	int	_DtHelpCeAsciiIsSingleByte (void);
 extern	int	_DtHelpCeStrchr (
 			const char	*s1,
 			const char	*value,

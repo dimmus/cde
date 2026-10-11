@@ -1,5 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 include ../dtdocbook.am
 
 infolibdir = $(dtdocbooklibexecdir)/infolib
@@ -20,7 +22,7 @@ noinst_PROGRAMS = restore
 AM_LFLAGS = -Cf -L -8 -s
 AM_YFLAGS = -d
 
-AM_CXXFLAGS = \
+AM_CXXFLAGS = $(CDE_CXXFLAGS) $(KEEP_ASSERTS) \
 	      -DCDE_NEXT \
 	      -DDTDCBK_DATAROOTDIR=\"$(dtdocbookdatadir)\" \
 	      -DDTSEARCH \
@@ -28,7 +30,7 @@ AM_CXXFLAGS = \
 	      -DEXPAND_TEMPLATES \
 	      -I$(top_builddir)/lib/DtMmdb
 
-AM_LDFLAGS = $(XTOOLLIB) $(LIBMMDB) $(DTCLIENTLIBS) $(LMDBLIB)
+LDADD = $(LIBMMDB)
 
 MixedGen_SOURCES = \
 		   MixedGen.C \

@@ -104,6 +104,22 @@ Dtwm*Dtbuilder*secondariesOnTop: 	False
 
 !###
 !#
+!#  Specify how windows are shown while they are moved or resized
+!#  with an outline.
+!#
+!#   With freezeOnConfig False the X server is not grabbed during
+!#   the move or resize, so other clients keep running and redrawing.
+!#   With useWindowOutline True the outline is drawn with windows
+!#   instead of XOR lines, which would have to flash when the server
+!#   is not grabbed.
+!#
+!#   Defaults are:  freezeOnConfig True, useWindowOutline False
+!###
+Dtwm*freezeOnConfig:	False
+Dtwm*useWindowOutline:	True
+
+!###
+!#
 !#  Specify the number of workspaces
 !#  
 !#  Specify multiple workspaces on screen 0, a single

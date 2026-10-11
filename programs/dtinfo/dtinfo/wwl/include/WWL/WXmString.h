@@ -44,6 +44,8 @@
 #ifndef WXmString_h
 #define WXmString_h
 
+#include <string.h>	/* memcmp() */
+
 extern Boolean XmStringUngenerate(XmString, XmStringCharSet, char**);
 
 class WXmString {
@@ -151,8 +153,23 @@ public:
    inline Dimension	Baseline (XmFontList fl) const {
       return XmStringBaseline (fl, string);
    }
+   // What the deprecated XmStringByteCompare() does: compare the
+   // byte stream (ASN.1) forms of the strings.
    inline Boolean	ByteCompare (XmString s) const {
-      return XmStringByteCompare (string, s);
+      if (string == NULL || s == NULL)
+	 return (string == s);
+      unsigned char* a = NULL;
+      unsigned char* b = NULL;
+      unsigned int a_length = XmCvtXmStringToByteStream (string, &a);
+      unsigned int b_length = XmCvtXmStringToByteStream (s, &b);
+      Boolean result;
+      if (a == NULL || b == NULL)
+	 result = (string == s);
+      else
+	 result = (a_length == b_length && memcmp (a, b, a_length) == 0);
+      XtFree ((char*) a);
+      XtFree ((char*) b);
+      return result;
    }
    inline Boolean	Compare (XmString s) const {
       return XmStringCompare (string, s);
@@ -184,9 +201,6 @@ public:
    }
    inline int		LineCount () const {
       return XmStringLineCount (string);
-   }
-   inline void		NConcat (XmString s, int n) {
-      XmStringNConcat (string, s, n);
    }
    inline Dimension	Width (XmFontList fl) const {
       return XmStringWidth (fl, string);

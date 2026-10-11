@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 noinst_LTLIBRARIES = libdti_cc.la
 
-libdti_cc_la_CXXFLAGS = -I..
+libdti_cc_la_CXXFLAGS = $(CDE_CXXFLAGS) -I..
 
 libdti_cc_la_SOURCES = CC_Dlist.C \
 		       CC_Listbase.C \

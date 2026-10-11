@@ -70,7 +70,11 @@
 #endif
 
 static const char            TT_DB_RPC_PROTO[] = "tcp";
-static const struct timeval  TT_DB_RPC_NORMAL_TIMEOUT = {1000000, 0};
+// Synchronous dbserver RPCs used to wait 1000000 s (11.6 days), so a wedged
+// rpc.ttdbserverd hung its clients, and ttsession with them.  Its file
+// operations can be slow (ISAM on NFS, an fsync per row), so allow them
+// rather longer than the ttsession requests; TT_RPC_TIMEOUT overrides.
+static const int             TT_DB_RPC_NORMAL_TIMEOUT_SECS = 30;
 static const struct timeval  TT_DB_RPC_QUICK_TIMEOUT = {4, 0};
 const int              TT_DB_RPC_RETRIES = 3;
 
@@ -222,8 +226,12 @@ _Tt_db_results _Tt_db_client::connectToDB (const _Tt_string &hostname)
 
 		if ((auth_level_results) && (auth_level_results->results == TT_DB_OK)) {
 
+			struct timeval normal_timeout;
+			normal_timeout.tv_sec =
+				_tt_rpc_timeout(TT_DB_RPC_NORMAL_TIMEOUT_SECS);
+			normal_timeout.tv_usec = 0;
 			clnt_control(dbServer, CLSET_TIMEOUT,
-				     (char *)&TT_DB_RPC_NORMAL_TIMEOUT);
+				     (char *)&normal_timeout);
 
 			dbAuthLevel = auth_level_results->auth_level;
 		 

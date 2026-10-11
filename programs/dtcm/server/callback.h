@@ -40,6 +40,7 @@ typedef struct __DtCmsRegistrationInfo {
 	u_long	versnum;
 	u_long	procnum;
 	int	pid;
+	CLIENT	*cl;	/* cached callback handle, NULL until first used */
 	struct	__DtCmsRegistrationInfo *next;
 } _DtCmsRegistrationInfo;
 

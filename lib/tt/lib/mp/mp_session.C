@@ -68,6 +68,7 @@ _Tt_session()
 	_rpc_version = 0;
 	_pid = 0;
 	_rpc_program = 0;
+	_rpc_port = 0;
 	_server_num = 0;
 	_server_uid = 0;
 }
@@ -211,12 +212,30 @@ client_session_init()
 	_is_server = 0;
 	if (env() == _TT_ENV_X11 && _desktop.is_null()) {
 		_desktop = new _Tt_desktop();
-		if (! _desktop->init(_displayname, _TT_DESKTOP_X11)) {
-			return(TT_ERR_ACCESS);
-		}
 	}
 	if (_address_string.len() == 0) {
-		if (find_advertised_address(_address_string) != TT_OK) {
+		// For an X session the address is a property on the
+		// root window.  Connect just long enough to read it:
+		// libtt has no other use for the connection on the
+		// client side, and keeping it open cost every client a
+		// second X connection for its whole life.  A desktop
+		// that is already connected belongs to someone else
+		// (ttsession checking for a live session shares its
+		// own), so it is left alone.
+		int connected_here = 0;
+		Tt_status found;
+
+		if (env() == _TT_ENV_X11) {
+			connected_here = ! _desktop->connected();
+			if (! _desktop->init(_displayname, _TT_DESKTOP_X11)) {
+				return(TT_ERR_ACCESS);
+			}
+		}
+		found = find_advertised_address(_address_string);
+		if (connected_here) {
+			_desktop->release();
+		}
+		if (found != TT_OK) {
 			return(TT_WRN_NOTFOUND);
 		}
 	}
@@ -273,7 +292,7 @@ client_session_init()
 	if (! rpc_init_done) {
 		_rpc_client = new _Tt_rpc_client();
 		if (! _rpc_client->init(_host, _rpc_program, _rpc_version,
-					_server_uid, _auth)) {
+					_server_uid, _auth, _rpc_port)) {
 			return(TT_ERR_NOMP);
 		}
 	}
@@ -417,7 +436,7 @@ call(int rpc_proc,
 			tmout = -1;
 			break;
 		      default:
-			tmout = TT_RPC_TMOUT;
+			tmout = _tt_rpc_timeout(TT_RPC_TMOUT);
 			break;
 		}
 	} else {
@@ -434,7 +453,7 @@ call(int rpc_proc,
 			if (! _rpc_client->init(_host, _rpc_program,
 						_rpc_version,
 						_server_uid,
-						_auth)) {
+						_auth, _rpc_port)) {
 				status = TT_ERR_NOMP;
 				processing = 0;
 				break;
@@ -481,7 +500,7 @@ call(int rpc_proc,
 			if (! _rpc_client->init(_host, _rpc_program,
 						_rpc_version,
 						_server_uid,
-						_auth)) {
+						_auth, _rpc_port)) {
 				status = TT_ERR_NOMP;
 				processing = 0;
 				break;
@@ -508,8 +527,15 @@ call(int rpc_proc,
 		}
 	}
 
+	// A dead default session is dropped.  Not when the session was
+	// reached through a stale advertised port, though: that is
+	// found by tt_open()'s first ping, and _Tt_c_session::c_init()
+	// goes on to find or start the real session for this very
+	// object (just as when the portmapper reports the session gone
+	// before any call is made).
 	if (status == TT_ERR_NOMP &&
 	    !_tt_mp->in_server() &&
+	    !_rpc_client->stale_port() &&
 	    !_tt_c_mp->default_c_session.is_null() &&
 	    has_id(_tt_c_mp->default_c_session->address_string())) {
 		_tt_c_mp->default_c_session = NULL;
@@ -635,12 +661,14 @@ Tt_status _Tt_session::
 parsed_address(_Tt_string &addr_string)
 {
 #define IPVADDRLEN	16
-	char		session_host[IPVADDRLEN];
+	char		session_host[IPVADDRLEN + 1];
 	char		strid[BUFSIZ];
 	int		junk_version = 1;
 	Tt_status	status;
 	const char 	*addr_format_fmt = "%%ld %%d %%d %%d %%lu %%%ds %%d";
 	char 		 addr_format[64];
+	const char 	*port_addr_format_fmt = "%%ld %%d %%d %%d %%lu %%%ds %%d %%d";
+	char 		 port_addr_format[64];
 	const char 	*fcs1_addr_format_fmt = "%%ld %%d %%d %%d %%lu %%%ds";
 	char 		 fcs1_addr_format[32];
 	
@@ -651,6 +679,11 @@ parsed_address(_Tt_string &addr_string)
 	// Additional fields can be added at the end of addr_format as
 	// long as if the parsing fails then the old format
 	// (fcs1_addr_format) is tried.
+	//
+	// The 8th field is the server's TCP port.  Clients that know
+	// it connect without asking the portmapper first; older
+	// clients stop scanning after the 7th field and never see it,
+	// and an address without it (an older ttsession) still parses.
 	//
 	_rpc_version = TT_RPC_VERSION;
 	if (addr_string.len() == 0) {
@@ -681,6 +714,9 @@ parsed_address(_Tt_string &addr_string)
 			(long)_server_uid,
 			(char *)_host->stringaddr(),
 			_rpc_version);
+		if (_rpc_port > 0) {
+			sprintf(strid + strlen(strid), " %d", _rpc_port);
+		}
 		
 		addr_string = strid;
 		if ((status = _auth.set_sessionid(
@@ -697,6 +733,7 @@ parsed_address(_Tt_string &addr_string)
 
 		sprintf(fcs1_addr_format, fcs1_addr_format_fmt, IPVADDRLEN);
 		sprintf(addr_format,      addr_format_fmt,      IPVADDRLEN);
+		sprintf(port_addr_format, port_addr_format_fmt, IPVADDRLEN);
 
 		// check version number of format first
 
@@ -731,14 +768,18 @@ parsed_address(_Tt_string &addr_string)
 		long long_pid;
 		long long_server_uid;
 		_Tt_auth_level auth_level;
-		if (7 != sscanf(str+3, addr_format,
-				&long_pid,
-				&_rpc_program,
-				&junk_version, /* always 1 ... */
-				&auth_level,
-				&long_server_uid,
-				session_host,
-				&_rpc_version)) {
+		int port = 0;
+		int nfields = sscanf(str+3, port_addr_format,
+				     &long_pid,
+				     &_rpc_program,
+				     &junk_version, /* always 1 ... */
+				     &auth_level,
+				     &long_server_uid,
+				     session_host,
+				     &_rpc_version,
+				     &port);
+		_rpc_port = (nfields == 8 && port > 0 && port < 65536) ? port : 0;
+		if (nfields < 7) {
 
 			// new format scan failed. Try to parse the
 			// string for the old format

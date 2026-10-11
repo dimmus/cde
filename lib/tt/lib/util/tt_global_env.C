@@ -33,6 +33,9 @@
  */
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "mp/mp_mp.h"
 #include "util/tt_global_env.h"
@@ -77,8 +80,19 @@ int _Tt_global::
 find_host(_Tt_string haddr, _Tt_host_ptr &h, int create_ifnot)
 {
 	_Tt_host_ptr hc;
+	// haddr is either a raw 4-byte IPv4 address (what the server
+	// keeps for procids) or the same address in '.' notation (what
+	// session addresses carry).  The cache is keyed on the raw form,
+	// so convert dotted addresses first; otherwise they never hit.
+	int		dotted = (haddr.len() != 4);
+	_Tt_string	key = haddr;
+	struct in_addr	ia;
 
-	if (_host_cache->lookup(haddr, hc)) {
+	if (dotted && inet_aton((char *)haddr, &ia)) {
+		key.set((const unsigned char *)&ia.s_addr, 4);
+	}
+
+	if (_host_cache->lookup(key, hc)) {
 		h = hc;
 		return(1);
 	}
@@ -87,24 +101,40 @@ find_host(_Tt_string haddr, _Tt_host_ptr &h, int create_ifnot)
 		return(0);
 	}
 	h = new _Tt_host();
-        /* host not found, add it to list */
-        // XXX - a hack to prevent a bogus gethostbyaddr call from
-        // happening on the client side, which results in a
-        // name service packet going out on the wire to a bogus
-        // IP address.  The code that uses IP addresses in ToolTalk
-        // needs to be reviewed and overhauled a bit, to make it
-        // more cohesive.
-        if (_tt_mp->in_server()) {
-                if (! h->init_byaddr(haddr)) {
-                        if (! h->init_bystringaddr(haddr)) {
-                                return(0);
-                        }
-                }
-        } else {
-                if (! h->init_bystringaddr(haddr)) {
-                        return(0);
-                }
-        }
+	/* host not found, add it to list */
+	// Clients only need the address of a session host: its name
+	// is used only in diagnostics (and by the TLI and secure-RPC
+	// transports, which need it).  A reverse DNS lookup on every
+	// tt_open can stall for seconds when the resolver is slow, so
+	// clients skip it.  A dotted address is never passed to
+	// init_byaddr(), which wants the raw bytes.
+#if defined(OPT_TLI) || defined(OPT_SECURE_RPC)
+	int resolve_name = 1;
+#else
+	int resolve_name = _tt_mp->in_server();
+#endif
+	if (dotted) {
+		if (! h->init_bystringaddr(haddr, resolve_name)) {
+			return(0);
+		}
+	} else if (_tt_mp->in_server()) {
+		if (! h->init_byaddr(haddr)) {
+			// No name for this address: it is still a
+			// perfectly usable address.  (This used to fail,
+			// so a client on a host without reverse DNS got
+			// TT_ERR_PROCID.)
+			const unsigned char *b =
+				(const unsigned char *)(const char *)haddr;
+			char str[16];
+			sprintf(str, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+			if (! h->init_bystringaddr(str, 0)) {
+				return(0);
+			}
+		}
+	} else {
+		// Raw address on the client: nothing to parse it as.
+		return(0);
+	}
 	_host_cache->insert(h);
 	_host_byname_cache->insert(h);
 	return(1);

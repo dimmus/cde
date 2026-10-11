@@ -160,7 +160,7 @@ paint_dayview_appts(Calendar *c, Paint_cache *cache, int a_total, void *rect)
 	XFontSetExtents fontextents2;
 	Props *p = (Props*)c->properties;
 	Boolean am = True;
-	char buf[5], *appt_str;
+	char buf[12], *appt_str;	/* an hour */
 	int pfy, curr_line, maxlines;
 	Lines *lines = NULL, *headlines = NULL;
 	DisplayType disp_t;
@@ -787,32 +787,25 @@ print_day_range(Calendar *c, Tick start_tick, Tick end_tick)
 }
 
 static int
-count_day_pages(Calendar *c, int lines_per_page, Tick tick)
+count_day_pages(Calendar *c, int lines_per_page, Tick tick, CmRangeList *rl)
 {
-	int	i, j, num_appts, pages, max = 0; 
+	int	i, num_appts, pages, max = 0; 
 	Props *p = (Props *)c->properties;
 	int       daybegin = get_int_prop(p, CP_DAYBEGIN);
 	int       dayend   = get_int_prop(p, CP_DAYEND);
 	time_t 	start, end;
         CSA_entry_handle *list;
-        CSA_attribute *range_attrs;
-	CSA_enum *ops;
 	CSA_uint32 a_total;
 
 	for (i=daybegin; i < dayend; i++) {
 		start = (time_t) lower_bound(i, tick);
 		end = (time_t) next_nhours(start+1, 1) - 1;
-		setup_range(&range_attrs, &ops, &j, start, end,
-			    CSA_TYPE_EVENT, 0, B_FALSE, c->general->version);
-        	csa_list_entries(c->cal_handle, j, range_attrs, ops, &a_total, &list, NULL);
-		free_range(&range_attrs, &ops, j);
+		a_total = CmRangeListGet(rl, start, end, &list);
 
                 num_appts = count_multi_appts(list, a_total, c);
 
 		if (num_appts > max)
 			max = num_appts;
-
-                csa_free(list);
 	}
  
        	pages = max / lines_per_page;
@@ -831,17 +824,16 @@ _print_day(Calendar *c,
     Boolean first)
 {
     char buf[100];
-    int i, j, timeslots, num_appts;
+    int i, timeslots, num_appts;
     int daybegin = get_int_prop(p, CP_DAYBEGIN);
     int dayend   = get_int_prop(p, CP_DAYEND);
     OrderingType ord_t = get_int_prop(p, CP_DATEORDERING);
     Boolean more, done = False, all_done = True;
     CSA_entry_handle *list;
-    CSA_attribute *range_attrs;
-    CSA_enum *ops;
     CSA_uint32 a_total;
     time_t start, stop;
     int lines_per_page;
+    CmRangeList rl;
     static Tick tick = 0;
     static int total_pages = 0;
 
@@ -864,9 +856,15 @@ _print_day(Calendar *c,
 
     if (num_page > 1)
       tick = prevday(tick);
-    else
+
+    /* one call for the day instead of one per hour (twice) */
+    CmRangeListInit(&rl, c->cal_handle, c->general->version,
+		    (time_t)lowerbound(tick) - daysec,
+		    (time_t)next_ndays(tick, 2));
+
+    if (num_page == 1)
       total_pages = (lines_per_page > 0) ?
-	count_day_pages(c, lines_per_page, tick) : 1;
+	count_day_pages(c, lines_per_page, tick, &rl) : 1;
 
     format_date(tick, ord_t, buf, 1, 0, 0);
 
@@ -876,12 +874,7 @@ _print_day(Calendar *c,
     for (i=daybegin; i < dayend; i++) {
       start = (time_t) lower_bound(i, tick);
       stop = (time_t) next_nhours(start+1, 1) - 1;
-      setup_range(&range_attrs, &ops, &j, start, stop,
-		  CSA_TYPE_EVENT, 0, B_FALSE, c->general->version);
-
-      csa_list_entries(c->cal_handle, j, range_attrs,
-		       ops, &a_total, &list, NULL);
-      free_range(&range_attrs, &ops, j);
+      a_total = CmRangeListGet(&rl, start, stop, &list);
  
       num_appts = count_multi_appts(list, a_total, c);
 
@@ -899,8 +892,8 @@ _print_day(Calendar *c,
 
       if (!done)
 	all_done = False;
-      csa_free(list);
     }
+    CmRangeListFree(&rl);
  
     x_finish_printer(xp);
     tick = nextday(tick); 

@@ -53,11 +53,14 @@ extern void PlaceIconOnScreen (ClientData *pCD, int *pX, int *pY);
 extern void ProcessMwmHints (ClientData *pCD);
 extern void ProcessWmClass (ClientData *pCD);
 extern void ProcessWmHints (ClientData *pCD, Boolean firstTime);
-extern void ProcessWmIconTitle (ClientData *pCD, Boolean firstTime);
+extern void ProcessWmIconTitle (ClientData *pCD, Boolean firstTime,
+				Atom changed);
 extern void ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, 
 				  long manageFlags);
+extern void ProcessWmNormalHintsNoMaxSize (ClientData *pCD);
 extern void ProcessWmTransientFor (ClientData *pCD);
-extern void ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime);
+extern void ProcessWmWindowTitle (ClientData *pCD, Boolean firstTime,
+				  Atom changed);
 extern Boolean SetupClientIconWindow (ClientData *pCD, Window window);
 extern Boolean WmGetWindowAttributes (Window window);
 extern void ProcessSmClientID (ClientData *pCD);

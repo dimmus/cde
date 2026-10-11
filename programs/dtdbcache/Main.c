@@ -25,6 +25,10 @@
 cc -g -o Main Main.c -I/usr/dt/include -I/usr/openwin/include -R/export2/build/SunOS/lib1/DtSvc:/usr/dt/lib:/usr/openwin/lib -L/export2/build/SunOS/lib1/DtSvc -L/usr/dt/lib -L/usr/openwin/lib -lDtSvc -lXt
  */
 #include <locale.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <Tt/tt_c.h>
 #include <X11/Intrinsic.h>
 #include <Xm/MessageB.h>
@@ -35,10 +39,12 @@ cc -g -o Main Main.c -I/usr/dt/include -I/usr/openwin/include -R/export2/build/S
 #include <Dt/DtsMM.h>
 #include <Dt/UserMsg.h>
 #include <Dt/EnvControlP.h>
+#include <bms/XeUserMsg.h>
 
 static void DbCacheCreateError(Widget toplevel);
 static void DbCacheCreateErrorCallback(Widget, XtPointer, XtPointer);
 static void DieFromToolTalkError(char*, Tt_status);
+static int InitCache(void);
 
 #define ApplicationClass "dtdtscache"
 #define RebuildMsg 	 "DtDtsCache"
@@ -65,13 +71,33 @@ main(int argc, char **argv)
         }
         _DtEnvControl(DT_ENV_SET);
 
-	if(strcmp(argv[1], "-init") == 0)
+	if(argc > 1 && strcmp(argv[1], "-init") == 0)
 	{
 		init_flag = 1;
 	}
 	else
 	{
 		init_flag = 0;
+	}
+
+	if(init_flag)
+	{
+		/*
+		 * Building the cache needs neither the X display nor the
+		 * toolkit: skip XtAppInitialize() and DtAppInitialize().
+		 */
+		DtProgName = argv[0];
+		if (!InitCache())
+		{
+			/*
+			 * Log an error message.  Cannot post a dialog because
+			 * there is a good chance system is starting up.
+			 */
+			_DtSimpleError(ApplicationClass, DtFatalError, NULL,
+			  "Couldn't create the Desktop Action/DataTypes Database.\n\
+Check disk space and/or permissions.\n");
+		}
+		exit(0);
 	}
 
 	if(!init_flag)
@@ -151,20 +177,67 @@ main(int argc, char **argv)
 		}
 	}
 
-	if(init_flag)
-	{
-	    if (!_DtDtsMMInit(1))
-	    {
-		/*
-		 * Log an error message.  Cannot post a dialog because
-		 * there is a good chance system is starting up.
-		 */
-		_DtSimpleError(ApplicationClass, DtFatalError, NULL,
-		  "Couldn't create the Desktop Action/DataTypes Database.\n\
-Check disk space and/or permissions.\n");
-	    }
-	}
 	exit(0);
+}
+
+/*
+ * dtdbcache -init, run at login: makes sure that the cache file shared
+ * by the clients of the display is up to date.
+ *
+ * It used to rebuild the file every time (and the login scripts
+ * removed it at every logout).  Now a cache file that is ours, of this
+ * format and built for the database search path we have is kept if
+ * libDtSvc finds it up to date (it compares the stamps of the database
+ * directories and files it was built from), and rebuilt in place if
+ * not.  Any other file (missing, of another format or search path, or
+ * not ours) is replaced, as before.
+ */
+static int
+InitCache(void)
+{
+	char		*display = getenv("DISPLAY");
+	char		*name;
+	int		fd;
+	int		usable = 0;
+	DtDtsMMHeader	hdr;
+
+	if(!display || !*display || !(name = _DtDtsMMCacheName(1)))
+	{
+		return(_DtDtsMMInit(1));
+	}
+
+	if((fd = open(name, O_RDONLY | O_NOFOLLOW)) != -1)
+	{
+		if(pread(fd, &hdr, sizeof(hdr), 0) == (ssize_t)sizeof(hdr) &&
+		   hdr.magic == DTDTSMM_MAGIC &&
+		   hdr.version == DTDTSMM_VERSION)
+		{
+			/*
+			 * Maps this very file (and takes over fd), after
+			 * checking that it is a plain file of ours, of this
+			 * format and of the size the header says, so the
+			 * search path read from it is that of this file.
+			 */
+			if(_DtDtsMMapFd(fd))
+			{
+				char		*searchpath = _DtDtsMMSearchPath();
+				const char	*path =
+					_DtDtsMMBosonToString(hdr.searchpath);
+
+				usable = searchpath && path &&
+					 strcmp(searchpath, path) == 0;
+				XtFree(searchpath);
+			}
+		}
+		else
+		{
+			close(fd);
+		}
+	}
+	free(name);
+
+	/* Validated, and rebuilt in place if stale; or replaced. */
+	return(_DtDtsMMInit(usable ? 0 : 1));
 }
 
 static void

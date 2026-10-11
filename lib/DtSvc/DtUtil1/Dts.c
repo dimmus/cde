@@ -48,6 +48,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <ctype.h>
 #include <sys/mman.h>
@@ -86,12 +87,19 @@ struct	list
 	DtDtsMMRecord *rec;
 };
 
+/*
+ * Per-call typing state.  It lives on the caller's stack and borrows
+ * the caller's strings and stat buffers wherever it can.
+ */
 typedef	struct	type_info
 {
-	char			*file_path;
-	char			*name;
-	const struct stat	*file_stat;
-	const struct stat	*file_lstat;
+	char			*file_path;	/* full path */
+	int			own_file_path;	/* file_path was malloc'ed */
+	char			*name;		/* last component, in file_path */
+	const struct stat	*file_stat;	/* caller's, or &stat_buf */
+	const struct stat	*file_lstat;	/* caller's, or &lstat_buf */
+	struct stat		stat_buf;
+	struct stat		lstat_buf;
 	int			file_fd;
 	const char		*buffer;
 	int			buff_size;
@@ -100,15 +108,17 @@ typedef	struct	type_info
 	const char		*opt_name;
 	int			error;
 	const char		*link_path;
+	int			own_link_path;	/* link_path was malloc'ed */
 	const char		*link_name;
 	int			set_datatype;
 	char			*ot;
-	char			*mb;
-	int			mb_size;
+	char			*mb;		/* mb_local or malloc'ed */
+	size_t			mb_size;
 	int			name_type;
 	int			*name_prev;
 	int			name_count;
 	char			*orig_attr;
+	char			mb_local[256];
 } type_info_t;
 
 static	DtShmBoson	dtdts_path_pattern = 0;
@@ -122,8 +132,8 @@ static	DtShmBoson	dtdts_da_is_action = 0;
 static	DtShmBoson	dtdts_da_icon = 0;
 static	DtShmBoson	dtdts_da_description = 0;
 static	DtShmBoson	dtdts_da_label = 0;
+static	unsigned int	dtdts_bosons_gen = 0;	/* mapping the bosons belong to */
 
-#define	MB_SIZE	100
 #define _MBLEN(p) (mblen(p, MB_CUR_MAX) > 1 ? mblen(p, MB_CUR_MAX) : 1)
 #define _MBADV(p) ((p) += _MBLEN(p))
 
@@ -164,7 +174,145 @@ _DtDtsClear(void)
 	dtdts_da_icon = 0;
 	dtdts_da_description = 0;
 	dtdts_da_label = 0;
+	dtdts_bosons_gen = 0;
 	_DtSvcProcessUnlock();
+}
+
+/*
+ * True when every byte of S is ASCII.  In every ASCII-compatible
+ * encoding (all the locale encodings we support) such a string is a
+ * sequence of single-byte characters whose wide values equal the bytes,
+ * so it can be scanned byte by byte with the same result as the
+ * mblen()/mbtowc() based code.
+ */
+static int
+is_ascii(const char *s)
+{
+	const unsigned char *u = (const unsigned char *)s;
+
+	while (*u)
+	{
+		if (*u++ & 0x80)
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*
+ * Byte-wise versions of gmatch() and csh_match_star() below, for ASCII
+ * strings and patterns.  They follow the wide-character code step by
+ * step, including its quirks with '-' in brackets, so the results are
+ * the same.
+ */
+static int	csh_match_star_b(const char *, const char *);
+
+static int
+gmatch_b(const char *string, const char *pattern)
+{
+	int		string_ch;
+	int		k;
+	int		pattern_ch;
+	int		lower_bound;
+	const char	*p;
+
+top:
+	for (; 1; pattern++, string++)
+	{
+		lower_bound = MAXINT;
+		string_ch = (unsigned char)*string;
+		pattern_ch = (unsigned char)*pattern;
+		switch (pattern_ch)
+		{
+		case '[':
+			k = 0;
+			for (pattern_ch = (unsigned char)*++pattern;
+			     pattern_ch != '\0';
+			     pattern_ch = (unsigned char)*++pattern)
+			{
+				switch (pattern_ch)
+				{
+				case ']':
+					if (!k)
+					{
+						return 0;
+					}
+					string++;
+					pattern++;
+					goto top;
+				case '-':
+					if (lower_bound <= string_ch)
+					{
+						p = pattern;
+						pattern_ch = (unsigned char)*++pattern;
+						k |= (string_ch <= pattern_ch);
+						pattern = p;
+					}
+					/* Fall through... */
+				default:
+					if (string_ch == (lower_bound = pattern_ch))
+					{
+						k++;
+					}
+				}
+			}
+			return 0;
+		case '*':
+			return csh_match_star_b(string, pattern + 1);
+		case '\0':
+			return ((string_ch != '\0') ? 0 : 1);
+		case '?':
+			if (string_ch == '\0')
+			{
+				return 0;
+			}
+			break;
+		default:
+			if (pattern_ch != string_ch)
+			{
+				return 0;
+			}
+			break;
+		}
+	}
+	/* NOTREACHED */
+}
+
+static int
+csh_match_star_b(const char *string, const char *pattern)
+{
+	int	pattern_ch = (unsigned char)*pattern;
+	int	string_ch;
+
+	switch (pattern_ch)
+	{
+	case '\0':
+		return 1;
+	case '[':
+	case '?':
+	case '*':
+		for (; *string; string++)
+		{
+			if (gmatch_b(string, pattern))
+			{
+				return 1;
+			}
+		}
+		break;
+	default:
+		pattern++;
+		while (*string)
+		{
+			string_ch = (unsigned char)*string++;
+			if (string_ch == pattern_ch && gmatch_b(string, pattern))
+			{
+				return 1;
+			}
+		}
+		break;
+	}
+	return 0;
 }
 
 static int
@@ -285,28 +433,28 @@ csh_match_star(const char *string, const char *pattern)
 	return 0;
 }
 
+/*
+ * Returns a scratch buffer of at least SIZE bytes (SIZE 0 returns the
+ * current one).  The contents are not preserved when it grows.
+ */
 static char *
 max_buf(size_t size, type_info_t *info)
 {
-	if(!info->mb)
-	{
-		info->mb_size += MB_SIZE;
-		info->mb = (char *)calloc(info->mb_size, 1);
-	}
-	if(!size)
-	{
-		return(info->mb);
-	}
 	if(size > info->mb_size)
 	{
-		info->mb = (char *)realloc(info->mb, info->mb_size);
+		if(info->mb != info->mb_local)
+		{
+			free(info->mb);
+		}
+		info->mb = (char *)malloc(size);
 		info->mb_size = size;
 	}
 	return(info->mb);
 }
 
-static type_info_t *
-set_vals(const char		*fn,
+static void
+set_vals(type_info_t		*linfo,
+	const char		*fn,
 	const char		*buf,
 	const int		bs,
 	const struct stat	*fs,
@@ -314,53 +462,51 @@ set_vals(const char		*fn,
 	const struct stat	*ls,
 	const char		*on)
 {
-	type_info_t	*linfo = (type_info_t *)calloc(1, sizeof(type_info_t));
-
+	memset(linfo, 0, offsetof(type_info_t, mb_local));
 	linfo->buff_size = -1;
 	linfo->file_fd = -1;
-	linfo->error = 0;
 	linfo->mmap_size_to_free = -1;
 	linfo->size_to_free = -1;
-	linfo->set_datatype = 0;
-	linfo->ot = 0;
-	linfo->mb = 0;
-	linfo->mb_size = 0;
-	linfo->orig_attr = 0;
+	linfo->mb = linfo->mb_local;
+	linfo->mb_size = sizeof(linfo->mb_local);
 
 	if(fn)
 	{
-		linfo->file_path = strdup(fn);
-		linfo->name = strrchr(linfo->file_path, '/');
-		if(linfo->name)
+		const char	*slash = strrchr(fn, '/');
+
+		if(slash)
 		{
-			linfo->name++;
+			/* borrowed: nothing writes through file_path */
+			linfo->file_path = (char *)fn;
+			linfo->name = (char *)slash + 1;
 		}
 		else
 		{
-			char	path[MAXPATHLEN];
-			char	*tmp;
+			char	cwd[MAXPATHLEN];
+			size_t	cwd_len;
+			size_t	fn_len = strlen(fn);
 
-			getcwd(path, MAXPATHLEN);
-			strcat(path, "/");
-			strcat(path, linfo->file_path);
-
-			tmp = linfo->file_path;
-			linfo->file_path = strdup(path);
-			linfo->name = strstr(linfo->file_path, tmp);
-			free(tmp);
+			if(getcwd(cwd, sizeof(cwd)) == NULL)
+			{
+				cwd[0] = '\0';
+			}
+			cwd_len = strlen(cwd);
+			linfo->file_path = malloc(cwd_len + fn_len + 2);
+			memcpy(linfo->file_path, cwd, cwd_len);
+			linfo->file_path[cwd_len] = '/';
+			memcpy(linfo->file_path + cwd_len + 1, fn, fn_len + 1);
+			linfo->own_file_path = 1;
+			linfo->name = linfo->file_path + cwd_len + 1;
 		}
 	}
 	else if(buf)
 	{
 		if(!fs)
 		{
-			struct	stat	*buf;
-			buf = malloc(sizeof(struct stat));
-			memset(buf, '\0', sizeof(struct stat));
-			buf->st_mode = 	S_IFREG | S_IROTH | S_IRGRP | 
+			linfo->stat_buf.st_mode = S_IFREG | S_IROTH | S_IRGRP |
 					S_IRUSR | S_IWOTH | S_IWGRP | 
 					S_IWUSR;
-			linfo->file_stat = (const struct stat *)buf;
+			linfo->file_stat = &linfo->stat_buf;
 		}
 	}
 			
@@ -368,26 +514,16 @@ set_vals(const char		*fn,
 	{
 		linfo->buffer = buf;
 	}
-	/*
-	 * 04/30/96 - What should this if() REALLY be?  Chances are
-	 * pretty good that bs will either not equal 0 or not equal -1!
-	 */
-	if(bs != 0 || bs != -1)
-	{
-		linfo->buff_size = bs;
-	}
+	linfo->buff_size = bs;
 	if(fs)
 	{
-		linfo->file_stat = (struct stat *)malloc(sizeof(struct stat));
-		memcpy((void *)linfo->file_stat,
-			(struct stat *)fs,
-			sizeof(struct stat));
+		linfo->file_stat = fs;
 	}
 	if(ln)
 	{
 		if(*ln == '/')
 		{
-			linfo->link_path = (char *)strdup(ln);
+			linfo->link_path = ln;
 			linfo->link_name = strrchr(ln, '/');
 			if(linfo->link_name)
 			{
@@ -401,17 +537,12 @@ set_vals(const char		*fn,
 	}
 	if(ls)
 	{
-		linfo->file_lstat = (struct stat *)malloc(sizeof(struct stat));
-		memcpy((void*)linfo->file_lstat,
-			(struct stat *)ls,
-			sizeof(struct stat));
+		linfo->file_lstat = ls;
 	}
 	if(on)
 	{
-		linfo->opt_name = strdup(on);
+		linfo->opt_name = on;
 	}
-
-	return(linfo);
 }
 
 static char *
@@ -420,31 +551,18 @@ cleanup(char *ot, type_info_t *info)
 	if(ot)
 	{
 		ot = strdup(ot);
+		free(info->ot);
 	}
 	else if(info->ot)
 	{
-		ot = strdup(info->ot);
+		ot = info->ot;
 	}
 	else
 	{
 		ot = strdup(DtDTS_DT_UNKNOWN);
 	}
-	if(info->ot)
-	{
-		free(info->ot);
-	}
+	info->ot = 0;
 
-	if(info->file_stat)
-	{
-		free((void *)info->file_stat);
-	}
-	if(info->file_lstat)
-	{
-		free((void *)info->file_lstat);
-	}
-
-	info->file_stat = 0;
-	info->file_lstat = 0;
 	if(info->buffer)
 	{
 		if(info->mmap_size_to_free != -1)
@@ -456,48 +574,26 @@ cleanup(char *ot, type_info_t *info)
 					DtProgName, DtError, NULL,
 					"munmap", NULL);
 			}
-			info->buffer = 0;
-			info->mmap_size_to_free = -1;
 		}
 		else if(info->size_to_free != -1)
 		{
 			free((void *)info->buffer);
-			info->buffer = 0;
-			info->size_to_free = -1;
 		}
 	}
 	if(info->file_fd != -1)
 	{
 		close(info->file_fd);
-		info->file_fd = -1;
 	}
-	info->buffer = 0;
-	if(info->file_path)
+	if(info->own_file_path)
 	{
-		free((void *)info->file_path);
-		info->file_path = 0;
-		info->name = 0;
+		free(info->file_path);
 	}
-	if(info->name)
-	{
-		free((void *)info->name);
-		info->name = 0;
-	}
-	info->file_path = 0;
-	info->name = 0;
-	info->file_fd = -1;
-	info->buff_size = -1;
-	info->error = 0;
-	if(info->link_path != (char *)0 && info->link_path != (char *)-1)
+	if(info->own_link_path &&
+	   info->link_path != (char *)0 && info->link_path != (char *)-1)
 	{
 		free((void *)info->link_path);
 	}
-
-	if(info->opt_name)
-	{
-		free((void *)info->opt_name);
-	}
-	if(info->mb)
+	if(info->mb != info->mb_local)
 	{
 		free(info->mb);
 	}
@@ -505,9 +601,6 @@ cleanup(char *ot, type_info_t *info)
 	{
 		_DtDtsMMSafeFree(info->orig_attr);
 	}
-
-	free(info);
-	info = 0;
 	return(ot);
 }
 
@@ -541,11 +634,38 @@ get_fd(type_info_t *info)
 {
 	if(!info->error && info->file_fd == -1)
 	{
+		int	flags = O_RDONLY|O_NOCTTY|O_CLOEXEC;
+
 		if(info->file_path == 0)
 		{
 			return(-1);
 		}
-		if((info->file_fd = open(info->file_path, O_RDONLY|O_NOCTTY, 0)) == -1)
+#ifdef O_NOATIME
+		/*
+		 * Typing a file should not count as reading it.  O_NOATIME
+		 * is only allowed on our own files (or as root), so ask
+		 * for it only then rather than retrying after EPERM.
+		 */
+		if(info->file_stat &&
+		   (info->file_stat->st_uid == geteuid() || geteuid() == 0))
+		{
+			flags |= O_NOATIME;
+		}
+#endif
+		info->file_fd = open(info->file_path, flags, 0);
+#ifdef O_NOATIME
+		/*
+		 * The ownership test can be wrong (a stat buffer from the
+		 * caller that is stale or describes something else, root
+		 * without CAP_FOWNER): then the kernel refuses O_NOATIME.
+		 */
+		if(info->file_fd == -1 && errno == EPERM && (flags & O_NOATIME))
+		{
+			info->file_fd = open(info->file_path,
+					     flags & ~O_NOATIME, 0);
+		}
+#endif
+		if(info->file_fd == -1)
 		{
 			info->error = errno;
 			return(-1);
@@ -557,8 +677,6 @@ get_fd(type_info_t *info)
 static const struct stat *
 get_lstat(type_info_t *info)
 {
-	struct	stat	buf;
-
 	if(!info->file_lstat)
 	{
 		if(NULL == info->file_path)
@@ -567,7 +685,7 @@ get_lstat(type_info_t *info)
 			info->file_lstat = 0;
 			return(0);
 		}
-		else if(lstat(info->file_path, &buf) == -1)
+		else if(lstat(info->file_path, &info->lstat_buf) == -1)
 		{
 			info->error = errno;
 			info->file_lstat = 0;
@@ -575,8 +693,7 @@ get_lstat(type_info_t *info)
 		}
 		else
 		{
-			info->file_lstat = (struct stat *)malloc(sizeof(struct stat));
-			memcpy((char *)info->file_lstat, &buf, sizeof(buf));
+			info->file_lstat = &info->lstat_buf;
 		}
 	}
 	return(info->file_lstat);
@@ -585,8 +702,6 @@ get_lstat(type_info_t *info)
 static const struct stat *
 get_stat(type_info_t *info)
 {
-	struct	stat	buf;
-
 	if (!info->file_stat)
 	{
 		if(NULL == get_file_path(info))
@@ -594,7 +709,7 @@ get_stat(type_info_t *info)
 			info->error = ENOENT;
 			info->file_stat = 0;
 		}
-		else if(stat(get_file_path(info), &buf) == -1)
+		else if(stat(get_file_path(info), &info->stat_buf) == -1)
 		{
 			if(errno == ENOENT)
 			{
@@ -608,8 +723,7 @@ get_stat(type_info_t *info)
 		}
 		else
 		{
-			info->file_stat = (struct stat *)malloc(sizeof(struct stat));
-			memcpy((char *)info->file_stat, &buf, sizeof(buf));
+			info->file_stat = &info->stat_buf;
 		}
 	}
 
@@ -626,12 +740,15 @@ islink(type_info_t *info)
 	return(0);
 }
 
+#define	MAXSYMLINKS_FOLLOWED	40
+
 void
 get_link_info(type_info_t *info)
 {
 	char		buff[MAXPATHLEN];
 	const	char	*name = 0;
 	int		n;
+	int		hops = 0;
 
 	if(info->link_path == 0)
 	{
@@ -645,16 +762,27 @@ get_link_info(type_info_t *info)
 		{
 			name = strdup(name);
 		}
-		while((n = readlink(name, buff, MAXPATHLEN)) > 0)
+		/*
+		 * readlink() does not terminate the name; this used to
+		 * overwrite its last character instead, so e.g. a link to
+		 * "x.dti" never matched LINK_NAME *.dti.  A cycle used to
+		 * loop forever.
+		 */
+		while((n = readlink(name, buff, sizeof(buff) - 1)) > 0)
 		{
-	
-			buff[n - 1] = 0;
+			buff[n] = 0;
 			free((void *)name);
 			name = strdup(buff);
+			if(++hops > MAXSYMLINKS_FOLLOWED)
+			{
+				errno = ELOOP;
+				break;
+			}
 		}
 		if(errno == EINVAL || errno == ENOENT)
 		{
 			info->link_path = name;
+			info->own_link_path = 1;
 			info->link_name = strrchr(info->link_path, '/');
 			if(info->link_name == 0)
 			{
@@ -668,6 +796,7 @@ get_link_info(type_info_t *info)
 		else
 		{
 			info->error = errno;
+			free((void *)name);
 			info->link_path = (char *)-1;
 			info->link_name = (char *)-1;
 		}
@@ -689,35 +818,104 @@ get_link_name(type_info_t *info)
 	return(info->link_name);
 }
 
+/*
+ * Reads up to SIZE bytes from the start of FD, retrying short reads
+ * (FUSE and network file systems return them).  Returns the number of
+ * bytes read, or -1.
+ */
+static ssize_t
+read_prefix(int fd, char *buf, size_t size)
+{
+	size_t	done = 0;
+	ssize_t	n;
+
+	while(done < size)
+	{
+		n = pread(fd, buf + done, size - done, (off_t)done);
+		if(n == -1)
+		{
+			if(errno == EINTR)
+				continue;
+			return(done ? (ssize_t)done : -1);
+		}
+		if(n == 0)
+			break;
+		done += n;
+	}
+	return((ssize_t)done);
+}
+
+static long	content_bound(void);
+
 static const char *
 get_buff(type_info_t *info)
 {
 	const struct	stat	*buf;
 
-	if(!info->buffer && info->buffer != (char *)-1)
+	if(!info->buffer)
 	{
+		long	bound;
+
 		buf = get_stat(info);
 		if(buf && buf->st_size)
 		{
 			if ((info->file_fd == -1) && (get_fd(info) == -1))
 			   return 0;
-			
-			info->mmap_size_to_free = buf->st_size;
-			if((info->buffer = mmap(NULL,
-				buf->st_size,
-				PROT_READ, MAP_PRIVATE,
-				info->file_fd, 0)) == (char *)-1)
+
+			bound = content_bound();
+			if(bound < 0 || buf->st_size > bound)
 			{
-				info->mmap_size_to_free = -1;
-				info->size_to_free = buf->st_size+1;
-				info->buffer = malloc(info->size_to_free);
-				if(read(info->file_fd, (void *)info->buffer,
-						info->size_to_free) == -1)
+				/*
+				 * No CONTENT rule looks past BOUND bytes, so
+				 * that is all we need to read.
+				 */
+				if(bound >= 0)
 				{
-					return(0);
+					ssize_t	got;
+					char	*b = malloc(bound + 1);
+
+					got = b ? read_prefix(info->file_fd, b, bound) : -1;
+					if(got < 0)
+					{
+						free(b);
+						info->buffer = (char *)-1;
+						return(info->buffer);
+					}
+					b[got] = '\0';
+					info->buffer = b;
+					info->size_to_free = bound + 1;
+					info->buff_size = got;
+					return(info->buffer);
 				}
+				info->mmap_size_to_free = buf->st_size;
+				if((info->buffer = mmap(NULL,
+					buf->st_size,
+					PROT_READ, MAP_PRIVATE,
+					info->file_fd, 0)) != (char *)-1)
+				{
+					info->buff_size = buf->st_size;
+					return(info->buffer);
+				}
+				info->mmap_size_to_free = -1;
 			}
-			info->buff_size = buf->st_size;
+
+			/* small file, or mmap failed: read all of it */
+			{
+				ssize_t	got;
+				char	*b = malloc(buf->st_size + 1);
+
+				got = b ? read_prefix(info->file_fd, b, buf->st_size) : -1;
+				if(got < 0)
+				{
+					free(b);
+					info->buffer = (char *)-1;
+					return(info->buffer);
+				}
+				b[got] = '\0';
+				info->buffer = b;
+				info->size_to_free = buf->st_size + 1;
+				info->buff_size = got;
+			}
 		}
 		else
 		{
@@ -733,11 +931,24 @@ get_buff_size(type_info_t *info)
 {
 	return(info->buff_size);
 }
+/*
+ * The database handles point into the mapped database, so they are
+ * cached together with the mapping generation they belong to.
+ */
+static DtDtsMMDatabase	*dc_db_cache = 0;
+static unsigned int	dc_db_gen = 0;
+static DtDtsMMDatabase	*da_db_cache = 0;
+static unsigned int	da_db_gen = 0;
+
 static DtDtsMMDatabase *
 get_dc_db(void)
 {
 	DtDtsMMDatabase *dc_db = 0;
 
+	if(dc_db_cache && dc_db_gen == _DtDtsMMGeneration())
+	{
+		dc_db = dc_db_cache;
+	}
 	if(!dc_db)
 	{
 #ifdef	DEBUG
@@ -751,6 +962,8 @@ fprintf(stderr, "Load DataCriteria\n");
 				"No DataBase loaded\n", NULL);
 			return(NULL);
 		}
+		dc_db_cache = dc_db;
+		dc_db_gen = _DtDtsMMGeneration();
 	}
 #ifdef NO_MMAP
 	if(dc_db->compare != cde_dc_compare)
@@ -777,6 +990,11 @@ static DtDtsMMDatabase *
 get_da_db(void)
 {
 	DtDtsMMDatabase *da_db = 0;
+
+	if(da_db_cache && da_db_gen == _DtDtsMMGeneration())
+	{
+		da_db = da_db_cache;
+	}
 	if(!da_db)
 	{
 #ifdef	DEBUG
@@ -790,6 +1008,8 @@ fprintf(stderr, "Load DataAttributes\n");
 				"No DataBase loaded\n", NULL);
 			return(NULL);
 		}
+		da_db_cache = da_db;
+		da_db_gen = _DtDtsMMGeneration();
 	}
 
 #ifdef NO_MMAP
@@ -813,6 +1033,132 @@ fprintf(stderr, "Load DataAttributes\n");
 }
 
 #define	DTSATTRVAL(attr_name) if(_DtDtsMMStringToBoson(attr_name) == fld_ptr->fieldName)
+
+/*
+ * An upper bound on the bytes a CONTENT value can look at, or -1 when
+ * there is none (an offset from the end of the file, or a $variable
+ * whose value we cannot know in advance).
+ *
+ * type_content() splits a value on '&' and '|' into terms of the form
+ * "[!]offset type data...", reads the offset with atoi() and compares
+ * at most strlen(value) bytes of data (four per number for "long").
+ * Splitting more finely, on whitespace and on every '&' and '|', and
+ * taking the largest number that starts any piece can only over-
+ * estimate the offset, and _DtDbFillVariables() only shortens a value
+ * without '$', so the bound is safe.
+ */
+#define	CONTENT_MAX_OFFSET	(1L << 20)
+
+static long
+content_value_bound(const char *value)
+{
+	const char	*c = value;
+	long		max_off = 0;
+	long		off;
+
+	if(strchr(value, '$'))
+	{
+		return(-1);
+	}
+	while(*c)
+	{
+		while(*c == ' ' || *c == '\t' || *c == '\n' || *c == '&' ||
+		      *c == '|')
+		{
+			c++;
+		}
+		if(!*c)
+		{
+			break;
+		}
+		while(*c == '!' || *c == '\\')
+		{
+			c++;
+		}
+		if(*c == '-')
+		{
+			return(-1);	/* relative to the end of the file */
+		}
+		off = 0;
+		if(*c == '+')
+		{
+			c++;
+		}
+		while(*c >= '0' && *c <= '9')
+		{
+			off = off * 10 + (*c - '0');
+			if(off > CONTENT_MAX_OFFSET)
+			{
+				return(-1);
+			}
+			c++;
+		}
+		if(off > max_off)
+		{
+			max_off = off;
+		}
+		while(*c && !(*c == ' ' || *c == '\t' || *c == '\n' ||
+			      *c == '&' || *c == '|'))
+		{
+			c++;
+		}
+	}
+	return(max_off + 4 * (long)strlen(value) + 1);
+}
+
+static long		content_bound_cache = -1;
+static unsigned int	content_bound_gen = 0;
+
+/* The largest content_value_bound() of all CONTENT fields. */
+static long
+content_bound(void)
+{
+	DtDtsMMDatabase	*db;
+	DtDtsMMRecord	*rec_list;
+	DtDtsMMField	*fld_list;
+	DtShmBoson	content;
+	long		bound = 0;
+	long		b;
+	int		i, j;
+
+	if(content_bound_gen == _DtDtsMMGeneration())
+	{
+		return(content_bound_cache);
+	}
+	if(!(db = get_dc_db()))
+	{
+		return(-1);
+	}
+	content = _DtDtsMMStringToBoson(DtDTS_CONTENT);
+	rec_list = _DtDtsMMGetPtr(db->recordList);
+	for(i = 0; bound >= 0 && i < db->recordCount; i++)
+	{
+		fld_list = _DtDtsMMGetPtr(rec_list[i].fieldList);
+		for(j = 0; j < rec_list[i].fieldCount; j++)
+		{
+			const char	*v;
+
+			if(fld_list[j].fieldName != content)
+			{
+				continue;
+			}
+			v = _DtDtsMMBosonToString(fld_list[j].fieldValue);
+			b = v ? content_value_bound(v) : 0;
+			if(b < 0)
+			{
+				bound = -1;
+				break;
+			}
+			if(b > bound)
+			{
+				bound = b;
+			}
+		}
+	}
+	content_bound_cache = bound;
+	content_bound_gen = _DtDtsMMGeneration();
+	return(bound);
+}
 
 static int
 type_content(char *attr, type_info_t *info)
@@ -1022,41 +1368,56 @@ type_content(char *attr, type_info_t *info)
 	return(match);
 }
 
+/*
+ * Returns the data type named in the directory's .DtDirDataType file,
+ * or NULL.
+ */
 static char *
 _DtDtsGetDataType(const char *file)
 {
 	int		fd;
 	char		*name;
+	size_t		name_len;
 	struct stat	file_stat;
-	u_char		*buff = 0;
-	int		start;
+	char		*buff;
 	char		*dt = 0;
-	int		end;
+	size_t		start;
+	size_t		end;
+	ssize_t		got;
 
-	name = calloc(1, MAXPATHLEN+1);
-	sprintf(name, "%s/%s", file, DtDTS_DT_DIR);
-	if((fd = open(name, O_RDONLY, 0644)) != -1)
+	name_len = strlen(file) + sizeof(DtDTS_DT_DIR) + 1;
+	name = malloc(name_len);
+	snprintf(name, name_len, "%s/%s", file, DtDTS_DT_DIR);
+	/* O_NONBLOCK: do not hang on a FIFO of that name */
+	fd = open(name, O_RDONLY|O_NOCTTY|O_NONBLOCK|O_CLOEXEC);
+	free(name);
+	if(fd == -1)
 	{
-		if(fstat(fd, &file_stat) == 0)
-		{
-			buff = (u_char *)calloc((size_t)1, file_stat.st_size+1);
-			read(fd, buff, file_stat.st_size);
-		}
-		dt = strstr((char *)buff, DtDTS_DATA_ATTRIBUTES_NAME);
+		return(0);
+	}
+	if(fstat(fd, &file_stat) == 0 && S_ISREG(file_stat.st_mode) &&
+	   file_stat.st_size > 0 &&
+	   (buff = malloc((size_t)file_stat.st_size + 1)) != NULL)
+	{
+		got = read_prefix(fd, buff, (size_t)file_stat.st_size);
+		buff[got > 0 ? got : 0] = '\0';
+		dt = strstr(buff, DtDTS_DATA_ATTRIBUTES_NAME);
 		if(dt != NULL)
 		{
-			start = dt-(char*)buff;
-			while(!isspace(buff[start])) start++;
-			while(isspace(buff[start]))start++;
+			start = dt - buff;
+			while(buff[start] && !isspace((unsigned char)buff[start]))
+				start++;
+			while(isspace((unsigned char)buff[start]))
+				start++;
 			end = start;
-			while(!isspace(buff[end])) end++;
+			while(buff[end] && !isspace((unsigned char)buff[end]))
+				end++;
 			buff[end] = '\0';
-			dt = strdup((char *)&buff[start]);
+			dt = buff[start] ? strdup(&buff[start]) : 0;
 		}
-		close(fd);
+		free(buff);
 	}
-	free(buff);
-	free(name);
+	close(fd);
 	return(dt);
 }
 
@@ -1177,7 +1538,8 @@ type_name(const char *name, char *attr)
 #ifdef USE_FNMATCH
 		match = !fnmatch(attr, name, 0);
 #else
-		match =  gmatch(name, attr);
+		match = (is_ascii(name) && is_ascii(attr)) ?
+			gmatch_b(name, attr) : gmatch(name, attr);
 #endif
 	}
 	return(match);
@@ -1193,17 +1555,34 @@ type_path(const char *path, char *attr)
 #ifdef USE_FNMATCH
 		match = !fnmatch(attr, path, 0);
 #else
-		match = gmatch(path, attr);
+		match = (is_ascii(path) && is_ascii(attr)) ?
+			gmatch_b(path, attr) : gmatch(path, attr);
 #endif
 	}
 	return(match);
 }
 
+/*
+ * Returns the first character of SEP in STR that is not escaped with a
+ * backslash, or NULL.  ASCII says STR is all ASCII (see is_ascii()).
+ */
 static char *
-next_sep(char *str, char *sep)
+next_sep(char *str, char *sep, int ascii)
 {
 	char	*c;
 	char	*prev;
+
+	if(ascii)
+	{
+		for(c = str; (c = strpbrk(c, sep)) != NULL; c++)
+		{
+			if(c == str || c[-1] != '\\')
+			{
+				return(c);
+			}
+		}
+		return((char *)0);
+	}
 
 	c = str;
 	while(*c)
@@ -1235,7 +1614,8 @@ DtDtsDataToDataType(const char *fp,
 	DtDtsMMDatabase	*db;
 	DtDtsMMRecord	*rec_ptr = 0;
 	DtDtsMMField	*fld_ptr_list;
-	type_info_t	*info = 0;
+	type_info_t	info_store;
+	type_info_t	*info = &info_store;
 	int	j;
 	int	rec_m = 0;
 	int	fld_m = 0;
@@ -1254,8 +1634,8 @@ DtDtsDataToDataType(const char *fp,
 		return(strdup("UNKNOWN"));
 	}
 
-	info = set_vals(fp, buf, bs, fs, ln, ls, on);
-	if(!dtdts_path_pattern)
+	set_vals(info, fp, buf, bs, fs, ln, ls, on);
+	if(dtdts_bosons_gen != _DtDtsMMGeneration())
 	{
 		dtdts_path_pattern = _DtDtsMMStringToBoson(DtDTS_PATH_PATTERN);
 		dtdts_name_pattern = _DtDtsMMStringToBoson(DtDTS_NAME_PATTERN);
@@ -1269,6 +1649,7 @@ DtDtsDataToDataType(const char *fp,
 		dtdts_da_icon = _DtDtsMMStringToBoson(DtDTS_DA_ICON);
 		dtdts_da_description = _DtDtsMMStringToBoson(DtDTS_DA_DESCRIPTION);
 		dtdts_da_label = _DtDtsMMStringToBoson(DtDTS_DA_LABEL);
+		dtdts_bosons_gen = _DtDtsMMGeneration();
 	}
 
 	while(!rec_m && (rec_ptr = name_list(info, db, rec_ptr)))
@@ -1279,12 +1660,15 @@ DtDtsDataToDataType(const char *fp,
 		{
 			char	sep = '&';
 			DtDtsMMField	*fld_ptr = &fld_ptr_list[j];
+			int	ascii;
 
 			p_atr_m = 1;
 			c_atr_m = 1;
-			info->orig_attr = _DtDtsMMExpandValue(
+			/* read-only from here on: it may be the mapped value */
+			info->orig_attr = _DtDtsMMExpandValueNoCopy(
 					_DtDtsMMBosonToString(fld_ptr->fieldValue));
 			attr = info->orig_attr;
+			ascii = is_ascii(attr);
 			do
 			{
 				int	neg = 0;
@@ -1298,7 +1682,7 @@ DtDtsDataToDataType(const char *fp,
 					neg = !neg;
 					attr++;
 				}
-				new_sep = next_sep(attr, "&|\0");
+				new_sep = next_sep(attr, "&|", ascii);
 				if(new_sep == 0)
 				{
 					new_sep = attr + strlen(attr);
@@ -1306,7 +1690,7 @@ DtDtsDataToDataType(const char *fp,
 				n = new_sep-attr+1;
 				c = max_buf((size_t)n, info);
 
-				strncpy(c, attr, new_sep-attr);
+				memcpy(c, attr, new_sep-attr);
 				c[new_sep-attr] = '\0';
 				attr = new_sep;
 				new_sep = c;
@@ -1498,19 +1882,23 @@ expand_keyword(const char *attr_in, const char *in_pathname)
 			}
 			else if ( !strncmp(c,"%dir%",5) )
 			{
+				/* (a name without '/' used to crash here) */
 				tmp = strrchr(netPath, '/');
-				*tmp = '\0';
-				n += strlen(netPath) - 5;
+				if (tmp)
+					*tmp = '\0';
+				p = tmp ? netPath : ".";
+				n += strlen(p) - 5;
 				buf = (char *)realloc(buf, n);
-				strcpy((buf+i),netPath);
-				i += strlen(netPath);
-				*tmp = '/';
+				strcpy((buf+i),p);
+				i += strlen(p);
+				if (tmp)
+					*tmp = '/';
 				c += 4;
 			}
 			else if ( !strncmp(c,"%name%",6) )
 			{
 				tmp = strrchr(netPath, '/');
-				tmp ++;
+				tmp = tmp ? tmp + 1 : netPath;
 				n += strlen(tmp) - 6;
 				buf = (char *)realloc(buf, n);
 				strcpy((buf+i),tmp);
@@ -1532,7 +1920,7 @@ expand_keyword(const char *attr_in, const char *in_pathname)
 			else if ( !strncmp(c,"%base%",6) )
 			{
 				tmp = strrchr(netPath, '/');
-				tmp ++;
+				tmp = tmp ? tmp + 1 : netPath;
 				if ((p = strrchr(tmp,'.')) != NULL)
 				{
 					n += p-tmp - 6;
@@ -1638,30 +2026,59 @@ expand_shell(const char *attr)
 	return(results);
 }
 
+/*
+ * Expands variables, %keywords% and `commands` in a database value.
+ * The result is always malloc'ed.  Each step is skipped when the value
+ * holds nothing it would change; this gives the same result as running
+ * all of them (each of them copies such a value unchanged).
+ */
 static char *
 expand_value(DtShmBoson attr, char *in_pathname)
 {
+	const char *value;
 	char *tmp;
 	char *exp;
 	char *shell_exp;
+	int keyword_again = 1;
 
-	if(attr && attr != -1)
+	if(!attr || attr == -1 || !(value = _DtDtsMMBosonToString(attr)))
 	{
-		tmp = _DtDtsMMExpandValue(_DtDtsMMBosonToString(attr));
-		exp = expand_keyword(tmp, in_pathname);
-		shell_exp = expand_shell(exp);
+		return(NULL);
+	}
+	if(!strpbrk(value, "$\\%`"))
+	{
+		return(strdup(value));
+	}
 
-		_DtDtsMMSafeFree(tmp);
-		if(shell_exp)
-		{
-			free(exp);
-			exp = expand_keyword(shell_exp, in_pathname);
-			free(shell_exp);
-		}
+	tmp = _DtDtsMMExpandValueNoCopy(value);
+	if(in_pathname && strchr(tmp, '%'))
+	{
+		exp = expand_keyword(tmp, in_pathname);
 	}
 	else
 	{
-		exp = NULL;
+		exp = strdup(tmp);
+	}
+	_DtDtsMMSafeFree(tmp);
+
+	if(strchr(exp, '`'))
+	{
+		if((shell_exp = expand_shell(exp)))
+		{
+			free(exp);
+			exp = shell_exp;
+		}
+		else
+		{
+			keyword_again = 0;	/* the command failed */
+		}
+	}
+	/* keywords are expanded again, also in the commands' output */
+	if(keyword_again && in_pathname && strchr(exp, '%'))
+	{
+		tmp = expand_keyword(exp, in_pathname);
+		free(exp);
+		exp = tmp;
 	}
 
 	return(exp);
@@ -1814,16 +2231,29 @@ DtDtsFreeDataType(char *datatype)
 int
 DtDtsDataTypeIsAction(const char *datatype)
 {
-	char	*val;
-	if((val = DtDtsDataTypeToAttributeValue(datatype, "IS_ACTION", NULL)))
+	DtDtsMMDatabase	*db;
+	DtDtsMMRecord	*entry;
+	DtDtsMMField	*fld;
+	int		result = 0;
+
+	/*
+	 * This used to expand the IS_ACTION value and test the result for
+	 * NULL; the expansion is never NULL for a value that exists.
+	 */
+	_DtSvcAppLockDefault();
+	_DtSvcProcessLock();
+	db = get_da_db();
+	if(db && datatype &&
+	   (entry = _DtDtsMMGetRecordByName(db, datatype)) &&
+	   (fld = _DtDtsMMGetField(entry, DtDTS_DA_IS_ACTION)) &&
+	   fld->fieldValue && fld->fieldValue != -1 &&
+	   _DtDtsMMBosonToString(fld->fieldValue))
 	{
-		DtDtsFreeAttributeValue(val);
-		return(1);
+		result = 1;
 	}
-	else
-	{
-		return(0);
-	}
+	_DtSvcProcessUnlock();
+	_DtSvcAppUnlockDefault();
+	return(result);
 }
 
 char **
@@ -1875,6 +2305,7 @@ DtDtsFindAttribute(const char *name, const char *value)
 	char		*v;
 	DtDtsMMRecord	*rec_ptr;
 	DtDtsMMRecord	*rec_ptr_list;
+	DtShmBoson	name_boson;
 
 	_DtSvcAppLockDefault();
 	_DtSvcProcessLock();    /* To avoid deadlock with DtDtsMMDatabase mutex
@@ -1887,12 +2318,28 @@ DtDtsFindAttribute(const char *name, const char *value)
 		return(NULL);
 	}
 
-	list = (char **)calloc(ot->recordCount, sizeof(char *));
+	list = (char **)calloc(ot->recordCount + 1, sizeof(char *));
 	rec_ptr_list = _DtDtsMMGetPtr(ot->recordList);
-	for(i = 0; i < ot->recordCount; i++)
+	/* an unknown field name matches no record */
+	name_boson = _DtDtsMMStringToBoson(name);
+	for(i = 0; name_boson != -1 && i < ot->recordCount; i++)
 	{
+		DtDtsMMField	*fld_list;
+		int		f;
+
 		rec_ptr = &rec_ptr_list[i];
-		v = _DtDtsMMExpandValue(_DtDtsMMGetFieldByName(rec_ptr, (char *)name));
+		fld_list = _DtDtsMMGetPtr(rec_ptr->fieldList);
+		for(f = 0; f < rec_ptr->fieldCount; f++)
+		{
+			if(fld_list[f].fieldName == name_boson)
+				break;
+		}
+		if(f == rec_ptr->fieldCount)
+		{
+			continue;
+		}
+		v = _DtDtsMMExpandValueNoCopy(
+			_DtDtsMMBosonToString(fld_list[f].fieldValue));
 		if(v && !strcmp(value, v))
 		{
 			list[j++] = strdup(_DtDtsMMBosonToString(rec_ptr->recordName));

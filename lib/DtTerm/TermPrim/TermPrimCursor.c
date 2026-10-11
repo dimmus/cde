@@ -30,6 +30,7 @@
  * (c) Copyright 1996 Hitachi.						*
  */
 
+#include <time.h>
 #include <Xm/ScrollBar.h>
 #include <Xm/XmPrivate.h>
 
@@ -42,6 +43,55 @@
 #include "TermPrimBufferP.h"
 
 static void cursorToggle(Widget w);
+static void timeoutCallback(XtPointer client_data, XtIntervalId *id);
+
+/* stop blinking (leaving the cursor drawn) after this long without
+ * output, keyboard input or a focus change, so that an idle terminal
+ * does not wake up blinkRate times a second forever...
+ */
+#define	BLINK_IDLE_STOP_MS	30000
+
+/* set the input method spot location at most this often.  With an
+ * XIM server (ibus, fcitx, ...) every update is a synchronous round
+ * trip.  The first move after a quiet period is sent at once (so the
+ * spot follows typing without delay); moves during a burst of output
+ * are coalesced into one update at the end of the interval...
+ */
+#define	IM_SPOT_INTERVAL_MS	50
+
+/* milliseconds on the monotonic clock.  The value wraps around (it is
+ * unsigned, so that this is well defined even where a long is 32 bits),
+ * so compare two of them by their unsigned difference...
+ */
+unsigned long
+_DtTermPrimMonotonicMs(void)
+{
+    struct timespec now;
+
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    return((unsigned long) now.tv_sec * 1000UL +
+	    (unsigned long) (now.tv_nsec / 1000000L));
+}
+
+/*
+ * The blink timer.  It is armed (cursorTimeoutId != 0) only while we
+ * have the focus and blinkRate > 0.  _DtTermPrimCursorOff() leaves it
+ * armed, and _DtTermPrimCursorOn() arms it only if it is not, so that
+ * output (which turns the cursor off and on again for every burst) does
+ * not remove and re-add a timer each time.  The cursor stays drawn for
+ * a full blinkRate after it is turned on, as before: a tick that comes
+ * sooner than that just waits out the rest of the period...
+ */
+static void
+addBlinkTimeout(Widget w, long ms)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+
+    tw->term.tpd->cursorTimeoutId =
+	    XtAppAddTimeOut(XtWidgetToApplicationContext(w),
+	    (unsigned long) MAX(1, ms),
+	    (XtTimerCallbackProc) timeoutCallback, (XtPointer) w);
+}
 
 /*ARGSUSED*/
 static void
@@ -49,16 +99,145 @@ timeoutCallback(XtPointer client_data, XtIntervalId *id)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) client_data;
     struct termData *tpd = tw->term.tpd;
-    (void) cursorToggle((Widget) tw);
+    unsigned long now;
 
-    /* add a timeout... */
-    if (tw->term.blinkRate > 0) {
-	tpd->cursorTimeoutId =
-		XtAppAddTimeOut(XtWidgetToApplicationContext((Widget) tw),
-		tw->term.blinkRate,
-		(XtTimerCallbackProc) timeoutCallback, (XtPointer) tw);
+    tpd->cursorTimeoutId = (XtIntervalId) 0;
+
+    /* the cursor is off (output is being processed, or it has been made
+     * invisible).  _DtTermPrimCursorOn() will rearm us...
+     */
+    if ((CURSORoff == tpd->cursorState) || !tpd->cursorVisible ||
+	    !tw->term.hasFocus) {
+	return;
+    }
+
+    now = _DtTermPrimMonotonicMs();
+    if ((tw->term.blinkRate <= 0) ||
+	    (now - tpd->cursorActiveMs >= BLINK_IDLE_STOP_MS)) {
+	/* stop blinking.  Leave the cursor drawn... */
+	if (CURSORon == tpd->cursorState) {
+	    (void) cursorToggle((Widget) tw);
+	}
+	return;
+    }
+
+    if (now - tpd->cursorOnMs < (unsigned long) tw->term.blinkRate) {
+	/* the cursor was turned on less than a period ago... */
+	(void) addBlinkTimeout((Widget) tw,
+		tw->term.blinkRate - (long) (now - tpd->cursorOnMs));
+	return;
+    }
+
+    (void) cursorToggle((Widget) tw);
+    (void) addBlinkTimeout((Widget) tw, tw->term.blinkRate);
+}
+
+/* (re)start blinking if we should be and are not (it stops after
+ * BLINK_IDLE_STOP_MS of inactivity)...
+ */
+static void
+restartBlinking(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+
+    if (tw->term.hasFocus && (tw->term.blinkRate > 0) &&
+	    tpd->cursorVisible && (CURSORoff != tpd->cursorState) &&
+	    !tpd->cursorTimeoutId) {
+	(void) addBlinkTimeout(w, tw->term.blinkRate);
+    }
+}
+
+/* a key was pressed: we are not idle...
+ */
+void
+_DtTermPrimCursorKeyActivity(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+
+    tpd->cursorActiveMs = _DtTermPrimMonotonicMs();
+    if (!tpd->cursorTimeoutId) {
+	/* restart blinking from the drawn state... */
+	tpd->cursorOnMs = tpd->cursorActiveMs;
+	(void) restartBlinking(w);
+    }
+}
+
+/* set the input method spot location to the cursor position...
+ */
+static void
+setIMSpot(Widget w)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    struct termData *tpd = tw->term.tpd;
+    XPoint point;
+
+    tpd->IMCursorColumn = tpd->cursorColumn;
+    tpd->IMCursorRow = tpd->cursorRow;
+    tpd->imSpotSentMs = _DtTermPrimMonotonicMs();
+    point.x = tpd->cursorColumn * tpd->cellWidth + tpd->offsetX;
+    point.y = tpd->cursorRow * tpd->cellHeight + tpd->offsetY + tpd->ascent;
+    DebugF('F', 1, fprintf(stderr,
+	    "%s() %s calling %s\n",
+	    "_DtTermPrimCursorOn",
+	    "don't care",
+	    "XmImVaSetValues()"));
+    (void) XmImVaSetValues(w,
+	    XmNspotLocation, &point,
+	    NULL);
+}
+
+/*ARGSUSED*/
+static void
+imSpotTimeout(XtPointer client_data, XtIntervalId *id)
+{
+    Widget w = (Widget) client_data;
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    tpd->imSpotTimerId = (XtIntervalId) 0;
+    if ((tpd->IMCursorColumn != tpd->cursorColumn) ||
+	    (tpd->IMCursorRow != tpd->cursorRow)) {
+	(void) setIMSpot(w);
+    }
+}
+
+static void
+updateIMSpot(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+    unsigned long elapsed;
+
+    if (((tpd->IMCursorColumn == tpd->cursorColumn) &&
+	    (tpd->IMCursorRow == tpd->cursorRow)) || tpd->imSpotTimerId) {
+	/* nothing to do, or already scheduled... */
+	return;
+    }
+
+    elapsed = _DtTermPrimMonotonicMs() - tpd->imSpotSentMs;
+    if (elapsed >= IM_SPOT_INTERVAL_MS) {
+	(void) setIMSpot(w);
     } else {
+	tpd->imSpotTimerId = XtAppAddTimeOut(XtWidgetToApplicationContext(w),
+		IM_SPOT_INTERVAL_MS - elapsed,
+		imSpotTimeout, (XtPointer) w);
+    }
+}
+
+/* remove our timers (the widget is being destroyed)...
+ */
+void
+_DtTermPrimCursorDestroy(Widget w)
+{
+    struct termData *tpd = ((DtTermPrimitiveWidget) w)->term.tpd;
+
+    if (tpd->cursorTimeoutId) {
+	(void) XtRemoveTimeOut(tpd->cursorTimeoutId);
 	tpd->cursorTimeoutId = (XtIntervalId) 0;
+    }
+    if (tpd->imSpotTimerId) {
+	(void) XtRemoveTimeOut(tpd->imSpotTimerId);
+	tpd->imSpotTimerId = (XtIntervalId) 0;
     }
 }
 
@@ -80,6 +259,7 @@ _DtTermPrimCursorChangeFocus(Widget w)
 	    tpd->IMHasFocus = True;
 	    tpd->IMCursorColumn = tpd->cursorColumn;
 	    tpd->IMCursorRow = tpd->cursorRow;
+	    tpd->imSpotSentMs = _DtTermPrimMonotonicMs();
 
 	    point.x = tpd->IMCursorColumn * tpd->cellWidth + tpd->offsetX;
 	    point.y = tpd->IMCursorRow * tpd->cellHeight + tpd->offsetY +
@@ -95,6 +275,7 @@ _DtTermPrimCursorChangeFocus(Widget w)
 	}
 
 	/* we want to blink now... */
+	tpd->cursorActiveMs = _DtTermPrimMonotonicMs();
 	if (tpd->cursorVisible && (!tpd->cursorTimeoutId) &&
 		(tw->term.blinkRate > 0) &&
 		(tpd->cursorState != CURSORoff)) {
@@ -104,10 +285,8 @@ _DtTermPrimCursorChangeFocus(Widget w)
 
 	    /* add a timeout... */
 	    Debug('F', fprintf(stderr, ">>adding a timeout...\n"));
-	    tpd->cursorTimeoutId =
-		    XtAppAddTimeOut(
-		    XtWidgetToApplicationContext(w),
-		    tw->term.blinkRate, timeoutCallback, (XtPointer) w);
+	    tpd->cursorOnMs = 0;
+	    (void) addBlinkTimeout(w, tw->term.blinkRate);
 	}
     } else {
 	if (tpd->IMHasFocus) {
@@ -121,15 +300,17 @@ _DtTermPrimCursorChangeFocus(Widget w)
 	    (void) XmImUnsetFocus(w);
 	}
 
-	/* we want to stop blinking now... */
-	if (tpd->cursorTimeoutId && (tpd->cursorState != CURSORoff)) {
-	    Debug('F', fprintf(stderr, ">>we lost focus...\n"));
-	    if (CURSORon == tpd->cursorState) {
-		/* we need to make the cursor visible... */
-		Debug('F', fprintf(stderr,
-			">>turning on the cursor...\n"));
-		(void) cursorToggle(w);
-	    }
+	/* we want to stop blinking now (the cursor may be off with the
+	 * timer still armed, or drawn with blinking stopped by
+	 * timeoutCallback())...
+	 */
+	if (CURSORon == tpd->cursorState) {
+	    /* we need to make the cursor visible... */
+	    Debug('F', fprintf(stderr,
+		    ">>turning on the cursor...\n"));
+	    (void) cursorToggle(w);
+	}
+	if (tpd->cursorTimeoutId) {
 	    /* we need to kill the timeout... */
 	    Debug('F', fprintf(stderr, ">>removing the timeout...\n"));
 	    (void) XtRemoveTimeOut(tpd->cursorTimeoutId);
@@ -202,7 +383,6 @@ _DtTermPrimCursorOn(Widget w)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
     struct termData *tpd = tw->term.tpd;
-    XPoint point;
     static Boolean alreadyActive = False;
     short chunkWidth;
     enhValues enhancements;
@@ -235,6 +415,17 @@ _DtTermPrimCursorOn(Widget w)
     }
     _DtTermProcessUnlock();
 
+    /* paint any text we have been holding back (before we draw the
+     * cursor over it)...
+     */
+    (void) _DtTermPrimRenderFlushDirty(w);
+
+    /* the frame we may have been waiting to paint is painted now... */
+    if (tpd->frameTimerId) {
+	(void) XtRemoveTimeOut(tpd->frameTimerId);
+	tpd->frameTimerId = (XtIntervalId) 0;
+    }
+
 #ifdef	DISOWN_SELECTION_ON_CURSOR_ON_OR_OFF 
     if ( _DtTermPrimSelectIsAboveSelection(w,tpd->cursorRow,
 	    tpd->cursorColumn)) {
@@ -242,23 +433,10 @@ _DtTermPrimCursorOn(Widget w)
     }
 #endif	/* DISOWN_SELECTION_ON_CURSOR_ON_OR_OFF */
 
-    /* update the input method spot location...
+    /* update the input method spot location (at most every
+     * IM_SPOT_INTERVAL_MS)...
      */
-    if ((tpd->IMCursorColumn != tpd->cursorColumn) ||
-	    (tpd->IMCursorRow != tpd->cursorRow)) {
-	tpd->IMCursorColumn = tpd->cursorColumn;
-	tpd->IMCursorRow = tpd->cursorRow;
-	point.x = tpd->cursorColumn * tpd->cellWidth + tpd->offsetX;
-	point.y = tpd->cursorRow * tpd->cellHeight + tpd->offsetY + tpd->ascent;
-	DebugF('F', 1, fprintf(stderr,
-		"%s() %s calling %s\n",
-		"_DtTermPrimCursorOn",
-		"don't care",
-		"XmImVaSetValues()"));
-	(void) XmImVaSetValues(w,
-		XmNspotLocation, &point,
-		NULL);
-    }
+    (void) updateIMSpot(w);
 #ifdef	NOT_NEEDED
     if (!tw->term.hasFocus) {
 	(void) fprintf(stderr,
@@ -335,15 +513,12 @@ _DtTermPrimCursorOn(Widget w)
     tpd->cursorState = CURSORon;
     (void) cursorToggle(w);
 
-    if (tw->term.hasFocus) {
-	/* add a timeout... */
-	if (tw->term.blinkRate > 0) {
-	    tpd->cursorTimeoutId =
-		    XtAppAddTimeOut(XtWidgetToApplicationContext(w),
-		    tw->term.blinkRate, (XtTimerCallbackProc) timeoutCallback,
-		    (XtPointer) w);
-	}
-    }
+    /* the cursor stays drawn for a full period from now.  Arm the blink
+     * timer if it is not already...
+     */
+    tpd->cursorOnMs = _DtTermPrimMonotonicMs();
+    tpd->cursorActiveMs = tpd->cursorOnMs;
+    (void) restartBlinking(w);
 
 }
 
@@ -500,14 +675,10 @@ _DtTermPrimCursorOff(Widget w)
 	(void) cursorToggle(w);
     }
 
-    /* reset the state flag... */
+    /* reset the state flag.  The blink timer stays armed (see
+     * timeoutCallback())...
+     */
     tpd->cursorState = CURSORoff;
-
-    /* turn off the timer... */
-    if (tpd->cursorTimeoutId) {
-	XtRemoveTimeOut(tpd->cursorTimeoutId);
-    }
-    tpd->cursorTimeoutId = (XtIntervalId) 0;
 
 #ifdef	DISOWN_SELECTION_ON_CURSOR_ON_OR_OFF 
     if ( _DtTermPrimSelectIsAboveSelection(w,tpd->cursorRow,

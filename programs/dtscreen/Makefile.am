@@ -1,8 +1,14 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 MAITAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtscreen
 
-dtscreen_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtscreen_LDADD = $(LIBSVC) $(XTLIB) $(XEXTLIB) $(X11LIB) $(MATHLIB)
 
 if SOLARIS
 dtscreen_LDADD += -lgen

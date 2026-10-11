@@ -1,8 +1,9 @@
 # message files for non-C locales - ie: local .msg files.  So much
 # nicer :)
 
-BUILT_SOURCES = $(shell ls *.msg |grep -v libAB |sed -e 's/.msg/.cat/g')
-CLEANFILES = $(BUILT_SOURCES)
+# $(srcdir), so that this also works in a build directory.
+BUILT_SOURCES = $(patsubst %.msg,%.cat,$(filter-out libAB%,$(notdir $(wildcard $(srcdir)/*.msg))))
+CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 msgcatdir = $(CDE_INSTALLATION_TOP)/lib/nls/msg/$(LANG)
 dist_msgcat_DATA = $(BUILT_SOURCES)
@@ -10,8 +11,8 @@ dist_msgcat_DATA = $(BUILT_SOURCES)
 SUFFIXES = .msg .cat
 
 .msg.cat:
-	$(RM) $@
-	LANG=$(LANG) $(GENCAT) $@ $^ || $(RM) $@
+	$(RM) $@ $@.tmp
+	LANG=$(LANG) $(GENCAT) $@.tmp $^ && mv -f $@.tmp $@
 
 SYM2NUM_CMD = $(KSH) $(top_builddir)/programs/dtprintinfo/sym2num
 
@@ -20,7 +21,7 @@ dtprintinfo.cat: export LANG := $(LANG)
 dtprintinfo.cat: export LC_COLLATE = C
 
 dtprintinfo.cat: dtprintinfo.msg
-	$(RM) $@
-	$(SYM2NUM_CMD) $(@:.cat=) $(@:.cat=.msg) > tmp.msg
-	$(GENCAT) $@ tmp.msg
+	$(RM) $@ $@.tmp
+	$(SYM2NUM_CMD) $(@:.cat=) $< > tmp.msg
+	$(GENCAT) $@.tmp tmp.msg && mv -f $@.tmp $@
 	$(RM) tmp.msg $(@:.cat=_msg.h)

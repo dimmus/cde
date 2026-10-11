@@ -254,7 +254,7 @@ remove_entry(Btree *btree, char *pkp, int pos)
     assert(pos >= 0 && pos < nkeys);
     
     /* Shift nkeys - pos - 1 entries to the left. */
-    memcpy(pkp + BT_KEYS_OFF + pos * keylength,
+    memmove(pkp + BT_KEYS_OFF + pos * keylength,
 	   pkp + BT_KEYS_OFF + (pos + 1) * keylength,
 	   (nkeys - pos - 1) * keylength);
     
@@ -282,7 +282,7 @@ move_from_right(Btree *btree, char *l, char *r, int move_keys)
 	  move_keys * keylength);
     
     /* Move remaining entries in r to the left side. */
-    memcpy( r + BT_KEYS_OFF,r + BT_KEYS_OFF + move_keys * keylength,
+    memmove( r + BT_KEYS_OFF,r + BT_KEYS_OFF + move_keys * keylength,
 	  (rnkeys - move_keys) * keylength);
     
     /* If non-leaf, move the pointers stored at the end of block. */
@@ -322,7 +322,7 @@ move_from_left(Btree *btree, char *l, char *r, int move_keys)
     /* If non-leaf,  move the pointers stored at the end of block. */
     if (level > 0) {
 	
-	memcpy(r + ISPAGESIZE - (rnkeys + move_keys) * BLKNOSIZE,
+	memmove(r + ISPAGESIZE - (rnkeys + move_keys) * BLKNOSIZE,
 	       r + ISPAGESIZE - rnkeys * BLKNOSIZE,
 	       rnkeys * BLKNOSIZE);
 	

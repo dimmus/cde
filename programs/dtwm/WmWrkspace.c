@@ -32,6 +32,8 @@
  * Included Files:
  */
 
+#include <limits.h>
+#include <stdlib.h>
 #include "WmGlobal.h"
 #include "WmHelp.h"
 #include "WmResNames.h"
@@ -71,6 +73,9 @@ static void InsureUniqueWorkspaceHints(
 
 /* FindDtSessionMatch () put in WmResParse.h */
 
+/* in Callback.c */
+extern void SwitchSetCurrentWorkspace (WmScreenData *pSD, Atom atom_name);
+
 /* external functions */
 #include "WmBackdrop.h"
 #include "WmError.h"
@@ -97,6 +102,83 @@ static WorkspaceID *pResIDs = NULL;
 
 
 
+/*
+ * The clients of a workspace in the order they are shown when changing to
+ * it: from the top of the stack down, so that a window is not painted
+ * where the windows above it are about to cover it.  A transient follows
+ * its leader (which maps the transients first, see MapClientWindows); a
+ * minimized client is placed by its icon.
+ */
+typedef struct _ShowOrder
+{
+    ClientData *pCD;
+    int rank;		/* stacking position of the leader, top is 0 */
+    int depth;		/* transient depth below the leader */
+    int index;		/* position in the workspace's client list */
+} ShowOrder;
+
+static int
+CompareShowOrder (const void *p1, const void *p2)
+{
+    const ShowOrder *a = p1, *b = p2;
+
+    if (a->rank != b->rank)
+	return (a->rank < b->rank) ? -1 : 1;
+    if (a->depth != b->depth)
+	return (a->depth < b->depth) ? -1 : 1;
+    return (a->index < b->index) ? -1 : (a->index > b->index);
+}
+
+static ShowOrder *
+GetShowOrder (WmWorkspaceData *pWS)
+{
+    WmScreenData *pSD = pWS->pSD;
+    ClientListEntry *pEntry;
+    ShowOrder *pOrder;
+    ClientData *pCD, *pcdLeader;
+    int i, rank;
+
+    if (!pWS->numClients ||
+	!(pOrder = (ShowOrder *) malloc (pWS->numClients * sizeof (ShowOrder))))
+    {
+	return (NULL);
+    }
+
+    /* clients that are not in the stacking list go last, in list order */
+    for (i = 0; i < pWS->numClients; i++)
+    {
+	pWS->ppClients[i]->stackRank = INT_MAX;
+    }
+    for (rank = 0, pEntry = pSD->clientList; pEntry;
+	 pEntry = pEntry->nextSibling, rank++)
+    {
+	pCD = pEntry->pCD;
+	if ((pEntry->type == MINIMIZED_STATE) ==
+	    ((pCD->clientState & ~UNSEEN_STATE) == MINIMIZED_STATE))
+	{
+	    pCD->stackRank = rank;
+	}
+    }
+
+    for (i = 0; i < pWS->numClients; i++)
+    {
+	pCD = pWS->ppClients[i];
+	pOrder[i].pCD = pCD;
+	pOrder[i].index = i;
+	pOrder[i].depth = 0;
+	for (pcdLeader = pCD; pcdLeader->transientLeader;
+	     pcdLeader = pcdLeader->transientLeader)
+	{
+	    pOrder[i].depth++;
+	}
+	pOrder[i].rank = pcdLeader->stackRank;
+    }
+    qsort (pOrder, pWS->numClients, sizeof (ShowOrder), CompareShowOrder);
+
+    return (pOrder);
+}
+
+
 /*************************************<->*************************************
  *
  *  ChangeToWorkspace (pNewWS)
@@ -110,6 +192,12 @@ static WorkspaceID *pResIDs = NULL;
  *  ------
  *  pNewWS =  pointer to workspace data
  *
+ *  Comments:
+ *  --------
+ *  The backdrop is changed first, then the windows of the new workspace
+ *  are shown from the top of the stack down, then the windows that are
+ *  not in it are hidden: each part of the screen is painted about once,
+ *  rather than with the old backdrop, the new one, then the windows.
  * 
  *************************************<->***********************************/
 
@@ -121,19 +209,16 @@ ChangeToWorkspace(
     ClientData *pCD;
     int i;
     WmScreenData *pSD = pNewWS->pSD;
+    WmWorkspaceData *pOldWS;
+    ShowOrder *pOrder;
 
-    ClientData *pWsPCD;
+    ClientData *pWsPCD = NULL;
     Context   wsContext = F_CONTEXT_NONE;
 
     if (pNewWS == pSD->pActiveWS)
 	return;				/* already there */
 
-    pSD->pLastWS = pSD->pActiveWS;
-
-    /*
-     * Go through client list of old workspace and hide windows
-     * that shouldn't appear in new workspace.
-     */
+    pOldWS = pSD->pLastWS = pSD->pActiveWS;
 
     if (pSD->presence.shellW && 
 	pSD->presence.onScreen &&
@@ -142,17 +227,6 @@ ChangeToWorkspace(
 	pWsPCD = pSD->presence.pCDforClient;
 	wsContext = pSD->presence.contextForClient;
 	HidePresenceBox (pSD, False);
-    }
-
-    for (i = 0; i < pSD->pActiveWS->numClients; i++)
-    {
-	pCD = pSD->pActiveWS->ppClients[i];
-	if (!ClientInWorkspace (pNewWS, pCD))
-	{
-	   SetClientWsIndex(pCD);
-	   SetClientState (pCD, pCD->clientState | UNSEEN_STATE,
-		 CurrentTime);
-	}
     }
 
     /*
@@ -169,22 +243,23 @@ ChangeToWorkspace(
      */
     if (pSD->useIconBox)
     {
-	UnmapIconBoxes (pSD->pLastWS);
+	UnmapIconBoxes (pOldWS);
     }
     
     /* 
-     * Set new active workspace 
+     * Set new active workspace and its backdrop
      */
     pSD->pActiveWS = pNewWS;
     ChangeBackdrop (pNewWS);
 
     /*
      * Go through client list of new workspace and show windows
-     * that should appear.
+     * that should appear, from the top of the stack down.
      */
+    pOrder = GetShowOrder (pNewWS);
     for (i = 0; i < pNewWS->numClients; i++)
     {
-	pCD = pNewWS->ppClients[i];
+	pCD = pOrder ? pOrder[i].pCD : pNewWS->ppClients[i];
 	SetClientWsIndex(pCD);
         if (pCD->clientState & UNSEEN_STATE)
 	{
@@ -228,6 +303,27 @@ ChangeToWorkspace(
 	    }
 	}
     }
+    free (pOrder);
+
+    /*
+     * Go through client list of old workspace and hide windows
+     * that shouldn't appear in new workspace.  This is done as it was
+     * before the new workspace was shown: in the context of the old one
+     * (the client's data for it, see SetClientWsIndex).
+     */
+
+    pSD->pActiveWS = pOldWS;
+    for (i = 0; i < pOldWS->numClients; i++)
+    {
+	pCD = pOldWS->ppClients[i];
+	if (!ClientInWorkspace (pNewWS, pCD))
+	{
+	   SetClientWsIndex(pCD);
+	   SetClientState (pCD, pCD->clientState | UNSEEN_STATE,
+		 CurrentTime);
+	}
+    }
+    pSD->pActiveWS = pNewWS;
 
     if ( (wsContext == F_CONTEXT_ICON &&
 	  ClientInWorkspace (ACTIVE_WS, pWsPCD)) ||
@@ -239,6 +335,9 @@ ChangeToWorkspace(
     {
 	ShowPresenceBox(pSD->presence.pCDforClient, F_CONTEXT_ICON);
     }
+
+    /* update the front panel switch now, not on the notice below */
+    SwitchSetCurrentWorkspace (pSD, (Atom) pNewWS->id);
 
     SetCurrentWorkspaceProperty (pSD);
 
@@ -476,7 +575,7 @@ CreateWorkspace(
      */
     if (pSD->numWsDataAllocated <= pSD->numWorkspaces)
     {
-	iActiveWS = (pSD->pActiveWS - pSD->pWS) / sizeof (WmWorkspaceData);
+	iActiveWS = pSD->pActiveWS - pSD->pWS;	/* an index, not bytes */
 	pSD->numWsDataAllocated += WS_ALLOC_AMOUNT;
 	pSD->pWS = (WmWorkspaceData *) XtRealloc ((char *)pSD->pWS,
 		    pSD->numWsDataAllocated * sizeof(WmWorkspaceData));
@@ -654,14 +753,7 @@ DeleteWorkspace(
 	/*
 	 * Delete the workspace data structures
 	 */
-	if (pWS->backdrop.imagePixmap)
-	{
-	    if (!XmDestroyPixmap (XtScreen(pWS->workspaceTopLevelW),
-			    pWS->backdrop.imagePixmap))
-	    {
-		/* not in Xm pixmap cache */
-	    }
-	}
+	FreeBackdropPixmap (pWS);
 
 	/* free pWS->backdrop.image */
 	if ((pWS->backdrop.flags & BACKDROP_IMAGE_ALLOCED) &&
@@ -763,14 +855,17 @@ void
 ProcessDtWmHints (ClientData *pCD)
 {
     DtWmHints *pHints;
-    Atom	property;
+    static Atom	property = None;
     long	saveFunctions;
 
     /*
      * Retrieve the _DT_WM_HINTS property if it exists.
      */
 
-    property = XmInternAtom(DISPLAY, _XA_DT_WM_HINTS, False);
+    if (property == None)
+    {
+	property = XmInternAtom(DISPLAY, _XA_DT_WM_HINTS, False);
+    }
 
     if (
 	(HasProperty (pCD, property)) 
@@ -990,7 +1085,8 @@ WorkspaceIsInCommand(
     {
 	if (pCD->pSD->remainingSessionItems)
 	{
-	    if(!(XGetWMClientMachine(dpy, pCD->client, &clientMachineProp)))
+	    if (!HasProperty (pCD, XA_WM_CLIENT_MACHINE) ||
+		!(XGetWMClientMachine(dpy, pCD->client, &clientMachineProp)))
 	    {
 		clientMachineProp.value = NULL;
 	    }

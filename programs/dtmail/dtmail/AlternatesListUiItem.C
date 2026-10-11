@@ -45,6 +45,7 @@
 #include <DtMail/PropUi.hh>
 #include <DtMail/ListUiItem.hh>
 #include <DtMail/AlternatesListUiItem.hh>
+#include "XmCompat.h"
 
 extern Boolean props_changed;
 void handleAlternateSelection(Widget w, XtPointer clientdata, XtPointer calldata);
@@ -237,7 +238,7 @@ void AlternatesListUiItem::handleAddButtonPress()
 	new_pair->label = strdup(test_str);
 	new_pair->value = NULL;
       
-	if(XmListGetSelectedPos(this->getWidget(),
+	if(XmCompatListGetSelectedPos(this->getWidget(),
 				&pos_list,
 				&num_pos))
 	  {
@@ -285,7 +286,7 @@ void AlternatesListUiItem::handleChangeButtonPress()
   int *pos_list, num_pos;
 
   // if nothing selected nothing to change...
-  if(XmListGetSelectedPos(this->getWidget(),
+  if(XmCompatListGetSelectedPos(this->getWidget(),
 			  &pos_list,
 			  &num_pos))
     {
@@ -330,7 +331,7 @@ void AlternatesListUiItem::handleDeleteButtonPress()
   int *p_list, p_count;
 
   // get the selected position
-  if(XmListGetSelectedPos(list_widget,
+  if(XmCompatListGetSelectedPos(list_widget,
 			  &p_list,
 			  &p_count))
     {

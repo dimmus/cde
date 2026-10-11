@@ -73,6 +73,7 @@
 #include <assert.h>
 #include <Xm/XmPrivate.h>
 #include "GifUtilsI.h"
+#include "ilX.h"
 
 #ifndef __STDC__
 #define debug1(s, x)  s <<  "x" << " = " << (x) << "\n"
@@ -717,7 +718,8 @@ int allocate_colors(GifObj *g)
       color.blue  = g->GifCMap[i].blue;
     
       /*printf ("Allocating %3d: ", i); */
-      if ( !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
+      if ( !_ilXComputeColor (g->f_dpy, g->f_cmap, g->f_visual, &color) &&
+           !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
 
 	  /*puts ("FAILED!!!"); */
          colors = (unsigned long *) malloc (sizeof(unsigned long)  * i);
@@ -808,7 +810,8 @@ debug1(cerr, GifCMap[i].grey);
          color.blue  = (i*65535)/(g->f_total_greys - 1);
    
          /*fprintf (stderr, "Allocating %3d: ", i);*/
-         if ( !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
+         if ( !_ilXComputeColor (g->f_dpy, g->f_cmap, g->f_visual, &color) &&
+              !XAllocColor (g->f_dpy, g->f_cmap, &color) ) {
 
 	     /*fprintf(stderr, "alloc Grey FAILED!!!");*/
             colors = (unsigned long *) malloc (sizeof(unsigned long)  * i);
@@ -1198,7 +1201,7 @@ else
     return None;
   }
 
-  _XmPutScaledImage (g->f_dpy,pm,g->f_gc,g->f_ximage,
+  _ilXPutScaledImage (g->f_dpy,pm,g->f_gc,g->f_ximage,
 		     0,0,0,0,width,height,
 		     scaledWidth,scaledHeight);
 

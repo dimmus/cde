@@ -284,6 +284,10 @@ static void RedisplayUsingStackingOrder (
                         Widget w,
                         XEvent *event,
                         Region region) ;
+static Boolean WidgetMayIntersect (
+                        FileMgrData * file_mgr_data,
+                        Widget w,
+                        Region region) ;
 static void ReorderChildrenList (
                         XmManagerWidget file_window,
                         Widget * manage,
@@ -491,12 +495,28 @@ GetStrcollProc(void)
   return ((StrcollProc)strcoll);
 }
 
+/* 1 for ".", 2 for "..", else 0 */
+static int
+DotRank(
+        const char *name)
+{
+  if (name[0] != '.')
+    return 0;
+  if (name[1] == '\0')
+    return 1;
+  if (name[1] == '.' && name[2] == '\0')
+    return 2;
+  return 0;
+}
+
 static Boolean
 SpecialCases(
              FileViewData **t1,
              FileViewData **t2,
              int *rc )
 {
+  int d1, d2;
+
   /* Tree mode */
   if (((FileMgrData *)((DirectorySet *)((*t1)->directory_set))->file_mgr_data)
       ->show_type == MULTIPLE_DIRECTORY)
@@ -516,23 +536,26 @@ SpecialCases(
 
 
 
-  /* Special files */
-  if (FMStrcoll ((*t1)->file_data->file_name, "." ) == 0 )
+  /* Special files ("." first, then "..") */
+  d1 = DotRank((*t1)->file_data->file_name);
+  d2 = DotRank((*t2)->file_data->file_name);
+
+  if (d1 == 1)
   {
     *rc = -1;
     return True;
   }
 
-  if (FMStrcoll ((*t1)->file_data->file_name, "..") == 0 )
+  if (d1 == 2)
   {
-    if ( FMStrcoll ((*t2)->file_data->file_name, ".") == 0 )
+    if (d2 == 1)
       *rc = 1;
     else
       *rc = -1;
     return True;
   }
 
-  if (FMStrcoll ((*t2)->file_data->file_name, ".") == 0 || FMStrcoll ((*t2)->file_data->file_name, "..") == 0)
+  if (d2 != 0)
   {
     *rc = 1;
     return True;
@@ -631,6 +654,17 @@ FileNameDescending(
    return 0;
 }
 
+/* strcoll() of two data type names; most compared types are equal */
+static int
+TypeCmp(
+        const char *a,
+        const char *b)
+{
+  if (a == b || strcmp(a, b) == 0)
+    return 0;
+  return strcoll(a, b);
+}
+
 static int
 FileTypeAscending(
         FileViewData **t1,
@@ -641,7 +675,7 @@ FileTypeAscending(
   if( SpecialCases( t1, t2, &rc ) )
     return rc;
 
-  rc = strcoll( (*t1)->file_data->logical_type, (*t2)->file_data->logical_type );
+  rc = TypeCmp( (*t1)->file_data->logical_type, (*t2)->file_data->logical_type );
   if( rc == 0 )
     rc = FileNameAscending( t1, t2 );
   return rc;
@@ -658,7 +692,7 @@ FileTypeDescending(
   if( SpecialCases( t1, t2, &rc ) )
     return rc;
 
-   rc = strcoll( (*t1)->file_data->logical_type, (*t2)->file_data->logical_type );
+   rc = TypeCmp( (*t1)->file_data->logical_type, (*t2)->file_data->logical_type );
 
    if (rc <= -1)
      return 1;
@@ -768,9 +802,7 @@ OrderFiles(
    int             file_count;
    FileViewData ** order_list;
    int * sort = NULL;
-   int * sub_sort;
    int i;
-   int start;
 
    file_view_data = directory_set->file_view_data;
    file_count = directory_set->file_count;
@@ -797,21 +829,12 @@ OrderFiles(
 
    /*  Set up the sorting functions according to the order and direction.  */
 
-   sub_sort = NULL;
-
    if (file_mgr_data->order == ORDER_BY_FILE_TYPE)
    {
       if (file_mgr_data->direction == DIRECTION_ASCENDING)
-      {
          sort = (int *) FileTypeAscending;
-         sub_sort = (int *) FileNameAscending;
-      }
       else
-      {
          sort = (int *) FileTypeDescending;
-         sub_sort = (int *) FileNameDescending;
-
-      }
    }
    else if (file_mgr_data->order == ORDER_BY_ALPHABETICAL)
    {
@@ -841,31 +864,11 @@ OrderFiles(
       return;
    }
 
-   /*  Sort the files and if the sub_sort function is non-null,  */
-   /*  sort sets of the files broken according to file type.     */
+   /*
+    *  Sort the files.  (The file type comparisons already order files
+    *  of the same type by name, so there is no second pass by name.)
+    */
    qsort (order_list, file_count, sizeof (FileViewData *), (int (*)())sort);
-
-   if (sub_sort != NULL)
-   {
-      start = 0;
-      i = 0;
-
-      while (i < file_count)
-      {
-         if (order_list[start]->file_data->logical_type !=
-             order_list[i]->file_data->logical_type)
-         {
-            qsort (order_list + start, i - start,
-                   sizeof (FileViewData *), (int (*)())sub_sort);
-            start = i;
-         }
-
-         i++;
-      }
-
-      qsort (order_list + start, i - start, sizeof (FileViewData *),
-                                                         (int (*)())sub_sort);
-   }
 }
 
 
@@ -881,6 +884,77 @@ OrderFiles(
  *
  ************************************************************************/
 
+/*
+ * FilterTypeIndex: finds the first filter entry for a data type
+ * (FilterFiles used to search the list of all types for every file).
+ */
+typedef struct
+{
+   int *slots;             /* filter entry index + 1, 0 = empty */
+   unsigned int mask;
+} FilterTypeIndex;
+
+static unsigned int
+FilterTypeHash(
+        const char *s)
+{
+   unsigned int h = 2166136261u;
+
+   while (*s)
+      h = (h ^ (unsigned char)*s++) * 16777619u;
+   return h;
+}
+
+static void
+FilterTypeIndexBuild(
+        FilterTypeIndex *ix,
+        FilterData *filter_data)
+{
+   unsigned int size = 16;
+   unsigned int j, k;
+
+   while (size < 2 * (unsigned int)filter_data->count)
+      size *= 2;
+   ix->mask = size - 1;
+   ix->slots = (int *)XtCalloc(size, sizeof(int));
+
+   for (j = 0; j < (unsigned int)filter_data->count; j++)
+   {
+      char *type = filter_data->user_data[j]->filetype;
+
+      for (k = FilterTypeHash(type) & ix->mask;
+           ix->slots[k] != 0;
+           k = (k + 1) & ix->mask)
+      {
+         if (strcmp(filter_data->user_data[ix->slots[k] - 1]->filetype,
+                    type) == 0)
+            break;      /* keep the first entry for this type */
+      }
+      if (ix->slots[k] == 0)
+         ix->slots[k] = j + 1;
+   }
+}
+
+/* index of the first filter entry for type, or -1 */
+static int
+FilterTypeIndexFind(
+        FilterTypeIndex *ix,
+        FilterData *filter_data,
+        char *type)
+{
+   unsigned int k;
+
+   for (k = FilterTypeHash(type) & ix->mask;
+        ix->slots[k] != 0;
+        k = (k + 1) & ix->mask)
+   {
+      if (strcmp(filter_data->user_data[ix->slots[k] - 1]->filetype,
+                 type) == 0)
+         return ix->slots[k] - 1;
+   }
+   return -1;
+}
+
 void
 FilterFiles(
         FileMgrData *file_mgr_data,
@@ -895,6 +969,8 @@ FilterFiles(
    int            filterCount = 0;
    int            invisibleCount = 0;
    FileViewData  *sub_root;
+   TypeInfo      *type_info;
+   FilterTypeIndex type_index;
 #ifdef DT_PERFORMANCE
    struct timeval update_time_s;
    struct timeval update_time_f;
@@ -922,6 +998,7 @@ FilterFiles(
 
    /*  Filter out all files not matching the specifications  */
 
+   FilterTypeIndexBuild(&type_index, filter_data);
    for (i = 0; i < directory_set->file_count; i++)
    {
       /* Initially assume the file is not filtered out */
@@ -940,9 +1017,11 @@ FilterFiles(
 
       /* filter out any files that have their attributes "invisible"   */
       /* field set to false                                            */
-      if((_DtCheckForDataTypeProperty(
-             file_view_data[i]->file_data->logical_type,
-             "invisible")) &&
+      type_info = _DtGetTypeInfo(file_view_data[i]->file_data->logical_type);
+      if((type_info ? type_info->invisible :
+                      _DtCheckForDataTypeProperty(
+                          file_view_data[i]->file_data->logical_type,
+                          "invisible")) &&
          (file_mgr_data != trashFileMgrData))
       {
          filterCount++;
@@ -1073,28 +1152,25 @@ FilterFiles(
               }
             }
          }
-         else
-           for(j = 0; j < filter_data->count; j++)
-           {
-             if(strcmp(filter_data->user_data[j]->filetype,
-                       file_view_data[i]->file_data->logical_type) == 0)
-             {
-                if((filter_data->user_data[j]->selected == True &&
-                                                   filter_data->match_flag) ||
-                (filter_data->user_data[j]->selected == False &&
-                                                   !filter_data->match_flag))
-                {
-                   if(!matches)
-                   {
-                      filterCount++;
-                      file_view_data[i]->filtered = True;
-                   }
-                }
-                break;
-             }
-          }
+         else if ((j = FilterTypeIndexFind(&type_index, filter_data,
+                        file_view_data[i]->file_data->logical_type)) >= 0)
+         {
+            if((filter_data->user_data[j]->selected == True &&
+                                               filter_data->match_flag) ||
+            (filter_data->user_data[j]->selected == False &&
+                                               !filter_data->match_flag))
+            {
+               if(!matches)
+               {
+                  filterCount++;
+                  file_view_data[i]->filtered = True;
+               }
+            }
+         }
       }
    }
+
+   XtFree((char *)type_index.slots);
 
    /* update ndir, nfile counts for this sub directory */
    directory_set->filtered_file_count = filterCount;
@@ -2664,9 +2740,8 @@ SelectFile(
         FileViewData *file_view_data )
 {
    int selection_count;
-   int i;
 
-   /* Add to the front of the selection list */
+   /* Add to the front of the selection list (NULL-terminated) */
    selection_count = file_mgr_data->selected_file_count;
    file_mgr_data->selected_file_count++;
 
@@ -2674,10 +2749,10 @@ SelectFile(
       XtRealloc ((char *) file_mgr_data->selection_list,
                  sizeof(FileViewData *) * (selection_count + 2));
 
-   for (i = file_mgr_data->selected_file_count; i > 0; i--)
-      file_mgr_data->selection_list[i] = file_mgr_data->selection_list[i-1];
-
+   memmove(file_mgr_data->selection_list + 1, file_mgr_data->selection_list,
+           selection_count * sizeof(FileViewData *));
    file_mgr_data->selection_list[0] = file_view_data;
+   file_mgr_data->selection_list[selection_count + 1] = NULL;
 
    /* mark selected */
    SetFileSelected(file_mgr_data, file_view_data);
@@ -2728,6 +2803,55 @@ DeselectFile(
 
 
 
+/*
+ * Sort a list of file view data by the stacking order of their objects,
+ * keeping the list order for equal stacking orders.
+ */
+
+typedef struct
+{
+   FileViewData *fvd;
+   int index;
+} StackSortItem;
+
+static int
+StackSortCmp(
+        const void *a,
+        const void *b)
+{
+   const StackSortItem *x = (const StackSortItem *)a;
+   const StackSortItem *y = (const StackSortItem *)b;
+   int sx = x->fvd->position_info->stacking_order;
+   int sy = y->fvd->position_info->stacking_order;
+
+   if (sx != sy)
+      return sx < sy ? -1 : 1;
+   return x->index - y->index;
+}
+
+static void
+SortByStackingOrder(
+        FileViewData **list,
+        int count)
+{
+   StackSortItem *items;
+   int i;
+
+   if (count < 2)
+      return;
+   items = (StackSortItem *)XtMalloc(count * sizeof(StackSortItem));
+   for (i = 0; i < count; i++)
+   {
+      items[i].fvd = list[i];
+      items[i].index = i;
+   }
+   qsort(items, count, sizeof(StackSortItem), StackSortCmp);
+   for (i = 0; i < count; i++)
+      list[i] = items[i].fvd;
+   XtFree((char *)items);
+}
+
+
 /************************************************************************
  *
  *  DeselectAllFiles
@@ -2740,7 +2864,7 @@ DeselectAllFiles(
         FileMgrData *file_mgr_data )
 {
    FileViewData * file_view_data;
-   int i, j, k;
+   int i;
    ObjectPtr bottom;
    FileViewData ** repaint_list;
 
@@ -2768,28 +2892,10 @@ DeselectAllFiles(
       repaint_list = (FileViewData **)XtMalloc(sizeof(FileViewData *) *
                      file_mgr_data->selected_file_count);
 
-      /* Order the objects to be unselected */
-      for (i = 0; i < file_mgr_data->selected_file_count; i++)
-      {
-         file_view_data = file_mgr_data->selection_list[i];
-         for (j = 0; j < i; j++)
-         {
-            if (file_view_data->position_info->stacking_order <
-                repaint_list[j]->position_info->stacking_order)
-            {
-               /* Insert here, pushing down all lower entries */
-               for (k = file_mgr_data->selected_file_count - 1; k > j; k--)
-                  repaint_list[k] = repaint_list[k-1];
-
-               repaint_list[j] = file_view_data;
-               break;
-            }
-         }
-
-         /* Insert at end, if necessary */
-         if (j >= i)
-            repaint_list[i] = file_view_data;
-      }
+      /* Order the objects to be unselected by stacking order (stable) */
+      memcpy(repaint_list, file_mgr_data->selection_list,
+             sizeof(FileViewData *) * file_mgr_data->selected_file_count);
+      SortByStackingOrder(repaint_list, file_mgr_data->selected_file_count);
 
       /* Start the redraw process */
       i = file_mgr_data->selected_file_count - 1;
@@ -2846,6 +2952,7 @@ SelectAllFiles(
    FileViewData ** order_list;
    int directory_count;
    int selection_count;
+   int first;
    int i;
    int j;
    ObjectPtr top;
@@ -2856,7 +2963,7 @@ SelectAllFiles(
    {
       /* Force selection list order to match stacking order */
       selection_list = (FileViewData **)XtMalloc(sizeof(FileViewData *) *
-             (file_mgr_data->num_objects));
+             (file_mgr_data->num_objects + 1));
 
       top = GetTopOfStack(file_mgr_data);
       selection_count = 0;
@@ -2906,12 +3013,19 @@ SelectAllFiles(
       /*  structure to see if the icon is filtered.  If not, select it  */
       /*  and increment the selection count.                            */
 
-      selection_count = 0;
-
       /* For tree mode the index has to be -1 */
+      first = (file_mgr_data->show_type == MULTIPLE_DIRECTORY)?-1:0;
 
-      i = (file_mgr_data->show_type == MULTIPLE_DIRECTORY)?-1:0;
-      for (; i < directory_count; i++)
+      /* size the selection list once */
+      selection_count = 0;
+      for (i = first; i < directory_count; i++)
+         selection_count += file_mgr_data->directory_set[i]->file_count;
+      XtFree ((char *) file_mgr_data->selection_list);
+      file_mgr_data->selection_list = (FileViewData **)
+         XtMalloc (sizeof(FileViewData *) * (selection_count + 1));
+
+      selection_count = 0;
+      for (i = first; i < directory_count; i++)
       {
          directory_data = file_mgr_data->directory_set[i];
          order_list = directory_data->order_list;
@@ -2926,17 +3040,11 @@ SelectAllFiles(
                 || strcmp( order_list[j]->file_data->file_name, ".." ) == 0 )
                continue;
 
-            selection_count++;
-
-            file_mgr_data->selection_list = (FileViewData **)
-                XtRealloc ((char *) file_mgr_data->selection_list,
-                           sizeof(FileViewData *) * (selection_count + 1));
-
-            file_mgr_data->selection_list[selection_count] = NULL;
-            file_mgr_data->selection_list[selection_count - 1] = order_list[j];
+            file_mgr_data->selection_list[selection_count++] = order_list[j];
             SetFileSelected(file_mgr_data, order_list[j]);
          }
       }
+      file_mgr_data->selection_list[selection_count] = NULL;
    }
 
    file_mgr_data->selected_file_count = selection_count;
@@ -3651,6 +3759,7 @@ RedisplayUsingStackingOrder (
    XRectangle rect;
    XEvent expEvent;
    int numChildren = 0;
+   int childrenSize = 0;
    Widget * children = NULL;
    Region widget_region;
    Region tmp_region;
@@ -3713,7 +3822,8 @@ RedisplayUsingStackingOrder (
          {
             child = file_view_data->widget;
 
-            if (child && XmIsGadget(child) && XtIsManaged(child))
+            if (child && XmIsGadget(child) && XtIsManaged(child) &&
+                WidgetMayIntersect(file_mgr_data, child, redrawRegion))
             {
                widget_region = XCreateRegion();
                WidgetRectToRegion(file_mgr_data, child, widget_region);
@@ -3721,8 +3831,12 @@ RedisplayUsingStackingOrder (
                if (!XEmptyRegion(widget_region))
                {
                   XSubtractRegion(redrawRegion, widget_region, redrawRegion);
-                  children = (Widget *)XtRealloc((char *)children,
-                                         (numChildren + 1) * sizeof(Widget));
+                  if (numChildren == childrenSize)
+                  {
+                     childrenSize = childrenSize ? 2 * childrenSize : 16;
+                     children = (Widget *)XtRealloc((char *)children,
+                                            childrenSize * sizeof(Widget));
+                  }
                   children[numChildren] = child;
                   numChildren++;
                }
@@ -3745,7 +3859,9 @@ RedisplayUsingStackingOrder (
          {
             child = file_view_data->widget;
 
-            if (child && XmIsGadget(child) && XtIsManaged(child))
+            if (child && XmIsGadget(child) && XtIsManaged(child) &&
+                (((numChildren >= 0) && (children[numChildren] == child)) ||
+                 WidgetMayIntersect(file_mgr_data, child, redrawRegion)))
             {
                widget_region = XCreateRegion();
                WidgetRectToRegion(file_mgr_data, child, widget_region);
@@ -3777,6 +3893,41 @@ RedisplayUsingStackingOrder (
    XDestroyRegion(redrawRegion);
    XtFree((char *)children);
    children = NULL;
+}
+
+
+/*
+ * Whether the region WidgetRectToRegion() builds for w could intersect
+ * region; tested rectangle by rectangle, without creating a Region.
+ */
+
+static Boolean
+WidgetMayIntersect (
+   FileMgrData * file_mgr_data,
+   Widget w,
+   Region region)
+{
+   XRectangle pRect, lRect;
+   unsigned char flags;
+
+   if ((file_mgr_data->show_type != SINGLE_DIRECTORY) ||
+       (file_mgr_data->view == BY_ATTRIBUTES))
+   {
+      return XRectInRegion(region, (short)w->core.x, (short)w->core.y,
+                           (unsigned short)w->core.width,
+                           (unsigned short)w->core.height) != RectangleOut;
+   }
+
+   _DtIconGetIconRects((DtIconGadget)w, &flags, &pRect, &lRect);
+   if ((flags & XmPIXMAP_RECT) &&
+       XRectInRegion(region, pRect.x, pRect.y, pRect.width, pRect.height)
+          != RectangleOut)
+      return True;
+   if ((flags & XmLABEL_RECT) &&
+       XRectInRegion(region, lRect.x, lRect.y, lRect.width, lRect.height)
+          != RectangleOut)
+      return True;
+   return False;
 }
 
 
@@ -4041,7 +4192,8 @@ OrderChildrenList (
    int num_managed;
    int num_unmanaged;
    ObjectPosition * top;
-   int i, j;
+   PtrMap in_stack = { NULL, NULL, 0, 0 };
+   int i;
 
    file_window = (XmManagerWidget) file_mgr_rec->file_window;
    managed = (Widget *)XtMalloc(sizeof(Widget *) *
@@ -4054,25 +4206,24 @@ OrderChildrenList (
    while(top)
    {
       if (top->file_view_data != NULL && top->file_view_data->widget != NULL)
+      {
          managed[num_managed++] = top->file_view_data->widget;
+         PtrMapPut(&in_stack, top->file_view_data->widget,
+                   top->file_view_data->widget);
+      }
       top = top->next;
    }
 
    /* All the rest get put at the end of the children's list */
    for (i = 0; i < file_window->composite.num_children; i++)
    {
-      for (j = 0; j < num_managed; j++)
-      {
-         if (managed[j] == file_window->composite.children[i])
-            break;
-      }
-
-      if (j >= num_managed)
+      if (PtrMapGet(&in_stack, file_window->composite.children[i]) == NULL)
          unmanaged[num_unmanaged++] = file_window->composite.children[i];
    }
 
    ReorderChildrenList(file_window, managed, num_managed, unmanaged,
                        num_unmanaged);
+   PtrMapFree(&in_stack);
    XtFree( (char *)managed );
    XtFree( (char *)unmanaged );
 }
@@ -4080,16 +4231,50 @@ OrderChildrenList (
 
 /*
  * SetHotRects
+ *
+ * With skip_unchanged, a gadget that is already registered with the
+ * same operations and drop rectangles, and has not moved or changed
+ * size since, gets only its drop callback renewed (XmDropSiteUpdate
+ * makes Motif resynchronize its whole drop site tree).
  */
+
+static void SetHotRectsInternal(
+   FileViewData  * file_view_data,
+   XtCallbackProc callback,
+   XtPointer callback_data,
+   Boolean skip_unchanged);
+
+typedef struct _IconState IconState;
+static void RecordDropSite(
+   Widget w,
+   unsigned char operations,
+   XRectangle *rects,
+   int num_rects);
+static Boolean DropSiteUnchanged(
+   Widget w,
+   unsigned char operations,
+   XRectangle *rects,
+   int num_rects);
 
 void
 SetHotRects (
    FileViewData  * file_view_data,
    XtCallbackProc callback,
    XtPointer callback_data)
+{
+   SetHotRectsInternal(file_view_data, callback, callback_data, False);
+}
+
+static void
+SetHotRectsInternal (
+   FileViewData  * file_view_data,
+   XtCallbackProc callback,
+   XtPointer callback_data,
+   Boolean skip_unchanged)
 
 {
    Arg args[3];
+   Boolean was_registered = file_view_data->registered;
 
    if (file_view_data->displayed)
    {
@@ -4168,15 +4353,22 @@ SetHotRects (
                numRects++;
           }
 
-          if (numRects)
+          if (!(skip_unchanged && was_registered &&
+                DropSiteUnchanged(file_view_data->widget, operations,
+                                  rects, numRects)))
           {
-             XtSetArg(args[n], XmNdropRectangles, rects);        n++;
-             XtSetArg(args[n], XmNnumDropRectangles, numRects);  n++;
-          }
-          XtSetArg (args[n], XmNdropSiteOperations, operations); n++;
+             if (numRects)
+             {
+                XtSetArg(args[n], XmNdropRectangles, rects);        n++;
+                XtSetArg(args[n], XmNnumDropRectangles, numRects);  n++;
+             }
+             XtSetArg (args[n], XmNdropSiteOperations, operations); n++;
 
-          XmDropSiteUpdate (file_view_data->widget, args, n);
-          g->icon.operations = operations;
+             XmDropSiteUpdate (file_view_data->widget, args, n);
+             g->icon.operations = operations;
+             RecordDropSite(file_view_data->widget, operations,
+                            rects, numRects);
+          }
 
           /* add client data */
           XtRemoveAllCallbacks(file_view_data->widget, XmNdropCallback);
@@ -4189,8 +4381,14 @@ SetHotRects (
          /* file does not have associated MCL actions */
          /*********************************************/
          /* make drop site inactive */
-         XtSetArg (args[0], XmNdropSiteOperations, XmDROP_NOOP);
-         XmDropSiteUpdate (file_view_data->widget, args, 1);
+         if (!(skip_unchanged && was_registered &&
+               DropSiteUnchanged(file_view_data->widget, XmDROP_NOOP,
+                                 NULL, 0)))
+         {
+            XtSetArg (args[0], XmNdropSiteOperations, XmDROP_NOOP);
+            XmDropSiteUpdate (file_view_data->widget, args, 1);
+            RecordDropSite(file_view_data->widget, XmDROP_NOOP, NULL, 0);
+         }
          XtRemoveAllCallbacks(file_view_data->widget, XmNdropCallback);
       }
     }
@@ -4207,6 +4405,7 @@ SetHotRects (
          /* make drop site inactive */
          XtSetArg (args[0], XmNdropSiteOperations, XmDROP_NOOP);
          XmDropSiteUpdate (file_view_data->widget, args, 1);
+         RecordDropSite(file_view_data->widget, XmDROP_NOOP, NULL, 0);
          XtRemoveAllCallbacks(file_view_data->widget, XmNdropCallback);
       }
    }
@@ -4225,6 +4424,10 @@ TypeToDropOperations (
 {
    unsigned char operations = 0L;
    char *action;
+   TypeInfo *type_info = _DtGetTypeInfo(file_type);
+
+   if (type_info)
+      return type_info->drop_ops;
 
    /* does object have MOVE, COPY, and/or LINK actions */
    /*    -- or no actions at all                       */
@@ -5182,6 +5385,9 @@ FreeLayoutData(XtPointer p)
    layout_data->reuse_btns = NULL;
    XtFree((char *)layout_data->manage);
    layout_data->manage = NULL;
+   PtrMapFree(&layout_data->manage_set);
+   XtFree((char *)layout_data->change);
+   layout_data->change = NULL;
 
    XtFree((char *)layout_data);
    layout_data = NULL;
@@ -5313,7 +5519,10 @@ AddFileIcons(
 static int
 WidgetCmp(Widget *w1, Widget *w2)
 {
-  return *w1 - *w2;
+  /* (a pointer difference truncated to int can have the wrong sign) */
+  if (*w1 < *w2)
+    return -1;
+  return *w1 > *w2;
 }
 
 static void
@@ -5326,7 +5535,7 @@ MakeReuseList(
         Widget **reuse_btns)
 {
 #ifdef DEBUG
-   int n_old, n_filtered, del_icon, del_btn;
+   int n_old = 0, n_filtered = 0, del_icon = 0, del_btn = 0;
 #endif
    Widget *sorted_chilren = NULL;
    Boolean *reuse = NULL;
@@ -5527,6 +5736,164 @@ UpdateOneIconLabel(
 
 
 /*--------------------------------------------------------------------
+ * Icon gadget state
+ *
+ *   After a refresh most files are unchanged, and each keeps the icon
+ *   gadget it had (GetFileData passes the widget on).  To leave such a
+ *   gadget alone, we remember per gadget what UpdateOneFileIcon last
+ *   gave it: the label text and the image name it asked for (the
+ *   gadget may show a fallback image; see _DtCheckAndFreePixmapData).
+ *   The other resources are compared with the gadget's own values.
+ *   Code elsewhere that changes the label or image of a file window
+ *   icon calls FileIconStateInvalidate(); as a second guard, the state
+ *   is only trusted while the gadget still holds the same string,
+ *   image name and pixmap it held when the state was recorded.
+ *------------------------------------------------------------------*/
+
+struct _IconState
+{
+   char    *label;         /* label text given to the gadget */
+   char    *image;         /* image name asked for (NULL: none) */
+   XmString string;        /* G_String() after the update */
+   String   image_name;    /* G_ImageName() after the update */
+   Pixmap   pixmap;        /* G_Pixmap() after the update */
+   Boolean  valid;
+
+   /* last drop site update made by SetHotRects */
+   Boolean  ds_valid;
+   unsigned char ds_operations;
+   int      ds_num_rects;
+   XRectangle ds_rects[2];
+   Position ds_x, ds_y;    /* gadget geometry at that time */
+   Dimension ds_width, ds_height;
+};
+
+static PtrMap iconStates;        /* Widget -> IconState */
+
+/* the DtIcon gadget's minimum default spacing (SPACING_DEFAULT in Icon.c) */
+#define ICON_SPACING_DEFAULT 2
+
+static void
+IconStateDestroyCB(
+        Widget w,
+        XtPointer client_data,
+        XtPointer call_data)
+{
+   IconState *st = (IconState *)client_data;
+
+   PtrMapRemove(&iconStates, w);
+   XtFree(st->label);
+   XtFree(st->image);
+   XtFree((char *)st);
+}
+
+static IconState *
+GetIconState(
+        Widget w,
+        Boolean create)
+{
+   IconState *st = (IconState *)PtrMapGet(&iconStates, w);
+
+   if (st != NULL || !create)
+      return st;
+
+   st = (IconState *)XtCalloc(1, sizeof(IconState));
+   PtrMapPut(&iconStates, w, st);
+   XtAddCallback(w, XmNdestroyCallback, IconStateDestroyCB, (XtPointer)st);
+   return st;
+}
+
+static void
+RecordDropSite(
+        Widget w,
+        unsigned char operations,
+        XRectangle *rects,
+        int num_rects)
+{
+   IconState *st = GetIconState(w, False);
+
+   if (st == NULL)
+      return;
+   st->ds_valid = True;
+   st->ds_operations = operations;
+   st->ds_num_rects = num_rects;
+   if (num_rects > 0)
+      memcpy(st->ds_rects, rects, num_rects * sizeof(XRectangle));
+   st->ds_x = w->core.x;
+   st->ds_y = w->core.y;
+   st->ds_width = w->core.width;
+   st->ds_height = w->core.height;
+}
+
+static Boolean
+DropSiteUnchanged(
+        Widget w,
+        unsigned char operations,
+        XRectangle *rects,
+        int num_rects)
+{
+   IconState *st = GetIconState(w, False);
+
+   return st != NULL &&
+          st->ds_valid &&
+          st->ds_operations == operations &&
+          st->ds_num_rects == num_rects &&
+          (num_rects == 0 ||
+           memcmp(st->ds_rects, rects, num_rects * sizeof(XRectangle)) == 0) &&
+          st->ds_x == w->core.x &&
+          st->ds_y == w->core.y &&
+          st->ds_width == w->core.width &&
+          st->ds_height == w->core.height;
+}
+
+/* The label or image of this icon gadget was changed by other code. */
+void
+FileIconStateInvalidate(
+        Widget w)
+{
+   IconState *st;
+
+   if (w != NULL && (st = GetIconState(w, False)) != NULL)
+      st->valid = False;
+}
+
+static void
+RecordIconState(
+        Widget w,
+        char *label,
+        char *image)
+{
+   DtIconGadget g = (DtIconGadget)w;
+   IconState *st = GetIconState(w, True);
+
+   if (st->label == NULL || strcmp(st->label, label) != 0)
+   {
+      XtFree(st->label);
+      st->label = XtNewString(label);
+   }
+   if (st->image != image)
+   {
+      XtFree(st->image);
+      st->image = image ? XtNewString(image) : NULL;
+   }
+   st->string = G_String(g);
+   st->image_name = G_ImageName(g);
+   st->pixmap = G_Pixmap(g);
+   st->valid = True;
+}
+
+static Boolean
+SameString(
+        char *a,
+        char *b)
+{
+   if (a == NULL || b == NULL)
+      return a == b;
+   return strcmp(a, b) == 0;
+}
+
+
+/*--------------------------------------------------------------------
  * UpdateOneFileIcon
  *------------------------------------------------------------------*/
 
@@ -5539,12 +5906,15 @@ UpdateOneFileIcon(
    XmString icon_label;
    char *logical_type;
    PixmapData *pixmapData;
+   char *image;
    Widget icon_widget;
    Widget btn_widget;
    Boolean is_instance_icon;
    Boolean instance_icon_changed;
+   IconState *state;
+   Pixel background, foreground, pixmap_background, pixmap_foreground;
+   unsigned char pixmap_position;
    Arg args[35];
-   int n_color_args;
    int argi_imageName;
    int n;
 
@@ -5555,8 +5925,6 @@ UpdateOneFileIcon(
    /* Get the label and icon to be used for the widget */
    if (!file_view_data->label)
      UpdateOneIconLabel(file_mgr_data, file_view_data);
-
-   icon_label = XmStringCreateLocalized(file_view_data->label);
 
    /*  Get the icon name based on the file type  */
 
@@ -5589,6 +5957,7 @@ UpdateOneFileIcon(
                          (Widget) file_window,
                          SMALL);
    }
+   image = pixmapData ? pixmapData->iconFileName : NULL;
 
    /* check if this is an instance icon */
    is_instance_icon = False;
@@ -5617,80 +5986,60 @@ UpdateOneFileIcon(
    else
      file_view_data->icon_mtime = 0;
 
-   /* Build the arg list for color resources.  */
-   n = 0;
-   XtSetArg (args[n], XmNarmColor, white_pixel);                     n++;
-
+   /* Determine the colors.  */
    if (layout_data->background == white_pixel)
    {
       if (file_view_data->selected)
       {
-         XtSetArg (args[n], XmNbackground, black_pixel);             n++;
-         XtSetArg (args[n], XmNforeground, white_pixel);             n++;
+         background = black_pixel;
+         foreground = white_pixel;
       }
       else
       {
-         XtSetArg (args[n], XmNbackground, white_pixel);             n++;
-         XtSetArg (args[n], XmNforeground, layout_data->foreground); n++;
+         background = white_pixel;
+         foreground = layout_data->foreground;
       }
-      XtSetArg (args[n], XmNpixmapBackground, white_pixel);          n++;
-      XtSetArg (args[n], XmNpixmapForeground, black_pixel);          n++;
+      pixmap_background = white_pixel;
+      pixmap_foreground = black_pixel;
    }
    else if (layout_data->background == black_pixel)
    {
       if (file_view_data->selected)
       {
-         XtSetArg (args[n], XmNbackground, white_pixel);             n++;
-         XtSetArg (args[n], XmNforeground, black_pixel);             n++;
+         background = white_pixel;
+         foreground = black_pixel;
       }
       else
       {
-         XtSetArg (args[n], XmNbackground, black_pixel);             n++;
-         XtSetArg (args[n], XmNforeground, layout_data->foreground); n++;
+         background = black_pixel;
+         foreground = layout_data->foreground;
       }
-      XtSetArg (args[n], XmNpixmapBackground, white_pixel);          n++;
-      XtSetArg (args[n], XmNpixmapForeground, black_pixel);          n++;
+      pixmap_background = white_pixel;
+      pixmap_foreground = black_pixel;
    }
    else
    {
       if (file_view_data->selected)
       {
-         XtSetArg (args[n], XmNbackground, white_pixel);             n++;
-         XtSetArg (args[n], XmNforeground, black_pixel);             n++;
-         XtSetArg (args[n], XmNpixmapBackground, white_pixel);       n++;
-         XtSetArg (args[n], XmNpixmapForeground, black_pixel);       n++;
+         background = white_pixel;
+         foreground = black_pixel;
+         pixmap_background = white_pixel;
+         pixmap_foreground = black_pixel;
       }
       else
       {
-         XtSetArg (args[n], XmNbackground, layout_data->background); n++;
-         XtSetArg (args[n], XmNforeground, layout_data->foreground); n++;
-         XtSetArg (args[n], XmNpixmapBackground, layout_data->pixmap_back); n++;
-         XtSetArg (args[n], XmNpixmapForeground, layout_data->pixmap_fore); n++;
+         background = layout_data->background;
+         foreground = layout_data->foreground;
+         pixmap_background = layout_data->pixmap_back;
+         pixmap_foreground = layout_data->pixmap_fore;
       }
    }
 
-   n_color_args = n;
-
-   /* Build the rest of the arg list and either create or reuse the widget. */
-
-   XtSetArg (args[n], XmNstring, icon_label);                        n++;
-   argi_imageName = n;
-   if (pixmapData)
-     XtSetArg (args[n], XmNimageName, pixmapData->iconFileName);
-   else
-     XtSetArg (args[n], XmNimageName, NULL);
-   n++;
-   XtSetArg (args[n], XmNmaxPixmapWidth, layout_data->pixmap_width);   n++;
-   XtSetArg (args[n], XmNmaxPixmapHeight, layout_data->pixmap_height); n++;
-   XtSetArg (args[n], XmNuserData, directory_set);                     n++;
-   XtSetArg (args[n], XmNunderline, False);                            n++;
-   XtSetArg (args[n], XmNfillMode, XmFILL_TRANSPARENT);                n++;
    if (file_mgr_data->view == BY_NAME_AND_ICON &&
        file_mgr_data->show_type != MULTIPLE_DIRECTORY)
-      XtSetArg (args[n], XmNpixmapPosition, XmPIXMAP_TOP);
+      pixmap_position = XmPIXMAP_TOP;
    else
-      XtSetArg (args[n], XmNpixmapPosition, XmPIXMAP_LEFT);
-   n++;
+      pixmap_position = XmPIXMAP_LEFT;
 
    /* See if we can re-use the same or some other icon gadget */
    if (file_view_data->widget)
@@ -5700,79 +6049,158 @@ UpdateOneFileIcon(
    else
       icon_widget = NULL;
 
-   /* See if we found an available icon gadget */
-   if (icon_widget)
+   /*
+    * If this file keeps its own gadget, find out what we gave the
+    * gadget last time; if the gadget still holds it, we only need to
+    * set what changed.
+    */
+   state = NULL;
+   if (icon_widget != NULL &&
+       icon_widget == file_view_data->widget &&
+       !file_mgr_data->newSize &&
+       !instance_icon_changed)
    {
-      /* reuse the icon gadget */
-      if (icon_widget != file_view_data->widget || file_mgr_data->newSize)
+      DtIconGadget g = (DtIconGadget)icon_widget;
+
+      state = GetIconState(icon_widget, False);
+      if (state != NULL &&
+          (!state->valid ||
+           G_String(g) != state->string ||
+           G_ImageName(g) != state->image_name ||
+           G_Pixmap(g) != state->pixmap))
+         state = NULL;
+   }
+
+   if (state != NULL)
+   {
+      /* the gadget is up to date except for what differs below */
+      DtIconGadget g = (DtIconGadget)icon_widget;
+      Boolean new_image = !SameString(image, state->image);
+
+      icon_label = NULL;
+      n = 0;
+      if (G_ArmColor(g) != white_pixel)
       {
-         XtSetArg (args[n], XmNdropSiteOperations, XmDROP_NOOP);n++;
-         XtRemoveAllCallbacks(icon_widget, XmNdropCallback);
-         file_view_data->registered = False;
+         XtSetArg (args[n], XmNarmColor, white_pixel);                n++;
       }
+      if (G_Background(g) != background)
+      {
+         XtSetArg (args[n], XmNbackground, background);               n++;
+      }
+      if (G_Foreground(g) != foreground)
+      {
+         XtSetArg (args[n], XmNforeground, foreground);               n++;
+      }
+      if (G_PixmapBackground(g) != pixmap_background)
+      {
+         XtSetArg (args[n], XmNpixmapBackground, pixmap_background);  n++;
+      }
+      if (G_PixmapForeground(g) != pixmap_foreground)
+      {
+         XtSetArg (args[n], XmNpixmapForeground, pixmap_foreground);  n++;
+      }
+      if (strcmp(state->label, file_view_data->label) != 0)
+      {
+         icon_label = XmStringCreateLocalized(file_view_data->label);
+         XtSetArg (args[n], XmNstring, icon_label);                   n++;
+      }
+      if (new_image)
+      {
+         XtSetArg (args[n], XmNimageName, image);                     n++;
+      }
+      if (G_MaxPixmapWidth(g) != layout_data->pixmap_width)
+      {
+         XtSetArg (args[n], XmNmaxPixmapWidth, layout_data->pixmap_width);
+         n++;
+      }
+      if (G_MaxPixmapHeight(g) != layout_data->pixmap_height)
+      {
+         XtSetArg (args[n], XmNmaxPixmapHeight, layout_data->pixmap_height);
+         n++;
+      }
+      if (G_Underline(g) != False)
+      {
+         XtSetArg (args[n], XmNunderline, False);                     n++;
+      }
+      if (G_FillMode(g) != XmFILL_TRANSPARENT)
+      {
+         XtSetArg (args[n], XmNfillMode, XmFILL_TRANSPARENT);         n++;
+      }
+      if (G_PixmapPosition(g) != pixmap_position)
+      {
+         XtSetArg (args[n], XmNpixmapPosition, pixmap_position);      n++;
+      }
+
+      /* userData is plain storage; it changes with every directory set */
+      ((XmGadget)icon_widget)->gadget.user_data = (XtPointer)directory_set;
+
       XtRemoveAllCallbacks (icon_widget, XmNcallback);
 
-      /* if instance_icon_changed, force destroy of old pixmap */
-      if (instance_icon_changed)
-         XtSetArg (args[argi_imageName], XmNimageName, NULL);
-
-      /*
-       * Move the gadget off the visible area; this avoids unnecessary
-       * redraw events at the old position when the gadget is moved to
-       * the correct position once it is determined in LayoutFileIcons.
-       */
-      icon_widget->core.x = -999;
-      icon_widget->core.y = -999;
-      XtSetValues (icon_widget, args, n);
-
-      if (instance_icon_changed && pixmapData)
+      if (n > 0)
       {
-         XtSetArg (args[0], XmNimageName, pixmapData->iconFileName);
-         XtSetValues (icon_widget, args, 1);
+         /* move off the visible area (see below) */
+         icon_widget->core.x = -999;
+         icon_widget->core.y = -999;
+         XtSetValues (icon_widget, args, n);
       }
+
+      if (new_image)
+      {
+         /* save the name before _DtCheckAndFreePixmapData frees it */
+         image = image ? XtNewString(image) : NULL;
+         if (file_mgr_data->view != BY_NAME)
+            _DtCheckAndFreePixmapData(logical_type,
+                                      (Widget) file_window,
+                                      (DtIconGadget) icon_widget,
+                                      pixmapData);
+      }
+      else
+      {
+         /* the gadget already shows this image */
+         image = state->image;
+         _DtFreePixmapData(pixmapData);
+      }
+      pixmapData = NULL;
    }
    else
    {
-      /* create a new or duplicate an existing widget */
-      XtSetArg (args[n], XmNshadowThickness, 2);             n++;
-      XtSetArg (args[n], XmNdropSiteOperations, XmDROP_NOOP);n++;
-      XtSetArg (args[n], XmNfontList, user_font);            n++;
-      if( keybdFocusPolicy == XmEXPLICIT)
-      {
-         XtSetArg (args[n], XmNtraversalOn, True);           n++;
-      }
-      else
-      {
-         XtSetArg (args[n], XmNtraversalOn, False);          n++;
-         XtSetArg (args[n], XmNhighlightThickness, 0);       n++;
-      }
-      XtSetArg (args[n], XmNborderType, DtNON_RECTANGLE);   n++;
+      icon_label = XmStringCreateLocalized(file_view_data->label);
 
-      if (layout_data->dup_icon_widget == NULL)
-      {
-#ifdef HARDCODED_ICON_MARGINS
-         XtSetArg (args[n], XmNmarginWidth, 0);  n++;
-         XtSetArg (args[n], XmNmarginHeight, 0); n++;
-#endif
-         XtSetArg (args[n], XmNx, -999);  n++;
-         XtSetArg (args[n], XmNy, -999);  n++;
-         icon_widget = layout_data->dup_icon_widget =
-                   _DtCreateIcon ((Widget)file_window, "icon", args, n);
-      }
-      else
-      {
-         DtIconGadget g;
-         int i = n_color_args;
+      /* Build the arg list for color resources.  */
+      n = 0;
+      XtSetArg (args[n], XmNarmColor, white_pixel);                   n++;
+      XtSetArg (args[n], XmNbackground, background);                  n++;
+      XtSetArg (args[n], XmNforeground, foreground);                  n++;
+      XtSetArg (args[n], XmNpixmapBackground, pixmap_background);     n++;
+      XtSetArg (args[n], XmNpixmapForeground, pixmap_foreground);     n++;
 
-         icon_widget = _DtDuplicateIcon ((Widget)file_window,
-                       layout_data->dup_icon_widget,
-                       icon_label,
-                       (pixmapData? pixmapData->iconFileName: NULL),
-                       (XtPointer)directory_set, /* userData */
-                       False);                   /* underline */
-         g = (DtIconGadget)icon_widget;
-         g->gadget.highlighted = False;
-         g->gadget.highlight_drawn = False;
+      /* Build the rest of the arg list and either create or reuse the widget. */
+
+      XtSetArg (args[n], XmNstring, icon_label);                      n++;
+      argi_imageName = n;
+      XtSetArg (args[n], XmNimageName, image);                        n++;
+      XtSetArg (args[n], XmNmaxPixmapWidth, layout_data->pixmap_width);   n++;
+      XtSetArg (args[n], XmNmaxPixmapHeight, layout_data->pixmap_height); n++;
+      XtSetArg (args[n], XmNuserData, directory_set);                 n++;
+      XtSetArg (args[n], XmNunderline, False);                        n++;
+      XtSetArg (args[n], XmNfillMode, XmFILL_TRANSPARENT);            n++;
+      XtSetArg (args[n], XmNpixmapPosition, pixmap_position);         n++;
+
+      /* See if we found an available icon gadget */
+      if (icon_widget)
+      {
+         /* reuse the icon gadget */
+         if (icon_widget != file_view_data->widget || file_mgr_data->newSize)
+         {
+            XtSetArg (args[n], XmNdropSiteOperations, XmDROP_NOOP);n++;
+            XtRemoveAllCallbacks(icon_widget, XmNdropCallback);
+            file_view_data->registered = False;
+         }
+         XtRemoveAllCallbacks (icon_widget, XmNcallback);
+
+         /* if instance_icon_changed, force destroy of old pixmap */
+         if (instance_icon_changed)
+            XtSetArg (args[argi_imageName], XmNimageName, NULL);
 
          /*
           * Move the gadget off the visible area; this avoids unnecessary
@@ -5781,23 +6209,134 @@ UpdateOneFileIcon(
           */
          icon_widget->core.x = -999;
          icon_widget->core.y = -999;
+         XtSetValues (icon_widget, args, n);
 
-         /* make sure colors, drop operations, and clipping are right */
-         XtSetArg(args[i], XmNdropSiteOperations, XmDROP_NOOP);             i++;
-         XtSetArg(args[i], XmNmaxPixmapWidth, layout_data->pixmap_width);   i++;
-         XtSetArg(args[i], XmNmaxPixmapHeight, layout_data->pixmap_height); i++;
-         XtSetValues (icon_widget, args, i);
+         if (instance_icon_changed && pixmapData)
+         {
+            XtSetArg (args[0], XmNimageName, pixmapData->iconFileName);
+            XtSetValues (icon_widget, args, 1);
+         }
       }
-      XtAddCallback(icon_widget, XmNhelpCallback,
-                    (XtCallbackProc)HelpRequestCB, NULL);
-      file_view_data->registered = False;
-   }
+      else
+      {
+         /* create a new or duplicate an existing widget */
+         XtSetArg (args[n], XmNshadowThickness, 2);             n++;
+         XtSetArg (args[n], XmNdropSiteOperations, XmDROP_NOOP);n++;
+         XtSetArg (args[n], XmNfontList, user_font);            n++;
+         if( keybdFocusPolicy == XmEXPLICIT)
+         {
+            XtSetArg (args[n], XmNtraversalOn, True);           n++;
+         }
+         else
+         {
+            XtSetArg (args[n], XmNtraversalOn, False);          n++;
+            XtSetArg (args[n], XmNhighlightThickness, 0);       n++;
+         }
+         XtSetArg (args[n], XmNborderType, DtNON_RECTANGLE);   n++;
 
-   if (file_mgr_data->view != BY_NAME)
-      _DtCheckAndFreePixmapData(logical_type,
-                                (Widget) file_window,
-                                (DtIconGadget) icon_widget,
-                                pixmapData);
+         if (layout_data->dup_icon_widget == NULL)
+         {
+#ifdef HARDCODED_ICON_MARGINS
+            XtSetArg (args[n], XmNmarginWidth, 0);  n++;
+            XtSetArg (args[n], XmNmarginHeight, 0); n++;
+#endif
+            XtSetArg (args[n], XmNx, -999);  n++;
+            XtSetArg (args[n], XmNy, -999);  n++;
+            icon_widget = layout_data->dup_icon_widget =
+                      _DtCreateIcon ((Widget)file_window, "icon", args, n);
+         }
+         else
+         {
+            DtIconGadget g;
+            DtIconGadget dup = (DtIconGadget)layout_data->dup_icon_widget;
+            int i;
+
+            /*
+             * The duplicate inherits the master's maximum pixmap size;
+             * fix it once on the master, so that the duplicates need not
+             * rescale (and query) their pixmaps.
+             */
+            if (G_MaxPixmapWidth(dup) != layout_data->pixmap_width ||
+                G_MaxPixmapHeight(dup) != layout_data->pixmap_height)
+            {
+               Arg max_args[2];
+
+               XtSetArg(max_args[0], XmNmaxPixmapWidth,
+                        layout_data->pixmap_width);
+               XtSetArg(max_args[1], XmNmaxPixmapHeight,
+                        layout_data->pixmap_height);
+               XtSetValues ((Widget)dup, max_args, 2);
+            }
+
+            icon_widget = _DtDuplicateIcon ((Widget)file_window,
+                          layout_data->dup_icon_widget,
+                          icon_label,
+                          image,
+                          (XtPointer)directory_set, /* userData */
+                          False);                   /* underline */
+            g = (DtIconGadget)icon_widget;
+            g->gadget.highlighted = False;
+            g->gadget.highlight_drawn = False;
+
+            /*
+             * Move the gadget off the visible area; this avoids unnecessary
+             * redraw events at the old position when the gadget is moved to
+             * the correct position once it is determined in LayoutFileIcons.
+             */
+            icon_widget->core.x = -999;
+            icon_widget->core.y = -999;
+
+            /* make sure colors, drop operations, and clipping are right */
+            i = 0;
+            if (G_ArmColor(g) != white_pixel)
+            {
+               XtSetArg(args[i], XmNarmColor, white_pixel);                    i++;
+            }
+            if (G_Background(g) != background)
+            {
+               XtSetArg(args[i], XmNbackground, background);                   i++;
+            }
+            if (G_Foreground(g) != foreground)
+            {
+               XtSetArg(args[i], XmNforeground, foreground);                   i++;
+            }
+            if (G_PixmapBackground(g) != pixmap_background)
+            {
+               XtSetArg(args[i], XmNpixmapBackground, pixmap_background);      i++;
+            }
+            if (G_PixmapForeground(g) != pixmap_foreground)
+            {
+               XtSetArg(args[i], XmNpixmapForeground, pixmap_foreground);      i++;
+            }
+            if (G_Operations(g) != XmDROP_NOOP)
+            {
+               XtSetArg(args[i], XmNdropSiteOperations, XmDROP_NOOP);          i++;
+            }
+            if (G_MaxPixmapWidth(g) != layout_data->pixmap_width)
+            {
+               XtSetArg(args[i], XmNmaxPixmapWidth, layout_data->pixmap_width);   i++;
+            }
+            if (G_MaxPixmapHeight(g) != layout_data->pixmap_height)
+            {
+               XtSetArg(args[i], XmNmaxPixmapHeight, layout_data->pixmap_height); i++;
+            }
+            if (i > 0)
+               XtSetValues (icon_widget, args, i);
+         }
+         XtAddCallback(icon_widget, XmNhelpCallback,
+                       (XtCallbackProc)HelpRequestCB, NULL);
+         file_view_data->registered = False;
+      }
+
+      /* save the name before _DtCheckAndFreePixmapData frees it */
+      image = image ? XtNewString(image) : NULL;
+      if (file_mgr_data->view != BY_NAME)
+         _DtCheckAndFreePixmapData(logical_type,
+                                   (Widget) file_window,
+                                   (DtIconGadget) icon_widget,
+                                   pixmapData);
+      pixmapData = NULL;
+   }
 
 #ifdef _SHOW_LINK
    if (file_view_data->file_data->link != 0)
@@ -5811,26 +6350,56 @@ UpdateOneFileIcon(
     * If viewing by attributes, adjust spacing between the icon pixmap and
     * the file name so that all file names are aligned.
     */
-   if (file_mgr_data->view != BY_NAME_AND_ICON ||
-       file_mgr_data->show_type == MULTIPLE_DIRECTORY)
    {
-     Dimension pixmap_width = ((DtIconGadget)icon_widget)->icon.pixmap_width;
+     DtIconGadget g = (DtIconGadget)icon_widget;
+     Dimension pixmap_width = g->icon.pixmap_width;
+     Dimension spacing = G_Spacing(g);
 
-     if (pixmap_width < layout_data->pixmap_width)
+     if ((file_mgr_data->view != BY_NAME_AND_ICON ||
+          file_mgr_data->show_type == MULTIPLE_DIRECTORY) &&
+         pixmap_width < layout_data->pixmap_width)
      {
-        XtSetArg (args[0], XmNspacing,
-              layout_data->spacing + layout_data->pixmap_width - pixmap_width);
+        spacing =
+              layout_data->spacing + layout_data->pixmap_width - pixmap_width;
+     }
+     else if (state != NULL)
+     {
+        /*
+         * A full update sets the label, which makes the gadget reset its
+         * spacing to string height / 5, at least ICON_SPACING_DEFAULT
+         * (GetIconLayoutParms relies on that for "."); do the same.
+         */
+        spacing = G_StringHeight(g) / 5;
+        if (spacing < ICON_SPACING_DEFAULT)
+           spacing = ICON_SPACING_DEFAULT;
+     }
+
+     if (G_Spacing(g) != spacing)
+     {
+        XtSetArg (args[0], XmNspacing, spacing);
         XtSetValues (icon_widget, args, 1);
      }
    }
 
+   /*
+    * Remember what the gadget was given.  'image' is our own copy of
+    * the name, unless it is the recorded name itself (nothing changed).
+    */
+   if (state == NULL || image != state->image)
+   {
+      RecordIconState(icon_widget, file_view_data->label, image);
+      XtFree(image);
+   }
+   else
+      RecordIconState(icon_widget, file_view_data->label, image);
 
    file_view_data->file_data->is_broken = False;
    file_view_data->widget = icon_widget;
    XtAddCallback (icon_widget, XmNcallback, (XtCallbackProc)IconCallback,
                   file_view_data);
 
-   XmStringFree (icon_label);
+   if (icon_label)
+      XmStringFree (icon_label);
 
    /* Check if we need a button for tree branch expand */
 
@@ -5868,8 +6437,24 @@ UpdateOneFileIcon(
 
      /* See if we found an available button gadget */
      if (btn_widget) {
+        Pixmap cur_px = XmUNSPECIFIED_PIXMAP;
+        Pixel cur_bg = 0;
+        XtPointer cur_data = NULL;
+
         XtRemoveAllCallbacks (btn_widget, XmNactivateCallback);
-        XtSetValues (btn_widget, args, n);
+
+        /* a button kept by its own file needs no update if unchanged */
+        if (btn_widget == file_view_data->treebtn)
+           XtVaGetValues(btn_widget,
+                         XmNlabelPixmap, &cur_px,
+                         XmNbackground, &cur_bg,
+                         XmNuserData, &cur_data,
+                         NULL);
+        if (btn_widget != file_view_data->treebtn ||
+            cur_px != px ||
+            cur_bg != layout_data->background ||
+            cur_data != (XtPointer)file_mgr_data)
+           XtSetValues (btn_widget, args, n);
      }
      else
      {
@@ -6011,7 +6596,9 @@ _UpdateFileIcons(
    layout_data->next_icon_to_use = layout_data->reuse_icons;
    layout_data->next_btn_to_use = layout_data->reuse_btns;
 
-   layout_data->manage = (Widget *)XtMalloc(2*order_count*sizeof(Widget));
+   /* (every icon, its tree button, and the rename text field: all are
+      now managed in one go at the end, see DisplayWorkProc) */
+   layout_data->manage = (Widget *)XtMalloc((2*order_count + 1)*sizeof(Widget));
    layout_data->manage_count = 0;
 
    layout_data->i_do_next_vis = 0;
@@ -6500,7 +7087,11 @@ RedrawTreeLines(
       if (x  <= ex + ewidth  && x + TreeWd(level, sz) > ex &&
           y0 <= ey + eheight && y1 > ey)
       {
-         GetAncestorInfo(file_mgr_data, file_view_data, NULL, NULL, more);
+         /* for each level: are more siblings displayed after this one? */
+         FileViewData *pp = file_view_data;
+
+         for (i = level; i >= 0 && pp; i--, pp = pp->parent)
+            more[i] = pp->more_after;
 
          /* draw vertical connecting lines for upper tree levels */
          for (i = 0; i < level; i++) {
@@ -6598,13 +7189,18 @@ ToBeManaged(
         IconLayoutData *layout_data,
         FileViewData *file_view_data)
 {
-   int i;
+   return PtrMapGet(&layout_data->manage_set, file_view_data->widget) != NULL;
+}
 
-   for (i = 0; i < layout_data->manage_count; i++)
-      if (layout_data->manage[i] == file_view_data->widget)
-         return True;
-
-   return False;
+static void
+AddToManage(
+        IconLayoutData *layout_data,
+        Widget *manage,
+        int *manageCount,
+        Widget w)
+{
+   manage[(*manageCount)++] = w;
+   PtrMapPut(&layout_data->manage_set, w, w);
 }
 
 
@@ -6651,8 +7247,11 @@ DisplaySomeIcons(
    order_count = layout_data->order_count;
    manage = layout_data->manage + layout_data->manage_count;
 
-   /* allocate storage for list of changed icons */
-   change = (FileViewData **)XtMalloc(order_count * sizeof(FileViewData *));
+   /* storage for the list of changed icons (kept for the next call) */
+   if (layout_data->change == NULL)
+      layout_data->change =
+         (FileViewData **)XtMalloc((order_count + 1) * sizeof(FileViewData *));
+   change = layout_data->change;
 
    /*  Find the maximum values for the icon heights and widths  */
    grid_width = file_mgr_data->grid_width;
@@ -6927,9 +7526,10 @@ do_this_entry:
       /* make sure the icon gadget and tree button, if any, are managed */
       if (!XtIsManaged(child) && !ToBeManaged(layout_data, file_view_data))
       {
-         manage[manageCount++] = child;
+         AddToManage(layout_data, manage, &manageCount, child);
          if (file_view_data->treebtn)
-            manage[manageCount++] = file_view_data->treebtn;
+            AddToManage(layout_data, manage, &manageCount,
+                        file_view_data->treebtn);
          changed = True;
       }
 
@@ -6963,8 +7563,9 @@ do_this_entry:
 					child->core.height,
 					child->core.border_width);
 
-                     /* manage it */
-                     manage[manageCount++] = child;
+                     /* manage it (once) */
+                     if (PtrMapGet(&layout_data->manage_set, child) == NULL)
+                        AddToManage(layout_data, manage, &manageCount, child);
                   }
                   break;
                }
@@ -7040,15 +7641,12 @@ do_this_entry:
    {
       for (k = 0; k < changeCount; k++)
       {
-         SetHotRects(change[k],
-                     (XtCallbackProc) DropOnObject,
-                     (XtPointer) change[k]);
+         SetHotRectsInternal(change[k],
+                             (XtCallbackProc) DropOnObject,
+                             (XtPointer) change[k],
+                             True);
       }
    }
-
-   /* free storage */
-   XtFree((char *)change);
-   change = NULL;
 
    /* update count of children to be managed */
    layout_data->manage_count += manageCount;
@@ -7190,11 +7788,32 @@ CommitWorkProcUpdates(
    }
 
    layout_data->manage_count = 0;
+   PtrMapClear(&layout_data->manage_set);
 
    /* start new update */
    XmDropSiteStartUpdate(layout_data->drop_site_w);
 }
 
+
+/*
+ * The display work proc updates icons in batches of DISPLAY_WORK_BATCH
+ * until DISPLAY_WORK_BUDGET_MS have passed, then returns to the event
+ * loop.  (It used to do one icon per call, which made the main loop go
+ * round, flush and poll the X connection once per icon.)
+ */
+#define DISPLAY_WORK_BATCH      8
+#define DISPLAY_WORK_BUDGET_MS  8
+
+static long
+ElapsedMs(
+  struct timespec *t0)
+{
+   struct timespec t;
+
+   clock_gettime(CLOCK_MONOTONIC, &t);
+   return (t.tv_sec - t0->tv_sec) * 1000L +
+          (t.tv_nsec - t0->tv_nsec) / 1000000L;
+}
 
 static Boolean
 DisplayWorkProc(
@@ -7210,9 +7829,9 @@ DisplayWorkProc(
    Widget child;
    int n;
    Boolean commit_updates = False;
+   struct timespec t0;
 
-   int n1 = 1;
-   int n2 = 1;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
 
    dialog_data = _DtGetInstanceData ((XtPointer)file_mgr_rec);
    if (dialog_data == NULL)
@@ -7235,36 +7854,35 @@ DisplayWorkProc(
       layout_data->visible_done = False;
    }
 
-   /* first work on icons in the currently visible area */
-   if (layout_data->visible_done)
-      n = 0;
-   else
+   do
    {
-     n = DisplaySomeIcons(file_mgr_rec, file_mgr_data, ex, ey, ewd, eht, n1, False);
-     if (n == 0)
-     {
-       /* we just finished updating all visible icons */
-       DPRINTF(("DisplayWorkProc: visible done.\n"));
-       layout_data->visible_done = True;
-       commit_updates = True;
-     }
-   }
-
-   /* if we still have some time left, work on other icons */
-   if (layout_data->visible_done && n < n2)
-   {
-      n = DisplaySomeIcons(file_mgr_rec, file_mgr_data,
-                           0, 0, 32767, 32767, n2 - n, True);
-
-      /* check if we are done */
-      if (n == 0)
+      if (!layout_data->visible_done)
       {
-         layout_data->all_done = True;
-         commit_updates = True;
+         /* first work on icons in the currently visible area */
+         n = DisplaySomeIcons(file_mgr_rec, file_mgr_data, ex, ey, ewd, eht,
+                              DISPLAY_WORK_BATCH, False);
+         if (n == 0)
+         {
+            /* we just finished updating all visible icons: show them now */
+            DPRINTF(("DisplayWorkProc: visible done.\n"));
+            layout_data->visible_done = True;
+            commit_updates = True;
+         }
       }
-      else if (layout_data->manage_count >= 100)
-         commit_updates = True;
-   }
+      else
+      {
+         /* then work on the other icons; they are managed all at once */
+         n = DisplaySomeIcons(file_mgr_rec, file_mgr_data,
+                              0, 0, 32767, 32767, DISPLAY_WORK_BATCH, True);
+
+         /* check if we are done */
+         if (n == 0)
+         {
+            layout_data->all_done = True;
+            commit_updates = True;
+         }
+      }
+   } while (!commit_updates && ElapsedMs(&t0) < DISPLAY_WORK_BUDGET_MS);
 
    if (commit_updates)
    {
@@ -7487,6 +8105,22 @@ LayoutFileIcons(
    max_level = 0;
    if (file_mgr_data->show_type == MULTIPLE_DIRECTORY)
    {
+      /* note which entries have displayed siblings after them */
+      for (i = -1; i < file_mgr_data->directory_count; i++)
+      {
+         DirectorySet *ds = file_mgr_data->directory_set[i];
+         Boolean seen = False;
+
+         if (ds == NULL || ds->order_list == NULL)
+            continue;
+         for (j = ds->file_count - 1; j >= 0; j--)
+         {
+            ds->order_list[j]->more_after = seen;
+            if (ds->order_list[j]->displayed)
+               seen = True;
+         }
+      }
+
       for (i = 0; i < order_count; i++)
       {
          if (order_list[i]->displayed)

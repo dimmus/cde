@@ -435,15 +435,27 @@ MakeLangAbort( int arg )
     siglongjmp (langJump, 1);
 }
 
+static int
+LangCompare(const void *a, const void *b)
+{
+    return strcmp(*(char * const *) a, *(char * const *) b);
+}
+
 void
 MakeLangList( void )
 {
     int i, j;
 
-    char        *lang[500];             /* sort list for languages         */
+    /*
+     * One entry per word in languageList: a word takes two bytes at
+     * least (the name and a blank), so this holds all of them.  (The
+     * 500 entries there used to be could overflow.)
+     */
+    char        *lang[LANGLISTSIZE / 2 + 1]; /* sort list for languages    */
     int         nlang;                  /* total number of languages       */
     char        *p, *s;
     char        *savelist;
+    size_t      len;
 
     /*
      *  build language list from set of languages installed on the host...
@@ -470,42 +482,38 @@ MakeLangList( void )
 
 
     /*
-     *  sort the list to eliminate duplicates and replace in global array...
+     *  sort the list to eliminate duplicates and replace in global array
+     *  (with qsort(), and without strcat() from the start of the list
+     *  for every word: that was quadratic)...
      */
 
     p = savelist = strdup(languageList);
+    if (savelist == NULL)
+        return;
     nlang = 0;
 
-    while ( (s = strtok(p, DELIM)) != NULL ) {
-
-        if ( nlang == 0 ) {
-            lang[0] = s;
-            lang[++nlang] = 0;
-            p = NULL;
-            continue;
-        }
-
-        for (i = nlang; i > 0 && strcmp(s,lang[i-1]) < 0; i--);
-
-        if (i==0 || strcmp(s,lang[i-1]) != 0 ) {
-            for (j = nlang; j > i; j--)
-                lang[j] = lang[j-1];
-
-            lang[i] = s;
-            lang[++nlang] = 0;
-        }
-
+    while ( nlang < (int) (sizeof(lang) / sizeof(lang[0])) &&
+            (s = strtok(p, DELIM)) != NULL ) {
+        lang[nlang++] = s;
         p = NULL;
     }
 
+    qsort(lang, nlang, sizeof(lang[0]), LangCompare);
+    for (i = j = 0; i < nlang; i++)
+        if (j == 0 || strcmp(lang[i], lang[j-1]) != 0)
+            lang[j++] = lang[i];
+    nlang = j;
 
     p = languageList;
-    strcpy(p,"");
+    *p = '\0';
 
     for ( i = 0; i < nlang; i++) {
-        strcat(p, lang[i]);
-        strcat(p, " ");
+        len = strlen(lang[i]);
+        memcpy(p, lang[i], len);	/* fits: no longer than before */
+        p += len;
+        *p++ = ' ';
     }
+    *p = '\0';
 
     free(savelist);
 
@@ -570,6 +578,10 @@ ScanNLSDir(char *dirname)
     /*
      * To determin the fully installed locale list, check several locations.
      */
+    size_t used = strlen(languageList);
+    size_t len;
+    int isdir;
+
     if(NULL != (dirp = opendir(dirname)))
     {
         while((dp = readdir(dirp)) != NULL)
@@ -580,17 +592,30 @@ ScanNLSDir(char *dirname)
                  (strcmp(dp->d_name, "..") == 0) )
               continue;
 
-	    if (locale[0] != '.' &&
-                LANGLISTSIZE > (int) (strlen(languageList)+strlen(locale)+2))
+	    len = strlen(locale);
+	    if (locale[0] != '.' && LANGLISTSIZE > used + len + 2)
 	    {
-		(void) snprintf(locale_path, MAXPATHLEN, "%s/%s",
-                                dirname, locale);
-	        retval = stat(locale_path, &locale_stat);
-
-	    	if (0 == retval && S_ISDIR(locale_stat.st_mode))
+#ifdef DT_DIR
+		/* Only symbolic links and unknown types need a stat(). */
+		if (dp->d_type == DT_DIR)
+		    isdir = 1;
+		else if (dp->d_type != DT_UNKNOWN && dp->d_type != DT_LNK)
+		    isdir = 0;
+		else
+#endif
 		{
-		    strcat(languageList, " ");
-		    strcat(languageList, locale);
+		    (void) snprintf(locale_path, MAXPATHLEN, "%s/%s",
+				    dirname, locale);
+		    retval = stat(locale_path, &locale_stat);
+		    isdir = (0 == retval && S_ISDIR(locale_stat.st_mode));
+		}
+
+	    	if (isdir)
+		{
+		    /* appended at the end: no strcat() from the start */
+		    languageList[used++] = ' ';
+		    memcpy(languageList + used, locale, len + 1);
+		    used += len;
 		}
             }
         }

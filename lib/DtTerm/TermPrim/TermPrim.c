@@ -58,6 +58,7 @@ extern char * _DtTermPrimGetMessage( char *filename, int set, int n, char *s );
 #include "TermPrimPendingTextP.h"
 #include "TermPrimRenderFont.h"
 #include "TermPrimRenderFontSet.h"
+#include "TermPrimRenderP.h"
 #include "TermPrimSelectP.h"
 #include "TermPrimSetUtmp.h"
 #include "TermPrimUtil.h"     
@@ -73,6 +74,15 @@ extern char * _DtTermPrimGetMessage( char *filename, int set, int n, char *s );
 #include <ctype.h>
 #include <Dt/MsgCatP.h>
 #include <wchar.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
+#include <langinfo.h>
+
+/* pty output processing (see readPty())... */
+#define	READ_BUFFER_SIZE	(64 * 1024)
+#define	READ_HEADROOM		MB_LEN_MAX
+#define	READ_TIME_BUDGET_NS	(8 * 1000 * 1000)	/* 8 ms */
 #if defined(__linux__)
 # include <sys/types.h> /* For FD_* macros. */
 # include <sys/time.h> /* For select() prototype. */
@@ -517,7 +527,7 @@ externaldef(termclassrec) DtTermPrimitiveClassRec dtTermPrimitiveClassRec =
 	/* num_resources	*/	XtNumber(resources),
 	/* xrm_class		*/	NULLQUARK,
 	/* compress_motion	*/	TRUE,
-	/* compress_exposure	*/	FALSE,
+	/* compress_exposure	*/	XtExposeCompressMultiple,
 	/* compress_enterlv	*/	TRUE,
 	/* visible_interest	*/	TRUE,
 	/* destroy		*/	Destroy,
@@ -760,6 +770,274 @@ CreateRenderFont
 	*retFont = font;
 
     /* return the generated font... */
+    return(termFont);
+}
+
+/* make a bold version of the term font, by asking for the same font(s)
+ * with "bold" in the weight field...
+ */
+static TermFont
+CreateDefaultBoldFont
+(
+    Widget		  w
+)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) w;
+    TermFont boldTermFont = (TermFont) 0;
+
+    /* let's try and build a bold fontlist off of the base fontlist... */
+    int num_fonts;
+    char **fontNames;
+    char *boldFontNames = NULL;
+    const char *bold = "bold";
+    size_t boldLen = strlen(bold);
+
+    if (tw->term.fontSet) {
+	int i;
+	XFontStruct **fonts;
+	size_t len = 1; /* 1: NUL */
+
+	Debug('f', fprintf(stderr, ">>generating bold fontset\n"));
+	num_fonts = XFontsOfFontSet(tw->term.fontSet, &fonts, &fontNames);
+
+	for (i = 0; i < num_fonts; ++i)
+	    /* 2: COMMA and SPACE */
+	    len += strlen(fontNames[i]) + boldLen + 2;
+
+	boldFontNames = malloc(len);
+    }
+
+    if (boldFontNames) {
+	char *c1;
+	char *c2;
+	int i1;
+	int i2;
+	char **missingCharsetList;
+	int missingCharsetCount;
+
+	for (i1 = 0, c2 = boldFontNames; i1 < num_fonts; i1++) {
+	    /* if this is not the first name we need a comma to
+	     * separate the names...
+	     */
+	    if (i1 > 0) {
+		*c2++ = ',';
+		*c2++ = ' ';
+	    }
+
+	    /* copy over the first 3 fields... */
+	    for (c1 = fontNames[i1], i2 = 0; (i2 < 3) && *c1; i2++) {
+		while (*c1 && (*c1 != '-')) {
+		    *c2++ = *c1++;
+		}
+		if (!*c1) {
+		    break;
+		}
+		/* copy over the '-'... */
+		*c2++ = *c1++;
+	    }
+	    /* make boldFont bold by swapping the bold in for the
+	     * weight...
+	     */
+	    (void) strcpy(c2, bold);
+	    c2 += boldLen;
+
+	    /* skip over the weight in the source... */
+	    while (*c1 && (*c1 != '-')) {
+		c1++;
+	    }
+
+	    /* copy over the rest of the fontname... */
+	    while (*c1) {
+		*c2++ = *c1++;
+	    }
+	}
+
+	/* null term... */
+	*c2 = '\0';
+
+	/* now create the fontset... */
+	tw->term.boldFontSet = XCreateFontSet(XtDisplay(w),
+		boldFontNames,
+		&missingCharsetList,
+		&missingCharsetCount,
+		(char **) 0);
+
+	free(boldFontNames);
+
+	if (missingCharsetCount > 0) {
+	    int i;
+
+	    for (i = 0; i < missingCharsetCount; i++)
+		Debug('f', fprintf(stderr,
+			">>missing charsets in boldfont \"%s\"\n",
+			missingCharsetList[i]));
+	    (void) XFreeStringList(missingCharsetList);
+	    if (tw->term.boldFontSet) {
+		(void) XFreeFontSet(XtDisplay(w), tw->term.boldFontSet);
+		tw->term.boldFontSet = (XFontSet) 0;
+	    }
+	}
+
+	/* create a bold render font... */
+	if (tw->term.boldFontSet) {
+	    boldTermFont =
+		    _DtTermPrimRenderFontSetCreate(w, tw->term.boldFontSet);
+	}
+    } else if (tw->term.font) {
+	unsigned long ret;
+	char *fontName;
+	char boldFontName[BUFSIZ];
+	char *c1;
+	char *c2;
+	int i2;
+
+	/* get the fontname associated with the font... */
+	if (XGetFontProperty(tw->term.font, XA_FONT, &ret)) {
+	    fontName = XGetAtomName(XtDisplay(w), ret);
+	    /* copy over the first 3 fields... */
+	    for (c1 = fontName, c2 = boldFontName, i2 = 0;
+		    (i2 < 3) && *c1; i2++) {
+		while (*c1 && (*c1 != '-')) {
+		    *c2++ = *c1++;
+		}
+		if (!*c1) {
+		    break;
+		}
+		/* copy over the '-'... */
+		*c2++ = *c1++;
+	    }
+	    /* make boldFont bold by swapping the bold in for the
+	     * weight...
+	     */
+	    (void) strcpy(c2, bold);
+	    c2 += boldLen;
+
+	    /* skip over the weight in the source... */
+	    while (*c1 && (*c1 != '-')) {
+		c1++;
+	    }
+
+	    /* copy over the rest of the fontname... */
+	    while (*c1) {
+		*c2++ = *c1++;
+	    }
+
+	    /* null term the string... */
+	    *c2 = '\0';
+
+	    tw->term.boldFont = XLoadQueryFont(XtDisplay(w), boldFontName);
+	    /* create a bold render font... */
+	    if (tw->term.boldFont) {
+		boldTermFont =
+			_DtTermPrimRenderFontCreate(w, tw->term.boldFont);
+	    }
+	    XFree(fontName) ;
+	}
+    }
+
+    return(boldTermFont);
+}
+
+/*
+ * The default bold font is only made when bold text is first drawn:
+ * making it means loading as many fonts as the term font has, each a
+ * few round trips (and for an iso10646-1 font, the metrics of every
+ * character), and plenty of terminals never show bold text.  Until then
+ * the bold font is this stand-in.  If no bold font can be made, bold
+ * text is drawn with the term font, overstruck, as it would have been
+ * with no bold font at all...
+ */
+typedef struct _LazyBoldFontRec {
+    TermFont boldTermFont;		/* the real one, once made	*/
+    Boolean tried;			/* have we tried to make it?	*/
+} LazyBoldFontRec, *LazyBoldFont;
+
+static void
+LazyBoldRenderFunction(
+    Widget		  w,
+    TermFont		  font,
+    Pixel		  fg,
+    Pixel		  bg,
+    unsigned long	  flags,
+    int			  x,
+    int			  y,
+    unsigned char	 *string,
+    int			  len
+)
+{
+    LazyBoldFont lazyBold = (LazyBoldFont) font->fontInfo;
+    TermFont termFont;
+
+    /* (the bold font is made from the term font's fontset or font, which
+     * is only the font it was made for while the term font has not been
+     * changed)...
+     */
+    if (!lazyBold->tried && (((DtTermPrimitiveWidget) w)->term.tpd->termFont ==
+	    ((DtTermPrimitiveWidget) w)->term.tpd->defaultTermFont)) {
+	lazyBold->tried = True;
+	lazyBold->boldTermFont = CreateDefaultBoldFont(w);
+    }
+    if (lazyBold->boldTermFont) {
+	termFont = lazyBold->boldTermFont;
+    } else {
+	termFont = ((DtTermPrimitiveWidget) w)->term.tpd->defaultTermFont;
+	flags |= TermENH_OVERSTRIKE;
+    }
+    (void) (*termFont->renderFunction)(w, termFont, fg, bg, flags, x, y,
+	    string, len);
+}
+
+static void
+LazyBoldExtentsFunction(
+    Widget		  w,
+    TermFont		  font,
+    unsigned char	 *string,
+    int			  len,
+    int			 *widthReturn,
+    int			 *heightReturn,
+    int			 *ascentReturn
+)
+{
+    LazyBoldFont lazyBold = (LazyBoldFont) font->fontInfo;
+    TermFont termFont = lazyBold->boldTermFont ? lazyBold->boldTermFont :
+	    ((DtTermPrimitiveWidget) w)->term.tpd->defaultTermFont;
+
+    (void) (*termFont->extentsFunction)(w, termFont, string, len,
+	    widthReturn, heightReturn, ascentReturn);
+}
+
+static void
+LazyBoldDestroyFunction(
+    Widget		  w,
+    TermFont		  font
+)
+{
+    LazyBoldFont lazyBold = (LazyBoldFont) font->fontInfo;
+
+    if (lazyBold->boldTermFont) {
+	(void) _DtTermPrimDestroyFont(w, lazyBold->boldTermFont);
+    }
+    (void) XtFree((char *) lazyBold);
+    (void) XtFree((char *) font);
+}
+
+static TermFont
+CreateLazyBoldFont
+(
+    Widget		  w
+)
+{
+    TermFont termFont;
+    LazyBoldFont lazyBold;
+
+    termFont = (TermFont) XtMalloc(sizeof(TermFontRec));
+    termFont->renderFunction = LazyBoldRenderFunction;
+    termFont->destroyFunction = LazyBoldDestroyFunction;
+    termFont->extentsFunction = LazyBoldExtentsFunction;
+    lazyBold = (LazyBoldFont) XtMalloc(sizeof(LazyBoldFontRec));
+    lazyBold->boldTermFont = (TermFont) 0;
+    lazyBold->tried = False;
+    termFont->fontInfo = (XtPointer) lazyBold;
     return(termFont);
 }
 
@@ -1054,6 +1332,10 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
     tpd->pendingRead = _DtTermPrimPendingTextCreate();
     tpd->pendingWrite = _DtTermPrimPendingTextCreate();
 
+    /* the pty read buffer (see readPty())... */
+    tpd->readBuffer = (unsigned char *) XtMalloc(READ_HEADROOM +
+	    READ_BUFFER_SIZE);
+
     /*
     ** Initialize the utmp stuff...
     */
@@ -1084,155 +1366,10 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
 	tpd->boldTermFont = CreateRenderFont(w, tw->term.boldFontList,
 		&tw->term.boldFontSet, &tw->term.boldFont);
     } else {
-	/* let's try and build a bold fontlist off of the base fontlist... */
-	int num_fonts;
-	char **fontNames;
-	char *boldFontNames = NULL;
-	const char *bold = "bold";
-	size_t boldLen = strlen(bold);
-
-	if (tw->term.fontSet) {
-	    int i;
-	    XFontStruct **fonts;
-	    size_t len = 1; /* 1: NUL */
-
-	    Debug('f', fprintf(stderr, ">>generating bold fontset\n"));
-	    num_fonts = XFontsOfFontSet(tw->term.fontSet, &fonts, &fontNames);
-
-	    for (i = 0; i < num_fonts; ++i)
-		/* 2: COMMA and SPACE */
-		len += strlen(fontNames[i]) + boldLen + 2;
-
-	    boldFontNames = malloc(len);
-	}
-
-	if (boldFontNames) {
-	    char *c1;
-	    char *c2;
-	    int i1;
-	    int i2;
-	    char **missingCharsetList;
-	    int missingCharsetCount;
-
-	    for (i1 = 0, c2 = boldFontNames; i1 < num_fonts; i1++) {
-		/* if this is not the first name we need a comma to
-		 * separate the names...
-		 */
-		if (i1 > 0) {
-		    *c2++ = ',';
-		    *c2++ = ' ';
-		}
-
-		/* copy over the first 3 fields... */
-		for (c1 = fontNames[i1], i2 = 0; (i2 < 3) && *c1; i2++) {
-		    while (*c1 && (*c1 != '-')) {
-			*c2++ = *c1++;
-		    }
-		    if (!*c1) {
-			break;
-		    }
-		    /* copy over the '-'... */
-		    *c2++ = *c1++;
-		}
-		/* make boldFont bold by swapping the bold in for the
-		 * weight...
-		 */
-		(void) strcpy(c2, bold);
-		c2 += boldLen;
-
-		/* skip over the weight in the source... */
-		while (*c1 && (*c1 != '-')) {
-		    c1++;
-		}
-
-		/* copy over the rest of the fontname... */
-		while (*c1) {
-		    *c2++ = *c1++;
-		}
-	    }
-
-	    /* null term... */
-	    *c2 = '\0';
-
-	    /* now create the fontset... */
-	    tw->term.boldFontSet = XCreateFontSet(XtDisplay(w),
-		    boldFontNames,
-		    &missingCharsetList,
-		    &missingCharsetCount,
-		    (char **) 0);
-
-	    free(boldFontNames);
-
-	    if (missingCharsetCount > 0) {
-		int i;
-
-		for (i = 0; i < missingCharsetCount; i++)
-		    Debug('f', fprintf(stderr,
-			    ">>missing charsets in boldfont \"%s\"\n",
-			    missingCharsetList[i]));
-		(void) XFreeStringList(missingCharsetList);
-		if (tw->term.boldFontSet) {
-		    (void) XFreeFontSet(XtDisplay(w), tw->term.boldFontSet);
-		    tw->term.boldFontSet = (XFontSet) 0;
-		}
-	    }
-
-	    /* create a bold render font... */
-	    if (tw->term.boldFontSet) {
-		tpd->boldTermFont =
-			_DtTermPrimRenderFontSetCreate(w, tw->term.boldFontSet);
-	    }
-	} else if (tw->term.font) {
-	    unsigned long ret;
-	    char *fontName;
-	    char boldFontName[BUFSIZ];
-	    char *c1;
-	    char *c2;
-	    int i2;
-
-	    /* get the fontname associated with the font... */
-	    if (XGetFontProperty(tw->term.font, XA_FONT, &ret)) {
-		fontName = XGetAtomName(XtDisplay(w), ret);
-		/* copy over the first 3 fields... */
-		for (c1 = fontName, c2 = boldFontName, i2 = 0;
-			(i2 < 3) && *c1; i2++) {
-		    while (*c1 && (*c1 != '-')) {
-			*c2++ = *c1++;
-		    }
-		    if (!*c1) {
-			break;
-		    }
-		    /* copy over the '-'... */
-		    *c2++ = *c1++;
-		}
-		/* make boldFont bold by swapping the bold in for the
-		 * weight...
-		 */
-		(void) strcpy(c2, bold);
-		c2 += boldLen;
-
-		/* skip over the weight in the source... */
-		while (*c1 && (*c1 != '-')) {
-		    c1++;
-		}
-
-		/* copy over the rest of the fontname... */
-		while (*c1) {
-		    *c2++ = *c1++;
-		}
-
-		/* null term the string... */
-		*c2 = '\0';
-
-		tw->term.boldFont = XLoadQueryFont(XtDisplay(w), boldFontName);
-		/* create a bold render font... */
-		if (tw->term.boldFont) {
-		    tpd->boldTermFont =
-			    _DtTermPrimRenderFontCreate(w, tw->term.boldFont);
-		}
-                XFree(fontName) ;
-	    }
-	}
+	/* we will build a bold font off of the base font when it is
+	 * first needed...
+	 */
+	tpd->boldTermFont = CreateLazyBoldFont(w);
     }
 
     /* save away our original fonts as defaults... */
@@ -1280,6 +1417,9 @@ Initialize(Widget ref_w, Widget w, Arg *args, Cardinal *num_args)
      */
     DebugF('m', 1, tpd->mbCurMax = MB_LEN_MAX);
     tpd->mbPartialCharLen = 0;	/* no pending partial multi-byte char */
+    /* UTF-8 output is decoded inline rather than through mblen()... */
+    tpd->isUtf8 = (tpd->mbCurMax > 1) &&
+	    !strcmp(nl_langinfo(CODESET), "UTF-8");
 
     /* check results of type converters... */
     shadowTypeID = XmRepTypeGetId(XmRShadowType);
@@ -1503,6 +1643,11 @@ InitOrResizeTermBuffer(Widget w)
 
     /* resize/create the term buffer... */
     if (tpd->termBuffer) {
+	/* paint any queued scroll and deferred text while they still
+	 * match the window...
+	 */
+	(void) _DtTermPrimPaintFrame(w);
+
 	/* restore the buffer-to-window ratio of our off-window buffer
 	 * is less than 75% of the original off-window buffer...
 	 */
@@ -1913,6 +2058,14 @@ handleNonMaskableEvents(Widget w, XtPointer eventData, XEvent *event,
     case NoExpose:
 	/* clear the scroll flag... */
 	tpd->scrollInProgress = False;
+
+	if (tw->term.jumpScroll) {
+	    /* this was a jump scroll's copy area.  Nothing waits for it to
+	     * complete (_DtTermPrimScrollWait() waits itself if it needs to
+	     * do another one first)...
+	     */
+	    break;
+	}
 
 	if (tpd->scroll.nojump.pendingScroll) {
 	    (void) _DtTermPrimScrollComplete(w, False);
@@ -2683,11 +2836,9 @@ Destroy(Widget w)
     /* remove the termData structure contents, followed by the structure...
      */
     if (tw->term.tpd) {
-	/* remove the cursor timeout... */
-	if (tw->term.tpd->cursorTimeoutId) {
-	    (void) XtRemoveTimeOut(tw->term.tpd->cursorTimeoutId);
-	    tw->term.tpd->cursorTimeoutId = (XtIntervalId) 0;
-	}
+	/* remove the cursor blink, IM spot and visual bell timeouts... */
+	(void) _DtTermPrimCursorDestroy(w);
+	(void) _DtTermPrimBellDestroy(w);
 
 	/* free up all our GC's...
 	 */
@@ -2728,6 +2879,13 @@ Destroy(Widget w)
 	    tw->term.tpd->scrollRefreshRows = (Boolean *) 0;
 	}
 
+	/* and the deferred rendering state... */
+	(void) _DtTermPrimRenderFreeDirty(w);
+	if (tw->term.tpd->frameTimerId) {
+	    (void) XtRemoveTimeOut(tw->term.tpd->frameTimerId);
+	    tw->term.tpd->frameTimerId = (XtIntervalId) 0;
+	}
+
         /* free up the selection information */
 	if (tw->term.tpd->selectInfo) {
 	    (void) _DtTermPrimSelectDestroy(w, tw->term.tpd->selectInfo);
@@ -2743,6 +2901,16 @@ Destroy(Widget w)
 	    (void) _DtTermPrimPendingTextDestroy(tw->term.tpd->pendingWrite);
 	    tw->term.tpd->pendingWrite = (PendingText) 0;
 	}
+
+	/* free up the output processing buffers... */
+	(void) XtFree((char *) tw->term.tpd->readBuffer);
+	tw->term.tpd->readBuffer = (unsigned char *) 0;
+	(void) XtFree((char *) tw->term.tpd->overflowBuffer);
+	tw->term.tpd->overflowBuffer = (termChar *) 0;
+	(void) XtFree((char *) tw->term.tpd->wcBuffer);
+	tw->term.tpd->wcBuffer = (wchar_t *) 0;
+	(void) XtFree((char *) tw->term.tpd->wcByteOffsets);
+	tw->term.tpd->wcByteOffsets = (int *) 0;
 
         if (tw->term.tpd->capsLockKeyCodes)
                  (void) XtFree((char *)tw->term.tpd->capsLockKeyCodes) ;
@@ -2860,21 +3028,209 @@ moreInput(int pty)
     return(True);
 }
 
+/* note output that has just arrived (from the pty or looped back): map
+ * the window if we map on output, and pass it to the output log...
+ */
+static void
+noteOutput(DtTermPrimitiveWidget tw, unsigned char *buffer, int len)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (!tpd->windowMapped && tw->term.mapOnOutput) {
+	/*
+	** map window unless it is too early...
+	*/
+	if (tw->term.mapOnOutputDelay)
+	    if ((time((time_t *) 0) - tpd->creationTime) >
+		    tw->term.mapOnOutputDelay) {
+		/*
+		** time is up
+		*/
+		tw->term.mapOnOutputDelay = 0 ;
+	    }
+
+	if (!tw->term.mapOnOutputDelay) {
+	    Widget sw;
+
+	    for (sw = (Widget)tw; !XtIsShell(sw); sw = XtParent(sw))
+		;
+	    XtMapWidget(sw);
+	}
+    }
+
+    if (tw->term.log_on) {
+	_DtTermPrimWriteLog(tw, (char *) buffer, len) ;
+    }
+
+    if (tw->term.outputLogCallback) {
+	DtTermOutputLogCallbackStruct cb;
+
+	cb.reason = DtCR_TERM_OUTPUT_LOG;
+	cb.event = (XEvent *) 0;
+	cb.text = buffer;
+	cb.length = len;
+
+	(void) XtCallCallbackList((Widget) tw,
+		tw->term.outputLogCallback, &cb);
+    }
+}
+
+/* parse and display buffer.  If the parser stops early (because input
+ * was turned off for a scroll, ^S, etc.), the unprocessed text is put
+ * back on the pendingRead list: into chunk if we were working on a
+ * pending chunk, else onto the end of the list...
+ */
+static void
+processOutput(DtTermPrimitiveWidget tw, unsigned char *buffer, int len,
+	PendingTextChunk chunk)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+    unsigned char *dangleBuffer;
+    int dangleBufferLen;
+
+    if (!_DtTermPrimParseInput((Widget) tw, buffer, len,
+	    &dangleBuffer, &dangleBufferLen)) {
+	/* we were not able to write out everything and
+	 * we need to stuff away the pending text.  The pending text
+	 * list takes over the dangle buffer...
+	 */
+	if (chunk) {
+	    /* we didn't finish up the pending text chunk we were
+	     * working on, so update the pointers and continue...
+	     */
+	    (void) _DtTermPrimPendingTextReplace(chunk, dangleBuffer,
+		    dangleBufferLen);
+	} else {
+	    chunk = _DtTermPrimPendingTextAppendBuffer(tpd->pendingRead,
+		    dangleBuffer, dangleBufferLen);
+	}
+	/* this text has already been logged... */
+	chunk->logged = True;
+    } else if (chunk) {
+	/* we finished a pending chunk, so let's move on... */
+	_DtTermPrimPendingTextRemoveChunk(tpd->pendingRead, chunk);
+    }
+}
+
+static long
+elapsedNs(struct timespec *start)
+{
+    struct timespec now;
+
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    if (now.tv_sec - start->tv_sec > 1) {
+	/* long enough (and no overflow where a long is 32 bits)... */
+	return(2L * 1000000000L);
+    }
+    return((now.tv_sec - start->tv_sec) * 1000000000L +
+	    (now.tv_nsec - start->tv_nsec));
+}
+
+/* the end of output frame we put off has come due (see endOfOutput())...
+ */
+/*ARGSUSED*/
+static void
+frameTimeout(XtPointer client_data, XtIntervalId *id)
+{
+    DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) client_data;
+
+    tw->term.tpd->frameTimerId = (XtIntervalId) 0;
+    /* paint and turn the cursor back on... */
+    (void) _DtTermPrimCursorOn((Widget) tw);
+}
+
+/* the output has stopped for now.  Paint it and turn the cursor back on
+ * -- unless we painted less than a frame ago and there is something to
+ * paint: then do it when the frame is due, so that output that comes in
+ * bursts is painted once per frame and not once per burst...
+ */
+static void
+endOfOutput(DtTermPrimitiveWidget tw)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll &&
+	    (tpd->scroll.jump.scrolled || tpd->dirtyRows) &&
+	    !_DtTermPrimFrameDue((Widget) tw)) {
+	if (!tpd->frameTimerId) {
+	    tpd->frameTimerId =
+		    XtAppAddTimeOut(XtWidgetToApplicationContext((Widget) tw),
+		    _DtTermPrimFrameRemainingMs((Widget) tw), frameTimeout,
+		    (XtPointer) tw);
+	}
+	return;
+    }
+    /* turn the cursor back on (this paints everything)... */
+    (void) _DtTermPrimCursorOn((Widget) tw);
+}
+
+/* more output is on its way.  Paint what we have if a frame is due...
+ */
+static void
+paintIfFrameDue(DtTermPrimitiveWidget tw)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll &&
+	    (tpd->scroll.jump.scrolled || tpd->dirtyRows) &&
+	    _DtTermPrimFrameDue((Widget) tw)) {
+	(void) _DtTermPrimPaintFrame((Widget) tw);
+    }
+}
+
+/* leave readPty() early because input has been turned off (^S, a
+ * non-jump scroll waiting for its copy area to complete, ...)...
+ */
+static void
+inputTurnedOff(DtTermPrimitiveWidget tw)
+{
+    DtTermPrimData tpd = tw->term.tpd;
+
+    if (tw->term.jumpScroll) {
+	/* show what we have so far... */
+	(void) _DtTermPrimPaintFrame((Widget) tw);
+    }
+    tpd->deferRender = False;
+    tpd->readInProgress = False;
+}
+
+/* readPty...
+ *
+ * Process output from the pty (or text looped back with
+ * DtTermDisplaySend()).  Text queued on the pendingRead list is processed
+ * first, one chunk per call.  Otherwise we read the pty into a
+ * READ_BUFFER_SIZE buffer, and if the pty is non-blocking, keep reading
+ * and processing until it runs dry (EAGAIN) or READ_TIME_BUDGET_NS has
+ * passed, so that a fast producer costs one main loop pass per budget
+ * rather than per read.
+ */
 /*ARGSUSED*/
 static void
 readPty(XtPointer client_data, int *source, XtInputId *id)
 {
     DtTermPrimitiveWidget tw = (DtTermPrimitiveWidget) client_data;
     DtTermPrimData tpd = tw->term.tpd;
-    unsigned char buffer[BUFSIZ];
+    unsigned char *buffer;
     int len;
-    unsigned char *dangleBuffer;
-    int dangleBufferLen;
+    int flags;
+    int partialLen;
+    Boolean drained = False;
+    Boolean keepReading;
+    struct timespec start = { 0, 0 };
     PendingTextChunk chunk = (PendingTextChunk) 0;
 
     Debug('i', fprintf(stderr, ">>readPty() starting\n"));
     tpd->readInProgress = True;
     (void) _DtTermPrimCursorOff((Widget) tw);
+    /* we will decide again when to paint... */
+    if (tpd->frameTimerId) {
+	(void) XtRemoveTimeOut(tpd->frameTimerId);
+	tpd->frameTimerId = (XtIntervalId) 0;
+    }
+    /* in jump scroll, hold back the painting of text until the end of
+     * the frame (see _DtTermPrimRefreshText())...
+     */
+    tpd->deferRender = tw->term.jumpScroll;
     /* if we are using a history buffer and have scrolled into it, we
      * need to snap back down before we do anything...
      */
@@ -2884,23 +3240,59 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
     }
 
     if (TextIsPending(tpd->pendingRead)) {
-	/* take text from the pendingRead buffer instead of doing a read...
+	/* take text from the pendingRead buffer instead of doing a read.
+	 * We parse it in place; processOutput() replaces or removes the
+	 * chunk once the parser is done with it...
 	 */
 	chunk = _DtTermPrimPendingTextGetChunk(tpd->pendingRead);
-	len = chunk->len;
-	(void) memcpy(buffer, chunk->bufPtr, len);
+	if (chunk->len > 0) {
+	    if (!chunk->logged) {
+		(void) noteOutput(tw, chunk->bufPtr, chunk->len);
+	    }
+	    (void) processOutput(tw, chunk->bufPtr, chunk->len, chunk);
+	} else {
+	    _DtTermPrimPendingTextRemoveChunk(tpd->pendingRead, chunk);
+	}
+	if (!tpd->ptyInputId) {
+	    /* we need to wait until we get a graphicsexpose (count==0)
+	     * or a noexpose...
+	     */
+	    (void) inputTurnedOff(tw);
+	    Debug('i', fprintf(stderr, ">>readPty() finished\n"));
+	    return;
+	}
     } else {
-	len = read(*source, buffer, sizeof(buffer));
-	Debug('i', fprintf(stderr, ">>readPty() read len=%d\n", len));
-	if (isDebugFSet('i', 1)) {
+	/* only loop on a non-blocking fd, or we could block here... */
+	flags = fcntl(*source, F_GETFL, 0);
+	keepReading = (flags != -1) && (flags & O_NONBLOCK);
+	if (keepReading) {
+	    (void) clock_gettime(CLOCK_MONOTONIC, &start);
+	}
+
+	do {
+	    buffer = tpd->readBuffer + READ_HEADROOM;
+	    len = read(*source, buffer, READ_BUFFER_SIZE);
+	    Debug('i', fprintf(stderr, ">>readPty() read len=%d\n", len));
+	    if (len < 0) {
+		if (errno == EINTR) {
+		    continue;
+		}
+		if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+		    drained = True;
+		}
+		break;
+	    }
+	    if (len == 0) {
+		break;
+	    }
+	    if (isDebugFSet('i', 1)) {
 #ifdef	BBA
 #pragma BBA_IGNORE
 #endif	/*BBA*/
-	    int i1;
+		int i1;
 
-	    (void) fprintf(stderr,
-		    ">>readPty() read %d bytes", len);
-	    if (len > 0) {
+		(void) fprintf(stderr,
+			">>readPty() read %d bytes", len);
 		for (i1 = 0; i1 < len; i1++) {
 		    if (!(i1 % 20))
 			fputs("\n    ", stderr);
@@ -2908,93 +3300,64 @@ readPty(XtPointer client_data, int *source, XtInputId *id)
 		}
 		(void) fprintf(stderr, "\n");
 	    }
-	}
-    }
-	
-    if (len > 0) {
-        if (!tpd->windowMapped && tw->term.mapOnOutput) {
-            /*
-            ** map window unless it is too early...
-            */
-            if (tw->term.mapOnOutputDelay)
-                if ((time((time_t *) 0) - tpd->creationTime) >
-			tw->term.mapOnOutputDelay) {
-                /*
-                ** time is up
-                */
-                tw->term.mapOnOutputDelay = 0 ;
-            }
 
-            if (!tw->term.mapOnOutputDelay) {
-                Widget sw;
+	    (void) noteOutput(tw, buffer, len);
 
-                for (sw = (Widget)tw; !XtIsShell(sw); sw = XtParent(sw))
-		    ;
-                XtMapWidget(sw);
-            }
-        }
- 
-        if (tw->term.log_on) {
-            _DtTermPrimWriteLog(tw, (char *) buffer, len) ;
-        }
-
-	if (tw->term.outputLogCallback) {
-	    DtTermOutputLogCallbackStruct cb;
-
-	    cb.reason = DtCR_TERM_OUTPUT_LOG;
-	    cb.event = (XEvent *) 0;
-	    cb.text = buffer;
-	    cb.length = len;
-
-	    (void) XtCallCallbackList((Widget) tw,
-		    tw->term.outputLogCallback, &cb);
-	}
-
-	if (!_DtTermPrimParseInput((Widget) tw, buffer, len,
-		&dangleBuffer, &dangleBufferLen)) {
-	    /* we were not able to write out everything and
-	     * we need to stuff away the pending text...
+	    /* if the last read ended with a partial multibyte
+	     * character, put it in front of the new text here rather
+	     * than have the parser copy the whole buffer to do so...
 	     */
-	    if (chunk) {
-		/* we didn't finish up the pending text chunk we were
-		 * working on, so update the pointers and continue...
-		 */
-		(void) _DtTermPrimPendingTextReplace(chunk, dangleBuffer,
-			dangleBufferLen);
-	    } else {
-		(void) _DtTermPrimPendingTextAppend(tpd->pendingRead,
-			dangleBuffer, dangleBufferLen);
+	    partialLen = tpd->mbPartialCharLen;
+	    if ((partialLen > 0) && (partialLen <= READ_HEADROOM)) {
+		buffer -= partialLen;
+		(void) memcpy(buffer, tpd->mbPartialChar, partialLen);
+		len += partialLen;
+		tpd->mbPartialCharLen = 0;
 	    }
-	    (void) XtFree((char *) dangleBuffer);
-	} else if (chunk) {
-	    /* we finished a pending chunk, so let's move on... */
-	    _DtTermPrimPendingTextRemoveChunk(tpd->pendingRead, chunk);
-	}
-	if (!tpd->ptyInputId) {
-	    /* we need to wait until we get a graphicsexpose (count==0)
-	     * or a noexpose...
+
+	    (void) processOutput(tw, buffer, len, (PendingTextChunk) 0);
+
+	    if (!tpd->ptyInputId) {
+		/* we need to wait until we get a graphicsexpose
+		 * (count==0) or a noexpose...
+		 */
+		/* we know we have more input, so we don't need to turn on
+		 * the cursor...
+		 */
+		(void) inputTurnedOff(tw);
+		Debug('i', fprintf(stderr, ">>readPty() finished\n"));
+		return;
+	    }
+
+	    /* text that was put back has to be processed before we
+	     * read any more...
 	     */
-	    /* we know we have more input, so we don't need to turn on
-	     * the cursor...
-	     */
-	    tpd->readInProgress = False;
-	    Debug('i', fprintf(stderr, ">>readPty() finished\n"));
-	    return;
-	}
+	    if (TextIsPending(tpd->pendingRead)) {
+		break;
+	    }
+	} while (keepReading && (elapsedNs(&start) < READ_TIME_BUDGET_NS));
     }
 
-    if (!moreInput(tw->term.pty)) {
+    if (!drained && moreInput(*source)) {
+	/* more input is waiting.  We will be called again as soon as
+	 * the main loop has handled any pending events...
+	 */
+	(void) paintIfFrameDue(tw);
+    } else {
 	/* we won't be getting an input select so we need to check on
 	 * pending text and force a read if we still have some...
 	 */
 	if (TextIsPending(tpd->pendingRead)) {
 	    (void) XtAppAddTimeOut(XtWidgetToApplicationContext((Widget) tw),
 		    0, _DtTermPrimForcePtyRead, (XtPointer) tw);
+	    (void) paintIfFrameDue(tw);
 	} else {
-	    /* turn the cursor back on... */
-	    (void) _DtTermPrimCursorOn((Widget) tw);
+	    /* paint and turn the cursor back on... */
+	    tpd->deferRender = False;
+	    (void) endOfOutput(tw);
 	}
     }
+    tpd->deferRender = False;
     tpd->readInProgress = False;
     Debug('i', fprintf(stderr, ">>readPty() finished\n"));
 }
@@ -3131,6 +3494,9 @@ _DtTermPrimActionKeyInput(Widget w, XEvent *event, String *params,
 		keyEvent->type);
 	return;
     }
+    /* we are not idle (restart cursor blinking if it has stopped)... */
+    (void) _DtTermPrimCursorKeyActivity(w);
+
     if (KEYBOARD_LOCKED(tpd->keyboardLocked)) {
         /* keyboard locked -- ring the bell...
          */

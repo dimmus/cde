@@ -78,4 +78,28 @@ extern void TranslationDragStart(Widget, XEvent *, String *,
 extern void DtcmProcessPress(Widget, XEvent *, String *,
 					   Cardinal *);
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+/*
+ * Create the file named by template (".../XXXXXX", filled in) with
+ * mkstemp() and return it open for writing; NULL on failure.  Unlike
+ * mktemp() and fopen(), nobody can create or link the name first.
+ */
+static inline FILE *
+mkstemp_fopen(char *template)
+{
+	FILE *fp;
+	int fd = mkstemp(template);
+
+	if (fd < 0)
+		return NULL;
+	if ((fp = fdopen(fd, "w")) == NULL) {
+		close(fd);
+		unlink(template);
+	}
+	return fp;
+}
+
 #endif

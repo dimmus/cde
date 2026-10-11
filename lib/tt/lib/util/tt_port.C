@@ -49,6 +49,11 @@
 #include <sys/utsname.h>
 #endif
 #include <errno.h>
+#include <poll.h>
+#include <time.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#endif
 #include "tt_port.h"
 #include "tt_global_env.h"
 #include "tt_string.h"
@@ -179,6 +184,32 @@ _tt_restoredtablesize(void)
 		return setrlimit(RLIMIT_NOFILE, &original_dtablesize);
 	}
 #endif
+}
+
+
+/*
+ * Closes every descriptor from lowfd up, typically in a child between
+ * fork() and exec().  Uses close_range()/closefrom() where available:
+ * looping close() up to the descriptor limit (maxfds, used as-is by
+ * the fallback) costs one system call per possible descriptor, which
+ * with a raised limit (ttsession -N) is a million of them per process
+ * started.
+ */
+void
+_tt_close_fds_from(int lowfd, int maxfds)
+{
+#if defined(__linux__) && defined(SYS_close_range)
+	if (syscall(SYS_close_range, (unsigned int)lowfd, ~0U, 0) == 0) {
+		return;
+	}
+	// ENOSYS (kernel before 5.9): fall through.
+#elif defined(CSRG_BASED)
+	closefrom(lowfd);
+	return;
+#endif
+	for (int i = lowfd; i < maxfds; i++) {
+		close(i);
+	}
 }
 
 
@@ -462,3 +493,52 @@ int _tt_put_all_env_var (int i_num_names, const char* pc_val, ...) {
     return i_index;
 }
 
+
+long long
+_tt_monotonic_ms(void)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+		return (long long)time(0) * 1000;
+	}
+	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+
+int
+_tt_backoff(int *delay_ms, int max_ms, long long deadline_ms)
+{
+	long long left = deadline_ms - _tt_monotonic_ms();
+	int ms = *delay_ms;
+
+	if (left <= 0) {
+		return 0;
+	}
+	if (ms > max_ms) {
+		ms = max_ms;
+	}
+	if (ms > left) {
+		ms = (int)left;
+	}
+	if (ms > 0) {
+		(void)poll(NULL, 0, ms);
+	}
+	*delay_ms = (*delay_ms > max_ms / 2) ? max_ms : 2 * *delay_ms;
+	return 1;
+}
+
+
+int
+_tt_rpc_timeout(int default_secs)
+{
+	static int env_secs = -1;
+
+	if (env_secs == -1) {
+		const char *val = getenv("TT_RPC_TIMEOUT");
+		long secs = val ? strtol(val, 0, 10) : 0;
+
+		env_secs = (secs > 0 && secs <= 1000000) ? (int)secs : 0;
+	}
+	return env_secs > 0 ? env_secs : default_secs;
+}

@@ -70,6 +70,8 @@
  *
  *****************************************************************************/
 #define	GROW_SIZE	10
+/* grow the canvas arrays geometrically: appending stays O(1) amortised */
+#define	GROW_MAX(m)	((m) < GROW_SIZE ? GROW_SIZE : (m) * 2)
 #define	CheckFormat(x) \
 	(((x)->format_y == -1 || (x)->format_y > (x)->y_pos) ? False : True)
 
@@ -131,6 +133,13 @@ static _DtCvValue
 IsTrueMultiByte (wchar_t wc_char)
 {
     char buf[MB_LEN_MAX];
+
+    /*
+     * ASCII is a single byte in every locale whose encoding is a
+     * stateless ASCII superset.
+     */
+    if (wc_char > 0 && wc_char < 0x80 && _DtHelpCeAsciiIsSingleByte())
+	return False;
 
     /*
      * check to see if this is a one byte character
@@ -427,7 +436,12 @@ _DtCvCheckLineSyntax (
       {
         wcFlag   = _DtCvIsSegWideChar(pSeg);
         pChar    = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg), wcFlag, start);
-        myStrLen = _DtCvStrLen (pChar, wcFlag);
+        /*
+         * only whether the string is shorter than, as long as or longer
+         * than 'str_len' matters below; don't scan the rest of a long
+         * paragraph to find out (this is called for every word).
+         */
+        myStrLen = _DtCvStrLenMax (pChar, wcFlag, str_len);
       }
 
     /*
@@ -669,7 +683,6 @@ _DtCvGetNextWidth (
     int      tLen;
     int      wcFlag;
     int      curWidth;
-    int      myLength;
     int      nextLen = 0;
     void    *pChar;
     char    *tChar;
@@ -739,7 +752,6 @@ _DtCvGetNextWidth (
 	 */
 	wcFlag   = _DtCvIsSegWideChar (pSeg);
 	pChar    = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg), wcFlag, start);
-	myLength = _DtCvStrLen (pChar, wcFlag);
     
 	    /*
 	 * if a single byte string, zoom through it looking for
@@ -816,13 +828,31 @@ _DtCvGetNextWidth (
 	 */
 	else
 	  {
+	    /*
+	     * (the rest of the segment can be a long paragraph: find its
+	     * end as the characters are stepped over, not up front.)
+	     */
+	    int ascii = _DtHelpCeAsciiIsSingleByte();
+
 	    len = 0;
-	    while (len < myLength)
+	    while (1)
 	      {
-		if (wcFlag) len++;
+		if (wcFlag)
+		  {
+		    if (0 == ((wchar_t *) pChar)[len])
+			break;
+		    len++;
+		  }
 		else
 		  {
-		    mbl = mblen(pChar + len, MB_CUR_MAX);
+		    unsigned char c = ((unsigned char *) pChar)[len];
+
+		    if ('\0' == c)
+			break;
+		    if (ascii && c < 0x80)
+			mbl = 1;
+		    else
+			mbl = mblen(((char *) pChar) + len, MB_CUR_MAX);
 
 		    if (mbl == -1)
 		      {
@@ -923,7 +953,7 @@ _DtCvSaveInfo (
 
     if (txtCnt >= canvas->txt_max)
       {
-	canvas->txt_max += GROW_SIZE;
+	canvas->txt_max = GROW_MAX(canvas->txt_max);
 	if (canvas->txt_lst)
 	    canvas->txt_lst = (_DtCvDspLine *) realloc (
 				(void *) canvas->txt_lst,
@@ -976,10 +1006,7 @@ _DtCvSaveInfo (
 
 	    pChar = _DtCvStrPtr(_DtCvStringOfStringSeg(pSeg),
 					_DtCvIsSegWideChar(pSeg), start);
-	    len   = _DtCvStrLen (pChar, _DtCvIsSegWideChar(pSeg));
-
-	    if (len > count)
-		len = count;
+	    len   = _DtCvStrNLen (pChar, _DtCvIsSegWideChar(pSeg), count);
 	  }
 	else if (_DtCvIsSegRegion(pSeg))
 	  {
@@ -1207,6 +1234,96 @@ _DtCvCheckAddHyperToTravList (
 }
 
 /******************************************************************************
+ * Function:	WidthUpTo
+ *
+ * Returns:	The width of the 'len' units at 'p_char' when that width is
+ *		not more than 'limit'.  Otherwise some value greater than
+ *		'limit' (the width of a prefix that is already too wide).
+ *
+ * Purpose:	The layout asks "does the rest of this segment fit on the
+ *		line?" for every line of a segment.  Measuring all of the
+ *		rest each time makes a long paragraph O(N*L).  Character
+ *		widths are never negative, so a prefix that is wider than
+ *		the limit proves the whole is too; measure growing prefixes
+ *		and stop as soon as one is.
+ *****************************************************************************/
+static _DtCvUnit
+WidthUpTo (
+    _DtCanvasStruct	*canvas,
+    _DtCvSegmentI	*p_seg,
+    void		*p_char,
+    int			 len,
+    _DtCvUnit		 limit)
+{
+    int		 wcFlag = _DtCvIsSegWideChar(p_seg);
+    int		 count;
+    int		 mbl;
+    _DtCvUnit	 maxWidth = 0;
+    _DtCvUnit	 width;
+    char	*str = (char *) p_char;
+    int		 ascii = _DtHelpCeAsciiIsSingleByte();
+
+    /*
+     * no width is negative.  (A limit of 0 is still measured: an empty
+     * or zero width string fits it.)
+     */
+    if (limit < 0)
+	return 0;
+
+    _DtCvFontMetrics(canvas, _DtCvFontOfStringSeg(p_seg),
+					NULL, NULL, &maxWidth, NULL, NULL);
+    if (maxWidth < 1)
+	maxWidth = 1;
+
+    /*
+     * start with a prefix of about four times the characters
+     * guaranteed to fit.
+     */
+    count = 16;
+    if (limit / maxWidth < (INT_MAX - 16) / 4)
+	count += 4 * (limit / maxWidth);
+
+    while (count < len)
+      {
+	/*
+	 * a multi-byte string must be cut at a character boundary.
+	 */
+	if (0 == wcFlag && canvas->mb_length > 1)
+	  {
+	    int bytes = 0;
+	    int chars = 0;
+
+	    while (bytes < len && chars < count)
+	      {
+		if (ascii && ((unsigned char) str[bytes]) < 0x80
+						&& '\0' != str[bytes])
+		    mbl = 1;
+		else
+		    mbl = mblen(str + bytes, MB_CUR_MAX);
+		if (0 == mbl)
+		    break;
+		bytes += (mbl < 0 ? 1 : mbl);
+		chars++;
+	      }
+	    if (bytes >= len)
+		break;
+	    width = _DtCvGetStringWidth(canvas, p_seg, p_char, bytes);
+	  }
+	else
+	    width = _DtCvGetStringWidth(canvas, p_seg, p_char, count);
+
+	if (width > limit)
+	    return width;
+
+	if (count > INT_MAX / 2)
+	    break;
+	count *= 2;
+      }
+
+    return _DtCvGetStringWidth(canvas, p_seg, p_char, len);
+}
+
+/******************************************************************************
  * Function: ProcessStringSegment
  *
  * chops a string segment up until its completely used.
@@ -1240,9 +1357,17 @@ _DtCvProcessStringSegment(
     char	 *strPtr;
     _DtCvValue    done    = False;
     _DtCvSegmentI *retSeg;
+    int		  segLen;
 
     if (NULL != _DtCvStringOfStringSeg(cur_seg))
       {
+	/*
+	 * the length of the whole string: the rest of it is wanted for
+	 * every line.
+	 */
+	segLen = _DtCvStrLen(_DtCvStringOfStringSeg(cur_seg),
+						_DtCvIsSegWideChar(cur_seg));
+
 	if (lay_info->cur_len == 0)
 	  {
 	    lay_info->line_seg   = cur_seg;
@@ -1384,14 +1509,22 @@ _DtCvProcessStringSegment(
 	     */
 	    pChar     = _DtCvStrPtr(_DtCvStringOfStringSeg(cur_seg),
 				_DtCvIsSegWideChar(cur_seg), *cur_start);
-	    stringLen = _DtCvStrLen (pChar, _DtCvIsSegWideChar(cur_seg));
+	    stringLen = segLen - (int) *cur_start;
     
 	    /*
-	     * get the pixel width of the text string.
+	     * get the pixel width of the text string.  Unless the whole
+	     * string is wanted, stop measuring once it is known not to
+	     * fit (textWidth is then only known to exceed workWidth,
+	     * which is all the code below uses it for).
 	     */
-	    textWidth = _DtCvGetStringWidth(canvas,cur_seg,pChar,stringLen)
-			+ _DtCvGetTraversalWidth(canvas, cur_seg,
+	    nWidth = _DtCvGetTraversalWidth(canvas, cur_seg,
 					lay_info->lst_hyper);
+	    if (stat_flag == True)
+		textWidth = _DtCvGetStringWidth(canvas,cur_seg,pChar,stringLen);
+	    else
+		textWidth = WidthUpTo(canvas, cur_seg, pChar, stringLen,
+							workWidth - nWidth);
+	    textWidth += nWidth;
 	    /*
 	     * Will it fit in the current width?
 	     */
@@ -1569,7 +1702,7 @@ _DtCvProcessStringSegment(
 		pChar      = _DtCvStrPtr(_DtCvStringOfStringSeg(cur_seg),
 						_DtCvIsSegWideChar(cur_seg),
 						*cur_start);
-		stringLen  = _DtCvStrLen (pChar, _DtCvIsSegWideChar(cur_seg));
+		stringLen  = segLen - (int) *cur_start;
 		if (retCount > 0 && retCount < stringLen)
 		    stringLen = retCount;
 
@@ -1585,7 +1718,7 @@ _DtCvProcessStringSegment(
 		 * If we had to do a bigger segment,
 		 * then we're done processing the target segment.
 		 */
-		if (stringLen == _DtCvStrLen(pChar,_DtCvIsSegWideChar(cur_seg)))
+		if (stringLen == segLen - (int) *cur_start)
 		  {
 		    if (_DtCvCheckLineSyntax (canvas, cur_seg,
 				*cur_start, stringLen, False) == False)
@@ -1741,7 +1874,7 @@ _DtCvGetNextTravEntry (
 	/*
 	 * grow by a set amount
 	 */
-	canvas->trav_max += GROW_SIZE;
+	canvas->trav_max = GROW_MAX(canvas->trav_max);
 
 	/*
 	 * realloc or malloc?
@@ -1811,7 +1944,7 @@ int
 _DtCvGetNextSearchEntry(_DtCanvasStruct* canvas)
 {
     if (canvas->search_cnt >= canvas->search_max) {
-	canvas->search_max += GROW_SIZE;
+	canvas->search_max = GROW_MAX(canvas->search_max);
 
 	if (canvas->searchs)
 	    canvas->searchs = (_DtCvSearchData *)
@@ -2350,7 +2483,7 @@ _DtCvAddToMarkList (
      */
     if (canvas->mark_cnt >= canvas->mark_max)
       {
-	canvas->mark_max += GROW_SIZE;
+	canvas->mark_max = GROW_MAX(canvas->mark_max);
 
         if (NULL == canvas->marks)
 	    canvas->marks = (_DtCvMarkData *) malloc(

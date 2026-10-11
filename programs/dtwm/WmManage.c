@@ -98,6 +98,25 @@ static void CheckPushRecallClient (ClientData *pCD);
  */
 
 
+/*
+ * True if the icon frame of workspace i of the client is the icon frame
+ * of an earlier workspace: a root icon (not in an icon box) is one window
+ * shared by all the workspaces the client is in.
+ */
+static Boolean IconFrameSeen (ClientData *pCD, int i)
+{
+    int j;
+
+    for (j = 0; j < i; j++)
+    {
+	if (pCD->pWsList[j].iconFrameWin == pCD->pWsList[i].iconFrameWin)
+	{
+	    return (True);
+	}
+    }
+    return (False);
+}
+
 static void ApplyPrematureClientMessages (ClientData *pCD)
 {
     unsigned long i, nitems, leftover;
@@ -326,6 +345,7 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
     int initialState;
     int i;
     Boolean sendConfigNotify;
+    Time focusTime = CurrentTime;
     WmWorkspaceData *pwsi;
     WmFpEmbeddedClientData *pECD;
 
@@ -612,7 +632,8 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 			  pCD->clientFrameWin, GrabModeSync, F_CONTEXT_ALL);
 	for (i = 0; i < pCD->numInhabited; i++)
 	{
-	    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin)
+	    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin &&
+		!IconFrameSeen (pCD, i))
 	    {
 		SetupKeyBindings (pCD->systemMenuSpec->accelKeySpecs,
 			      pCD->pWsList[i].iconFrameWin, GrabModeSync, 
@@ -623,7 +644,8 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 
   for (i = 0; i < pCD->numInhabited; i++)
   {
-    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin)
+    if (!pCD->pWsList[i].pIconBox && pCD->pWsList[i].iconFrameWin &&
+	!IconFrameSeen (pCD, i))
     {
 	static int iconKeySpec = 1;
 	static int iconAccelSpec = 1;
@@ -665,12 +687,15 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 
 
     /*
-     * Make sure the client window has been reparented ...
+     * Make sure the client window has been reparented ...  Reading the
+     * server time is a round trip, like XSync, after which an error that
+     * says the window is gone has been handled; the time serves to give
+     * the window the focus below.
      */
 
     if (!(manageFlags & MANAGEW_WM_CLIENTS))
     {
-        XSync (DISPLAY, False);
+        focusTime = GetTimestamp ();
 
         if (pCD->clientFlags & CLIENT_DESTROYED)
         {
@@ -698,7 +723,13 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
      */
     AddClientToList (GetWorkspaceData (pSD, pCD->pWsList[0].wsID),
 	pCD, True /*on top*/);
-    SetClientState (pCD, initialState, GetTimestamp());
+
+    /*
+     * SetClientState uses the time only to move the focus when a window
+     * leaves the normal or the minimized state; this one is withdrawn,
+     * so a timestamp would cost a round trip for nothing.
+     */
+    SetClientState (pCD, initialState, CurrentTime);
 
     /*
      * Set the keyboard input focus to the newly managed window if appropriate:
@@ -725,12 +756,14 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 	  (pCD->inputFocusModel ||
 	   (pCD->protocolFlags & PROTOCOL_WM_TAKE_FOCUS)))))
     {
-	Do_Focus_Key (pCD, GetTimestamp() , ALWAYS_SET_FOCUS);
+	Do_Focus_Key (pCD, (focusTime != CurrentTime) ? focusTime :
+		      GetTimestamp (), ALWAYS_SET_FOCUS);
     }
     else if ((pCD->inputMode == MWM_INPUT_SYSTEM_MODAL) ||
 	     (wmGD.keyboardFocus && IS_APP_MODALIZED(wmGD.keyboardFocus)))
     {
-	Do_Focus_Key ((ClientData *)NULL, GetTimestamp() , ALWAYS_SET_FOCUS);
+	Do_Focus_Key ((ClientData *)NULL, (focusTime != CurrentTime) ?
+		      focusTime : GetTimestamp (), ALWAYS_SET_FOCUS);
     }
 
     if (smAckState == SM_START_ACK)
@@ -742,8 +775,13 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 
     ApplyPrematureClientMessages (pCD);
 
+    /*
+     * An empty _NET_WM_STATE for a client that has none (there is
+     * nothing to read and merge).
+     */
     if (!HasProperty (pCD, wmGD.xa__NET_WM_STATE))
-	UpdateNetWmState (pCD->client, NULL, 0, _NET_WM_STATE_REMOVE);
+	XChangeProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_STATE, XA_ATOM,
+			 32, PropModeReplace, (unsigned char *) NULL, 0);
 
     /*
      * Free the initial property list. This will force

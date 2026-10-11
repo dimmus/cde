@@ -38,6 +38,8 @@
  * system includes
  */
 #include <stdlib.h>
+#include <string.h>
+#include <limits.h>
 #include <X11/Xlib.h>
 #include <X11/Xlibint.h>
 #include <X11/Xresource.h>
@@ -462,6 +464,110 @@ LoadFont (
 }
 
 /******************************************************************************
+ * Fonts that failed to load.
+ *
+ * A font spec that cannot be loaded is remembered in the exact font list
+ * with the index FAILED_FONT, so that every later style (or chunk) that
+ * resolves to it does not ask the server again.  Only failures are
+ * shared this way; a font that loads keeps its own index per request,
+ * as before.
+ *****************************************************************************/
+#define	FAILED_FONT	INT_MIN
+#ifndef	REALLOC_INCR
+#define	REALLOC_INCR	10
+#endif
+
+/*
+ * the position of 'xlfd_spec' in the exact font list, or -1;
+ * 'ret_cnt' gets the length of the list.
+ */
+static int
+FindExactFont (
+    DtHelpDAFontInfo	*font_info,
+    const char		*xlfd_spec,
+    int			*ret_cnt)
+{
+    int    i = 0;
+    char **nameList = font_info->exact_fonts;
+    int    found = -1;
+
+    if (NULL != nameList)
+      {
+	for (i = 0; NULL != nameList[i]; i++)
+	    if (-1 == found && 0 == strcmp(nameList[i], xlfd_spec))
+		found = i;
+      }
+
+    if (NULL != ret_cnt)
+	*ret_cnt = i;
+    return found;
+}
+
+/*
+ * add 'xlfd_spec' with 'idx' at position 'i' (the end) of the exact
+ * font list.  Returns 0 if it was added.
+ */
+static int
+AddExactFont (
+    DtHelpDAFontInfo	*font_info,
+    const char		*xlfd_spec,
+    int			 i,
+    int			 idx)
+{
+    char *copy = strdup(xlfd_spec);
+    int  *newIdx;
+
+    if (NULL == copy)
+	return -1;
+
+    font_info->exact_fonts = (char **) _DtHelpCeAddPtrToArray(
+					(void **) font_info->exact_fonts,
+					(void *) copy);
+    if (NULL == font_info->exact_fonts)
+	return -1;
+
+    if (NULL == font_info->exact_idx)
+	newIdx = (int *) malloc(sizeof(int) * REALLOC_INCR);
+    else if ((i + 1) % REALLOC_INCR == 0)
+	newIdx = (int *) realloc(font_info->exact_idx,
+				sizeof(int) * (i + 1 + REALLOC_INCR));
+    else
+	newIdx = font_info->exact_idx;
+
+    if (NULL == newIdx)
+	return -1;
+
+    font_info->exact_idx    = newIdx;
+    font_info->exact_idx[i] = idx;
+    return 0;
+}
+
+/*
+ * LoadFont, unless 'font_string' is known not to load.
+ */
+static short
+LoadFontOnce (
+    Display		*dpy,
+    DtHelpDAFontInfo	*font_info,
+    char		*font_string,
+    long		*ret_index)
+{
+    int i;
+    int cnt;
+
+    i = FindExactFont(font_info, font_string, &cnt);
+    if (-1 != i && FAILED_FONT == font_info->exact_idx[i])
+	return False;
+
+    if (LoadFont(dpy, font_info, font_string, ret_index))
+	return True;
+
+    if (-1 == i)
+	(void) AddExactFont(font_info, font_string, cnt, FAILED_FONT);
+    return False;
+}
+
+/******************************************************************************
  *
  * Semi Public Functions
  *
@@ -512,7 +618,7 @@ __DtHelpFontIndexGet (
 						    &retType, &retValue))
 	  {
 	    fontSpec  = ((char *) retValue.addr);
-	    if (LoadFont (dpy, fontInfo, fontSpec, &fontIndex))
+	    if (LoadFontOnce (dpy, fontInfo, fontSpec, &fontIndex))
 		result = 0;
 	  }
 
@@ -524,7 +630,7 @@ __DtHelpFontIndexGet (
 						    &retType, &retValue))
 	  {
 	    fontSpec  = ((char *) retValue.addr);
-	    if (LoadFont (dpy, fontInfo, fontSpec, &fontIndex))
+	    if (LoadFontOnce (dpy, fontInfo, fontSpec, &fontIndex))
 		result = 0;
 	  }
 
@@ -537,7 +643,7 @@ __DtHelpFontIndexGet (
 	retValue.addr = (XtPointer) &fontIndex;
 	XrmQPutResource (&(fontInfo->font_idx_db),
 				((XrmBindingList) FontBindings),
-					xrm_list, _DtHelpXrmInt, &retValue);
+				xrm_list, _DtHelpXrmInt, &retValue);
 
 	/*
 	 * remember the character set for this font.
@@ -1010,90 +1116,70 @@ _DtHelpGetExactFontIndex (
     char		 	*xlfd_spec,
     long			*ret_idx)
 {
-    int			 i = 0;
+    int			 i;
+    int			 cnt;
     int		 	 result    = -1;
     long                 fontIndex = pDAS->font_info.def_idx;
-    char		**nameList;
     DtHelpDAFontInfo	*fontInfo = &(pDAS->font_info);
     Display		*dpy      = XtDisplay(pDAS->dispWid);
 
     /*
      * look in my font data base to see if I've already processed
-     * this xlfd_spec.
+     * this xlfd_spec (and whether it loaded).
      */
-#ifndef	REALLOC_INCR
-#define	REALLOC_INCR	10
-#endif
-    nameList = fontInfo->exact_fonts;
-    if (NULL != nameList)
+    i = FindExactFont(fontInfo, xlfd_spec, &cnt);
+    if (-1 != i)
       {
-        for (i = 0; NULL != *nameList && strcmp(*nameList, xlfd_spec); i++)
-	    nameList++;
-      }
-
-    if (NULL != nameList && NULL != *nameList)
-      {
-	fontIndex = fontInfo->exact_idx[i];
-	result = 0;
+	if (FAILED_FONT != fontInfo->exact_idx[i])
+	  {
+	    fontIndex = fontInfo->exact_idx[i];
+	    result = 0;
+	  }
       }
     else if (LoadFont(dpy, fontInfo, xlfd_spec, &fontIndex))
       {
 	/*
-	 * make a copy of the font spec
+	 * now save it away for later tests.
 	 */
-	xlfd_spec = strdup(xlfd_spec);
-	if (NULL != xlfd_spec)
+	if (0 == AddExactFont(fontInfo, xlfd_spec, cnt, (int) fontIndex))
 	  {
+	    char       buffer[10];
+	    XrmValue   retValue;
+	    XrmName    xrmList[3];
+	    XrmQuark   myQuark;
+
+	    result = 0;
+
 	    /*
-	     * now save it away for later tests.
+	     * remember the character set for this font.
 	     */
-	    fontInfo->exact_fonts = (char **) _DtHelpCeAddPtrToArray(
-					    (void **)fontInfo->exact_fonts,
-					    (void *) xlfd_spec);
-	    if (NULL != fontInfo->exact_fonts)
-	      {
-		if (NULL == fontInfo->exact_idx)
-		    fontInfo->exact_idx = (int *) malloc(
-						    sizeof(int)*REALLOC_INCR);
-		else if ((i + 1) % REALLOC_INCR == 0)
-		    fontInfo->exact_idx = (int *) realloc(fontInfo->exact_idx,
-				    sizeof(int) * (i + 1 + REALLOC_INCR));
-    
-		if (NULL != fontInfo->exact_idx)
-		  {
-		    char       buffer[10];
-		    XrmValue   retValue;
-		    XrmName    xrmList[3];
-		    XrmQuark   myQuark;
-    
-		    fontInfo->exact_idx[i] = fontIndex;
-		    result = 0;
-    
-		    /*
-		     * remember the character set for this font.
-		     */
-		    myQuark = XrmStringToQuark(char_set);
-		    sprintf (buffer, "%ld", fontIndex);
-		    retValue.size = sizeof (XrmQuark);
-		    retValue.addr = (XtPointer) &myQuark;
-		    xrmList[0] = XrmStringToQuark (buffer);
-		    xrmList[1] = XrmStringToQuark ("code_set");
-		    xrmList[2] = 0;
-		    XrmQPutResource (&(fontInfo->font_idx_db),
-				    ((XrmBindingList) FontBindings),
-				    xrmList, _DtHelpXrmQuark, &retValue);
-	    
-		    /*
-		     * remember the language for this font.
-		     */
-		    myQuark    = XrmStringToQuark(lang);
-		    xrmList[1] = XrmStringToQuark ("language");
-		    XrmQPutResource (&(fontInfo->font_idx_db),
-				    ((XrmBindingList) FontBindings),
-				    xrmList, _DtHelpXrmQuark, &retValue);
-		  }
-	      }
+	    myQuark = XrmStringToQuark(char_set);
+	    sprintf (buffer, "%ld", fontIndex);
+	    retValue.size = sizeof (XrmQuark);
+	    retValue.addr = (XtPointer) &myQuark;
+	    xrmList[0] = XrmStringToQuark (buffer);
+	    xrmList[1] = XrmStringToQuark ("code_set");
+	    xrmList[2] = 0;
+	    XrmQPutResource (&(fontInfo->font_idx_db),
+			    ((XrmBindingList) FontBindings),
+			    xrmList, _DtHelpXrmQuark, &retValue);
+
+	    /*
+	     * remember the language for this font.
+	     */
+	    myQuark    = XrmStringToQuark(lang);
+	    xrmList[1] = XrmStringToQuark ("language");
+	    XrmQPutResource (&(fontInfo->font_idx_db),
+			    ((XrmBindingList) FontBindings),
+			    xrmList, _DtHelpXrmQuark, &retValue);
 	  }
+      }
+    else
+      {
+	/*
+	 * remember that it does not load.
+	 */
+	(void) AddExactFont(fontInfo, xlfd_spec, cnt, FAILED_FONT);
       }
 
     *ret_idx = fontIndex;

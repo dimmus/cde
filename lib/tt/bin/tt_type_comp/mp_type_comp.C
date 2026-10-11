@@ -177,6 +177,7 @@ merge(int overwrite)
 	_Tt_ptype_ptr			pt;
 	_Tt_otype_ptr			ot;
 	Tt_status			st = TT_OK;
+	_Tt_string_list_cursor		files;
 
 	if (cedb == TypedbNone) {
 		cedb = TypedbUser;
@@ -191,7 +192,17 @@ merge(int overwrite)
 	}
 
 	xdb = new _Tt_typedb();
-	read_types(ifile, db);
+	//
+	// Parse every source file before touching the database, so a
+	// syntax error in any of them leaves the database unchanged.
+	//
+	int nsources = cargs->count();
+	_Tt_typedb_ptr *sources = new _Tt_typedb_ptr[nsources];
+	int i = 0;
+	files.reset(cargs);
+	while (files.next()) {
+		read_types(*files, sources[i++]);
+	}
 
 	if ((st=xdb->init_xdr(cedb)) != TT_OK) {
 		// if TT_ERR_DBEXIST is returned from init_ce
@@ -235,6 +246,15 @@ merge(int overwrite)
 		exit(3);
 	}
 
+	//
+	// Merging several source files in one run is equivalent to
+	// merging them one by one in the same order: a type defined in
+	// a later file replaces (-m) or yields to (-M) the one already
+	// in the database.  The database is read, locked and written
+	// (and the "Saved" notice sent) only once.
+	//
+	for (i = 0; i < nsources; i++) {
+	db = sources[i];
 	db_otypes.reset(db->otable);
 	while (db_otypes.next()) {
 		ot = xdb->otable->lookup(db_otypes->otid());
@@ -285,6 +305,7 @@ merge(int overwrite)
 						   "definition for %s"),
 					   (char *)db_ptypes->ptid());
 				xdb->abort_write();
+				exit(3);
 			}
 		}
 		if (! _tt_global->silent) {
@@ -300,7 +321,9 @@ merge(int overwrite)
 					   "new definition for %s"),
 				   (char *)db_ptypes->ptid());
 			xdb->abort_write();
+			exit(3);
 		}
+	}
 	}
 
 	if (! xdb->end_write()) {

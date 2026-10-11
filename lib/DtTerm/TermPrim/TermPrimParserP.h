@@ -77,6 +77,12 @@ typedef struct _StateTableRec
     StateEntry      stateEntry;	    /* state entry table for state	 */
     StateEntry      statePreParseEntry;
 				    /* pre-parse state entry table	 */
+    unsigned char  *index;	    /* built on first use (leave it out of
+				     * the initializers): for each byte,
+				     * the index of its entry in
+				     * stateEntry[], then (at 256 + byte)
+				     * in statePreParseEntry[] or
+				     * NO_PRE_PARSE_ENTRY		 */
 } StateTableRec;
 
 /* 

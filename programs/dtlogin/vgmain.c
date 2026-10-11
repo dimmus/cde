@@ -606,9 +606,11 @@ main( int argc, char **argv )
     _DtEnvControl( DT_ENV_RESTORE_PRE_DT );
 
     /*
-     * Add request callback.
+     * Add request callback.  Requests arrive on a pipe and are handled
+     * as events, so there is nothing to wait for here.  (A sleep(5) that
+     * used to sit here kept the greeter mapped but unpainted for five
+     * seconds on every boot and logout.)
      */
-     sleep(5);
      XtAddInput(0, (XtPointer)XtInputReadMask, RequestCB, NULL);
    
 #ifdef VG_TRACE

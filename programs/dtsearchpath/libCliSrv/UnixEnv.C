@@ -291,12 +291,18 @@ char buffer[100];
     system(buffer);
 #else
 
+    /*
+     * The pattern is compiled once, not once per entry (and is freed:
+     * the compiled patterns used to leak, one per directory entry).
+     */
+    regex_t re;
+    if (regcomp (&re, filespec.data(), 0) != 0)
+	return;
+
     DirectoryIterator dir(dirspec);
     struct dirent * direntry;
     while ((direntry = dir())) {
         /*# ifdef should_be_sun_but_this_dont_work*/
-	regex_t re;
-	regcomp (&re, filespec.data(), 0);
 	if (regexec (&re, direntry->d_name, 0, NULL, 0) == 0) {
 	    if (strcmp(direntry->d_name,".") == 0 ||
 		strcmp(direntry->d_name,"..") == 0)
@@ -304,6 +310,7 @@ char buffer[100];
 	    removeFile(dirspec + "/" + direntry->d_name);
 	}
     }
+    regfree (&re);
 #endif
 }
 
@@ -329,12 +336,18 @@ void UnixEnvironment::removeDeadLinks
 {
     DIR * dir = opendir(dirspec.data());
     struct dirent * direntry;
+    if (dir == NULL)
+	return;
     while ((direntry = readdir(dir))) {
-	if (isLink(dirspec + "/" + direntry->d_name))
-	    if (!isFile(dirspec + "/" + direntry->d_name) &&
-		!isDirectory(dirspec + "/" + direntry->d_name))
-	        removeFile(dirspec + "/" + direntry->d_name);
+	CString path(dirspec + "/" + direntry->d_name);
+	struct stat file;
+
+	/* A link to neither a plain file nor a directory (one stat). */
+	if (isLink(path))
+	    if (stat(path.data(), &file) != 0 ||
+		(!S_ISREG(file.st_mode) && !S_ISDIR(file.st_mode)))
+	        removeFile(path);
     }
-    closedir(dir);	    
+    closedir(dir);
 }
 

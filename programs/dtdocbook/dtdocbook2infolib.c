@@ -191,6 +191,15 @@ static char *usageMsg2 = "\
 
 static GlobalsStruct *gStruct;
 
+/*
+ * Where the DocBook data (sgml, spec, dtsr) and the infolib tools are.
+ * Like dtdocbook2sdl and dtdocbook2man, the program can be pointed at
+ * another tree (the source tree, during the CDE build) through the
+ * environment variables dtdcbk_datarootdir and dtdcbk_libexecdir.
+ */
+static const char *dataRootDir(void);
+static const char *infolibLibexecDir(void);
+
 static void printUsage(char *preMsg, int exitCode);
 static void dieRWD(int exitCode, char *format, ...);
 static void die(int exitCode, char *format, ...);
@@ -944,10 +953,35 @@ buildPath(char *format, ...)
     return XtsNewString(pathBuf);
 }
 
+static const char *
+dataRootDir(void)
+{
+    const char *dir = getenv("dtdcbk_datarootdir");
+
+    return (dir && *dir) ? dir : STR(DTDCBK_DATAROOTDIR);
+}
+
+static const char *
+infolibLibexecDir(void)
+{
+    static char *dir;
+    const char *libexecdir;
+
+    if (!dir)
+    {
+	libexecdir = getenv("dtdcbk_libexecdir");
+	if (libexecdir && *libexecdir)
+	    dir = buildPath("%s/infolib", libexecdir);
+	else
+	    dir = STR(INFOLIB_LIBEXECDIR);
+    }
+    return dir;
+}
+
 static char *
 buildSGML(void)
 {
-    char *sgmlPath = buildPath("%s/sgml", STR(DTDCBK_DATAROOTDIR));
+    char *sgmlPath = buildPath("%s/sgml", dataRootDir());
 
 #ifdef SGML_DEBUG
     fprintf(stderr, "(DEBUG) buildSGML=\"%s\"\n", sgmlPath);
@@ -973,7 +1007,7 @@ buildStyleProlog(void)
 static char *
 buildSpec(void)
 {
-    return buildPath("%s/spec/mmdb.infolib.spec", STR(DTDCBK_DATAROOTDIR));
+    return buildPath("%s/spec/mmdb.infolib.spec", dataRootDir());
 }
 
 static void
@@ -1044,18 +1078,18 @@ checkGlobals(void)
 	checkExec("dtsrload");
 	checkExec("dtsrindex");
 
-	gStruct->dtsrlib = buildPath("%s/dtsr", STR(DTDCBK_DATAROOTDIR),
+	gStruct->dtsrlib = buildPath("%s/dtsr", dataRootDir(),
 				     STR(langtbl[gStruct->dtsridx].name));
 
 	if (!checkStat(gStruct->dtsrlib, FSTAT_IS_DIR)) {
 	    free(gStruct->dtsrlib);
-	    gStruct->dtsrlib = buildPath("%s/dtsr", STR(DTDCBK_DATAROOTDIR),
+	    gStruct->dtsrlib = buildPath("%s/dtsr", dataRootDir(),
 					LANG_COMMON);
 	}
 #ifdef DTSR_DEBUG
 	fprintf(stderr, "(DEBUG) gStruct->dtsrlib=\"%s\"\n", gStruct->dtsrlib);
 #endif
-	gStruct->dbdfile = buildPath("%s/dtsr/%s.dbd", STR(DTDCBK_DATAROOTDIR),
+	gStruct->dbdfile = buildPath("%s/dtsr/%s.dbd", dataRootDir(),
 				     gStruct->searchEngine);
 	gStruct->keytypes = "Default Head Graphics Example Index Table";
     }
@@ -2337,7 +2371,7 @@ main(int argc, char *argv[])
     if (setenv("SP_ENCODING", "UTF-8", 1) == -1)
 	die(-1, "%s: SP_ENCODING: %s\n", EXEC_NAME, strerror(errno));
 
-    if (!addToEnv("PATH", STR(INFOLIB_LIBEXECDIR), true))
+    if (!addToEnv("PATH", (char *)infolibLibexecDir(), true))
 	die(-1, "%s: could not set PATH\n", EXEC_NAME);
 
     if (!doAdmin(argc, argv) &&

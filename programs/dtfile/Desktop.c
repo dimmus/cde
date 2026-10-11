@@ -234,7 +234,7 @@ InitializeDesktopWindows(
    Arg args[20];
    char   *popup_name;
    Widget pu_shell, frame, drawA;
-   XtTranslations trans_table;
+   static XtTranslations trans_table = NULL;
 
    if(desktop_data == NULL)
    {
@@ -320,10 +320,10 @@ InitializeDesktopWindows(
       else
          XmAddToPostFromList(desktop_data->popupMenu->popup, drawA);
 
-      /* set up translations in main edit widget */
-      trans_table = XtParseTranslationTable(translations_da);
-
-      /* set up translations in main edit widget */
+      /* set up translations in main edit widget (parsed once: a table
+       * can be shared by all the desktop objects) */
+      if (trans_table == NULL)
+         trans_table = XtParseTranslationTable(translations_da);
       XtOverrideTranslations(drawA, trans_table);
 
       /* Event handler for posting popup menu */
@@ -1108,6 +1108,19 @@ LoadDesktopInfo(
         char * path;
         struct stat stat_buf;
 
+        /* a truncated file: nothing to load */
+        if (desktopWindow->file_name == NULL ||
+            desktopWindow->dir_linked_to == NULL)
+        {
+          XtFree(desktopWindow->file_name);
+          desktopWindow->file_name = NULL;
+          XtFree(workSpace);
+          workSpace = NULL;
+          XtFree(desktopWindow->dir_linked_to);
+          desktopWindow->dir_linked_to = NULL;
+          continue;
+        }
+
         if (strcmp(desktopWindow->dir_linked_to, "/") == 0)
         {
           path = (char *) XtMalloc(strlen(desktopWindow->dir_linked_to) +
@@ -1179,8 +1192,8 @@ LoadDesktopInfo(
           sscanf( message, "%d %d %d %d %d %d %d\n",
                   &toolbox, &view, &order, &direction, &positionEnabled, &rX, &rY );
       }
-      else
-          message = NULL;
+      /* (on a short file the defaults above stay; message is kept for
+         the next fgets: it used to be set to NULL here) */
 
       desktopWindow->toolbox = (char)toolbox;
       desktopWindow->view = (char)view;
@@ -1192,7 +1205,8 @@ LoadDesktopInfo(
       haveOne = False;
       for(j = 0; j < desktop_data->numWorkspaces; j++)
       {
-         if(strcmp(workSpace, desktop_data->workspaceData[j]->name) == 0)
+         if(workSpace != NULL &&
+            strcmp(workSpace, desktop_data->workspaceData[j]->name) == 0)
          {
              haveOne = True;
              desktopWindow->workspace_name = workSpace;

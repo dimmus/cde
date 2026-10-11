@@ -63,7 +63,17 @@ ldlong(char *p)
     for (i=0; i<LONGSIZE ; i++)
         val = (val << 8) + *((unsigned char *)p++);
 
+#if LONG_BIT == 64
     return ((long)val);
+#else
+    /*
+     * The field is a 4-byte two's complement number.  Sign-extend it
+     * where long is wider (LP64 without LONG_BIT): otherwise -1 (e.g.
+     * FREELIST_NOPAGE) reads back as 4294967295 and ISMINLONG sorts
+     * above ISMAXLONG.
+     */
+    return ((long)(int)val);
+#endif
 }
 
 /* stlong() - Store a long integer at a potentially unaligned address */

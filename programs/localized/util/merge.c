@@ -248,7 +248,11 @@ void cat_open (void)
 
     if(pfile != NULL)
     {
-        snprintf(line, PATH_MAX, "gencat %s %s", pFilename, pfile);
+        if ( snprintf(line, sizeof(line), "gencat %s %s", pFilename, pfile)
+             >= (int) sizeof(line) )
+	{
+           fatal("primary .tmsg file name too long\n",0,9);
+	}
         if ( system(line) != 0 )
 	{
            fatal("primary .tmsg file would not gencat\n",0,9);
@@ -259,7 +263,11 @@ void cat_open (void)
 
     if(dfile != NULL)
     {
-        snprintf(line, PATH_MAX, "gencat %s %s", dFilename, dfile);
+        if ( snprintf(line, sizeof(line), "gencat %s %s", dFilename, dfile)
+             >= (int) sizeof(line) )
+	{
+           fatal("default .tmsg file name too long\n",0,9);
+	}
         if ( system(line) != 0 )
 	{
            fatal("default .tmsg file would not gencat\n",0,9);

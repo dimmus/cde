@@ -709,33 +709,106 @@ Repaint_Tablet(
         int width,
         int height )
 {
-  int i, j, lx, ly;
-  XImage *scratch_img;
+  int i, lx, ly, lx0, ly0, lx1, ly1, iw, ih, tw, th;
+  XImage *src_img, *fat_img;
+  char *data;
 
-  scratch_img = XGetImage(dpy, color_icon, 0, 0, icon_width, icon_height,
-                AllPlanes, ZPixmap);
 #ifdef DEBUG
   if (debug)
     stat_out("****** Repaint_Tablet: x,y=%d,%d w,h=%d,%d\n", x,y,width,height);
 #endif
 
-  for (i=x; i<x+width+MagFactor; i+=MagFactor)
-    for (j=y; j<y+height+MagFactor; j+=MagFactor) {
-      Icon_Coords(i, j, &lx, &ly);
-      if ((lx >= 0) && (lx < icon_width) &&
-          (ly >= 0) && (ly < icon_height)) {
-        XSetForeground(dpy, scratch_gc, XGetPixel(scratch_img, lx, ly));
-        XFillRectangle(dpy, tablet_win, scratch_gc,
-        lx*MagFactor, ly*MagFactor, MagFactor, MagFactor);
-        if (hotSpot)
-          if ((lx == X_Hot) && (ly == Y_Hot)) {
-            XDrawLine(dpy, tablet_win, Grid_gc,
-            lx*MagFactor, ly*MagFactor+MagFactor, lx*MagFactor+MagFactor, ly*MagFactor);
-            XDrawLine(dpy, tablet_win, Grid_gc,
-            lx*MagFactor, ly*MagFactor, lx*MagFactor+MagFactor, ly*MagFactor+MagFactor);
-          }
-       } /* if */
-     } /* for */
+  if (x < 0) { width += x; x = 0; }
+  if (y < 0) { height += y; y = 0; }
+  if (width < 0) width = 0;
+  if (height < 0) height = 0;
+
+  /* The icon pixels whose fat tiles intersect the area (plus the one
+   * beyond, as the per-tile loop this replaces did). */
+  lx0 = x / MagFactor;
+  ly0 = y / MagFactor;
+  lx1 = lx0 + (width + MagFactor - 1) / MagFactor;
+  ly1 = ly0 + (height + MagFactor - 1) / MagFactor;
+  if (lx1 >= icon_width)  lx1 = icon_width - 1;
+  if (ly1 >= icon_height) ly1 = icon_height - 1;
+
+  if (lx0 <= lx1 && ly0 <= ly1)
+  {
+    iw = lx1 - lx0 + 1;
+    ih = ly1 - ly0 + 1;
+    tw = iw * MagFactor;
+    th = ih * MagFactor;
+
+    /* Fetch only that part of the icon, magnify it client side and
+     * send it as one image, instead of one fill per fat pixel. */
+    src_img = XGetImage(dpy, color_icon, lx0, ly0, iw, ih, AllPlanes, ZPixmap);
+    fat_img = NULL;
+    if (src_img != NULL)
+    {
+      fat_img = XCreateImage(dpy, DefaultVisual(dpy, screen), src_img->depth,
+                             ZPixmap, 0, NULL, tw, th,
+                             src_img->bitmap_pad, 0);
+      if (fat_img != NULL)
+      {
+        data = malloc((size_t)fat_img->bytes_per_line * th);
+        if (data == NULL)
+        {
+          XDestroyImage(fat_img);
+          fat_img = NULL;
+        }
+        else
+          fat_img->data = data;
+      }
+    }
+
+    if (fat_img != NULL)
+    {
+      for (ly = 0; ly < ih; ly++)
+      {
+        int row = ly * MagFactor;
+        char *first = fat_img->data + (size_t)row * fat_img->bytes_per_line;
+
+        for (lx = 0; lx < iw; lx++)
+        {
+          unsigned long pixel = XGetPixel(src_img, lx, ly);
+          int k;
+
+          for (k = 0; k < MagFactor; k++)
+            XPutPixel(fat_img, lx * MagFactor + k, row, pixel);
+        }
+        for (i = 1; i < MagFactor; i++)
+          memcpy(first + (size_t)i * fat_img->bytes_per_line, first,
+                 fat_img->bytes_per_line);
+      }
+      XPutImage(dpy, tablet_win, scratch_gc, fat_img, 0, 0,
+                lx0 * MagFactor, ly0 * MagFactor, tw, th);
+      XDestroyImage(fat_img);
+    }
+    else if (src_img != NULL)
+    {
+      /* Out of memory: fall back to one fill per fat pixel. */
+      for (ly = 0; ly < ih; ly++)
+        for (lx = 0; lx < iw; lx++)
+        {
+          XSetForeground(dpy, scratch_gc, XGetPixel(src_img, lx, ly));
+          XFillRectangle(dpy, tablet_win, scratch_gc,
+                         (lx0 + lx) * MagFactor, (ly0 + ly) * MagFactor,
+                         MagFactor, MagFactor);
+        }
+    }
+    if (src_img != NULL)
+      XDestroyImage(src_img);
+
+    if (hotSpot && X_Hot >= lx0 && X_Hot <= lx1 && Y_Hot >= ly0 && Y_Hot <= ly1)
+    {
+      lx = X_Hot * MagFactor;
+      ly = Y_Hot * MagFactor;
+      XDrawLine(dpy, tablet_win, Grid_gc,
+                lx, ly + MagFactor, lx + MagFactor, ly);
+      XDrawLine(dpy, tablet_win, Grid_gc,
+                lx, ly, lx + MagFactor, ly + MagFactor);
+    }
+  }
 
   Quantize(&x, &y, False);
   width += (MagFactor*2);
@@ -745,14 +818,33 @@ Repaint_Tablet(
    Draw the grid if Enabled....
 */
   if (GridEnabled) {
-    for (i=x; i<=x+width+MagFactor; i+=MagFactor)
-      XDrawLine(dpy, win, Grid_gc, i, y, i, (y+height));
-    for (i=y; i<=y+height+MagFactor; i+=MagFactor)
-      XDrawLine(dpy, win, Grid_gc, x, i, (x+width), i);
+    int nseg = (width + MagFactor) / MagFactor + 1
+             + (height + MagFactor) / MagFactor + 1;
+    XSegment *seg = (XSegment *) malloc(nseg * sizeof(XSegment));
+
+    if (seg != NULL) {
+      int n = 0;
+
+      for (i=x; i<=x+width+MagFactor && n < nseg; i+=MagFactor, n++) {
+        seg[n].x1 = seg[n].x2 = i;
+        seg[n].y1 = y; seg[n].y2 = y + height;
+      }
+      for (i=y; i<=y+height+MagFactor && n < nseg; i+=MagFactor, n++) {
+        seg[n].y1 = seg[n].y2 = i;
+        seg[n].x1 = x; seg[n].x2 = x + width;
+      }
+      XDrawSegments(dpy, win, Grid_gc, seg, n);
+      free(seg);
+    }
+    else {
+      for (i=x; i<=x+width+MagFactor; i+=MagFactor)
+        XDrawLine(dpy, win, Grid_gc, i, y, i, (y+height));
+      for (i=y; i<=y+height+MagFactor; i+=MagFactor)
+        XDrawLine(dpy, win, Grid_gc, x, i, (x+width), i);
+    }
    }
 
-
-  XDestroyImage(scratch_img);
+  Refresh_HotBox();
 }
 
 
@@ -2272,7 +2364,7 @@ SaveSession( void )
     char *tmpStr, *tmpStr2;
     Position x,y;
     Dimension width, height;
-    char bufr[1024];        /* make bigger if needed */
+    char bufr[MAX_FNAME + 16];  /* "*file: <last_fname>\n" */
     XmVendorShellExtObject  vendorExt;
     XmWidgetExtData         extData;
     WM_STATE *wmState;

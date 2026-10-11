@@ -134,6 +134,84 @@ Pixmap MakeClientIconPixmap (
 
 
 
+/*
+ * Icon images that are not bitmap files of the bitmap cache (those are in
+ * pSD->bitmapCache): Xm icon files such as the color pixmaps that most
+ * clients' iconImage resources name.  Making one decodes the file, waits
+ * for the server and copies the image into a new pixmap with the client's
+ * icon colors; the image is the same for every client with the same name
+ * and colors (every dtterm), so it is made once and shared, like the
+ * pixmaps of the bitmap cache.  A name that cannot be made into an image
+ * is remembered too, with or without the warning it gives.
+ */
+typedef struct _NamedIconCache
+{
+    struct _NamedIconCache *next;
+    WmScreenData *pSD;
+    String	name;
+    Pixel	foreground;
+    Pixel	background;
+    Pixel	topShadowColor;
+    Pixel	bottomShadowColor;
+    Pixmap	topShadowPixmap;
+    Pixmap	bottomShadowPixmap;
+    Pixmap	pixmap;		/* None if the image cannot be made */
+    Boolean	notFound;	/* no such file: warn */
+} NamedIconCache;
+
+static NamedIconCache *namedIconCache = NULL;
+
+static NamedIconCache *
+FindNamedIcon (ClientData *pCD, String iconName)
+{
+    NamedIconCache *pNIC;
+
+    for (pNIC = namedIconCache; pNIC; pNIC = pNIC->next)
+    {
+	if ((pNIC->pSD == PSD_FOR_CLIENT(pCD)) &&
+	    (pNIC->foreground == pCD->iconImageForeground) &&
+	    (pNIC->background == pCD->iconImageBackground) &&
+	    (pNIC->topShadowColor == pCD->iconImageTopShadowColor) &&
+	    (pNIC->bottomShadowColor == pCD->iconImageBottomShadowColor) &&
+	    (pNIC->topShadowPixmap == pCD->iconImageTopShadowPixmap) &&
+	    (pNIC->bottomShadowPixmap == pCD->iconImageBottomShadowPixmap) &&
+	    !strcmp (pNIC->name, iconName))
+	{
+	    return (pNIC);
+	}
+    }
+    return (NULL);
+}
+
+static void
+AddNamedIcon (ClientData *pCD, String iconName, Pixmap pixmap,
+	      Boolean notFound)
+{
+    NamedIconCache *pNIC;
+
+    if (!(pNIC = (NamedIconCache *) malloc (sizeof (NamedIconCache))))
+    {
+	return;
+    }
+    if (!(pNIC->name = strdup (iconName)))
+    {
+	free (pNIC);
+	return;
+    }
+    pNIC->pSD = PSD_FOR_CLIENT(pCD);
+    pNIC->foreground = pCD->iconImageForeground;
+    pNIC->background = pCD->iconImageBackground;
+    pNIC->topShadowColor = pCD->iconImageTopShadowColor;
+    pNIC->bottomShadowColor = pCD->iconImageBottomShadowColor;
+    pNIC->topShadowPixmap = pCD->iconImageTopShadowPixmap;
+    pNIC->bottomShadowPixmap = pCD->iconImageBottomShadowPixmap;
+    pNIC->pixmap = pixmap;
+    pNIC->notFound = notFound;
+    pNIC->next = namedIconCache;
+    namedIconCache = pNIC;
+}
+
+
 /*************************************<->*************************************
  *
  *  MakeNamedIconPixmap (pCD, iconName)
@@ -154,6 +232,12 @@ Pixmap MakeClientIconPixmap (
  *  Outputs:
  *  -------
  *  RETURN = icon pixmap or NULL
+ *
+ *
+ *  Comments:
+ *  --------
+ *  The pixmap is shared (see NamedIconCache and MakeCachedIconPixmap):
+ *  it must not be freed.
  * 
  *************************************<->***********************************/
 
@@ -166,6 +250,21 @@ Pixmap MakeNamedIconPixmap (ClientData *pCD, String iconName)
     unsigned int	width, height, border_width, depth;
     String	sIconFileName;
     int		iconSizeDesired;
+    NamedIconCache *pNIC;
+
+    /*
+     * An Xm icon file made into an icon image before, or a name that
+     * could not be: neither is a bitmap file of the bitmap cache.
+     */
+
+    if (iconName && (pNIC = FindNamedIcon (pCD, iconName)))
+    {
+	if (pNIC->notFound)
+	{
+            MWarning (((char *)GETMESSAGE(38, 7, "Unable to read bitmap file %s\n")), iconName);
+	}
+	return (pNIC->pixmap);
+    }
 
     /*
      * Get the bitmap cache entry (will read data from file if necessary).
@@ -215,6 +314,8 @@ Pixmap MakeNamedIconPixmap (ClientData *pCD, String iconName)
        if (pixmap == XmUNSPECIFIED_PIXMAP)
        {
             MWarning (((char *)GETMESSAGE(38, 7, "Unable to read bitmap file %s\n")), iconName);
+	    if (iconName)
+		AddNamedIcon (pCD, iconName, (Pixmap)NULL, True);
        }
        else
        {
@@ -248,6 +349,9 @@ Pixmap MakeNamedIconPixmap (ClientData *pCD, String iconName)
 	   if (mask)
 	       XmDestroyPixmap (
 		   XtScreen (PSD_FOR_CLIENT(pCD)->screenTopLevelW1), mask);
+
+	   if (iconName)
+	       AddNamedIcon (pCD, iconName, pixmap_r, False);
 
 	   return (pixmap_r);
        }

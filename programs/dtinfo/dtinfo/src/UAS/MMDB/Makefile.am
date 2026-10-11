@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 noinst_LIBRARIES = libMMDB.a
 
 # get our env
@@ -8,7 +12,7 @@ include $(top_srcdir)/programs/dtinfo/dtinfo_env.mk
 # class info
 include Classlist.mk
 
-libMMDB_a_CXXFLAGS = -I../Base -I../.. $(DTINFO_DEFINES)	\
+libMMDB_a_CXXFLAGS = $(CDE_CXXFLAGS) -I../Base -I../.. $(DTINFO_DEFINES)	\
 	$(DTINFO_INCLUDES)
 libMMDB_a_SOURCES = $(MMDB_SRCS)
 

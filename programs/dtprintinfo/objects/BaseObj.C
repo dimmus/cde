@@ -106,7 +106,7 @@ BaseObj::~BaseObj()
    delete []_actions;
    delete []_children;
    free(_lastActionName);
-   delete [] _lastActionOutput;
+   free(_lastActionOutput);
    free(_details);
    free(_displayName);
    free(_name);
@@ -404,23 +404,33 @@ boolean BaseObj::HasAction(const char *actionName)
 boolean BaseObj::SendAction(Action *action,
 		            BaseObj *requestor)
 {
+   return DoSendAction(action, action ? action->ReferenceName : NULL,
+		       requestor);
+}
+
+boolean BaseObj::DoSendAction(Action *action, const char *actionName,
+		              BaseObj *requestor)
+{
    boolean status;
 
-   delete [] _lastActionOutput;
+   free(_lastActionOutput);
    free(_lastActionName);
    _lastActionOutput = NULL;
-   _lastActionName = strdup(action->ReferenceName);
+   _lastActionName = STRDUP(actionName);
    if ((status = HasAction(action)) == true)
       _lastActionStatus = (*action->Handler)(this, &_lastActionOutput,
 					     requestor);
    else
     {
+      // action is NULL when actionName is not one of our actions
+      const char *name = actionName ? actionName : "";
       _lastActionStatus = -1;
       int len = strlen("'%s' is not an action of %s") +
-		strlen(ObjectClassName()) + strlen(action->ReferenceName) + 1;
-      _lastActionOutput = new char [len];
-      sprintf(_lastActionOutput, "'%s' is not an action of %s", 
-	      ObjectClassName(), action->ReferenceName);
+		strlen(ObjectClassName()) + strlen(name) + 1;
+      _lastActionOutput = (char *) malloc(len);
+      if (_lastActionOutput)
+         sprintf(_lastActionOutput, "'%s' is not an action of %s", 
+	         name, ObjectClassName());
     }
    return status;
 }
@@ -431,7 +441,7 @@ boolean BaseObj::SendAction(const char *actionName,
    Action *action = NULL;
 
    (void) HasAction(actionName, &action);
-   return SendAction(action, requestor);
+   return DoSendAction(action, actionName, requestor);
 }
 
 char * BaseObj::AttributeValue(char *referenceName)

@@ -1,22 +1,29 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 bin_PROGRAMS = dtstyle
 
-dtstyle_CPPFLAGS = -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"	\
+dtstyle_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"	\
 	-DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" -I../dthelp	\
 	$(DT_INCDIR)
 
-dtstyle_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtstyle_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 dtstyle_SOURCES = Main.c MainWin.c Font.c Audio.c Startup.c Mouse.c	\
 		  SaveRestore.c Backdrop.c Screen.c Keyboard.c		\
 		  ColorMain.c ColorPalette.c ColorFile.c ColorEdit.c	\
 		  Resource.c Protocol.c Dtwm.c Help.c HelpCB.c		\
-		  I18nMain.c I18nEnv.c I18nUtil.c Audio.h ColorMain.h	\
+		  I18nMain.c I18nEnv.c I18nUtil.c TrueColor.c Audio.h ColorMain.h	\
 		  Help.h Keyboard.h OWsync.h Screen.h Backdrop.h	\
 		  ColorPalette.h I18nEnv.h Main.h Protocol.h		\
 		  Startup.h ColorEdit.h Dtwm.h I18nMain.h MainWin.h	\
 		  Resource.h ColorFile.h Font.h I18nUtil.h Mouse.h	\
+		  TrueColor.h						\
 		  SaveRestore.h
 
 if SOLARIS

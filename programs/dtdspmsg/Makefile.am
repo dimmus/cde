@@ -12,7 +12,7 @@ MsgCat.c: ${top_srcdir}/lib/DtSvc/DtUtil2/MsgCat.c
 
 # this is just to initialize so the += ops can work later if needed
 dtdspmsg_LDADD =
-dtdspmsg_CFLAGS = -DNO_XLIB
+dtdspmsg_CFLAGS = $(CDE_CFLAGS) -DNO_XLIB
 
 if SOLARIS
 dtdspmsg_LDADD += -lgen

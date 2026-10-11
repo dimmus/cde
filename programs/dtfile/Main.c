@@ -2341,7 +2341,7 @@ SaveDefaultOkCB(
 
    FileMgrRec * file_mgr_rec;
    static char * name_list[] = { DTFILE_CLASS_NAME, NULL, NULL };
-   char view_number[5];
+   char view_number[12];
    int fd;
    Arg args[1];
 
@@ -2562,7 +2562,7 @@ SaveSession(
    static char * name_list[] = { DTFILE_CLASS_NAME, NULL, NULL, NULL,
                                  NULL, NULL};
    char view_number[12];
-   char number[5];
+   char number[12];
    char workspaceNumber[11];
    int fd;
    Atom * ws_presence = NULL;
@@ -4906,6 +4906,7 @@ ReloadDatabases(void)
    DesktopRec *desktopWindow;
 
    DtDbLoad();
+   _DtFlushTypeInfo();
 
    XmeFlushIconFileCache ( NULL );
 
@@ -5935,6 +5936,7 @@ BuildAndShowIconName(
                              widget,
                              (DtIconGadget) widget,
                              pixmapData);
+   FileIconStateInvalidate(widget);
 
    XtFree(new_file_type_name);
 }
@@ -6023,6 +6025,7 @@ ForceMyIconClosed (
                                 file_view_data->widget,
                                 (DtIconGadget) file_view_data->widget,
                                 pixmapData);
+      FileIconStateInvalidate(file_view_data->widget);
    }
 
    /* now check to see if any desktop objects are this directory */

@@ -50,11 +50,16 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#ifdef __GLIBC__
+#include <malloc.h>	/* malloc_usable_size() */
+#endif
 
 /*
  * private includes
  */
 #include "CvStringI.h"
+#include "StringFuncsI.h"
 
 /******************************************************************************
  *
@@ -102,6 +107,58 @@ _DtCvStrLen (
       }
 
     return len;
+}
+
+/******************************************************************************
+ * Function: _DtCvStrNLen (const void *p1, int type, int max)
+ *
+ * Returns:	The number of characters in p1 (bytes or wide characters,
+ *		as _DtCvStrLen), but at most 'max'; a negative 'max' means
+ *		no limit.
+ *
+ * Purpose:	Lets callers that only compare the length with a bound
+ *		avoid scanning the rest of a long string.
+ *****************************************************************************/
+int
+_DtCvStrNLen (
+    const void    *p1,
+    int            type,
+    int            max)
+{
+    const wchar_t *wcs = (const wchar_t *) p1;
+    int            len = 0;
+
+    if (max < 0)
+	return _DtCvStrLen(p1, type);
+
+    if (0 == type)
+	return ((int) strnlen((const char *) p1, (size_t) max));
+
+    while (len < max && 0 != wcs[len])
+	len++;
+
+    return len;
+}
+
+/******************************************************************************
+ * Function: _DtCvStrLenMax (const void *p1, int type, int count)
+ *
+ * Returns:	The number of characters in p1 when that is not more than
+ *		'count'; otherwise some number greater than 'count'.
+ *
+ * Purpose:	For the many "len = strlen; if (len > count) ..." tests:
+ *		the string is often the rest of a long paragraph.
+ *****************************************************************************/
+int
+_DtCvStrLenMax (
+    const void    *p1,
+    int            type,
+    int            count)
+{
+    if (count < 0 || count == INT_MAX)
+	return _DtCvStrLen(p1, type);
+
+    return _DtCvStrNLen(p1, type, count + 1);
 }
 
 /******************************************************************************
@@ -162,20 +219,25 @@ _DtCvChar (
     if (0 == type) {
 	ptr = (char *) p1 + count;
 
-	if (MB_CUR_MAX > 1) {
+	if (MB_CUR_MAX > 1 &&
+		!(((unsigned char) *ptr) < 0x80 && _DtHelpCeAsciiIsSingleByte())) {
 	    len = mbtowc(&value, ptr, MB_CUR_MAX);
 
+	    /*
+	     * 'count' is not at the start of a character: find the
+	     * character that contains it.
+	     */
 	    if (len == -1) {
 		for (i = 1; i < MB_CUR_MAX; ++i) {
-		    ptr -= i;
+		    ptr = (char *) p1 + count - i;
 
-		    if (ptr < (char *) p1) {
-			len = -1;
+		    if (ptr < (char *) p1)
 			break;
-		    }
 
 		    len = mbtowc(&value, ptr, MB_CUR_MAX);
-		    if (len == -1) continue;
+		    if (len > i)
+			break;
+		    len = -1;
 		}
 
 		if (len == -1) value = (wchar_t) -1;
@@ -332,6 +394,87 @@ _DtCvStrcspn (
 }
 
 /****************************************************************************
+ * Function:    void **_DtCvAddPtrToArrayN (void **array, int count, void *ptr)
+ *
+ * Parameters:  array           A pointer to a NULL-terminated array
+ *                              of pointers (made by these functions).
+ *              count           The number of pointers in 'array' (the
+ *                              index of its NULL); ignored if 'array'
+ *                              is NULL or empty.
+ *              ptr             The pointer which is to be added to
+ *                              the end of the array.
+ *
+ * Returns:     A pointer to the NULL-terminated array created
+ *              by adding 'ptr' to the end of 'array', or NULL if out of
+ *              memory.
+ *
+ * Purpose:     _DtCvAddPtrToArray for callers that keep count, so the
+ *		array is not walked on every append.
+ *
+ *		Where the allocator can tell an allocation's size, the
+ *		array grows geometrically (appending n items is O(n));
+ *		otherwise it grows by REALLOC_INCR as it always did.
+ *
+ ****************************************************************************/
+void **
+_DtCvAddPtrToArrayN (
+       void  **array,
+       int     count,
+       void   *ptr)
+{
+    void **nextP = NULL;
+
+    /* If this is the first item for the array, malloc the array and set
+       nextP to point to the first element. */
+    if (array == NULL || *array == NULL) {
+        array = (void **) malloc (REALLOC_INCR * sizeof (void *));
+
+        nextP = array;
+    }
+
+    else {
+        int full;
+
+#ifdef __GLIBC__
+        /* room for the new pointer and the NULL? */
+        full = ((size_t) (count + 2) * sizeof (void *)
+				> malloc_usable_size ((void *) array));
+#else
+        /* The array always grows by chunks of size REALLOC_INCR.  So see if
+           it currently is an exact multiple of REALLOC_INCR size (remember to
+           count the NULL pointer).  If it is then it must be full. */
+        full = ((count + 1) % REALLOC_INCR == 0);
+#endif
+
+        /* Also remember to move 'nextP' because the array will probably
+           move in memory. */
+        if (full) {
+            void **newArray;
+            int    newSize = count + 1 + REALLOC_INCR;
+
+#ifdef __GLIBC__
+            if (newSize < (count + 1) * 2)
+                newSize = (count + 1) * 2;
+#endif
+            /* (on failure the old array is not freed, as before: callers
+               may still hold it) */
+            newArray = (void **) realloc (array, newSize * sizeof (void *));
+            array = newArray;
+        }
+        if (array)
+            nextP = array + count;
+    }
+
+    if (nextP)
+      {
+        *nextP++ = ptr;
+        *nextP = NULL;
+      }
+
+    return (array);
+}
+
+/****************************************************************************
  * Function:    void **_DtCvAddPtrToArray (void **array, void *ptr)
  *
  * Parameters:  array           A pointer to a NULL-terminated array
@@ -352,47 +495,14 @@ _DtCvAddPtrToArray (
        void  **array,
        void   *ptr)
 {
+    int numElements = 0;
 
-    void **nextP = NULL;
-    int numElements;
+    /* Find the NULL pointer at the end of the array. */
+    if (array != NULL)
+        while (array[numElements] != NULL)
+            numElements++;
 
-    /* If this is the first item for the array, malloc the array and set
-       nextP to point to the first element. */
-    if (array == NULL || *array == NULL) {
-        array = (void **) malloc (REALLOC_INCR * sizeof (void *));
-
-        nextP = array;
-    }
-
-    else {
-
-        /* Find the NULL pointer at the end of the array. */
-        numElements = 0;
-        for (nextP = array; *nextP != NULL; nextP++)
-                numElements++;
-
-        /* The array always grows by chunks of size REALLOC_INCR.  So see if
-           it currently is an exact multiple of REALLOC_INCR size (remember to
-           count the NULL pointer).  If it is then it must be full, so realloc
-           another chunk.  Also remember to move 'nextP' because the array
-           will probably move in memory. */
-        if ((numElements + 1) % REALLOC_INCR == 0) {
-            array = (void **) realloc (array,
-                        (numElements + 1 + REALLOC_INCR) * sizeof (void *));
-            if (array)
-                nextP = array + numElements;
-            else
-                nextP = NULL;
-        }
-    }
-
-    if (nextP)
-      {
-        *nextP++ = ptr;
-        *nextP = NULL;
-      }
-
-    return (array);
+    return (_DtCvAddPtrToArrayN (array, numElements, ptr));
 }
 
 /******************************************************************************

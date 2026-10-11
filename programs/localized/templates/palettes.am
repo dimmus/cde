@@ -1,7 +1,7 @@
 # process the palettes file...
 
 BUILT_SOURCES = desc.$(LANG)
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
 palettesdir = $(CDE_INSTALLATION_TOP)/share/palettes
 dist_palettes_DATA = $(BUILT_SOURCES)
@@ -10,4 +10,4 @@ TOP = $(top_builddir)/programs
 MERGE = $(top_builddir)/programs/localized/util/merge
 
 desc.$(LANG): $(TOP)/dtstyle/Palettes Palettes.tmsg
-	$(MERGE) -lang $(LANG) Palettes.tmsg < $< > $@ || $(RM) $@
+	$(MERGE) -lang $(LANG) Palettes.tmsg < $< > $@.tmp && mv -f $@.tmp $@

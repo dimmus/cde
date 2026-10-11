@@ -866,7 +866,6 @@ Tt_callback_action IconEdit_tt_handler( Tt_message m, Tt_pattern p )
            if (pIconData->pmDirtyBit) {
               tmpIconFile = pIconData->pmFileName;
            } else {
-              tmpnam(pIconData->pmFileName);
               bIsNewFile = True;
               tmpIconFile = pIconData->pmFileName;
            }
@@ -874,13 +873,15 @@ Tt_callback_action IconEdit_tt_handler( Tt_message m, Tt_pattern p )
            if (pIconData->bmDirtyBit) {
               tmpIconFile = pIconData->bmFileName;
            } else {
-              tmpnam(pIconData->bmFileName);
               bIsNewFile = True;
               tmpIconFile = pIconData->bmFileName;
            }
         }
         if (bIsNewFile) {
-            tmpfd = open(tmpIconFile, O_CREAT | O_WRONLY | O_NDELAY, 0666);
+            /* A new temporary file; mkstemp() creates it, unlike tmpnam() */
+            /* there is no window for someone else to create it first.    */
+            snprintf(tmpIconFile, MAXPATHLEN, "%s/dtcreateXXXXXX", P_tmpdir);
+            tmpfd = mkstemp(tmpIconFile);
         } else {
            tmpfd = open(tmpIconFile, O_TRUNC | O_WRONLY | O_NDELAY, 0666);
         }
@@ -1002,7 +1003,14 @@ Tt_callback_action IconEdit_tt_handler( Tt_message m, Tt_pattern p )
 #ifdef DEBUG
               printf("Mask file name = '%s'\n", tmpbuf); /* debug */
 #endif
-              tmpfd = open(tmpbuf, O_CREAT | O_WRONLY | O_NDELAY, 0666);
+              /* A new mask next to a new mkstemp() file must not exist   */
+              /* yet (no symlink race); an old one is rewritten in full.  */
+              if (bIsNewFile)
+                 tmpfd = open(tmpbuf, O_CREAT | O_EXCL | O_WRONLY | O_NDELAY,
+                              0600);
+              else
+                 tmpfd = open(tmpbuf, O_CREAT | O_TRUNC | O_WRONLY | O_NDELAY,
+                              0666);
               if (tmpfd == -1) {
 		 msgPtr =
 		     GETMESSAGE(5, 60, "Could not open the following file:");

@@ -184,7 +184,7 @@ LineDrawRenderFunction(
 		tpd->renderGC.gc,		/* GC			*/
 		x,				/* X1			*/
 		y + tpd->cellHeight - 1,		/* Y1			*/
-		x + len * tpd->cellWidth,	/* X2			*/
+		x + len * tpd->cellWidth - 1,	/* X2			*/
 		y + tpd->cellHeight - 1);	/* Y2			*/
     }
 

@@ -155,9 +155,10 @@ decode1522(const char * enc_start, const char * max_end, char **output, DtMail::
 	  return (enc_start);
     }
 
-    // Do codeset conversion if charset is present
-    char *from_cs = s->csToConvName(cs_name);
-    char *to_cs = s->locToConvName();
+    // Do codeset conversion if charset is present (a value that
+    // belongs to no session is left in its own charset)
+    char *from_cs = s ? s->csToConvName(cs_name) : NULL;
+    char *to_cs = s ? s->locToConvName() : NULL;
     if ( from_cs && to_cs ) {
         if ( strcasecmp(from_cs, to_cs) != 0 ) {
             unsigned long tmplen = (unsigned long) strlen(*output);
@@ -347,6 +348,25 @@ parseTZ(const char * start, const char * end)
     return(0);
 }
 
+// Copy a date token into buf, NUL-terminated and truncated to fit.
+// end points at the token's last character, or at the NUL ending the
+// string when the token is the last one.
+//
+static void
+copyToken(char * buf, size_t size, const char * begin, const char * end)
+{
+    size_t len = end - begin + 1;
+
+    if (len > 0 && *end == '\0') {
+	len -= 1;
+    }
+    if (len > size - 1) {
+	len = size - 1;
+    }
+    memcpy(buf, begin, len);
+    buf[len] = '\0';
+}
+
 DtMailValueDate
 RFCValue::toDate(void)
 {
@@ -477,9 +497,12 @@ RFCValue::toDate(void)
 	    }
 	}
 
-	strncpy(num_buf, token_begin[this_token], 4);
-	// Don't remove last digit from year and get bad dates in header.
-	num_buf[token_end[this_token] - token_begin[this_token] + 1] = 0;
+	// The year. (This used to copy 4 characters but terminate after
+	// the whole token, which for the last token of the string counts
+	// the terminating NUL: a stray byte after "2026" could turn it
+	// into year 2026x.)
+	copyToken(num_buf, sizeof(num_buf),
+		  token_begin[this_token], token_end[this_token]);
 	new_time.tm_year = (int) strtol(num_buf, NULL, 10);
 	if (new_time.tm_year > 1900) {
 	    new_time.tm_year -= 1900;
@@ -514,9 +537,8 @@ RFCValue::toDate(void)
 	}
 
 	// The year, which is either 2 or 4 digits.
-	int t_size = token_end[this_token] - token_begin[this_token] + 1;
-	strncpy(num_buf, token_begin[this_token], t_size);
-	num_buf[t_size] = 0;
+	copyToken(num_buf, sizeof(num_buf),
+		  token_begin[this_token], token_end[this_token]);
 	new_time.tm_year = (int) strtol(num_buf, NULL, 10);
 	if (new_time.tm_year > 1900) {
 	    new_time.tm_year -= 1900;

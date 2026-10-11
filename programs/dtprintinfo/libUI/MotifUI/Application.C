@@ -116,6 +116,10 @@ Application::Application(char *name,
 
    topLevel = _w;
    display = XtDisplay(_w);
+   _shell_mapped = false;
+   _shell_obscured = false;
+   XtAddEventHandler(_w, StructureNotifyMask | VisibilityChangeMask, False,
+		     ShellEventHandler, (XtPointer)this);
    root = RootWindowOfScreen(XtScreen(_w));
    white = WhitePixelOfScreen(XtScreen(_w));
    black = BlackPixelOfScreen(XtScreen(_w));
@@ -232,6 +236,40 @@ boolean Application::SetVisiblity(boolean flag)
     }
 
    return true;
+}
+
+boolean Application::DoIsVisible()
+{
+   if (!_w || !XtIsRealized(_w))
+      return true;
+   return (_shell_mapped && !_shell_obscured) ? true : false;
+}
+
+void Application::ShellEventHandler(Widget, XtPointer client_data,
+				    XEvent *event, Boolean *)
+{
+   Application *obj = (Application *)client_data;
+   boolean was_visible = obj->DoIsVisible();
+
+   switch (event->type)
+    {
+    case MapNotify:
+      obj->_shell_mapped = true;
+      break;
+    case UnmapNotify:
+      obj->_shell_mapped = false;
+      obj->_shell_obscured = false;
+      break;
+    case VisibilityNotify:
+      obj->_shell_obscured =
+	 (event->xvisibility.state == VisibilityFullyObscured) ? true : false;
+      break;
+    default:
+      return;
+    }
+   boolean is_visible = obj->DoIsVisible();
+   if (is_visible != was_visible)
+      obj->ShellVisibilityChanged(is_visible);
 }
 
 void Application::Run()

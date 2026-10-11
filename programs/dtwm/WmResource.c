@@ -393,20 +393,27 @@ void InitBuiltinSystemMenu(void)
     }
     else
     {
-        /* put it together */
-        snprintf(dsm, sizeof(dsm), "%s\n{\n%s\n%s\n%s\n%s\n%s\n%s\n no-label  f.separator\n",
+        /* put it together; a menu that does not fit (long translations)
+           is not cut off, the default one below is used instead */
+        int len;
+
+        len = snprintf(dsm, sizeof(dsm), "%s\n{\n%s\n%s\n%s\n%s\n%s\n%s\n no-label  f.separator\n",
                  defaultSystemMenuName, ResString, MovString,
                  SizString, MinString, MaxString, LowString);
-	if (DtwmBehavior)
+	if (DtwmBehavior && len >= 0 && len < (int) sizeof(dsm))
 	{
-	    snprintf(dsmtemp, sizeof(dsmtemp), "%s%s\n%s\n%s\n%s\n no-label  f.separator\n",
+	    len = snprintf(dsmtemp, sizeof(dsmtemp), "%s%s\n%s\n%s\n%s\n no-label  f.separator\n",
 	             dsm, RenString, OcpString, OcaString, RemString);
 	    strcpy(dsm, dsmtemp);
 	}
-        snprintf(dsmtemp, sizeof(dsmtemp), "%s%s\n}", dsm, CloString);
-        strcpy(dsm, dsmtemp);
+	if (len >= 0 && len < (int) sizeof(dsm))
+	{
+	    len = snprintf(dsmtemp, sizeof(dsmtemp), "%s%s\n}", dsm, CloString);
+	    strcpy(dsm, dsmtemp);
+	}
 	
-	if ((builtinSystemMenu =
+	if (len < 0 || len >= (int) sizeof(dsm) ||
+	    (builtinSystemMenu =
 	     (char *)XtMalloc ((unsigned int) (strlen(dsm) + 1))) == NULL)
 	{
 	   Warning (((char *)GETMESSAGE(62, 21, "Insufficient memory for localized default system menu")));
@@ -729,6 +736,16 @@ XtResource wmGlobalResources[] =
         XtOffsetOf(WmGlobalData, useWindowOutline),
 	XtRImmediate,
 	(XtPointer)False
+    },
+
+    {
+	WmNslideSubpanels,
+	WmCSlideSubpanels,
+	XtRBoolean,
+	sizeof (Boolean),
+        XtOffsetOf(WmGlobalData, slideSubpanels),
+	XtRImmediate,
+	(XtPointer)True
     },
 
     {
@@ -5149,9 +5166,17 @@ ProcessWorkspaceResources (WmWorkspaceData *pWS)
 
     /* This call will create the backdrop windows of the correct size */
     ProcessBackdropResources (pWS, 0);
-    /* 1 = CHANGE_BACKDROP HACK this call will handle changing from the
-     * default tiled, to centered, fill or fit */
-    ProcessBackdropResources (pWS, 1);
+    /*
+     * 1 = CHANGE_BACKDROP HACK this call will handle changing from the
+     * default tiled, to centered, fill or fit.  A tiled backdrop is
+     * done: the second pass would only copy the image into a private
+     * duplicate (and give up the Xm pixmap cache's copy, which other
+     * workspaces with the same image and colors share).
+     */
+    if (pWS->backdrop.imageType != DtWSM_BACKDROP_IMAGETYPE_TILED)
+    {
+	ProcessBackdropResources (pWS, 1 | BACKDROP_RESOURCE_PASS);
+    }
 
 } /* END OF FUNCTION ProcessWorkspaceResources */
 

@@ -26,6 +26,13 @@
  * ALL RIGHTS RESERVED 
 */ 
 
+/*
+ * ProcessBackdropResources callFlags: the startup pass that turns the
+ * image read from the resources into a centered, fit or fill backdrop
+ * (with CHANGE_BACKDROP, which is 1).
+ */
+#define BACKDROP_RESOURCE_PASS	(1L << 1)
+
 /********    Public Function Declarations    ********/
 
 extern void ChangeBackdrop( 
@@ -35,6 +42,8 @@ extern void ProcessBackdropResources(
                         unsigned long callFlags) ;
 extern String FullBitmapFilePath( 
                         String pch) ;
+extern void FreeBackdropPixmap(
+                        WmWorkspaceData *pWS) ;
 extern void SetNewBackdrop( 
                         WmWorkspaceData *pWS,
                         Pixmap pixmap,

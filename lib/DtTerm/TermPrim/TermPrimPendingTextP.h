@@ -38,7 +38,12 @@
 extern "C" {
 #endif	/* __cplusplus */
 
-#define DEFAULT_CHUNK_BUF_SIZE  1024
+/*
+** Text appended to a pending text list is split into chunks of at most
+** this many bytes.  The read side processes one chunk per pass through
+** the main loop, so this also bounds the work done per pass.
+*/
+#define PENDING_CHUNK_MAX       (64 * 1024)
 
 #define	TextIsPending(list)	(list->head->next != list->tail)
 
@@ -48,6 +53,9 @@ typedef struct _PendingTextChunkRec
     int                 buffLen;        /* length of buffer                */
     unsigned char      *bufPtr;         /* text remaining to be processed  */
     int                 len;            /* bytes remaining to be processed */
+    Boolean             logged;         /* already passed to the output
+                                         * log (text put back after a
+                                         * partial parse)                  */
     PendingTextChunk    next;           /* next chunk in list              */
     PendingTextChunk    prev;           /* prev chunk in list              */
 } PendingTextChunkRec;
@@ -67,6 +75,14 @@ typedef struct _PendingTextRec
  * the pty flow control problems.
  */
 #define MAX_PTY_WRITE 128 /* this is 1/2 POSIX minimum MAX_INPUT */
+
+/*
+** the maximum number of bytes written to the pty per write select
+** callback.  Writing stops early as soon as the pty does not take a
+** whole MAX_PTY_WRITE piece, and the main loop runs between callbacks,
+** so the subprocess's echo is still read while a paste is written.
+*/
+#define PTY_WRITE_BUDGET (32 * MAX_PTY_WRITE)
 
 #ifdef	__cplusplus
 } /* close scope of 'extern "C"'... */

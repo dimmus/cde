@@ -346,6 +346,24 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 		       const DtMailBoolean replace,
 		       const char * val)
 {
+    storeHeader(error, name, replace, val, DTM_TRUE);
+}
+
+void
+RFCEnvelope::setDerivedHeader(DtMailEnv & error,
+			      const char * name, 
+			      const char * val)
+{
+    storeHeader(error, name, DTM_TRUE, val, DTM_FALSE);
+}
+
+void
+RFCEnvelope::storeHeader(DtMailEnv & error,
+			 const char * name, 
+			 const DtMailBoolean replace,
+			 const char * val,
+			 const DtMailBoolean mark_dirty)
+{
     MutexLock lock_header(_header_lock);
 
     RFCMessage * msg = (RFCMessage *)_parent;
@@ -357,6 +375,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
     //
     ParsedHeader * hdr;
     const char * real_name;
+    int changed = 0;
 
     // Find the header if it currently exists
     //
@@ -403,7 +422,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 	hdr = new ParsedHeader;
 	slot = _parsed_headers.append(hdr);
 	real_name = mapName(name);
-	_dirty = 1;				// new entry: header dirty
+	changed = 1;				// new entry: header dirty
     }
     else {
 	hdr = _parsed_headers[slot];
@@ -417,7 +436,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 	hdr->name_start = strdup(real_name);
 	hdr->name_len = strlen(real_name);
 	_header_len += hdr->name_len;
-	_dirty = 1;				// new name: header dirty
+	changed = 1;				// new name: header dirty
     }
 
     // Clean up the existing value if need be.
@@ -425,7 +444,7 @@ RFCEnvelope::setHeader(DtMailEnv & error,
     if (hdr->value_start) {
       if ( (strlen(val) != (size_t) hdr->value_len)
 	|| (strncmp(hdr->value_start, val, hdr->value_len)!=0) )	// has value changed??
-	  _dirty = 1;				// yes: header dirty
+	  changed = 1;				// yes: header dirty
 	if (hdr->alloc_mask & VALUE_MASK) {
 	    free((char *)hdr->value_start);
 	}
@@ -434,15 +453,21 @@ RFCEnvelope::setHeader(DtMailEnv & error,
 	hdr->value_len = 0;
     }
     else
-      _dirty = 1;				// new value: header dirty
+      changed = 1;				// new value: header dirty
 
     hdr->value_start = strdup(val);
     hdr->value_len = strlen(hdr->value_start);
     _header_len += hdr->value_len + 1;
     hdr->alloc_mask |= VALUE_MASK;
 
-    if (msg) {
-      msg->markDirty(_dirty);
+    // Only a real change dirties the message: setting a header to the
+    // value it already has must not force the mailbox to be rewritten.
+    //
+    if (changed && mark_dirty == DTM_TRUE) {
+      _dirty = 1;
+      if (msg) {
+	msg->markDirty(1);
+      }
     }
 }
 
@@ -456,8 +481,14 @@ RFCEnvelope::removeHeader(DtMailEnv & error, const char * name)
     // Remove all versions of this header.
     //
     int slot = lookupHeader(name);
+    if (slot < 0) {
+	return;		// Nothing to remove: nothing changed.
+    }
+
     while (slot >= 0) {
+	ParsedHeader * hdr = _parsed_headers[slot];
 	_parsed_headers.remove(slot);
+	delete hdr;
 	slot = lookupHeader(name);
     }
 
@@ -683,19 +714,25 @@ RFCEnvelope::getTransportHeader(DtMailEnv & error,
 {
     error.clear();
 
-    // First, let's try to find out how many times the header
-    // appears. It may appear 1, many, or not at all.
+    // One pass over the headers collects every occurrence of the
+    // name (it may appear once, many times, or not at all). The name
+    // is only compared when its length matches. A header only counts
+    // as present if one of its occurrences has a value, but once it
+    // is present every occurrence is returned, empty ones included.
     //
+    // The caller holds _header_lock, which covers the headers too.
+    //
+    const int name_len = strlen(name);
+    const int count = _parsed_headers.length();
+    enum { MAX_FOUND = 64 };
+    ParsedHeader * found[MAX_FOUND];
+    int nfound = 0;
     int appears = 0;
-    for (int hdr = 0; hdr < _parsed_headers.length(); hdr++) {
-	// We need to lock the object until we are done.
-	//
-	MutexLock lock_header(_parsed_headers[hdr]->mutex);
 
-	// Make sure we have a header!
-	//
-	if (!_parsed_headers[hdr]->name_start ||
-	    !_parsed_headers[hdr]->value_start) {
+    for (int hdr = 0; hdr < count; hdr++) {
+	ParsedHeader * h = _parsed_headers[hdr];
+
+	if (h->name_len != name_len || !h->name_start) {
 	    continue;
 	}
 
@@ -703,16 +740,22 @@ RFCEnvelope::getTransportHeader(DtMailEnv & error,
 	// It will always appear as the first header, if it appears
 	// at all.
 	//
-	if (hdr == 0 &&	
-	    strncmp(_parsed_headers[hdr]->name_start, "From ", 5) == 0) {
+	if (hdr == 0 && strncmp(h->name_start, "From ", 5) == 0) {
 	    continue;
 	}
 
-	if (matchName(*_parsed_headers[hdr], name) == DTM_TRUE) {
-	    // If the header exists, make sure it has a value.
-	    if (_parsed_headers[hdr]->value_len > 0)
-		appears += 1;
+	if (strncasecmp(h->name_start, name, name_len) != 0) {
+	    continue;
 	}
+
+	// If the header exists, make sure it has a value.
+	if (h->value_start && h->value_len > 0) {
+	    appears += 1;
+	}
+	if (nfound < MAX_FOUND) {
+	    found[nfound] = h;
+	}
+	nfound += 1;
     }
 
     if (appears == 0) { // Not here!
@@ -720,19 +763,27 @@ RFCEnvelope::getTransportHeader(DtMailEnv & error,
 	return;
     }
 
-    // Second pass, find the headers and convert the values to the
-    // appropriate type.
+    if (nfound <= MAX_FOUND) {
+	for (int f = 0; f < nfound; f++) {
+	    value.append(new RFCValue(found[f]->value_start,
+				      found[f]->value_len,
+				      parentSession()));
+	}
+	return;
+    }
+
+    // More occurrences than we remembered: walk the list again.
     //
-    for (int val = 0; val < _parsed_headers.length(); val++) {
-	if (val == 0 &&	
-	    strncmp(_parsed_headers[val]->name_start, "From ", 5) == 0) {
+    for (int val = 0; val < count; val++) {
+	ParsedHeader * h = _parsed_headers[val];
+
+	if (val == 0 && strncmp(h->name_start, "From ", 5) == 0) {
 	    continue;
 	}
 
-	if (matchName(*_parsed_headers[val], name) == DTM_TRUE) {
-	    RFCValue * new_value = new RFCValue(_parsed_headers[val]->value_start,
-						_parsed_headers[val]->value_len, _parent->session());
-	    value.append(new_value);
+	if (matchName(*h, name) == DTM_TRUE) {
+	    value.append(new RFCValue(h->value_start, h->value_len,
+				      parentSession()));
 	}
     }
 
@@ -757,7 +808,7 @@ RFCEnvelope::parseUnixFrom(DtMailEnv & error,
 
     int size = end - hdr.value_start;
 
-    RFCValue * new_value = new RFCValue(hdr.value_start, size, _parent->session());
+    RFCValue * new_value = new RFCValue(hdr.value_start, size, parentSession());
     value.append(new_value);
 
     return;
@@ -792,7 +843,7 @@ RFCEnvelope::parseUnixDate(DtMailEnv & error,
     //
     int size = (hdr.value_start + hdr.value_len) - end;
 
-    RFCValue * new_value = new RFCValue(end, size, _parent->session());
+    RFCValue * new_value = new RFCValue(end, size, parentSession());
     value.append(new_value);
 
     return;
@@ -805,7 +856,7 @@ RFCEnvelope::makeValue(DtMailEnv & error,
 {
     error.clear();
 
-    RFCValue * new_value = new RFCValue(hdr.value_start, hdr.value_len, _parent->session());
+    RFCValue * new_value = new RFCValue(hdr.value_start, hdr.value_len, parentSession());
     value.append(new_value);
 }
 
@@ -902,7 +953,7 @@ RFCEnvelope::makeReply(DtMailEnv & error,
 	// We're done. Copy the values from one to the other.
 	//
 	for (int nc = 0; nc < lvalue.length(); nc++) {
-	    RFCValue * new_value = new RFCValue(*(lvalue[nc]), strlen(*(lvalue[nc])), _parent->session());
+	    RFCValue * new_value = new RFCValue(*(lvalue[nc]), strlen(*(lvalue[nc])), parentSession());
 	    value.append(new_value);
 	}
 	return;
@@ -917,7 +968,7 @@ RFCEnvelope::makeReply(DtMailEnv & error,
     mailrc->getValue(lerror, "metoo", &mval);
     if (lerror.isNotSet()) {
 	for (int nc = 0; nc < lvalue.length(); nc++) {
-	    RFCValue * new_value = new RFCValue(*(lvalue[nc]), strlen(*(lvalue[nc])), _parent->session());
+	    RFCValue * new_value = new RFCValue(*(lvalue[nc]), strlen(*(lvalue[nc])), parentSession());
 	    value.append(new_value);
 	}
 	return;
@@ -991,7 +1042,7 @@ RFCEnvelope::makeReply(DtMailEnv & error,
 	    }
 	}
 
-	RFCValue * new_val = new RFCValue(str_addr, strlen(str_addr), _parent->session());
+	RFCValue * new_val = new RFCValue(str_addr, strlen(str_addr), parentSession());
 	value.append(new_val);
 	delete [] str_addr;
     }

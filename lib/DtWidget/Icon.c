@@ -1672,6 +1672,27 @@ GetParentBackgroundGC(
 
 
 /*-------------------------------------------------------------
+**	GetPixmapSize
+**		Width and height of a pixmap.  Pixmaps from XmGetPixmap()
+**		(the image name case) are in the Motif pixmap cache, so
+**		this costs no round trip; any other pixmap is measured
+**		once and then cached, as XmLabel does.  This used to be
+**		an XGetGeometry() round trip per pixmap set.
+*/
+static void
+GetPixmapSize(
+        Widget w,
+        Pixmap pixmap,
+        unsigned int *width,
+        unsigned int *height )
+{
+	*width = *height = 0;
+	XmeGetPixmapData (XtScreen (w), pixmap, NULL, NULL, NULL, NULL,
+			  NULL, NULL, width, height);
+}
+
+
+/*-------------------------------------------------------------
 **	Initialize
 **		Initialize a new gadget instance.
 */
@@ -1682,10 +1703,7 @@ Initialize(
 {
 	DtIconGadget	request =	(DtIconGadget) request_w,
 			new =		(DtIconGadget) new_w;
-	Window		root;
-	int		int_x = 0, int_y = 0;
-	unsigned int	int_w = 0, int_h = 0,
-			int_bw, depth;
+	unsigned int	int_w = 0, int_h = 0;
 	Dimension	w, h;
 	EventMask	mask;
 	String		name = NULL;
@@ -1759,11 +1777,8 @@ Initialize(
 /*	Update width and height; copy image name.
 */
 		if (G_Pixmap (new))
-		{
-			XGetGeometry (XtDisplay (new), G_Pixmap (new),
-				&root, &int_x, &int_y, &int_w, &int_h,
-				&int_bw, &depth);
-		}
+			GetPixmapSize ((Widget) new, G_Pixmap (new),
+				&int_w, &int_h);
 		if (name)
 		{
 			G_ImageName (new) = XtNewString(name);
@@ -2036,10 +2051,7 @@ SetValues(
 	DtIconGadget	current =	(DtIconGadget) current_w,
 			new =		(DtIconGadget) new_w;
 
-	Window		root;
-	int		int_x = 0, int_y = 0;
-	unsigned int	int_w = 0, int_h = 0,
-			int_bw, depth;
+	unsigned int	int_w = 0, int_h = 0;
 	Dimension	w, h;
 	Boolean		new_image_name = False,
 			redraw_flag = False,
@@ -2238,9 +2250,8 @@ SetValues(
 		if (G_Pixmap (new) != XmUNSPECIFIED_PIXMAP)
 		{
     		    G_Mask(new) = (Pixmap)_DtGetMask(XtScreen(new), G_ImageName(new));
-		    XGetGeometry (XtDisplay (new), G_Pixmap (new),
-				  &root, &int_x, &int_y, &int_w, &int_h,
-				  &int_bw, &depth);
+		    GetPixmapSize ((Widget) new, G_Pixmap (new),
+				   &int_w, &int_h);
 		    name = G_ImageName (new);
 		    w = Limit((Dimension) int_w, G_MaxPixmapWidth(new));
 		    h = Limit((Dimension) int_h, G_MaxPixmapHeight(new));
@@ -2312,9 +2323,8 @@ SetValues(
 	{
 		if (G_Pixmap (new))
 		{
-			XGetGeometry (XtDisplay (new), G_Pixmap (new), &root,
-					&int_x, &int_y, &int_w, &int_h,
-					&int_bw, &depth);
+			GetPixmapSize ((Widget) new, G_Pixmap (new),
+				       &int_w, &int_h);
 			w = Limit((Dimension) int_w, G_MaxPixmapWidth(new));
 			h = Limit((Dimension) int_h, G_MaxPixmapHeight(new));
 		}
@@ -2350,9 +2360,8 @@ SetValues(
         {
                 if (G_Pixmap (new))
                 {
-                        XGetGeometry (XtDisplay (new), G_Pixmap (new), &root,
-                                        &int_x, &int_y, &int_w, &int_h,
-                                        &int_bw, &depth);
+                        GetPixmapSize ((Widget) new, G_Pixmap (new),
+                                       &int_w, &int_h);
                         w = Limit((Dimension) int_w, G_MaxPixmapWidth(new));
                         h = Limit((Dimension) int_h, G_MaxPixmapHeight(new));
                 }
@@ -3660,7 +3669,7 @@ LoadPixmap(
 
    XmeGetPixmapData(s, pm, NULL, NULL, NULL, NULL, NULL, NULL, &int_w, &int_h);
    G_PixmapWidth(new) = Limit((Dimension)int_w, G_MaxPixmapWidth(new));
-   G_PixmapHeight(new) = Limit((Dimension)int_h, G_MaxPixmapWidth(new));
+   G_PixmapHeight(new) = Limit((Dimension)int_h, G_MaxPixmapHeight(new));
    return(False);
 }
 

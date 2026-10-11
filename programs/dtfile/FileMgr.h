@@ -97,6 +97,18 @@
 /* Forward structure pointer declaration */
 typedef struct _ObjectPosition * ObjectPtr;
 
+/*
+ * A small open-addressing hash map from a non-NULL pointer to a pointer
+ * (see PtrMapGet() etc. in SharedProcs.c).  A zeroed PtrMap is empty.
+ */
+typedef struct
+{
+   void       ** keys;
+   void       ** vals;
+   unsigned int  size;           /* number of slots, 0 or a power of 2 */
+   unsigned int  count;          /* number of keys stored */
+} PtrMap;
+
 /*  Structure for containing the data for 1 file  */
 
 typedef struct _FileData
@@ -173,6 +185,9 @@ typedef struct _FileViewData
    char *label;                  /* icon label string */
    long icon_mtime;              /* modified time of instance icon */
    ObjectPtr position_info;
+   Boolean more_after;           /* tree mode: a later entry of the same
+                                    directory is displayed (set by
+                                    LayoutFileIcons) */
 } FileViewData;
 
 
@@ -445,6 +460,8 @@ typedef struct
   Widget dup_icon_widget;
   Widget *manage;
   int manage_count;
+  PtrMap manage_set;            /* the widgets in manage[] */
+  FileViewData **change;        /* scratch list for DisplaySomeIcons */
 
   /* DisplayWorkProc */
   XtWorkProcId work_id;

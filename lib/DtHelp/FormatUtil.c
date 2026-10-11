@@ -73,6 +73,7 @@ extern int errno;
 #include "CanvasError.h"
 #include "bufioI.h"
 #include "FormatUtilI.h"
+#include "StringFuncsI.h"
 
 #if defined(NLS16) || !defined(NO_MESSAGE_CATALOG)
 #include <Dt/MsgCatP.h>
@@ -270,13 +271,26 @@ _DtHelpCeAddCharToBuf(
     dstPtr = *dst;
     if ((*dst_size + 2) >= *dst_max)
       {
+	/*
+	 * grow geometrically (by half) so that building a long string
+	 * one character at a time is not quadratic.
+	 */
+	if (grow_size < *dst_max / 2)
+	    grow_size = *dst_max / 2;
+
 	if (grow_size > *dst_size + 3 - *dst_max)
 	    *dst_max = *dst_max + grow_size;
 	else
 	    *dst_max = *dst_size + 3;
 
 	if (dstPtr)
-	    dstPtr = (char *) realloc ((void *) dstPtr, *dst_max);
+	  {
+	    char *newPtr = (char *) realloc ((void *) dstPtr, *dst_max);
+
+	    if (newPtr == NULL)
+		free (dstPtr);
+	    dstPtr = newPtr;
+	  }
 	else
 	  {
 	    dstPtr = (char *) malloc (*dst_max);
@@ -364,7 +378,12 @@ _DtHelpCeAddStrToBuf (
     /*
      * check the input
      */
-    if (src == NULL || *src == NULL || (((int)strlen(*src)) < copy_size)
+    /*
+     * (memchr, not strlen: 'src' is often a pointer into a large buffer,
+     * and only 'copy_size' characters of it matter.)
+     */
+    if (src == NULL || *src == NULL || copy_size < 0
+		|| (copy_size > 0 && memchr(*src, '\0', copy_size) != NULL)
 		|| dst == NULL || dst_size == NULL || dst_max == NULL
 		|| (*dst == NULL && (*dst_size || *dst_max)))
       {
@@ -377,13 +396,23 @@ _DtHelpCeAddStrToBuf (
 
     if ((*dst_size + copy_size + 1) >= *dst_max)
       {
+	/* grow geometrically, see _DtHelpCeAddCharToBuf */
+	if (grow_size < *dst_max / 2)
+	    grow_size = *dst_max / 2;
+
 	if (grow_size > (*dst_size + copy_size + 2 - *dst_max))
 	    *dst_max = *dst_max + grow_size;
 	else
 	    *dst_max = *dst_size + copy_size + 2;
 
 	if (dstPtr)
-	    dstPtr = (char *) realloc ((void *) dstPtr, *dst_max);
+	  {
+	    char *newPtr = (char *) realloc ((void *) dstPtr, *dst_max);
+
+	    if (newPtr == NULL)
+		free (dstPtr);
+	    dstPtr = newPtr;
+	  }
 	else
 	  {
 	    dstPtr = (char *) malloc (*dst_max);
@@ -399,14 +428,11 @@ _DtHelpCeAddStrToBuf (
       }
 
     /*
-     * make sure there is a null byte to append to.
+     * copy the source into the destination (at dst_size: strncat would
+     * rescan the whole destination on every call).
      */
-    dstPtr[*dst_size] = '\0';
-
-    /*
-     * copy the source into the destination
-     */
-    strncat (dstPtr, srcPtr, copy_size);
+    memcpy (dstPtr + *dst_size, srcPtr, copy_size);
+    dstPtr[*dst_size + copy_size] = '\0';
 
     /*
      * adjust the pointers
@@ -753,10 +779,14 @@ _DtHelpFmtFindBreak (
     int   numChars = 0;
     int   mySize;
     short done = 0;
+    int   ascii = _DtHelpCeAsciiIsSingleByte();
 
     while (0 == done && '\0' != *ptr)
       {
-        mySize = mblen(ptr, MB_CUR_MAX);
+	if (ascii && ((unsigned char) *ptr) < 0x80)
+	    mySize = 1;
+	else
+            mySize = mblen(ptr, MB_CUR_MAX);
         done   = 1;
         if (0 < mySize &&
 		((1 != mb_len && 1 != mySize) || (1 == mb_len && 1 == mySize)))

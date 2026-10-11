@@ -1,14 +1,16 @@
 MAINTAINERCLENAFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 TT_VERSION = "CDE Version @CDE_VERSION_MAJOR@.@CDE_VERSION_MINOR@.@CDE_VERSION_MICRO@@CDE_VERSION_DEV@"
 TT_VERSION_DEFINE = -DTT_VERSION_STRING=\"$(TT_VERSION)\"
 
 bin_PROGRAMS = tttar
 
-tttar_CXXFLAGS = -I../../lib $(TT_VERSION_DEFINE)
+tttar_CXXFLAGS = $(CDE_CXXFLAGS) -I../../lib $(TT_VERSION_DEFINE)
 
 tttar_LDADD = ../../slib/libstt.a ../../mini_isam/libisam.a \
-	$(LIBTT) $(TIRPCLIB) $(XTOOLLIB)
+	$(LIBTT) $(TIRPCLIB)
 
 if SOLARIS
 tttar_LDADD += -lintl -lsocket -lnsl

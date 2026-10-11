@@ -60,7 +60,10 @@ struct globalStruct {
 #define DEFAULT_LOW_BG	"black"
 #define DEFAULT_FG	"white"
 #define DEFAULT_LOW_FG	"white"
-#define DEFAULT_TIME	"240"
+#define DEFAULT_TIME	"15"
+
+/* root window property dtsession sets when it stops waiting for the WM */
+#define _XA_DT_SM_WM_READY	"_DT_SM_WM_READY"
 
 #define DEFAULT_XOFFSET_SMALL	 25
 #define DEFAULT_XOFFSET_MEDIUM	 50

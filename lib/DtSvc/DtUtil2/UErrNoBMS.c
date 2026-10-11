@@ -166,8 +166,11 @@ log_message(
     */
    switch (severity) {
       case DtError:
+      case DtFatalError:
+      case DtInternalError:
 		msg_type = DtMsgLogError; break;
       case DtIgnore:
+      case DtInformation:
 		msg_type = DtMsgLogInformation; break;
       case DtWarning:
 		msg_type = DtMsgLogWarning; break;

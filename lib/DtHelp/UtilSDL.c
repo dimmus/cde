@@ -69,6 +69,7 @@
 #include "FormatSDLI.h"
 #include "StringFuncsI.h"
 #include "UtilSDLI.h"
+#include "Lock.h"
 
 #ifdef NLS16
 #endif
@@ -519,6 +520,28 @@ _DtHelpCeReturnSdlElement (
     return 0;
 }
 
+/*
+ * Append one character to the cdata buffer; the common case (room left)
+ * without a function call.  Same semantics as _DtHelpCeAddCharToBuf.
+ */
+static int
+AddCdataChar (
+    char	  c,
+    char	**string,
+    int		 *str_size,
+    int		 *str_max)
+{
+    char *ptr = &c;
+
+    if (string != NULL && *string != NULL && (*str_size + 2) < *str_max)
+      {
+	(*string)[(*str_size)++] = c;
+	(*string)[*str_size]     = '\0';
+	return 0;
+      }
+    return _DtHelpCeAddCharToBuf(&ptr, string, str_size, str_max, 32);
+}
+
 /******************************************************************************
  * Function:	int _DtHelpCeGetSdlCdata (BufFilePtr f, char **string)
  *
@@ -561,6 +584,7 @@ _DtHelpCeGetSdlCdata (
     int        reason  = 0;
     int        len     = 0;
     int        strMB   = 1;
+    int        asciiFast = 0;
     char      *ptr;
     char       buf[MB_LEN_MAX + 1];
 #define	ESC_STR_LEN	4
@@ -576,6 +600,14 @@ _DtHelpCeGetSdlCdata (
 	   *str_max = strSize;
       }
 
+    /*
+     * In a stateless multibyte encoding (every locale glibc supports),
+     * a byte 0x01-0x7f at the start of a character is a character by
+     * itself, so mblen() need only be called for the other bytes.
+     */
+    if (max_mb != 1)
+	asciiFast = _DtHelpCeAsciiIsSingleByte();
+
     do {
 	c = BufFileGet(f);
 
@@ -583,7 +615,12 @@ _DtHelpCeGetSdlCdata (
 	buf[len]   = '\0';
 
 	if (c != BUFFILEEOF && max_mb != 1)
-	    strMB = mblen(buf, max_mb);
+	  {
+	    if (asciiFast && len == 1 && c > 0 && ((unsigned char) c) < 0x80)
+		strMB = 1;
+	    else
+		strMB = mblen(buf, max_mb);
+	  }
 
 	if (c == BUFFILEEOF || (escaped == False && strMB == 1 &&
 		(c == '<' ||
@@ -603,9 +640,7 @@ _DtHelpCeGetSdlCdata (
 
 	    if (lastWasNl == True)
 	      {
-		ptr = " ";
-	        if (_DtHelpCeAddCharToBuf(&ptr, string, &strSize,
-							str_max, 32) == -1)
+	        if (AddCdataChar(' ', string, &strSize, str_max) == -1)
 		    return -1;
 		lastWasSpace = True;
 	      }
@@ -708,7 +743,6 @@ _DtHelpCeGetSdlCdata (
 	        if (c == '\t')
 		    c = ' ';
 
-	        ptr = &c;
 	        if (c == '\n')
 		  {
 		    lastWasSpace = True;
@@ -727,8 +761,7 @@ _DtHelpCeGetSdlCdata (
 		    if ((lastWasSpace == False || type == SdlTypeLiteral ||
 						type == SdlTypeUnlinedLiteral)
 				&&
-	                _DtHelpCeAddCharToBuf(&ptr, string, &strSize,
-							str_max, 32) == -1)
+	                AddCdataChar(c, string, &strSize, str_max) == -1)
 		            return -1;
 
 		    if (type != SdlTypeLiteral &&
@@ -1507,8 +1540,8 @@ _DtHelpCeSaveString(
  * Returns:     Nothing.
  *
  *****************************************************************************/
-_DtCvSegment *
-_DtHelpCeMatchSemanticStyle (
+static _DtCvSegment *
+MatchSemanticStyleScan (
     _DtCvSegment	*toss,
     SdlOption		 clan,
     int			 level,
@@ -1575,6 +1608,187 @@ _DtHelpCeMatchSemanticStyle (
       } while (pClassStyle->start != SdlOptionBad);
 
     return NULL;
+}
+
+/*
+ * The TOSS of a volume never changes once read, and which of its
+ * segments _DtHelpCeMatchSemanticStyle looks at depends only on the
+ * clan; the level and ssi only decide which of those matches.  So the
+ * candidates are collected once per (toss, clan), in the order the
+ * original scan visits them, and matching just walks that short list.
+ */
+#define	TOSS_FIRST_CLAN	SdlClassAcro
+#define	TOSS_LAST_CLAN	SdlClassUdefgraph
+#define	TOSS_NUM_CLANS	(TOSS_LAST_CLAN - TOSS_FIRST_CLAN + 1)
+
+typedef struct _tossIndex {
+    struct _tossIndex	 *next;
+    _DtCvSegment	 *toss;
+    _DtCvSegment	**cands[TOSS_NUM_CLANS];  /* NULL terminated */
+    char		  built[TOSS_NUM_CLANS];
+} TossIndex;
+
+static TossIndex *TossIndexList = NULL;
+
+/*
+ * Collect, in visiting order, the segments of 'toss' with clan 'clan'
+ * that the scan in _DtHelpCeMatchSemanticStyle examines.
+ */
+static _DtCvSegment **
+BuildTossCandidates (
+    _DtCvSegment	*toss,
+    SdlOption		 clan)
+{
+    _DtCvSegment	*pSeg = toss;
+    _DtCvSegment       **list = NULL;
+    _DtCvSegment       **newList;
+    int			 count = 0;
+    int			 max   = 0;
+    const ClassStyleMatrix *pClassStyle = ClassToStyle;
+
+    do
+      {
+        while (pClassStyle->start != SdlOptionBad &&
+		!(pClassStyle->start <= clan && clan <= pClassStyle->end))
+	    pClassStyle++;
+
+        if (pClassStyle->start != SdlOptionBad)
+	  {
+            while (pSeg != NULL &&
+		_SdlSegPtrToTossType(pSeg) != pClassStyle->style &&
+		_SdlSegPtrToTossType(pSeg) != pClassStyle[1].style)
+	        pSeg = pSeg->next_seg;
+
+            while (pSeg != NULL &&
+		_SdlSegPtrToTossType(pSeg) == pClassStyle->style)
+              {
+	        if (_SdlTossInfoPtrClan(_SdlSegPtrToTossInfo(pSeg)) == clan)
+		  {
+		    if (count + 1 >= max)
+		      {
+			max = (max == 0) ? 8 : max * 2;
+			newList = (_DtCvSegment **) realloc (list,
+						max * sizeof(_DtCvSegment *));
+			if (newList == NULL)
+			  {
+			    free(list);
+			    return NULL;
+			  }
+			list = newList;
+		      }
+		    list[count++] = pSeg;
+		    list[count]   = NULL;
+		  }
+	        pSeg = pSeg->next_seg;
+              }
+	    pClassStyle++;
+          }
+      } while (pClassStyle->start != SdlOptionBad);
+
+    if (list == NULL)
+      {
+	/* no candidates: an empty list (NULL means "could not build") */
+	list = (_DtCvSegment **) malloc (sizeof(_DtCvSegment *));
+	if (list != NULL)
+	    list[0] = NULL;
+      }
+    return list;
+}
+
+/******************************************************************************
+ * Function:    void _DtHelpCeFreeTossIndex (_DtCvSegment *toss)
+ *
+ * Purpose:     Forget the match index of a TOSS that is being freed.
+ *****************************************************************************/
+void
+_DtHelpCeFreeTossIndex (
+    _DtCvSegment	*toss)
+{
+    TossIndex  **pp, *idx;
+    int		 i;
+
+    _DtHelpProcessLock();
+    for (pp = &TossIndexList; (idx = *pp) != NULL; pp = &idx->next)
+	if (idx->toss == toss)
+	  {
+	    *pp = idx->next;
+	    for (i = 0; i < TOSS_NUM_CLANS; i++)
+		free(idx->cands[i]);
+	    free(idx);
+	    break;
+	  }
+    _DtHelpProcessUnlock();
+}
+
+/******************************************************************************
+ * Function:    _DtCvSegment *_DtHelpCeMatchSemanticStyle (CESDLSegment *toss,
+ *				enum SdlClass clan, int level, char *ssi)
+ *
+ * Parameters:
+ *
+ * Returns      ptr to the toss segment that matches, NULL otherwise.
+ *
+ * errno Values:
+ *
+ * Purpose:     Find the toss segment for a class, level and ssi.
+ *
+ *****************************************************************************/
+_DtCvSegment *
+_DtHelpCeMatchSemanticStyle (
+    _DtCvSegment	*toss,
+    SdlOption		 clan,
+    int			 level,
+    char		*ssi)
+{
+    TossIndex		*idx;
+    _DtCvSegment       **cand;
+    _DtCvSegment	*pSeg = NULL;
+    SDLTossInfo		*pEl;
+    int			 n;
+
+    /* clans outside every class/style range never match */
+    if (clan < TOSS_FIRST_CLAN || clan > TOSS_LAST_CLAN || toss == NULL)
+	return NULL;
+    n = clan - TOSS_FIRST_CLAN;
+
+    _DtHelpProcessLock();
+    for (idx = TossIndexList; idx != NULL && idx->toss != toss; idx = idx->next)
+	;
+    if (idx == NULL)
+      {
+	idx = (TossIndex *) calloc (1, sizeof(TossIndex));
+	if (idx != NULL)
+	  {
+	    idx->toss = toss;
+	    idx->next = TossIndexList;
+	    TossIndexList = idx;
+	  }
+      }
+    if (idx != NULL && !idx->built[n])
+      {
+	idx->cands[n] = BuildTossCandidates(toss, clan);
+	idx->built[n] = (idx->cands[n] != NULL);
+      }
+    cand = (idx != NULL && idx->built[n]) ? idx->cands[n] : NULL;
+    _DtHelpProcessUnlock();
+
+    if (cand == NULL)
+	return MatchSemanticStyleScan(toss, clan, level, ssi);
+
+    for (; *cand != NULL; cand++)
+      {
+	pEl = _SdlSegPtrToTossInfo(*cand);
+	if ((_SdlTossInfoPtrRlevel(pEl) == -1 ||
+			_SdlTossInfoPtrRlevel(pEl) == level) &&
+	    (_SdlTossInfoPtrSsi(pEl) == NULL ||
+		       (ssi != NULL &&
+		       _DtHelpCeStrCaseCmp(_SdlTossInfoPtrSsi(pEl), ssi) == 0)))
+	  {
+	    pSeg = *cand;
+	    break;
+	  }
+      }
+    return pSeg;
 }
 
 /******************************************************************************

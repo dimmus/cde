@@ -642,7 +642,7 @@ Attachment::saveToFile(DtMailEnv &, char *filename)
 	return;
     }
 
-    if ((unsigned long) SafeWrite(fd, _myContents, (unsigned int)_myContentsSize) < _myContentsSize) {
+    if (SafeWrite(fd, _myContents, (size_t) _myContentsSize) < (ssize_t) _myContentsSize) {
 	sprintf(buf, CATGETS(DT_catd, 3, 45, "Unable to create %s."),
 		filename);
         helpId = DTMAILHELPNOCREATE;
@@ -843,7 +843,17 @@ Attachment::action(
 		}
 		tmp_file = SafeOpen(fileArg.name, O_RDONLY);
 		char *tmp_buf = (char*) malloc((size_t) stat_buf.st_size);
-		SafeRead(tmp_file, (void *)tmp_buf, (size_t) stat_buf.st_size);
+		if (tmp_file < 0 || (tmp_buf == NULL && stat_buf.st_size > 0) ||
+		    SafeRead(tmp_file, (void *)tmp_buf,
+			     (size_t) stat_buf.st_size) < (ssize_t) stat_buf.st_size) {
+		    mail_error.setError(DTME_ObjectAccessFailed);
+		    mail_error.logError(DTM_FALSE, "Mailer: Unable to process action, cannot read file %s.\n", fileArg.name);
+		    if (tmp_file >= 0)
+			SafeClose(tmp_file);
+		    free(tmp_buf);
+		    delete [] buf;
+		    return;
+		}
 		SafeClose(tmp_file);
 
 		_body_part->setContents(mail_error,
@@ -963,7 +973,17 @@ Attachment::action(
 		}
 		tmp_file = SafeOpen(fileArg.name, O_RDONLY);
 		char *tmp_buf = (char*) malloc((size_t) stat_buf.st_size);
-		SafeRead(tmp_file, (void *)tmp_buf, (size_t) stat_buf.st_size);
+		if (tmp_file < 0 || (tmp_buf == NULL && stat_buf.st_size > 0) ||
+		    SafeRead(tmp_file, (void *)tmp_buf,
+			     (size_t) stat_buf.st_size) < (ssize_t) stat_buf.st_size) {
+		    mail_error.setError(DTME_ObjectAccessFailed);
+		    mail_error.logError(DTM_FALSE, "Mailer: Unable to process action, cannot read file %s.\n", fileArg.name);
+		    if (tmp_file >= 0)
+			SafeClose(tmp_file);
+		    free(tmp_buf);
+		    delete [] buf;
+		    return;
+		}
 		SafeClose(tmp_file);
 
 		_body_part->setContents(mail_error,

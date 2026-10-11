@@ -82,6 +82,8 @@ typedef	struct	_dtCvLayoutStruct {
 
 /********    Private Function Declarations    ********/
 
+extern	void		_DtCvDropYIndex (
+				_DtCanvasStruct	*canvas);
 extern	void		_DtCvAddSpace (
 				_DtCvUnit	 number,
 				_DtCvUnit	*ret_y);

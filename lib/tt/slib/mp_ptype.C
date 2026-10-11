@@ -389,11 +389,7 @@ launch(_Tt_s_message_ptr &m, const _Tt_msg_trace &trace)
 
 		m->set_start_env();
 		maxfds = _tt_global->maxfds();
-		int i;
-		for (i = 3; i < maxfds; i++) {
-			// fcntl(i, F_SETFD, 1);
-			close(i);
-		}
+		_tt_close_fds_from(3, maxfds);
 		_tt_restoredtablesize();
 #ifdef _POWER
 		cargv[0] = "/bin/bsh";

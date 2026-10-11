@@ -808,6 +808,9 @@ void ProcessWmColormapWindows (ClientData *pCD)
      * Read the WM_COLORMAP_WINDOWS property.
      */
 
+    if (!HasProperty (pCD, wmGD.xa_WM_COLORMAP_WINDOWS))
+	rValue = ~Success;
+    else
     rValue = XGetWindowProperty (DISPLAY, pCD->client,
 		 wmGD.xa_WM_COLORMAP_WINDOWS, 0L,
 		 (long)MAX_COLORMAP_WINDOWS_COUNT, False, AnyPropertyType,
@@ -1043,6 +1046,9 @@ GetMwmMenuItems(
      */
 
     textProperty.value = (unsigned char *)NULL;
+    if (!HasProperty (pCD, wmGD.xa_MWM_MENU))
+	rValue = 0;
+    else
     rValue = XGetTextProperty(DISPLAY, pCD->client, &textProperty,
 			      wmGD.xa_MWM_MENU);
     if ((rValue == 0) || (textProperty.value == (unsigned char *)NULL))
@@ -1267,7 +1273,13 @@ SetCurrentWorkspaceProperty (WmScreenData *pSD)
 	32, PropModeReplace, (unsigned char *)&aCurrent,
 	(sizeof(Atom))/sizeof(long));
 
-    XSync (DISPLAY, False);     /* XFlush didn't work here, why? */
+    /*
+     * Make sure the server has the property before the ToolTalk notice
+     * of the change (dtSendWorkspaceModifyNotification) can reach a client
+     * that reads it: once flushed, the request could still be waiting in
+     * the server's input while the other client's request is processed.
+     */
+    XSync (DISPLAY, False);
 
 } /* END OF FUNCTION SetCurrentWorkspaceProperty */
 
@@ -1518,7 +1530,6 @@ void SetWorkspacePresence (Window propWindow, Atom *pWsPresence, unsigned long c
     XChangeProperty (DISPLAY, propWindow, wmGD.xa_DT_WORKSPACE_PRESENCE, 
 	wmGD.xa_DT_WORKSPACE_PRESENCE, 32, PropModeReplace, 
 	(unsigned char *)pWsPresence, cPresence);
-    XFlush (DISPLAY);
 
 } /* END OF FUNCTION SetWorkspacePresence */
 
@@ -1902,7 +1913,7 @@ HasProperty (
 char *GetUtf8String (Display *display, Window w, Atom property)
 {
     int actualFormat;
-    char *propReturn;
+    char *propReturn = NULL;
     unsigned long nitems, leftover;
     Atom actualType;
     Atom reqType = wmGD.xa_UTF8_STRING;
@@ -1992,6 +2003,57 @@ void UpdateNetWmState (Window window, Atom *states, unsigned long nstates,
 	    if (j >= nold) newStates[nnew++] = state;
 	}
     }
+
+    XChangeProperty (DISPLAY, window, type, XA_ATOM, 32, PropModeReplace,
+		     (unsigned char *) newStates, nnew);
+
+done:
+    if (oldStates) XFree (oldStates);
+    if (newStates) free (newStates);
+}
+
+/**
+ * @brief Removes states from the _NET_WM_STATE property and adds others,
+ *        with one read and one write: the same result as
+ *        UpdateNetWmState (remove, _NET_WM_STATE_REMOVE) followed by
+ *        UpdateNetWmState (add, _NET_WM_STATE_ADD).
+ *
+ * @param window
+ * @param remove
+ * @param nremove
+ * @param add
+ * @param nadd
+ */
+void ReplaceNetWmStates (Window window, Atom *remove, unsigned long nremove,
+			 Atom *add, unsigned long nadd)
+{
+    unsigned long i, j, k;
+    int actualFormat;
+    unsigned long nold, leftover;
+    Atom actualType;
+    unsigned long nnew = 0;
+    Atom type = wmGD.xa__NET_WM_STATE;
+    Atom *oldStates = NULL;
+    Atom *newStates = NULL;
+
+    if (!(XGetWindowProperty (DISPLAY, window, type, 0L, 1000000L, False,
+			      XA_ATOM, &actualType, &actualFormat, &nold,
+			      &leftover, (unsigned char **) &oldStates)
+	== Success && actualType == XA_ATOM)) nold = 0;
+
+    newStates = malloc ((1 + nadd + nold) * sizeof (Atom));
+
+    if (!newStates) goto done;
+
+    for (i = 0; i < nold; ++i)
+    {
+	Atom oldState = oldStates[i];
+	for (j = 0; j < nremove; ++j) if (oldState == remove[j]) break;
+	for (k = 0; k < nadd; ++k) if (oldState == add[k]) break;
+	if (j >= nremove && k >= nadd) newStates[nnew++] = oldState;
+    }
+
+    for (k = 0; k < nadd; ++k) newStates[nnew++] = add[k];
 
     XChangeProperty (DISPLAY, window, type, XA_ATOM, 32, PropModeReplace,
 		     (unsigned char *) newStates, nnew);

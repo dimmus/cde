@@ -113,9 +113,12 @@ nl_catd  scmc_catd;   /* Cat descriptor for scmc conversion */
 #include <signal.h>
 #include <string.h>
 #include <errno.h>
+#include <poll.h>
+#include <time.h>
 
 #include <X11/Intrinsic.h> /* For Boolean */
 #include <X11/Shell.h>
+#include <X11/extensions/dpms.h>
 #include "dtscreen.h"
 #ifdef NEVER
 /* We'd like to include DtP.h, but it interferes with dtscreen.h */
@@ -136,6 +139,8 @@ void        (*init) () = NULL;
 static perwindow *Win; /* perwindow information */
 static int  windows;            /* number of windows */
 static Window *winprop = NULL;  /* dtsession cover windows */
+
+extern void drawblank();        /* blank.c */
 
 /* VARARGS1 */
 void
@@ -159,28 +164,120 @@ finish(void)
 }
 
 
+/*
+ * Frame pacing.  Each mode's "delay" is the period between frames; it is
+ * never shorter than MIN_FRAME_US (about 60 frames per second), so "hop"
+ * (delay 0) no longer spins a CPU.  Between frames we block in poll() on
+ * the connection, so events are still handled promptly.
+ */
+#define MIN_FRAME_US	16667L
+#define DPMS_CHECK_US	2000000L	/* how often to ask whether the monitor is on */
+#define DPMS_OFF_US	1000000L	/* frame period while the monitor is off */
+
+static long long
+now_us(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000;
+}
+
+static void
+handleEvent(XEvent *event)
+{
+#ifndef DEBUG
+    if (event->type == VisibilityNotify)
+        XRaiseWindow(dsp, event->xany.window);
+#else
+    (void) event;
+#endif
+}
+
+/* True when DPMS has put the monitor to sleep, so drawing is wasted. */
+static Bool
+monitorOff(void)
+{
+    static int haveDPMS = -1;
+    int dummy;
+    CARD16 level;
+    BOOL enabled;
+
+    if (haveDPMS < 0)
+        haveDPMS = DPMSQueryExtension(dsp, &dummy, &dummy) && DPMSCapable(dsp);
+    if (!haveDPMS || !DPMSInfo(dsp, &level, &enabled))
+        return False;
+    return enabled && level != DPMSModeOn;
+}
+
+/* Handle events until 'deadline' (CLOCK_MONOTONIC, microseconds). */
+static void
+waitUntil(long long deadline)
+{
+    struct pollfd pfd;
+    XEvent event;
+
+    pfd.fd = ConnectionNumber(dsp);
+    pfd.events = POLLIN;
+    for (;;) {
+        long long left;
+
+        while (XPending(dsp)) {
+            XNextEvent(dsp, &event);
+            handleEvent(&event);
+        }
+        left = deadline - now_us();
+        if (left <= 0)
+            return;
+        /* round up so we do not wake just before the deadline */
+        if (poll(&pfd, 1, (int)((left + 999) / 1000)) < 0 && errno != EINTR)
+            return;
+    }
+}
+
 static void
 justDisplay(void)
 {
     XEvent      event;
-    int window;
+    int         window;
+    long long   period, next, nextDpmsCheck;
+    Bool        off = False;
 
     for (window = 0; window < windows; window++)
         init(Win+window);
-    do {
-        while (!XPending(dsp)) {
+
+    /* "blank" draws nothing after init: just block for events. */
+    if (callback == drawblank) {
+        XFlush(dsp);
+        for (;;) {
+            XNextEvent(dsp, &event);
+            handleEvent(&event);
+        }
+    }
+
+    period = delay > MIN_FRAME_US ? delay : MIN_FRAME_US;
+    next = now_us();
+    nextDpmsCheck = next + DPMS_CHECK_US;
+    for (;;) {
+        long long now;
+
+        if (!off)
             for (window = 0; window < windows; window++)
                 callback(Win+window);
-            XSync(dsp, False);
-            usleep(delay);
-        }
-        XNextEvent(dsp, &event);
+        /* Round trip: keeps us from queueing frames faster than the
+         * server draws them. */
+        XSync(dsp, False);
 
-#ifndef DEBUG
-        if (event.type == VisibilityNotify)
-            XRaiseWindow(dsp, event.xany.window);
-#endif
-    } while (1);
+        now = now_us();
+        if (now >= nextDpmsCheck) {
+            off = monitorOff();
+            nextDpmsCheck = now + DPMS_CHECK_US;
+        }
+        next += off ? DPMS_OFF_US : period;
+        if (next < now)         /* fell behind: do not try to catch up */
+            next = now;
+        waitUntil(next);
+    }
 }
 
 

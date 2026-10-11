@@ -1337,46 +1337,20 @@ void
 DtMail::MailRc::nalias(char * key, void * data, void * client_data)
 {
     DtVirtArray<char *> *value_list = (DtVirtArray<char *> *)client_data;
-    char *new_alias = NULL;
-    char *white_space = NULL;
-    int m_size = 0;
-    int  i, num_spaces = 0;
-    int key_len = strlen(key);
-    // figure out whitespace for formatting
-    // assume 13 for normal sized alias name
+    const char *value = (const char *)data;
+    size_t key_len = strlen(key);
+    // "key = value", with the key padded with spaces to 13 columns
+    // (a normal sized alias name)
+    size_t num_spaces = key_len < 13 ? 13 - key_len : 0;
+    char *new_alias = (char *)malloc(key_len + num_spaces + strlen(" = ")
+				     + strlen(value) + 1);
+    char *p;
 
-    if(key_len < 13)  // need to add spaces
-      {
-	num_spaces = 13 - key_len;
+    p = stpcpy(new_alias, key);
+    memset(p, ' ', num_spaces);
+    p = stpcpy(p + num_spaces, " = ");
+    strcpy(p, value);
 
-	white_space = (char *)malloc(num_spaces + 1);
-	white_space[0] = '\0';
-
-	for(i = 0; i < num_spaces; i++)
-	  white_space[i] = ' ';
-
-	white_space[num_spaces] = '\0';
-
-//	  strcat(white_space, " ");
-
-	/* make an alias string */
-	m_size = key_len + strlen((char *)white_space)
-		 + strlen((char *)data) + strlen(" = ") + 1;
-	new_alias = (char *)malloc(m_size);
-    
-	snprintf(new_alias, m_size, "%s%s = %s",key, white_space, (char *) data);
-
-      }
-    else
-      {
-		/* make an alias string */
-	m_size = key_len + strlen((char *)data) + strlen(" = ") + 1;
-	new_alias = (char *)malloc(m_size);
-    
-	sprintf(new_alias, "%s = %s",key, (char *) data);
-
-      }
-    
     value_list->append(new_alias);
 
 }

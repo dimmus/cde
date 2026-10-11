@@ -36,6 +36,7 @@
 #include <iostream>
 using namespace std;
 #include <stdarg.h>
+#include <stdlib.h>
 
      
 extern featureDefDictionary* g_FeatureDefDictionary;
@@ -111,8 +112,13 @@ int main(int argc, char** argv )
            quit(1);
         }
      } else {
+        // dtdocbook2infolib points dtdcbk_datarootdir at the source
+        // tree during the CDE build
+        const char* datarootdir = getenv("dtdcbk_datarootdir");
+        if ( !datarootdir || !*datarootdir )
+           datarootdir = DTDCBK_DATAROOTDIR;
         char* spec_file_path = form("%s/spec/%s.feature.spec",
-				    DTDCBK_DATAROOTDIR, argv[1]);
+				    datarootdir, argv[1]);
 
         defStream = new fstream(spec_file_path, ios::in);
 

@@ -24,6 +24,7 @@
 #include "DtPrinterIcon.h"
 #include "Button.h"
 #include "DtMainW.h"
+#include "DtApp.h"
 #include "Prompt.h"
 #include "DtPrtProps.h"
 #include "DtSetModList.h"
@@ -38,6 +39,8 @@
 #include <stdlib.h> // This is for the getenv function
 #include <sys/param.h>
 #include <pwd.h>
+#include <errno.h>
+#include <string.h>
 
 #include "dtprintinfomsg.h"
 
@@ -49,6 +52,68 @@ const char *PRINTERS_PERSONAL_DIR = ".dt/.Printers";
 
 char DtPrinterIcon::homeDir[300] = "";
 
+// "mkdir -p path" without running mkdir
+static void MakeDirectories(const char *path)
+{
+   char *dir = strdup(path);
+   if (!dir)
+      return;
+   char *s;
+   for (s = dir + 1; *s; s++)
+      if (*s == '/')
+       {
+	 *s = '\0';
+	 mkdir(dir, 0777);
+	 *s = '/';
+       }
+   mkdir(dir, 0777);
+   free(dir);
+}
+
+// "cp file dir" without running cp: the copy gets the permissions of file
+// if it is new, and keeps its own if it exists.
+static void CopyFileToDirectory(const char *file, const char *dir)
+{
+   const char *base = strrchr(file, '/');
+   base = base ? base + 1 : file;
+   char *target = new char[strlen(dir) + strlen(base) + 2];
+   sprintf(target, "%s/%s", dir, base);
+
+   struct stat statbuff;
+   int in = open(file, O_RDONLY);
+   if (in >= 0 && fstat(in, &statbuff) == 0)
+    {
+      int out = open(target, O_WRONLY | O_CREAT | O_TRUNC,
+		     statbuff.st_mode & 07777);
+      if (out >= 0)
+       {
+	 char buf[8192];
+	 ssize_t n;
+	 while ((n = read(in, buf, sizeof(buf))) > 0 ||
+		(n < 0 && errno == EINTR))
+	  {
+	    char *p = buf;
+	    while (n > 0)
+	     {
+	       ssize_t w = write(out, p, n);
+	       if (w < 0 && errno == EINTR)
+		  continue;
+	       if (w <= 0)
+		  break;
+	       p += w;
+	       n -= w;
+	     }
+	    if (n > 0)
+	       break;
+	  }
+	 close(out);
+       }
+    }
+   if (in >= 0)
+      close(in);
+   delete [] target;
+}
+
 DtPrinterIcon::DtPrinterIcon(DtMainW *mainW, AnyUI *parent, Queue *que, 
 			     PrinterApplicationMode _app_mode)
 	: IconObj((char *) que->ObjectClassName(), parent,
@@ -56,6 +121,10 @@ DtPrinterIcon::DtPrinterIcon(DtMainW *mainW, AnyUI *parent, Queue *que,
 		  GetPrinterIcon(que->Name(), _app_mode))
 {
    app_mode = _app_mode;
+   mainw = mainW;
+   updating = false;
+   waitForChildren = false;
+   jobs_read = false;
    queue = que;
    status = NULL;
    dnd = NULL;
@@ -67,7 +136,8 @@ DtPrinterIcon::DtPrinterIcon(DtMainW *mainW, AnyUI *parent, Queue *que,
    if (app_mode == INITIALIZE_PRINTERS)
       return;
 
-   char *buf = new char[sizeof(DtPrinterIcon::homeDir) + 32];
+   char *buf = new char[sizeof(DtPrinterIcon::homeDir) + 32 +
+			strlen(que->Name())];
    struct stat statbuff;
    if (*homeDir == '\0')
     {
@@ -78,19 +148,13 @@ DtPrinterIcon::DtPrinterIcon(DtMainW *mainW, AnyUI *parent, Queue *que,
          pwInfo = getpwuid(getuid());
          home = pwInfo->pw_dir;
        }
-      strcpy(homeDir, home);
+      snprintf(homeDir, sizeof(DtPrinterIcon::homeDir), "%s", home);
       sprintf(buf, "%s/%s", homeDir, PRINTERS_PERSONAL_DIR);
       if (stat(buf, &statbuff) < 0)
-       {
-         sprintf(buf, "mkdir -p %s/%s", homeDir, PRINTERS_PERSONAL_DIR);
-         system(buf);
-       }
+         MakeDirectories(buf);
       sprintf(buf, "%s/.dt/types", homeDir);
       if (stat(buf, &statbuff) < 0)
-       {
-         sprintf(buf, "mkdir -p %s/.dt/types", homeDir);
-         system(buf);
-       }
+         MakeDirectories(buf);
       DtDbReloadNotify(&DtPrinterIcon::ReloadNotifyCB, this);
     }
    sprintf(buf, "%s/%s/%s_Print", homeDir, PRINTERS_PERSONAL_DIR,
@@ -272,10 +336,7 @@ char *DtPrinterIcon::CreateActionFile()
     {
       snprintf(filename, MAXPATHLEN, "/etc/dt/appconfig/types/%s", lang);
       if (stat(filename, &statbuff) < 0)
-       {
-         snprintf(buf, MAXPATHLEN, "/bin/mkdir -p %s", filename);
-         system(buf);
-       }
+         MakeDirectories(filename);
       snprintf(filename, MAXPATHLEN, "/etc/dt/appconfig/types/%s/%s.dt", lang,
 	      queue->Name());
       if (stat(filename, &statbuff) < 0 || statbuff.st_size == 0)
@@ -291,9 +352,10 @@ char *DtPrinterIcon::CreateActionFile()
          snprintf(buf, MAXPATHLEN, "/etc/dt/appconfig/types/%s/%s.dt", lang, queue->Name());
          if (stat(buf, &statbuff) >= 0 && statbuff.st_size > 0)
 	  {
-            snprintf(buf, MAXPATHLEN, "/bin/cp /etc/dt/appconfig/types/%s/%s.dt %s/.dt/types",
-		    lang, queue->Name(), homeDir);
-	    system(buf);
+	    char *types = new char[strlen(homeDir) + 12];
+	    sprintf(types, "%s/.dt/types", homeDir);
+	    CopyFileToDirectory(buf, types);
+	    delete [] types;
 	    create_file = false;
 	  }
 	 else
@@ -455,6 +517,17 @@ void DtPrinterIcon::UpdateExpand()
 }
 
 void DtPrinterIcon::Update()
+{
+#ifdef aix
+   UpdateNow();
+#else
+   // DtApp reads the status of all queues with one command
+   if (mainw)
+      ((DtApp *)mainw->Parent())->RequestStatusUpdate();
+#endif
+}
+
+void DtPrinterIcon::UpdateNow()
 {
    char *cmd = new char[200];
    sprintf(cmd, GET_QUEUE_STATUS, queue->Name());

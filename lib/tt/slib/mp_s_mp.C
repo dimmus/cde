@@ -52,6 +52,7 @@
 #include "util/tt_base64.h"
 #include "util/tt_host.h"
 #include "util/tt_port.h"
+#include "util/tt_enumname.h"
 #include <errno.h>
 #include <sys/resource.h>
 #include <time.h>
@@ -195,11 +196,12 @@ _Tt_s_mp::init_self()
 	// Use the lame do-loop hack to avoid repeating the drop_mutex
 	// code after every possible failure...
 	
+	Tt_status status = TT_OK;
 	do {
 		//
 		// tt_open(), tt_fd()
 		//
-		Tt_status status = _self->init();
+		status = _self->init();
 		if (status != TT_OK) {
 			break;
 		}
@@ -220,7 +222,14 @@ _Tt_s_mp::init_self()
 
 	_tt_global->drop_mutex();
 
-	return TT_OK;
+	// ttsession carries on without its self-procid (only the
+	// Session_Trace and Saved handling depend on it), but say so
+	// instead of dropping the error.
+	if (status != TT_OK) {
+		_tt_syslog( 0, LOG_WARNING, "_Tt_s_mp::init_self(): %s",
+			    _tt_enumname( status ) );
+	}
+	return status;
 }
 
 Tt_status
@@ -397,11 +406,28 @@ void _Tt_s_mp::
 install_ptable(_Tt_ptype_table_ptr &p)
 {
 	_Tt_ptype_table_cursor	ptypes;
+	_Tt_ptype_ptr		pt;
 	
 	ptable = p;
+	// First drop the installed signatures of every ptype in the
+	// table, in one pass over the signature table, then install
+	// theirs.  This used to call remove_signatures() per ptype,
+	// i.e. a pass over every installed signature for each ptype.
+	// The result is the same: each signature a ptype carries has
+	// that ptype's ptid (tt_type_comp also files otype signatures
+	// under their implementing ptype), so removing ptype B's never
+	// touched what was just installed for ptype A.
+	_Tt_sigs_by_op_table_cursor	sigs_byopC(sigs);
+	while (! ptable.is_null() && sigs_byopC.next()) {
+		_Tt_signature_list_cursor sigC(sigs_byopC->sigs);
+		while (sigC.next()) {
+			if (ptable->lookup(sigC->ptid(), pt)) {
+				sigC.remove();
+			}
+		}
+	}
 	ptypes.reset(ptable);
 	while (ptypes.next()) {
-		remove_signatures(**ptypes);
 		install_signatures(ptypes->hsigs());
 		install_signatures(ptypes->osigs());
 	}
@@ -416,11 +442,22 @@ void _Tt_s_mp::
 install_otable(_Tt_otype_table_ptr &o)
 {
 	_Tt_otype_table_cursor	otypes;
+	_Tt_otype_ptr		ot;
 	
 	otable = o;
+	// As in install_ptable(): one removal pass for the whole table
+	// (each signature an otype carries has that otype's otid).
+	_Tt_sigs_by_op_table_cursor	sigs_byopC(sigs);
+	while (! otable.is_null() && sigs_byopC.next()) {
+		_Tt_signature_list_cursor sigC(sigs_byopC->sigs);
+		while (sigC.next()) {
+			if (otable->lookup(sigC->otid(), ot)) {
+				sigC.remove();
+			}
+		}
+	}
 	otypes.reset(otable);
 	while (otypes.next()) {
-		remove_signatures(**otypes);
 		install_signatures(otypes->hsigs());
 		install_signatures(otypes->osigs());
 	}

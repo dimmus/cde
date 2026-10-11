@@ -979,6 +979,7 @@ void InitializeClientData (ClientData *pCD, IconBoxData *pIBD)
     }
 
     pCD->clientTitle = pCD->pSD->iconBoxTitle;
+    pCD->titleWidthString = NULL;
     pCD->iconTitle   = pCD->pSD->iconBoxTitle;
     
 } /* END OF FUNCTION InitializeClientData */   

@@ -127,6 +127,43 @@ SafeOpen(const char * path, int oflag, mode_t mode)
     return(status);
 }
 
+// Create a new temporary file <dir>/<prefix>XXXXXX in the directory
+// tempnam(3) chose: $TMPDIR if it is a directory, else dir if it is
+// one, else P_tmpdir.  Returns the open descriptor (the file has mode
+// 0600) and the malloc'ed name in *path, or -1 (*path is then NULL).
+// mkstemp() creates the file, so unlike with the name tempnam()
+// returned nobody can create or link it first.
+//
+int
+SafeMkstemp(const char * dir, const char * prefix, char ** path)
+{
+    const char * d = getenv("TMPDIR");
+    struct stat sb;
+    char * name;
+    int fd;
+
+    *path = NULL;
+    if (d == NULL || *d == '\0' || stat(d, &sb) != 0 || !S_ISDIR(sb.st_mode)) {
+	d = dir;
+	if (d == NULL || stat(d, &sb) != 0 || !S_ISDIR(sb.st_mode))
+	    d = P_tmpdir;
+    }
+
+    name = (char *) malloc(strlen(d) + strlen(prefix) + sizeof("/XXXXXX"));
+    if (name == NULL)
+	return(-1);
+    sprintf(name, "%s/%sXXXXXX", d, prefix);
+
+    fd = mkstemp(name);
+    if (fd < 0) {
+	free(name);
+	return(-1);
+    }
+
+    *path = name;
+    return(fd);
+}
+
 int
 SafeClose(int fd)
 {
@@ -615,7 +652,7 @@ SafeStrftime(char * buf, size_t buf_size,
 void *SockOpen(char *host, int clientPort, char **errorstring)
 {
     int sockfd;
-    unsigned long inaddr;
+    in_addr_t inaddr;
     struct sockaddr_in ad;
     struct hostent *hp;
     DtMailEnv error;
@@ -624,8 +661,11 @@ void *SockOpen(char *host, int clientPort, char **errorstring)
     memset(&ad, 0, sizeof(ad));
     ad.sin_family = AF_INET;
 
+    // A host name is not a dotted address: inet_addr() returns
+    // INADDR_NONE, which an unsigned long never compared equal to, so
+    // names were never looked up.
     inaddr = inet_addr(host);
-    if (inaddr != (unsigned long) -1)
+    if (inaddr != INADDR_NONE)
       memcpy(&ad.sin_addr, &inaddr, sizeof(inaddr));
     else
     {

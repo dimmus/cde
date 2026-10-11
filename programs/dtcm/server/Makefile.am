@@ -1,10 +1,12 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 bin_PROGRAMS = rpc.cmsd
 
-rpc_cmsd_CFLAGS = -I../../../lib/csa $(DT_INCDIR) $(CSA_INCDIR)
+rpc_cmsd_CFLAGS = $(CDE_CFLAGS) -I../../../lib/csa $(DT_INCDIR) $(CSA_INCDIR)
 
-rpc_cmsd_LDADD = $(LIBCSA) $(DTCLIENTLIBS) $(TIRPCLIB) $(XTOOLLIB)
+rpc_cmsd_LDADD = $(LIBCSA) $(TIRPCLIB)
 
 if SOLARIS
 rpc_cmsd_LDADD += -lsocket -lnsl -lintl

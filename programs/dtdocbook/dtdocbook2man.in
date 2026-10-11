@@ -33,8 +33,6 @@
 # written authorization.
 #
 
-trap "rm -f /tmp/dtm.$$.psinc /tmp/dtm.$$.out1 /tmp/dtm.$$.out2" 0 1 2 3 4 5 6 7 8 10 12 15
-
 prefix="@prefix@"
 exec_prefix="@exec_prefix@"
 
@@ -58,9 +56,9 @@ decl="${sgml_dir}/docbook.dcl"
 
 nroff=
 
-if [ $# -gt 0 ] && [ $1 = "-c" ]
+if [ $# -gt 0 ] && [ "$1" = "-c" ]
 then
-	nroff="| tbl | nroff -man"
+	nroff=yes
 	shift
 fi
 if [ $# -eq 4 ]
@@ -72,14 +70,22 @@ else	echo "usage:  dtdocbook2man [-c] locale dcl-file ref-src-file man-dst-file"
 	exit 1
 fi
 
-cat > /tmp/dtm.$$.psinc <<\!
-'\" t
-!
+# The page is written next to man-dst-file and renamed into place, so a
+# failed run leaves no half-written page behind.
+tmpfile="${manfile}.tmp$$"
+trap 'rm -f "$tmpfile" "$tmpfile.nroff"' 0
+trap 'exit 1' 1 2 3 15
 
-grep '<\!-- $''XConsortium: ' $reffile | \
-sed -e 's/<\!-- $''XConsortium:/...\\"/g' -e 's/ -->//g' >> /tmp/dtm.$$.psinc
+{
+printf '%s\n' "'\\\" t"
 
-cat >> /tmp/dtm.$$.psinc <<\!
+sed -n -e '/<!-- $''XConsortium: /{
+s/<!-- $''XConsortium:/...\\"/g
+s/ -->//g
+p
+}' "$reffile"
+
+cat <<\!
 .de P!
 .fl
 \!!1 setgray
@@ -127,9 +133,18 @@ cat >> /tmp/dtm.$$.psinc <<\!
 .ds f4\"
 !
 
-cat $decl $dclfile $reffile | \
+} > "$tmpfile" || exit 1
+
+cat "$decl" "$dclfile" "$reffile" | \
 sed -e 's/<\!\[[ ]*\%CDE\.C\.CDE;[ ]*\[<[rR]ef[eE]ntry [iI]d="[^"]*">\]\]>/<refentry>/g' | \
 $parser $parser_opts | \
-$instant -L$locale -croff.cmap -sroff.sdata -tdocbook-to-man.ts > \
-/tmp/dtm.$$.out1 && eval cat /tmp/dtm.$$.psinc /tmp/dtm.$$.out1 $nroff > \
-/tmp/dtm.$$.out2 && cp /tmp/dtm.$$.out2 $manfile
+$instant -L$locale -croff.cmap -sroff.sdata -tdocbook-to-man.ts >> \
+"$tmpfile" || exit 1
+
+if [ -n "$nroff" ]
+then
+	tbl "$tmpfile" | nroff -man > "$tmpfile.nroff" || exit 1
+	mv -f "$tmpfile.nroff" "$tmpfile" || exit 1
+fi
+
+mv -f "$tmpfile" "$manfile"

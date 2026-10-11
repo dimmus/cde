@@ -3199,11 +3199,21 @@ switch_it(Calendar *c, char *new_calendar, WindowType win)
  * An optimization would be to only refresh the canvas region affected
  * by the data changed.
  */
+/*
+ * The refresh is deferred and coalesced: one change can bring several
+ * callbacks (one per registration), and a bulk change one per entry,
+ * and each refresh repaints the canvas and makes three or four RPCs.
+ */
+#define UPDATE_DELAY_MS	100
+
+static XtIntervalId	update_timer = 0;
+
 static void
-update_handler(CSA_session_handle cal, CSA_flags reason,
-	       CSA_buffer call_data, CSA_buffer client_data, CSA_extension *ext)
+do_update(XtPointer data, XtIntervalId *id)
 {
 	Calendar	*c = calendar;
+
+	update_timer = 0;
 
 	/* sync canvas */
 	invalidate_cache(c);
@@ -3216,6 +3226,15 @@ update_handler(CSA_session_handle cal, CSA_flags reason,
 	if (todo_showing((ToDo *)calendar->todo))
  		add_all_todo((ToDo *)calendar->todo);
 
+}
+
+static void
+update_handler(CSA_session_handle cal, CSA_flags reason,
+	       CSA_buffer call_data, CSA_buffer client_data, CSA_extension *ext)
+{
+	if (update_timer == 0)
+		update_timer = XtAppAddTimeOut(app, UPDATE_DELAY_MS,
+					       do_update, NULL);
 }
 
 static Boolean

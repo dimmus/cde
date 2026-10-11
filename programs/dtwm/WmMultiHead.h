@@ -34,5 +34,6 @@ typedef struct _WmHeadInfo {
 
 WmHeadInfo_t *GetHeadInfo(const ClientData *pcd);
 WmHeadInfo_t *GetHeadInfoById(int id);
+void InvalidateHeadInfo(void);
 
 #endif /* _WmMultiHead_h */

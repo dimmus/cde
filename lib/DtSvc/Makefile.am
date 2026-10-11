@@ -1,17 +1,27 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+include $(top_srcdir)/build-aux/cde-libs.am
+
 lib_LTLIBRARIES = libDtSvc.la
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtSvc_la_LDFLAGS = -version-info 2:1:0
+libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libDtSvc_la_LDFLAGS = -version-info 3:0:1
+libDtSvc_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+# export only the symbols in build-aux/symbols/libDtSvc.sym
+if EXPORT_MAPS
+libDtSvc_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtSvc-exports.ver
+EXTRA_libDtSvc_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtSvc-exports.ver
+endif
+$(VSCRIPT_DIR)/libDtSvc-exports.ver: $(EXPORTS_DIR)/libDtSvc.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
 
 
 # USe CPPFLAGS so it will apply to both C and C++ components
-libDtSvc_la_CPPFLAGS = -I./include -DMULTIBYTE -DNLS16 -I../include \
+libDtSvc_la_CPPFLAGS = $(CDE_CPPFLAGS) $(KEEP_ASSERTS) -I./include -DMULTIBYTE -DNLS16 -I../include \
 	@DT_INCDIR@ -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
        -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"
 
@@ -47,6 +57,8 @@ if SOLARIS
 libDtSvc_la_CPPFLAGS += -DOSMAJORVERSION=5 -DOSMINORVERSION=10
 endif
 
+
+libDtSvc_la_LIBADD = $(LIBTT) $(LIBXIN) $(XMLIB) $(XTLIB) $(X11LIB)
 
 libDtSvc_la_SOURCES = 	DtCodelibs/buf.C \
 	DtCodelibs/buf.h \
@@ -175,5 +187,5 @@ libDtSvc_la_SOURCES = 	DtCodelibs/buf.C \
 
 if HAS_PAM_LIBRARY
 libDtSvc_la_SOURCES += DtUtil2/SvcPam.c
-libDtSvc_la_LIBADD = $(PAMLIB)
+libDtSvc_la_LIBADD += $(PAMLIB)
 endif

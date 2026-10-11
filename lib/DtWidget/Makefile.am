@@ -1,23 +1,42 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 unixdir = $(CDE_INSTALLATION_TOP)/app-defaults/C
 
 MAINTAINERCLEANFILES = Makefile.in
 
 lib_LTLIBRARIES = libDtWidget.la
 
-AM_CPPFLAGS = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) $(DT_INCDIR)
+# also used to preprocess UNIXbindings, which must not see $(CDE_CPPFLAGS)
+WIDGET_DEFINES = -DCDE_INSTALLATION_TOP=$(CDE_INSTALLATION_TOP) $(DT_INCDIR)
 
-libDtWidget_la_CFLAGS = -DI18N_MSG -DMULTIBYTE
+AM_CPPFLAGS = $(CDE_CPPFLAGS) $(WIDGET_DEFINES)
+
+libDtWidget_la_CFLAGS = $(CDE_CFLAGS) -DI18N_MSG -DMULTIBYTE
 
 # in order to try to keep lib versions the same across platforms, (2.1.0)
 if BSD
-libDtWidget_la_LDFLAGS = -version-info 2:1:0
+libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 2:1:0
 else
-libDtWidget_la_LDFLAGS = -version-info 3:0:1
+libDtWidget_la_LDFLAGS = $(CDE_LDFLAGS) $(CDE_LIB_LDFLAGS) -version-info 3:0:1
 endif
+
+# export only the symbols in build-aux/symbols/libDtWidget.sym
+if EXPORT_MAPS
+libDtWidget_la_LDFLAGS += -Wl,--version-script=$(VSCRIPT_DIR)/libDtWidget-exports.ver
+EXTRA_libDtWidget_la_DEPENDENCIES = $(VSCRIPT_DIR)/libDtWidget-exports.ver
+endif
+$(VSCRIPT_DIR)/libDtWidget-exports.ver: $(EXPORTS_DIR)/libDtWidget.sym
+	$(AM_V_GEN)$(MAKE_VERSION_SCRIPT)
+
+libDtWidget_la_LIBADD = $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
 
 if SOLARIS
 libDtWidget_la_CFLAGS += -DNO_REGCOMP
-libDtWidget_la_LIBADD = -lw -lintl
+libDtWidget_la_LIBADD += -lw -lintl
 endif
 
 
@@ -25,6 +44,7 @@ libDtWidget_la_SOURCES = ComboBox.c      Control.c       DialogBox.c \
 			 DtMsgs.c        DtStrDefs.c     EditAreaData.c \
 			 EditCalls.c     Editor.c        Icon.c \
 			 MenuButton.c    NewCvt.c        SearchCalls.c \
+			 ItemExtent.c \
 			 SearchDlg.c     SpinBox.c       TitleBox.c \
 			 View.c
 
@@ -34,4 +54,4 @@ CLEANFILES = UNIXbindings
 
 UNIXbindings: UNIXbindings.cpp
 	$(RM) $@
-	$(GENCPP) -P -DXCOMM=# $(AM_CPPFLAGS) $< > $@
+	$(GENCPP) -P -DXCOMM=# $(WIDGET_DEFINES) $< > $@

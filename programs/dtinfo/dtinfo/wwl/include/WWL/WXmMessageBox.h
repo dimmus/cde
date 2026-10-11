@@ -66,9 +66,6 @@ public :
    DEFINE_CALLBACK      (OkCallback,"okCallback")
    DEFINE_STRING_GETSET (OkLabelString,"okLabelString")
    DEFINE_GETTER_SETTER (SymbolPixmap,Pixmap,"symbolPixmap")
-   inline	Widget	GetChild (unsigned char child) const {
-      return XmMessageBoxGetChild (widget, child);
-   }
 };
 
 #define	NULLWXmMessageBox		WXmMessageBox((Widget)0)
@@ -98,17 +95,22 @@ class WXmMessageDialog : public WXmMessageBox
       : WXmMessageBox(XmCreateDialogShell(Widget(father),name,NULL,0),
 		      name, args){};
 
+   // The children XmMessageBoxGetChild() (deprecated) returns: the
+   // cancel button is the XmNcancelButton resource, the others are the
+   // captive widgets XmMessageBox creates under these names.
    inline WXmPushButton OkPB() { 
-      return WXmPushButton(GetChild(XmDIALOG_OK_BUTTON));}
+      return WXmPushButton(XtNameToWidget(widget, "OK"));}
 
    inline WXmPushButton CancelPB() { 
-      return WXmPushButton(GetChild(XmDIALOG_CANCEL_BUTTON));}
+      Widget w = NULL;
+      XtVaGetValues(widget, XmNcancelButton, &w, NULL);
+      return WXmPushButton(w);}
 
    inline WXmPushButton HelpPB() { 
-      return WXmPushButton(GetChild(XmDIALOG_HELP_BUTTON));}
+      return WXmPushButton(XtNameToWidget(widget, "Help"));}
 
    inline WXmPushButton Separator() { 
-      return WXmPushButton(GetChild(XmDIALOG_SEPARATOR));}
+      return WXmPushButton(XtNameToWidget(widget, "Separator"));}
 
 };
 

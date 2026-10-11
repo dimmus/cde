@@ -72,6 +72,7 @@
 #include "WmResNames.h"
 #include "WmResParse.h"
 #include "WmFunction.h"
+#include "WmWrkspace.h"
 
 
 /************************************************************************
@@ -545,6 +546,79 @@ WorkspaceAdjustPanelPosition (Position x,
 
 /************************************************************************
  *
+ *  SwitchShowCurrent
+ *	Show the workspace atom_name as the current one: set its switch
+ *	button and unset the old one, and title the front panel after it.
+ *	Nothing is done when the switch already shows it, so the title
+ *	is written once per workspace change.
+ *
+ ************************************************************************/
+
+static void
+SwitchShowCurrent (SwitchData * switch_data,
+                   Atom         atom_name)
+
+{
+   int i;
+   Arg al[2];
+
+   for (i = 0; i < switch_data->switch_count; i++)
+   {
+      if (switch_data->atom_names[i] == atom_name)
+      {
+         if (i != switch_data->active_switch)
+         {
+            XtSetArg (al[0], XmNiconName, switch_data->switch_names[i]); 
+            XtSetArg (al[1], XmNtitle, switch_data->switch_names[i]);
+            XtSetValues (panel.shell, al, 2);
+
+            _DtIconSetState (switch_data->buttons[switch_data->active_switch], False, False);
+            switch_data->active_switch = i;
+         }
+         _DtIconSetState (switch_data->buttons[i], True, False);
+         break;
+      }
+   }
+}
+
+
+
+
+/************************************************************************
+ *
+ *  SwitchSetCurrentWorkspace
+ *	Called by the window manager when it has changed to the workspace
+ *	atom_name, to update the front panel switch at once rather than
+ *	when the DtWorkspace_Modified notice comes back through ToolTalk
+ *	(which also needs a ToolTalk session).
+ *
+ ************************************************************************/
+
+void
+SwitchSetCurrentWorkspace (WmScreenData * pSD,
+                           Atom           atom_name)
+
+{
+   int i;
+
+   if (!pSD->wPanelist || pSD->wPanelist != panel.form || !panel.shell)
+      return;
+
+   for (i = 0; i < panel.box_data_count; i++)
+   {
+      if (panel.box_data[i]->switch_data != NULL)
+      {
+         SwitchShowCurrent (panel.box_data[i]->switch_data, atom_name);
+         break;
+      }
+   }
+}
+
+
+
+
+/************************************************************************
+ *
  *  WorkspaceModifyCB
  *	Called by the workspace manager API to send notification of 
  *	configuration changes to the workspace.  The types of changes
@@ -563,7 +637,7 @@ WorkspaceModifyCB (Widget    w,
 {
    SwitchData         * switch_data = (SwitchData *) client_data;
    BoxData            * box_data = switch_data->box_data;
-   DtWsmWorkspaceInfo * workspace_info;
+   DtWsmWorkspaceInfo * workspace_info = NULL;
 
    Position  x;
    Position  y;
@@ -578,8 +652,17 @@ WorkspaceModifyCB (Widget    w,
    height = XtHeight (panel.shell);
    screen_width = WidthOfScreen (XtScreen (panel.shell));
    
-   DtWsmGetWorkspaceInfo (XtDisplay (w), RootWindowOfScreen (XtScreen (w)),
-                          atom_name, &workspace_info);
+   /*  Only an added or renamed workspace needs its title (and that  */
+   /*  costs round trips).                                           */
+
+   if (type == DtWSM_REASON_ADD || type == DtWSM_REASON_TITLE)
+   {
+      if (DtWsmGetWorkspaceInfo (XtDisplay (w),
+                                 RootWindowOfScreen (XtScreen (w)),
+                                 atom_name, &workspace_info) != Success ||
+          workspace_info == NULL)
+         return;
+   }
 
    
    switch (type)
@@ -747,6 +830,7 @@ WorkspaceModifyCB (Widget    w,
          {
             if (atom_name == switch_data->atom_names[i])
 	    {
+	       XtFree (switch_data->switch_names[i]);
 	       switch_data->switch_names[i] = 
 	          XtNewString (workspace_info->pchTitle);
 
@@ -757,9 +841,14 @@ WorkspaceModifyCB (Widget    w,
                XtSetValues (switch_data->buttons[i], al, 1);
                XmStringFree (toggle_string);
 
-               XtSetArg (al[0], XmNiconName, workspace_info->pchTitle);
-               XtSetArg (al[1], XmNtitle, workspace_info->pchTitle);
-               XtSetValues (panel.shell, al, 2);
+               /*  The front panel is titled after the current workspace  */
+
+               if (i == switch_data->active_switch)
+               {
+                  XtSetArg (al[0], XmNiconName, workspace_info->pchTitle);
+                  XtSetArg (al[1], XmNtitle, workspace_info->pchTitle);
+                  XtSetValues (panel.shell, al, 2);
+               }
 
                break;
 	    }
@@ -772,30 +861,16 @@ WorkspaceModifyCB (Widget    w,
       /*  that is now active.  Unset the old workspace button and    */
       /*  set the new one referenced by the atom.                    */
 
-      case DtWSM_REASON_CURRENT:
-      {
-         int i;
-	 Arg al[2];
-   
-         for (i = 0; i < switch_data->switch_count; i++)
-         {
-            if (switch_data->atom_names[i] == atom_name)
-            {
-	       XtSetArg (al[0], XmNiconName, switch_data->switch_names[i]); 
-	       XtSetArg (al[1], XmNtitle, switch_data->switch_names[i]);
-	       XtSetValues (panel.shell, al, 2);
+      /*  The window manager has normally done this already, when it  */
+      /*  changed the workspace (SwitchSetCurrentWorkspace).          */
 
-               _DtIconSetState (switch_data->buttons[switch_data->active_switch], False, False);
-               switch_data->active_switch = i;
-               _DtIconSetState (switch_data->buttons[switch_data->active_switch], True, False);
-               break;
-            }
-         }
-      }
+      case DtWSM_REASON_CURRENT:
+         SwitchShowCurrent (switch_data, atom_name);
       break;
    }
 
-   DtWsmFreeWorkspaceInfo (workspace_info);
+   if (workspace_info)
+      DtWsmFreeWorkspaceInfo (workspace_info);
 } 
  
 
@@ -870,21 +945,33 @@ SwitchButtonCB (Widget    w,
       if (event->xany.type == ButtonRelease)
          switch_data->time_stamp = event->xbutton.time;
 
+      /*  The front panel is part of the window manager: change the  */
+      /*  workspace directly, rather than with a ToolTalk request to  */
+      /*  ourselves.  ChangeToWorkspace updates the switch and the    */
+      /*  front panel title (SwitchSetCurrentWorkspace) and tells the */
+      /*  other clients.                                              */
+
       for (i = 0; i < switch_data->switch_count; i++)
       {
          if (switch_button == switch_data->buttons[i])
 	 {
-            XtSetArg (al[0], XmNiconName, switch_data->switch_names[i]);
-            XtSetArg (al[1], XmNtitle, switch_data->switch_names[i]);
-            XtSetValues (panel.shell, al, 2);
+            WmWorkspaceData * pWS =
+               GetWorkspaceData (wmGD.dtSD, switch_data->atom_names[i]);
 
-            DtWsmSetCurrentWorkspace (XtParent (switch_button),
-                                      switch_data->atom_names[i]);
+            if (pWS)
+               ChangeToWorkspace (pWS);
             break;
          }
       }
 
-      _DtIconSetState (old_switch_button, False, False);
+
+      /*  Show the workspace that is current now (the one selected,  */
+      /*  unless it no longer exists).                               */
+
+      if (wmGD.dtSD->pActiveWS)
+         SwitchShowCurrent (switch_data, wmGD.dtSD->pActiveWS->id);
+      if (switch_button != switch_data->buttons[switch_data->active_switch])
+         _DtIconSetState (switch_button, False, False);
    }
    else
    {

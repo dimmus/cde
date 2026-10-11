@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/param.h>
+#include <dirent.h>
 
 #include <Xm/Xm.h>
 #include <Xm/MwmUtil.h>
@@ -270,14 +272,24 @@ struct dirent **build_dirent_list (char *filter, int *filecount)
 int new_name_select (struct dirent *dir_entry, char *pszdir_name)
 {
   struct stat stat_buffer;
-  char        filename[256];
+  char        filename[MAXPATHLEN];
 
   /***********************************************************************/
   /* This will only filter the icons of the filter size which by default */
   /* is medium icons.                                                    */
   /***********************************************************************/
   if (strstr(dir_entry->d_name, file_filter_global)) {
-     sprintf(filename, "%s%s", pszdir_name, dir_entry->d_name);
+#ifdef DT_REG
+     /* readdir already says it is a regular file: no stat needed.
+      * Symbolic links (to files) and unknown types are still stat'ed. */
+     if (dir_entry->d_type == DT_REG)
+        return(1);
+     if (dir_entry->d_type != DT_LNK && dir_entry->d_type != DT_UNKNOWN)
+        return(0);
+#endif
+     if (snprintf(filename, sizeof(filename), "%s%s", pszdir_name,
+                  dir_entry->d_name) >= (int)sizeof(filename))
+        return(0);
      if (!stat(filename, &stat_buffer)) {
         if ( (S_ISREG(stat_buffer.st_mode)) ||
              (S_ISLNK(stat_buffer.st_mode)) ) {
@@ -743,8 +755,8 @@ void  update_container_contents (char *filter)
      /*memset(&(icons_in_container[icon_count]), 0, sizeof(DtIconGadget *));*/
      for (lcv = old_count; lcv < icon_count; lcv++) {
         icons_in_container[lcv] =
-        /*(DtIconGadget *)XtCreateManagedWidget (filelist[lcv]->d_name,*/
-          (DtIconGadget *)XtCreateManagedWidget ("IconGadget",
+        /* created unmanaged: all are managed in one call below */
+          (DtIconGadget *)XtCreateWidget ("IconGadget",
                             dtIconGadgetClass, (Widget)icon_scrolled_container,
                             args, n);
           XtAddCallback((Widget) icons_in_container[lcv], XmNcallback,
@@ -784,7 +796,20 @@ void  update_container_contents (char *filter)
     /* the filesystem after the application is already up and       */
     /* running, the icon gadgets to not see them.                   */
     /****************************************************************/
-    XmeFlushIconFileCache(NULL);
+    /* Only this directory's entry needs flushing (Motif caches it
+       without the trailing slash, by absolute path); NULL flushed the
+       cache of every icon directory. */
+    if (path[0] == '/' && path[1] != '\0') {
+       char   *dir = XtNewString(path);
+       size_t len = strlen(dir);
+
+       while (len > 1 && dir[len - 1] == '/')
+          dir[--len] = '\0';
+       XmeFlushIconFileCache(dir);
+       XtFree(dir);
+    }
+    else
+       XmeFlushIconFileCache(NULL);
 
     for (lcv = 0; lcv < count; lcv++) {
        snprintf(iconfile, sizeof(iconfile), "%s%s", path, filelist[lcv]->d_name);
@@ -797,7 +822,6 @@ void  update_container_contents (char *filter)
                              XmNstring,        xmstring,
                              XmNimageName,     iconfile,
                              NULL);
-       XtManageChild((Widget) icons_in_container [lcv]);
        XmStringFree(xmstring);
 
 #ifdef DEBUG
@@ -816,16 +840,17 @@ void  update_container_contents (char *filter)
                              XmNstring,        xmstring,
                              XmNimageName,     (char *)NULL,
                              NULL);
-       XtManageChild((Widget) icons_in_container[0]);
        XmStringFree(xmstring);
   }
 
   /******************************************************************/
-  /* unmanage any spare icon gadgets                                */
+  /* unmanage any spare icon gadgets, manage the used ones; one call */
+  /* each instead of one geometry pass per gadget                   */
   /******************************************************************/
-  for (lcv = count; lcv < icon_count; lcv++) {
-     XtUnmanageChild ((Widget) icons_in_container[lcv]);
-  }
+  if (count < icon_count)
+     XtUnmanageChildren ((WidgetList) &icons_in_container[count],
+                         icon_count - count);
+  XtManageChildren ((WidgetList) icons_in_container, count);
 
   /******************************************************************/
   /* free dirent list                                               */

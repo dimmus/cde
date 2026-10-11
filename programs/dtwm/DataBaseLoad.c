@@ -1740,7 +1740,6 @@ EliminateEntries (RecordData * record_data,
                   int        * record_count,
                   int          start,
                   int          end,
-                  int        * i,
                   int        * count,
                   int          record_type)
 
@@ -1754,14 +1753,16 @@ EliminateEntries (RecordData * record_data,
        RemoveEntry(&(record_data[j]), record_type);
    }
 
+   /*
+    * Close the gap.  The records removed are always above the index
+    * of the caller's loop, so that index does not move.
+    */
    if (end + 1 < *record_count)
    {
       memmove((void *) &record_data[start], (void *) &record_data[end+1],
-              (size_t) ((*record_count - end) * sizeof(RecordData)));
+              (size_t) ((*record_count - end - 1) * sizeof(RecordData)));
    }
 
-
-   *i += (end - start) + 1;
    *count = *record_count -= (end - start) + 1;
 }
 
@@ -1817,8 +1818,9 @@ ResolveDuplicates (RecordData * record_data,
          element_values = record_data[i].element_values;
          if (ANY_CONTAINER_TYPE == container_type)
          {
+            /* boxes have no container: compare the names only */
             while ((strcmp((char *) (element_values[name_type].parsed_value),
-                           cont_name) == 0))
+                           record_name) == 0))
             {
                last_index = i;
                i--;
@@ -1843,7 +1845,7 @@ ResolveDuplicates (RecordData * record_data,
          }
          if (start_index != last_index)
             EliminateEntries(record_data, record_count, last_index,
-			     start_index - 1, &i, &count, record_type);
+			     start_index - 1, &count, record_type);
 
          if (i < 0) break;
       }
@@ -1889,17 +1891,18 @@ ResolveDuplicates (RecordData * record_data,
          {
             if (start_index == lock_index)
 	       EliminateEntries(record_data, record_count, last_index + 1,
-				start_index, &i, &count, record_type);
+				start_index, &count, record_type);
             else
             {
-               int diff = start_index - lock_index;
+               /*
+                * Keep the locked record: remove the ones above it, then
+                * the ones below it (whose indices the first removal
+                * does not change).
+                */
 	       EliminateEntries(record_data, record_count, lock_index + 1,
-				start_index, &i, &count, record_type);
-               lock_index += diff;
-               last_index += diff;
-               if (lock_index != last_index)
-	          EliminateEntries(record_data, record_count, last_index,
-				   lock_index - 1, &i, &count, record_type);
+				start_index, &count, record_type);
+	       EliminateEntries(record_data, record_count, last_index,
+				lock_index - 1, &count, record_type);
             }
          }
          if (i < 0) break;
@@ -1981,7 +1984,7 @@ EliminateUnused (RecordData    * record_data,
 		 int 		 record_type)
 
 {
-   int i, j, dummy = 0;
+   int i, j;
    char * container_name;
    int count = *record_count;
    Boolean name_found = False;
@@ -2014,7 +2017,7 @@ EliminateUnused (RecordData    * record_data,
             printf("Entry Eliminated - %s\n",
 		    (char *)element_values[cont_name].parsed_value);
 #endif
-	    EliminateEntries(record_data, record_count, i, i, &dummy, &count,
+	    EliminateEntries(record_data, record_count, i, i, &count,
 			     record_type);
           }
           else
@@ -2050,7 +2053,7 @@ EliminateDeleted (RecordData    * record_data,
 		 int		 lock_type)
 
 {
-   int i, j, dummy = 0;
+   int i, j;
    int count;
    ElementValue * element_values, * other_element_values;
    char * container_name, * rec_name;
@@ -2094,18 +2097,18 @@ EliminateDeleted (RecordData    * record_data,
                 {
                    if ((intptr_t)other_element_values[delete_type].parsed_value)
                    {
-                       EliminateEntries(record_data, record_count, j, j, &dummy,
+                       EliminateEntries(record_data, record_count, j, j,
                                         &count, record_type);
                        delete_rest = True;
                    }
                    else if (delete_rest)
                    {
-                       EliminateEntries(record_data, record_count, j, j, &dummy,
+                       EliminateEntries(record_data, record_count, j, j,
                                         &count, record_type);
                    }
                 }
                 else
-                   EliminateEntries(record_data, record_count, j, j, &dummy,
+                   EliminateEntries(record_data, record_count, j, j,
                                     &count, record_type);
              }
           }

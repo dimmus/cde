@@ -2452,7 +2452,7 @@ set_item(enum item_type itemno, char *str)
             w = X->modevals[(int) DISPLAYITEM] ;
             XmTextSetString(w, displayStr) ;
             XmTextSetInsertionPosition(w, XmTextGetLastPosition(w)) ;
-            XSync(X->dpy, False);
+            XFlush(X->dpy);  /* send it now; no round trip per keypress */
          }
       }
       return ;
@@ -3162,7 +3162,7 @@ win_display(enum fcp_type fcptype, int state)
 void
 write_cf_value(Widget widget, XtPointer client_data, XtPointer call_data)
 {
-  char message[MAXLINE] ;
+  char message[2 * MAXLINE] ;  /* str, a newline and a message */
   char str[MAXLINE] ;          /* Temporary buffer for various strings. */
   Widget focus_widget;
   Arg args[1];
@@ -3198,7 +3198,7 @@ write_cf_value(Widget widget, XtPointer client_data, XtPointer call_data)
     {
       snprintf(str, MAXLINE, "%s", (X->CFtype == M_CON) ? vstrs[(int) V_LCON]
                                    : vstrs[(int) V_LFUN]) ;
-      snprintf(message, MAXLINE, "%s\n%s", str, vstrs[(int) V_RANGE]) ;
+      snprintf(message, sizeof(message), "%s\n%s", str, vstrs[(int) V_RANGE]) ;
       do_continue_notice(X->CFframe, message) ;
       return ;
     }
@@ -3218,7 +3218,7 @@ write_cf_value(Widget widget, XtPointer client_data, XtPointer call_data)
       snprintf(str, MAXLINE, mess[(int) MESS_CON],
                    (X->CFtype == M_CON) ? vstrs[(int) V_UCON]
                                         : vstrs[(int) V_UFUN], X->cfno) ;
-      snprintf(message, MAXLINE, "%s\n%s", str, vstrs[(int) V_OWRITE]) ;
+      snprintf(message, sizeof(message), "%s\n%s", str, vstrs[(int) V_OWRITE]) ;
       XtUnmanageChild(X->CFframe) ;
       do_confirm_notice(X->CFframe, message) ;
     }

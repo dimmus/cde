@@ -73,6 +73,14 @@ class _Tt_object_list: public _Tt_object {
       public:
         int _count;
         _Tt_object_list_element *first, *last;
+      private:
+	// operator[] remembers the element it returned last, so that
+	// walking a list by index (as the per-argument API calls do)
+	// costs O(1) per step instead of O(index).  Any change that
+	// can move or free elements forgets it (forget_index()).
+	mutable _Tt_object_list_element *_idx_elem;
+	mutable int _idx;
+	void forget_index() { _idx_elem = 0; }
 };
 declare_ptr_to(_Tt_object_list)
 

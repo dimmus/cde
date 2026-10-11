@@ -118,12 +118,24 @@ class DtPrinterIcon : public IconObj
 
    boolean updating;
    boolean waitForChildren;
+   boolean jobs_read;      // the queue's jobs were read asynchronously
 
    DtPrinterIcon(DtMainW *, AnyUI *parent, Queue *queue,
 		 PrinterApplicationMode app_mode = SINGLE_PRINTER);
    ~DtPrinterIcon();
    void DisplayProps();
+   // Refresh the queue and device status (asynchronously where possible)
    void Update();
+   // Run the status commands of this queue and wait for them
+   void UpdateNow();
+#ifndef aix
+   // Set the queue and device status read by DtApp
+   void SetStatus(boolean queue_up, boolean device_up)
+    {
+      PrintQueueUp(queue_up);
+      PrintDeviceUp(device_up);
+    }
+#endif
    void UpdateExpand();
    void PrintQueueUp(boolean);
    boolean PrintQueueUp() { return _print_queue_up; }

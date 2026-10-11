@@ -44,6 +44,12 @@ class Process {
    uid_t uid;
    pid_t pid;
    pid_t ppid;
+#ifdef __linux__
+   // Read /proc/PID instead of listing every process with ps
+   bool use_proc;
+   char proc_line[320];
+   char *ReadProc(pid_t);
+#endif
 
  public:
 

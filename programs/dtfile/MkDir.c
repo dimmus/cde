@@ -123,8 +123,12 @@ RunFileCommand(
 
       do			/* wait for completion of command */
       {
-         wait_return = wait (&exit_value);
-      } while (wait_return != child);
+         /* only this child: wait() could reap and lose other children */
+         wait_return = waitpid (child, &exit_value, 0);
+      } while (wait_return < 0 && errno == EINTR);
+
+      if (wait_return != child)
+         exit_value = -1;
 
       (void) signal (SIGCHLD, oldSig); /* child stopped or terminated */
 

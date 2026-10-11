@@ -339,6 +339,7 @@ MakeServerAuthFile (struct display *d)
 #endif
     char    cleanname[NAMELEN];
     int r;
+    int fd;
     struct stat	statb;
 
     if (d->clientAuthFile && *d->clientAuthFile)
@@ -391,7 +392,15 @@ MakeServerAuthFile (struct display *d)
 	}
     	sprintf (d->authFile, "%s/%s/%s/A%s-XXXXXX",
 		 authDir, authdir1, authdir2, cleanname);
-    	(void) mktemp (d->authFile);
+	/* as xdm does: mkstemp() reserves the name (the caller then
+	   replaces the file), mktemp() only picked one */
+	fd = mkstemp (d->authFile);
+	if (fd < 0) {
+	    free (d->authFile);
+	    d->authFile = NULL;
+	    return FALSE;
+	}
+	close (fd);
     }
     return TRUE;
 }
@@ -1069,7 +1078,6 @@ SetUserAuthorization (struct display *d, struct verify_info *verify)
 {
     FILE	*old, *new;
     char	home_name[1024], backup_name[1024], new_name[1024];
-    char	home_name_temp[sizeof(home_name)];
     char	*name;
     char	*home;
     char	*envname = 0;
@@ -1087,14 +1095,15 @@ SetUserAuthorization (struct display *d, struct verify_info *verify)
     if (auths) {
 	home = getEnv (verify->userEnviron, "HOME");
 	lockStatus = LOCK_ERROR;
-	if (home) {
-	    snprintf(home_name, sizeof(home_name), "%s", home);
-	    if (home[strlen(home) - 1] != '/') {
-	        snprintf(home_name_temp, sizeof(home_name_temp), "%s/", home_name);
-	        strcpy(home_name, home_name_temp);
-	    }
-	    snprintf(home_name_temp, sizeof(home_name_temp), "%s.Xauthority", home_name);
-        strcpy(home_name, home_name_temp);
+	home_name[0] = '\0';
+	/* $HOME/.Xauthority; a path too long for the buffer is not used
+	   (cut off, it would name some other file) */
+	if (home && *home &&
+	    snprintf(home_name, sizeof(home_name), "%s%s.Xauthority", home,
+		     home[strlen(home) - 1] != '/' ? "/" : "")
+	    >= (int) sizeof(home_name))
+	    home_name[0] = '\0';
+	if (home_name[0]) {
 	    Debug ("XauLockAuth %s\n", home_name);
 	    lockStatus = XauLockAuth (home_name, 1, 2, 10);
 	    Debug ("Lock is %d\n", lockStatus);
@@ -1110,24 +1119,37 @@ SetUserAuthorization (struct display *d, struct verify_info *verify)
 	    }
 	}
 	if (lockStatus != LOCK_SUCCESS) {
+	    int fd;
+
+	    /*
+	     * mkstemp() creates the (empty) backup file, so nobody can
+	     * plant a link under its name in a shared userAuthDir; it is
+	     * read as the old file and replaced below.
+	     */
 	    sprintf (backup_name, "%s/.XauthXXXXXX", d->userAuthDir);
-	    (void) mktemp (backup_name);
-	    Debug ("XauLockAuth %s\n", backup_name);
-	    lockStatus = XauLockAuth (backup_name, 1, 2, 10);
-	    Debug ("backup lock is %d\n", lockStatus);
-	    if (lockStatus == LOCK_SUCCESS) {
-		if (openFiles (backup_name, new_name, &old, &new)) {
-		    name = backup_name;
-		    setenv = 1;
-		} else {
-		    XauUnlockAuth (backup_name);
-		    lockStatus = LOCK_ERROR;
-		}	
+	    fd = mkstemp (backup_name);
+	    if (fd >= 0) {
+		close (fd);
+		Debug ("XauLockAuth %s\n", backup_name);
+		lockStatus = XauLockAuth (backup_name, 1, 2, 10);
+		Debug ("backup lock is %d\n", lockStatus);
+		if (lockStatus == LOCK_SUCCESS) {
+		    if (openFiles (backup_name, new_name, &old, &new)) {
+			name = backup_name;
+			setenv = 1;
+		    } else {
+			XauUnlockAuth (backup_name);
+			lockStatus = LOCK_ERROR;
+		    }	
+		}
+		if (lockStatus != LOCK_SUCCESS)
+		    (void) unlink (backup_name);
 	    }
 	    /*
 	     * Won't be using this file so unlock it.
 	     */
-	    XauUnlockAuth (home_name);
+	    if (home_name[0])
+		XauUnlockAuth (home_name);
 	}
 	if (lockStatus != LOCK_SUCCESS) {
 	    Debug ("can't lock auth file %s or backup %s\n",
@@ -1252,7 +1274,6 @@ RemoveUserAuthorization (struct display *d, struct verify_info *verify)
     char    *home;
     Xauth   **auths, *entry;
     char    name[1024], new_name[1024];
-    char    name_temp[sizeof(name)];
     int	    lockStatus;
     FILE    *old, *new;
     struct stat	statb;
@@ -1265,13 +1286,11 @@ RemoveUserAuthorization (struct display *d, struct verify_info *verify)
     if (!home)
 	return;
     Debug ("RemoveUserAuthorization\n");
-    snprintf(name, sizeof(name), "%s", home);
-    if (home[strlen(home) - 1] != '/') {
-        snprintf(name_temp, sizeof(name_temp), "%s/", name);
-        strcpy(name, name_temp);
-    }
-    snprintf(name_temp, sizeof(name_temp), "%s.Xauthority", name);
-    strcpy(name, name_temp);
+    if (!*home ||
+        snprintf(name, sizeof(name), "%s%s.Xauthority", home,
+                 home[strlen(home) - 1] != '/' ? "/" : "")
+        >= (int) sizeof(name))
+	return;			/* the path does not fit */
     Debug ("XauLockAuth %s\n", name);
     lockStatus = XauLockAuth (name, 1, 2, 10);
     Debug ("Lock is %d\n", lockStatus);

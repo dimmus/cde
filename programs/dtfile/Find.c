@@ -30,25 +30,24 @@
  *
  *   Description:    Source file for the find file dialog.
  *
- *   FUNCTIONS: AlternateInputHandler
- *		AlternateInputHandler
- *		AlternateInputHandler
+ *   FUNCTIONS: AddMatch
  *		Create
  *		Destroy
+ *		EndSearchProcess
  *		EnterStopBttn
  *		ExecuteFind
- *		ExecuteGrep
  *		ExtractDirectory
+ *		FinishSearch
  *		FindProcessStarted
  *		FindPutOnDesktop
  *		FreeMatchInfo
+ *		FreeGrepState
  *		FreeValues
  *		GetDefaultValues
  *		GetFileName
  *		GetFindValues
  *		GetResourceValues
  *		GetValues
- *		GrowBuffer
  *		InstallChange
  *		InstallClose
  *		InvalidFindMessage
@@ -57,13 +56,16 @@
  *		NewView
  *		SetActiveItem
  *		SetFocus
+ *		SearchInputHandler
+ *		SearchLine
  *		SetValues
+ *		SpawnSearchProcess
  *		StartCallback
+ *		StartNextGrep
  *		StartSearch
  *		StopCallback
  *		StopSearch
  *		WriteResourceValues
- *		findpopen
  *
  *   (c) Copyright 1993, 1994, 1995 Hewlett-Packard Company
  *   (c) Copyright 1993, 1994, 1995 International Business Machines Corp.
@@ -82,6 +84,10 @@
 #include <sys/stat.h>
 #include <pwd.h>
 #include <signal.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <glob.h>
+#include <spawn.h>
 
 
 #include <stdlib.h>
@@ -152,16 +158,21 @@ typedef struct _Dummy {
 
 
 /* More string defines */
-static char * PRINT_OPTION = " -print ";
-static char * FIND_COMMAND = "find ";
-static char * GREP_COMMAND = "grep -i -l ";
-static char * NAME_OPTION =  " -name ";
-#if defined(sun)
-static char * FOLLOW_OPTION = " -follow";
-#endif /* sun */
-static char * REDIRECTOR =   " 2>&-";
-static char * TYPEDIR = " -type d";
 static char * FIND_FILE = "FindFile";
+
+/* what the output of the running search process lists (searchPhase) */
+#define PHASE_NAMES  0   /* search by name: the matching files */
+#define PHASE_DIRS   1   /* search by contents: the folders to search */
+#define PHASE_GREP   2   /* search by contents: the files that contain it */
+
+/* bytes read from the search process per input callback */
+#define SEARCH_READ_CHUNK  16384
+
+/* at most this many files (and bytes of names) per grep process */
+#define GREP_MAX_FILES     1024
+#define GREP_MAX_BYTES     (64 * 1024)
+
+extern char **environ;
 
 #define NEW_VIEW     0
 #define CURRENT_VIEW 1
@@ -262,10 +273,6 @@ static void StopCallback(
                         Widget w,
                         XtPointer client_data,
                         XtPointer call_data) ;
-static String GrowBuffer(
-                        String buf,
-                        int *size,
-                        int extra) ;
 static Boolean FindProcessStarted(
                         FindRec *find_rec,
                         FindData *find_data) ;
@@ -273,20 +280,20 @@ static Boolean ExecuteFind(
                         FindRec *find_rec,
                         FindData *find_data,
                         FileMgrData *file_mgr_data) ;
-static Boolean ExecuteGrep(
+static int SpawnSearchProcess(
+                        FindRec *find_rec,
+                        char **argv) ;
+static void StartNextGrep(
                         FindRec * find_rec) ;
-static void AlternateInputHandler(
+static void SearchInputHandler(
                         XtPointer client_data,
                         int *source,
                         XtInputId *id) ;
-static void AlternateInputHandler2(
-                        XtPointer client_data,
-                        int *source,
-                        XtInputId *id) ;
-static void AlternateInputHandler3(
-                        XtPointer client_data,
-                        int *source,
-                        XtInputId *id) ;
+static void EndSearchProcess(
+                        FindRec *find_rec,
+                        Boolean kill_it) ;
+static void FreeGrepState(
+                        FindRec *find_rec) ;
 static void GetFileName(
                         Widget list,
                         int selectedItem,
@@ -312,7 +319,6 @@ static void SetActiveItem(
 static void SetFocus(
                         FindRec *find_rec,
                         FindData *find_data ) ;
-FILE *findpopen(char *,char *,int *);
 
 /********    End Static Function Declarations    ********/
 
@@ -340,8 +346,6 @@ static DialogClass findClassRec =
 };
 
 DialogClass * findClass = (DialogClass *) &findClassRec;
-char *buffer;
-static char *ptr;
 
 
 /************************************************************************
@@ -373,10 +377,6 @@ Create(
    Arg args[12];
    int n;
    XtTranslations trans_table;
-
-   /* Initialize some global varibles */
-   buffer = NULL;
-   ptr = NULL;
 
    /*  Allocate the find file dialog instance record.  */
 
@@ -807,10 +807,19 @@ Create(
    find_rec->help = help;
 
    find_rec->selectedItem = -1;
-   find_rec->popenId = NULL;
+   find_rec->pipeFd = -1;
    find_rec->childpid = -1;
    find_rec->alternateInputId = 0;
    find_rec->searchInProgress = False;
+   find_rec->searchPhase = PHASE_NAMES;
+   find_rec->lineBuf = NULL;
+   find_rec->lineLen = find_rec->lineSize = 0;
+   find_rec->grepDirs = NULL;
+   find_rec->grepCount = find_rec->grepSize = find_rec->grepNext = 0;
+   find_rec->grepName = NULL;
+   find_rec->grepContent = NULL;
+   find_rec->grepGlob = NULL;
+   find_rec->grepGlobNext = 0;
    find_rec->fileMgrRec = NULL;
 
 
@@ -885,6 +894,9 @@ static void
 Destroy(
         FindRec *find_rec )
 {
+   EndSearchProcess (find_rec, True);
+   FreeGrepState (find_rec);
+   XtFree (find_rec->lineBuf);
    XtDestroyWidget (find_rec->shell);
    XtFree ((char *) find_rec->apply_data);
    XtFree ((char *) find_rec);
@@ -1432,18 +1444,13 @@ StopSearch(
    /* just as the user hit the 'stop' key, we need to check to see   */
    /* if the operation is still active.                              */
 
-   if (find_rec->popenId != NULL)
+   if (find_rec->pipeFd >= 0)
    {
-      /* Abort the find process, and remove the alternate input handler */
-      (void) fclose (find_rec->popenId);
-      if(find_rec->childpid > 1)  /* trying to be safe */
-        kill(find_rec->childpid,SIGTERM);  /* Ignore errors */
-      find_rec->popenId = NULL;
-      find_rec->childpid = -1;
-      XtRemoveInput (find_rec->alternateInputId);
-      find_rec->alternateInputId = 0;
+      /* Abort the search process, and remove the alternate input handler */
+      EndSearchProcess (find_rec, True);
       find_rec->searchInProgress = False;
    }
+   FreeGrepState (find_rec);
 
 
    /* Change button sensitivities */
@@ -1463,9 +1470,6 @@ StopSearch(
 
    _DtTurnOffHourGlass (find_rec->shell);
    XmUpdateDisplay (w);
-   XtFree(buffer);
-   buffer = NULL;
-   ptr = NULL;
 }
 
 
@@ -1625,26 +1629,6 @@ StopCallback(
 
 
 
-/************************************************************************
- *
- *  GrowBuffer
- *
- ************************************************************************/
-
-static String
-GrowBuffer(
-        String buf,
-        int *size,
-        int extra )
-{
-   if (strlen (buf) + 1 + extra >= *size)
-   {
-      *size = strlen(buf) + extra + 1025;
-      buf = XtRealloc (buf, *size);
-   }
-
-   return (buf);
-}
 
 
 
@@ -1685,11 +1669,12 @@ ExecuteFind(
    FindData * find_data,
    FileMgrData *file_mgr_data)
 {
-   int commandLen;
-   String command;
    String findptr;
    String host;
    String path;
+   char *argv[10];
+   int n = 0;
+   int rc;
 #if defined (SVR4) || defined(_AIX) || \
     !(defined(__linux__) || defined(CSRG_BASED) || defined(BLS))
    int access_priv;
@@ -1703,7 +1688,6 @@ ExecuteFind(
    int save_rgid;
 #endif /* SVR4 */
    char *link_path;
-   void (*oldSig)();
 
    if(strcmp(find_data->content, "") == 0)
    {
@@ -1730,13 +1714,6 @@ ExecuteFind(
    }
 
 
-   /* Construct the 'find' command */
-
-   commandLen = 1024;
-   command = XtMalloc (commandLen);
-   (void) strcpy (command, FIND_COMMAND);
-
-
    /* Convert directory names from external to internal (nfs) format */
 
    findptr = find_data->directories;
@@ -1757,10 +1734,7 @@ ExecuteFind(
    path = XtNewString(link_path);
 
    if(path == NULL)
-   {
-      XtFree(command);
       return False;
-   }
    /* Verify that the path exists and is accessible */
 #if defined (SVR4)  || defined(_AIX)
 /* needed for getaccess () call */
@@ -1810,45 +1784,42 @@ ExecuteFind(
 
       InvalidFindMessage (find_rec, NO_DIR_ACCESS, findptr);
       XtFree ((char *) path);
-      XtFree ((char *) command);
       return (False);
    }
 
 
-   /* See if the buffer needs to grow */
-
-   command = GrowBuffer (command, &commandLen, (int) strlen (path));
-
-
-   /* Add path to the command string */
-
-   (void) strcat (command, path);
-   (void) strcat (command, " ");
-   XtFree ((char *) path);
-
-   /* Add on the rest of the search constraints */
+   /*
+    * Run find(1) directly, with the path and pattern as arguments.  This
+    * used to be "ksh -c" with a command line, which split paths at
+    * blanks and let the shell expand $, ` and \ in the pattern.
+    */
+   argv[n++] = "find";
+   argv[n++] = path;
 
    if(strcmp(find_data->content, "") != 0)
    {
-      command = GrowBuffer (command, &commandLen, (int) strlen (TYPEDIR));
-      (void) strcat (command, TYPEDIR);
+      /* search by contents: find the folders, then grep in each */
+      argv[n++] = "-type";
+      argv[n++] = "d";
+      find_rec->searchPhase = PHASE_DIRS;
+      FreeGrepState (find_rec);
+      find_rec->grepName = XmTextFieldGetString (find_rec->fileNameFilter);
+      if (strcmp (find_rec->grepName, "") == 0)
+      {
+         XtFree (find_rec->grepName);
+         find_rec->grepName = XtNewString ("*");
+      }
+      find_rec->grepContent = XmTextFieldGetString (find_rec->content);
    }
    else
    {
-       /* File name regular expression */
-       if (find_data->filter)
-       {
-          command =
-             GrowBuffer (command, &commandLen, (int)strlen (find_data->filter) +
-                                                (int) strlen (NAME_OPTION) + 2);
-
-          /* The string needs to be quoted */
-          (void) strcat (command, NAME_OPTION);
-          (void) strcat (command, "\"");
-          (void) strcat (command, find_data->filter);
-          (void) strcat (command, "\" ");
-       }
-
+      /* File name pattern */
+      find_rec->searchPhase = PHASE_NAMES;
+      if (find_data->filter)
+      {
+         argv[n++] = "-name";
+         argv[n++] = find_data->filter;
+      }
    }
 
 #if defined(sun)
@@ -1861,57 +1832,23 @@ ExecuteFind(
       if(menuHistory == find_rec->widgArry[ON])
       {
          /* Add the option to follow a link */
-
-         command = GrowBuffer (command, &commandLen,
-                                    (int) strlen (FOLLOW_OPTION));
-         (void) strcat (command, FOLLOW_OPTION);
+         argv[n++] = "-follow";
       }
    }
 #endif
 
-   /* Add the -print to get the results of the find */
+   argv[n++] = "-print";
+   argv[n] = NULL;
 
-   command = GrowBuffer (command, &commandLen, (int) strlen (PRINT_OPTION));
-   (void) strcat (command, PRINT_OPTION);
+   /* Start the 'find' process, and read its output as it comes */
 
-
-   /* Add the redirector for stderr, so it is disabled */
-
-   command = GrowBuffer (command, &commandLen, (int) strlen (REDIRECTOR));
-   (void) strcat (command, REDIRECTOR);
-
-
-   /* Start the 'find' process */
-
-   oldSig = signal(SIGCHLD, SIG_DFL);
-   find_rec->popenId = findpopen(command, "r",&(find_rec->childpid));
-   signal (SIGCHLD, oldSig);
-
-   if (find_rec->popenId == NULL)
+   rc = SpawnSearchProcess (find_rec, argv);
+   XtFree ((char *) path);
+   if (rc != 0)
    {
-      XtFree ((char *) command);
+      FreeGrepState (find_rec);
       return (False);
    }
-
-
-   /* Set up the alternate input source handler */
-
-   if(strcmp(find_data->content, "") != 0)
-   {
-      find_rec->alternateInputId =
-         XtAddInput (fileno (find_rec->popenId), (XtPointer)XtInputReadMask,
-                  (XtInputCallbackProc)AlternateInputHandler2, find_rec);
-   }
-   else
-   {
-      find_rec->alternateInputId =
-         XtAddInput (fileno (find_rec->popenId), (XtPointer)XtInputReadMask,
-                  (XtInputCallbackProc)AlternateInputHandler, find_rec);
-   }
-
-   /* printf ("%s\n", command); */
-
-   XtFree ((char *) command);
 
    return (True);
 }
@@ -1919,568 +1856,484 @@ ExecuteFind(
 
 /************************************************************************
  *
- *  ExecuteGrep()
- *	Create the command string for invoking the 'grep' process,
- *      and then execute it.
+ *  SpawnSearchProcess()
+ *	Start find(1) or grep(1) with the given arguments (no shell), its
+ *	output going to a pipe that SearchInputHandler reads.  Error
+ *	messages are discarded, as the "2>&-" of the old shell commands
+ *	did.  Returns 0, or -1 if the process could not be started.
  *
  ************************************************************************/
-static Boolean
-ExecuteGrep( FindRec * find_rec)
+
+static int
+SpawnSearchProcess(
+        FindRec *find_rec,
+        char **argv )
 {
-   int commandLen;
-   String command;
-   Arg args[1];
-   char *contents;
-   char *ptr2;
-   int item_count;
-   char * title;
-   char * msg;
+   posix_spawn_file_actions_t actions;
+   posix_spawnattr_t attr;
+   sigset_t sigdefault;
+   int fds[2];
+   pid_t pid;
+   int rc;
 
-   /* Construct the 'grep' command */
-   commandLen = 1024;
-   command = XtMalloc (commandLen);
-   (void) strcpy (command, GREP_COMMAND);
+   if (pipe (fds) < 0)
+      return -1;
 
-   contents = XmTextFieldGetString (find_rec->content);
-
-   command = GrowBuffer (command, &commandLen, strlen(contents) + 4);
-
-   (void) strcat (command, "\"");
-   (void) strcat (command, contents);
-   (void) strcat (command, "\"");
-   (void) strcat (command, " ");
-
-   if( ptr == NULL)
-      ptr = buffer;
-
-   ptr2 = DtStrchr(ptr, ',');
-   if(ptr2 == NULL)
+   posix_spawn_file_actions_init (&actions);
+   posix_spawn_file_actions_addclose (&actions, fds[0]);
+   if (fds[1] != STDOUT_FILENO)
    {
-      XtFree ((char *) command);
-      XtFree(buffer);
-      buffer = NULL;
-      ptr = NULL;
-      if(find_rec->popenId != NULL)
-         (void) fclose (find_rec->popenId);
-      find_rec->popenId = NULL;
-      find_rec->alternateInputId = 0;
-
-      find_rec->searchInProgress = False;
-
-      /* Reset button sensitivity */
-
-      XtSetSensitive (find_rec->close, True);
-      XtSetSensitive (find_rec->start, True);
-      XtSetSensitive (find_rec->stop, False);
-
-      XtSetArg (args[0], XmNitemCount, &item_count);
-      XtGetValues (find_rec->matchList, args, 1);
-
-      XtSetArg (args[0], XmNdefaultButton, find_rec->start);
-      XtSetValues (find_rec->form, args, 1);
-
-      if (item_count == 0)
-      {
-         char * tmpStr;
-
-         tmpStr = GetSharedMessage(FIND_ERROR_TITLE);
-         title = XtNewString(tmpStr);
-         tmpStr = GetSharedMessage(NO_FILES_FOUND_ERROR);
-         msg = XtNewString(tmpStr);
-         _DtMessage (find_rec->shell, title, msg, NULL, HelpRequestCB);
-         XtFree(title);
-         XtFree(msg);
-      }
-      else
-      {
-         XmListSelectPos(find_rec->matchList, 1, True);
-         XmProcessTraversal(find_rec->matchList, XmTRAVERSE_CURRENT);
-      }
-
-      _DtTurnOffHourGlass (find_rec->shell);
-      return(True);
+      posix_spawn_file_actions_adddup2 (&actions, fds[1], STDOUT_FILENO);
+      posix_spawn_file_actions_addclose (&actions, fds[1]);
    }
-   else
+   posix_spawn_file_actions_addopen (&actions, STDERR_FILENO, "/dev/null",
+                                     O_WRONLY, 0);
+
+   /* signals dtfile ignores must not stay ignored in the child: find has
+    * to die of SIGPIPE when the search is stopped */
+   posix_spawnattr_init (&attr);
+   sigemptyset (&sigdefault);
+   sigaddset (&sigdefault, SIGPIPE);
+   sigaddset (&sigdefault, SIGCHLD);
+   sigaddset (&sigdefault, SIGINT);
+   sigaddset (&sigdefault, SIGQUIT);
+   sigaddset (&sigdefault, SIGTERM);
+   posix_spawnattr_setsigdefault (&attr, &sigdefault);
+   posix_spawnattr_setflags (&attr, POSIX_SPAWN_SETSIGDEF);
+
+   rc = posix_spawnp (&pid, argv[0], &actions, &attr, argv, environ);
+
+   posix_spawnattr_destroy (&attr);
+   posix_spawn_file_actions_destroy (&actions);
+   close (fds[1]);
+   if (rc != 0)
    {
-      *ptr2 = '\0';
-      command = GrowBuffer (command, &commandLen, (int) strlen (ptr) + 3);
-
-      /* Add buffer to the command string */
-
-      (void) strcat (command, ptr);
-      (void) strcat (command, " ");
-      *ptr2 = ',';
-      ptr2++;
-      ptr = ptr2;
+      close (fds[0]);
+      return -1;
    }
 
-   /* Add the redirector for stderr, so it is disabled */
+   DPRINTF(("SpawnSearchProcess: %s started, pid %d\n", argv[0], (int) pid));
 
-   command = GrowBuffer (command, &commandLen, (int) strlen (REDIRECTOR));
-   (void) strcat (command, REDIRECTOR);
+   /* the input callback reads what is there, and never blocks */
+   (void) fcntl (fds[0], F_SETFL, fcntl (fds[0], F_GETFL) | O_NONBLOCK);
+   (void) fcntl (fds[0], F_SETFD, FD_CLOEXEC);
 
-
-   /* Start the 'grep' process */
-
-   if ((find_rec->popenId = popen (command, "r")) == NULL)
-   {
-      XtFree ((char *) command);
-      return (False);
-   }
-
-
-   /* Set up the alternate input source handler */
-
+   find_rec->pipeFd = fds[0];
+   find_rec->childpid = pid;
+   find_rec->lineLen = 0;
    find_rec->alternateInputId =
-      XtAddInput (fileno (find_rec->popenId), (XtPointer)XtInputReadMask,
-                  (XtInputCallbackProc)AlternateInputHandler3, find_rec);
-
-   /* printf ("%s\n", command); */
-
-   XtFree ((char *) command);
-
-   if(ptr == NULL)
-   {
-      XtFree(buffer);
-      buffer = NULL;
-      ptr = NULL;
-   }
-   return (True);
+      XtAppAddInput (XtWidgetToApplicationContext (find_rec->shell),
+                     fds[0], (XtPointer) XtInputReadMask,
+                     (XtInputCallbackProc) SearchInputHandler, find_rec);
+   return 0;
 }
-
 
 
 /************************************************************************
  *
- *  AlternateInputHandler()
- *	When a 'find' operation is taking place, this function will be
- *      invoked whenever the 'find' process has some data to send to us.
- *      The function will extract a single line from the pipe, and then
- *      add it to the list of matches, if it matches the selected file
- *      types.
+ *  EndSearchProcess()
+ *	Stop reading the search process; optionally terminate it.
  *
  ************************************************************************/
 
 static void
-AlternateInputHandler(
+EndSearchProcess(
+        FindRec *find_rec,
+        Boolean kill_it )
+{
+   if (find_rec->alternateInputId)
+   {
+      XtRemoveInput (find_rec->alternateInputId);
+      find_rec->alternateInputId = 0;
+   }
+   if (find_rec->pipeFd >= 0)
+   {
+      close (find_rec->pipeFd);
+      find_rec->pipeFd = -1;
+   }
+   if (kill_it && find_rec->childpid > 1)  /* trying to be safe */
+      kill (find_rec->childpid, SIGTERM);  /* Ignore errors */
+   find_rec->childpid = -1;
+   find_rec->lineLen = 0;
+}
+
+
+/************************************************************************
+ *
+ *  FreeGrepState()
+ *	Forget the folders and patterns of a search by contents.
+ *
+ ************************************************************************/
+
+static void
+FreeGrepState(
+        FindRec *find_rec )
+{
+   int i;
+
+   for (i = 0; i < find_rec->grepCount; i++)
+      XtFree (find_rec->grepDirs[i]);
+   XtFree ((char *) find_rec->grepDirs);
+   find_rec->grepDirs = NULL;
+   find_rec->grepCount = find_rec->grepSize = find_rec->grepNext = 0;
+
+   XtFree (find_rec->grepName);
+   find_rec->grepName = NULL;
+   XtFree (find_rec->grepContent);
+   find_rec->grepContent = NULL;
+
+   if (find_rec->grepGlob)
+   {
+      globfree ((glob_t *) find_rec->grepGlob);
+      XtFree ((char *) find_rec->grepGlob);
+      find_rec->grepGlob = NULL;
+   }
+   find_rec->grepGlobNext = 0;
+}
+
+
+/************************************************************************
+ *
+ *  FinishSearch()
+ *	The search is complete: reset the dialog, report if nothing
+ *	was found, else select the first match.
+ *
+ ************************************************************************/
+
+static void
+FinishSearch(
+        FindRec *find_rec )
+{
+   Arg args[1];
+   int item_count;
+   char * title;
+   char * msg;
+   char * tmpStr;
+
+   FreeGrepState (find_rec);
+   XtRemoveEventHandler (find_rec->stop, LeaveWindowMask, FALSE, (XtEventHandler)LeaveStopBttn, find_rec);
+   XtRemoveEventHandler (find_rec->stop, EnterWindowMask, FALSE, (XtEventHandler)EnterStopBttn, find_rec);
+
+   find_rec->searchInProgress = False;
+
+   /* Reset button sensitivity */
+
+   XtSetSensitive (find_rec->close, True);
+   XtSetSensitive (find_rec->start, True);
+   XtSetSensitive (find_rec->stop, False);
+
+   XtSetArg (args[0], XmNitemCount, &item_count);
+   XtGetValues (find_rec->matchList, args, 1);
+
+   XtSetArg (args[0], XmNdefaultButton, find_rec->start);
+   XtSetValues (find_rec->form, args, 1);
+
+   if (item_count == 0)
+   {
+      tmpStr = GetSharedMessage(FIND_ERROR_TITLE);
+      title = XtNewString(tmpStr);
+      tmpStr = GetSharedMessage(NO_FILES_FOUND_ERROR);
+      msg = XtNewString(tmpStr);
+      _DtMessage (find_rec->shell, title, msg, NULL, HelpRequestCB);
+      XtFree(title);
+      XtFree(msg);
+   }
+   else
+   {
+      XmListSelectPos(find_rec->matchList, 1, True);
+      XmProcessTraversal(find_rec->matchList, XmTRAVERSE_CURRENT);
+   }
+
+   _DtTurnOffHourGlass (find_rec->shell);
+}
+
+
+/************************************************************************
+ *
+ *  StartNextGrep()
+ *	Search by contents: start grep(1) on the next files that match the
+ *	file name pattern in the folders find(1) listed.  This used to be
+ *	"grep ... folder/pattern" through a shell, one per folder; glob()
+ *	expands the pattern as the shell did (no dot files unless the
+ *	pattern asks for them), and folder names are passed unchanged.
+ *	When no folder is left, the search is complete.
+ *
+ ************************************************************************/
+
+static void
+StartNextGrep(
+        FindRec * find_rec )
+{
+   glob_t *g;
+   char *pattern;
+   char **argv;
+   size_t bytes;
+   int n;
+
+   for (;;)
+   {
+      g = (glob_t *) find_rec->grepGlob;
+      if (g == NULL || find_rec->grepGlobNext >= g->gl_pathc)
+      {
+         /* expand the pattern in the next folder */
+         if (g)
+         {
+            globfree (g);
+            XtFree ((char *) g);
+            find_rec->grepGlob = NULL;
+         }
+         if (find_rec->grepNext >= find_rec->grepCount)
+         {
+            FinishSearch (find_rec);
+            return;
+         }
+
+         pattern = XtMalloc (strlen (find_rec->grepDirs[find_rec->grepNext]) +
+                             strlen (find_rec->grepName) + 2);
+         sprintf (pattern, "%s/%s", find_rec->grepDirs[find_rec->grepNext],
+                  find_rec->grepName);
+         find_rec->grepNext++;
+
+         g = XtNew (glob_t);
+         memset (g, 0, sizeof (glob_t));
+         if (glob (pattern, 0, NULL, g) != 0)
+         {
+            /* no match (or an error): an empty list, safe to globfree */
+            globfree (g);
+            memset (g, 0, sizeof (glob_t));
+         }
+         XtFree (pattern);
+         find_rec->grepGlob = (void *) g;
+         find_rec->grepGlobNext = 0;
+         continue;
+      }
+
+      /* grep -i -l -e TEXT -- FILES... */
+      argv = (char **) XtMalloc ((6 + GREP_MAX_FILES + 1) * sizeof (char *));
+      n = 0;
+      argv[n++] = "grep";
+      argv[n++] = "-i";
+      argv[n++] = "-l";
+      argv[n++] = "-e";
+      argv[n++] = find_rec->grepContent;
+      argv[n++] = "--";
+      bytes = 0;
+      while (find_rec->grepGlobNext < g->gl_pathc &&
+             n < 6 + GREP_MAX_FILES && bytes < GREP_MAX_BYTES)
+      {
+         argv[n] = g->gl_pathv[find_rec->grepGlobNext++];
+         bytes += strlen (argv[n++]) + 1;
+      }
+      argv[n] = NULL;
+
+      if (SpawnSearchProcess (find_rec, argv) == 0)
+      {
+         find_rec->searchPhase = PHASE_GREP;
+         XtFree ((char *) argv);
+         return;
+      }
+      XtFree ((char *) argv);
+      /* grep could not be started; go on with the next files */
+   }
+}
+
+
+/************************************************************************
+ *
+ *  AddMatch()
+ *	Add a file to the matches of this input callback.
+ *
+ ************************************************************************/
+
+static void
+AddMatch(
+        FileMgrData *file_mgr_data,
+        char *path,
+        XmString **items,
+        int *count,
+        int *size )
+{
+   if (*count >= *size)
+   {
+      *size = *size ? 2 * *size : 64;
+      *items = (XmString *) XtRealloc ((char *) *items,
+                                       *size * sizeof (XmString));
+   }
+   if(file_mgr_data->restricted_directory != NULL)
+      (*items)[(*count)++] = XmStringCreateLocalized (path +
+                                 strlen(file_mgr_data->restricted_directory));
+   else
+      (*items)[(*count)++] = XmStringCreateLocalized (path);
+}
+
+
+/************************************************************************
+ *
+ *  SearchLine()
+ *	Process one line of output of the search process.
+ *
+ ************************************************************************/
+
+static void
+SearchLine(
+        FindRec *find_rec,
+        FileMgrData *file_mgr_data,
+        char *line,
+        XmString **items,
+        int *count,
+        int *size )
+{
+   struct stat stat_data;
+   char *path;
+   char *file_type;
+   TypeInfo *type_info;
+   Boolean invisible;
+
+   if (*line == '\0' || (path = (char *) DtEliminateDots (line)) == NULL)
+      return;
+
+   switch (find_rec->searchPhase)
+   {
+      case PHASE_NAMES:
+         if (lstat (path, &stat_data) != 0)
+            return;
+
+         /* Strip out any invisible files; the type of a file that is not
+          * a link follows from what lstat returned */
+         file_type = (char *) DtDtsDataToDataType (path, NULL, 0,
+                                    S_ISLNK (stat_data.st_mode) ? NULL : &stat_data,
+                                    NULL, NULL, NULL);
+         type_info = _DtGetTypeInfo (file_type);
+         invisible = type_info && type_info->invisible;
+         DtDtsFreeDataType (file_type);
+         if (invisible)
+            return;
+
+         /*  Add to the scrolled list of matches  */
+         if (strncmp (desktop_dir, path, strlen (desktop_dir)) != 0)
+            AddMatch (file_mgr_data, path, items, count, size);
+         break;
+
+      case PHASE_DIRS:
+         if (stat (path, &stat_data) != 0 && lstat (path, &stat_data) != 0)
+            return;
+
+         /* remember the folder, to search in it later */
+         if (find_rec->grepCount >= find_rec->grepSize)
+         {
+            find_rec->grepSize = find_rec->grepSize ? 2 * find_rec->grepSize : 64;
+            find_rec->grepDirs = (char **) XtRealloc ((char *) find_rec->grepDirs,
+                                     find_rec->grepSize * sizeof (char *));
+         }
+         find_rec->grepDirs[find_rec->grepCount++] = XtNewString (path);
+         break;
+
+      case PHASE_GREP:
+         if (stat (path, &stat_data) != 0 && lstat (path, &stat_data) != 0)
+            return;
+
+         /* Make sure its nots a directory */
+         if (!S_ISDIR (stat_data.st_mode) &&
+             strncmp (desktop_dir, path, strlen (desktop_dir)) != 0)
+            AddMatch (file_mgr_data, path, items, count, size);
+         break;
+   }
+}
+
+
+/************************************************************************
+ *
+ *  SearchInputHandler()
+ *	Called whenever the search process has sent output (or ended).
+ *	Reads what is available, processes every complete line and adds
+ *	the matches to the list in one call.  The old handlers read one
+ *	byte at a time through stdio and returned after one line, so the
+ *	rest waited in the stdio buffer until the process wrote again.
+ *
+ ************************************************************************/
+
+static void
+SearchInputHandler(
         XtPointer client_data,
         int *source,
         XtInputId *id )
 {
-   static int bufSize = 0;
-   static char * buf = NULL;
    FindRec * find_rec = (FindRec *) client_data;
    FileMgrData *file_mgr_data;
    DialogData * dialog_data;
-   int offset = 0;
-   char next;
-   XmString string;
-   int count = 0;
-   Arg args[1];
-   char * findptr;
-   struct stat stat_data;
-   int item_count;
-   char * title;
-   char * msg;
-   char * file_type;
+   XmString *items = NULL;
+   int count = 0, size = 0;
+   char *line, *nl, *end;
+   Boolean eof = False;
+   ssize_t n;
+   int i;
 
    /* Abort if the pipe has already been closed */
 
-   if (find_rec->popenId == NULL) {
-      XtSetArg (args[0], XmNdefaultButton, find_rec->start);
-      XtSetValues (find_rec->form, args, 1);
-      _DtTurnOffHourGlass (find_rec->shell);
-      return;
-   }
-
-
-   /* Allocate some buffer, if this is the first time here */
-
-   if (bufSize == 0)
+   if (find_rec->pipeFd < 0)
    {
-      bufSize = 512;
-      buf = XtMalloc (bufSize);
-   }
-
-   dialog_data=_DtGetInstanceData((XtPointer)find_rec->fileMgrRec);
-   file_mgr_data = (FileMgrData *) dialog_data->data;
-
-   /* Extract the next line, upto a NewLine or EOF */
-
-   while (1)
-   {
-      while ((offset < bufSize - 1) &&
-          ((count = fread (&next, sizeof (char), 1, find_rec->popenId)) == 1) &&
-          (next != '\n'))
-      {
-          buf[offset++] = next;
-      }
-
-
-      /* See if we broke out because the buffer needs to grow */
-
-      if (offset >= bufSize)
-      {
-         bufSize += 512;
-         buf = XtRealloc (buf, bufSize);
-         continue;
-      }
-
-
-      /* Save the string we just extracted */
-
-      if (offset > 0)
-      {
-         buf[offset] = '\0';
-         buf = (String) DtEliminateDots (buf);
-
-         if ((stat (buf, &stat_data) == 0) ||
-             (lstat (buf, &stat_data) == 0))
-         {
-            findptr = buf;
-
-            /* Strip out any invisible files */
-            if (findptr)
-            {
-               file_type = (char *) DtDtsDataToDataType(findptr, NULL, 0, NULL,
-                                                        NULL, NULL, NULL);
-               if (_DtCheckForDataTypeProperty(file_type, "invisible"))
-                  findptr = NULL;
-            }
-
-            /*  Add string to the scrolled list of matches  */
-            /*  Add to the scrolled list of matches         */
-
-            if (findptr &&
-                    strncmp(desktop_dir, findptr, strlen(desktop_dir)) != 0)
-            {
-               if(file_mgr_data->restricted_directory != NULL)
-                  string = XmStringCreateLocalized (findptr +
-                         strlen(file_mgr_data->restricted_directory));
-               else
-                  string =
-                         XmStringCreateLocalized (findptr);
-               XmListAddItemUnselected (find_rec->matchList, string, 0);
-               XmStringFree (string);
-            }
-         }
-      }
-
-      if (count == 0)
-      {
-         /* EOF; command is complete */
-         /* Clean up */
-
-         (void) fclose (find_rec->popenId);
-         find_rec->popenId = NULL;
-         XtRemoveInput (find_rec->alternateInputId);
-         XtRemoveEventHandler (find_rec->stop, LeaveWindowMask, FALSE, (XtEventHandler)LeaveStopBttn, find_rec);
-         XtRemoveEventHandler (find_rec->stop, EnterWindowMask, FALSE, (XtEventHandler)EnterStopBttn, find_rec);
-         find_rec->alternateInputId = 0;
-
-         find_rec->searchInProgress = False;
-
-         /* Reset button sensitivity */
-
-         XtSetSensitive (find_rec->close, True);
-         XtSetSensitive (find_rec->start, True);
-         XtSetSensitive (find_rec->stop, False);
-
-         XtSetArg (args[0], XmNitemCount, &item_count);
-         XtGetValues (find_rec->matchList, args, 1);
-
-         XtSetArg (args[0], XmNdefaultButton, find_rec->start);
-         XtSetValues (find_rec->form, args, 1);
-
-         if (item_count == 0)
-         {
-            char * tmpStr;
-
-            tmpStr = GetSharedMessage(FIND_ERROR_TITLE);
-            title = XtNewString(tmpStr);
-            tmpStr = GetSharedMessage(NO_FILES_FOUND_ERROR);
-            msg = XtNewString(tmpStr);
-            _DtMessage (find_rec->shell, title, msg, NULL, HelpRequestCB);
-            XtFree(title);
-            XtFree(msg);
-         }
-         else
-         {
-            XmListSelectPos(find_rec->matchList, 1, True);
-            XmProcessTraversal(find_rec->matchList, XmTRAVERSE_CURRENT);
-         }
-
-         _DtTurnOffHourGlass (find_rec->shell);
-      }
-      return;
-   }
-}
-
-static void
-AlternateInputHandler2(
-        XtPointer client_data,
-        int *source,
-        XtInputId *id )
-{
-   static int bufSize = 0;
-   static char * buf = NULL;
-   FindRec * find_rec = (FindRec *) client_data;
-   int offset = 0;
-   char next;
-   int count = 0;
-   char * findptr;
-   struct stat stat_data;
-   char * content;
-
-   content = XmTextFieldGetString (find_rec->fileNameFilter);
-   if(strcmp(content, "") == 0)
-      content = XtNewString("*");
-
-  /* Abort if the pipe has already been closed */
-
-   if (find_rec->popenId == NULL) {
       Arg args[1];
 
-      _DtTurnOffHourGlass (find_rec->shell);
       XtSetArg (args[0], XmNdefaultButton, find_rec->start);
       XtSetValues (find_rec->form, args, 1);
-
-      return;
-   }
-
-   /* Allocate some buffer, if this is the first time here */
-
-   if (bufSize == 0)
-   {
-      bufSize = 512;
-      buf = XtMalloc (bufSize);
-   }
-
-
-   /* Extract the next line, upto a NewLine or EOF */
-
-   while (1)
-   {
-      while ((offset < bufSize - 1) &&
-          ((count = fread (&next, sizeof (char), 1, find_rec->popenId)) == 1) &&
-          (next != '\n'))
-      {
-          buf[offset++] = next;
-      }
-
-
-      /* See if we broke out because the buffer needs to grow */
-
-      if (offset >= bufSize)
-      {
-         bufSize += 512;
-         buf = XtRealloc (buf, bufSize);
-         continue;
-     }
-
-
-      /* Save the string we just extracted */
-
-      if (offset > 0)
-      {
-         buf[offset] = '\0';
-         buf = (String) DtEliminateDots (buf);
-
-         if ((stat (buf, &stat_data) == 0) ||
-             (lstat (buf, &stat_data) == 0))
-         {
-            findptr = buf;
-
-            if (findptr)
-            {
-               /* save it with the content, */
-               if(buffer == NULL)
-               {
-                  buffer = (char *)XtMalloc(strlen(findptr) + strlen(content) + 3);
-                  strcpy(buffer, findptr);
-               }
-               else
-               {
-                  int size;
-                  size = strlen(findptr) + strlen(buffer) + strlen(content) +4;
-                  buffer = (char *)XtRealloc(buffer, size);
-                  strcat(buffer, findptr);
-               }
-               strcat(buffer, "/");
-               strcat(buffer, content);
-               strcat(buffer, ",");
-            }
-         }
-      }
-
-      if (count == 0)
-      {
-         /* EOF; command is complete */
-         /* Clean up */
-
-         (void) fclose (find_rec->popenId);
-         find_rec->popenId = NULL;
-         XtRemoveInput (find_rec->alternateInputId);
-         XtRemoveEventHandler (find_rec->stop, LeaveWindowMask, FALSE, (XtEventHandler)LeaveStopBttn, find_rec);
-         XtRemoveEventHandler (find_rec->stop, EnterWindowMask, FALSE, (XtEventHandler)EnterStopBttn, find_rec);
-         find_rec->alternateInputId = 0;
-
-         ExecuteGrep(find_rec);
-      }
-
-      XtFree(content);
-      return;
-   }
-}
-
-
-static void
-AlternateInputHandler3(
-        XtPointer client_data,
-        int *source,
-        XtInputId *id )
-{
-   static int bufSize = 0;
-   static char * buf = NULL;
-   FindRec * find_rec = (FindRec *) client_data;
-   FileMgrData *file_mgr_data;
-   DialogData * dialog_data;
-   int offset = 0;
-   char next;
-   XmString string;
-   int count = 0;
-   Arg args[1];
-   char * findptr;
-   struct stat stat_data;
-   int item_count;
-   char * title;
-   char * msg;
-
-  /* Abort if the pipe has already been closed */
-
-   if (find_rec->popenId == NULL) {
       _DtTurnOffHourGlass (find_rec->shell);
-
-      XtSetArg (args[0], XmNdefaultButton, find_rec->start);
-      XtSetValues (find_rec->form, args, 1);
       return;
    }
 
-   /* Allocate some buffer, if this is the first time here */
-
-   if (bufSize == 0)
+   if (find_rec->lineSize - find_rec->lineLen < SEARCH_READ_CHUNK + 1)
    {
-      bufSize = 512;
-      buf = XtMalloc (bufSize);
+      find_rec->lineSize = find_rec->lineLen + SEARCH_READ_CHUNK + 1;
+      find_rec->lineBuf = XtRealloc (find_rec->lineBuf, find_rec->lineSize);
    }
 
-   dialog_data=_DtGetInstanceData((XtPointer)find_rec->fileMgrRec);
+   do
+      n = read (find_rec->pipeFd, find_rec->lineBuf + find_rec->lineLen,
+                SEARCH_READ_CHUNK);
+   while (n < 0 && errno == EINTR);
+   if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+      return;
+   if (n <= 0)
+      eof = True;
+   else
+      find_rec->lineLen += n;
+
+   dialog_data = _DtGetInstanceData ((XtPointer) find_rec->fileMgrRec);
    file_mgr_data = (FileMgrData *) dialog_data->data;
 
-   /* Extract the next line, upto a NewLine or EOF */
-   while (1)
+   line = find_rec->lineBuf;
+   end = line + find_rec->lineLen;
+   while ((nl = memchr (line, '\n', end - line)) != NULL)
    {
-      while ((offset < bufSize - 1) &&
-          ((count = fread (&next, sizeof (char), 1, find_rec->popenId)) == 1) &&
-          (next != '\n'))
-      {
-          buf[offset++] = next;
-      }
+      *nl = '\0';
+      SearchLine (find_rec, file_mgr_data, line, &items, &count, &size);
+      line = nl + 1;
+   }
+   if (eof && line < end)
+   {
+      /* the last line had no NewLine */
+      *end = '\0';
+      SearchLine (find_rec, file_mgr_data, line, &items, &count, &size);
+      line = end;
+   }
+   find_rec->lineLen = end - line;
+   memmove (find_rec->lineBuf, line, find_rec->lineLen);
 
+   if (count > 0)
+   {
+      XmListAddItemsUnselected (find_rec->matchList, items, count, 0);
+      for (i = 0; i < count; i++)
+         XmStringFree (items[i]);
+   }
+   XtFree ((char *) items);
 
-      /* See if we broke out because the buffer needs to grow */
-
-      if (offset >= bufSize)
-      {
-         bufSize += 512;
-         buf = XtRealloc (buf, bufSize);
-         continue;
-     }
-
-
-      /* Save the string we just extracted */
-
-      if (offset > 0)
-      {
-         buf[offset] = '\0';
-         buf = (String) DtEliminateDots (buf);
-
-         if ((stat (buf, &stat_data) == 0) ||
-             (lstat (buf, &stat_data) == 0))
-         {
-            findptr = buf;
-
-            if (findptr)
-            {
-               /* Make sure its nots a directory */
-               if(!((stat_data.st_mode & S_IFMT) == S_IFDIR) &&
-                     strncmp(desktop_dir, findptr, strlen(desktop_dir)) != 0)
-               {
-                  if(file_mgr_data->restricted_directory != NULL)
-                     string = XmStringCreateLocalized (findptr +
-                            strlen(file_mgr_data->restricted_directory));
-                  else
-                     string =
-                        XmStringCreateLocalized (findptr);
-                  XmListAddItemUnselected (find_rec->matchList, string, 0);
-                  XmStringFree (string);
-               }
-            }
-         }
-      }
-
-      if (count == 0)
-      {
-         /* EOF; command is complete */
-         /* Clean up */
-
-         (void) fclose (find_rec->popenId);
-         find_rec->popenId = NULL;
-         XtRemoveInput (find_rec->alternateInputId);
-         XtRemoveEventHandler (find_rec->stop, LeaveWindowMask, FALSE, (XtEventHandler)LeaveStopBttn, find_rec);
-         XtRemoveEventHandler (find_rec->stop, EnterWindowMask, FALSE, (XtEventHandler)EnterStopBttn, find_rec);
-         find_rec->alternateInputId = 0;
-
-         if(buffer != NULL)
-            ExecuteGrep(find_rec);
-         else
-         {
-            find_rec->searchInProgress = False;
-
-            /* Reset button sensitivity */
-
-            XtSetSensitive (find_rec->close, True);
-            XtSetSensitive (find_rec->start, True);
-            XtSetSensitive (find_rec->stop, False);
-
-            XtSetArg (args[0], XmNitemCount, &item_count);
-            XtGetValues (find_rec->matchList, args, 1);
-            XtSetArg (args[0], XmNdefaultButton, find_rec->start);
-            XtSetValues (find_rec->form, args, 1);
-
-            if (item_count == 0)
-            {
-               char * tmpStr;
-
-               tmpStr = GetSharedMessage(FIND_ERROR_TITLE);
-               title = XtNewString(tmpStr);
-               tmpStr = GetSharedMessage(NO_FILES_FOUND_ERROR);
-               msg = XtNewString(tmpStr);
-               _DtMessage (find_rec->shell, title, msg, NULL, HelpRequestCB);
-               XtFree(title);
-               XtFree(msg);
-            }
-            else
-            {
-               XmListSelectPos(find_rec->matchList, 1, True);
-               XmProcessTraversal(find_rec->matchList, XmTRAVERSE_CURRENT);
-            }
-
-            _DtTurnOffHourGlass (find_rec->shell);
-         }
-      }
-
-      return;
+   if (eof)
+   {
+      /* EOF; this process is complete */
+      EndSearchProcess (find_rec, False);
+      if (find_rec->searchPhase == PHASE_NAMES)
+         FinishSearch (find_rec);
+      else
+         StartNextGrep (find_rec);
    }
 }
 
@@ -2828,49 +2681,4 @@ SetFocus(
 {
    /* Force the focus to the text field */
    XmProcessTraversal(find_rec->fileNameFilter, XmTRAVERSE_CURRENT);
-}
-
-FILE *
-findpopen(char *cmd, char *mode, int *childpid)
-{
-#ifdef DEBUG
-   static char *pname = "findpopen";
-#endif
-   int     fd[2];
-   int parentside, childside;
-
-   if(pipe(fd) < 0)
-        return(NULL);
-   parentside = (mode[0] == 'r')? fd[0]:fd[1];
-   childside = (mode[0] == 'r')? fd[1]:fd[0];
-   if((*childpid = fork()) == 0)
-   {
-      int     read_or_write;
-
-      DBGFORK(("%s:  child forked, pipe %d\n", pname, childside));
-
-      /* Child has to select the stdin or stdout based on the mode */
-      read_or_write = (mode[0] == 'r')? 1:0;
-      (void) close(parentside);
-      /* Dup the stdin or stdout based on the mode */
-      if ( read_or_write != childside )  /* If what we got is already stdin */
-      {                                  /* or stdout then no need to close */
-         (void) close(read_or_write);
-         (void) fcntl(childside, F_DUPFD, read_or_write);
-         (void) close(childside);        /* Save a file descriptor */
-      }
-      (void) execl(KORNSHELL, "ksh", "-c", cmd, (char *)0);
-     /* Need to process the error return */
-
-      DBGFORK(("%s:  child exiting\n", pname));
-      exit(1);
-   }
-
-   if(*childpid == -1)
-      return(NULL);
-
-   DBGFORK(("%s:  forked child<%d>, pipe %d\n", pname, childpid, parentside));
-
-   (void) close(childside);  /* We don't need child side, so close it */
-   return(fdopen(parentside, mode));
 }

@@ -48,6 +48,7 @@ void m_endaction(M_ELEMENT m_elt)
   {
     M_ELEMENT m_action;
     char buffer[2*MAXD+M_NAMELEN+1];
+    char *mb_name;
 
     if (m_tagtrace) {
       if (m_element[m_elt - 1].content != M_NONE) {
@@ -55,12 +56,12 @@ void m_endaction(M_ELEMENT m_elt)
           strcpy(buffer, "\n");
           m_trace(buffer);
           }
-        sprintf(buffer,
-		"%s%s%s",
-		m_etago,
-		(char *) m_nameofelt(m_elt),
-		m_tagc);
-        m_trace(buffer);
+        /* element names are wide strings: convert them, do not cast */
+        mb_name = MakeMByteString(m_nameofelt(m_elt));
+        m_trace(m_etago);
+        m_trace(mb_name);
+        m_trace(m_tagc);
+        m_free(mb_name, "multi-byte string");
         }
       m_toptstat = M_OTHER;
       }
@@ -156,7 +157,7 @@ m_free(wc_string,"wide character string");
 void m_strtaction(M_ELEMENT m_elt)
   {
     int m_par, m_i;
-    M_WCHAR *m_p;
+    char *m_p, *mb_name, *mb_value;
     M_ELEMENT m_action;
     static char newpar[] = "\n   ";
     static char quote[] = " = \"";
@@ -169,17 +170,24 @@ void m_strtaction(M_ELEMENT m_elt)
     m_start = TRUE;
     m_getline(&m_stacktop->file, &m_stacktop->line);
     if (m_tagtrace) {
-      sprintf(buffer, "%s%s", m_stago, (char *) m_nameofelt(m_elt));
-      m_trace(buffer);
+      /* element and parameter names and values are wide strings:
+         convert them, do not cast */
+      mb_name = MakeMByteString(m_nameofelt(m_elt));
+      m_trace(m_stago);
+      m_trace(mb_name);
+      m_free(mb_name, "multi-byte string");
       for (m_i = 0, m_par = m_element[m_elt - 1].parptr;
            m_i < m_element[m_elt - 1].parcount;
            m_i++, m_par++)
         if (m_stacktop->param[m_i]) {
-          sprintf(buffer, "%s%s%s",
-                  newpar, (char *) &m_pname[m_parameter[m_par - 1].paramname], quote);
-          m_trace(buffer);
+          mb_name = MakeMByteString(&m_pname[m_parameter[m_par - 1].paramname]);
+          m_trace(newpar);
+          m_trace(mb_name);
+          m_trace(quote);
+          m_free(mb_name, "multi-byte string");
+          mb_value = MakeMByteString(m_stacktop->param[m_i]);
           buffer[1] = M_EOS;
-          for (m_p = m_stacktop->param[m_i] ; *m_p ; m_p++)
+          for (m_p = mb_value ; *m_p ; m_p++)
             if (*m_p != '"') {
               buffer[0] = *m_p;
               m_trace(buffer);
@@ -189,6 +197,7 @@ void m_strtaction(M_ELEMENT m_elt)
               m_trace(buffer);
               buffer[1] = M_EOS;
               }
+          m_free(mb_value, "multi-byte string");
           buffer[0] = '"';
           m_trace(buffer);
           }

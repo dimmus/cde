@@ -352,8 +352,50 @@ TermStrDraw (
           }
       }
 
+    if (wcStr == NULL)
+	return;
+
     if (0 == wc)
-        mbstowcs(&wcStr[x], string, byte_len);
+      {
+	/*
+	 * Convert character by character: mbstowcs stops at the first
+	 * byte the locale cannot convert (any byte >= 0x80 in the C
+	 * locale), which left the rest of the line uninitialized.
+	 * Unconvertible bytes print as '?'; every position the layout
+	 * reserved (one per byte) gets a character.
+	 */
+	const char *mb  = (const char *) string;
+	int         end = x + byte_len;
+	int         n;
+	wchar_t     wch;
+
+	int         ascii = _DtHelpCeAsciiIsSingleByte();
+
+	mbtowc(NULL, NULL, 0);
+	while (x < end && byte_len > 0)
+	  {
+	    if (ascii && *mb != '\0' && ((unsigned char) *mb) < 0x80)
+	      {
+		wcStr[x++] = (wchar_t) *mb++;
+		byte_len--;
+		continue;
+	      }
+	    n = mbtowc(&wch, mb, byte_len);
+	    if (n == 0)
+		break;		/* end of the string: don't read past it */
+	    if (n < 0)
+	      {
+		wch = (wchar_t) '?';
+		n   = 1;
+		mbtowc(NULL, NULL, 0);
+	      }
+	    wcStr[x++] = wch;
+	    mb        += n;
+	    byte_len  -= n;
+	  }
+	while (x < end)
+	    wcStr[x++] = WcSpace;
+      }
     else
       {
 	wchar_t *wcp = (wchar_t *) string;
@@ -1123,8 +1165,32 @@ _DtHelpTermGetTopicData(
 	      {
 		len      = (termInfo->wc_num[i] + 1) * MB_CUR_MAX;
 		*strList = (char *) malloc (sizeof (char) * len);
-		if (*strList != NULL)
-		    wcstombs(*strList, *wcList, len);
+		if (*strList != NULL &&
+			wcstombs(*strList, *wcList, len) == (size_t) -1)
+		  {
+		    /*
+		     * a character the locale cannot represent: convert
+		     * one at a time and print '?' for it, rather than
+		     * leave the string unterminated.
+		     */
+		    const wchar_t *wcp = *wcList;
+		    char          *out = *strList;
+		    int            n;
+
+		    wctomb(NULL, 0);
+		    for (; *wcp != 0; wcp++)
+		      {
+			n = wctomb(out, *wcp);
+			if (n < 0)
+			  {
+			    *out++ = '?';
+			    wctomb(NULL, 0);
+			  }
+			else
+			    out += n;
+		      }
+		    *out = '\0';
+		  }
 	      }
    	   }
    

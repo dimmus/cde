@@ -1,0 +1,40 @@
+# In-tree libraries, for the _LDADD and _LIBADD of the Makefile.am files
+# that include this one.
+#
+# They are defined here rather than substituted by configure: automake
+# leaves a substituted variable out of a program's dependencies (it could
+# hold -l flags), so a program linked with $(LIBSVC) from configure was
+# never relinked when libDtSvc changed.  Defined here, automake sees the
+# .la files and adds them to the program's _DEPENDENCIES.
+#
+# Each program names the libraries it uses itself, and each library names
+# the libraries it uses in its _LIBADD (the libraries link with
+# -Wl,-z,defs, see CDE_LIB_LDFLAGS in configure.ac), so that a program
+# does not load libraries it has no use for.
+
+LIBTT = $(top_builddir)/lib/tt/lib/libtt.la
+LIBXIN = $(top_builddir)/lib/DtXinerama/libDtXinerama.la
+LIBSVC = $(top_builddir)/lib/DtSvc/libDtSvc.la
+LIBSEARCH = $(top_builddir)/lib/DtSearch/libDtSearch.la
+LIBWIDGET = $(top_builddir)/lib/DtWidget/libDtWidget.la
+LIBHELP = $(top_builddir)/lib/DtHelp/libDtHelp.la
+LIBPRINT = $(top_builddir)/lib/DtPrint/libDtPrint.la
+LIBTERM = $(top_builddir)/lib/DtTerm/libDtTerm.la
+LIBMRM = $(top_builddir)/lib/DtMrm/libDtMrm.la
+LIBCSA = $(top_builddir)/lib/csa/libcsa.la
+LIBMMDB = $(top_builddir)/lib/DtMmdb/libDtMmdb.la
+
+# The lists of the symbols each library exports (with --enable-export-maps,
+# the default; see build-aux/gen-exports.py), and the command that turns
+# one ($<) into a version script ($@) for the linker.  The script has no
+# version node, so the symbols it exports keep their unversioned ABI;
+# every other global symbol of the library becomes local.  (libtool's
+# -export-symbols does not do this for C++ libraries.)  The script goes
+# to libtool's .libs directory, which "make clean" removes, under a name
+# that libtool does not delete before it links (.libs/libX-exports.ver,
+# not .libs/libX.*).
+EXPORTS_DIR = $(top_srcdir)/build-aux/symbols
+VSCRIPT_DIR = .libs
+MAKE_VERSION_SCRIPT = $(MKDIR_P) $(VSCRIPT_DIR) && \
+	{ echo '{ global:'; sed -e 's/$$/;/' $<; echo 'local: *; };'; } \
+	> $@.tmp && mv -f $@.tmp $@

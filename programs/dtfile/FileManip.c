@@ -70,6 +70,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
+#include <spawn.h>
 
 #if defined(sun) && !defined(SVR4)
 #include <ufs/fs.h>
@@ -91,6 +92,7 @@
 #include "Main.h"
 #include "Help.h"
 #include "SharedMsgs.h"
+#include "fsrtns.h"
 
 #ifndef CDE_INSTALLATION_TOP
 #define CDE_INSTALLATION_TOP "/usr/dt"
@@ -100,6 +102,55 @@
 static char * MOVE_CMD = "/bin/mv";
 static char * LINK_CMD = "/bin/ln";
 static char * DTCOPY = CDE_INSTALLATION_TOP "/bin/dtfile_copy";
+
+extern char **environ;
+
+
+/************************************************************************
+ *
+ *  SpawnDtCopy
+ *    Start dtfile_copy with the given arguments (argv[0] is set here)
+ *    and do not wait for it.  posix_spawn avoids duplicating this
+ *    (large) process just to exec.  Returns False only if no process
+ *    could be created; that is reported through errorHandler like a
+ *    failed fork() was.  If dtfile_copy cannot be executed, the error
+ *    is printed and True returned, as the forked child used to do.
+ *
+ ************************************************************************/
+static Boolean
+SpawnDtCopy(
+        Widget w,
+        char **argv,
+        void (*errorHandler)())
+{
+   pid_t pid;
+   int rc;
+   char * msg;
+   char * tmpStr;
+
+   argv[0] = "dtfile_copy";
+   rc = posix_spawn(&pid, DTCOPY, NULL, NULL, argv, environ);
+   if (rc == EAGAIN || rc == ENOMEM)
+   {
+      if (errorHandler)
+      {
+         tmpStr = GETMESSAGE(11, 39, "Cannot create child process.\nThe maximum number of processes for this system has been reached.\nStop some of the processes or programs that are currently\nrunning and then retry this function.");
+         msg = XtNewString(tmpStr);
+         (*errorHandler) (w, msg, NULL);
+         XtFree(msg);
+      }
+      return False;
+   }
+   if (rc != 0)
+   {
+      errno = rc;
+      perror ("Could not exec child process \"dtfile_copy\"");
+      return True;
+   }
+
+   DPRINTF(("SpawnDtCopy: started child<%d>\n", (int) pid));
+   return True;
+}
 
 
 /************************************************************************
@@ -112,6 +163,14 @@ CheckAccess(
         char *fname,
         int what)
 {
+#if defined(AT_EACCESS) && !defined(BLS)
+   /*
+    * Check with the effective user and group IDs.  This is what the
+    * code below does by temporarily setting the real IDs to the
+    * effective ones, in one system call instead of seven.
+    */
+   return faccessat(AT_FDCWD, fname, what, AT_EACCESS);
+#else
     int access_priv;
     uid_t save_ruid;
     gid_t save_rgid;
@@ -154,6 +213,7 @@ CheckAccess(
 
    return access_priv;
 #endif /* BLS */
+#endif /* AT_EACCESS */
 }
 
 
@@ -303,9 +363,6 @@ MoveDir(
         char ** targetRtn ,
         int type )
 {
-#ifdef DEBUG
-   static char *pname = "MoveDir";
-#endif
    char *p;
 
    char * targetDir;            /* original target dir path */
@@ -315,10 +372,9 @@ MoveDir(
    char * cptr;
    int len, val, val1;
 
-   static char buf [BUF_SIZE];  /* generic buffer */
+   static char buf [MAX_PATH];  /* generic buffer */
    char * msg;
    char * tmpStr;
-   int child_pid;
 
    /* Copy target so we have it for an error dialog if we need it */
    targetDir = XtNewString(target);
@@ -342,6 +398,20 @@ MoveDir(
          {
             char * tmpStr;
             tmpStr = GetSharedMessage(CANT_OVERWRITE_ERROR);
+            msg = XtNewString(tmpStr);
+            (*errorHandler) (w, msg, target);
+            XtFree(msg);
+         }
+         XtFree(targetDir);
+         return (False);
+      }
+
+      /* buf used to be BUF_SIZE (256) bytes: longer paths overflowed it */
+      if (strlen (target) + strlen (DName (source)) + 2 > sizeof (buf))
+      {
+         if (errorHandler)
+         {
+            tmpStr = GetSharedMessage(CANT_CREATE_ERROR);
             msg = XtNewString(tmpStr);
             (*errorHandler) (w, msg, target);
             XtFree(msg);
@@ -475,45 +545,26 @@ MoveDir(
       /* Determine correct Geometry Placement fo Move Dialog */
       /* @@@ ... to be added */
 
-      child_pid = fork();
-      if (child_pid == -1)
       {
-         if (errorHandler)
-         {
-            tmpStr = GETMESSAGE(11, 39, "Cannot create child process.\nThe maximum number of processes for this system has been reached.\nStop some of the processes or programs that are currently\nrunning and then retry this function.");
-            msg = XtNewString(tmpStr);
-            (*errorHandler) (w, msg, NULL);
-            XtFree(msg);
-         }
-         XtFree(targetDir);
-         return False;
-      }
-
-      if (child_pid == 0)
-      {
-	 DBGFORK(("%s:  child forked\n", pname));
-
          /* pass in geometry, and other command lines params when available */
-	 if(type == TRASH_DIRECTORY)
-           execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
-		 "-confirmErrors", "-popDown","-checkPerms", source, target, NULL);
-	 else
-           execlp(DTCOPY, "dtfile_copy", "-move", "-confirmReplace",
-		 "-confirmErrors", "-popDown", source, target, NULL);
+         char *argv[10];
+         int n = 1;
+         Boolean ok;
 
-         /* call errorhandler */
-         perror ("Could not exec child process \"dtfile_copy\"");
+         argv[n++] = "-move";
+         argv[n++] = "-confirmReplace";
+         argv[n++] = "-confirmErrors";
+         argv[n++] = "-popDown";
+         if (type == TRASH_DIRECTORY)
+            argv[n++] = "-checkPerms";
+         argv[n++] = source;
+         argv[n++] = target;
+         argv[n] = NULL;
 
-	 DBGFORK(("%s:  child exiting\n", pname));
-
-         exit (1);
+         ok = SpawnDtCopy(w, argv, errorHandler);
+         XtFree(targetDir);
+         return (ok);
       }
-
-      DBGFORK(("%s:  forked child<%d>\n", pname, child_pid));
-
-
-      XtFree(targetDir);
-      return (True);
    }
 
 
@@ -545,7 +596,13 @@ MoveDir(
    else
 */
    {
-     if (RunFileCommand (MOVE_CMD, source, target, NULL) == 0)
+     /*
+      * Both parents are on the same file system, so this is a rename.
+      * /bin/mv is only needed when the kernel still refuses with EXDEV
+      * (e.g. different mounts of one file system), as it can then copy.
+      */
+     if (rename (source, target) == 0 ||
+         (errno == EXDEV && RunFileCommand (MOVE_CMD, source, target, NULL) == 0))
      {
        XtFree(targetDir);
        return (True);
@@ -574,15 +631,12 @@ CopyDir(
         Boolean checkForBusyDir,
         int type )
 {
-#ifdef DEBUG
-   static char *pname = "CopyDir";
-#endif
    char * cptr;
    int len;
    char target [MAX_PATH];	/* buffer to hold the full file name */
    char target_dir [MAX_PATH], target_file [MAX_PATH];
    struct stat  s2;             /* status of to file   */
-   int child_pid, rc, target_rc;
+   int rc, target_rc;
    char *msg, *tmpStr;
 
    /* Check if source is readable */
@@ -687,49 +741,33 @@ CopyDir(
 
    /* If all the above checks have passed, then fork off the copy dialog */
 
-   child_pid = fork();
-   if (child_pid == -1)
    {
-      if (errorHandler)
-      {
-         tmpStr = GETMESSAGE(11, 39, "Cannot create child process.\nThe maximum number of processes for this system has been reached.\nStop some of the processes or programs that are currently\nrunning and then retry this function.");
-         msg = XtNewString(tmpStr);
-         (*errorHandler) (w, msg, NULL);
-         XtFree(msg);
-      }
-      return False;
-   }
-
-   if (child_pid == 0)
-   {
-      DBGFORK(("%s:  child forked\n", pname));
-
       /* pass in geometry, and other command lines params when available */
+      char *argv[12];
+      int n = 1;
+
       if (mode == MERGE_DIR)
-        /* merge source & target directories */
-        rc = execlp(DTCOPY, "dtfile_copy",
-                     "-dontDelete", "-forceCopies", "-copyTop",
-                     "-confirmReplace", "-confirmErrors", "-popDown",
-                    from, target, (char *)NULL);
+      {
+         /* merge source & target directories */
+         argv[n++] = "-dontDelete";
+         argv[n++] = "-forceCopies";
+         argv[n++] = "-copyTop";
+         argv[n++] = "-confirmReplace";
+      }
       else
+      {
          /* replace target dir */
-         rc = execlp(DTCOPY, "dtfile_copy",
-                     "-forceCopies", "-copyTop",
-                     "-confirmErrors", "-popDown",
-                     from, target, (char *)NULL);
+         argv[n++] = "-forceCopies";
+         argv[n++] = "-copyTop";
+      }
+      argv[n++] = "-confirmErrors";
+      argv[n++] = "-popDown";
+      argv[n++] = from;
+      argv[n++] = target;
+      argv[n] = NULL;
 
-      /* call errorhandler */
-      perror ("Could not exec child process \"dtfile_copy\"");
-
-      DBGFORK(("%s:  child exiting\n", pname));
-
-      exit (1);
+      return SpawnDtCopy(w, argv, errorHandler);
    }
-
-   DBGFORK(("%s:  forked child<%d>\n", pname, child_pid));
-
-
-   return TRUE;
 }
 
 
@@ -768,7 +806,6 @@ FileManip(
    struct stat s2;      /* status of to file e.g.   stat info  */
    struct stat s3;      /* status of to file e.g.   lstat info */
 
-   char buf [BLOCK_SIZE];		/* generic buffer */
    char filename [MAX_PATH];		/* buffer to hold the full file name */
    char * msg;
    int link_result;
@@ -1063,9 +1100,11 @@ FileManip(
             {
                if (RunFileCommand(MOVE_CMD, from, to, NULL) == 0)
                   return(True);
-               else
-                  if (RunFileCommand(LINK_CMD, "-s", from, to) == 0)
-                     return(True);
+            }
+            else
+            {
+               if (RunFileCommand(LINK_CMD, "-s", from, to) == 0)
+                  return(True);
             }
 
             link_result = (-1);
@@ -1083,6 +1122,18 @@ FileManip(
 
             if(strcmp(link_path, from) != 0)
                  link_result = symlink(link_path, to);
+            else if (mode == MOVE_FILE)
+            {
+                 /*
+                  * A move within a file system is a rename.  If that is
+                  * not possible (e.g. another file system, or a sticky
+                  * directory), copy the file and remove the original
+                  * below, which also reports the error.
+                  */
+                 if (rename (from, to) == 0)
+                    return (True);
+                 link_result = (-1);
+            }
             else
                  link_result = link (from, to);
          }
@@ -1166,12 +1217,11 @@ FileManip(
 
    /*  do the copy  */
 
-
-   while ((n = read (fold, buf, BLOCK_SIZE)))
    {
-     int result;
+     int read_error;
 
-     if (n < 0)
+     n = fsCopyData(fold, fnew, &read_error);
+     if (n != 0 && read_error)
      {
        if (errorHandler)
        {
@@ -1185,9 +1235,8 @@ FileManip(
        return (False);
      }
 
-     errno = 0;
-     result = write(fnew, buf, n);
-     if (result != n)
+     errno = (n > 0) ? n : 0;
+     if (n != 0)
      {
        (void) close (fold);
        (void) close (fnew);

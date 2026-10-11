@@ -145,6 +145,24 @@ cleanup:
 	}
 }
 
+/*
+ * The dump goes to a temporary file that is renamed over the log only
+ * when complete, so it is written without O_SYNC (which cost one disk
+ * flush per entry) and flushed once with fsync() before the rename.
+ */
+static CSA_return_code
+finish_dump(CSA_return_code stat)
+{
+	if (stat == CSA_SUCCESS && fsync(fd) != 0)
+		stat = CSA_X_DT_E_BACKING_STORE_PROBLEM;
+
+	if (close(fd) != 0 && stat == CSA_SUCCESS)
+		stat = CSA_X_DT_E_BACKING_STORE_PROBLEM;
+
+	fd = -1;
+	return (stat);
+}
+
 extern CSA_return_code
 _DtCmsDumpDataV1(char *file, _DtCmsCalendar *cal)
 {
@@ -153,33 +171,30 @@ _DtCmsDumpDataV1(char *file, _DtCmsCalendar *cal)
 	dump_error = CSA_SUCCESS;
 
 	/* Keep the temp log file open during garbage collection. */
-	if ((fd = open(file, O_WRONLY | O_APPEND | O_SYNC)) < 0)
+	if ((fd = open(file, O_WRONLY | O_APPEND)) < 0)
 	{
 		return (CSA_X_DT_E_BACKING_STORE_PROBLEM);
 	}
 
 	if ((stat = _DtCmsAppendAccessByFD(fd, access_read_4,
 	    GET_R_ACCESS(cal))) != CSA_SUCCESS)
-		return (stat);
+		return (finish_dump(stat));
 
 	if ((stat = _DtCmsAppendAccessByFD(fd, access_write_4,
 	    GET_W_ACCESS(cal))) != CSA_SUCCESS)
-		return (stat);
+		return (finish_dump(stat));
 
 	if ((stat = _DtCmsAppendAccessByFD (fd, access_delete_4,
 	    GET_D_ACCESS(cal))) != CSA_SUCCESS)
-		return (stat);
+		return (finish_dump(stat));
 
 	if ((stat = _DtCmsAppendAccessByFD (fd, access_exec_4,
 	    GET_X_ACCESS(cal))) != CSA_SUCCESS)
-		return (stat);
+		return (finish_dump(stat));
 
 	_DtCmsEnumerateUp(cal, visit1);	/* dump the tree */
 
-	if (close(fd) == EOF)
-		return (CSA_X_DT_E_BACKING_STORE_PROBLEM);
-
-	return (dump_error);
+	return (finish_dump(dump_error));
 }
 
 extern CSA_return_code
@@ -190,7 +205,7 @@ _DtCmsDumpDataV2(char *file, _DtCmsCalendar *cal)
 	dump_error = CSA_SUCCESS;
 
 	/* Keep the temp log file open during garbage collection. */
-	if ((fd = open(file, O_WRONLY | O_APPEND | O_SYNC)) < 0)
+	if ((fd = open(file, O_WRONLY | O_APPEND)) < 0)
 	{
 		return (CSA_X_DT_E_BACKING_STORE_PROBLEM);
 	}
@@ -199,19 +214,16 @@ _DtCmsDumpDataV2(char *file, _DtCmsCalendar *cal)
 	if (cal->num_attrs > 0) {
 		if ((stat = _DtCmsAppendCalAttrsByFD(fd, cal->num_attrs,
 		    cal->attrs)) != CSA_SUCCESS)
-			return (stat);
+			return (finish_dump(stat));
 	}
 
 	if ((stat = _DtCmsAppendHTableByFD(fd, cal->entry_tbl->size,
 	    cal->entry_tbl->names, cal->types)) != CSA_SUCCESS)
-		return (stat);
+		return (finish_dump(stat));
 
 	_DtCmsEnumerateUp(cal, visit2);	/* dump the tree */
 
-	if (close(fd) == EOF)
-		return (CSA_X_DT_E_BACKING_STORE_PROBLEM);
-
-	return (dump_error);
+	return (finish_dump(dump_error));
 }
 
 static boolean_t

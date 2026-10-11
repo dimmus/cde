@@ -77,6 +77,7 @@ extern char *_DtHelpGetLocale(void);
 #include "AccessCCDFI.h"
 #include "FormatUtilI.h"
 #include "StringFuncsI.h"
+#include "CvStringI.h"
 #include "HelpXlate.h"
 
 #ifdef NLS16
@@ -1011,6 +1012,8 @@ _DtHelpCeGetCcdfKeywordList (
     char	***topicList;
     char	 *token;
     char	 *currKeyword;
+    int		  numKeys;
+    int		  numTopics;
     CcdfVolumePtr  ccdfVol = GetCcdfVolumePtr(vol);
 
     /* Generate the name of the keyword file.  Because volume files
@@ -1063,6 +1066,12 @@ _DtHelpCeGetCcdfKeywordList (
      */
     nextC = (char *) keywordString;
 
+    /* the arrays are appended to with counts, not walked every time */
+    numKeys = 0;
+    if (vol->keywords != NULL)
+	while (vol->keywords[numKeys] != NULL)
+	    numKeys++;
+
     while (nextC && *nextC)
       {
 
@@ -1083,7 +1092,7 @@ _DtHelpCeGetCcdfKeywordList (
 	    if (vol->keywordTopics)
 	      {
 	        for (topicList = vol->keywordTopics;
-						topicList; topicList++)
+						*topicList; topicList++)
 		    _DtHelpCeFreeStringArray (*topicList);
 	        free (vol->keywordTopics);
 	        vol->keywordTopics = NULL;
@@ -1103,6 +1112,7 @@ _DtHelpCeGetCcdfKeywordList (
 
 	/* Now get the list of topics. */
 	topics = NULL;
+	numTopics = 0;
 	do
 	  {
 	    nextC = _DtHelpGetNxtToken (nextC, &token);
@@ -1118,7 +1128,7 @@ _DtHelpCeGetCcdfKeywordList (
 		if (vol->keywordTopics)
 		  {
 		    for (topicList = vol->keywordTopics;
-						topicList; topicList++)
+						*topicList; topicList++)
 			_DtHelpCeFreeStringArray (*topicList);
 		    free (vol->keywordTopics);
 		    vol->keywordTopics = NULL;
@@ -1145,12 +1155,13 @@ _DtHelpCeGetCcdfKeywordList (
 		 */
 		if (topics != NULL)
 		  {
-		    vol->keywords = (char **) _DtHelpCeAddPtrToArray (
-			              (void **) vol->keywords,
+		    vol->keywords = (char **) _DtCvAddPtrToArrayN (
+			              (void **) vol->keywords, numKeys,
 				      (void *) currKeyword);
-		    vol->keywordTopics = (char ***) _DtHelpCeAddPtrToArray (
-					(void **) vol->keywordTopics,
+		    vol->keywordTopics = (char ***) _DtCvAddPtrToArrayN (
+					(void **) vol->keywordTopics, numKeys,
 					(void *) topics);
+		    numKeys++;
 		    /*
 		     * If we just malloc'ed ourselves out of existence...
 		     * stop here.
@@ -1168,7 +1179,7 @@ _DtHelpCeGetCcdfKeywordList (
 			if (vol->keywordTopics)
 			  {
 			    for (topicList = vol->keywordTopics;
-							topicList; topicList++)
+							*topicList; topicList++)
 				_DtHelpCeFreeStringArray (*topicList);
 			    free (vol->keywordTopics);
 			    vol->keywordTopics = NULL;
@@ -1180,8 +1191,9 @@ _DtHelpCeGetCcdfKeywordList (
 	      }
 	    else
 	      {
-		topics = (char **) _DtHelpCeAddPtrToArray ((void **) topics, 
-						(void *) token);
+		topics = (char **) _DtCvAddPtrToArrayN ((void **) topics,
+						numTopics, (void *) token);
+		numTopics++;
 		/*
 		 * If we just malloc'ed ourselves out of existence
 		 * stop here.
@@ -1198,7 +1210,7 @@ _DtHelpCeGetCcdfKeywordList (
 		    if (vol->keywordTopics != NULL)
 		      {
 			for (topicList = vol->keywordTopics;
-							topicList; topicList++)
+							*topicList; topicList++)
 			    _DtHelpCeFreeStringArray (*topicList);
 			free (vol->keywordTopics);
 			vol->keywordTopics = NULL;

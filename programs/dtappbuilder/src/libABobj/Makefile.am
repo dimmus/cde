@@ -12,7 +12,7 @@ noinst_LIBRARIES = libABobj.a
 
 #noinst_PROGRAMS = test test_notify
 
-libABobj_a_CFLAGS = $(EXTRA_DEFINES) -I$(ABINCLUDES)
+libABobj_a_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES)
 
 libABobj_a_SOURCES = obj.c \
 		     obj_action.c \

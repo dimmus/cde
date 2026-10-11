@@ -41,6 +41,7 @@ typedef struct {
 	_DtCmsGetKeyProc get;
 	_DtCmsEnumerateProc enumerate;
 	_DtCmsCompareProc compare;
+	List_node	*tail;	/* last node, so appends are O(1) */
 } Private;
 
 
@@ -153,6 +154,21 @@ hc_insert_node (Hc_list *hc_list, List_node *p_node, caddr_t key)
 		return (rb_notable);
 	private = (Private *) hc_list->private;
 
+	/*
+	 * Entries are loaded and inserted in ascending key order, so
+	 * check the tail first; walking the list for every insert made
+	 * loading R repeating entries O(R^2).
+	 */
+	if (private->tail != NULL &&
+	    private->compare (key, private->tail->data) == _DtCmsIsGreater)
+	{
+		p_node->rlink = NULL;
+		p_node->llink = private->tail;
+		private->tail->rlink = p_node;
+		private->tail = p_node;
+		return (rb_ok);
+	}
+
 	p_curr = hc_list->root;
 	while (p_curr != NULL)
 	{
@@ -165,6 +181,7 @@ hc_insert_node (Hc_list *hc_list, List_node *p_node, caddr_t key)
 				/* Insert at end of the list */
 				p_curr->rlink = p_node;
 				p_node->llink = p_curr;
+				private->tail = p_node;
 				return (rb_ok);
 			}
 		}
@@ -185,6 +202,8 @@ hc_insert_node (Hc_list *hc_list, List_node *p_node, caddr_t key)
 	p_node->rlink = hc_list->root;
 	if (p_node->rlink != NULL)
 		p_node->rlink->llink = p_node;
+	else
+		private->tail = p_node;
 	hc_list->root = p_node;
 	return (rb_ok);
 }
@@ -216,6 +235,10 @@ hc_insert(
 extern List_node *
 hc_delete_node (Hc_list *hc_list, List_node	*p_node)
 {
+	Private	*private = (Private *) hc_list->private;
+
+	if (private->tail == p_node)
+		private->tail = p_node->llink;
 	if (p_node->llink == NULL)
 		hc_list->root = p_node->rlink;
 	else

@@ -54,10 +54,18 @@ public:
 			   _Tt_string       &real_hostname,
 			   _Tt_db_results   &dbResults);
 
+  // Like getDB(), but connects to hostname itself, ignoring the
+  // hostname redirection map.
+  _Tt_db_client_ptr getDirectDB (const _Tt_string &hostname,
+				 _Tt_db_results   &dbResults);
+
   static void flush ();
   static _Tt_string dbHostnameMapKey (_Tt_object_ptr &db);
 
 private:
+  _Tt_db_client_ptr connectDB (const _Tt_string &hostname,
+			       _Tt_db_results   &dbResults);
+
   static _Tt_db_client_table_ptr *dbHostnameMap;
 
 };

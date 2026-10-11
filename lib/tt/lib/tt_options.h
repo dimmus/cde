@@ -47,21 +47,12 @@
  *                   attempt to dlopen it at runtime rather than require
  *                   the application to link with the library.
  *
- * OPT_DLOPEN_CE -- if defined then any code that would use libce will
- *                   attempt to dlopen it at runtime rather than require
- *                   the application to link with the library.
- *
  * OPT_ADDMSG_DIRECT -- if defined then messages are sent directly
  *			down a client's signalling fd rather than
  *			incurring an additional rpc. 
  *
  * OPT_SECURE_RPC -- if defined then code for implementing DES authorization
  *	             is included.
- *
- * OPT_CLASSING_ENGINE -- if defined, code is included to store and
- *			  retrieve type data in the OpenWindows Classing
- *	          	  Engine.  If not defined, type data is stored
- *			  only in XDR format files.
  *
  * OPT_PATCH -- if defined, build patch info into objects
  *

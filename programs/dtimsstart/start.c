@@ -30,8 +30,8 @@
 #include	<time.h>
 #include    <errno.h>
 
-#if (defined(__linux__) || defined(CSRG_BASED)) && !defined(_NFILE)
-#define _NFILE FOPEN_MAX
+#if defined(__linux__)
+#include	<sys/syscall.h>
 #endif
 
     /* local functions */
@@ -45,6 +45,7 @@ static void	on_sig_chld(/* sig */);
 static bool	is_ims_running(/* renv, ims */);
 static int	settle_ims(/* sel */);
 static Window	property_owner(/* prop_atom, prop_str */);
+static void	close_all_fds(void);
 
 void	ximsStart(void)
 {
@@ -116,6 +117,7 @@ void	ximsWait(void)
     struct timeval	interval;
     time_t	start_tm = 0;
     int		lapse;
+    int		poll_ms;
 
     DPR(("ximsWait(): OpState=%s  OpErrCode=%s[%d]\n",
 				StateName(), error_name(OpErrCode), OpErrCode));
@@ -140,12 +142,14 @@ void	ximsWait(void)
 
 	    /* waiting */
 	lapse = 0;
-	interval.tv_sec = Opt.Interval / 1000;
-	interval.tv_usec = (Opt.Interval % 1000) * 1000;
+	poll_ms = next_wait_interval(True);
 	start_tm = time((time_t) 0);
 
 	while (is_waiting()) {
+	    interval.tv_sec = poll_ms / 1000;
+	    interval.tv_usec = (poll_ms % 1000) * 1000;
 	    select(0, 0, 0, 0, &interval);		/* usleep */
+	    poll_ms = next_wait_interval(False);
 	    lapse = (int) time((time_t) 0) - start_tm;
 
 	    if (im_mod_available(sel->renv) != 0 || lapse >= Opt.Timeout) {
@@ -218,6 +222,26 @@ void	set_sig_chld(int enable)
 {
     DPR(("set_sig_chld(%s)\n", enable ? "Enabled" : "Disabled"));
     signal(SIGCHLD, enable ? on_sig_chld : SIG_IGN);
+}
+
+/*
+ * Delay before the next check for the IMS's selection owner.  Checking
+ * every Opt.Interval ms (1 s by default) added ~0.5 s of dead time to
+ * every login that starts an input method.  A check is a single
+ * XGetSelectionOwner round trip, so start at FIRST_INTERVAL and double up
+ * to MAX_FAST_INTERVAL, never exceeding Opt.Interval.
+ */
+int	next_wait_interval(int restart)
+{
+    static int	cur = 0;
+    int		limit = Opt.Interval > 0 ? Min(Opt.Interval, MAX_FAST_INTERVAL)
+					 : MAX_FAST_INTERVAL;
+
+    if (restart || cur <= 0)
+	cur = Min(FIRST_INTERVAL, limit);
+    else
+	cur = Min(cur * 2, limit);
+    return cur;
 }
 
 int	im_mod_available(RunEnv *renv)
@@ -556,7 +580,6 @@ static int	invoke_ims(UserSelection *sel)
 {
     RunEnv	*renv = sel->renv;
     pid_t	pid;
-    int		i;
 
     set_sig_chld(True);
 
@@ -569,8 +592,7 @@ static int	invoke_ims(UserSelection *sel)
 	return renv->status = ErrImsExecution;
     }
     if (pid == (pid_t) 0) {	/* child */
-	for (i = 0; i < _NFILE; i++)
-	    (void) close(i);
+	close_all_fds();
 
 #if defined(CSRG_BASED)
 	setsid();
@@ -595,6 +617,27 @@ static int	invoke_ims(UserSelection *sel)
     DPR(("invoke_ims(%s): pid=%d\n", sel->name, pid));
 
     return NoError;
+}
+
+/*
+ * Close every descriptor in the child before running the IMS.  This used
+ * to stop at _NFILE, defined as FOPEN_MAX (16) on Linux and the BSDs, so
+ * any descriptor above 15 (the X connection among them, with enough
+ * libraries loaded) leaked into the input method server.
+ */
+static void	close_all_fds(void)
+{
+    long	max, fd;
+
+#if defined(__linux__) && defined(SYS_close_range)
+    if (syscall(SYS_close_range, 0U, ~0U, 0U) == 0)
+	return;
+#endif
+    max = sysconf(_SC_OPEN_MAX);
+    if (max <= 0)
+	max = 1024;
+    for (fd = 0; fd < max; fd++)
+	(void) close((int) fd);
 }
 
 static void	on_sig_chld(int sig)

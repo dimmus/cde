@@ -179,6 +179,9 @@ class BaseObj {
    BaseObj(BaseObj *parent,
 	  const char *name);
 
+   boolean DoSendAction(Action *action, const char *actionName,
+			BaseObj *requestor);
+
    void AddToParent();
    void DeleteFromParent();
    void DeleteAttribute(const char *ReferenceName);

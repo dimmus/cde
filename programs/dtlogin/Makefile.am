@@ -1,3 +1,9 @@
+include $(top_srcdir)/build-aux/cde-libs.am
+
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 SUBDIRS = config
 
 bin_PROGRAMS = dtlogin dtgreet dtchooser
@@ -11,7 +17,7 @@ DEF_SYSTEM_PATH = $(PATH):$(XBINDIR)
 DEF_BM_PATH = $(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B
 DEF_PM_PATH = $(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/%L/%B:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_CONFIGURATION_TOP)/appconfig/icons/C/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/%L/%B:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.pm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B%M.bm:$(CDE_INSTALLATION_TOP)/appconfig/icons/C/%B
 
-AM_CFLAGS = -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
+AM_CFLAGS = $(CDE_CFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\" \
             -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
             -DCDE_LOGFILES_TOP=\"$(CDE_LOGFILES_TOP)\" \
 	    -DBINDIR=\"$(XBINDIR)\" \
@@ -48,12 +54,13 @@ dtgreet_SOURCES = vgcallback.c vglogo.c vgmain.c vgutil.c vglang.c
 dtchooser_SOURCES = chooser.c dtchooser.c vglogo.c vgutil.c vgcallback.c \
 		    vglang.c
 
-dtlogin_LDADD = libresource.a $(DTCLIENTLIBS) $(XDMCPLIB) \
-	$(XTOOLLIB) $(TIRPCLIB)
+dtlogin_LDADD = libresource.a $(LIBSVC) $(XDMCPLIB) $(XMULIB) $(XAULIB) \
+	$(X11LIB) $(TIRPCLIB) $(CRYPTLIB)
 
-dtgreet_LDADD = $(DTCLIENTLIBS) $(XTOOLLIB)
+dtgreet_LDADD = $(LIBWIDGET) $(LIBSVC) $(LIBXIN) $(XMLIB) $(XTLIB) $(X11LIB)
 
-dtchooser_LDADD = $(DTCLIENTLIBS) $(XDMCPLIB) $(XTOOLLIB)
+dtchooser_LDADD = $(LIBWIDGET) $(LIBSVC) $(LIBXIN) $(XDMCPLIB) \
+	$(XMLIB) $(XTLIB) $(X11LIB)
 
 
 if LINUX

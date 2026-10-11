@@ -44,6 +44,17 @@ class Application : public MotifUI {
 
    static void SaveSessionCB(Widget, XtPointer, XtPointer);
    static void CloseCB(Widget, XtPointer, XtPointer);
+   static void ShellEventHandler(Widget, XtPointer, XEvent *, Boolean *);
+
+   // Whether the top level window is mapped and not fully obscured,
+   // tracked from MapNotify, UnmapNotify and VisibilityNotify events so
+   // that IsVisible() needs no round trip to the server.
+   boolean _shell_mapped;
+   boolean _shell_obscured;
+   boolean DoIsVisible();
+   // Called when IsVisible() changes
+   virtual void ShellVisibilityChanged(boolean /*visible*/) { }
+
    XFontStruct *fs;
    FILE *fp;
    char **attributes;
