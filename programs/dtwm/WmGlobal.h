@@ -154,6 +154,37 @@ enum {
     NETSTATE_COUNT
 };
 
+/* the _NET_WM_WINDOW_TYPE atoms (wmGD.xa__NET_WM_WINDOW_TYPE_[]) */
+enum {
+    NETTYPE_NORMAL,
+    NETTYPE_DESKTOP,
+    NETTYPE_DOCK,
+    NETTYPE_TOOLBAR,
+    NETTYPE_MENU,
+    NETTYPE_UTILITY,
+    NETTYPE_SPLASH,
+    NETTYPE_DIALOG,
+    NETTYPE_DROPDOWN_MENU,
+    NETTYPE_POPUP_MENU,
+    NETTYPE_TOOLTIP,
+    NETTYPE_NOTIFICATION,
+    NETTYPE_COMBO,
+    NETTYPE_DND,
+    NETTYPE_COUNT
+};
+
+/*
+ * Stacking layers, from the bottom: a client list entry is always above
+ * those of lower layers (see ClampStackPosition).
+ */
+#define LAYER_DESKTOP		0
+#define LAYER_BELOW		1
+#define LAYER_NORMAL		2
+#define LAYER_ABOVE		3
+#define LAYER_DOCK		4
+#define LAYER_FULLSCREEN	5	/* while it has the focus */
+#define LAYER_SYSTEM_MODAL	6
+
 /* window manager exit value on fatal errors: */
 #define WM_ERROR_EXIT_VALUE	1
 
@@ -1343,9 +1374,6 @@ typedef struct _WmScreenData
     DtSvcHandle	hWsm;		/* WORKSPACEMGR message handle */
     Boolean	bMarqueeSelectionInitialized;
 
-    /* top and bottom clients */
-    struct _ClientData	*topClient;
-    struct _ClientData	*bottomClient;
 
     /* EWMH root window properties (see WmEwmh.c) */
     unsigned int	netDirty;		/* NET_SD_* to write */
@@ -1729,6 +1757,8 @@ struct _ClientData
     long	netDesktopWritten;		/* _NET_WM_DESKTOP */
     unsigned int netStateWritten;		/* _NET_WM_STATE, NETSTATE bits */
     unsigned char maxAxes;			/* MAX_AXIS_* when maximized */
+    unsigned char netType;			/* NETTYPE_* */
+    unsigned char layer;			/* LAYER_* of its type */
 
     /* client window frame graphic data: */
 
@@ -2049,6 +2079,7 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_FULLSCREEN_MONITORS;
     Atom	xa__NET_WM_STATE;
     Atom	xa__NET_WM_STATE_[NETSTATE_COUNT];
+    Atom	xa__NET_WM_WINDOW_TYPE_[NETTYPE_COUNT];
     Atom	xa__NET_WM_DESKTOP;
 
     /* EWMH property writer (WmEwmh.c): */

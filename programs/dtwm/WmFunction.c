@@ -281,7 +281,8 @@ Boolean ForceLowerWindow (ClientData *pcd)
     while (pCLE != NULL)
     {
 	if ((pCLE->pCD != pcd) &&
-	    (ClientInWorkspace (ACTIVE_WS, pCLE->pCD)))
+	    (ClientInWorkspace (ACTIVE_WS, pCLE->pCD)) &&
+	    (EntryLayer (pCLE) >= ClientLayer (pcd)))
 	{
 	    if ((pCLE->type == MINIMIZED_STATE) &&
 		(pCLE->pCD->clientState == MINIMIZED_STATE))
@@ -530,13 +531,11 @@ void Do_Lower (ClientData *pCD, ClientListEntry *pStackEntry, int flags)
 	}
 	else
 	{
-	    if (ACTIVE_PSD->lastClient != &pcdLeader->iconEntry)
-	    {
-		StackWindow (pWS, &pcdLeader->iconEntry, 
-			     False /*on bottom*/, (ClientListEntry *) NULL);
-		MoveEntryInList (pWS, &pcdLeader->iconEntry, 
-			     False /*on bottom*/, (ClientListEntry *) NULL);
-	    }
+	    /* to the bottom of its layer (StackWindow knows when it is) */
+	    StackWindow (pWS, &pcdLeader->iconEntry, 
+			 False /*on bottom*/, (ClientListEntry *) NULL);
+	    MoveEntryInList (pWS, &pcdLeader->iconEntry, 
+			 False /*on bottom*/, (ClientListEntry *) NULL);
 	}
     }
     else /* NORMAL_STATE, MAXIMIZED_STATE, adoption */
@@ -674,8 +673,7 @@ void Do_Lower (ClientData *pCD, ClientListEntry *pStackEntry, int flags)
 	}
 	else
 	{
-	    if ((pWS->pSD->lastClient != &pcdLeader->clientEntry) &&
-		!(wmGD.systemModalActive &&
+	    if (!(wmGD.systemModalActive &&
 		  (pcdLeader == wmGD.systemModalClient)) &&
 		!(flags & STACK_WITHIN_FAMILY))
 	    {
@@ -745,10 +743,12 @@ Boolean F_Circle_Down (String args, ClientData *pCD, XEvent *event)
 	 */
 
 	pcdNext = pNextEntry->pCD;
-	if (((pNextEntry->type == NORMAL_STATE) &&
+	if ((pcdNext->netType != NETTYPE_DOCK) &&
+	    (pcdNext->netType != NETTYPE_DESKTOP) &&
+	    (((pNextEntry->type == NORMAL_STATE) &&
 	     (pcdNext->clientState != MINIMIZED_STATE)) ||
 	    ((pNextEntry->type == MINIMIZED_STATE) &&
-	     (pcdNext->clientState == MINIMIZED_STATE)))
+	     (pcdNext->clientState == MINIMIZED_STATE))))
 	{
 	    if (pcdNext->clientState == MINIMIZED_STATE)
 	    {
@@ -837,10 +837,12 @@ Boolean F_Circle_Up (String args, ClientData *pCD, XEvent *event)
 	 */
 
 	pcdNext = pNextEntry->pCD;
-	if (((pNextEntry->type == NORMAL_STATE) &&
+	if ((pcdNext->netType != NETTYPE_DOCK) &&
+	    (pcdNext->netType != NETTYPE_DESKTOP) &&
+	    (((pNextEntry->type == NORMAL_STATE) &&
 	     (pcdNext->clientState != MINIMIZED_STATE)) ||
 	    ((pNextEntry->type == MINIMIZED_STATE) &&
-	     (pcdNext->clientState == MINIMIZED_STATE)))
+	     (pcdNext->clientState == MINIMIZED_STATE))))
 	{
 	    if (pcdNext->clientState == MINIMIZED_STATE)
 	    {
@@ -3520,6 +3522,7 @@ Boolean ForceRaiseWindow (ClientData *pcd)
     WmScreenData *pSD = (ACTIVE_WS)->pSD;
 #endif
     XWindowChanges changes;
+    ClientData *pcdTop;
     Boolean restack = False;
 
 #if 0
@@ -3535,11 +3538,17 @@ Boolean ForceRaiseWindow (ClientData *pcd)
 
     /*
      * Windows did not raise on regular f.raise because the raise was
-     * not relative to another window (methinks).
+     * not relative to another window (methinks).  To the top of its
+     * transient tree, not above the windows of higher layers.
      */
-    changes.stack_mode = Above;
-    XConfigureWindow (DISPLAY, pcd->clientFrameWin, CWStackMode,
-		      &changes);
+    pcdTop = FindTransientOnTop (FindTransientTreeLeader (pcd));
+    if (pcdTop != pcd)
+    {
+	changes.stack_mode = Above;
+	changes.sibling = pcdTop->clientFrameWin;
+	XConfigureWindow (DISPLAY, pcd->clientFrameWin,
+			  CWStackMode | CWSibling, &changes);
+    }
 
     return (restack);
 }
@@ -3728,13 +3737,11 @@ void Do_Raise (ClientData *pCD, ClientListEntry *pStackEntry, int flags)
 	}
 	else
 	{
-	    if (ACTIVE_PSD->clientList != &pcdLeader->iconEntry)
-	    {
-	        StackWindow (pWS, &pcdLeader->iconEntry, 
-		    True /*on top*/, (ClientListEntry *) NULL);
-	        MoveEntryInList (pWS, &pcdLeader->iconEntry, 
-		    True /*on top*/, (ClientListEntry *) NULL);
-	    }
+	    /* to the top of its layer (StackWindow knows when it is) */
+	    StackWindow (pWS, &pcdLeader->iconEntry, 
+		True /*on top*/, (ClientListEntry *) NULL);
+	    MoveEntryInList (pWS, &pcdLeader->iconEntry, 
+		True /*on top*/, (ClientListEntry *) NULL);
 	}
     }
     else /* NORMAL_STATE, MAXIMIZED_STATE, adoption */
@@ -3842,13 +3849,11 @@ void Do_Raise (ClientData *pCD, ClientListEntry *pStackEntry, int flags)
             }
             else
             {
-                if (ACTIVE_PSD->clientList != &pcdLeader->clientEntry)
-                {
-                    StackWindow (pWS, &pcdLeader->clientEntry,
-                        True /*on top*/, (ClientListEntry *) NULL);
-                    MoveEntryInList (pWS, &pcdLeader->clientEntry,
-                        True /*on top*/, (ClientListEntry *) NULL);
-                }
+		/* to the top of its layer (StackWindow knows when it is) */
+                StackWindow (pWS, &pcdLeader->clientEntry,
+                    True /*on top*/, (ClientListEntry *) NULL);
+                MoveEntryInList (pWS, &pcdLeader->clientEntry,
+                    True /*on top*/, (ClientListEntry *) NULL);
             }
         }
   

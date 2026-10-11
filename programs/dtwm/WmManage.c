@@ -753,6 +753,7 @@ ManageWindow (WmScreenData *pSD, Window clientWindow, long manageFlags)
 	   (wmGD.keyboardFocus && (IS_APP_MODALIZED(wmGD.keyboardFocus)))) &&
 	  !(manageFlags &
 	    (MANAGEW_WM_STARTUP | MANAGEW_WM_RESTART | MANAGEW_WM_CLIENTS)) &&
+	  !(pCD->netFlags & NET_FLAG_NOFOCUS_MAP) &&
 	  (pCD->clientState != MINIMIZED_STATE) &&
           !(pCD->clientState & UNSEEN_STATE) &&
 	  (pCD->inputFocusModel ||
@@ -952,9 +953,6 @@ void WithdrawWindow (ClientData *pCD)
     int y;
     int i;
     XWindowChanges xwc;
-
-    if (pCD->pSD->topClient == pCD) pCD->pSD->topClient = NULL;
-    if (pCD->pSD->bottomClient == pCD) pCD->pSD->bottomClient = NULL;
 
     /*
      * Put the client window into a withdrawn state:

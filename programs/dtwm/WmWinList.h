@@ -42,6 +42,10 @@ extern Boolean CheckIfClientObscuredByAny (ClientData *pcd);
 extern Boolean CheckIfClientObscuring (ClientData *pcdTop, ClientData *pcd);
 extern Boolean CheckIfClientObscuringAny (ClientData *pcd);
 extern Boolean CheckIfObscuring (ClientData *pcdA, ClientData *pcdB);
+extern void ClampStackPosition (WmScreenData *pSD, ClientListEntry *pEntry,
+				Boolean *pOnTop,
+				ClientListEntry **ppStackEntry);
+extern int ClientLayer (ClientData *pCD);
 extern int CountTransientChildren (ClientData *pcd);
 extern void DeleteClientFromList (WmWorkspaceData *pWS, ClientData *pCD);
 extern void DeleteEntryFromList (WmWorkspaceData *pWS, 
@@ -49,6 +53,7 @@ extern void DeleteEntryFromList (WmWorkspaceData *pWS,
 extern void DeleteFullAppModalChildren (ClientData *pcdLeader, 
 					ClientData *pCD);
 extern void DeleteTransient (ClientData *pCD);
+extern int EntryLayer (ClientListEntry *pEntry);
 extern ClientListEntry *FindClientNameMatch (ClientListEntry *pEntry, 
 					     Boolean toNext, 
 					     String clientName,
@@ -71,6 +76,9 @@ extern void MoveEntryInList (WmWorkspaceData *pWS, ClientListEntry *pEntry,
 extern Boolean NormalizeTransientTreeStacking (ClientData *pcdLeader);
 extern Boolean PutTransientBelowSiblings (ClientData *pcd);
 extern Boolean PutTransientOnTop (ClientData *pcd);
+extern void RestackClientLayer (ClientData *pCD);
+extern void RestackFullscreenForFocus (ClientData *pcdOld,
+				       ClientData *pcdNew);
 extern void RestackTransients (ClientData *pcd);
 extern void RestackTransientsAtWindow (ClientData *pcd);
 extern void SetupSystemModalState (ClientData *pCD);

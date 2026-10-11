@@ -1271,9 +1271,6 @@ InitWmScreen (WmScreenData *pSD, int sNum)
     pSD->iconBoxControl = False;
     pSD->displayResolutionType = _DtGetDisplayResolution(DISPLAY, sNum);
 
-    pSD->topClient = NULL;
-    pSD->bottomClient = NULL;
-
     pSD->netDirty = 0;
     pSD->netClients = NULL;
     pSD->numNetClients = 0;

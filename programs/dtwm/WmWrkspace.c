@@ -1005,6 +1005,8 @@ GetClientWorkspaceInfo(
     /* 
      * Determine initial workspace set.
      *
+     * Desktop windows and docks are in all workspaces.
+     *
      * If this is a secondary window, use the hints from the
      * transient tree leader.
      *
@@ -1020,7 +1022,8 @@ GetClientWorkspaceInfo(
      * the current workspace.
      */
     if (pCD->client &&
-	((pCD->transientLeader && GetLeaderPresence(pCD, &pIDs, &numIDs)) ||
+	(GetNetWmTypeWorkspaces (pCD, &pIDs, &numIDs, &bAll) ||
+	 (pCD->transientLeader && GetLeaderPresence(pCD, &pIDs, &numIDs)) ||
 	 ((manageFlags & MANAGEW_WM_RESTART) && 
 	   GetMyOwnPresence (pCD, &pIDs, &numIDs)) ||
 	 (WorkspaceIsInCommand (DISPLAY, pCD, &pIDs, &numIDs)) ||

@@ -80,17 +80,6 @@ static void AcceptPrematureClientMessage (XClientMessageEvent *clientEvent)
 		     sizeof(XClientMessageEvent));
 }
 
-static void HandleVisibilityNotify (ClientData *pCD,
-				    XVisibilityEvent *visibilityEvent)
-{
-    if (pCD == pCD->pSD->topClient &&
-	visibilityEvent->state != VisibilityUnobscured)
-	Do_Raise (pCD, NULL, STACK_NORMAL);
-    else if (pCD == pCD->pSD->bottomClient &&
-	     visibilityEvent->state != VisibilityFullyObscured)
-	Do_Lower (pCD, NULL, STACK_NORMAL);
-}
-
 
 
 /*************************************<->*************************************
@@ -707,13 +696,6 @@ Boolean HandleEventsOnClientWindow (ClientData *pCD, XEvent *pEvent)
 	     */
 
 	    HandleClientMessage (pCD, (XClientMessageEvent *)pEvent);
-	    break;
-	}
-
-	case VisibilityNotify:
-	{
-	    HandleVisibilityNotify (pCD, (XVisibilityEvent *)pEvent);
-	    doXtDispatchEvent = False;
 	    break;
 	}
     }

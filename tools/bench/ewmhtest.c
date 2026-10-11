@@ -38,6 +38,17 @@
  *               focus, states set before the window is mapped (full
  *               screen, maximized vertically, sticky), and xdotool
  *               windowstate
+ *   layers      the stacking layers (_NET_CLIENT_LIST_STACKING and the X
+ *               order of the frames agree): above and below windows stay
+ *               there when others are raised (XRaiseWindow, xdotool
+ *               windowraise and windowactivate) or they are lowered or
+ *               raised; a dock is above them, a desktop window below all;
+ *               a full screen window is above the dock only while it has
+ *               the focus; transients stay above their leader and come
+ *               with it; a system modal window is above everything
+ *   types       _NET_WM_WINDOW_TYPE: decorations (frame and client
+ *               geometry), focus when mapped, workspaces, position, and a
+ *               dialog that becomes a transient of its window group
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -1362,6 +1373,373 @@ static void test_states(void)
 	printf("states: ok\n");
 }
 
+/* ------------------------------------------------------------------ */
+/* Layers and window types                                             */
+/* ------------------------------------------------------------------ */
+
+static Atom type_atom(const char *name)
+{
+	char full[64];
+
+	snprintf(full, sizeof full, "_NET_WM_WINDOW_TYPE_%s", name);
+	return XInternAtom(dpy, full, False);
+}
+
+/*
+ * A window of a type (or NULL), with these states set, at a position
+ * given as a program-specified one, in a window group (or None).
+ */
+static Window create_typed(const char *title, const char *type,
+			   const char *state, int x, int y, int w, int h,
+			   Window group)
+{
+	Window win = create_window(title, None);
+	XSizeHints *sh = XAllocSizeHints();
+	XWMHints *wmh = XGetWMHints(dpy, win);
+	Atom a;
+
+	if (type) {
+		a = type_atom(type);
+		XChangeProperty(dpy, win,
+				XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False),
+				XA_ATOM, 32, PropModeReplace,
+				(unsigned char *)&a, 1);
+	}
+	if (state) {
+		a = state_atom(state);
+		XChangeProperty(dpy, win, a_net_wm_state, XA_ATOM, 32,
+				PropModeReplace, (unsigned char *)&a, 1);
+	}
+	XMoveResizeWindow(dpy, win, x, y, w, h);
+	sh->flags = PPosition | PSize;
+	sh->x = x;
+	sh->y = y;
+	sh->width = w;
+	sh->height = h;
+	XSetWMNormalHints(dpy, win, sh);
+	XFree(sh);
+	if (group && wmh) {
+		wmh->flags |= WindowGroupHint;
+		wmh->window_group = group;
+		XSetWMHints(dpy, win, wmh);
+	}
+	if (wmh)
+		XFree(wmh);
+	return win;
+}
+
+static Window map_managed(Window w)
+{
+	XMapWindow(dpy, w);
+	wait_for_on(w, a_wm_state, has_wm_state, NULL,
+		    "WM_STATE NormalState");
+	expect_list(a_client_list, "_NET_CLIENT_LIST", 1, 1, w);
+	return w;
+}
+
+/*
+ * The X stacking order of our frames, bottom to top, must be the one of
+ * _NET_CLIENT_LIST_STACKING (our windows in both).
+ */
+static void check_x_order(void)
+{
+	Window r, parent, *kids, frames[MAX_OURS], xorder[MAX_OURS];
+	unsigned int nkids, i;
+	unsigned long *v;
+	int j, k, n, nx = 0, nl = 0;
+	Window listed[MAX_OURS];
+
+	XSync(dpy, False);
+	for (j = 0; j < nours; j++)
+		frames[j] = frame_of(ours[j]);
+	if (!XQueryTree(dpy, rootw, &r, &parent, &kids, &nkids))
+		fail("XQueryTree failed");
+	for (i = 0; i < nkids; i++)
+		for (j = 0; j < nours; j++)
+			if (kids[i] == frames[j] && frames[j] != ours[j] &&
+			    nx < MAX_OURS)
+				xorder[nx++] = ours[j];
+
+	v = get_prop(a_stacking, XA_WINDOW, &n);
+	for (k = 0; k < n; k++)
+		if (is_ours(v[k]) && nl < MAX_OURS)
+			listed[nl++] = v[k];
+	if (v)
+		XFree(v);
+
+	if (nx != nl || memcmp(xorder, listed, nx * sizeof(Window))) {
+		fprintf(stderr, "ewmhtest: X order:");
+		for (j = 0; j < nx; j++)
+			fprintf(stderr, " 0x%lx", xorder[j]);
+		fprintf(stderr, "\nmapped root children, bottom to top:");
+		for (i = 0; i < nkids; i++) {
+			XWindowAttributes wa;
+
+			if (!XGetWindowAttributes(dpy, kids[i], &wa) ||
+			    wa.map_state != IsViewable)
+				continue;
+			for (j = 0; j < nours && kids[i] != frames[j]; j++)
+				;
+			if (j < nours)
+				fprintf(stderr, " [0x%lx]", ours[j]);
+			else
+				fprintf(stderr, " %s0x%lx",
+					wa.override_redirect ? "o:" : "",
+					kids[i]);
+		}
+		fprintf(stderr, "\n");
+		print_list("_NET_CLIENT_LIST_STACKING", a_stacking);
+		fail("the X stacking order is not _NET_CLIENT_LIST_STACKING");
+	}
+	if (kids)
+		XFree(kids);
+}
+
+#define expect_stack(n, ...) do { \
+	expect_list(a_stacking, "_NET_CLIENT_LIST_STACKING", 0, n, \
+		    __VA_ARGS__); \
+	check_x_order(); \
+} while (0)
+
+static int not_listed(Window w, Atom prop, const void *arg)
+{
+	Window gone = *(const Window *)arg;
+	unsigned long *v;
+	int i, n, found = 0;
+
+	v = get_prop_on(w, prop, XA_WINDOW, &n);
+	for (i = 0; i < n; i++)
+		if (v[i] == gone)
+			found = 1;
+	if (v)
+		XFree(v);
+	return !found;
+}
+
+static void test_layers(void)
+{
+	Window n1, n2, a, b, d, k, f, l, t, s;
+	long hints[5] = { 1L << 2, 0, 0, 2 /* system modal */, 0 };
+	Atom mwm_hints = XInternAtom(dpy, "_MOTIF_WM_HINTS", False);
+	int have_xdotool = !system("xdotool version >/dev/null 2>&1");
+
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	n1 = map_managed(create_window("ewmhtest N1", None));
+	n2 = map_managed(create_window("ewmhtest N2", None));
+	a = map_managed(create_typed("ewmhtest A", NULL, "ABOVE",
+				     100, 100, 300, 200, None));
+	b = map_managed(create_typed("ewmhtest B", NULL, "BELOW",
+				     150, 150, 300, 200, None));
+	expect_state(a, "ABOVE", 1);
+	expect_state(b, "BELOW", 1);
+	expect_stack(4, b, n1, n2, a);
+
+	/* raising normal windows leaves them between below and above */
+	XRaiseWindow(dpy, n1);
+	expect_stack(4, b, n2, n1, a);
+	if (have_xdotool) {
+		xdotool("windowraise 0x%lx", n2);
+		expect_stack(4, b, n1, n2, a);
+		xdotool("windowactivate --sync 0x%lx", n1);
+		expect_stack(4, b, n2, n1, a);
+	} else {
+		XRaiseWindow(dpy, n2);
+		expect_stack(4, b, n1, n2, a);
+		send_active(n1);
+		expect_stack(4, b, n2, n1, a);
+	}
+
+	/* raising the below one, lowering the above one: they stay */
+	XRaiseWindow(dpy, b);
+	XLowerWindow(dpy, a);
+	XRaiseWindow(dpy, n2);			/* a fence */
+	expect_stack(4, b, n1, n2, a);
+	send_active(b);
+	expect_state(b, "FOCUSED", 1);
+	XRaiseWindow(dpy, n1);
+	expect_stack(4, b, n2, n1, a);
+
+	/* changing layers */
+	send_state(n2, ADD, "ABOVE", NULL);
+	expect_stack(4, b, n1, a, n2);
+	send_state(n2, REMOVE, "ABOVE", NULL);
+	expect_stack(4, b, n1, n2, a);
+	send_state(n2, ADD, "BELOW", NULL);
+	expect_stack(4, n2, b, n1, a);
+	send_state(n2, REMOVE, "BELOW", NULL);
+	expect_stack(4, b, n2, n1, a);
+
+	/* a dock above all those, a desktop window below them */
+	d = map_managed(create_typed("ewmhtest D", "DOCK", NULL,
+				     0, 1000, 1920, 40, None));
+	expect_stack(5, b, n2, n1, a, d);
+	k = map_managed(create_typed("ewmhtest K", "DESKTOP", NULL,
+				     0, 0, 1920, 1080, None));
+	expect_stack(6, k, b, n2, n1, a, d);
+	XRaiseWindow(dpy, k);
+	XRaiseWindow(dpy, a);
+	XLowerWindow(dpy, d);
+	XRaiseWindow(dpy, n2);			/* a fence */
+	expect_stack(6, k, b, n1, n2, a, d);
+	if (have_xdotool) {
+		xdotool("windowraise 0x%lx", k);
+		xdotool("windowraise 0x%lx", n1);
+		expect_stack(6, k, b, n2, n1, a, d);
+	}
+
+	/* full screen: above the dock while it has the focus */
+	f = map_managed(create_window("ewmhtest F", None));
+	send_state(f, ADD, "FULLSCREEN", NULL);
+	expect_state(f, "FULLSCREEN", 1);
+	send_active(f);
+	expect_state(f, "FOCUSED", 1);
+	expect_stack(7, k, b, n2, n1, a, d, f);
+	send_active(n1);
+	expect_state(n1, "FOCUSED", 1);
+	expect_stack(7, k, b, n2, f, n1, a, d);
+	send_active(f);
+	expect_stack(7, k, b, n2, n1, a, d, f);
+	send_state(f, REMOVE, "FULLSCREEN", NULL);
+	expect_stack(7, k, b, n2, n1, f, a, d);
+
+	/* a transient stays above its leader, and comes with it */
+	l = map_managed(create_window("ewmhtest L", None));
+	t = map_managed(create_window("ewmhtest T, transient for L", l));
+	expect_stack(9, k, b, n2, n1, f, l, t, a, d);
+	XRaiseWindow(dpy, n1);
+	expect_stack(9, k, b, n2, f, l, t, n1, a, d);
+	XRaiseWindow(dpy, l);
+	expect_stack(9, k, b, n2, f, n1, l, t, a, d);
+	XLowerWindow(dpy, l);
+	expect_stack(9, k, b, l, t, n2, f, n1, a, d);
+	XRaiseWindow(dpy, t);
+	expect_stack(9, k, b, n2, f, n1, l, t, a, d);
+
+	/* a system modal window is above everything */
+	s = create_window("ewmhtest S, system modal", None);
+	XChangeProperty(dpy, s, mwm_hints, mwm_hints, 32, PropModeReplace,
+			(unsigned char *)hints, 5);
+	map_managed(s);
+	expect_stack(10, k, b, n2, f, n1, l, t, a, d, s);
+	/* while it is up, the others are not raised */
+	XRaiseWindow(dpy, d);
+	XRaiseWindow(dpy, n1);
+	destroy_window(s);
+	wait_for(a_client_list, not_listed, &s, "S out of _NET_CLIENT_LIST");
+	expect_stack(9, k, b, n2, f, n1, l, t, a, d);
+	XRaiseWindow(dpy, n1);
+	expect_stack(9, k, b, n2, f, l, t, n1, a, d);
+
+	destroy_all();
+	printf("layers: ok\n");
+}
+
+/* The frame has decorations: it is larger than the client. */
+static int decorated(Window w)
+{
+	int x, y, wd, ht, fx, fy, fw, fh;
+
+	root_geometry(w, &x, &y, &wd, &ht);
+	root_geometry(frame_of(w), &fx, &fy, &fw, &fh);
+	return fw > wd || fh > ht;
+}
+
+static void test_types(void)
+{
+	static const struct {
+		const char *type;
+		int decorated, focus, all, position;
+	} types[] = {
+		{ NULL,            1, 1, 0, 0 },
+		{ "NORMAL",        1, 1, 0, 0 },
+		{ "DIALOG",        1, 1, 0, 0 },
+		{ "DESKTOP",       0, 0, 1, 1 },
+		{ "DOCK",          0, 0, 1, 1 },
+		{ "TOOLBAR",       1, 0, 0, 0 },
+		{ "MENU",          1, 0, 0, 0 },
+		{ "UTILITY",       1, 0, 0, 0 },
+		{ "SPLASH",        0, 0, 0, 0 },
+		{ "DROPDOWN_MENU", 0, 0, 0, 1 },
+		{ "POPUP_MENU",    0, 0, 0, 1 },
+		{ "TOOLTIP",       0, 0, 0, 1 },
+		{ "NOTIFICATION",  0, 0, 1, 1 },
+		{ "COMBO",         0, 0, 0, 1 },
+		{ "DND",           0, 0, 0, 1 },
+	};
+	int sw = DisplayWidth(dpy, DefaultScreen(dpy));
+	int sh = DisplayHeight(dpy, DefaultScreen(dpy));
+	int i, x, y, wd, ht;
+	unsigned long *v;
+	Window w, focus, g, dlg;
+	char title[64];
+
+	v = get_prop(a_supported, XA_ATOM, &i);
+	for (x = 0; x < (int)(sizeof types / sizeof types[0]); x++) {
+		if (!types[x].type)
+			continue;
+		for (y = 0; y < i && v[y] != type_atom(types[x].type); y++)
+			;
+		if (y == i)
+			fail("_NET_SUPPORTED lacks _NET_WM_WINDOW_TYPE_%s",
+			     types[x].type);
+	}
+	if (v)
+		XFree(v);
+
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	focus = map_managed(create_window("ewmhtest focus", None));
+	send_active(focus);
+	wait_for(a_active, active_is, &focus, "_NET_ACTIVE_WINDOW = focus");
+
+	for (i = 0; i < (int)(sizeof types / sizeof types[0]); i++) {
+		const char *name = types[i].type ? types[i].type : "(none)";
+
+		snprintf(title, sizeof title, "ewmhtest type %s", name);
+		w = map_managed(create_typed(title, types[i].type, NULL,
+					     123, 234, 320, 160, None));
+		if (types[i].focus) {
+			wait_for(a_active, active_is, &w, title);
+		} else {
+			/* the fence: its _NET_WM_DESKTOP is written last */
+			expect_card(w, a_wm_desktop,
+				    types[i].all ? ALL_DESKTOPS : 0,
+				    "_NET_WM_DESKTOP");
+			if (active_is(rootw, a_active, &w))
+				fail("%s: got the focus when mapped", name);
+		}
+		expect_card(w, a_wm_desktop, types[i].all ? ALL_DESKTOPS : 0,
+			    "_NET_WM_DESKTOP");
+		if (decorated(w) != types[i].decorated)
+			fail("%s: %sdecorated", name,
+			     types[i].decorated ? "not " : "");
+		root_geometry(w, &x, &y, &wd, &ht);
+		if (types[i].position && (x != 123 || y != 234))
+			fail("%s: at %d,%d, not 123,234", name, x, y);
+		if (types[i].type && !strcmp(types[i].type, "SPLASH") &&
+		    (x != (sw - 320) / 2 || y != (sh - 160) / 2))
+			fail("SPLASH: at %d,%d, not centred", x, y);
+		destroy_window(w);
+		send_active(focus);
+		wait_for(a_active, active_is, &focus,
+			 "_NET_ACTIVE_WINDOW = focus");
+	}
+
+	/* a dialog that is no transient becomes one of its window group */
+	g = map_managed(create_window("ewmhtest G", None));
+	dlg = map_managed(create_typed("ewmhtest dialog of G", "DIALOG", NULL,
+				       200, 200, 200, 100, g));
+	XRaiseWindow(dpy, focus);
+	expect_stack(3, g, dlg, focus);
+	XRaiseWindow(dpy, g);
+	expect_stack(3, focus, g, dlg);
+
+	destroy_all();
+	printf("types: ok\n");
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
@@ -1371,6 +1749,8 @@ static const struct {
 	{ "desktops", test_desktops },
 	{ "xdotool", test_xdotool },
 	{ "states", test_states },
+	{ "layers", test_layers },
+	{ "types", test_types },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))

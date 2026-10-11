@@ -229,6 +229,11 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->netDesktopWritten = NET_DESKTOP_NOT_WRITTEN;
     pCD->netStateWritten = NET_STATE_NOT_WRITTEN;
     pCD->maxAxes = MAX_AXES_BOTH;
+    pCD->netType = NETTYPE_NORMAL;
+    pCD->layer = LAYER_NORMAL;
+    pCD->iconEntry.nextSibling = NULL;
+    pCD->iconEntry.prevSibling = NULL;
+    pCD->iconEntry.pCD = NULL;
 
     for (i = 0; i < STRETCH_COUNT; ++i) pCD->clientStretchWin[i] = (Window)0L;
 
@@ -264,8 +269,7 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
      * Listen for property change events on the window so that we keep 
      * in sync with the hints.
      */
-    sAttributes.event_mask = (PropertyChangeMask | ColormapChangeMask |
-			      VisibilityChangeMask);
+    sAttributes.event_mask = (PropertyChangeMask | ColormapChangeMask);
     XChangeWindowAttributes (DISPLAY, pCD->client, CWEventMask,
         &sAttributes);
 
@@ -305,6 +309,12 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
      */
 
     ProcessWmTransientFor (pCD);
+
+    /*
+     * Retrieve and process _NET_WM_WINDOW_TYPE (layer, focus, ...):
+     */
+
+    ProcessNetWmWindowType (pCD);
 
     /*
      * Get client window resource data (from resources, .mwmrc):
@@ -384,6 +394,12 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
      */
 
     ProcessWmNormalHints (pCD, True /*first time*/, manageFlags);
+
+    /*
+     * Where the window type says the window goes:
+     */
+
+    ApplyNetWmTypePlacement (pCD);
 
 
     /*
@@ -3935,6 +3951,8 @@ ProcessMwmHints (ClientData *pCD)
 	{
 	    pCD->clientFunctions = WM_FUNC_ALL;
 	}
+	/* the window type's default comes before an explicit resource */
+	pCD->clientFunctions = NetTypeFunctions (pCD, pCD->clientFunctions);
         if (pCD->dtwmBehaviors & DtWM_BEHAVIOR_SUBPANEL)
 	{
 	    pCD->clientFunctions &= WM_FUNC_SUBPANEL_DEFAULT;   
@@ -3957,6 +3975,8 @@ ProcessMwmHints (ClientData *pCD)
 	{
 	    pCD->clientDecoration = WM_DECOR_ALL;
 	}
+	pCD->clientDecoration = NetTypeDecoration (pCD,
+						   pCD->clientDecoration);
         if (pCD->dtwmBehaviors & DtWM_BEHAVIOR_SUBPANEL)
 	{
 	    pCD->clientDecoration = pCD->pSD->subpanelDecoration;

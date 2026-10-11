@@ -1449,41 +1449,20 @@ void ShowIconForMinimizedClient (WmWorkspaceData *pWS, ClientData *pCD)
     }
     else
     {
-	XWindowChanges windowChanges;
-
 	/*
 	 * Map the icon on the screen at the appropriate place in the 
-	 * window stack.
+	 * window stack (StackWindow keeps it in the layer of icons).
 	 */
 
 	if (wmGD.lowerOnIconify)
 	{
-	    if ((&pCD->iconEntry != pSD->lastClient) &&
-		(pSD->lastClient))
-	    {
-		if (pSD->lastClient->type == MINIMIZED_STATE)
-		{
-		    windowChanges.sibling = 
-			ICON_FRAME_WIN(pSD->lastClient->pCD);
-		}
-		else
-		{
-		    windowChanges.sibling =
-			pSD->lastClient->pCD->clientFrameWin;
-		}
-		windowChanges.stack_mode = Below;
-		XConfigureWindow (DISPLAY, ICON_FRAME_WIN(pCD),
-		    		  (CWSibling | CWStackMode), &windowChanges);
-		MoveEntryInList (pWS, &pCD->iconEntry, 
-		    False /*on bottom*/, NULL);
-	    }
+	    StackWindow (pWS, &pCD->iconEntry, False /*on bottom*/, NULL);
+	    MoveEntryInList (pWS, &pCD->iconEntry, False /*on bottom*/, NULL);
 	}
 	else
 	{
-	    windowChanges.sibling = pCD->clientFrameWin;
-	    windowChanges.stack_mode = Below;
-	    XConfigureWindow (DISPLAY, ICON_FRAME_WIN(pCD),
-	    		      (CWSibling | CWStackMode), &windowChanges);
+	    StackWindow (pWS, &pCD->iconEntry, False /*below*/,
+			 &pCD->clientEntry);
 	    MoveEntryInList (pWS, &pCD->iconEntry, False /*below*/,
 			     &pCD->clientEntry);
 	}

@@ -68,6 +68,10 @@
 #define NET_FLAG_INIT_MAX_VERT	(1u << 7)	/* client set before it */
 #define NET_FLAG_INIT_MAX_HORZ	(1u << 8)	/* was mapped, until */
 #define NET_FLAG_INIT_FULLSCREEN (1u << 9)	/* GetClientInfo is done */
+#define NET_FLAG_ABOVE		(1u << 10)	/* _NET_WM_STATE_ABOVE */
+#define NET_FLAG_BELOW		(1u << 11)	/* _NET_WM_STATE_BELOW */
+#define NET_FLAG_NOFOCUS_MAP	(1u << 12)	/* window type: no focus */
+						/* when mapped */
 #define NET_FLAG_INIT		(NET_FLAG_INIT_STICKY | \
 				 NET_FLAG_INIT_MAX_VERT | \
 				 NET_FLAG_INIT_MAX_HORZ | \
@@ -88,6 +92,12 @@ void ProcessNetWmDesktop (ClientData *pCD, unsigned long desktop);
 void ReadInitialNetWmState (ClientData *pCD);
 void ApplyInitialNetWmState (ClientData *pCD);
 void UpdateNetUrgency (ClientData *pCD, Boolean urgent);
+void ProcessNetWmWindowType (ClientData *pCD);
+Boolean GetNetWmTypeWorkspaces (ClientData *pCD, WorkspaceID **ppIDs,
+    unsigned int *pNumIDs, Boolean *pbAll);
+long NetTypeDecoration (ClientData *pCD, long decoration);
+long NetTypeFunctions (ClientData *pCD, long functions);
+void ApplyNetWmTypePlacement (ClientData *pCD);
 void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     int top, int bottom, int left, int right);
 void ProcessNetWmState (ClientData *pCD, long action,

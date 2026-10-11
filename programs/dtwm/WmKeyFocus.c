@@ -274,6 +274,7 @@ void SetKeyboardFocus (ClientData *pCD, long focusFlags)
     
     wmGD.keyboardFocus = pCD;
     UpdateNetActiveWindow ();
+    RestackFullscreenForFocus (currentFocus, pCD);
 
 
     /*
@@ -1289,6 +1290,15 @@ Boolean CheckForKeyFocus (ClientListEntry *pNextEntry, unsigned long type, Boole
      * First check for focusing within a transient tree.
      */
 
+
+    /*
+     * Docks and desktop windows are not traversed.
+     */
+
+    if ((pCD->netType == NETTYPE_DOCK) || (pCD->netType == NETTYPE_DESKTOP))
+    {
+	return (False);
+    }
 
     /*
      * Make sure the window is being displayed and is of the specified type.

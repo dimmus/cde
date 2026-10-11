@@ -57,6 +57,7 @@ static Atom xa__NET_DESKTOP_GEOMETRY;
 static Atom xa__NET_DESKTOP_VIEWPORT;
 static Atom xa__NET_CURRENT_DESKTOP;
 static Atom xa__NET_DESKTOP_NAMES;
+static Atom xa__NET_WM_WINDOW_TYPE;
 
 /*
  * The atoms, interned together by SetupWmEwmh.  _NET_SUPPORTED lists
@@ -106,6 +107,94 @@ static const struct
     NETSTATE (DEMANDS_ATTENTION),
     NETSTATE (FOCUSED),
 #undef NETSTATE
+    { "_NET_WM_WINDOW_TYPE",		&xa__NET_WM_WINDOW_TYPE,	True },
+#define NETTYPE(t) \
+    { "_NET_WM_WINDOW_TYPE_" #t, \
+      &wmGD.xa__NET_WM_WINDOW_TYPE_[NETTYPE_ ## t],			True }
+    NETTYPE (NORMAL),
+    NETTYPE (DESKTOP),
+    NETTYPE (DOCK),
+    NETTYPE (TOOLBAR),
+    NETTYPE (MENU),
+    NETTYPE (UTILITY),
+    NETTYPE (SPLASH),
+    NETTYPE (DIALOG),
+    NETTYPE (DROPDOWN_MENU),
+    NETTYPE (POPUP_MENU),
+    NETTYPE (TOOLTIP),
+    NETTYPE (NOTIFICATION),
+    NETTYPE (COMBO),
+    NETTYPE (DND),
+#undef NETTYPE
+};
+
+/*
+ * What a window type means to dtwm: the default decorations and
+ * functions (TYPE_UNCHANGED: dtwm's own default, TYPE_TRANSIENT: those
+ * of transient windows), which an explicit clientDecoration or
+ * clientFunctions resource and then _MOTIF_WM_HINTS override; the layer;
+ * and TYPE_* flags.
+ */
+#define TYPE_UNCHANGED		(-1)
+#define TYPE_TRANSIENT		(-2)
+
+#define TYPE_NO_FOCUS		(1 << 0)	/* not given the focus when */
+						/* mapped */
+#define TYPE_ALL_WORKSPACES	(1 << 1)	/* always in every workspace */
+#define TYPE_STICKY		(1 << 2)	/* in every one, by default */
+#define TYPE_POSITION		(1 << 3)	/* its position is honoured */
+#define TYPE_CENTER		(1 << 4)	/* centred on its head */
+#define TYPE_PSEUDO_TRANSIENT	(1 << 5)	/* a transient of its group */
+
+static const struct
+{
+    int		decoration;
+    int		functions;
+    unsigned char layer;
+    unsigned char flags;
+} netTypes[NETTYPE_COUNT] =
+{
+    [NETTYPE_NORMAL] =
+	{ TYPE_UNCHANGED, TYPE_UNCHANGED, LAYER_NORMAL, 0 },
+    [NETTYPE_DESKTOP] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_DESKTOP,
+	  TYPE_NO_FOCUS | TYPE_ALL_WORKSPACES | TYPE_POSITION },
+    [NETTYPE_DOCK] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_DOCK,
+	  TYPE_NO_FOCUS | TYPE_ALL_WORKSPACES | TYPE_POSITION },
+    [NETTYPE_TOOLBAR] =
+	{ TYPE_TRANSIENT, MWM_FUNC_MOVE | MWM_FUNC_CLOSE, LAYER_NORMAL,
+	  TYPE_NO_FOCUS | TYPE_PSEUDO_TRANSIENT },
+    [NETTYPE_MENU] =
+	{ TYPE_TRANSIENT, MWM_FUNC_MOVE | MWM_FUNC_CLOSE, LAYER_NORMAL,
+	  TYPE_NO_FOCUS | TYPE_PSEUDO_TRANSIENT },
+    [NETTYPE_UTILITY] =
+	{ TYPE_TRANSIENT, TYPE_TRANSIENT, LAYER_NORMAL,
+	  TYPE_NO_FOCUS | TYPE_PSEUDO_TRANSIENT },
+    [NETTYPE_SPLASH] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_NORMAL,
+	  TYPE_NO_FOCUS | TYPE_CENTER },
+    [NETTYPE_DIALOG] =
+	{ TYPE_TRANSIENT, TYPE_TRANSIENT, LAYER_NORMAL,
+	  TYPE_PSEUDO_TRANSIENT },
+    [NETTYPE_DROPDOWN_MENU] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_ABOVE,
+	  TYPE_NO_FOCUS | TYPE_POSITION },
+    [NETTYPE_POPUP_MENU] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_ABOVE,
+	  TYPE_NO_FOCUS | TYPE_POSITION },
+    [NETTYPE_TOOLTIP] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_ABOVE,
+	  TYPE_NO_FOCUS | TYPE_POSITION },
+    [NETTYPE_NOTIFICATION] =
+	{ WM_DECOR_NONE, MWM_FUNC_CLOSE, LAYER_ABOVE,
+	  TYPE_NO_FOCUS | TYPE_STICKY | TYPE_POSITION },
+    [NETTYPE_COMBO] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_ABOVE,
+	  TYPE_NO_FOCUS | TYPE_POSITION },
+    [NETTYPE_DND] =
+	{ WM_DECOR_NONE, WM_FUNC_NONE, LAYER_ABOVE,
+	  TYPE_NO_FOCUS | TYPE_POSITION },
 };
 
 #define NETSTATE_BIT(s)		(1u << NETSTATE_ ## s)
@@ -498,8 +587,8 @@ static unsigned int NetWmState (ClientData *pCD)
 	if (pCD->maxAxes & MAX_AXIS_VERT) state |= NETSTATE_BIT (MAXIMIZED_VERT);
 	if (pCD->maxAxes & MAX_AXIS_HORZ) state |= NETSTATE_BIT (MAXIMIZED_HORZ);
     }
-    if (pCD->pSD->topClient == pCD) state |= NETSTATE_BIT (ABOVE);
-    if (pCD->pSD->bottomClient == pCD) state |= NETSTATE_BIT (BELOW);
+    if (pCD->netFlags & NET_FLAG_ABOVE) state |= NETSTATE_BIT (ABOVE);
+    if (pCD->netFlags & NET_FLAG_BELOW) state |= NETSTATE_BIT (BELOW);
     if (NetWmDesktop (pCD) == NET_ALL_DESKTOPS) state |= NETSTATE_BIT (STICKY);
     if ((pCD->netFlags & NET_FLAG_MODAL) ||
 	(pCD->inputMode != MWM_INPUT_MODELESS))
@@ -715,6 +804,168 @@ void EwmhRootResized (WmScreenData *pSD, int width, int height)
 }
 
 
+/* All the workspaces of the screen, for GetClientWorkspaceInfo. */
+static Boolean AllWorkspaces (ClientData *pCD, WorkspaceID **ppIDs,
+    unsigned int *pNumIDs, Boolean *pbAll)
+{
+    WmScreenData *pSD = pCD->pSD;
+    int i;
+
+    *ppIDs = (WorkspaceID *) XtMalloc (pSD->numWorkspaces *
+				       sizeof (WorkspaceID));
+    for (i = 0; i < pSD->numWorkspaces; ++i)
+	(*ppIDs)[i] = pSD->pWS[i].id;
+    *pNumIDs = pSD->numWorkspaces;
+    *pbAll = True;
+    return True;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  GetNetWmTypeWorkspaces (pCD, ppIDs, pNumIDs, pbAll)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Desktop windows and docks are in all workspaces, whatever else asks
+ *  (GetClientWorkspaceInfo tries this first).
+ *
+ *
+ *  Outputs:
+ *  -------
+ *  *ppIDs = the workspace IDs (XtMalloc'd), *pNumIDs = how many
+ *  *pbAll = True
+ *  RETURN = True if the window type puts the window in every workspace
+ *
+ *************************************<->***********************************/
+
+Boolean GetNetWmTypeWorkspaces (ClientData *pCD, WorkspaceID **ppIDs,
+    unsigned int *pNumIDs, Boolean *pbAll)
+{
+    if (wmGD.useStandardBehavior ||
+	!(netTypes[pCD->netType].flags & TYPE_ALL_WORKSPACES))
+	return False;
+
+    return AllWorkspaces (pCD, ppIDs, pNumIDs, pbAll);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessNetWmWindowType (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reads _NET_WM_WINDOW_TYPE, once, when the window is managed (only
+ *  when it has one, HasProperty): the first type that dtwm knows, else a
+ *  dialog for a transient window and a normal window for the others.
+ *  Sets what follows from the type before the steps of GetClientInfo
+ *  that use it: the layer, focus when mapped, every workspace by
+ *  default, and transient of its window group.  Decorations, functions
+ *  (NetTypeDecoration, NetTypeFunctions), all workspaces
+ *  (GetNetWmTypeWorkspaces) and placement (ApplyNetWmTypePlacement)
+ *  come later.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = client being managed (after ProcessWmTransientFor)
+ *
+ *************************************<->***********************************/
+
+void ProcessNetWmWindowType (ClientData *pCD)
+{
+    Atom actualType;
+    int actualFormat, type = -1, t;
+    unsigned long nitems, leftover, i;
+    Atom *types = NULL;
+
+    if (HasProperty (pCD, xa__NET_WM_WINDOW_TYPE) &&
+	XGetWindowProperty (DISPLAY, pCD->client, xa__NET_WM_WINDOW_TYPE,
+	    0L, 32L, False, XA_ATOM, &actualType, &actualFormat, &nitems,
+	    &leftover, (unsigned char **)&types) == Success &&
+	actualType == XA_ATOM && actualFormat == 32)
+    {
+	for (i = 0; i < nitems && type < 0; ++i)
+	    for (t = 0; t < NETTYPE_COUNT; ++t)
+		if (types[i] == wmGD.xa__NET_WM_WINDOW_TYPE_[t])
+		{
+		    type = t;
+		    break;
+		}
+    }
+    if (types) XFree (types);
+
+    if (type < 0)
+	type = (pCD->clientFlags & CLIENT_TRANSIENT) ?
+	    NETTYPE_DIALOG : NETTYPE_NORMAL;
+
+    pCD->netType = type;
+    pCD->layer = netTypes[type].layer;
+    if (netTypes[type].flags & TYPE_NO_FOCUS)
+	pCD->netFlags |= NET_FLAG_NOFOCUS_MAP;
+    if (netTypes[type].flags & TYPE_STICKY)
+	pCD->netFlags |= NET_FLAG_INIT_STICKY;
+    if ((netTypes[type].flags & TYPE_PSEUDO_TRANSIENT) &&
+	!(pCD->clientFlags & CLIENT_TRANSIENT))
+	pCD->bPseudoTransient = True;
+}
+
+
+/*
+ * The default decorations and functions of the window type, for
+ * ProcessMwmHints to use instead of dtwm's when no resource sets them.
+ */
+long NetTypeDecoration (ClientData *pCD, long decoration)
+{
+    int type = netTypes[pCD->netType].decoration;
+
+    if (type == TYPE_UNCHANGED) return decoration;
+    if (type == TYPE_TRANSIENT) return TRANSIENT_DECORATION (pCD);
+    return type;
+}
+
+long NetTypeFunctions (ClientData *pCD, long functions)
+{
+    int type = netTypes[pCD->netType].functions;
+
+    if (type == TYPE_UNCHANGED) return functions;
+    if (type == TYPE_TRANSIENT) return TRANSIENT_FUNCTIONS (pCD);
+    return type;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ApplyNetWmTypePlacement (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Desktop windows, docks, menus, tooltips and notifications go where
+ *  they ask (as with a user specified position); a splash screen is
+ *  centred on its head.  Called after WM_NORMAL_HINTS gave the geometry.
+ *
+ *************************************<->***********************************/
+
+void ApplyNetWmTypePlacement (ClientData *pCD)
+{
+    int flags = netTypes[pCD->netType].flags;
+    WmHeadInfo_t *pHead;
+
+    if ((flags & TYPE_CENTER) && (pHead = GetHeadInfo (pCD)))
+    {
+	pCD->clientX = pHead->x_org + (pHead->width - pCD->clientWidth) / 2;
+	pCD->clientY = pHead->y_org + (pHead->height - pCD->clientHeight) / 2;
+	free (pHead);
+    }
+    if (flags & (TYPE_POSITION | TYPE_CENTER))
+	pCD->sizeFlags |= US_POSITION;
+}
+
+
 /*************************************<->*************************************
  *
  *  GetNetWmDesktop (pCD, ppIDs, pNumIDs, pbAll)
@@ -747,7 +998,7 @@ Boolean GetNetWmDesktop (ClientData *pCD, WorkspaceID **ppIDs,
 {
     WmScreenData *pSD = pCD->pSD;
     Atom actualType;
-    int actualFormat, i;
+    int actualFormat;
     unsigned long nitems, leftover, desktop;
     unsigned char *data = NULL;
 
@@ -775,15 +1026,7 @@ Boolean GetNetWmDesktop (ClientData *pCD, WorkspaceID **ppIDs,
     }
 
     if (desktop == NET_ALL_DESKTOPS)
-    {
-	*ppIDs = (WorkspaceID *) XtMalloc (pSD->numWorkspaces *
-					   sizeof (WorkspaceID));
-	for (i = 0; i < pSD->numWorkspaces; ++i)
-	    (*ppIDs)[i] = pSD->pWS[i].id;
-	*pNumIDs = pSD->numWorkspaces;
-	*pbAll = True;
-	return True;
-    }
+	return AllWorkspaces (pCD, ppIDs, pNumIDs, pbAll);
     if (desktop >= pSD->numWorkspaces)
 	return False;
 
@@ -965,7 +1208,8 @@ void UpdateNetUrgency (ClientData *pCD, Boolean urgent)
  *  -----------
  *  Reads the _NET_WM_STATE that a client set before it was mapped (only
  *  when it has one, HasProperty).  dtwm keeps the flags that it only
- *  shows (skip taskbar and pager, demands attention, modal), and notes
+ *  shows (skip taskbar and pager, demands attention, modal) and the
+ *  layer (above, below; AddClientToList stacks it there), and notes
  *  sticky, maximized and full screen for the steps of GetClientInfo that
  *  apply them.  Hidden and focused are dtwm's, shaded is not supported.
  *
@@ -983,6 +1227,8 @@ void ReadInitialNetWmState (ClientData *pCD)
 	{ NETSTATE_SKIP_PAGER,		NET_FLAG_SKIP_PAGER },
 	{ NETSTATE_DEMANDS_ATTENTION,	NET_FLAG_DEMANDS_ATTENTION },
 	{ NETSTATE_MODAL,		NET_FLAG_MODAL },
+	{ NETSTATE_ABOVE,		NET_FLAG_ABOVE },
+	{ NETSTATE_BELOW,		NET_FLAG_BELOW },
 	{ NETSTATE_STICKY,		NET_FLAG_INIT_STICKY },
 	{ NETSTATE_MAXIMIZED_VERT,	NET_FLAG_INIT_MAX_VERT },
 	{ NETSTATE_MAXIMIZED_HORZ,	NET_FLAG_INIT_MAX_HORZ },
@@ -1129,8 +1375,6 @@ void ProcessNetActiveWindow (ClientData *pCD, Time timestamp)
     Do_Focus_Key (pCD, timestamp, ALWAYS_SET_FOCUS);
 }
 
-static void ProcessNetWmStateAbove (ClientData *pCD, long action);
-static void ProcessNetWmStateBelow (ClientData *pCD, long action);
 
 /* Whether a state is to be set after a _NET_WM_STATE action. */
 static Boolean NetStateAction (long action, Boolean set)
@@ -1230,51 +1474,47 @@ static void ProcessNetWmStateFullscreen (ClientData *pCD, long action)
 	pCD->fullscreen = True;
 	SetClientState (pCD, MAXIMIZED_STATE, GetTimestamp ());
     }
+
+    /* full screen with the focus is a layer of its own */
+    RestackClientLayer (pCD);
 }
 
+/*
+ * Above and below are layers around the normal one (ClientLayer).  The
+ * window goes to the top of the layer above, the bottom of the layer
+ * below, and back to the top (from above) or bottom (from below) of the
+ * normal layer.
+ */
 static void ProcessNetWmStateAbove (ClientData *pCD, long action)
 {
-    if (action == _NET_WM_STATE_TOGGLE)
-	action = pCD == pCD->pSD->topClient ? _NET_WM_STATE_REMOVE :
-					      _NET_WM_STATE_ADD;
+    Boolean above = (pCD->netFlags & NET_FLAG_ABOVE) != 0;
 
-    switch (action)
+    if (NetStateAction (action, above) == above) return;
+
+    if (above)
     {
-	case _NET_WM_STATE_REMOVE:
-	    if (pCD->pSD->topClient == pCD) pCD->pSD->topClient = NULL;
-	    break;
-	case _NET_WM_STATE_ADD:
-	    pCD->pSD->topClient = pCD;
-	    ProcessNetWmStateBelow (pCD, _NET_WM_STATE_REMOVE);
-	    Do_Raise (pCD, NULL, STACK_NORMAL);
-	    break;
-	default:
-	    return;
+	pCD->netFlags &= ~NET_FLAG_ABOVE;
+	RestackClientLayer (pCD);
     }
-
+    else
+    {
+	pCD->netFlags = (pCD->netFlags | NET_FLAG_ABOVE) & ~NET_FLAG_BELOW;
+	Do_Raise (pCD, NULL, STACK_NORMAL);
+    }
     EwmhMarkClient (pCD, NET_CD_STATE);
 }
 
 static void ProcessNetWmStateBelow (ClientData *pCD, long action)
 {
-    if (action == _NET_WM_STATE_TOGGLE)
-	action = pCD == pCD->pSD->bottomClient ? _NET_WM_STATE_REMOVE :
-						 _NET_WM_STATE_ADD;
+    Boolean below = (pCD->netFlags & NET_FLAG_BELOW) != 0;
 
-    switch (action)
-    {
-	case _NET_WM_STATE_REMOVE:
-	    if (pCD->pSD->bottomClient == pCD) pCD->pSD->bottomClient = NULL;
-	    break;
-	case _NET_WM_STATE_ADD:
-	    pCD->pSD->bottomClient = pCD;
-	    ProcessNetWmStateAbove (pCD, _NET_WM_STATE_REMOVE);
-	    Do_Lower (pCD, NULL, STACK_NORMAL);
-	    break;
-	default:
-	    return;
-    }
+    if (NetStateAction (action, below) == below) return;
 
+    if (below)
+	pCD->netFlags &= ~NET_FLAG_BELOW;
+    else
+	pCD->netFlags = (pCD->netFlags | NET_FLAG_BELOW) & ~NET_FLAG_ABOVE;
+    Do_Lower (pCD, NULL, STACK_NORMAL);
     EwmhMarkClient (pCD, NET_CD_STATE);
 }
 

@@ -67,6 +67,225 @@
 
 /*************************************<->*************************************
  *
+ *  ClientLayer (pCD), EntryLayer (pEntry)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  The stacking layer of a client (LAYER_*): that of its window type,
+ *  above or below the normal layer as _NET_WM_STATE asks; the system
+ *  modal window is above all, a full screen window above the docks while
+ *  it (or one of its transients) has the focus.  Transients are in the
+ *  layer of their leader, icons in the normal layer.
+ *
+ *************************************<->***********************************/
+
+int ClientLayer (ClientData *pCD)
+{
+    ClientData *pcdLeader = FindTransientTreeLeader (pCD);
+    ClientData *pcdFocus = wmGD.keyboardFocus;
+
+    if (pcdLeader->inputMode == MWM_INPUT_SYSTEM_MODAL)
+	return LAYER_SYSTEM_MODAL;
+    if (pcdLeader->fullscreen && pcdLeader->maxConfig && pcdFocus &&
+	FindTransientTreeLeader (pcdFocus) == pcdLeader)
+	return LAYER_FULLSCREEN;
+    if (pcdLeader->layer == LAYER_NORMAL)
+    {
+	if (pcdLeader->netFlags & NET_FLAG_ABOVE)
+	    return LAYER_ABOVE;
+	if (pcdLeader->netFlags & NET_FLAG_BELOW)
+	    return LAYER_BELOW;
+    }
+    return pcdLeader->layer;
+}
+
+int EntryLayer (ClientListEntry *pEntry)
+{
+    return (pEntry->type == MINIMIZED_STATE) ?
+	LAYER_NORMAL : ClientLayer (pEntry->pCD);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ClampStackPosition (pSD, pEntry, pOnTop, ppStackEntry)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Keeps a client list entry in its layer: a position asked for (above
+ *  or below a stack entry, or at the top or bottom of the stack) that
+ *  would put it among the entries of another layer becomes the nearest
+ *  position in its own layer.  StackWindow and AddEntryToList both apply
+ *  it to the same request (pEntry, which StackWindow sees in the list and
+ *  AddEntryToList does not, is skipped), so that the X stacking order
+ *  and the client list agree.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pSD = screen
+ *  pEntry = the entry to (re)stack
+ *  *pOnTop, *ppStackEntry = the position asked for (see AddEntryToList)
+ *
+ *  Outputs:
+ *  -------
+ *  *pOnTop, *ppStackEntry = the position in its layer
+ *
+ *************************************<->***********************************/
+
+void ClampStackPosition (WmScreenData *pSD, ClientListEntry *pEntry,
+    Boolean *pOnTop, ClientListEntry **ppStackEntry)
+{
+    int layer = EntryLayer (pEntry);
+    ClientListEntry *p;
+    Boolean topOfLayer;
+
+    if (*ppStackEntry)
+    {
+	int stackLayer = EntryLayer (*ppStackEntry);
+
+	if (stackLayer == layer) return;
+	topOfLayer = (stackLayer > layer);
+    }
+    else
+    {
+	topOfLayer = *pOnTop;
+    }
+
+    if (topOfLayer)
+    {
+	/* above the highest entry of this layer or of a lower one */
+	for (p = pSD->clientList; p; p = p->nextSibling)
+	    if (p != pEntry && EntryLayer (p) <= layer) break;
+	*pOnTop = (p != NULL);		/* else at the bottom */
+    }
+    else
+    {
+	/* below the lowest entry of this layer or of a higher one */
+	for (p = pSD->lastClient; p; p = p->prevSibling)
+	    if (p != pEntry && EntryLayer (p) >= layer) break;
+	*pOnTop = (p == NULL);		/* else at the top */
+    }
+    *ppStackEntry = p;
+}
+
+
+/*
+ * The frame of a client list entry that is the highest (or lowest) in
+ * the X stack: that of an icon, a client, or of its transient tree.
+ */
+static Window EntryFrame (ClientListEntry *pEntry, Boolean highest)
+{
+    if (pEntry->type == MINIMIZED_STATE)
+	return ICON_FRAME_WIN (pEntry->pCD);
+    if (pEntry->pCD->transientChildren)
+	return highest ?
+	    FindTransientOnTop (pEntry->pCD)->clientFrameWin :
+	    LowestWindowInTransientFamily (pEntry->pCD);
+    return pEntry->pCD->clientFrameWin;
+}
+
+
+/* Stack a window above or below a client list entry, or at the top or
+ * bottom of the entries. */
+static void StackWindowAt (WmScreenData *pSD, Window window, Boolean onTop,
+    ClientListEntry *pStackEntry)
+{
+    XWindowChanges changes;
+
+    if (!pStackEntry)
+	pStackEntry = onTop ? pSD->clientList : pSD->lastClient;
+    if (!pStackEntry)
+	return;
+
+    changes.sibling = EntryFrame (pStackEntry, onTop);
+    changes.stack_mode = onTop ? Above : Below;
+    if (changes.sibling != window)
+	XConfigureWindow (DISPLAY, window, CWSibling | CWStackMode, &changes);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  RestackClientLayer (pCD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Puts a client (with its transient tree) back at the top of its layer
+ *  after its layer changed.
+ *
+ *************************************<->***********************************/
+
+/* Whether an entry is in the client list (not, while being withdrawn). */
+static Boolean EntryInList (WmScreenData *pSD, ClientListEntry *pEntry)
+{
+    ClientListEntry *p;
+
+    for (p = pSD->clientList; p; p = p->nextSibling)
+	if (p == pEntry)
+	    return True;
+    return False;
+}
+
+void RestackClientLayer (ClientData *pCD)
+{
+    ClientData *pcdLeader = FindTransientTreeLeader (pCD);
+    WmWorkspaceData *pWS = pcdLeader->pSD->pActiveWS;
+
+    if (!EntryInList (pcdLeader->pSD, &pcdLeader->clientEntry))
+	return;
+
+    StackWindow (pWS, &pcdLeader->clientEntry, True /*on top*/, NULL);
+    MoveEntryInList (pWS, &pcdLeader->clientEntry, True /*on top*/, NULL);
+}
+
+
+/*
+ * A full screen window is above the docks only while it, or one of its
+ * transients, has the focus: restack those that gain or lose it.
+ */
+void RestackFullscreenForFocus (ClientData *pcdOld, ClientData *pcdNew)
+{
+    ClientData *pcdOldLeader = pcdOld ? FindTransientTreeLeader (pcdOld) : NULL;
+    ClientData *pcdNewLeader = pcdNew ? FindTransientTreeLeader (pcdNew) : NULL;
+
+    if (pcdOldLeader == pcdNewLeader) return;
+
+    if (pcdOldLeader && pcdOldLeader->fullscreen && pcdOldLeader->maxConfig)
+    {
+	/*
+	 * Back to the top of its layer, but below the window that took
+	 * the focus if that one was raised to the top of it.
+	 */
+	ClientListEntry *pEntry = &pcdOldLeader->clientEntry;
+	ClientListEntry *pTop = NULL;
+	Boolean onTop = True;
+
+	ClampStackPosition (pcdOldLeader->pSD, pEntry, &onTop, &pTop);
+	if (pTop && onTop && pcdNewLeader &&
+	    pTop == &pcdNewLeader->clientEntry &&
+	    EntryInList (pcdOldLeader->pSD, pEntry))
+	{
+	    WmWorkspaceData *pWS = pcdOldLeader->pSD->pActiveWS;
+
+	    StackWindow (pWS, pEntry, False /*below*/, pTop);
+	    MoveEntryInList (pWS, pEntry, False /*below*/, pTop);
+	}
+	else
+	{
+	    RestackClientLayer (pcdOldLeader);
+	}
+    }
+    if (pcdNewLeader && pcdNewLeader->fullscreen && pcdNewLeader->maxConfig)
+	RestackClientLayer (pcdNewLeader);
+}
+
+
+/*************************************<->*************************************
+ *
  *  AddClientToList (pWS, pCD, onTop)
  *
  *
@@ -103,6 +322,7 @@ void AddClientToList (WmWorkspaceData *pWS, ClientData *pCD, Boolean onTop)
     XWindowChanges windowChanges;
     WmScreenData *pSD = pWS->pSD;
     WsClientData *pWsc = GetWsClientData (pWS, pCD);
+    ClientListEntry *pStackEntry = NULL;
 
 
     EwmhMarkScreen (pSD, NET_SD_STACKING);
@@ -155,46 +375,37 @@ void AddClientToList (WmWorkspaceData *pWS, ClientData *pCD, Boolean onTop)
 
 	if (belowSystemModal && wmGD.systemModalClient)
 	{
-	    AddEntryToList (pWS, &pCD->clientEntry, False /*below*/,
-			    pSD->clientList);
+	    onTop = False;
+	    pStackEntry = pSD->clientList;
 	}
-	else if (onTop)
+
+	/*
+	 * The new frame is on top of the X stack (or below the system
+	 * modal input screen): unless it goes on top of the list, move it
+	 * where its layer puts it.
+	 */
+	ClampStackPosition (pSD, &pCD->clientEntry, &onTop, &pStackEntry);
+	if (!onTop || (pStackEntry && pStackEntry != pSD->clientList) ||
+	    belowSystemModal)
 	{
-	    AddEntryToList (pWS, &pCD->clientEntry, True /*on top*/, NULL);
+	    StackWindowAt (pSD, pCD->clientFrameWin, onTop, pStackEntry);
 	}
-	else
-	{
-	    AddEntryToList (pWS, &pCD->clientEntry, False /*on bottom*/, NULL);
-	}
+	AddEntryToList (pWS, &pCD->clientEntry, onTop, pStackEntry);
 
 
 	if (!pWsc->pIconBox && pWsc->iconFrameWin)
 	{
 	    /*
-	     * Put the icon on the bottom of the stack.
+	     * Put the icon on the bottom of the stack (of its layer).
 	     */
-
-	    if (pSD->lastClient->type == MINIMIZED_STATE)
-	    {
-		WsClientData *pWsib;
-
-		pWsib = &pSD->lastClient->pCD->pWsList[0];
-		windowChanges.sibling = pWsib->iconFrameWin;
-	    }
-	    else
-	    {
-		windowChanges.sibling = pSD->lastClient->pCD->clientFrameWin;
-	    }
-	    windowChanges.stack_mode = Below;
-	    XConfigureWindow (DISPLAY, pWsc->iconFrameWin,
-	        CWSibling | CWStackMode, &windowChanges);
 
 	    pCD->iconEntry.type = MINIMIZED_STATE;
 	    pCD->iconEntry.pCD = pCD;
-	    pCD->iconEntry.nextSibling = NULL;
-	    pCD->iconEntry.prevSibling = pSD->lastClient;
-	    pSD->lastClient->nextSibling = &pCD->iconEntry;
-	    pSD->lastClient = &pCD->iconEntry;
+	    onTop = False;
+	    pStackEntry = NULL;
+	    ClampStackPosition (pSD, &pCD->iconEntry, &onTop, &pStackEntry);
+	    StackWindowAt (pSD, pWsc->iconFrameWin, onTop, pStackEntry);
+	    AddEntryToList (pWS, &pCD->iconEntry, onTop, pStackEntry);
 	}
     }
 
@@ -239,6 +450,7 @@ void AddEntryToList (WmWorkspaceData *pWS, ClientListEntry *pEntry, Boolean onTo
     WmScreenData *pSD = pWS->pSD;
 
     EwmhMarkScreen (pSD, NET_SD_STACKING);
+    ClampStackPosition (pSD, pEntry, &onTop, &pStackEntry);
 
     if (onTop)
     {
@@ -1521,11 +1733,36 @@ void StackWindow (WmWorkspaceData *pWS, ClientListEntry *pEntry, Boolean onTop, 
     WmScreenData *pSD = pWS->pSD;
 
 
+    /*
+     * Keep the window in its layer.  Where it is already, there is
+     * nothing to do but to stack its transients with it (a new one is on
+     * top of the X stack).
+     */
+    ClampStackPosition (pSD, pEntry, &onTop, &pStackEntry);
+    if (pStackEntry ?
+	(pEntry == (onTop ? pStackEntry->prevSibling :
+			    pStackEntry->nextSibling)) :
+	(pEntry == (onTop ? pSD->clientList : pSD->lastClient)))
+    {
+	if ((pEntry->type != MINIMIZED_STATE) &&
+	    pEntry->pCD->transientChildren)
+	{
+	    RestackTransients (pEntry->pCD);
+	}
+	return;
+    }
+
     if (pStackEntry)
     {
 	if (pStackEntry->type == MINIMIZED_STATE)
 	{
 	    stackWindow = ICON_FRAME_WIN(pStackEntry->pCD);
+	}
+	else if (onTop && pStackEntry->pCD->transientChildren)
+	{
+	    /* above its transients too */
+	    stackWindow =
+		(FindTransientOnTop (pStackEntry->pCD))->clientFrameWin;
 	}
 	else
 	{
@@ -1633,7 +1870,8 @@ void StackWindow (WmWorkspaceData *pWS, ClientListEntry *pEntry, Boolean onTop, 
 	 * Adjust stack entry window if we're stacking below a
 	 * transient tree.
 	 */
-	if (pStackEntry && pStackEntry->pCD->transientChildren)
+	if (pStackEntry && (pStackEntry->type != MINIMIZED_STATE) &&
+	    pStackEntry->pCD->transientChildren)
 	{
 	    stackWindow = LowestWindowInTransientFamily (pStackEntry->pCD);
 	}
