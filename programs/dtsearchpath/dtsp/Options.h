@@ -47,6 +47,7 @@ class Options {
   int       removeAutoMountPoint() const { return (flags & 16); }
   int       useCshEnv() const            { return (flags & 32); }
   int       useKshEnv() const            { return (flags & 64); }
+  const char * cacheFile() const         { return cache_file; }
 
   CString   getAutoMountPoint () const   { return *automountpoint; }
   CString * getUserID () const           { return user_id; }
@@ -60,6 +61,7 @@ class Options {
   CString *     user_id;
   CString *     home_dir;
   CString *     automountpoint;
+  const char *  cache_file;
 };
 
 #endif

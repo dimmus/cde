@@ -36,6 +36,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <string>
+#include <utility>
+#include <vector>
 
 
 class Shell  {
@@ -91,6 +94,36 @@ class CShell : public Shell {
 #endif
    }
 };
+
+/*
+ * Records what a run depends on: the environment variables read and
+ * the results of the file tests made (dtsearchpath -cache).  A run that
+ * changed anything (made a directory, say) or used something that is
+ * not recorded is "spoiled" and cannot be replayed from a cache.
+ */
+class EnvRecorder {
+ public:
+  EnvRecorder() : spoiled_(0), ignored_(0) {}
+
+  void env (const char * name, const char * value);
+  void test (char op, const char * path, int result);
+  void spoil () { spoiled_ = 1; }
+  void ignore (const char * name) { ignored_ = name; }
+  int  spoiled () const { return spoiled_; }
+
+  // The ksh93 condition under which a run would read the same.
+  std::string kshCondition () const;
+
+  static std::string kshQuote (const std::string &);
+
+ private:
+  std::vector<std::pair<std::string, std::string> > envs_;
+  std::vector<std::string> tests_;
+  int spoiled_;
+  const char * ignored_;
+};
+
+extern EnvRecorder * envRecorder;
 
 class OSEnvironment {
  public:

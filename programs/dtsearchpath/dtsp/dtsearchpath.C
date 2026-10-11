@@ -126,6 +126,13 @@
  **************************************************************************/
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string>
 #include "SearchPath.h"
 #include "Options.h"
 #include "Environ.h"
@@ -135,11 +142,107 @@ const char * DTINFOLIBDEFAULT_VALUE = "cde";
 
 Options * options;
 
+/*
+ * dtsearchpath -ksh -cache <file>: the output also goes to <file>, as a
+ * ksh93 script for Xsession that sets dtsp_out to it if the exported
+ * environment variables read and the results of the file tests made
+ * are still the same.  Xsession then does "eval $dtsp_out", which is
+ * what it does with the output of dtsearchpath, without running it.
+ */
+static EnvRecorder recorder;
+static FILE * capture;
+static int savedStdout = -1;
+
+static void StartCapture()
+{
+  if (!options->cacheFile())
+    return;
+  // Only the plain ksh output, and only when it depends on nothing
+  // but the environment and the file tests.
+  if (!options->useKshEnv() || options->Verbose() ||
+      options->CheckingUser() || options->getHomeDir())
+    return;
+  fflush(stdout);
+  if (!(capture = tmpfile()))
+    return;
+  if ((savedStdout = dup(1)) < 0 || dup2(fileno(capture), 1) < 0) {
+    if (savedStdout >= 0)
+      close(savedStdout);
+    savedStdout = -1;
+    fclose(capture);
+    capture = 0;
+    return;
+  }
+  recorder.ignore("SHELL");	// set by -ksh
+  envRecorder = &recorder;
+}
+
+static void WriteCache(const char * file, const std::string & out)
+{
+  std::string tmp(file);
+  std::string dir(file, strrchr(file, '/') - file);
+  std::string script;
+  std::string value(out);
+  size_t len;
+  int fd;
+
+  // As in $(...): no trailing newlines.
+  while (!value.empty() && value[value.size() - 1] == '\n')
+    value.erase(value.size() - 1);
+
+  script = "# Written by dtsearchpath -cache: its -ksh output, for "
+	   "Xsession (ksh93).\n"
+	   "dtsp_out=\n"
+	   "dtsp_x=\"\n$(typeset +x)\n\"\n"
+	   "if " + recorder.kshCondition() + "\n"
+	   "then\n"
+	   "  dtsp_out=" + EnvRecorder::kshQuote(value) + "\n"
+	   "fi\n"
+	   "unset dtsp_x\n";
+
+  if (!dir.empty() && mkdir(dir.c_str(), 0700) != 0 && errno != EEXIST)
+    return;
+  tmp += ".XXXXXX";
+  if ((fd = mkstemp(&tmp[0])) < 0)
+    return;
+  len = script.size();
+  if (write(fd, script.data(), len) != (ssize_t) len ||
+      close(fd) != 0 || rename(tmp.c_str(), file) != 0)
+    unlink(tmp.c_str());
+}
+
+static void EndCapture()
+{
+  std::string out;
+  char buf[4096];
+  size_t n;
+
+  if (!capture)
+    return;
+  envRecorder = 0;
+#ifdef IOSTREAMSWORKS
+  std::cout.flush();
+#endif
+  fflush(stdout);
+  dup2(savedStdout, 1);
+  close(savedStdout);
+  rewind(capture);
+  while ((n = fread(buf, 1, sizeof(buf), capture)) > 0)
+    out.append(buf, n);
+  fclose(capture);
+  capture = 0;
+  if (!out.empty() && write(1, out.data(), out.size()) != (ssize_t) out.size())
+    return;
+  if (!recorder.spoiled() && !out.empty())
+    WriteCache(options->cacheFile(), out);
+}
+
 int main (int argc, char **argv)
 {
   CString newShell("SHELL="); // Keep in scope for duration of program.
 
   options = new Options(argc, argv);
+  StartCapture();
 
   if ( options->useKshEnv() ) {
     newShell += UnixEnvironment::kshString();
@@ -226,5 +329,6 @@ int main (int argc, char **argv)
 
   }
 
+  EndCapture();
   return 0;
 }

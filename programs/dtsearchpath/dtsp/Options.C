@@ -50,16 +50,22 @@
  *      -csh    force Csh style environment set commands
  *
  *      -ksh    force Ksh style environment set commands
+ *
+ *      -cache file
+ *              with -ksh: also write the output to file, as a ksh93
+ *              script that sets dtsp_out to it as long as the
+ *              environment variables and directories it depends on
+ *              are the same (see Xsession)
  **************************************************************/
 
 Options::Options
 	(
 	unsigned int argc,
 	char **      argv
-	) : flags(0), user_id(0), home_dir(0), automountpoint(0)
+	) : flags(0), user_id(0), home_dir(0), automountpoint(0), cache_file(0)
 {
 CString Usage ("Usage: dtsearchpath [ -v | -T | -o | -a | -csh | -ksh ] "
-	       "[ -u <login-name> ]");
+	       "[ -u <login-name> ] [ -cache <file> ]");
 
     if (argc > 1) {
 	for (int i = 1; i < (int)argc; i++) {
@@ -77,6 +83,14 @@ CString Usage ("Usage: dtsearchpath [ -v | -T | -o | -a | -csh | -ksh ] "
 		flags |= 32;
 	    else if (strcmp(argv[i],"-ksh") == 0)
 		flags |= 64;
+	    else if (strcmp(argv[i],"-cache") == 0) {
+		if (++i < (int)argc && argv[i][0] == '/')
+		    cache_file = argv[i];
+		else {
+		    fprintf(stderr, "%s\n",Usage.data());
+		    exit(1);
+		}
+	    }
 	    else if (strcmp(argv[i],"-u") == 0) {
 		flags |= 2;
 		if (++i < (int)argc && argv[i][0] != '-') {

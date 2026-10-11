@@ -83,6 +83,10 @@ CString final_path;
     if (host) {
 	if (options->doingTooltalk()) {
 	    TTFile * file;
+
+	    // ToolTalk's file name mapping is not recorded: no cache.
+	    if (envRecorder)
+		envRecorder->spoil();
 	    Try {
 		file = new TTFile(*host,path);
 		if (!file->ttFileOpFailed())

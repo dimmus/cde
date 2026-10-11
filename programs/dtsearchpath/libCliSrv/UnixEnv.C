@@ -109,11 +109,11 @@ int UnixEnvironment::FileExists
 	) const
 {
 struct stat file;
+int result = stat((const char *)filename.data(),&file) == 0;
 
-    if (stat((const char *)filename.data(),&file) == 0)
-	return 1;
-
-    return 0;
+    if (envRecorder)
+	envRecorder->test('e', filename.data(), result);
+    return result;
 }
 
 void UnixEnvironment::MakeDirectory 
@@ -122,6 +122,8 @@ void UnixEnvironment::MakeDirectory
 	mode_t          permissions
 	)
 {
+    if (envRecorder)
+	envRecorder->spoil();
     if (mkdir (dirname.data(), permissions) == -1) {
 	CString errorStr("MakeDirectory: " + dirname);
 	perror(errorStr.data());
@@ -134,6 +136,8 @@ CString UnixEnvironment::getEnvironmentVariable
 	)
 {
   char * value = getenv(envvar);
+  if (envRecorder)
+    envRecorder->env(envvar, value ? value : "");
   if (value == 0)
     return CString("");
 
@@ -146,12 +150,12 @@ int UnixEnvironment::isDirectory
 	)
 {
 struct stat file;
+int result = stat((const char *)directory.data(),&file) == 0 &&
+	     S_ISDIR(file.st_mode);
 
-    if (stat((const char *)directory.data(),&file) == 0)
-	if (S_ISDIR(file.st_mode))
-	    return 1;
-
-    return 0;
+    if (envRecorder)
+	envRecorder->test('d', directory.data(), result);
+    return result;
 }
 
 int UnixEnvironment::isFile
@@ -160,12 +164,12 @@ int UnixEnvironment::isFile
 	)
 {
 struct stat file;
+int result = stat((const char *)filespec.data(),&file) == 0 &&
+	     S_ISREG(file.st_mode);
 
-    if (stat((const char *)filespec.data(),&file) == 0)
-	if (S_ISREG(file.st_mode))
-	    return 1;
-
-    return 0;
+    if (envRecorder)
+	envRecorder->test('f', filespec.data(), result);
+    return result;
 }
 
 int UnixEnvironment::isLink
@@ -174,12 +178,12 @@ int UnixEnvironment::isLink
 	)
 {
 struct stat file;
+int result = lstat((const char *)filespec.data(),&file) == 0 &&
+	     S_ISLNK(file.st_mode);
 
-    if (lstat((const char *)filespec.data(),&file) == 0)
-	if (S_ISLNK(file.st_mode))
-	    return 1;
-
-    return 0;
+    if (envRecorder)
+	envRecorder->test('L', filespec.data(), result);
+    return result;
 }
 
 void UnixEnvironment::symbolicLink
@@ -188,6 +192,8 @@ void UnixEnvironment::symbolicLink
 	const CString & linkee
 	)
 {
+    if (envRecorder)
+	envRecorder->spoil();
     if (symlink (linkto.data(), linkee.data()) == -1) {
 	CString errorStr("symbolicLink: " + linkee + " -> " + linkto + "| ");
 	perror(errorStr.data());
@@ -222,6 +228,8 @@ void UnixEnvironment::changePermissions
 	mode_t mode
 	)
 {
+    if (envRecorder)
+	envRecorder->spoil();
     if (chmod (filespec.data(), mode) == -1) {
 	CString errorStr("changePermissions: " + filespec + "| ");
 	perror(errorStr.data());
@@ -237,6 +245,9 @@ void UnixEnvironment::changeOwnerGroup
 {
     uid_t uid = UID_NO_CHANGE;
     gid_t gid = GID_NO_CHANGE;
+
+    if (envRecorder)
+	envRecorder->spoil();
 
     if (owner) {
 	if (owner[0]) {
@@ -319,6 +330,8 @@ void UnixEnvironment::removeFile
 	const CString & filespec
 	)
 {
+    if (envRecorder)
+	envRecorder->spoil();
     if (isDirectory(filespec) && !isLink(filespec))
 	removeDirectory(filespec);
     else {
@@ -351,3 +364,90 @@ void UnixEnvironment::removeDeadLinks
     closedir(dir);
 }
 
+
+
+/*
+ * EnvRecorder
+ */
+EnvRecorder * envRecorder = 0;
+
+void EnvRecorder::env
+	(
+	const char * name,
+	const char * value
+	)
+{
+    if (ignored_ && strcmp(name, ignored_) == 0)
+	return;
+    for (size_t i = 0; i < envs_.size(); i++)
+	if (envs_[i].first == name)
+	    return;		// the environment does not change
+    envs_.push_back(std::make_pair(std::string(name), std::string(value)));
+}
+
+void EnvRecorder::test
+	(
+	char op,
+	const char * path,
+	int result
+	)
+{
+    std::string t(result ? "" : "! ");
+    t += '-';
+    t += op;
+    t += ' ';
+    t += kshQuote(path);
+    for (size_t i = 0; i < tests_.size(); i++)
+	if (tests_[i] == t)
+	    return;
+    tests_.push_back(t);
+}
+
+std::string EnvRecorder::kshQuote
+	(
+	const std::string & str
+	)
+{
+    std::string q("'");
+    for (size_t i = 0; i < str.size(); i++)
+	if (str[i] == '\'')
+	    q += "'\\''";
+	else
+	    q += str[i];
+    q += '\'';
+    return q;
+}
+
+/*
+ * A variable counts as it was read only if it is exported (the shell
+ * may have variables of the same name that the program never sees):
+ * $dtsp_x must hold the names of the exported variables, one per line,
+ * with a newline before and after ("$(typeset +x)").  An unset and an
+ * empty variable read the same.
+ */
+std::string EnvRecorder::kshCondition () const
+{
+    std::string c;
+
+    for (size_t i = 0; i < envs_.size(); i++) {
+	const std::string & name = envs_[i].first;
+	const std::string & value = envs_[i].second;
+	std::string exported("$dtsp_x == *\"\n" + name + "\n\"*");
+
+	if (!c.empty())
+	    c += " &&\n   ";
+	if (value.empty())
+	    c += "[[ ! ( " + exported + " ) || -z ${" + name + "-} ]]";
+	else
+	    c += "[[ " + exported + " && ${" + name + "-} == " +
+		 kshQuote(value) + " ]]";
+    }
+    for (size_t i = 0; i < tests_.size(); i++) {
+	if (!c.empty())
+	    c += " &&\n   ";
+	c += "[[ " + tests_[i] + " ]]";
+    }
+    if (c.empty())
+	c = "true";
+    return c;
+}

@@ -398,16 +398,45 @@ XCOMM ##########################################################################
   fi
 
   HASH
+  HASH CheckSyntax shell file: true if "shell -n file" is, with its
+  HASH messages in syntax_errors.  Under ksh93 the text of a file that
+  HASH passed is kept (with the name of the shell) in a cache file, and
+  HASH the same text is not checked again, unless the shell has been
+  HASH replaced since: comparing the text costs no process.
+  HASH
+  CheckSyntax()
+  {
+    syntax_errors=
+    case "$KSH_VERSION" in
+      *" 93"*|*"A 20"*) ;;
+      *) syntax_errors=`$1 -n $2 2>&1`; return ;;
+    esac
+    cs_file=${2##*/}
+    cs_cache=$LOGDIR/cache/syntax-ok.${cs_file#.}
+    cs_text="$1
+$(<"$2")"
+    if [ -f "$cs_cache" -a -O "$cs_cache" ] && \
+       [ "${1#/}" = "$1" -o "$1" -ot "$cs_cache" ] && \
+       [[ $(<"$cs_cache") == "$cs_text" ]]; then
+      return 0
+    fi
+    syntax_errors=`$1 -n $2 2>&1` || return
+    [ -d $LOGDIR/cache ] || mkdir -m 700 $LOGDIR/cache 2>/dev/null
+    { print -r -- "$cs_text" > "$cs_cache.$$"; } 2>/dev/null && \
+      mv -f "$cs_cache.$$" "$cs_cache" 2>/dev/null
+    return 0
+  }
+
+  HASH
   HASH source the .dtprofile.
   HASH
   if [ -f $HOME/$DTPROFILE ]; then
-    dtprofile_errors=`KORNSHELL -n $HOME/$DTPROFILE 2>&1`
-    if [ "0" = "$?" ]; then
+    if CheckSyntax KORNSHELL $HOME/$DTPROFILE; then
       Log "sourcing $HOME/$DTPROFILE..."
       . $HOME/$DTPROFILE
     else
       Log "not sourcing $HOME/$DTPROFILE due to errors..."
-      Log "$dtprofile_errors"
+      Log "$syntax_errors"
     fi
   fi
 
@@ -530,7 +559,32 @@ StartFirst()
   else
     SetFirst startup dtstart_session        # get desktop session client
     StartFirst dtstart_hello                # start desktop hello client
-    StartFirst dtstart_searchpath eval      # setup desktop search paths
+    HASH
+    HASH Under ksh93, dtsearchpath also writes its output to a cache file,
+    HASH as a script that hands it back only while what it depends on is
+    HASH the same: the exported variables it reads and the results of
+    HASH its directory tests.  The cache is used instead of running
+    HASH dtsearchpath if it holds and dtsearchpath has not been replaced
+    HASH since it was written.
+    HASH
+    dtsp_out=
+    case "$KSH_VERSION" in
+      *" 93"*|*"A 20"*)
+        dtsp_cache=$LOGDIR/cache/dtsearchpath
+        if [ -f "$dtsp_cache" -a -O "$dtsp_cache" ] && \
+           [ "$DT_BINPATH/dtsearchpath" -ot "$dtsp_cache" ]; then
+          command . "$dtsp_cache"
+        fi
+        dtstart_searchpath="$dtstart_searchpath -cache $dtsp_cache"
+        ;;
+    esac
+    if [ -n "$dtsp_out" ]; then
+      Log "setting search paths from $dtsp_cache"
+      eval $dtsp_out                        # what StartFirst would eval
+    else
+      StartFirst dtstart_searchpath eval    # setup desktop search paths
+    fi
+    unset dtsp_out
 
     SetFirst tooltalk dtstart_ttsession     # get tooltalk client
     SetFirst dtdbcache dtstart_dtdbcache    # get dtdbcache client
@@ -553,13 +607,12 @@ StartFirst()
     case ${SHELL##*/} in
 
       sh | bash | ksh | ksh93 | dtksh)
-        dotprofile_errors=`$SHELL -n $shellprofile 2>&1`
-        if [ "0" = "$?" ]; then
+        if CheckSyntax $SHELL $shellprofile; then
           source_profile=". $shellprofile"
           source_login="source $shellprofile"
         else
           Log "parse errors found in $shellprofile..."
-          Log "$dotprofile_errors"
+          Log "$syntax_errors"
           source_profile="echo 'not execing $shellprofile due to errors'"
           source_login="echo 'not execing $shellprofile due to errors'"
         fi;;
