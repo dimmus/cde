@@ -30,8 +30,10 @@
  *
  * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
  */
+#include <stdlib.h>
 #include "Tt/tt_c.h"
 #include "Tt/tttk.h"
+#include "api/c/api_api.h"
 #include "tttk/tttkmessage.h"
 #include "tttk/tttk2free.h"
 #include "tttk/tttkutils.h"
@@ -49,15 +51,39 @@ _tttk_patterns_destroy(
 		return worst;
 	}
 	Tt_pattern *pats2free = pats;
-	while (*pats != 0) {
-		if (tt_ptr_error( *pats ) == TT_OK) {
-			Tt_status status = tt_pattern_destroy( *pats );
-			if (status != TT_OK) {
-				worst = status;
+	// Destroy them all at once: one round trip to ttsession
+	// instead of one per pattern.
+	int n = 0, k = 0;
+	while (pats[n] != 0) {
+		n++;
+	}
+	Tt_pattern *live = (Tt_pattern *)malloc( (n + 1) * sizeof(Tt_pattern) );
+	Tt_status *statuses = (Tt_status *)malloc( (n + 1) * sizeof(Tt_status) );
+	if (live != 0 && statuses != 0) {
+		for (int i = 0; i < n; i++) {
+			if (tt_ptr_error( pats[i] ) == TT_OK) {
+				live[k++] = pats[i];
 			}
 		}
-		pats++;
+		_tt_pattern_destroy_list( live, k, statuses );
+		for (int i = 0; i < k; i++) {
+			if (statuses[i] != TT_OK) {
+				worst = statuses[i];
+			}
+		}
+	} else {
+		while (*pats != 0) {
+			if (tt_ptr_error( *pats ) == TT_OK) {
+				Tt_status status = tt_pattern_destroy( *pats );
+				if (status != TT_OK) {
+					worst = status;
+				}
+			}
+			pats++;
+		}
 	}
+	free( live );
+	free( statuses );
 	if (pats2free != 0) {
 		free( (caddr_t)pats2free );
 	}

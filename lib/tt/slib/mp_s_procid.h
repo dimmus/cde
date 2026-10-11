@@ -65,6 +65,10 @@ class _Tt_s_procid : public _Tt_procid {
 		return(_flags&(1<<_TT_PROC_ACTIVE));
 	}
 	int			is_ptype(_Tt_string ptid);
+	// TT_RPC_OPEN_PROCID names a procid that has no id yet
+	void			set_id(const _Tt_string &id) {
+		_id = id;
+	}
 	Tt_status		next_message(_Tt_next_message_args &args);
 	int			service_timeout(int timeout);
 	void			activate();

@@ -42,6 +42,7 @@
 #include "mp/mp_rpc_client.h"
 #include "mp/mp_rpc_interface.h"
 #include "mp/mp_c_session.h"
+#include "mp/mp_c_procid.h"
 #include "mp/mp_desktop.h"
 #include "mp/mp_xdr_functions.h"
 #include "util/tt_port.h"
@@ -103,7 +104,9 @@ c_init()
 				OPT_PING_TRIES * OPT_PING_SLEEP * 1000;
 			int ping_delay = 10;
 			do {
-				status = ping();
+				// ping(), or tt_open()'s first contact
+				// standing in for it
+				status = _tt_c_procid_first_contact(this);
 				if (status != TT_ERR_NOMP) {
 					// Fatal error or TT_OK
 					return status;

@@ -334,8 +334,11 @@ _tt_open()
 	
 	_tt_internal_init();
 
+	_tt_c_procid_open_wanted(1);
 	ttrc=_tt_c_mp->c_init();
+	_tt_c_procid_open_wanted(0);
 	if (ttrc != TT_OK && ttrc != TT_ERR_NOMP) {
+		(void)_tt_c_procid_take_opened();
 		return (char *)error_pointer(ttrc);
 	}
 	if (TT_OK != (ttrc=_tt_c_mp->create_new_procid())) {

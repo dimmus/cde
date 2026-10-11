@@ -40,11 +40,99 @@
  * Copyright (c) 1992 by Sun Microsystems, Inc.
  */
 #include "mp_s_xdr_functions.h"
+#include "mp/mp_rpc_interface.h"
 
 bool_t
 tt_s_xdr_add_pattern_args(XDR *xdrs,_Tt_s_add_pattern_args *args)
 {
 	return(args->procid.xdr(xdrs) && args->pattern.xdr(xdrs));
+}
+
+
+// Decode only (the client encodes with tt_xdr_add_patterns_args).
+bool_t
+tt_s_xdr_add_patterns_args(XDR *xdrs, _Tt_s_add_patterns_args *args)
+{
+	int	n;
+
+	if (xdrs->x_op != XDR_DECODE) {
+		return 0;
+	}
+	if (! args->procid.xdr(xdrs) || ! xdr_int(xdrs, &n)) {
+		return 0;
+	}
+	if (n < 0 || n > TT_ADD_PATTERNS_MAX) {
+		return 0;
+	}
+	delete [] args->patterns;
+	args->patterns = new _Tt_s_pattern_ptr[n > 0 ? n : 1];
+	args->count = n;
+	for (int i = 0; i < n; i++) {
+		if (! args->patterns[i].xdr(xdrs)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+
+// Decode only (the client encodes with tt_xdr_del_patterns_args).
+bool_t
+tt_s_xdr_del_patterns_args(XDR *xdrs, _Tt_s_del_patterns_args *args)
+{
+	int	n;
+
+	if (xdrs->x_op != XDR_DECODE) {
+		return 0;
+	}
+	if (! args->procid.xdr(xdrs) || ! xdr_int(xdrs, &n)) {
+		return 0;
+	}
+	if (n < 0 || n > TT_ADD_PATTERNS_MAX) {
+		return 0;
+	}
+	delete [] args->pattern_ids;
+	args->pattern_ids = new _Tt_string[n > 0 ? n : 1];
+	args->count = n;
+	for (int i = 0; i < n; i++) {
+		if (! args->pattern_ids[i].xdr(xdrs)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+
+bool_t
+tt_s_xdr_fd_args(XDR *xdrs, _Tt_s_fd_args *args)
+{
+	return(args->procid.xdr(xdrs)
+	       && xdr_int(xdrs, &args->fd)
+	       && args->start_token.xdr(xdrs));
+}
+
+
+bool_t
+tt_s_xdr_open_procid_reply(XDR *xdrs, _Tt_open_procid_reply *reply)
+{
+	return(xdr_int(xdrs, &reply->status)
+	       && reply->key.xdr(xdrs)
+	       && reply->session_id.xdr(xdrs));
+}
+
+
+bool_t
+tt_s_xdr_add_patterns_reply(XDR *xdrs, _Tt_add_patterns_reply *reply)
+{
+	if (! xdr_int(xdrs, &reply->count)) {
+		return 0;
+	}
+	for (int i = 0; i < reply->count; i++) {
+		if (! xdr_int(xdrs, &reply->statuses[i])) {
+			return 0;
+		}
+	}
+	return 1;
 }
 
 

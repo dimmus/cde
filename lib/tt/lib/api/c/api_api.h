@@ -55,6 +55,10 @@ void		*_tt_error_pointer(Tt_status s);
 int		 _tt_error_int(Tt_status s);
 void		 _prepend_P_to_sessid(const char *sessid,
 					_Tt_string &sessid_with_P);
+void		 _tt_pattern_register_list(Tt_pattern *pats, int n,
+					   Tt_status *statuses);
+void		 _tt_pattern_destroy_list(Tt_pattern *pats, int n,
+					  Tt_status *statuses);
 #define error_pointer(ttrc) ((void *)(_tt_api_status_page+(int)(ttrc)))
 #define error_int(ttrc) (-(int)(ttrc))
 

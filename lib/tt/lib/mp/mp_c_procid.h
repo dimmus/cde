@@ -36,6 +36,7 @@
 #include <mp/mp_procid.h>
 #include <mp/mp_c_session.h>
 #include <mp/mp_c_message_utils.h>
+#include <mp/mp_c_procid_utils.h>
 #include "api/c/api_typecb_utils.h"
 
 class _Tt_c_procid : public _Tt_procid {
@@ -44,6 +45,8 @@ class _Tt_c_procid : public _Tt_procid {
 	~_Tt_c_procid();
 	_Tt_c_procid(const _Tt_string &id);
 	Tt_status		add_pattern(_Tt_pattern_ptr &p);
+	void			add_patterns(_Tt_pattern_ptr *pats, int n,
+					     Tt_status *statuses);
 	Tt_status		api_in(_Tt_string &s);
 	_Tt_string		api_out();
 	void			clear_signal();
@@ -63,7 +66,11 @@ class _Tt_c_procid : public _Tt_procid {
 	_Tt_c_session_ptr		&default_session();
 
 	Tt_status		del_pattern(const _Tt_string &id);
+	void			del_patterns(const _Tt_string *ids, int n,
+					     Tt_status *statuses);
 	Tt_status		init();
+	Tt_status		bind_session();
+	Tt_status		open(_Tt_string *session_id);
 	Tt_status		next_message(_Tt_c_message_ptr &m);
 	void			set_default_ptype(_Tt_string &ptid);
 	void			set_default_file(const _Tt_string &file);
@@ -86,5 +93,12 @@ class _Tt_c_procid : public _Tt_procid {
 	_Tt_typecb_table_ptr 	_ptype_callbacks;
 	_Tt_typecb_table_ptr 	_otype_callbacks;
 };
+
+// The first contact of tt_open() with its session, for
+// _Tt_c_session::c_init(): it opens tt_open()'s procid where it can, in
+// the same round trip as the ping it stands in for.
+void			_tt_c_procid_open_wanted(int on);
+Tt_status		_tt_c_procid_first_contact(_Tt_c_session *s);
+_Tt_c_procid_ptr	_tt_c_procid_take_opened();
 
 #endif				/* _MP_C_PROCID_H */

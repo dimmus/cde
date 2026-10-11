@@ -407,6 +407,7 @@ call(int rpc_proc,
 	//
 	switch (rpc_proc) {
 	    case TT_RPC_ADD_PATTERN_WITH_CONTEXT:
+	    case TT_RPC_ADD_PATTERNS:
 		if (xdr_version_2_use < TT_CONTEXTS_XDR_VERSION) {
 			xdr_version_2_use = TT_CONTEXTS_XDR_VERSION;
 		}

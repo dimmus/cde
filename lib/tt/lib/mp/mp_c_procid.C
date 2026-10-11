@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <tt_options.h>
 #include <util/tt_global_env.h>
+#include <util/tt_port.h>
 #include <util/tt_host.h>
 #include <util/tt_threadspecific.h>
 #include <mp/mp_c_file.h>
@@ -107,6 +108,125 @@ add_pattern(_Tt_pattern_ptr &p)
 		return status;
 	}
 	return p->join_files( default_session()->process_tree_id() );
+}
+
+
+//
+// The procedures a session has answered PROCUNAVAIL to (an older
+// ttsession; see TT_RPC_OPEN_PROCID in mp_rpc_interface.h), so that
+// they are not tried again.  Keyed by the session address, which names
+// one ttsession process.
+//
+enum {
+	_TT_LACKS_OPEN_PROCID	= 1,
+	_TT_LACKS_ADD_PATTERNS	= 2,
+	_TT_LACKS_DEL_PATTERNS	= 4
+};
+
+static struct {
+	_Tt_string	address;
+	int		lacks;
+} session_lacks_tab[8];
+static int session_lacks_next;
+
+static int
+session_lacks(_Tt_session *s, int what)
+{
+	const _Tt_string &addr = s->address_string();
+
+	for (int i = 0; i < 8; i++) {
+		if ((session_lacks_tab[i].lacks & what) &&
+		    session_lacks_tab[i].address == addr) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void
+set_session_lacks(_Tt_session *s, int what)
+{
+	const _Tt_string &addr = s->address_string();
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		if (session_lacks_tab[i].lacks &&
+		    session_lacks_tab[i].address == addr) {
+			session_lacks_tab[i].lacks |= what;
+			return;
+		}
+	}
+	i = session_lacks_next;
+	session_lacks_next = (session_lacks_next + 1) % 8;
+	session_lacks_tab[i].address = addr;
+	session_lacks_tab[i].lacks = what;
+}
+
+
+//
+// Registers n patterns, as n add_pattern() calls would, statuses[i]
+// getting pattern i's result; one TT_RPC_ADD_PATTERNS round trip
+// replaces the n ADD_PATTERN ones where the session has it.
+//
+void _Tt_c_procid::
+add_patterns(_Tt_pattern_ptr *pats, int n, Tt_status *statuses)
+{
+	_Tt_pattern_ptr		batch[TT_ADD_PATTERNS_MAX];
+	int			where[TT_ADD_PATTERNS_MAX];
+	int			replies[TT_ADD_PATTERNS_MAX];
+	int			i, j, k;
+
+	i = 0;
+	while (i < n && ! session_lacks(default_session().c_pointer(),
+					_TT_LACKS_ADD_PATTERNS)) {
+		_Tt_add_patterns_args	args;
+		_Tt_add_patterns_reply	reply;
+		Tt_status		rstatus;
+
+		// The next batch: patterns add_pattern() would send
+		for (k = 0; i < n && k < TT_ADD_PATTERNS_MAX; i++) {
+			if (pats[i]->category() == TT_CATEGORY_LAST) {
+				statuses[i] = TT_ERR_CATEGORY;
+				continue;
+			}
+			batch[k] = pats[i];
+			where[k] = i;
+			k++;
+		}
+		if (k == 0) {
+			return;
+		}
+		args.procid = this;
+		args.patterns = batch;
+		args.count = k;
+		reply.statuses = replies;
+		reply.count = k;
+		rstatus = default_session()->call(TT_RPC_ADD_PATTERNS,
+					(xdrproc_t)tt_xdr_add_patterns_args,
+					(char *)&args,
+					(xdrproc_t)tt_xdr_add_patterns_reply,
+					(char *)&reply);
+		if (rstatus == TT_ERR_UNIMP) {
+			// An older ttsession: ADD_PATTERN each one,
+			// this batch included
+			set_session_lacks(default_session().c_pointer(),
+					  _TT_LACKS_ADD_PATTERNS);
+			i = where[0];
+			break;
+		}
+		for (j = 0; j < k; j++) {
+			Tt_status st = (rstatus != TT_OK) ? rstatus :
+					(Tt_status)replies[j];
+			if (st == TT_OK) {
+				st = batch[j]->join_files(
+					default_session()->process_tree_id());
+			}
+			statuses[where[j]] = st;
+		}
+	}
+	for (; i < n; i++) {
+		statuses[i] = add_pattern(pats[i]);
+	}
 }
 
 
@@ -256,6 +376,65 @@ del_pattern(const _Tt_string &id)
 }		
 
 
+//
+// Unregisters n patterns, as n del_pattern() calls would, statuses[i]
+// getting pattern i's result; one TT_RPC_DEL_PATTERNS round trip
+// replaces the n DEL_PATTERN ones where the session has it.
+//
+void _Tt_c_procid::
+del_patterns(const _Tt_string *ids, int n, Tt_status *statuses)
+{
+	_Tt_string		batch[TT_ADD_PATTERNS_MAX];
+	int			where[TT_ADD_PATTERNS_MAX];
+	int			replies[TT_ADD_PATTERNS_MAX];
+	int			i, j, k;
+
+	i = 0;
+	while (i < n && ! session_lacks(default_session().c_pointer(),
+					_TT_LACKS_DEL_PATTERNS)) {
+		_Tt_del_patterns_args	args;
+		_Tt_add_patterns_reply	reply;
+		Tt_status		rstatus;
+
+		for (k = 0; i < n && k < TT_ADD_PATTERNS_MAX; i++) {
+			if (ids[i].len() == 0) {
+				statuses[i] = TT_ERR_INVALID;
+				continue;
+			}
+			batch[k] = ids[i];
+			where[k] = i;
+			k++;
+		}
+		if (k == 0) {
+			return;
+		}
+		args.procid = this;
+		args.pattern_ids = batch;
+		args.count = k;
+		reply.statuses = replies;
+		reply.count = k;
+		rstatus = default_session()->call(TT_RPC_DEL_PATTERNS,
+					(xdrproc_t)tt_xdr_del_patterns_args,
+					(char *)&args,
+					(xdrproc_t)tt_xdr_add_patterns_reply,
+					(char *)&reply);
+		if (rstatus == TT_ERR_UNIMP) {
+			set_session_lacks(default_session().c_pointer(),
+					  _TT_LACKS_DEL_PATTERNS);
+			i = where[0];
+			break;
+		}
+		for (j = 0; j < k; j++) {
+			statuses[where[j]] = (rstatus != TT_OK) ? rstatus :
+					     (Tt_status)replies[j];
+		}
+	}
+	for (; i < n; i++) {
+		statuses[i] = del_pattern(ids[i]);
+	}
+}
+
+
 // Invokes the right rpc call to load a set of types, contained in a 
 // string which is the image of an XDR types file, into the ttsession.
 // 
@@ -341,7 +520,61 @@ Tt_status _Tt_c_procid::
 init()
 {
 	Tt_status		status;
-			
+
+	if ((_flags&(1<<_TT_PROC_FD_CHANNEL_ON)) && _id.len()) {
+		// Opened already, by tt_open()'s first contact with its
+		// session (_tt_c_procid_first_contact())
+		return (fd() != -1) ? TT_OK : TT_ERR_PROCID;
+	}
+	status = bind_session();
+	if (status != TT_OK) {
+		return(status);
+	}
+
+	// One round trip where the session has TT_RPC_OPEN_PROCID...
+	status = open(0);
+	if (status != TT_ERR_UNIMP) {
+		if (status != TT_OK) {
+			return(status);
+		}
+		return (fd() != -1) ? TT_OK : TT_ERR_PROCID;
+	}
+
+	// ...else ALLOC_PROCID_KEY and SET_FD_CHANNEL.
+	status = _default_session->call(TT_RPC_ALLOC_PROCID_KEY,
+					(xdrproc_t)xdr_void, 0,
+					(xdrproc_t)tt_xdr_string,
+					(char *)&_id);
+		
+	
+	if (status != TT_OK) {
+		return(status);
+	}
+	if (!_id.len()) {
+		return(TT_ERR_INTERNAL);
+	}
+	_id = _id.cat(" ").cat(_default_session->address_string());
+		
+	// now set up an fd channel which is used by the
+	// server side to notify this procid of new messages
+	// as well as a notification mechanism of this procid
+	// going away (by breaking the fd channel).
+	
+	if (set_fd_channel() && fd() != -1) {
+		return(TT_OK);
+	} else {
+		return(TT_ERR_PROCID);
+	}
+}
+
+
+//
+// The part of init() before any RPC: binds the procid to its session
+// and fills in what identifies the process.
+//
+Tt_status _Tt_c_procid::
+bind_session()
+{
 	if (_default_session.is_null()) {
 			
 		// set the default session to the initial session.
@@ -391,31 +624,158 @@ init()
 		return(TT_ERR_NOMP);
 	}
 	_proc_host_ipaddr = _proc_host->addr();
-		
-	status = _default_session->call(TT_RPC_ALLOC_PROCID_KEY,
-					(xdrproc_t)xdr_void, 0,
-					(xdrproc_t)tt_xdr_string,
-					(char *)&_id);
-		
-	
-	if (status != TT_OK) {
-		return(status);
+	return(TT_OK);
+}
+
+
+//
+// ALLOC_PROCID_KEY and SET_FD_CHANNEL in one TT_RPC_OPEN_PROCID round
+// trip.  session_id, if not 0, gets what VRFY_SESSION would have said.
+//
+// Returns:
+//	TT_OK
+//	TT_ERR_UNIMP	the session predates TT_RPC_OPEN_PROCID
+//	TT_ERR_PROCID	the session refused the procid
+//	others		from _Tt_session::call()
+//
+Tt_status _Tt_c_procid::
+open(_Tt_string *session_id)
+{
+	_Tt_c_session_ptr	&session = default_session();
+	_Tt_fd_args		args;
+	_Tt_open_procid_reply	reply;
+	Tt_status		rstatus;
+
+	if (session_lacks(session.c_pointer(), _TT_LACKS_OPEN_PROCID)) {
+		return(TT_ERR_UNIMP);
 	}
-	if (!_id.len()) {
-		return(TT_ERR_INTERNAL);
+	if (_socket.is_null()) {
+		_socket = new _Tt_stream_socket(_proc_host, 0);
+		if (! _socket->init(1)) {
+			_socket = (_Tt_stream_socket *)0;
+			return(TT_ERR_PROCID);
+		}
 	}
-	_id = _id.cat(" ").cat(_default_session->address_string());
-		
-	// now set up an fd channel which is used by the
-	// server side to notify this procid of new messages
-	// as well as a notification mechanism of this procid
-	// going away (by breaking the fd channel).
-	
-	if (set_fd_channel() && fd() != -1) {
-		return(TT_OK);
-	} else {
-		return(TT_ERR_PROCID);
+
+	// The session puts the key in front of the id.
+	_id = _Tt_string(" ").cat(session->address_string());
+	args.procid = this;
+	args.start_token = _start_token;
+	args.fd = port();
+	reply.status = TT_ERR_INTERNAL;
+	rstatus = session->call(TT_RPC_OPEN_PROCID,
+				(xdrproc_t)tt_xdr_fd_args, (char *)&args,
+				(xdrproc_t)tt_xdr_open_procid_reply,
+				(char *)&reply);
+	if (rstatus != TT_OK || reply.status != TT_OK ||
+	    reply.key.len() == 0) {
+		_id = (char *)0;
+		if (rstatus == TT_ERR_UNIMP) {
+			set_session_lacks(session.c_pointer(),
+					  _TT_LACKS_OPEN_PROCID);
+			return(TT_ERR_UNIMP);
+		}
+		return (rstatus != TT_OK) ? rstatus : TT_ERR_PROCID;
 	}
+	_id = reply.key.cat(_id);
+	if (session_id != 0) {
+		*session_id = reply.session_id;
+	}
+	// as in set_fd_channel()
+	_start_token = (char *)0;
+	_flags |= (1<<_TT_PROC_FD_CHANNEL_ON);
+	return(TT_OK);
+}
+
+
+//
+// tt_open() calls _Tt_c_session::c_init() with this on, and the session's
+// first contact with its ttsession (_tt_c_procid_first_contact()) then
+// opens tt_open()'s procid as well, for _Tt_c_mp::create_new_procid() to
+// take (_tt_c_procid_take_opened()).
+//
+static int		open_wanted;
+static _Tt_c_procid_ptr	opened_procid;
+
+void
+_tt_c_procid_open_wanted(int on)
+{
+	open_wanted = on;
+}
+
+
+//
+// What _Tt_c_session::c_init() calls in place of _Tt_session::ping(),
+// with the same results.  When tt_open() is initializing its default
+// session and no start token is to be passed on (it needs the pinged
+// session to decide; see _Tt_c_mp::create_new_procid()), it opens
+// tt_open()'s procid instead: TT_RPC_OPEN_PROCID tells that the
+// session is alive and its id as VRFY_SESSION does.  Whatever goes
+// wrong is left to ping(), and the procid to init(), as before.
+//
+Tt_status
+_tt_c_procid_first_contact(_Tt_c_session *s)
+{
+	const char	*token;
+
+	if (! open_wanted) {
+		return s->ping();
+	}
+	open_wanted = 0;	// one try per tt_open()
+	token = _tt_get_first_set_env_var(2, TT_CDE_START_TOKEN,
+					  TT_START_TOKEN);
+	if (_tt_c_mp == 0 || _tt_c_mp->in_server() ||
+	    _tt_c_mp->default_c_session.c_pointer() != s ||
+	    (token != 0 && *token != 0) ||
+	    session_lacks(s, _TT_LACKS_OPEN_PROCID)) {
+		return s->ping();
+	}
+
+	_Tt_c_procid_ptr	p = new _Tt_c_procid();
+	_Tt_string		sid;
+	Tt_status		status;
+
+	if (p->bind_session() != TT_OK ||
+	    p->default_session().c_pointer() != s) {
+		return s->ping();
+	}
+	status = p->open(&sid);
+	switch (status) {
+	    case TT_OK:
+		if (sid.len() == 0) {
+			// Not the answer of a session (see ping());
+			// dropping p closes the channel it offered.
+			return s->ping();
+		}
+		s->set_id(sid);
+		opened_procid = p;
+		return TT_OK;
+	    case TT_ERR_UNIMP:		// an older ttsession
+	    case TT_ERR_PROCID:		// alive, but refused the procid
+		return s->ping();
+	    default:
+		// The session did not answer; ping() would not either.
+		return status;
+	}
+}
+
+
+//
+// The procid that _tt_c_procid_first_contact() opened, if any, and if it
+// belongs to the default session still.
+//
+_Tt_c_procid_ptr
+_tt_c_procid_take_opened()
+{
+	_Tt_c_procid_ptr	p = opened_procid;
+
+	opened_procid = (_Tt_c_procid *)0;
+	if (! p.is_null() &&
+	    (_tt_c_mp == 0 ||
+	     ! p->default_session().is_eq(_tt_c_mp->default_c_session))) {
+		p = (_Tt_c_procid *)0;
+	}
+	return p;
 }
 
 
@@ -776,10 +1136,13 @@ set_fd_channel(int p)
 	if (_flags&(1<<_TT_PROC_FD_CHANNEL_ON)) {
 		return(1);
 	}
-	_socket = new _Tt_stream_socket(_proc_host, p);
-	if (! _socket->init(1)) {
-		_socket = (_Tt_stream_socket *)0;
-		return(-1);
+	// (open() may have made the socket already.)
+	if (_socket.is_null()) {
+		_socket = new _Tt_stream_socket(_proc_host, p);
+		if (! _socket->init(1)) {
+			_socket = (_Tt_stream_socket *)0;
+			return(-1);
+		}
 	}
 	
 	fd_args.procid = this;

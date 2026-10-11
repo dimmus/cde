@@ -31,11 +31,12 @@
 
 int _tt_stats_state = 0;
 
-// Procedure numbers: ttsession 0..48 and 400 (VRFY_SESSION, kept in the
-// last slot); rpc.ttdbserver 1..24 (old ISAM interface) and 101..137.
-#define SESSION_SLOTS	51
-#define SESSION_VRFY	49
-#define SESSION_OTHER	50
+// Procedure numbers: ttsession 0..51 and 400 (VRFY_SESSION, kept in the
+// slot after them); rpc.ttdbserver 1..24 (old ISAM interface) and
+// 101..137.
+#define SESSION_SLOTS	54
+#define SESSION_VRFY	52
+#define SESSION_OTHER	53
 #define DB_SLOTS	140
 #define DB_OTHER	139
 
@@ -65,7 +66,9 @@ static const char * const session_names[SESSION_SLOTS] = {
 	"UNDECLARE_PTYPE", "EXISTS_PTYPE", "UNBLOCK_PTYPE",
 	"JOIN_CONTEXT", "QUIT_CONTEXT", "DISPATCH_WITH_CONTEXT",
 	"DISPATCH_2_WITH_CONTEXT", "ADD_PATTERN_WITH_CONTEXT",
-	"LOAD_TYPES", "VRFY_SESSION", "other"
+	"LOAD_TYPES", "OPEN_PROCID", "ADD_PATTERNS", "DEL_PATTERNS",
+	"VRFY_SESSION",
+	"other"
 };
 
 static const char * const db_old_names[25] = {

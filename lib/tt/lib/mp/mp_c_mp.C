@@ -310,8 +310,13 @@ create_new_procid()
 	const char	       *start_token;
 	int			commit = 0;
 	_Tt_string		session;
-	_Tt_c_procid		*cp = new _Tt_c_procid();
-	_Tt_c_procid_ptr	cpp = cp;
+	// tt_open()'s first contact with its session may have opened
+	// the procid already (see _tt_c_procid_first_contact()).
+	_Tt_c_procid_ptr	cpp = _tt_c_procid_take_opened();
+	if (cpp.is_null()) {
+		cpp = new _Tt_c_procid();
+	}
+	_Tt_c_procid		*cp = cpp.c_pointer();
 	
 	// initialize default procid
 

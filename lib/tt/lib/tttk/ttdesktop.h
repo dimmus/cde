@@ -45,6 +45,10 @@ typedef struct {
 	char       *display;
 } DisplayInfo;
 
+// Set while _TtDtProcid::pats_create() builds its patterns, which it
+// then registers all at once: _ttDesktopPatternFinish() leaves them
+// unregistered.
+extern int		_ttdt_defer_register;
 Tt_pattern		_ttDesktopPatternFinish(
 				Tt_pattern	pat,
 				Tt_message	commission,

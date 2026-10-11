@@ -41,10 +41,36 @@
 #include "mp_s_message_utils.h"
 #include "mp_s_pattern_utils.h"
 #include "mp_s_procid_utils.h"
+#include "mp/mp_xdr_functions.h"
 
 struct _Tt_s_add_pattern_args: public _Tt_allocated {
 	_Tt_s_procid_ptr	procid;
 	_Tt_s_pattern_ptr	pattern;
+};
+
+// TT_RPC_ADD_PATTERNS (see mp_rpc_interface.h)
+struct _Tt_s_add_patterns_args: public _Tt_allocated {
+	_Tt_s_add_patterns_args() : patterns(0), count(0) {}
+	~_Tt_s_add_patterns_args() { delete [] patterns; }
+	_Tt_s_procid_ptr	procid;
+	_Tt_s_pattern_ptr	*patterns;
+	int			count;
+};
+
+// TT_RPC_DEL_PATTERNS
+struct _Tt_s_del_patterns_args: public _Tt_allocated {
+	_Tt_s_del_patterns_args() : pattern_ids(0), count(0) {}
+	~_Tt_s_del_patterns_args() { delete [] pattern_ids; }
+	_Tt_s_procid_ptr	procid;
+	_Tt_string		*pattern_ids;
+	int			count;
+};
+
+// TT_RPC_OPEN_PROCID: a _Tt_fd_args whose procid can be given its id
+struct _Tt_s_fd_args: public _Tt_allocated {
+	_Tt_s_procid_ptr	procid;
+	int			fd;
+	_Tt_string		start_token;
 };
 
 struct _Tt_s_del_pattern_args: public _Tt_allocated {
@@ -59,6 +85,17 @@ struct _Tt_s_update_args: public _Tt_allocated {
 
 bool_t		tt_s_xdr_add_pattern_args(XDR *xdrs,
 					_Tt_s_add_pattern_args *args);
+bool_t		tt_s_xdr_add_patterns_args(XDR *xdrs,
+					_Tt_s_add_patterns_args *args);
+bool_t		tt_s_xdr_del_patterns_args(XDR *xdrs,
+					_Tt_s_del_patterns_args *args);
+bool_t		tt_s_xdr_fd_args(XDR *xdrs, _Tt_s_fd_args *args);
+// The replies, as libtt's tt_xdr_open_procid_reply() and
+// tt_xdr_add_patterns_reply() (which libtt does not export) decode them
+bool_t		tt_s_xdr_open_procid_reply(XDR *xdrs,
+					   _Tt_open_procid_reply *reply);
+bool_t		tt_s_xdr_add_patterns_reply(XDR *xdrs,
+					    _Tt_add_patterns_reply *reply);
 bool_t		tt_s_xdr_del_pattern_args(XDR *xdrs,
 					_Tt_s_del_pattern_args *args);
 bool_t		tt_s_xdr_update_args(XDR *xdrs,

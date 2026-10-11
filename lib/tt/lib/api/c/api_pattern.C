@@ -43,6 +43,7 @@
 #include "api/c/api_mp.h"
 #include "api/c/api_handle.h"
 #include "util/tt_audit.h"
+#include "util/tt_global_env.h"
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -143,6 +144,151 @@ tt_pattern_register(Tt_pattern p)
         audit.exit(status);       
 
 	return status;
+}
+
+
+//
+// tt_pattern_register() of n patterns, statuses[i] getting pattern i's
+// result, in one round trip to ttsession where it can (see
+// _Tt_c_procid::add_patterns()).  For tttk, which registers a dozen
+// patterns at a time.  With API tracing on (TT_TRACE_SCRIPT), each
+// pattern goes through tt_pattern_register() as before, so that the
+// trace shows each call.
+//
+void
+_tt_pattern_register_list(Tt_pattern *pats, int n, Tt_status *statuses)
+{
+	int	i;
+
+	if (n <= 1 || _Tt_trace::any_tracing()) {
+		for (i = 0; i < n; i++) {
+			statuses[i] = tt_pattern_register(pats[i]);
+		}
+		return;
+	}
+
+	// The checks of tt_pattern_register() (_Tt_audit::entry()),
+	// once for the call and then per pattern.
+	_Tt_audit audit;
+	Tt_status status = audit.entry("P", TT_PATTERN_REGISTER, pats[0]);
+	if (status != TT_OK) {
+		audit.exit(status);
+		for (i = 0; i < n; i++) {
+			statuses[i] = tt_pattern_register(pats[i]);
+		}
+		return;
+	}
+	_tt_global->event_counter += n - 1;	// one per API call
+
+	_Tt_c_procid    *d_procid = _tt_c_mp->default_c_procid().c_pointer();
+	if (d_procid->commit() != TT_OK) {	// PCOMMIT
+		for (i = 0; i < n; i++) {
+			statuses[i] = TT_ERR_SESSION;
+		}
+		audit.exit(TT_ERR_SESSION);
+		return;
+	}
+
+	_Tt_pattern_ptr	*batch = new _Tt_pattern_ptr[n];
+	int		*where = new int[n];
+	Tt_status	*results = new Tt_status[n];
+	int		k = 0;
+
+	for (i = 0; i < n; i++) {
+		Tt_pattern	p = pats[i];
+		_Tt_pattern_ptr	pat;
+
+		if (p == NULL || _tt_pointer_error(p) != TT_OK ||
+		    (pat = _tt_htab->lookup_pat(p)).is_null()) {
+			statuses[i] = TT_ERR_POINTER;
+		} else if (pat->is_registered()) {
+			statuses[i] = TT_ERR_INVALID;
+		} else {
+			batch[k] = pat;
+			where[k] = i;
+			k++;
+		}
+	}
+	d_procid->add_patterns(batch, k, results);
+	for (i = 0; i < k; i++) {
+		if (results[i] == TT_OK) {
+			batch[i]->set_registered();
+		}
+		statuses[where[i]] = results[i];
+	}
+	delete [] batch;
+	delete [] where;
+	delete [] results;
+	audit.exit(TT_OK);
+}
+
+
+//
+// tt_pattern_destroy() of n patterns, statuses[i] getting pattern i's
+// result, in one round trip to ttsession where it can (see
+// _Tt_c_procid::del_patterns()).  As _tt_pattern_register_list().
+//
+void
+_tt_pattern_destroy_list(Tt_pattern *pats, int n, Tt_status *statuses)
+{
+	int	i;
+
+	if (n <= 1 || _Tt_trace::any_tracing()) {
+		for (i = 0; i < n; i++) {
+			statuses[i] = tt_pattern_destroy(pats[i]);
+		}
+		return;
+	}
+
+	_Tt_audit audit;
+	Tt_status status = audit.entry("P", TT_PATTERN_DESTROY, pats[0]);
+	if (status != TT_OK) {
+		audit.exit(status);
+		for (i = 0; i < n; i++) {
+			statuses[i] = tt_pattern_destroy(pats[i]);
+		}
+		return;
+	}
+	_tt_global->event_counter += n - 1;	// one per API call
+
+	_Tt_c_procid    *d_procid = _tt_c_mp->default_c_procid().c_pointer();
+	if (d_procid->commit() != TT_OK) {	// PCOMMIT
+		for (i = 0; i < n; i++) {
+			statuses[i] = TT_ERR_SESSION;
+		}
+		audit.exit(TT_ERR_SESSION);
+		return;
+	}
+
+	_Tt_string	*ids = new _Tt_string[n];
+	int		*where = new int[n];
+	Tt_status	*results = new Tt_status[n];
+	int		k = 0;
+
+	for (i = 0; i < n; i++) {
+		Tt_pattern	p = pats[i];
+		_Tt_pattern_ptr	pat;
+
+		if (p == NULL || _tt_pointer_error(p) != TT_OK ||
+		    (pat = _tt_htab->lookup_pat(p)).is_null()) {
+			statuses[i] = TT_ERR_POINTER;
+		} else {
+			ids[k] = pat->id();
+			where[k] = i;
+			k++;
+		}
+	}
+	d_procid->del_patterns(ids, k, results);
+	for (i = 0; i < k; i++) {
+		_tt_htab->clear(pats[where[i]]);
+		// as _tt_pattern_destroy()
+		statuses[where[i]] = (results[i] == TT_WRN_NOTFOUND) ?
+				     TT_OK : results[i];
+	}
+	delete [] ids;
+	delete [] where;
+	delete [] results;
+	audit.exit(TT_OK);
 }
 
 

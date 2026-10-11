@@ -158,11 +158,37 @@ typedef enum {
 
 	TT_RPC_LOAD_TYPES	=	48,
 
+	/*
+	 * CDE 2.x numbers.  A ttsession without them answers
+	 * PROCUNAVAIL (TT_ERR_UNIMP), and the client goes back to the
+	 * procedures they replace, so either side may be older.
+	 *
+	 * TT_RPC_OPEN_PROCID: ALLOC_PROCID_KEY and SET_FD_CHANNEL in one
+	 * round trip.  The argument is SET_FD_CHANNEL's, with a procid
+	 * id that lacks the key (" <session address>"); the reply
+	 * (_Tt_open_procid_reply) carries the status, the key and the
+	 * session id that VRFY_SESSION would return, so the first
+	 * contact of tt_open() can stand in for the ping too.
+	 *
+	 * TT_RPC_ADD_PATTERNS: ADD_PATTERN for up to
+	 * TT_ADD_PATTERNS_MAX patterns, one status per pattern.  Its
+	 * patterns are XDRed as ADD_PATTERN_WITH_CONTEXT's are.
+	 *
+	 * TT_RPC_DEL_PATTERNS: DEL_PATTERN for up to TT_ADD_PATTERNS_MAX
+	 * pattern ids, one status per pattern.
+	 */
+	TT_RPC_OPEN_PROCID	=	49,
+	TT_RPC_ADD_PATTERNS	=	50,
+	TT_RPC_DEL_PATTERNS	=	51,
+
 	/* Add new RPC numbers before here and bump TT_RPC_LAST */
-	TT_RPC_LAST		=	49,
+	TT_RPC_LAST		=	52,
 
 	/* This high number is treated specially */
 	TT_RPC_VRFY_SESSION	=	400
 }  _Tt_rpc_procedure_number;
+
+/* Most patterns in one TT_RPC_ADD_PATTERNS or TT_RPC_DEL_PATTERNS call */
+#define TT_ADD_PATTERNS_MAX	256
 
 #endif /* _MP_RPC_INTERFACE_H */

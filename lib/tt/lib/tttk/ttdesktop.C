@@ -133,6 +133,8 @@ _ttDesktopMessageFinish(
 	return msg;
 }
 
+int _ttdt_defer_register = 0;
+
 //
 // Add commission id and register in session, if appropriate
 //
@@ -154,7 +156,7 @@ _ttDesktopPatternFinish(
 		}
 		tt_pattern_user_set( pat, _TttkContractKey, commission );
 	}
-	if (register_it) {
+	if (register_it && ! _ttdt_defer_register) {
 		status = tt_pattern_register( pat );
 		if (status != TT_OK) {
 			return (Tt_pattern)tt_error_pointer( status );

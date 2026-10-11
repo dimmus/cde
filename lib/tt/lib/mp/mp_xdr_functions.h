@@ -75,6 +75,38 @@ struct _Tt_add_pattern_args: public _Tt_allocated {
 	_Tt_pattern_ptr	pattern;
 };
 
+/*
+ * TT_RPC_OPEN_PROCID's reply (its argument is a _Tt_fd_args).
+ */
+struct _Tt_open_procid_reply: public _Tt_allocated {
+	int		status;
+	_Tt_string	key;		// the ALLOC_PROCID_KEY result
+	_Tt_string	session_id;	// the VRFY_SESSION result
+};
+
+/*
+ * TT_RPC_ADD_PATTERNS' argument and reply.  The reply's statuses go
+ * to the caller's array of count elements; a reply of a different
+ * length fails to decode.
+ */
+struct _Tt_add_patterns_args: public _Tt_allocated {
+	_Tt_procid_ptr	procid;
+	_Tt_pattern_ptr	*patterns;
+	int		count;
+};
+
+struct _Tt_del_patterns_args: public _Tt_allocated {
+	_Tt_procid_ptr	procid;
+	_Tt_string	*pattern_ids;
+	int		count;
+};
+
+// (also TT_RPC_DEL_PATTERNS' reply)
+struct _Tt_add_patterns_reply: public _Tt_allocated {
+	int		*statuses;
+	int		count;
+};
+
 struct _Tt_del_pattern_args: public _Tt_allocated {
 	_Tt_procid_ptr	procid;
 	_Tt_string	pattern_id;
@@ -147,6 +179,14 @@ bool_t		tt_xdr_add_pattern_args(XDR *xdrs,
 					_Tt_add_pattern_args *args);
 bool_t		tt_xdr_del_pattern_args(XDR *xdrs,
 					_Tt_del_pattern_args *args);
+bool_t		tt_xdr_open_procid_reply(XDR *xdrs,
+					 _Tt_open_procid_reply *reply);
+bool_t		tt_xdr_add_patterns_args(XDR *xdrs,
+					 _Tt_add_patterns_args *args);
+bool_t		tt_xdr_del_patterns_args(XDR *xdrs,
+					 _Tt_del_patterns_args *args);
+bool_t		tt_xdr_add_patterns_reply(XDR *xdrs,
+					  _Tt_add_patterns_reply *reply);
 bool_t		tt_xdr_otype_args(XDR *xdrs, _Tt_otype_args *args);
 bool_t		tt_xdr_rpc_result(XDR *xdrs, _Tt_rpc_result *args);
 bool_t		tt_xdr_update_args(XDR *xdrs, _Tt_update_args *args);

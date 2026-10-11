@@ -32,6 +32,7 @@
  */
 
 #include <limits.h>
+#include <string.h>
 #include <X11/Intrinsic.h>
 #include "util/tt_Xlib.h"
 #include "api/c/api_api.h"
@@ -80,6 +81,12 @@ pats_create(
 	if (pats == 0) {
 		return (Tt_pattern *)tt_error_pointer( TT_ERR_NOMEM );
 	}
+	// The patterns are registered all at once, at the end: one round
+	// trip to ttsession instead of one per pattern.  Those in
+	// optional[] were registered without regard to the result.
+	int optional[13];
+	memset( optional, 0, sizeof optional );
+	_ttdt_defer_register = 1;
 	int i = -1;
 	char *sess = tt_default_session();
 	if (shell != 0) {
@@ -91,12 +98,12 @@ pats_create(
 				_ttdt_do_wm_state, shell, 0 );
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_GET_MAPPED ) );
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 		pats[++i] = ttdt_Set_Iconified_pat( TT_HANDLE, contract,
 				_ttdt_do_wm_state, shell, 0 );
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_SET_MAPPED ) );
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 		pats[++i] = ttdt_Get_XInfo_pat(	TT_HANDLE, contract,
 				_ttdt_do_Get_XInfo, shell, 1 );
 		pats[++i] = ttdt_Set_XInfo_pat(	TT_HANDLE, contract,
@@ -105,7 +112,7 @@ pats_create(
 				contract, (void *)_ttdt_do_RaiseLower, shell, 0 );
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_LOWER ) );
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 	} else {
 		pats[++i] = ttdt_Get_Geometry_pat( TT_HANDLE, contract,
 				(Ttdt_Geometry_out_cb)cb, clientData, 1 );
@@ -115,12 +122,12 @@ pats_create(
 				(Ttdt_Iconified_out_cb)cb, clientData, 0 );
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_GET_MAPPED ) );
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 		pats[++i] = ttdt_Set_Iconified_pat( TT_HANDLE, contract,
 				(Ttdt_Iconified_out_cb)cb, clientData, 0 );
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_SET_MAPPED ) );
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 		pats[++i] = ttdt_Get_XInfo_pat(	TT_HANDLE, contract,
 				(Ttdt_XInfo_out_cb)cb, clientData, 1 );
 		pats[++i] = ttdt_Set_XInfo_pat(	TT_HANDLE, contract,
@@ -129,7 +136,7 @@ pats_create(
 				contract, (void *)cb, clientData, 0 );
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_LOWER ) );
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 	}
 	void *_clientData = clientData;
 	if (cb == 0) {
@@ -150,7 +157,7 @@ pats_create(
 				contract, (void *)cb, (cb ? clientData : shell), 0 );
 	tt_pattern_op_add( pats[i], _ttDtOp( TTDT_RESUME ));
 	tt_pattern_session_add( pats[i], sess );
-	tt_pattern_register( pats[i] );
+	optional[i] = 1;
 	pats[++i] = _ttdt_pat(	TTDT_GET_STATUS, _ttdt_contract_cb, TT_HANDLE,
 				contract, (void *)cb, clientData, 1 );
 	if (contract == 0) {
@@ -166,8 +173,9 @@ pats_create(
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_SIGNAL ));
 		tt_pattern_op_add( pats[i], _ttDtOp( TTDT_GET_SYSINFO ));
 		tt_pattern_session_add( pats[i], sess );
-		tt_pattern_register( pats[i] );
+		optional[i] = 1;
 	}
+	_ttdt_defer_register = 0;
 	pats[++i] = 0;
 	Tt_pattern *pat = pats;
 	while (*pat != 0) {
@@ -179,5 +187,14 @@ pats_create(
 		pat++;
 	}
 	tt_free( sess );
+	Tt_status statuses[13];
+	_tt_pattern_register_list( pats, i, statuses );
+	for (int j = 0; j < i; j++) {
+		if (statuses[j] != TT_OK && ! optional[j]) {
+			// As when _ttDesktopPatternFinish() fails
+			_tttk_patterns_destroy( pats );
+			return (Tt_pattern *)tt_error_pointer( statuses[j] );
+		}
+	}
 	return pats;
 }

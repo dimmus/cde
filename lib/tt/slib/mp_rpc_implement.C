@@ -159,6 +159,9 @@ void _tt_rpc_undeclare_ptype(SVCXPRT *);
 void _tt_rpc_exists_ptype(SVCXPRT *);
 void _tt_rpc_unblock_ptype(SVCXPRT *);
 void _tt_rpc_load_types(SVCXPRT *);
+void _tt_rpc_open_procid(SVCXPRT *);
+void _tt_rpc_add_patterns(SVCXPRT *);
+void _tt_rpc_del_patterns(SVCXPRT *);
 
 
 typedef	void (*_Tt_rpc_stub)(SVCXPRT *);
@@ -216,7 +219,10 @@ const _Tt_rpc_stub	_tt_rpc_dispatch_table[TT_RPC_LAST] = {
 	_tt_rpc_dispatch_with_context,	/* 45 - TT_RPC_DISPATCH_WITH_CONTEXT */
 	_tt_rpc_dispatch_2_with_context,/* 46 - TT_RPC_DISPATCH_2_WITH_CONTEXT */
 	_tt_rpc_add_pattern_with_context,/* 47 - TT_RPC_ADD_PATTERN_WITH_CONTEXT */
-	_tt_rpc_load_types		/* 48 - TT_RPC_LOAD_TYPES */
+	_tt_rpc_load_types,		/* 48 - TT_RPC_LOAD_TYPES */
+	_tt_rpc_open_procid,		/* 49 - TT_RPC_OPEN_PROCID */
+	_tt_rpc_add_patterns,		/* 50 - TT_RPC_ADD_PATTERNS */
+	_tt_rpc_del_patterns		/* 51 - TT_RPC_DEL_PATTERNS */
 };
 
 
@@ -805,6 +811,50 @@ _tt_rpc_add_pattern_with_context(SVCXPRT *transp)
 }
 
 
+/*
+ * TT_RPC_ADD_PATTERNS: _tt_rpc_add_pattern() for each of a list of
+ * patterns, in order, with one status per pattern in the reply.
+ */
+void
+_tt_rpc_add_patterns(SVCXPRT *transp)
+{
+	// The patterns are XDRed as ADD_PATTERN_WITH_CONTEXT's are:
+	// contexts are XDRed from XDR version 3 on.
+	int			vers = _tt_global->xdr_version();
+	_Tt_xdr_version		xvers(vers > TT_CONTEXTS_XDR_VERSION ?
+				      vers : TT_CONTEXTS_XDR_VERSION);
+	_Tt_s_add_patterns_args	args;
+	_Tt_add_patterns_reply	reply;
+	_Tt_s_procid_ptr	proc;
+	int			i;
+
+	if (! _tt_svc_getargs(transp,
+			      (xdrproc_t)tt_s_xdr_add_patterns_args,
+			      (char *)&args)) {
+		svcerr_decode(transp);
+		return;
+	}
+
+	reply.count = args.count;
+	reply.statuses = new int[args.count > 0 ? args.count : 1];
+	if (_tt_s_mp->find_proc(args.procid, proc, 1)) {
+		_Tt_s_procid	*sp = (_Tt_s_procid *)proc.c_pointer();
+
+		for (i = 0; i < args.count; i++) {
+			reply.statuses[i] = sp->add_pattern(args.patterns[i]);
+		}
+	} else {
+		for (i = 0; i < args.count; i++) {
+			reply.statuses[i] = TT_ERR_PROCID;
+		}
+	}
+
+	(void)svc_sendreply(transp, (xdrproc_t)tt_s_xdr_add_patterns_reply,
+			    (RPC_ARG_T)&reply);
+	delete [] reply.statuses;
+}
+
+
 /* 
  * Called when a procid wants to unregister a pattern with the server.
  */
@@ -834,6 +884,46 @@ _tt_rpc_del_pattern(SVCXPRT *transp)
 	}
 }
 
+
+
+/*
+ * TT_RPC_DEL_PATTERNS: _tt_rpc_del_pattern() for each of a list of
+ * pattern ids, in order, with one status per pattern in the reply.
+ */
+void
+_tt_rpc_del_patterns(SVCXPRT *transp)
+{
+	_Tt_s_del_patterns_args	args;
+	_Tt_add_patterns_reply	reply;
+	_Tt_s_procid_ptr	proc;
+	int			i;
+
+	if (! _tt_svc_getargs(transp,
+			      (xdrproc_t)tt_s_xdr_del_patterns_args,
+			      (char *)&args)) {
+		svcerr_decode(transp);
+		return;
+	}
+
+	reply.count = args.count;
+	reply.statuses = new int[args.count > 0 ? args.count : 1];
+	if (_tt_s_mp->find_proc(args.procid, proc, 1)) {
+		_Tt_s_procid	*sp = (_Tt_s_procid *)proc.c_pointer();
+
+		for (i = 0; i < args.count; i++) {
+			reply.statuses[i] =
+				sp->del_pattern(args.pattern_ids[i]);
+		}
+	} else {
+		for (i = 0; i < args.count; i++) {
+			reply.statuses[i] = TT_ERR_PROCID;
+		}
+	}
+
+	(void)svc_sendreply(transp, (xdrproc_t)tt_s_xdr_add_patterns_reply,
+			    (RPC_ARG_T)&reply);
+	delete [] reply.statuses;
+}
 
 
 /* 
@@ -1029,6 +1119,57 @@ _tt_rpc_set_fd_channel(SVCXPRT *transp)
 		_Tt_s_procid	*sp = (_Tt_s_procid *)proc.c_pointer();
 		sp->set_start_token(fd_args.start_token);
 		sp->set_fd_channel(fd_args.fd);
+	}
+}
+
+
+/*
+ * TT_RPC_OPEN_PROCID: _tt_rpc_alloc_procid_key() and
+ * _tt_rpc_set_fd_channel() in one call, for a procid whose id is
+ * " <session address>" until the key is put in front of it.  The reply
+ * also carries the session id that _tt_rpc_vrfy_session() returns.
+ */
+void
+_tt_rpc_open_procid(SVCXPRT *transp)
+{
+	_Tt_s_fd_args		args;
+	_Tt_open_procid_reply	reply;
+	_Tt_s_procid_ptr	proc;
+
+	if (! _tt_svc_getargs(transp,
+			      (xdrproc_t)tt_s_xdr_fd_args,
+			      (char *)&args) ||
+	    args.procid.is_null()) {
+		svcerr_decode(transp);
+		return;
+	}
+
+	reply.key = _tt_s_mp->alloc_procid_key();
+	args.procid->set_id(reply.key.cat(args.procid->id()));
+	if (_tt_global->xdr_version() == 1) {
+		reply.session_id = _tt_s_mp->initial_s_session->id();
+	} else {
+		reply.session_id =
+			_tt_s_mp->initial_s_session->process_tree_id();
+	}
+	if (_tt_s_mp->find_proc(args.procid, proc, 1)) {
+		reply.status = TT_OK;
+	} else {
+		reply.status = TT_ERR_PROCID;
+	}
+
+	// Reply before connecting to the client: see
+	// _tt_rpc_set_fd_channel().
+	if (svc_sendreply(transp,
+			  (xdrproc_t)tt_s_xdr_open_procid_reply,
+			  (RPC_ARG_T)&reply) == 0) {
+		return;
+	}
+
+	if (reply.status == TT_OK) {
+		_Tt_s_procid	*sp = (_Tt_s_procid *)proc.c_pointer();
+		sp->set_start_token(args.start_token);
+		sp->set_fd_channel(args.fd);
 	}
 }
 
