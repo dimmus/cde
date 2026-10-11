@@ -50,6 +50,7 @@
 #include "mp/mp_xdr_functions.h"
 #include "util/tt_host.h"
 #include "util/tt_port.h"
+#include "util/tt_stats.h"
 
 #if defined(_AIX)
 /* AIX's FD_ZERO macro uses bzero() without declaring it. */
@@ -181,6 +182,7 @@ init(_Tt_host_ptr &host, int program, int version,
 		_client = clnttcp_create(&_server_addr, _program,
 					 _version, &_socket, 4000, 4000);
 	}
+	_tt_stats_connect(_TT_STATS_SESSION, _client != 0);
 	if (_client == 0) {
 		// XXX only when in some kind of debug mode
 		//clnt_pcreateerror("_Tt_rpc_client::init(): clnttcp_create()");
@@ -348,6 +350,7 @@ call(int procnum, xdrproc_t inproc, char *in,
 		sigaction(SIGPIPE, &prev_action, 0);
 	}
 
+	long long stats_t0 = _tt_stats_start();
 	if (_TT_AUTH_ICEAUTH == _auth.auth_level()) {
 	    args.auth_level = _auth.auth_level();
 	    args.auth_cookie = _auth.auth_cookie();
@@ -365,6 +368,13 @@ call(int procnum, xdrproc_t inproc, char *in,
 			           inproc, in,
 			           outproc, out,
 			           total_timeout);
+	}
+	if (_tt_stats_on()) {
+		// A one-way call "times out" by design.
+		_tt_stats_call(_TT_STATS_SESSION, procnum, timeout == 0,
+			       stats_t0,
+			       (timeout == 0 && _clnt_stat == RPC_TIMEDOUT) ?
+			       0 : (int)_clnt_stat);
 	}
 	if (need2reset_sigpipe) {
 		sigaction(SIGPIPE, &prev_action, 0);

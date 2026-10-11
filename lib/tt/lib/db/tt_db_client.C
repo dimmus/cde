@@ -50,6 +50,7 @@
 
 #include "util/tt_port.h"
 #include "util/tt_gettext.h"
+#include "util/tt_stats.h"
 #include "db/tt_db_client.h"
 #include "db/tt_db_access.h"
 #include "db/tt_db_rpc_message_routines.h"
@@ -183,6 +184,8 @@ _Tt_db_results _Tt_db_client::connectToDB (const _Tt_string &hostname)
 		rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
 	}
 #endif	
+
+	_tt_stats_connect(_TT_STATS_DBSERVER, dbServer != 0);
 
 	// Connection failed.
 	if (!dbServer) {

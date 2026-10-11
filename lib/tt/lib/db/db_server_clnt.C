@@ -42,6 +42,23 @@
 #include "tt_options.h"
 #include "db/db_server.h"
 #include "db/tt_db_results.h"
+#include "util/tt_stats.h"
+
+// Every call to rpc.ttdbserver goes through here, for TT_STATS.
+static inline clnt_stat
+_tt_db_clnt_call(CLIENT *clnt, unsigned long proc, xdrproc_t inproc,
+		 caddr_t in, xdrproc_t outproc, caddr_t out,
+		 struct timeval timeout)
+{
+	long long t0 = _tt_stats_start();
+	clnt_stat st = CLNT_CALL(clnt, proc, inproc, in, outproc, out,
+				 timeout);
+
+	_tt_stats_call(_TT_STATS_DBSERVER, proc, 0, t0, (int)st);
+	return st;
+}
+#undef clnt_call
+#define clnt_call _tt_db_clnt_call
 
 // DM_ERROR is a fossil from the old v1.0 database server code.
 // As far as I can tell it just needs to not be zero (i.e. not TT_OK).
