@@ -24,6 +24,16 @@
  * the client's TCP port is appended as one line to STATS (default
  * stderr).  Once it listens, the proxy prints "ready" on stdout (unless
  * -q) and flushes it; it runs until SIGTERM or SIGINT.
+ *
+ * It also counts the requests per request type ("ops": core requests by
+ * name, extension requests by extension name, learnt from the replies
+ * to QueryExtension) and the round trips per type of the request that
+ * was answered ("op_round_trips"), which is what "xtrace -c" or xscope
+ * would give: say, how many GetGeometry, GetInputFocus and ClearArea a
+ * client sends, and which of its requests make it wait.  SIGUSR1 makes
+ * it append the counts so far of every open connection ("live": true),
+ * so that a script can take the counts of one action as the difference
+ * of two snapshots.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -56,9 +66,12 @@ struct chunk {
 };
 
 /* Incremental decoder of the message framing of one direction. */
+#define CAPTURE_MAX 512       /* QueryExtension requests read whole */
+
 struct framer {
 	int phase;            /* 0: connection setup, 1: requests/messages */
-	unsigned char hdr[32];
+	int capture;          /* reading a whole QueryExtension request */
+	unsigned char hdr[CAPTURE_MAX];
 	size_t have, need;
 	uint64_t skip;        /* bytes of the current message still to come */
 };
@@ -79,6 +92,13 @@ struct conn {
 	int big_endian;
 	int sent;             /* client data since the last reply or error */
 	unsigned long requests, replies, errors, events, round_trips;
+	unsigned long ops[256];          /* requests per major opcode */
+	unsigned long op_rtrips[256];    /* round trips per answered major */
+	unsigned char seqop[65536];      /* major opcode per sequence number */
+	struct {
+		unsigned seq;
+		char name[64];
+	} queries[8];                    /* QueryExtension awaiting replies */
 	unsigned long long c2s_bytes, s2c_bytes;
 	int64_t start;
 };
@@ -86,7 +106,48 @@ struct conn {
 static struct conn *conns[MAX_CONNS];
 static int64_t delay_ns;
 static FILE *stats;
-static volatile sig_atomic_t quit;
+static volatile sig_atomic_t quit, snapshot;
+
+/* The extensions' names by major opcode, as the server told a client. */
+static char *ext_names[256];
+
+static const char *const core_names[128] = {
+	NULL, "CreateWindow", "ChangeWindowAttributes", "GetWindowAttributes",
+	"DestroyWindow", "DestroySubwindows", "ChangeSaveSet",
+	"ReparentWindow", "MapWindow", "MapSubwindows", "UnmapWindow",
+	"UnmapSubwindows", "ConfigureWindow", "CirculateWindow",
+	"GetGeometry", "QueryTree", "InternAtom", "GetAtomName",
+	"ChangeProperty", "DeleteProperty", "GetProperty", "ListProperties",
+	"SetSelectionOwner", "GetSelectionOwner", "ConvertSelection",
+	"SendEvent", "GrabPointer", "UngrabPointer", "GrabButton",
+	"UngrabButton", "ChangeActivePointerGrab", "GrabKeyboard",
+	"UngrabKeyboard", "GrabKey", "UngrabKey", "AllowEvents",
+	"GrabServer", "UngrabServer", "QueryPointer", "GetMotionEvents",
+	"TranslateCoordinates", "WarpPointer", "SetInputFocus",
+	"GetInputFocus", "QueryKeymap", "OpenFont", "CloseFont", "QueryFont",
+	"QueryTextExtents", "ListFonts", "ListFontsWithInfo", "SetFontPath",
+	"GetFontPath", "CreatePixmap", "FreePixmap", "CreateGC", "ChangeGC",
+	"CopyGC", "SetDashes", "SetClipRectangles", "FreeGC", "ClearArea",
+	"CopyArea", "CopyPlane", "PolyPoint", "PolyLine", "PolySegment",
+	"PolyRectangle", "PolyArc", "FillPoly", "PolyFillRectangle",
+	"PolyFillArc", "PutImage", "GetImage", "PolyText8", "PolyText16",
+	"ImageText8", "ImageText16", "CreateColormap", "FreeColormap",
+	"CopyColormapAndFree", "InstallColormap", "UninstallColormap",
+	"ListInstalledColormaps", "AllocColor", "AllocNamedColor",
+	"AllocColorCells", "AllocColorPlanes", "FreeColors", "StoreColors",
+	"StoreNamedColor", "QueryColors", "LookupColor", "CreateCursor",
+	"CreateGlyphCursor", "FreeCursor", "RecolorCursor", "QueryBestSize",
+	"QueryExtension", "ListExtensions", "ChangeKeyboardMapping",
+	"GetKeyboardMapping", "ChangeKeyboardControl", "GetKeyboardControl",
+	"Bell", "ChangePointerControl", "GetPointerControl", "SetScreenSaver",
+	"GetScreenSaver", "ChangeHosts", "ListHosts", "SetAccessControl",
+	"SetCloseDownMode", "KillClient", "RotateProperties",
+	"ForceScreenSaver", "SetPointerMapping", "GetPointerMapping",
+	"SetModifierMapping", "GetModifierMapping", NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, "NoOperation"
+};
+
+#define X_QueryExtension 98
 
 static int64_t now_ns(void)
 {
@@ -98,8 +159,10 @@ static int64_t now_ns(void)
 
 static void on_signal(int sig)
 {
-	(void)sig;
-	quit = 1;
+	if (sig == SIGUSR1)
+		snapshot = 1;
+	else
+		quit = 1;
 }
 
 static unsigned card16(const struct conn *c, const unsigned char *p)
@@ -144,20 +207,63 @@ static int decode_c2s(struct conn *c, struct framer *fr)
 		fr->need = 8;
 		return 1;
 	}
+	/* QueryExtension: read it whole, for the name. */
+	if (fr->hdr[0] == X_QueryExtension && !fr->capture && len > 2 &&
+	    (size_t)len * 4 <= CAPTURE_MAX) {
+		fr->capture = 1;
+		fr->need = (size_t)len * 4;
+		return 1;
+	}
 	total = len ? (uint64_t)len * 4 : (uint64_t)card32(c, fr->hdr + 4) * 4;
 	fr->skip = total > fr->need ? total - fr->need : 0;
-	fr->need = 4;
 	c->requests++;
 	c->sent = 1;
+	c->ops[fr->hdr[0]]++;
+	c->seqop[c->requests & 0xffff] = fr->hdr[0];
+	if (fr->capture) {
+		unsigned n = card16(c, fr->hdr + 4);
+		int i;
+
+		if (n > 63)
+			n = 63;
+		if (8 + n > fr->need)
+			n = fr->need > 8 ? (unsigned)fr->need - 8 : 0;
+		for (i = 0; i < 8 && c->queries[i].name[0]; i++)
+			;
+		if (i == 8)
+			i = 0;
+		c->queries[i].seq = c->requests & 0xffff;
+		memcpy(c->queries[i].name, fr->hdr + 8, n);
+		c->queries[i].name[n] = '\0';
+		fr->capture = 0;
+	}
+	fr->need = 4;
 	return 0;
 }
 
-/* A reply or an error that the client had to wait for. */
-static void answered(struct conn *c)
+/* A reply or an error (to request seq) that the client had to wait for. */
+static void answered(struct conn *c, int seq)
 {
 	if (c->sent) {
 		c->round_trips++;
+		if (seq >= 0)
+			c->op_rtrips[c->seqop[seq]]++;
 		c->sent = 0;
+	}
+}
+
+/* The reply to a QueryExtension: remember the extension's opcode. */
+static void query_reply(struct conn *c, const unsigned char *rep)
+{
+	unsigned seq = card16(c, rep + 2);
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		if (!c->queries[i].name[0] || c->queries[i].seq != seq)
+			continue;
+		if (rep[8] && rep[9] >= 128 && !ext_names[rep[9]])
+			ext_names[rep[9]] = strdup(c->queries[i].name);
+		c->queries[i].name[0] = '\0';
 	}
 }
 
@@ -170,7 +276,7 @@ static int decode_s2c(struct conn *c, struct framer *fr)
 		fr->skip = (uint64_t)card16(c, fr->hdr + 6) * 4;
 		fr->phase = 1;
 		fr->need = 32;
-		answered(c);
+		answered(c, -1);
 		return 0;
 	}
 	type = fr->hdr[0] & 0x7f;
@@ -178,10 +284,12 @@ static int decode_s2c(struct conn *c, struct framer *fr)
 		fr->skip = (uint64_t)card32(c, fr->hdr + 4) * 4;
 	if (type == 0) {
 		c->errors++;
-		answered(c);
+		answered(c, (int)card16(c, fr->hdr + 2));
 	} else if (type == 1) {
 		c->replies++;
-		answered(c);
+		answered(c, (int)card16(c, fr->hdr + 2));
+		if (c->seqop[card16(c, fr->hdr + 2)] == X_QueryExtension)
+			query_reply(c, fr->hdr);
 	} else {
 		c->events++;
 	}
@@ -224,19 +332,57 @@ static void free_queue(struct dir *d)
 	d->queued = 0;
 }
 
-static void close_conn(int i)
+static void op_name(int major, char *buf, size_t len)
 {
-	struct conn *c = conns[i];
+	if (major < 128 && core_names[major])
+		snprintf(buf, len, "%s", core_names[major]);
+	else if (major >= 128 && ext_names[major])
+		snprintf(buf, len, "%s", ext_names[major]);
+	else
+		snprintf(buf, len, "op%d", major);
+}
 
+static void print_ops(const unsigned long *count)
+{
+	char name[80];
+	int i, first = 1;
+
+	fputc('{', stats);
+	for (i = 0; i < 256; i++) {
+		if (!count[i])
+			continue;
+		op_name(i, name, sizeof name);
+		fprintf(stats, "%s\"%s\": %lu", first ? "" : ", ", name,
+			count[i]);
+		first = 0;
+	}
+	fputc('}', stats);
+}
+
+static void print_conn(const struct conn *c, int live)
+{
 	fprintf(stats, "{\"conn\": %d, \"client_port\": %d, "
 		"\"requests\": %lu, \"replies\": %lu, "
 		"\"errors\": %lu, \"events\": %lu, \"round_trips\": %lu, "
 		"\"c2s_bytes\": %llu, \"s2c_bytes\": %llu, "
-		"\"seconds\": %.6f, \"delay_ms\": %.3f}\n",
+		"\"seconds\": %.6f, \"delay_ms\": %.3f, \"live\": %s, "
+		"\"ops\": ",
 		c->id, c->port, c->requests, c->replies, c->errors, c->events,
 		c->round_trips, c->c2s_bytes, c->s2c_bytes,
-		(now_ns() - c->start) / 1e9, delay_ns / 1e6);
+		(now_ns() - c->start) / 1e9, delay_ns / 1e6,
+		live ? "true" : "false");
+	print_ops(c->ops);
+	fprintf(stats, ", \"op_round_trips\": ");
+	print_ops(c->op_rtrips);
+	fprintf(stats, "}\n");
 	fflush(stats);
+}
+
+static void close_conn(int i)
+{
+	struct conn *c = conns[i];
+
+	print_conn(c, 0);
 	close(c->c2s.from);
 	close(c->s2c.from);
 	free_queue(&c->c2s);
@@ -453,6 +599,7 @@ int main(int argc, char **argv)
 	sa.sa_handler = on_signal;
 	sigaction(SIGTERM, &sa, NULL);
 	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGUSR1, &sa, NULL);
 	signal(SIGPIPE, SIG_IGN);
 
 	if (!quiet) {
@@ -464,6 +611,13 @@ int main(int argc, char **argv)
 		int64_t now = now_ns(), wake = -1;
 		struct timespec ts, *tsp = NULL;
 		int n = 1;
+
+		if (snapshot) {
+			snapshot = 0;
+			for (i = 0; i < MAX_CONNS; i++)
+				if (conns[i])
+					print_conn(conns[i], 1);
+		}
 
 		pfd[0].fd = lfd;
 		pfd[0].events = POLLIN;
