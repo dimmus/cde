@@ -120,6 +120,7 @@ extern char SmNshutDownMode[];
 extern char SmNdisplayResolution[];
 extern char SmNsessionLang[];
 extern char SmNsaveFontPath[];
+extern char SmNstartClientsEarly[];
 
 /*
  * Global resource classes
@@ -183,5 +184,6 @@ extern char SmCshutDownMode[];
 extern char SmCdisplayResolution[];
 extern char SmCsessionLang[];
 extern char SmCsaveFontPath[];
+extern char SmCstartClientsEarly[];
 
 #endif /* _smresource_h */

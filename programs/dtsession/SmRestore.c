@@ -59,6 +59,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #ifdef _SUN_OS   /* to get the define for NOFILE */
 #include <sys/param.h>
 #endif /* _SUN_OS */
@@ -337,6 +338,7 @@ static int FillHintBuf(unsigned char *, unsigned char **,
 		       unsigned int  *, unsigned int  *,
 		       unsigned int, unsigned int *);
 static void WaitForWM( void ) ;
+static void WaitForWMManaging( void ) ;
 static void HandleWMClientMessage(Widget smWidget, XtPointer dummy,
                                 XEvent *event);
 static void WaitWMTimeout( XtPointer , XtIntervalId *) ;
@@ -656,14 +658,18 @@ RestoreState( void )
  *  Clients may not be, as they are actually restored by different processes.
  * 
  *************************************<->***********************************/
-int 
-StartWM( void )
+static Boolean goodWmStartup = True;
+
+/*
+ * The first half of StartWM(): start the window manager and the
+ * message server.
+ */
+static void
+BeginWM( void )
 {
-    char wmStartupErrorString[(2 * MAXPATHSM) + 1];
-    char localWmErrorString[(2 * MAXPATHSM) + 1];
-    Boolean goodWmStartup = True;
     int status;
-  
+
+    goodWmStartup = True;
     wmIsDtwm = True;
     if((smGD.wmStartup == NULL) || (*smGD.wmStartup == 0))
     {
@@ -705,7 +711,17 @@ StartWM( void )
      */
 
     StartMsgServer();
-    
+}
+
+/*
+ * The second half of StartWM(): wait for the window manager.
+ */
+static void
+FinishWM( void )
+{
+    char wmStartupErrorString[(2 * MAXPATHSM) + 1];
+    char localWmErrorString[(2 * MAXPATHSM) + 1];
+
     if (goodWmStartup == False)
     {
 	sprintf(wmStartupErrorString, GETMESSAGE(16, 7,
@@ -762,9 +778,67 @@ StartWM( void )
      * End of  lines were added to support the builtin
      * panacomm dtwm.
      */
+}
 
-    
+int 
+StartWM( void )
+{
+    BeginWM();
+    FinishWM();
     return(0);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  StartWMForClients ()
+ *
+ *  Description:
+ *  -----------
+ *  StartWM() for a caller that starts the restored clients next.  With
+ *  the startClientsEarly resource (the default), it returns as soon as
+ *  dtwm manages the screen (it has SubstructureRedirect on the root
+ *  window, so the clients' windows are managed and placed as usual)
+ *  and has published its workspaces, without waiting for it to finish
+ *  starting up (the front panel, mostly): the clients start meanwhile.
+ *  The caller then calls FinishWMForClients().  Not with window manager
+ *  handshaking (contManagement), which needs it ready, nor with another
+ *  window manager.
+ *
+ *  Under Xvfb, restoring a session of xterms with saved positions,
+ *  workspaces and iconic state plus dtfile and dtterm, the windows were
+ *  placed exactly as when waiting (76 runs); all windows were up about
+ *  30-70 ms sooner (dtwm takes 200-400 ms to start there).
+ *
+ *  Outputs:
+ *  -------
+ *  Returns True if FinishWMForClients() must be called.
+ *
+ *************************************<->***********************************/
+static Boolean
+StartWMForClients( void )
+{
+    if (!smRes.startClientsEarly || (smRes.contManagement & SM_CM_HANDSHAKE))
+    {
+	StartWM();
+	return False;
+    }
+    BeginWM();
+    if (!wmIsDtwm)
+    {
+	/* Measured (placement, timing) with dtwm only. */
+	FinishWM();
+	return False;
+    }
+    WaitForWMManaging();
+    return True;
+}
+
+static void
+FinishWMForClients( Boolean pending )
+{
+    if (pending)
+	FinishWM();
 }
 
 
@@ -1970,6 +2044,7 @@ RestoreClients( void )
     int	    numRemoteDone = 0;
     Window	dtwmWin = 0;
     Boolean	clientsDone = False, wmHandshake = False, cmdInvInit = False;
+    Boolean	wmPending;
     XClientMessageEvent smToWmMessage;
     
     /*
@@ -2264,7 +2339,7 @@ RestoreClients( void )
 	}
     }
 
-    StartWM();
+    wmPending = StartWMForClients();
 
 
     /*
@@ -2424,6 +2499,8 @@ RestoreClients( void )
 		
 	}
     }
+
+    FinishWMForClients(wmPending);
     
     for(i = 0;i < smGD.numSavedScreens;i++)
     {
@@ -4113,6 +4190,111 @@ WMDispatcher(
     return (*wmPrevDispatcher)(event);
 }
 
+/*
+ * When StartWMForClients() has waited already, WaitForWM() waits only
+ * for what is left of the timeout.
+ */
+static Boolean		wmWaitStarted = False;
+static struct timespec	wmWaitStart;
+
+static unsigned long
+WMWaitTimeout( void )
+{
+    unsigned long	timeout = smRes.waitWmTimeout;
+    struct timespec	now;
+    unsigned long	elapsed;
+
+    if (!wmIsDtwm && !smGD.userSetWaitWmTimeout &&
+	timeout > WAIT_OTHER_WM_TIMEOUT)
+	timeout = WAIT_OTHER_WM_TIMEOUT;
+    if (wmWaitStarted)
+    {
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	elapsed = (now.tv_sec - wmWaitStart.tv_sec) * 1000 +
+		  (now.tv_nsec - wmWaitStart.tv_nsec) / 1000000;
+	timeout = (elapsed < timeout) ? timeout - elapsed : 1;
+    }
+    return timeout;
+}
+
+/*
+ * WaitForWMManaging - for StartWMForClients(): wait until a window
+ * manager has selected SubstructureRedirect on the root window (from
+ * then on the map requests of new windows go to it, even while it is
+ * still starting up), or has said it is ready, or the timeout passed.
+ * dtwm must also have published its workspace list: clients read it
+ * when they start (dtfile sleeps 2 seconds and tries again if it is
+ * not there yet).  The window manager's ready message may come
+ * meanwhile, so the handler WaitForWM() installs for it is installed
+ * here too.
+ */
+static Boolean
+WMManaging( Window root )
+{
+    XWindowAttributes	attr;
+    Atom		*wsList = NULL;
+    int			numWs = 0;
+
+    if (!XGetWindowAttributes(smGD.display, root, &attr) ||
+        !(attr.all_event_masks & SubstructureRedirectMask))
+        return False;
+    if (!wmIsDtwm)
+        return True;
+    if (DtWsmGetWorkspaceList(smGD.display, root, &wsList, &numWs) != Success)
+        return False;
+    if (wsList)
+        XFree((char *) wsList);
+    return numWs > 0;
+}
+
+#define WM_MANAGING_POLL	10	/* ms */
+
+static Boolean wmManagingPollDue;
+
+static void
+WMManagingPoll(
+        XtPointer client_data,
+        XtIntervalId *id)
+{
+    wmManagingPollDue = True;
+}
+
+static void
+WaitForWMManaging( void )
+{
+    Window		root = RootWindow(smGD.display, smGD.screen);
+    XtIntervalId	timerId, pollId;
+
+    clock_gettime(CLOCK_MONOTONIC, &wmWaitStart);
+    wmWaitStarted = False;
+
+    XtAddEventHandler(smGD.topLevelWid, 0, True,
+                      (XtEventHandler)HandleWMClientMessage, NULL);
+    wmTimeout = False;
+    timerId = XtAppAddTimeOut(smGD.appCon, WMWaitTimeout(),
+                              WaitWMTimeout, NULL);
+    wmWaitStarted = True;
+
+    while (!smGD.dtwmRunning && !wmTimeout)
+    {
+        if (WMManaging(root))
+            break;
+
+        wmManagingPollDue = False;
+        pollId = XtAppAddTimeOut(smGD.appCon, WM_MANAGING_POLL,
+                                 WMManagingPoll, NULL);
+        while (!wmManagingPollDue && !smGD.dtwmRunning && !wmTimeout)
+            XtAppProcessEvent(smGD.appCon, XtIMAll);
+        if (!wmManagingPollDue)
+            XtRemoveTimeOut(pollId);
+    }
+
+    if (!wmTimeout)
+        XtRemoveTimeOut(timerId);
+    XtRemoveEventHandler(smGD.topLevelWid, 0, True,
+                         (XtEventHandler)HandleWMClientMessage, NULL);
+}
+
 static void 
 WaitForWM( void )
 {
@@ -4122,7 +4304,7 @@ WaitForWM( void )
     XWindowAttributes	rootAttr;
     long		rootMask = 0;
     Boolean		watchSelection = False;
-    unsigned long	timeout = smRes.waitWmTimeout;
+    unsigned long	timeout = WMWaitTimeout();
     long		ready = 1;
     
     XtAddEventHandler(smGD.topLevelWid,
@@ -4161,9 +4343,6 @@ WaitForWM( void )
         else
             pollId = XtAppAddTimeOut(smGD.appCon, WM_SELECTION_POLL,
                                      WMSelectionPoll, (XtPointer) &pollId);
-
-        if (!smGD.userSetWaitWmTimeout && timeout > WAIT_OTHER_WM_TIMEOUT)
-            timeout = WAIT_OTHER_WM_TIMEOUT;
     }
 
     /*
@@ -4181,7 +4360,9 @@ WaitForWM( void )
 	XtAppProcessEvent(smGD.appCon, XtIMAll);
     }
     
-    XtRemoveTimeOut(wmTimerId);
+    if (!wmTimeout)
+        XtRemoveTimeOut(wmTimerId);
+    wmWaitStarted = False;
     if (pollId != (XtIntervalId) 0)
         XtRemoveTimeOut(pollId);
     XtRemoveEventHandler(smGD.topLevelWid,
@@ -4586,13 +4767,15 @@ StartXSMPSession (
 	XSMPClientDBRecPtr	pXSMPRec;
 	ProxyClientDBRecPtr	pProxyRec;
 	int			i;
+	Boolean			wmPending;
 
-	StartWM ();
+	wmPending = StartWMForClients ();
 
    	if ((inputDB = OpenInputClientDB (databaseName, 
 					  &smXSMP.dbVersion, 
 					  &smXSMP.dbSessionId)) == NULL) {
 		LogXSMPOpenDatabaseFailure (databaseName, DtMsgLogError, 1);
+		FinishWMForClients (wmPending);
 		return (False);
 	}
 
@@ -4662,6 +4845,8 @@ StartXSMPSession (
 	}
 
 	(void) CloseClientDB (inputDB, False);
+
+	FinishWMForClients (wmPending);
 
 	return (True);
 }

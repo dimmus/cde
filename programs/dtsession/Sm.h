@@ -123,6 +123,15 @@
 
 #define SM_CM_DEFAULT      SM_CM_NONE
 
+/*
+ * startClientsEarly: start the restored clients as soon as dtwm manages
+ * the screen (has SubstructureRedirect on the root window: their windows
+ * are then managed, and placed, as usual) and has published its
+ * workspaces, not once it has finished starting up.  See
+ * StartWMForClients().
+ */
+#define START_CLIENTS_EARLY_DEFAULT	True
+
 #ifndef NO_MESSAGE_CATALOG
 # define _CLIENT_CAT_NAME "dtsession"
 extern char *_DtGetMessage(char *filename, int set, int n, char *s);
@@ -193,6 +202,7 @@ typedef struct
     int         waitWmTimeout;
     Boolean     useBMS;
     Boolean	saveFontPath;
+    Boolean	startClientsEarly;
     int         saveYourselfTimeout;
     Boolean     mergeXdefaults;
     int		numSessionsBackedup;
