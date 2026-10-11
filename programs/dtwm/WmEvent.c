@@ -982,6 +982,12 @@ Boolean WmDispatchWsEvent (XEvent *event)
 	    if (event->xconfigure.window == event->xconfigure.event)
 	    {
 		InvalidateHeadInfo ();
+		if (!XFindContext (DISPLAY, event->xconfigure.window,
+				   wmGD.screenContextType, (caddr_t *)&pSD))
+		{
+		    EwmhRootResized (pSD, event->xconfigure.width,
+				     event->xconfigure.height);
+		}
 	    }
 	    break;
 	}

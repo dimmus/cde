@@ -51,6 +51,7 @@
 #include "WmError.h"
 #include "WmResParse.h"
 #include "WmIconBox.h"
+#include "WmEwmh.h"
 
 
 
@@ -1272,9 +1273,10 @@ SetCurrentWorkspaceProperty (WmScreenData *pSD)
 	XA_ATOM,
 	32, PropModeReplace, (unsigned char *)&aCurrent,
 	(sizeof(Atom))/sizeof(long));
+    UpdateNetCurrentDesktop (pSD);
 
     /*
-     * Make sure the server has the property before the ToolTalk notice
+     * Make sure the server has the properties before the ToolTalk notice
      * of the change (dtSendWorkspaceModifyNotification) can reach a client
      * that reads it: once flushed, the request could still be waiting in
      * the server's input while the other client's request is processed.

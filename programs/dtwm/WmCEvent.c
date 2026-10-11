@@ -2730,6 +2730,11 @@ void HandleClientMessage (ClientData *pCD, XClientMessageEvent *clientEvent)
 	ProcessNetWmState (pCD, clientEvent->data.l[0], clientEvent->data.l[1],
 	    clientEvent->data.l[2]);
     }
+    else if (clientEvent->message_type == wmGD.xa__NET_WM_DESKTOP)
+    {
+	if (clientEvent->format == 32)
+	    ProcessNetWmDesktop (pCD, (unsigned long)clientEvent->data.l[0]);
+    }
 } /* END OF FUNCTION HandleClientMessage */
 
 

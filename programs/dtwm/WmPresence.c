@@ -115,6 +115,7 @@ static void wspExtendedSelectCB(
 #include "WmCDecor.h"
 #include "WmCDInfo.h"
 #include "WmIconBox.h"
+#include "WmEwmh.h"
 #include "WmPanelP.h"  /* for typedef in WmManage.h */
 #include "WmManage.h"
 #include "WmResParse.h"
@@ -956,6 +957,7 @@ wspUpdateWorkspaceList(
 	{
 	    pPres->ItemSelected[wsnum] = False;
 	    pPres->pCDforClient->putInAll = False;
+	    EwmhMarkClient (pPres->pCDforClient, NET_CD_DESKTOP);
 	}
 
 	if (pPres->pCDforClient->pSD->pActiveWS->id ==

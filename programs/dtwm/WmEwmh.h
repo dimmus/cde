@@ -34,7 +34,8 @@
 #define NET_SD_CLIENTS		(1u << 0)	/* _NET_CLIENT_LIST */
 #define NET_SD_STACKING		(1u << 1)	/* _NET_CLIENT_LIST_STACKING */
 #define NET_SD_DESKTOPS		(1u << 2)	/* _NET_NUMBER_OF_DESKTOPS, */
-						/* _NET_DESKTOP_VIEWPORT */
+						/* _NET_DESKTOP_VIEWPORT, */
+						/* _NET_DESKTOP_GEOMETRY */
 #define NET_SD_NAMES		(1u << 3)	/* _NET_DESKTOP_NAMES */
 #define NET_SD_WORKAREA		(1u << 4)	/* _NET_WORKAREA */
 #define NET_SD_ACTIVE		(1u << 5)	/* _NET_ACTIVE_WINDOW */
@@ -49,6 +50,10 @@
 /* An empty Window cache: no XID has its top three bits set. */
 #define NET_NOT_WRITTEN		((Window) ~0UL)
 
+/* _NET_WM_DESKTOP: all desktops, and an empty cache */
+#define NET_ALL_DESKTOPS	0xFFFFFFFFL
+#define NET_DESKTOP_NOT_WRITTEN	(-2L)
+
 /* pCD->netFlags: */
 #define NET_FLAG_LISTED		(1u << 0)	/* in pSD->netClients */
 
@@ -58,6 +63,12 @@ void EwmhAddClient (ClientData *pCD);
 void EwmhRemoveClient (ClientData *pCD);
 void HandleNetRootMessage (WmScreenData *pSD,
     XClientMessageEvent *clientEvent);
+void UpdateNetCurrentDesktop (WmScreenData *pSD);
+void EwmhWorkspacesChanged (WmScreenData *pSD);
+void EwmhRootResized (WmScreenData *pSD, int width, int height);
+Boolean GetNetWmDesktop (ClientData *pCD, WorkspaceID **ppIDs,
+    unsigned int *pNumIDs, Boolean *pbAll);
+void ProcessNetWmDesktop (ClientData *pCD, unsigned long desktop);
 void ProcessNetWmFullscreenMonitors (ClientData *pCD,
     int top, int bottom, int left, int right);
 void ProcessNetWmState (ClientData *pCD, long action,

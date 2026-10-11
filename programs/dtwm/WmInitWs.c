@@ -1283,6 +1283,13 @@ InitWmScreen (WmScreenData *pSD, int sNum)
     pSD->numNetStackWritten = -1;
     pSD->sizeNetStackWritten = 0;
     pSD->netActiveWritten = NET_NOT_WRITTEN;
+    pSD->netCurrentWritten = -1;
+    pSD->netNumDesktopsWritten = -1;
+    pSD->netGeometry[0] = DisplayWidth (DISPLAY, sNum);
+    pSD->netGeometry[1] = DisplayHeight (DISPLAY, sNum);
+    pSD->netGeometryWritten[0] = pSD->netGeometryWritten[1] = -1;
+    pSD->netNamesWritten = NULL;
+    pSD->lenNetNamesWritten = -1;
 
     /*
      *  We've got display resolution type--now, let's get color

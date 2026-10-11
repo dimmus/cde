@@ -22,6 +22,15 @@
  *   active      _NET_ACTIVE_WINDOW follows _NET_ACTIVE_WINDOW requests,
  *               is rewritten only when it changes, and is not an iconified
  *               window
+ *   desktops    _NET_NUMBER_OF_DESKTOPS, _NET_DESKTOP_NAMES, ..._VIEWPORT,
+ *               ..._GEOMETRY and _NET_CURRENT_DESKTOP follow workspace
+ *               changes and the requests to switch, add and remove
+ *               desktops; _NET_WM_DESKTOP of a window follows requests to
+ *               move it, is honoured when set before the window is mapped
+ *               (a desktop, or all), and shifts when a workspace before
+ *               the window's is deleted (f.delete_workspace)
+ *   xdotool     the same through xdotool's desktop commands (skipped
+ *               when xdotool is not installed)
  *
  * Exit status: 0 when every test passed, 1 on a failure, 77 when there
  * is no display.
@@ -70,6 +79,8 @@ static int nxrm;
 static int front_panel;
 
 static Atom a_supported, a_check, a_client_list, a_stacking, a_active;
+static Atom a_number, a_current, a_names, a_viewport, a_geometry;
+static Atom a_wm_desktop, a_wm_state, a_utf8, a_dt_wm_request;
 
 /* The windows the tests created and have not destroyed. */
 #define MAX_OURS 32
@@ -158,8 +169,8 @@ static void check_wm(void)
 	}
 }
 
-/* A 32-bit property of the root window, or NULL (*n = 0) when absent. */
-static unsigned long *get_prop(Atom prop, Atom type, int *n)
+/* A 32-bit property of a window, or NULL (*n = 0) when absent. */
+static unsigned long *get_prop_on(Window w, Atom prop, Atom type, int *n)
 {
 	Atom rtype;
 	int format;
@@ -167,7 +178,7 @@ static unsigned long *get_prop(Atom prop, Atom type, int *n)
 	unsigned char *data = NULL;
 
 	*n = 0;
-	if (XGetWindowProperty(dpy, rootw, prop, 0, 65536, False, type,
+	if (XGetWindowProperty(dpy, w, prop, 0, 65536, False, type,
 			       &rtype, &format, &nitems, &after,
 			       &data) != Success || rtype != type ||
 	    format != 32) {
@@ -177,6 +188,11 @@ static unsigned long *get_prop(Atom prop, Atom type, int *n)
 	}
 	*n = (int)nitems;
 	return (unsigned long *)data;
+}
+
+static unsigned long *get_prop(Atom prop, Atom type, int *n)
+{
+	return get_prop_on(rootw, prop, type, n);
 }
 
 static int has_prop(Atom prop, Atom type)
@@ -214,14 +230,14 @@ static void print_list(const char *name, Atom prop)
 }
 
 /*
- * Handle events until a PropertyNotify of prop on the root window, or
- * until the deadline.  Returns 0 on timeout.  *counted, if counted is not
+ * Handle events until a PropertyNotify of prop on window w, or until the
+ * deadline.  Returns 0 on timeout.  *counted, if counted is not
  * NULL, counts the PropertyNotify events of counted_prop.
  */
 static Atom counted_prop;
 static int *counted;
 
-static int wait_notify(Atom prop, double deadline)
+static int wait_notify(Window w, Atom prop, double deadline)
 {
 	struct pollfd pfd = { ConnectionNumber(dpy), POLLIN, 0 };
 	XEvent ev;
@@ -230,11 +246,13 @@ static int wait_notify(Atom prop, double deadline)
 	for (;;) {
 		while (XPending(dpy)) {
 			XNextEvent(dpy, &ev);
-			if (ev.type != PropertyNotify ||
-			    ev.xproperty.window != rootw)
+			if (ev.type != PropertyNotify)
 				continue;
-			if (counted && ev.xproperty.atom == counted_prop)
+			if (counted && ev.xproperty.atom == counted_prop &&
+			    ev.xproperty.window == rootw)
 				++*counted;
+			if (ev.xproperty.window != w)
+				continue;
 			if (ev.xproperty.atom == prop)
 				return 1;
 		}
@@ -259,17 +277,19 @@ static void drain(void)
 }
 
 /*
- * Wait until check() holds of the root window property prop, rechecking
+ * Wait until check() holds of the property prop of window w, rechecking
  * at each of its PropertyNotify events.
  */
-static void wait_for(Atom prop, int (*check)(Atom prop, const void *arg),
-		     const void *arg, const char *what)
+typedef int (*checker)(Window w, Atom prop, const void *arg);
+
+static void wait_for_on(Window w, Atom prop, checker check, const void *arg,
+			const char *what)
 {
 	double deadline = bench_now_ns() + TIMEOUT_MS * 1e6;
 
 	XSync(dpy, False);
-	while (!check(prop, arg)) {
-		if (!wait_notify(prop, deadline)) {
+	while (!check(w, prop, arg)) {
+		if (!wait_notify(w, prop, deadline)) {
 			fprintf(stderr, "ewmhtest: timed out waiting for %s\n",
 				what);
 			print_list("_NET_CLIENT_LIST", a_client_list);
@@ -280,6 +300,12 @@ static void wait_for(Atom prop, int (*check)(Atom prop, const void *arg),
 	}
 }
 
+static void wait_for(Atom prop, checker check, const void *arg,
+		     const char *what)
+{
+	wait_for_on(rootw, prop, check, arg, what);
+}
+
 /* An expected list of windows: exactly these, or ending with them. */
 struct expect {
 	const Window *w;
@@ -288,14 +314,14 @@ struct expect {
 };
 
 /* The list holds our windows (others ignored) as expected. */
-static int list_is(Atom prop, const void *arg)
+static int list_is(Window w, Atom prop, const void *arg)
 {
 	const struct expect *e = arg;
 	unsigned long *v;
 	int i, n, k = 0, ok;
 	Window mine[MAX_OURS];
 
-	v = get_prop(prop, XA_WINDOW, &n);
+	v = get_prop_on(w, prop, XA_WINDOW, &n);
 	for (i = 0; i < n; i++)
 		if (is_ours(v[i]) && k < MAX_OURS)
 			mine[k++] = v[i];
@@ -309,27 +335,27 @@ static int list_is(Atom prop, const void *arg)
 	return ok;
 }
 
-static int active_is(Atom prop, const void *arg)
+static int active_is(Window w, Atom prop, const void *arg)
 {
 	Window want = *(const Window *)arg;
 	unsigned long *v;
 	int n, ok;
 
-	v = get_prop(prop, XA_WINDOW, &n);
+	v = get_prop_on(w, prop, XA_WINDOW, &n);
 	ok = n == 1 && v[0] == want;
 	if (v)
 		XFree(v);
 	return ok;
 }
 
-static int active_is_not(Atom prop, const void *arg)
+static int active_is_not(Window w, Atom prop, const void *arg)
 {
-	Window w = *(const Window *)arg;
+	Window not = *(const Window *)arg;
 	unsigned long *v;
 	int n, ok;
 
-	v = get_prop(prop, XA_WINDOW, &n);
-	ok = n == 1 && v[0] != w;
+	v = get_prop_on(w, prop, XA_WINDOW, &n);
+	ok = n == 1 && v[0] != not;
 	if (v)
 		XFree(v);
 	return ok;
@@ -455,7 +481,7 @@ static void start_wm(void)
 		check_wm();
 		if (bench_now_ns() > deadline)
 			fail("timed out waiting for dtwm to start");
-		wait_notify(a_client_list, bench_now_ns() + 100 * 1e6);
+		wait_notify(rootw, a_client_list, bench_now_ns() + 100 * 1e6);
 	}
 }
 
@@ -476,7 +502,7 @@ static Window create_window(const char *title, Window transient_for)
 	if (nours == MAX_OURS)
 		fail("too many windows");
 	swa.background_pixel = WhitePixel(dpy, DefaultScreen(dpy));
-	swa.event_mask = StructureNotifyMask;
+	swa.event_mask = StructureNotifyMask | PropertyChangeMask;
 	win = XCreateWindow(dpy, rootw, 100 + 40 * nours, 100 + 30 * nours,
 			    300, 200, 0, CopyFromParent, InputOutput,
 			    CopyFromParent, CWBackPixel | CWEventMask, &swa);
@@ -634,7 +660,7 @@ static void test_active(void)
 	if (writes)
 		fail("_NET_ACTIVE_WINDOW rewritten %d times without a change",
 		     writes);
-	if (!active_is(a_active, &b))
+	if (!active_is(rootw, a_active, &b))
 		fail("_NET_ACTIVE_WINDOW is no longer B");
 
 	/* an iconified window is not active */
@@ -646,12 +672,365 @@ static void test_active(void)
 	printf("active: ok\n");
 }
 
+/* ------------------------------------------------------------------ */
+/* Desktops                                                            */
+/* ------------------------------------------------------------------ */
+
+#define ALL_DESKTOPS 0xFFFFFFFFUL
+
+static void send_msg(Window w, Atom type, long l0)
+{
+	XEvent ev;
+
+	memset(&ev, 0, sizeof ev);
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = w;
+	ev.xclient.message_type = type;
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = l0;
+	ev.xclient.data.l[1] = 2;		/* from a pager */
+	XSendEvent(dpy, rootw, False,
+		   SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+}
+
+/* The property is one CARDINAL, *arg. */
+static int card_is(Window w, Atom prop, const void *arg)
+{
+	unsigned long want = *(const unsigned long *)arg, *v;
+	int n, ok;
+
+	v = get_prop_on(w, prop, XA_CARDINAL, &n);
+	ok = n == 1 && (v[0] & 0xFFFFFFFFUL) == want;
+	if (v)
+		XFree(v);
+	return ok;
+}
+
+static void expect_card(Window w, Atom prop, unsigned long want,
+			const char *what)
+{
+	char text[160];
+
+	snprintf(text, sizeof text, "%s = %ld", what, (long)want);
+	wait_for_on(w, prop, card_is, &want, text);
+}
+
+static long card(Window w, Atom prop)
+{
+	unsigned long *v;
+	long value = -1;
+	int n;
+
+	v = get_prop_on(w, prop, XA_CARDINAL, &n);
+	if (n == 1)
+		value = v[0] & 0xFFFFFFFFUL;
+	if (v)
+		XFree(v);
+	return value;
+}
+
+/* The names in _NET_DESKTOP_NAMES, each terminated by a NUL. */
+static int count_names(void)
+{
+	Atom type;
+	int format, count = 0;
+	unsigned long nitems, after, i;
+	unsigned char *data = NULL;
+
+	if (XGetWindowProperty(dpy, rootw, a_names, 0, 65536, False, a_utf8,
+			       &type, &format, &nitems, &after,
+			       &data) != Success || type != a_utf8 ||
+	    format != 8) {
+		if (data)
+			XFree(data);
+		return -1;
+	}
+	for (i = 0; i < nitems; i++)
+		if (!data[i])
+			count++;
+	if (nitems && data[nitems - 1])
+		count = -1;		/* the last one is not terminated */
+	XFree(data);
+	return count;
+}
+
+static int names_are(Window w, Atom prop, const void *arg)
+{
+	(void)w;
+	(void)prop;
+	return count_names() == *(const int *)arg;
+}
+
+/* Set the number of desktops, check the properties that go with it. */
+static void expect_desktops(int num)
+{
+	unsigned long *v;
+	int i, n;
+
+	expect_card(rootw, a_number, num, "_NET_NUMBER_OF_DESKTOPS");
+	wait_for(a_names, names_are, &num, "_NET_DESKTOP_NAMES count");
+	v = get_prop(a_viewport, XA_CARDINAL, &n);
+	if (n != 2 * num)
+		fail("_NET_DESKTOP_VIEWPORT has %d values for %d desktops",
+		     n, num);
+	for (i = 0; i < n; i++)
+		if (v[i])
+			fail("_NET_DESKTOP_VIEWPORT is not all 0,0");
+	if (v)
+		XFree(v);
+}
+
+static int viewable(Window w)
+{
+	XWindowAttributes wa;
+
+	XSync(dpy, False);
+	return XGetWindowAttributes(dpy, w, &wa) &&
+	       wa.map_state == IsViewable;
+}
+
+static void expect_viewable(Window w, int yes, const char *name)
+{
+	if (viewable(w) != yes)
+		fail("%s is %sviewable", name, yes ? "not " : "");
+}
+
+static int has_wm_state(Window w, Atom prop, const void *arg)
+{
+	Atom type;
+	int format;
+	unsigned long nitems, after;
+	unsigned char *data = NULL;
+	int ok;
+
+	(void)arg;
+	ok = XGetWindowProperty(dpy, w, prop, 0, 2, False, a_wm_state, &type,
+				&format, &nitems, &after, &data) == Success &&
+	     type == a_wm_state && format == 32 && nitems >= 1 &&
+	     ((unsigned long *)data)[0] == NormalState;
+	if (data)
+		XFree(data);
+	return ok;
+}
+
+/* Map a window with a _NET_WM_DESKTOP set beforehand; wait until managed. */
+static Window map_on_desktop(const char *title, unsigned long desktop)
+{
+	Window w = create_window(title, None);
+	long value = (long)desktop;
+
+	XChangeProperty(dpy, w, a_wm_desktop, XA_CARDINAL, 32,
+			PropModeReplace, (unsigned char *)&value, 1);
+	XMapWindow(dpy, w);
+	wait_for_on(w, a_wm_state, has_wm_state, NULL,
+		    "WM_STATE NormalState");
+	expect_list(a_client_list, "_NET_CLIENT_LIST", 1, 1, w);
+	return w;
+}
+
+/* f.delete_workspace through dtwm's _DT_WM_REQUEST: the active one goes. */
+static void delete_active_workspace(void)
+{
+	static const char req[] = "f.delete_workspace";
+	unsigned long *v;
+	int n;
+
+	v = get_prop(a_check, XA_WINDOW, &n);
+	if (n != 1)
+		fail("no _NET_SUPPORTING_WM_CHECK window");
+	XChangeProperty(dpy, v[0], a_dt_wm_request, XA_STRING, 8,
+			PropModeAppend, (const unsigned char *)req,
+			sizeof req);
+	XFree(v);
+}
+
+static void test_desktops(void)
+{
+	static const char *const names[] = {
+		"_NET_NUMBER_OF_DESKTOPS", "_NET_DESKTOP_GEOMETRY",
+		"_NET_DESKTOP_VIEWPORT", "_NET_CURRENT_DESKTOP",
+		"_NET_DESKTOP_NAMES", "_NET_WM_DESKTOP",
+	};
+	unsigned long *v;
+	int i, j, n;
+	Window w, p2, pall;
+
+	v = get_prop(a_supported, XA_ATOM, &n);
+	for (i = 0; i < (int)(sizeof names / sizeof names[0]); i++) {
+		Atom a = XInternAtom(dpy, names[i], False);
+
+		for (j = 0; j < n && v[j] != a; j++)
+			;
+		if (j == n)
+			fail("_NET_SUPPORTED lacks %s", names[i]);
+	}
+	if (v)
+		XFree(v);
+
+	v = get_prop(a_geometry, XA_CARDINAL, &n);
+	if (n != 2 || (int)v[0] != DisplayWidth(dpy, DefaultScreen(dpy)) ||
+	    (int)v[1] != DisplayHeight(dpy, DefaultScreen(dpy)))
+		fail("_NET_DESKTOP_GEOMETRY is not the screen size");
+	if (v)
+		XFree(v);
+
+	/* four desktops, the first one current */
+	send_msg(rootw, a_number, 4);
+	expect_desktops(4);
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	/* a window on the current desktop; switch away from it */
+	w = create_window("ewmhtest W", None);
+	XMapWindow(dpy, w);
+	expect_list(a_client_list, "_NET_CLIENT_LIST", 0, 1, w);
+	expect_card(w, a_wm_desktop, 0, "_NET_WM_DESKTOP of W");
+	send_msg(rootw, a_current, 1);
+	expect_card(rootw, a_current, 1, "_NET_CURRENT_DESKTOP");
+	expect_viewable(w, 0, "W, on desktop 0,");
+	if (card(w, a_wm_desktop) != 0)
+		fail("_NET_WM_DESKTOP of W changed with the current desktop");
+
+	/* move it to the current desktop */
+	send_msg(w, a_wm_desktop, 1);
+	expect_card(w, a_wm_desktop, 1, "_NET_WM_DESKTOP of W");
+	expect_viewable(w, 1, "W, moved to the current desktop,");
+
+	/* set before the window is mapped: a desktop that is not current */
+	p2 = map_on_desktop("ewmhtest P2", 2);
+	expect_card(p2, a_wm_desktop, 2, "_NET_WM_DESKTOP of P2");
+	expect_viewable(p2, 0, "P2, on desktop 2,");
+	send_msg(rootw, a_current, 2);
+	expect_card(rootw, a_current, 2, "_NET_CURRENT_DESKTOP");
+	expect_viewable(p2, 1, "P2, on the current desktop,");
+
+	/* all desktops, also one added later */
+	pall = map_on_desktop("ewmhtest PALL", ALL_DESKTOPS);
+	expect_card(pall, a_wm_desktop, ALL_DESKTOPS, "_NET_WM_DESKTOP of PALL");
+	expect_viewable(pall, 1, "PALL");
+	send_msg(rootw, a_current, 0);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	expect_viewable(pall, 1, "PALL, after set_desktop,");
+	send_msg(rootw, a_number, 5);
+	expect_desktops(5);
+	send_msg(rootw, a_current, 4);
+	expect_card(rootw, a_current, 4, "_NET_CURRENT_DESKTOP");
+	expect_viewable(pall, 1, "PALL, on a new desktop,");
+	expect_viewable(w, 0, "W, on desktop 1,");
+	expect_card(pall, a_wm_desktop, ALL_DESKTOPS, "_NET_WM_DESKTOP of PALL");
+
+	/* removing the current (last) desktop: dtwm goes to the first */
+	send_msg(rootw, a_number, 4);
+	expect_desktops(4);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+
+	/*
+	 * Deleting desktop 1 (the current one, f.delete_workspace): W, only
+	 * there, goes to the next one, desktop 2, which becomes 1 as P2's
+	 * does.
+	 */
+	send_msg(rootw, a_current, 1);
+	expect_card(rootw, a_current, 1, "_NET_CURRENT_DESKTOP");
+	delete_active_workspace();
+	expect_desktops(3);
+	expect_card(rootw, a_current, 1, "_NET_CURRENT_DESKTOP");
+	expect_card(p2, a_wm_desktop, 1, "_NET_WM_DESKTOP of P2");
+	expect_card(w, a_wm_desktop, 1, "_NET_WM_DESKTOP of W");
+	expect_card(pall, a_wm_desktop, ALL_DESKTOPS, "_NET_WM_DESKTOP of PALL");
+	expect_viewable(w, 1, "W");
+	expect_viewable(p2, 1, "P2");
+
+	/* an out-of-range request changes nothing */
+	send_msg(w, a_wm_desktop, 7);
+	send_msg(rootw, a_current, 7);
+	send_msg(w, a_wm_desktop, 0);
+	expect_card(w, a_wm_desktop, 0, "_NET_WM_DESKTOP of W");
+	expect_card(rootw, a_current, 1, "_NET_CURRENT_DESKTOP");
+
+	destroy_all();
+	send_msg(rootw, a_number, 4);
+	send_msg(rootw, a_current, 0);
+	expect_desktops(4);
+	expect_card(rootw, a_current, 0, "_NET_CURRENT_DESKTOP");
+	printf("desktops: ok\n");
+}
+
+/* Run xdotool with these arguments; its output as a number, or -1. */
+static long xdotool(const char *fmt, ...)
+{
+	char cmd[256], out[64];
+	long value = -1;
+	va_list ap;
+	FILE *f;
+
+	strcpy(cmd, "xdotool ");
+	va_start(ap, fmt);
+	vsnprintf(cmd + 8, sizeof cmd - 8, fmt, ap);
+	va_end(ap);
+	fflush(NULL);
+	if (!(f = popen(cmd, "r")))
+		fail("popen: %s", strerror(errno));
+	if (fgets(out, sizeof out, f))
+		value = strtol(out, NULL, 0);
+	if (pclose(f))
+		fail("%s failed", cmd);
+	return value;
+}
+
+static void test_xdotool(void)
+{
+	Window w;
+	long v;
+
+	if (system("xdotool version >/dev/null 2>&1")) {
+		printf("xdotool: skipped (no xdotool)\n");
+		return;
+	}
+	xdotool("set_num_desktops 4");
+	expect_card(rootw, a_number, 4, "_NET_NUMBER_OF_DESKTOPS");
+	if ((v = xdotool("get_num_desktops")) != 4)
+		fail("xdotool get_num_desktops says %ld", v);
+	xdotool("set_desktop 2");
+	expect_card(rootw, a_current, 2, "_NET_CURRENT_DESKTOP");
+	if ((v = xdotool("get_desktop")) != 2)
+		fail("xdotool get_desktop says %ld", v);
+
+	w = create_window("ewmhtest X", None);
+	XMapWindow(dpy, w);
+	expect_list(a_client_list, "_NET_CLIENT_LIST", 0, 1, w);
+	expect_card(w, a_wm_desktop, 2, "_NET_WM_DESKTOP of X");
+	xdotool("set_desktop_for_window 0x%lx 3", w);
+	expect_card(w, a_wm_desktop, 3, "_NET_WM_DESKTOP of X");
+	if ((v = xdotool("get_desktop_for_window 0x%lx", w)) != 3)
+		fail("xdotool get_desktop_for_window says %ld", v);
+	expect_viewable(w, 0, "X, moved to desktop 3,");
+
+	xdotool("set_num_desktops 6");
+	expect_desktops(6);
+	if ((v = xdotool("get_num_desktops")) != 6)
+		fail("xdotool get_num_desktops says %ld", v);
+	xdotool("set_desktop 5");
+	expect_card(rootw, a_current, 5, "_NET_CURRENT_DESKTOP");
+	xdotool("set_num_desktops 4");
+	expect_desktops(4);
+	if ((v = xdotool("get_desktop")) != 0)
+		fail("xdotool get_desktop says %ld after the current desktop "
+		     "was removed", v);
+	if ((v = xdotool("get_desktop_for_window 0x%lx", w)) != 3)
+		fail("xdotool get_desktop_for_window says %ld", v);
+
+	destroy_all();
+	printf("xdotool: ok\n");
+}
+
 static const struct {
 	const char *name;
 	void (*run)(void);
 } tests[] = {
 	{ "clientlist", test_clientlist },
 	{ "active", test_active },
+	{ "desktops", test_desktops },
+	{ "xdotool", test_xdotool },
 };
 
 #define NTESTS ((int)(sizeof tests / sizeof tests[0]))
@@ -719,6 +1098,15 @@ int main(int argc, char **argv)
 	a_client_list = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	a_stacking = XInternAtom(dpy, "_NET_CLIENT_LIST_STACKING", False);
 	a_active = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+	a_number = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+	a_current = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	a_names = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
+	a_viewport = XInternAtom(dpy, "_NET_DESKTOP_VIEWPORT", False);
+	a_geometry = XInternAtom(dpy, "_NET_DESKTOP_GEOMETRY", False);
+	a_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+	a_wm_state = XInternAtom(dpy, "WM_STATE", False);
+	a_utf8 = XInternAtom(dpy, "UTF8_STRING", False);
+	a_dt_wm_request = XInternAtom(dpy, "_DT_WM_REQUEST", False);
 	XSelectInput(dpy, rootw, PropertyChangeMask);
 
 	atexit(cleanup);

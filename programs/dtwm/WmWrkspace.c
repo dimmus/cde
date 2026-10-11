@@ -82,6 +82,7 @@ extern void SwitchSetCurrentWorkspace (WmScreenData *pSD, Atom atom_name);
 #include "WmFunction.h"
 #include "WmIDecor.h"
 #include "WmIconBox.h"
+#include "WmEwmh.h"
 #include "WmMenu.h"
 #include "WmProperty.h"
 #include "WmResParse.h"
@@ -176,6 +177,29 @@ GetShowOrder (WmWorkspaceData *pWS)
     qsort (pOrder, pWS->numClients, sizeof (ShowOrder), CompareShowOrder);
 
     return (pOrder);
+}
+
+
+/*
+ * Mark the _NET_WM_DESKTOP of the clients of a workspace, or only of
+ * those (partial) whose value depends on the active workspace.
+ */
+static void
+MarkNetWmDesktop (WmWorkspaceData *pWS, Boolean partial)
+{
+    ClientData *pCD;
+    int i;
+
+    for (i = 0; i < pWS->numClients; i++)
+    {
+	pCD = pWS->ppClients[i];
+	if (!partial ||
+	    (!pCD->putInAll && pCD->numInhabited > 1 &&
+	     pCD->numInhabited < pWS->pSD->numWorkspaces))
+	{
+	    EwmhMarkClient (pCD, NET_CD_DESKTOP);
+	}
+    }
 }
 
 
@@ -325,6 +349,9 @@ ChangeToWorkspace(
     }
     pSD->pActiveWS = pNewWS;
 
+    MarkNetWmDesktop (pOldWS, True);
+    MarkNetWmDesktop (pNewWS, True);
+
     if ( (wsContext == F_CONTEXT_ICON &&
 	  ClientInWorkspace (ACTIVE_WS, pWsPCD)) ||
 	
@@ -395,6 +422,7 @@ ChangeWorkspaceTitle(
      * Save changes to resource database
      */
     SaveWorkspaceResources (pWS, (WM_RES_WORKSPACE_TITLE));
+    EwmhMarkScreen (pWS->pSD, NET_SD_NAMES);
 
     /*
      * Replace old workspace in info property
@@ -435,6 +463,8 @@ UpdateWorkspacePresenceProperty(
     static Atom 	*pPresence = NULL;
     static unsigned long   cPresence = 0;
     unsigned long i;
+
+    EwmhMarkClient (pCD, NET_CD_DESKTOP);
 
     if (wmGD.useStandardBehavior)
     {
@@ -515,9 +545,7 @@ AddPersistentWindows(
      * For all the windows managed for this screen, see if they
      * want to be in all workspaces and add them to this workspace.
      */
-    pCLE = pSD->clientList;
-
-    while (1)
+    for (pCLE = pSD->clientList; pCLE; pCLE = pCLE->nextSibling)
     {
 	/*
 	 * Process all the non-icon client list entries 
@@ -527,14 +555,6 @@ AddPersistentWindows(
 	{
 	    AddClientToWorkspaces( pCLE->pCD, &(pWS->id), 1 );
 	}
-	
-	/*
-	 * Test for exit condition and advance client list pointer
-	 */
-	if (pCLE == pSD->lastClient) 
-	    break;
-	else
-	    pCLE = pCLE->nextSibling;
     }
 
 } /* END OF FUNCTION AddPersistentWindows */
@@ -634,6 +654,8 @@ CreateWorkspace(
      * Update workspace presence dialog data
      */
     UpdatePresenceWorkspaces(pSD);
+
+    EwmhWorkspacesChanged (pSD);
 
     return (pWS);
 } /* END OF FUNCTION CreateWorkspace */
@@ -808,9 +830,12 @@ DeleteWorkspace(
 	}
 
 	/*
-	 * We now have one less workspace.
+	 * We now have one less workspace.  The desktop indices of those
+	 * after it shift down.
 	 */
 	pSD->numWorkspaces--;
+	UpdateNetCurrentDesktop (pSD);
+	EwmhWorkspacesChanged (pSD);
 
 	/*
 	 * Update the properties that announce workspace info.
@@ -989,6 +1014,8 @@ GetClientWorkspaceInfo(
      *
      * Else, if workspace hints are on the window, then use them.
      *
+     * Else, if the window has a _NET_WM_DESKTOP, then use it.
+     *
      * If none of the above work out, the window will be put into
      * the current workspace.
      */
@@ -1000,7 +1027,8 @@ GetClientWorkspaceInfo(
 	 (
 	  HasProperty (pCD, wmGD.xa_DT_WORKSPACE_HINTS) 
 	  && (GetWorkspaceHints (DISPLAY, pCD->client, &pIDs, &numIDs, &bAll) == 
-	         Success))) &&
+	         Success)) ||
+	 GetNetWmDesktop (pCD, &pIDs, &numIDs, &bAll)) &&
 	 numIDs)
     {
 	/*
@@ -2944,6 +2972,7 @@ F_AddToAllWorkspaces(
 	AddClientToWorkspaces (pCD, pResIDs, pSD->numWorkspaces);
 
 	pCD->putInAll = True;
+	EwmhMarkClient (pCD, NET_CD_DESKTOP);
     }
 
     return (True);
@@ -2998,6 +3027,7 @@ F_Remove(
 	{
 	    RemoveClientFromWorkspaces (pCD, &ACTIVE_WS->id, 1);
             pCD->putInAll = False;
+	    EwmhMarkClient (pCD, NET_CD_DESKTOP);
 	}
     }
 

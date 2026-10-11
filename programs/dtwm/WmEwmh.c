@@ -32,6 +32,7 @@
 #include "WmEwmh.h"
 #include "WmWinList.h"
 #include "WmFunction.h"
+#include "WmIconBox.h"
 #include "WmMultiHead.h"
 #include "WmProperty.h"
 #include "WmWinState.h"
@@ -51,6 +52,11 @@ static Atom xa__NET_SUPPORTED;
 static Atom xa__NET_SUPPORTING_WM_CHECK;
 static Atom xa__NET_CLIENT_LIST;
 static Atom xa__NET_CLIENT_LIST_STACKING;
+static Atom xa__NET_NUMBER_OF_DESKTOPS;
+static Atom xa__NET_DESKTOP_GEOMETRY;
+static Atom xa__NET_DESKTOP_VIEWPORT;
+static Atom xa__NET_CURRENT_DESKTOP;
+static Atom xa__NET_DESKTOP_NAMES;
 
 /*
  * The atoms, interned together by SetupWmEwmh.  _NET_SUPPORTED lists
@@ -71,6 +77,12 @@ static const struct
     { _XA__NET_ACTIVE_WINDOW,		&wmGD.xa__NET_ACTIVE_WINDOW,	True },
     { "_NET_CLIENT_LIST",		&xa__NET_CLIENT_LIST,		True },
     { "_NET_CLIENT_LIST_STACKING",	&xa__NET_CLIENT_LIST_STACKING,	True },
+    { "_NET_NUMBER_OF_DESKTOPS",	&xa__NET_NUMBER_OF_DESKTOPS,	True },
+    { "_NET_DESKTOP_GEOMETRY",		&xa__NET_DESKTOP_GEOMETRY,	True },
+    { "_NET_DESKTOP_VIEWPORT",		&xa__NET_DESKTOP_VIEWPORT,	True },
+    { "_NET_CURRENT_DESKTOP",		&xa__NET_CURRENT_DESKTOP,	True },
+    { "_NET_DESKTOP_NAMES",		&xa__NET_DESKTOP_NAMES,		True },
+    { "_NET_WM_DESKTOP",		&wmGD.xa__NET_WM_DESKTOP,	True },
     { _XA__NET_WM_NAME,			&wmGD.xa__NET_WM_NAME,		True },
     { _XA__NET_WM_ICON_NAME,		&wmGD.xa__NET_WM_ICON_NAME,	True },
     { _XA__NET_WM_VISIBLE_NAME,		&wmGD.xa__NET_WM_VISIBLE_NAME,	True },
@@ -134,8 +146,9 @@ void EwmhMarkScreen (WmScreenData *pSD, unsigned int bits)
  *  Description:
  *  -----------
  *  Marks properties of a client window for EwmhFlushProc to recompute
- *  and write if they changed.  EwmhRemoveClient forgets the marks of a
- *  client that goes away first.
+ *  and write if they changed.  Only the clients in the client lists have
+ *  them (EwmhAddClient marks them all first); EwmhRemoveClient forgets
+ *  the marks of a client that goes away.
  *
  *
  *  Inputs:
@@ -148,7 +161,7 @@ void EwmhMarkScreen (WmScreenData *pSD, unsigned int bits)
 
 void EwmhMarkClient (ClientData *pCD, unsigned int bits)
 {
-    if (!bits) return;
+    if (!bits || !(pCD->netFlags & NET_FLAG_LISTED)) return;
 
     if (!pCD->netDirty)
     {
@@ -207,6 +220,7 @@ void EwmhAddClient (ClientData *pCD)
     pCD->netFlags |= NET_FLAG_LISTED;
 
     EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING);
+    EwmhMarkClient (pCD, NET_CD_DESKTOP);
 }
 
 
@@ -219,6 +233,8 @@ void EwmhAddClient (ClientData *pCD)
  *  -----------
  *  Removes a client that is being withdrawn from the client lists, and
  *  drops its pending marks: call it before its client data is freed.
+ *  The properties that dtwm wrote on the window go too (they stay when
+ *  dtwm exits).
  *
  *
  *  Inputs:
@@ -247,6 +263,10 @@ void EwmhRemoveClient (ClientData *pCD)
 
     if (!(pCD->netFlags & NET_FLAG_LISTED)) return;
     pCD->netFlags &= ~NET_FLAG_LISTED;
+
+    if (pCD->netDesktopWritten != NET_DESKTOP_NOT_WRITTEN &&
+	!(pCD->clientFlags & CLIENT_DESTROYED))
+	XDeleteProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_DESKTOP);
 
     for (i = 0; i < pSD->numNetClients; ++i)
     {
@@ -289,13 +309,16 @@ static void WriteNetWindowList (WmScreenData *pSD, Atom property,
 }
 
 
-/* _NET_ACTIVE_WINDOW: confirmed client focus, not icons or hidden windows. */
+/*
+ * _NET_ACTIVE_WINDOW: confirmed client focus, not icons, hidden windows
+ * or unlisted ones (the front panel, ...).
+ */
 static void FlushNetActiveWindow (WmScreenData *pSD)
 {
     ClientData *pCD = wmGD.keyboardFocus;
     Window active = None;
 
-    if (pCD && pCD->pSD == pSD &&
+    if (pCD && pCD->pSD == pSD && (pCD->netFlags & NET_FLAG_LISTED) &&
 	(pCD->clientState == NORMAL_STATE ||
 	 pCD->clientState == MAXIMIZED_STATE))
 	active = pCD->client;
@@ -395,10 +418,359 @@ static void FlushNetClientListStacking (WmScreenData *pSD)
 }
 
 
-/* Client window properties: written from the stages that add them. */
+/* The number of desktops: one in mwm mode, else one per workspace. */
+static int NumNetDesktops (WmScreenData *pSD)
+{
+    return wmGD.useStandardBehavior ? 1 : pSD->numWorkspaces;
+}
+
+
+/* The desktop index of a workspace, its index in pSD->pWS. */
+static long NetDesktopIndex (WmScreenData *pSD, WorkspaceID wsID)
+{
+    WmWorkspaceData *pWS;
+
+    if (wmGD.useStandardBehavior ||
+	!(pWS = GetWorkspaceData (pSD, wsID)))
+	return 0;
+    return pWS - pSD->pWS;
+}
+
+
+/*
+ * _NET_WM_DESKTOP can only say one desktop, or all of them: all when the
+ * client is to be in every workspace (putInAll) or is in all of several,
+ * else the active workspace if the client is in it, else the lowest
+ * index among the workspaces it is in.
+ */
+static long NetWmDesktop (ClientData *pCD)
+{
+    WmScreenData *pSD = pCD->pSD;
+    int num = NumNetDesktops (pSD);
+    long desktop, lowest = num;
+    int i;
+
+    if (wmGD.useStandardBehavior)
+	return 0;
+    if (pCD->putInAll || (num > 1 && pCD->numInhabited >= num))
+	return NET_ALL_DESKTOPS;
+    if (ClientInWorkspace (pSD->pActiveWS, pCD))
+	return pSD->pActiveWS - pSD->pWS;
+
+    for (i = 0; i < pCD->numInhabited; ++i)
+    {
+	desktop = NetDesktopIndex (pSD, pCD->pWsList[i].wsID);
+	if (desktop < lowest) lowest = desktop;
+    }
+    return lowest < num ? lowest : pSD->pActiveWS - pSD->pWS;
+}
+
+
+/* Client window properties: _NET_WM_DESKTOP (the others are to come). */
 static void FlushClient (ClientData *pCD)
 {
+    long desktop;
+
+    if (pCD->netDirty & NET_CD_DESKTOP)
+    {
+	desktop = NetWmDesktop (pCD);
+	if (desktop != pCD->netDesktopWritten)
+	{
+	    XChangeProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_DESKTOP,
+		XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
+	    pCD->netDesktopWritten = desktop;
+	}
+    }
+
     pCD->netDirty = 0;
+}
+
+
+/*
+ * _NET_NUMBER_OF_DESKTOPS, _NET_DESKTOP_VIEWPORT (no viewports: 0,0 for
+ * each desktop) and _NET_DESKTOP_GEOMETRY (the screen).
+ */
+static void FlushNetDesktops (WmScreenData *pSD)
+{
+    int num = NumNetDesktops (pSD);
+    long *viewport;
+
+    if (num != pSD->netNumDesktopsWritten)
+    {
+	long number = num;
+
+	XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_NUMBER_OF_DESKTOPS,
+	    XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&number, 1);
+
+	viewport = (long *) XtCalloc (2 * num, sizeof (long));
+	XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_DESKTOP_VIEWPORT,
+	    XA_CARDINAL, 32, PropModeReplace, (unsigned char *)viewport,
+	    2 * num);
+	XtFree ((char *)viewport);
+
+	pSD->netNumDesktopsWritten = num;
+    }
+
+    if (pSD->netGeometry[0] != pSD->netGeometryWritten[0] ||
+	pSD->netGeometry[1] != pSD->netGeometryWritten[1])
+    {
+	XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_DESKTOP_GEOMETRY,
+	    XA_CARDINAL, 32, PropModeReplace,
+	    (unsigned char *)pSD->netGeometry, 2);
+	pSD->netGeometryWritten[0] = pSD->netGeometry[0];
+	pSD->netGeometryWritten[1] = pSD->netGeometry[1];
+    }
+}
+
+
+/* _NET_DESKTOP_NAMES: the workspace titles, in UTF-8. */
+static void FlushNetDesktopNames (WmScreenData *pSD)
+{
+    int num = NumNetDesktops (pSD);
+    char **titles;
+    XTextProperty text;
+    int i, len;
+
+    titles = (char **) XtMalloc (num * sizeof (char *));
+    for (i = 0; i < num; ++i)
+	titles[i] = WmXmStringToString (pSD->pWS[i].title);
+    for (i = 0; i < num; ++i)
+	if (!titles[i]) titles[i] = XtNewString ("");
+
+    if (XmbTextListToTextProperty (DISPLAY, titles, num, XUTF8StringStyle,
+				   &text) >= Success)
+    {
+	/* each name is terminated, the last one too */
+	len = text.nitems + 1;
+	if (len != pSD->lenNetNamesWritten ||
+	    memcmp (text.value, pSD->netNamesWritten, len))
+	{
+	    XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_DESKTOP_NAMES,
+		wmGD.xa_UTF8_STRING, 8, PropModeReplace, text.value, len);
+	    XtFree (pSD->netNamesWritten);
+	    pSD->netNamesWritten = XtMalloc (len);
+	    memcpy (pSD->netNamesWritten, text.value, len);
+	    pSD->lenNetNamesWritten = len;
+	}
+	XFree (text.value);
+    }
+
+    for (i = 0; i < num; ++i)
+	XtFree (titles[i]);
+    XtFree ((char *)titles);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  UpdateNetCurrentDesktop (pSD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Writes _NET_CURRENT_DESKTOP if it changed, at once (not from
+ *  EwmhFlushProc): SetCurrentWorkspaceProperty, which calls it, then
+ *  syncs before the workspace change is announced.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pSD = screen
+ *
+ *************************************<->***********************************/
+
+void UpdateNetCurrentDesktop (WmScreenData *pSD)
+{
+    long current;
+
+    current = wmGD.useStandardBehavior ? 0 : pSD->pActiveWS - pSD->pWS;
+    if (current == pSD->netCurrentWritten) return;
+
+    XChangeProperty (DISPLAY, pSD->rootWindow, xa__NET_CURRENT_DESKTOP,
+	XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&current, 1);
+    pSD->netCurrentWritten = current;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  EwmhWorkspacesChanged (pSD)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Marks what depends on the set of workspaces of a screen after one was
+ *  created or deleted: the number of desktops and their names, and the
+ *  _NET_WM_DESKTOP of every client (deleting a workspace shifts the
+ *  indices of those after it).
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pSD = screen
+ *
+ *************************************<->***********************************/
+
+void EwmhWorkspacesChanged (WmScreenData *pSD)
+{
+    int i, j;
+
+    for (i = 0; i < pSD->numWorkspaces; ++i)
+	for (j = 0; j < pSD->pWS[i].numClients; ++j)
+	    EwmhMarkClient (pSD->pWS[i].ppClients[j], NET_CD_DESKTOP);
+
+    EwmhMarkScreen (pSD, NET_SD_DESKTOPS | NET_SD_NAMES);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  EwmhRootResized (pSD, width, height)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Takes the new size of the root window (RandR) for
+ *  _NET_DESKTOP_GEOMETRY.
+ *
+ *************************************<->***********************************/
+
+void EwmhRootResized (WmScreenData *pSD, int width, int height)
+{
+    pSD->netGeometry[0] = width;
+    pSD->netGeometry[1] = height;
+    EwmhMarkScreen (pSD, NET_SD_DESKTOPS);
+}
+
+
+/*************************************<->*************************************
+ *
+ *  GetNetWmDesktop (pCD, ppIDs, pNumIDs, pbAll)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Reads the _NET_WM_DESKTOP that a client set before it was mapped, the
+ *  workspace it asks to start in, or all of them.  It is read only when
+ *  the window has it (HasProperty), and ignored in mwm mode or when the
+ *  index is out of range.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = client being managed (its initial property list is known)
+ *
+ *
+ *  Outputs:
+ *  -------
+ *  *ppIDs = the workspace IDs (XtMalloc'd), *pNumIDs = how many
+ *  *pbAll = True for all workspaces
+ *  RETURN = True if the property gave workspaces
+ *
+ *************************************<->***********************************/
+
+Boolean GetNetWmDesktop (ClientData *pCD, WorkspaceID **ppIDs,
+    unsigned int *pNumIDs, Boolean *pbAll)
+{
+    WmScreenData *pSD = pCD->pSD;
+    Atom actualType;
+    int actualFormat, i;
+    unsigned long nitems, leftover, desktop;
+    unsigned char *data = NULL;
+
+    if (wmGD.useStandardBehavior ||
+	!HasProperty (pCD, wmGD.xa__NET_WM_DESKTOP) ||
+	XGetWindowProperty (DISPLAY, pCD->client, wmGD.xa__NET_WM_DESKTOP,
+	    0L, 1L, False, XA_CARDINAL, &actualType, &actualFormat, &nitems,
+	    &leftover, &data) != Success)
+	return False;
+
+    if (actualType != XA_CARDINAL || actualFormat != 32 || nitems != 1)
+    {
+	if (data) XFree (data);
+	return False;
+    }
+    desktop = *(unsigned long *)data & 0xFFFFFFFFUL;
+    XFree (data);
+
+    if (desktop == NET_ALL_DESKTOPS)
+    {
+	*ppIDs = (WorkspaceID *) XtMalloc (pSD->numWorkspaces *
+					   sizeof (WorkspaceID));
+	for (i = 0; i < pSD->numWorkspaces; ++i)
+	    (*ppIDs)[i] = pSD->pWS[i].id;
+	*pNumIDs = pSD->numWorkspaces;
+	*pbAll = True;
+	return True;
+    }
+    if (desktop >= pSD->numWorkspaces)
+	return False;
+
+    *ppIDs = (WorkspaceID *) XtMalloc (sizeof (WorkspaceID));
+    (*ppIDs)[0] = pSD->pWS[desktop].id;
+    *pNumIDs = 1;
+    *pbAll = False;
+    return True;
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ProcessNetWmDesktop (pCD, desktop)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  Handles a _NET_WM_DESKTOP client message: moves the client (with its
+ *  transient tree) to one workspace, or puts it in all of them, if it
+ *  may change workspaces.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pCD = client
+ *
+ *  desktop = desktop index, or 0xFFFFFFFF for all
+ *
+ *************************************<->***********************************/
+
+void ProcessNetWmDesktop (ClientData *pCD, unsigned long desktop)
+{
+    WmScreenData *pSD = pCD->pSD;
+    ClientData *pcdLeader = FindTransientTreeLeader (pCD);
+    WorkspaceID *pOthers;
+    WorkspaceID id;
+    int i, numOthers = 0;
+
+    if (wmGD.useStandardBehavior ||
+	!(pCD->dtwmFunctions & DtWM_FUNCTION_OCCUPY_WS))
+	return;
+
+    desktop &= 0xFFFFFFFFUL;
+    if (desktop == NET_ALL_DESKTOPS)
+    {
+	F_AddToAllWorkspaces (NULL, pcdLeader, NULL);
+	return;
+    }
+    if (desktop >= pSD->numWorkspaces)
+	return;
+
+    id = pSD->pWS[desktop].id;
+    AddClientToWorkspaces (pcdLeader, &id, 1);
+
+    /* the list changes as the client leaves workspaces: copy it */
+    pOthers = (WorkspaceID *) XtMalloc (pcdLeader->numInhabited *
+					sizeof (WorkspaceID));
+    for (i = 0; i < pcdLeader->numInhabited; ++i)
+	if (pcdLeader->pWsList[i].wsID != id)
+	    pOthers[numOthers++] = pcdLeader->pWsList[i].wsID;
+    if (numOthers)
+	RemoveClientFromWorkspaces (pcdLeader, pOthers, numOthers);
+    XtFree ((char *)pOthers);
+
+    pcdLeader->putInAll = pCD->putInAll = False;
+    EwmhMarkClient (pCD, NET_CD_DESKTOP);
+    EwmhMarkClient (pcdLeader, NET_CD_DESKTOP);
 }
 
 
@@ -444,6 +816,8 @@ static Boolean EwmhFlushProc (XtPointer clientData)
 	if (bits & NET_SD_ACTIVE) FlushNetActiveWindow (pSD);
 	if (bits & NET_SD_CLIENTS) FlushNetClientList (pSD);
 	if (bits & NET_SD_STACKING) FlushNetClientListStacking (pSD);
+	if (bits & NET_SD_DESKTOPS) FlushNetDesktops (pSD);
+	if (bits & NET_SD_NAMES) FlushNetDesktopNames (pSD);
     }
 
     return True;
@@ -483,13 +857,37 @@ void UpdateNetActiveWindow (void)
 
 void HandleNetRootMessage (WmScreenData *pSD, XClientMessageEvent *clientEvent)
 {
-    if (clientEvent->format != 32) return;
+    Atom type = clientEvent->message_type;
+    long value = clientEvent->data.l[0];
+    int num;
 
-    /*
-     * No root message is handled yet: the desktop requests
-     * (_NET_CURRENT_DESKTOP, _NET_NUMBER_OF_DESKTOPS,
-     * _NET_SHOWING_DESKTOP) are to come here.
-     */
+    /* in mwm mode, there is one desktop */
+    if (clientEvent->format != 32 || wmGD.useStandardBehavior) return;
+
+    if (type == xa__NET_CURRENT_DESKTOP)
+    {
+	if (value >= 0 && value < pSD->numWorkspaces)
+	    ChangeToWorkspace (&pSD->pWS[value]);
+    }
+    else if (type == xa__NET_NUMBER_OF_DESKTOPS)
+    {
+	/* add or delete workspaces at the end */
+	if (value < 1) value = 1;
+	if (value > MAX_WORKSPACE_COUNT) value = MAX_WORKSPACE_COUNT;
+
+	while (pSD->numWorkspaces < value)
+	{
+	    num = pSD->numWorkspaces;
+	    CreateWorkspace (pSD, NULL);
+	    if (pSD->numWorkspaces == num) break;
+	}
+	while (pSD->numWorkspaces > value)
+	{
+	    num = pSD->numWorkspaces;
+	    DeleteWorkspace (&pSD->pWS[num - 1]);
+	    if (pSD->numWorkspaces == num) break;
+	}
+    }
 }
 
 /* Use the normal focus path so ICCCM input models and modality still apply. */
@@ -755,6 +1153,7 @@ void SetupWmEwmh (void)
 			xa__NET_SUPPORTED, XA_ATOM, 32, PropModeReplace,
 			(unsigned char *)supported, numSupported);
 
-	EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING | NET_SD_ACTIVE);
+	EwmhMarkScreen (pSD, NET_SD_CLIENTS | NET_SD_STACKING | NET_SD_ACTIVE |
+			     NET_SD_DESKTOPS | NET_SD_NAMES);
     }
 }

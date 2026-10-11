@@ -1345,6 +1345,12 @@ typedef struct _WmScreenData
     int			numNetStackWritten;	/* or -1 */
     int			sizeNetStackWritten;
     Window		netActiveWritten;	/* _NET_ACTIVE_WINDOW */
+    long		netCurrentWritten;	/* _NET_CURRENT_DESKTOP */
+    int			netNumDesktopsWritten;	/* or -1 */
+    long		netGeometry[2];		/* root window size */
+    long		netGeometryWritten[2];
+    char		*netNamesWritten;	/* _NET_DESKTOP_NAMES */
+    int			lenNetNamesWritten;	/* or -1 */
 } WmScreenData;
 
 typedef struct _WmScreenData *PtrScreenData;
@@ -1708,6 +1714,7 @@ struct _ClientData
     Boolean	iconTitleFromNetWmName;		/* ... _NET_WM_ICON_NAME */
     unsigned int netFlags;			/* NET_FLAG_* */
     unsigned int netDirty;			/* NET_CD_* to write */
+    long	netDesktopWritten;		/* _NET_WM_DESKTOP */
 
     /* client window frame graphic data: */
 
@@ -2027,6 +2034,7 @@ typedef struct _WmGlobalData
     Atom	xa__NET_WM_STATE_FULLSCREEN;
     Atom	xa__NET_WM_STATE_ABOVE;
     Atom	xa__NET_WM_STATE_BELOW;
+    Atom	xa__NET_WM_DESKTOP;
 
     /* EWMH property writer (WmEwmh.c): */
 

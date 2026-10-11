@@ -59,6 +59,7 @@
 #include "WmIDecor.h"
 #include "WmIPlace.h"
 #include "WmIconBox.h"
+#include "WmEwmh.h"
 #include "WmImage.h"
 #include "WmManage.h"
 #include "WmMenu.h"
@@ -225,6 +226,7 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
     pCD->iconTitleFromNetWmName = False;
     pCD->netFlags = 0;
     pCD->netDirty = 0;
+    pCD->netDesktopWritten = NET_DESKTOP_NOT_WRITTEN;
 
     for (i = 0; i < STRETCH_COUNT; ++i) pCD->clientStretchWin[i] = (Window)0L;
 
