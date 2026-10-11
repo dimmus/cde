@@ -766,6 +766,15 @@ class RFCMailBox : public DtMail::MailBox
     const char			*_impl_name;	// Might be V3 or MIME.
     int				 _last_check;	// For polling only.
     time_t			 _last_poll;	// For polling only.
+
+    // The background new mail check and autosave do not wait for a
+    // .lock that someone else holds (see dotLockBusy()); they are
+    // retried from an Xt timer instead.
+    XtIntervalId		 _lock_retry_id = 0;
+    long			 _lock_retry_ms = 0;
+    unsigned long		 _busy_lock_ino = 0;
+    long			 _busy_lock_ctime = 0;
+    long			 _busy_lock_since = 0;	// CLOCK_MONOTONIC s
     int				 _links;
     DtMailBoolean		 _lock_flag;
     FileShare			*_lock_obj;
@@ -833,6 +842,10 @@ class RFCMailBox : public DtMail::MailBox
 			DtMailEnv &,
 			const DtMailBoolean already_locked = DTM_FALSE);
     time_t	linkLockFile(DtMailEnv &, char *tempLockFileName);
+    DtMailBoolean
+		dotLockBusy(void);
+    void	scheduleLockRetry(void);
+    static void	lockRetryProc(XtPointer, XtIntervalId *);
     void	lockFile(DtMailEnv &);
     void	lockNewMailboxFile(int new_fd);
     DTMBX_LONGLOCK

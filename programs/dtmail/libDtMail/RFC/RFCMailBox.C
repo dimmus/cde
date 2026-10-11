@@ -71,8 +71,10 @@
 #if defined(__linux__)
 #include <sys/vfs.h>
 #include <sys/ioctl.h>
+#include <sys/inotify.h>
 #include <linux/fs.h>
 #endif
+#include <poll.h>
 #include <Dt/DtPStrings.h>
 
 #include <assert.h>
@@ -92,6 +94,7 @@ extern "C" {
 #include <DtMail/ImplDriver.hh>
 #include <DtMail/Threads.hh>
 #include <DtMail/IO.hh>
+#include <DtMail/DtMailXtProc.h>
 #include "RFCImpl.hh"
 #include "str_utils.h"
 
@@ -392,6 +395,10 @@ RFCMailBox::~RFCMailBox(void)
 
 	DtMailEnv error;
 	_session->removeEventRoutine(error, PollEntry, this);
+	if (_lock_retry_id) {
+	    XtRemoveTimeOut(_lock_retry_id);
+	    _lock_retry_id = 0;
+	}
 
 	// We need to copy the file if writable and dirty out.
 	// NOTE: the caller should really call writeMailBox() or expunge()
@@ -2738,10 +2745,21 @@ RFCMailBox::PollEntry(void * client_data)
 
     // See if time's up for doing a new mail incorporate
     //
+    // Neither the new mail check nor the autosave waits for a .lock
+    // somebody else holds: they are tried again shortly (see
+    // scheduleLockRetry()), and are not noted as done meanwhile.
+    //
+    DtMailBoolean lock_busy = DTM_FALSE;
+
     if (ping > 0 && (now - self->_last_poll > ping))
     {
-	self->_last_poll = now;
-	self->NewMailEvent();
+	if (self->dotLockBusy() == DTM_TRUE) {
+	    lock_busy = DTM_TRUE;
+	}
+	else {
+	    self->_last_poll = now;
+	    self->NewMailEvent();
+	}
     }
 
     // See if time's up for doing an auto-save.
@@ -2750,6 +2768,12 @@ RFCMailBox::PollEntry(void * client_data)
     // a message...
 
     if (save_interval >= 0 &&
+	((now - self->_last_check) > save_interval) &&
+	(self->session()->getAutoSaveFlag()) &&
+	self->_dirty != 0 && self->dotLockBusy() == DTM_TRUE) {
+	lock_busy = DTM_TRUE;
+    }
+    else if (save_interval >= 0 &&
 	((now - self->_last_check) > save_interval) &&
 	(self->session()->getAutoSaveFlag())) {
 
@@ -2761,6 +2785,13 @@ RFCMailBox::PollEntry(void * client_data)
 // 	if (error.isSet()) {
 // 	  // MAILBOX COULD NOT BE CHECKPOINTED!!! MUST DO SOMETHING!!!
 // 	}
+    }
+
+    if (lock_busy == DTM_TRUE) {
+	self->scheduleLockRetry();
+    }
+    else {
+	self->_lock_retry_ms = 0;
     }
     return(DTM_TRUE);
 }
@@ -4147,15 +4178,83 @@ RFCMailBox::linkLockFile(DtMailEnv & error, char *tempLockFileName)
   return(0);
 }
 
-// Sleep before the next attempt to take the mailbox .lock file: 10 ms
-// the first time, then twice as long each time, up to 1 s.
+// Watch the directory of the mailbox .lock file, so that a wait for it
+// ends as soon as its holder removes it. Returns an inotify descriptor,
+// or -1 (not Linux, no permission to watch, out of watches): the wait
+// is then a plain sleep. inotify does not see changes made by other NFS
+// clients either, which is why the wait keeps its timeout.
+//
+static int
+lockWatchOpen(const char *lockFileName)
+{
+#if defined(__linux__)
+  const char *slash = strrchr(lockFileName, '/');
+  char dir[MAXPATHLEN];
+
+  if (slash == NULL) {
+    strcpy(dir, ".");
+  }
+  else if (slash == lockFileName) {
+    strcpy(dir, "/");
+  }
+  else if ((size_t) (slash - lockFileName) < sizeof(dir)) {
+    memcpy(dir, lockFileName, slash - lockFileName);
+    dir[slash - lockFileName] = '\0';
+  }
+  else {
+    return(-1);
+  }
+
+  int ifd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+  if (ifd < 0) {
+    return(-1);
+  }
+  if (inotify_add_watch(ifd, dir, IN_DELETE | IN_MOVED_FROM) < 0) {
+    close(ifd);
+    return(-1);
+  }
+  return(ifd);
+#else
+  (void) lockFileName;
+  return(-1);
+#endif
+}
+
+// Closes the lockWatchOpen() descriptor on every way out of lockFile().
+//
+struct LockWatch {
+  int fd;
+  LockWatch() : fd(-2) {}
+  ~LockWatch() { if (fd >= 0) close(fd); }
+};
+
+// Wait before the next attempt to take the mailbox .lock file: 10 ms
+// the first time, then twice as long each time, up to 1 s; but stop
+// waiting as soon as a file is removed from the lock file's directory
+// (watch_fd, when there is one).
 //
 static void
-lockBackoff(long & delayMs)
+lockWait(long & delayMs, int watch_fd)
 {
   delayMs = delayMs <= 0 ? 10 : delayMs * 2;
   if (delayMs > 1000) {
     delayMs = 1000;
+  }
+
+  if (watch_fd >= 0) {
+    struct pollfd pfd;
+    pfd.fd = watch_fd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    if (poll(&pfd, 1, (int) delayMs) > 0) {
+      // Drain the events; which file went does not matter, the
+      // caller simply tries again.
+      char buf[4096];
+      while (read(watch_fd, buf, sizeof(buf)) > 0) {
+	continue;
+      }
+    }
+    return;
   }
 
   struct timespec req;
@@ -4163,6 +4262,72 @@ lockBackoff(long & delayMs)
   req.tv_nsec = (delayMs % 1000) * 1000000L;
   while (nanosleep(&req, &req) < 0 && errno == EINTR) {
     continue;
+  }
+}
+
+// Is the mailbox .lock file held by someone else right now? The
+// background new mail check and autosave ask this first, and come back
+// later instead of waiting for the lock on the UI thread: lockFile()
+// waits as long as the lock file is less than 5 minutes old, which for
+// a lock file left behind by a crashed delivery agent froze dtmail for
+// 5 minutes. A lock file is only reported busy until this process has
+// seen the same one (inode and ctime) for 5 minutes; then the caller
+// goes ahead and lockFile() applies its stale lock rule as before.
+//
+DtMailBoolean
+RFCMailBox::dotLockBusy(void)
+{
+  struct stat sbuf;
+  struct timespec now;
+
+  if (_use_dot_lock == DTM_FALSE || _lockFileName == NULL ||
+      _dot_lock_active == DTM_TRUE || SafeStat(_lockFileName, &sbuf) < 0) {
+    _busy_lock_ino = 0;
+    _busy_lock_ctime = 0;
+    return(DTM_FALSE);
+  }
+
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if ((unsigned long) sbuf.st_ino != _busy_lock_ino ||
+      (long) sbuf.st_ctime != _busy_lock_ctime) {
+    _busy_lock_ino = (unsigned long) sbuf.st_ino;
+    _busy_lock_ctime = (long) sbuf.st_ctime;
+    _busy_lock_since = (long) now.tv_sec;
+  }
+  if ((long) now.tv_sec - _busy_lock_since >= 300) {
+    return(DTM_FALSE);
+  }
+  return(DTM_TRUE);
+}
+
+// Try the background work of PollEntry() again soon: after 50 ms, then
+// twice as long each time. Beyond about 13 s the regular 15 s poll does
+// the retrying, as PollEntry() did not note the work as done.
+//
+void
+RFCMailBox::scheduleLockRetry(void)
+{
+  if (_lock_retry_id || DtMailDamageContext == NULL) {
+    return;
+  }
+
+  _lock_retry_ms = _lock_retry_ms <= 0 ? 50 : _lock_retry_ms * 2;
+  if (_lock_retry_ms > 6400) {
+    return;
+  }
+  _lock_retry_id = XtAppAddTimeOut(DtMailDamageContext,
+				   (unsigned long) _lock_retry_ms,
+				   lockRetryProc, (XtPointer) this);
+}
+
+void
+RFCMailBox::lockRetryProc(XtPointer client_data, XtIntervalId *)
+{
+  RFCMailBox *self = (RFCMailBox *) client_data;
+
+  self->_lock_retry_id = 0;
+  if (self->_object_signature == RFCSignature) {
+    PollEntry(self);
   }
 }
 
@@ -4230,6 +4395,7 @@ RFCMailBox::lockFile(DtMailEnv & error)
   //
   long backoffMs = 0;
   struct timespec statFailedSince = {0, 0};
+  LockWatch watch;
   
   for (;;) {
     // Attempt to create a temporary file and link it to the intended lock file
@@ -4280,7 +4446,10 @@ RFCMailBox::lockFile(DtMailEnv & error)
         delete [] tempLockFileName;
 	return;
       }
-      lockBackoff(backoffMs);
+      if (watch.fd == -2) {
+	watch.fd = lockWatchOpen(_lockFileName);
+      }
+      lockWait(backoffMs, watch.fd);
       continue;
     }
 
@@ -4293,7 +4462,10 @@ RFCMailBox::lockFile(DtMailEnv & error)
     //
     statFailed = 0;
     if (t < (sbuf.st_ctime + 300)) {
-      lockBackoff(backoffMs);
+      if (watch.fd == -2) {
+	watch.fd = lockWatchOpen(_lockFileName);
+      }
+      lockWait(backoffMs, watch.fd);
       continue;
     }
 
