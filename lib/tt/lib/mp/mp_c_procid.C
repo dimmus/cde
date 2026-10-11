@@ -30,6 +30,8 @@
  *
  * Copyright (c) 1990,1992 by Sun Microsystems, Inc.
  */
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <tt_options.h>
@@ -123,8 +125,9 @@ enum {
 	_TT_LACKS_DEL_PATTERNS	= 4
 };
 
+// (Plain C data: no static constructors or destructors in the library.)
 static struct {
-	_Tt_string	address;
+	char		*address;
 	int		lacks;
 } session_lacks_tab[8];
 static int session_lacks_next;
@@ -132,11 +135,11 @@ static int session_lacks_next;
 static int
 session_lacks(_Tt_session *s, int what)
 {
-	const _Tt_string &addr = s->address_string();
+	const char *addr = (const char *)s->address_string();
 
 	for (int i = 0; i < 8; i++) {
 		if ((session_lacks_tab[i].lacks & what) &&
-		    session_lacks_tab[i].address == addr) {
+		    strcmp(session_lacks_tab[i].address, addr) == 0) {
 			return 1;
 		}
 	}
@@ -146,19 +149,24 @@ session_lacks(_Tt_session *s, int what)
 static void
 set_session_lacks(_Tt_session *s, int what)
 {
-	const _Tt_string &addr = s->address_string();
+	const char *addr = (const char *)s->address_string();
+	char *copy;
 	int i;
 
 	for (i = 0; i < 8; i++) {
 		if (session_lacks_tab[i].lacks &&
-		    session_lacks_tab[i].address == addr) {
+		    strcmp(session_lacks_tab[i].address, addr) == 0) {
 			session_lacks_tab[i].lacks |= what;
 			return;
 		}
 	}
+	if ((copy = strdup(addr)) == 0) {
+		return;
+	}
 	i = session_lacks_next;
 	session_lacks_next = (session_lacks_next + 1) % 8;
-	session_lacks_tab[i].address = addr;
+	free(session_lacks_tab[i].address);
+	session_lacks_tab[i].address = copy;
 	session_lacks_tab[i].lacks = what;
 }
 
@@ -695,7 +703,9 @@ open(_Tt_string *session_id)
 // take (_tt_c_procid_take_opened()).
 //
 static int		open_wanted;
-static _Tt_c_procid_ptr	opened_procid;
+// (A pointer to the smart pointer: no static constructors or
+// destructors in the library.)
+static _Tt_c_procid_ptr	*opened_procid;
 
 void
 _tt_c_procid_open_wanted(int on)
@@ -748,7 +758,8 @@ _tt_c_procid_first_contact(_Tt_c_session *s)
 			return s->ping();
 		}
 		s->set_id(sid);
-		opened_procid = p;
+		delete opened_procid;
+		opened_procid = new _Tt_c_procid_ptr(p);
 		return TT_OK;
 	    case TT_ERR_UNIMP:		// an older ttsession
 	    case TT_ERR_PROCID:		// alive, but refused the procid
@@ -767,9 +778,13 @@ _tt_c_procid_first_contact(_Tt_c_session *s)
 _Tt_c_procid_ptr
 _tt_c_procid_take_opened()
 {
-	_Tt_c_procid_ptr	p = opened_procid;
+	_Tt_c_procid_ptr	p;
 
-	opened_procid = (_Tt_c_procid *)0;
+	if (opened_procid != 0) {
+		p = *opened_procid;
+		delete opened_procid;
+		opened_procid = 0;
+	}
 	if (! p.is_null() &&
 	    (_tt_c_mp == 0 ||
 	     ! p->default_session().is_eq(_tt_c_mp->default_c_session))) {
