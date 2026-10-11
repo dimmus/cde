@@ -506,41 +506,23 @@ static int      both_valid_dates (char *date1, char *date2)
 }  /* both_valid_dates() */
 
 
-/************************************************/
-/*						*/
-/*		  DtSearchQuery			*/
-/*						*/
-/************************************************/
-/* Returns hitlist (dittolist) if search successful.
- * If dbname is NULL, assumes name from first dblk on dblist.
- * Will work correctly even if arg dittolist == &usrblk.dittolist.
- * Only return hits 'after' date1 and 'before' date2.
- * NULL in one date field means search not limited in that direction.
- * NULL in both date fields means search not restricted by dates.
- * NULL is also permitted in stems, but if stems is
- * not NULL, the passed stems array MUST be defined:
- *      char   stems [DtSrMAX_STEMCOUNT] [DtSrMAXWIDTH_HWORD].
- * If query is fzkeyi, it must point to
- * array of FZKEYSZ integers.
- * DtSearchQuery() was formerly named ausapi_search().
+/* The checks and preparation of a query (DtSearchQuery and
+ * DtSearchQueryStart): returns QUERY_READY, or a DtSr return code.
  */
-int             DtSearchQuery (
-		void	*qry,		/* query, fzkeyi, nav string */
-		char	*dbname,	/* database name from dbnamesv */
-		int	search_type,	/* 'P', 'W', 'S', 'T', 'Z', or 'N' */
-		char	*date1,		/* "yyyy mm dd", 3 numeric tokens */
-		char	*date2,		/* date1 earlier than date2 */
-		DtSrResult
-			**dittolist,	/* put hitlist here */
-		long	*dittocount,	/* put num items on returned hitlist */
-		char	*stems,		/* put stems array here */
-		int	*stemcount)	/* put size of stems array */
+#define QUERY_READY	(-1)
+
+static int	query_setup (
+		void	*qry,
+		char	*dbname,
+		int	search_type,
+		char	*date1,
+		char	*date2,
+		int	iterate)	/* let the engine iterate */
 {
     int             final_request;
     int             i;
     char           *ptr;
     DBLK           *db;
-    LLIST          *llp;
     enum { TEXT, NAVSTRING, FZKEYI }
                     qryarg;
 # define _DATE1STR_LEN (24)
@@ -606,7 +588,10 @@ QUERY_ERROR:
 	return DtSrFAIL;
 
     /* Finish setup usrblk for final search */
-    usrblk.flags |= USR_NO_ITERATE;	/* must ALWAYS be ON in this api */
+    if (iterate)
+	usrblk.flags &= ~USR_NO_ITERATE;	/* DtSearchQueryStart */
+    else
+	usrblk.flags |= USR_NO_ITERATE;	/* must ALWAYS be ON in this api */
     usrblk.request = final_request;
     db = usrblk.dblk;
     db->maxhits = aa_maxhits;
@@ -636,8 +621,22 @@ QUERY_ERROR:
 	fflush (aa_stderr);
     }
 
-    /* Final engine call, the search itself... */
-    Opera_Engine ();
+    return QUERY_READY;
+}
+
+/* The return value and results of a query the engine has completed
+ * (DtSearchQuery, DtSearchQueryContinue).
+ */
+static int	query_results (
+		DtSrResult
+			**dittolist,
+		long	*dittocount,
+		char	*stems,
+		int	*stemcount)
+{
+    int             i;
+    LLIST          *llp;
+
 
     if (usrblk.debug & USRDBG_SRCHCMPL) {
 	/* count msgs */
@@ -704,7 +703,172 @@ QUERY_ERROR:
 	     */
 	    return DtSrERROR;
     }	/* end switch */
+}  /* query_results() */
+
+
+
+
+/************************************************/
+/*						*/
+/*		  DtSearchQuery			*/
+/*						*/
+/************************************************/
+/* Returns hitlist (dittolist) if search successful.
+ * If dbname is NULL, assumes name from first dblk on dblist.
+ * Will work correctly even if arg dittolist == &usrblk.dittolist.
+ * Only return hits 'after' date1 and 'before' date2.
+ * NULL in one date field means search not limited in that direction.
+ * NULL in both date fields means search not restricted by dates.
+ * NULL is also permitted in stems, but if stems is
+ * not NULL, the passed stems array MUST be defined:
+ *      char   stems [DtSrMAX_STEMCOUNT] [DtSrMAXWIDTH_HWORD].
+ * If query is fzkeyi, it must point to
+ * array of FZKEYSZ integers.
+ * DtSearchQuery() was formerly named ausapi_search().
+ */
+int             DtSearchQuery (
+		void	*qry,		/* query, fzkeyi, nav string */
+		char	*dbname,	/* database name from dbnamesv */
+		int	search_type,	/* 'P', 'W', 'S', 'T', 'Z', or 'N' */
+		char	*date1,		/* "yyyy mm dd", 3 numeric tokens */
+		char	*date2,		/* date1 earlier than date2 */
+		DtSrResult
+			**dittolist,	/* put hitlist here */
+		long	*dittocount,	/* put num items on returned hitlist */
+		char	*stems,		/* put stems array here */
+		int	*stemcount)	/* put size of stems array */
+{
+    int             status;
+
+    status = query_setup (qry, dbname, search_type, date1, date2, FALSE);
+    if (status != QUERY_READY)
+	return status;
+
+    /* Final engine call, the search itself... */
+    Opera_Engine ();
+
+    return query_results (dittolist, dittocount, stems, stemcount);
 }  /* DtSearchQuery() */
+
+
+/************************************************/
+/*						*/
+/*	  DtSearchQueryStart, Continue, Stop	*/
+/*						*/
+/************************************************/
+/* An optional, asynchronous form of DtSearchQuery().  A search can
+ * take long (a collocation query reads and highlights every record
+ * that has both words); with these a client keeps its user interface
+ * working meanwhile, and can stop the search:
+ *
+ *   status = DtSearchQueryStart (qry, dbname, search_type, date1, date2,
+ *		dittolist, dittocount, stems, stemcount, &done);
+ *   while (!done)	(e.g. one call per Xt work procedure call)
+ *	status = DtSearchQueryContinue (&done);
+ *
+ * Start takes the arguments of DtSearchQuery(); when 'done' is set
+ * (by Start or by Continue) the search is complete, and the status
+ * returned and the results put through the pointers given to Start
+ * are those DtSearchQuery() gives for the same query.  Until then the
+ * status is DtSrOK, and nothing else may be asked of the engine (the
+ * other DtSearch calls, another query) but DtSearchQueryStop(): the
+ * next Continue then ends the search with DtSrFAIL and a message.
+ * DtSearchQuery() itself is unchanged and always runs to completion.
+ */
+static struct {
+    int		pending;	/* a search is under way */
+    DtSrResult	**dittolist;
+    long	*dittocount;
+    char	*stems;
+    int		*stemcount;
+} async_query = { FALSE, NULL, NULL, NULL, NULL };
+
+static int	async_query_end (int *done)
+{
+    *done = TRUE;
+    async_query.pending = FALSE;
+
+    /* the rest of this api runs the engine to completion, as always */
+    usrblk.flags |= USR_NO_ITERATE;
+
+    if (usrblk.retncode == OE_USER_STOP) {
+	sprintf (sprintbuf, CATGETS(dtsearch_catd, MS_ausapi, 32,
+		"%s Search stopped."), PROGNAME "1033");
+	DtSearchAddMessage (sprintbuf);
+	return DtSrFAIL;
+    }
+    return query_results (async_query.dittolist, async_query.dittocount,
+	async_query.stems, async_query.stemcount);
+}
+
+int		DtSearchQueryStart (
+		void	*qry,		/* query, fzkeyi, nav string */
+		char	*dbname,	/* database name from dbnamesv */
+		int	search_type,	/* 'P', 'W', 'S', 'T', 'Z', or 'N' */
+		char	*date1,		/* "yyyy mm dd", 3 numeric tokens */
+		char	*date2,		/* date1 earlier than date2 */
+		DtSrResult
+			**dittolist,	/* put hitlist here */
+		long	*dittocount,	/* put num items on returned hitlist */
+		char	*stems,		/* put stems array here */
+		int	*stemcount,	/* put size of stems array */
+		int	*done)		/* set when the search is complete */
+{
+    int             status;
+
+    *done = TRUE;
+    if (async_query.pending) {
+	sprintf (sprintbuf, CATGETS(dtsearch_catd, MS_ausapi, 33,
+		"%s A search is already under way."), PROGNAME "1034");
+	DtSearchAddMessage (sprintbuf);
+	return DtSrERROR;
+    }
+
+    status = query_setup (qry, dbname, search_type, date1, date2, TRUE);
+    if (status != QUERY_READY)
+	return status;
+
+    async_query.pending    = TRUE;
+    async_query.dittolist  = dittolist;
+    async_query.dittocount = dittocount;
+    async_query.stems      = stems;
+    async_query.stemcount  = stemcount;
+
+    /* the engine call, which may leave the rest to its workprocs */
+    Opera_Engine ();
+
+    if (usrblk.retncode == OE_SEARCHING) {
+	*done = FALSE;
+	return DtSrOK;
+    }
+    return async_query_end (done);
+}  /* DtSearchQueryStart() */
+
+int		DtSearchQueryContinue (int *done)
+{
+    *done = TRUE;
+    if (!async_query.pending) {
+	sprintf (sprintbuf, CATGETS(dtsearch_catd, MS_ausapi, 34,
+		"%s No search is under way."), PROGNAME "1035");
+	DtSearchAddMessage (sprintbuf);
+	return DtSrERROR;
+    }
+
+    /* the next part of the search */
+    usrblk.workproc ();
+
+    if (usrblk.retncode == OE_SEARCHING) {
+	*done = FALSE;
+	return DtSrOK;
+    }
+    return async_query_end (done);
+}  /* DtSearchQueryContinue() */
+
+void		DtSearchQueryStop (void)
+{
+    if (async_query.pending)
+	usrblk.flags |= USR_STOPSRCH;	/* seen by the next workproc */
+}  /* DtSearchQueryStop() */
 
 
 /************************************************/

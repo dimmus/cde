@@ -113,6 +113,10 @@ $ Msg 7 should not translate "dbnames" or "dbcount."
 7 "%s dbnames specified but not dbcount."
 20 "%1$s Invalid search_type '%2$c'."
 30 "%s Null query.  No search performed."
+$ Msgs 32-34: DtSearchQueryStart, DtSearchQueryContinue, DtSearchQueryStop.
+32 "%s Search stopped."
+33 "%s A search is already under way."
+34 "%s No search is under way."
 $ Msg 37 should not translate "DtSearchInit."  It is a function name.
 37 "%s First API function call must be DtSearchInit().\n"
 40 "%1$s Null cleartext.  No highlighting performed."

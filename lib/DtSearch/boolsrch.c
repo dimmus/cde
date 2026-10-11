@@ -1144,9 +1144,19 @@ static DB_ADDR	read_d99 (struct or_hwordrec *wordrec)
  * then compares the offset differences in the tables.
  * If no occurrence pairs are within the specified separation
  * range, the record is deleted from the bitvector.
- * Returns 0 if successful, otherwise returns -1 and msgs.
-@@@@ rewrite as its own workproc--reading/hiliting can take a long time...
+ *
+ * Reading and hiliting every record of the intersection can take a
+ * long time, so the records are checked COLLOC_RECS_PER_CALL at a time:
+ * read_stem_bitvec_WK stays the workproc, and calls this again, until
+ * all are checked.  colloc_recno is the next record to check (0 when
+ * no collocation is under way: the intersection is made first).
+ * Returns 1 if records remain to be checked, 0 when done,
+ * or -1 and msgs on errors.
  */
+#define COLLOC_RECS_PER_CALL	32	/* records read per workproc call */
+
+static long	colloc_recno =	0;
+
 static int	get_colloc_bitvec (void)
 {
     int		stemno_A =	or_wordrecs[save_stemno].or_hwoffset;
@@ -1159,6 +1169,7 @@ static int	get_colloc_bitvec (void)
     UCHAR	bitmask;
     int		parse_type;
     int		got_a_colloc;
+    int		recs_read = 0;
     char	*stemp;
     DtSrHitword *hitwords_A, *hitwords_B;
     long	hitwcount_A, hitwcount_B;
@@ -1170,20 +1181,23 @@ static int	get_colloc_bitvec (void)
     /* First construct the set intersection (AND) of
      * each of the collocated terms in the colloc bitvec.
      */
-    for (byteno = 0;  byteno < bitveclen;  byteno++)
-	bitvec_C [byteno] = bitvec_A [byteno] & bitvec_B [byteno];
-    if (debugging_boolsrch) {
-	int	i;
-	fprintf (aa_stderr,
-	    PROGNAME"312 INTERSECT[%d] (colloc %d & %d):\n",
-		save_stemno, stemno_A, stemno_B);
-	for  (i=0; i<bitveclen; i++) {
-	    fprintf (aa_stderr, " %02x", bitvec_C[i]);
-	    if (i > 22)
-		break;
+    if (colloc_recno == 0) {
+	for (byteno = 0;  byteno < bitveclen;  byteno++)
+	    bitvec_C [byteno] = bitvec_A [byteno] & bitvec_B [byteno];
+	if (debugging_boolsrch) {
+	    int	i;
+	    fprintf (aa_stderr,
+		PROGNAME"312 INTERSECT[%d] (colloc %d & %d):\n",
+		    save_stemno, stemno_A, stemno_B);
+	    for  (i=0; i<bitveclen; i++) {
+		fprintf (aa_stderr, " %02x", bitvec_C[i]);
+		if (i > 22)
+		    break;
+	    }
+	    fputc ('\n', aa_stderr);
+	    fflush (aa_stderr);
 	}
-	fputc ('\n', aa_stderr);
-	fflush (aa_stderr);
+	colloc_recno = 1;
     }
 
     /* Read cleartext for each rec in intersection/colloc bitvec.
@@ -1191,13 +1205,20 @@ static int	get_colloc_bitvec (void)
      * Switch off recs in bitvec where no term pairs are in
      * collocation range. 
      */
-    for (recno = 1;  recno < tot_addr_count;  recno++) {
+    for (recno = colloc_recno;  recno < tot_addr_count;  recno++) {
 	byteno = recno >> 3;	/* divide by 8 */
 	bitmask = 1 << (recno % 8);
 
 	/* Skip zero bits */
 	if ((bitvec_C[byteno] & bitmask) == 0)
 	    continue;
+
+	/* enough for this call? (the rest next time) */
+	if (recs_read == COLLOC_RECS_PER_CALL) {
+	    colloc_recno = recno;
+	    return 1;
+	}
+	recs_read++;
 
 	/* Convert recno to vista database address.
 	 * Silently skip rec if dba doesn't exist.
@@ -1222,8 +1243,10 @@ static int	get_colloc_bitvec (void)
 	}
 
 	/* Uncompress record text into usrblk.cleartext */
-	if (oe_unblob (bloblist) != OE_OK)
+	if (oe_unblob (bloblist) != OE_OK) {
+	    colloc_recno = 0;
 	    return -1;
+	}
 
 	/* Build 'hilite' table for stem A.  If stem
 	 * can't be found in the record, silently skip it.
@@ -1293,6 +1316,7 @@ static int	get_colloc_bitvec (void)
 
     } /* end loop on each recno in intersection/colloc bitvec */
 
+    colloc_recno = 0;
     return 0;
 } /* get_colloc_bitvec() */
 
@@ -1316,9 +1340,14 @@ static void	read_stem_bitvec_WK (void)
     if (got_USR_STOPSRCH())
 	return;
 
-    /* Process collocation 'stems' */
+    /* Process collocation 'stems' (a part of the records per call) */
     if (saveusr.stems [save_stemno] [0] == '@') {
 	d99recno = get_colloc_bitvec();
+	if (d99recno == 1) {
+	    usrblk.retncode = OE_SEARCHING;
+	    usrblk.workproc = read_stem_bitvec_WK;
+	    return;
+	}
 	goto DONE_READING;
     }
 
@@ -1580,6 +1609,7 @@ void	boolean_search (void)
      */
     usrblk.workproc = read_stem_bitvec_WK;
     save_stemno = 0;	/* global arg for first workproc */
+    colloc_recno = 0;	/* (a stopped search may have left it set) */
     usrblk.workproc();	/* direct call to first workproc */
 
     if ((usrblk.flags & USR_NO_ITERATE) != 0  &&
