@@ -34,6 +34,7 @@
  *
  */
 #include <sys/types.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -171,29 +172,64 @@ _tt_realpath(const _Tt_string &path)
     }
   }
   
-  _Tt_string right, left, dir, base;
-  left = temp_path;
+  _Tt_string right;
   
   _Tt_string temp_real_path(MAXPATHLEN);
   char *p = _tt_get_realpath((char *)temp_path, (char *)temp_real_path);
   
-  while ((p == 0) && (left.len() > 0)) {
+  if (p == 0) {
     // Realpath failed; drop right components until it works.
-    base = left.rsplit('/', dir);
-    
-    // Takes care of special case of "/file" where
-    // file does not exist.
-    if ((dir.len() <= 0) && (left[0]=='/')) {
-      dir = "/";
-    } 
-    left = dir;
-    
-    if (right.len() > 0) {
-      right = base.cat("/").cat(right);
-    } else {
-      right = base;
-    } 
-    p = _tt_get_realpath((char *)left, (char *)temp_real_path);
+    //
+    // This used to call realpath() for each shorter prefix, which
+    // costs a readlink() per component, so O(depth^2) system calls
+    // for a path whose last few components do not exist (yet).  When
+    // stat() of a prefix says ENOENT or ENOTDIR, realpath() of it
+    // fails too (it walks the same components and follows the same
+    // links), so skip those prefixes at one system call each and
+    // realpath() only the first prefix that stats, or fails to stat
+    // for another reason (EACCES: realpath() takes "dir/.." without
+    // searching dir).  Should that realpath() still fail, carry on
+    // with realpath() alone, as before.
+    const char *full = (char *)temp_path;
+    int pos = temp_path.len();
+    int use_stat = 1;
+
+    while (pos > 0) {
+      // Find the last '/' before pos: the prefix is everything
+      // before it ("/" for "/file" where file does not exist), the
+      // dropped part everything after it.
+      int slash = pos - 1;
+      while (slash >= 0 && full[slash] != '/') {
+        slash--;
+      }
+      if (slash < 0) {
+        // No more '/': nothing left to try.
+        break;
+      }
+      _Tt_string left = (slash > 0) ? temp_path.left(slash) : _Tt_string("/");
+      pos = (slash > 0) ? slash : 1;
+
+      struct stat st;
+      if (!use_stat || stat((char *)left, &st) == 0 ||
+          (errno != ENOENT && errno != ENOTDIR)) {
+        p = _tt_get_realpath((char *)left, (char *)temp_real_path);
+        if (p != 0) {
+          // The dropped part, without trailing slashes (the
+          // component-by-component loop lost those).
+          int end = temp_path.len();
+          while (end > slash + 1 && full[end - 1] == '/') {
+            end--;
+          }
+          right = temp_path.mid(slash + 1, end - slash - 1);
+          break;
+        }
+        use_stat = 0;
+      }
+      if (slash == 0) {
+        // Not even "/" resolves: give up rather than loop.
+        break;
+      }
+    }
   }
   
   _Tt_string real_path;
