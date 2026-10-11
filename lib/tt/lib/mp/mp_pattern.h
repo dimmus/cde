@@ -116,6 +116,10 @@ class _Tt_pattern : public _Tt_object {
 	bool_t			xdr(XDR *xdrs);
 	void			set_id(const _Tt_string &sender);
 	_Tt_string		id() const;
+	// The id without a copy, for comparisons in loops.
+	const _Tt_string	&id_ref() const {
+		return _pattern_id;
+	}
 	const _Tt_procid_ptr	&procid() const;
 	_Tt_string		&sender();	
 	int			is_registered() const;

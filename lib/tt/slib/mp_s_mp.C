@@ -31,6 +31,8 @@
  *
  * Copyright 1990,1993 Sun Microsystems, Inc.  All rights reserved.
  */
+#include <string>
+#include <unordered_map>
 #include "mp_s_global.h"
 #include "mp_s_mp.h"
 #include "mp/mp_mp.h"
@@ -67,6 +69,70 @@
 // instance of this object.
 _Tt_s_mp *_tt_s_mp = (_Tt_s_mp *)0;
 
+// The number of file-scope patterns registered for each file path.
+// (Two parallel lists, searched linearly on every file-scoped
+// dispatch, until this.)
+struct _Tt_file_scope_map {
+	std::unordered_map<std::string, int>	refcounts;
+};
+
+struct _Tt_s_patlist_map_rep {
+	std::unordered_map<std::string, _Tt_patlist_ptr>	map;
+};
+
+static inline std::string
+_tt_std_string(const _Tt_string &s)
+{
+	return std::string((const char *)s, s.len());
+}
+
+_Tt_s_patlist_map::
+_Tt_s_patlist_map()
+{
+	rep = new _Tt_s_patlist_map_rep;
+}
+
+_Tt_s_patlist_map::
+~_Tt_s_patlist_map()
+{
+	delete rep;
+}
+
+int _Tt_s_patlist_map::
+lookup(const _Tt_string &op, _Tt_patlist_ptr &po) const
+{
+	std::unordered_map<std::string, _Tt_patlist_ptr>::const_iterator it =
+		rep->map.find(_tt_std_string(op));
+
+	if (it == rep->map.end()) {
+		po = (_Tt_patlist *)0;
+		return 0;
+	}
+	po = it->second;
+	return 1;
+}
+
+_Tt_patlist_ptr _Tt_s_patlist_map::
+lookup(const _Tt_string &op) const
+{
+	_Tt_patlist_ptr po;
+
+	(void)lookup(op, po);
+	return po;
+}
+
+void _Tt_s_patlist_map::
+insert(_Tt_patlist_ptr &po)
+{
+	rep->map[_tt_std_string(po->op())] = po;
+}
+
+void _Tt_s_patlist_map::
+remove(const _Tt_string &op)
+{
+	rep->map.erase(_tt_std_string(op));
+}
+
 _Tt_s_mp::
 _Tt_s_mp() : _Tt_mp()
 {
@@ -87,7 +153,8 @@ _Tt_s_mp() : _Tt_mp()
 	ptable = new _Tt_ptype_table(_tt_ptype_ptid, 50);
 	otable = new _Tt_otype_table(_tt_otype_otid, 50);
 	sigs = new _Tt_sigs_by_op_table(_tt_sigs_by_op_op, 250);
-	opful_pats = new _Tt_patlist_table(_tt_patlist_op, 250);
+	opful_pats = new _Tt_s_patlist_map;
+	_file_scope = new _Tt_file_scope_map;
 	opless_pats = new _Tt_pattern_list();
 	active_procs = new _Tt_s_procid_table(_tt_procid_id, 250);
 	now = 1;
@@ -114,6 +181,8 @@ _Tt_s_mp::
 	// if (! _self.is_null()) {
 	// 	s_remove_procid( _self );
 	// }
+	delete _file_scope;
+	delete opful_pats;
 }
 
 // 
@@ -648,63 +717,33 @@ main_loop()
 
 // 
 // Returns 1 if there exist file-scope patterns for the given pathname.
-// Uses the two parallel lists _file_scope_paths and
-// _file_scope_refcounts which form a logical list of records of file
-// pathnames to number of patterns registered.
-// 
-//  XXX: Use of parallel lists is confusing. Recoding using a single list
-//  of records would improve readability.
 // 
 int _Tt_s_mp::
 in_file_scope(const _Tt_string &f)
 {
-	if (_file_scope_refcounts.is_null()) {
-		return(0);
-	}
-	_Tt_int_rec_list_cursor		refcounts(_file_scope_refcounts);
-	_Tt_string_list_cursor		paths(_file_scope_paths);
-	
-	while (refcounts.next() && paths.next()) {
-		if (*paths == f) {
-			return(1);
-		}
-	}
-	
-	return(0);
+	return _file_scope->refcounts.count(_tt_std_string(f)) != 0;
 }
 
 
 // 
 // Adds (subtracts) number of file-scope patterns registered for the
 // given pathname if add_scope is 1 (0). If the refcount of patterns goes
-// to 0 then the pathname is removed from the _file_scope_refcounts and
-// _file_scope_paths lists. See comment for _Tt_s_mp::in_file_scope for
-// an explanation of these lists.
+// to 0 then the pathname is forgotten.
 // 
 void _Tt_s_mp::
 mod_file_scope(const _Tt_string &f, int add_scope)
 {
-	if (_file_scope_refcounts.is_null()) {
-		_file_scope_refcounts = new _Tt_int_rec_list();
-		_file_scope_paths = new _Tt_string_list();
-	}
-	
-	_Tt_int_rec_list_cursor		refcounts(_file_scope_refcounts);
-	_Tt_string_list_cursor		paths(_file_scope_paths);
-	
-	while (refcounts.next() && paths.next()) {
-		if (*paths == f) {
-			refcounts->val += (add_scope ? 1 : -1);
-			if (refcounts->val == 0) {
-				refcounts.remove();
-				paths.remove();
-			}
-			return;
+	std::string key(_tt_std_string(f));
+	std::unordered_map<std::string, int>::iterator it =
+		_file_scope->refcounts.find(key);
+
+	if (it != _file_scope->refcounts.end()) {
+		it->second += (add_scope ? 1 : -1);
+		if (it->second == 0) {
+			_file_scope->refcounts.erase(it);
 		}
-	}
-	if (add_scope) {
-		_file_scope_refcounts->push(new _Tt_int_rec(1));
-		_file_scope_paths->push(f);
+	} else if (add_scope) {
+		_file_scope->refcounts[key] = 1;
 	}
 }
 

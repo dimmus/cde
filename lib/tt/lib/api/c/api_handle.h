@@ -128,8 +128,15 @@ class _Tt_api_handle_table : public _Tt_object {
 						      Tt_message mh);
 	void			print(FILE *fs = stdout) const;
       private:
-	// Pattern handles.
-	_Tt_api_handle_list_ptr	content;
+	// Pattern handles, hashed on the pattern id.  (They used to be
+	// one list, so each tt_pattern_create(), and each message
+	// received for a pattern not looked up last, scanned every
+	// live pattern handle.)
+	_Tt_api_handle_list_ptr	*pbuckets;
+	int			pbucket_count;
+	int			pcount;
+	_Tt_api_handle_list_ptr	&pbucket(const _Tt_string &id) const;
+	void			padd(_Tt_api_handle_ptr &h);
 	// Message handles, hashed on the message id.  (Messages used to
 	// share "content" with the patterns, so every message received
 	// and every tt_message_destroy() scanned every live handle.)

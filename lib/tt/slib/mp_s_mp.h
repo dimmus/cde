@@ -60,6 +60,23 @@
 
 const int SIGTYPES = SIGUSR2;
 
+// The patterns with ops, by op.  (This was a _Tt_patlist_table: 250
+// fixed buckets and _Tt_string::hash(), which puts similar op names in
+// the same few buckets; it is only ever looked up, never walked, so
+// its order does not matter.)
+class _Tt_s_patlist_map {
+      public:
+	_Tt_s_patlist_map();
+	~_Tt_s_patlist_map();
+	int			lookup(const _Tt_string &op,
+				       _Tt_patlist_ptr &po) const;
+	_Tt_patlist_ptr		lookup(const _Tt_string &op) const;
+	void			insert(_Tt_patlist_ptr &po);
+	void			remove(const _Tt_string &op);
+      private:
+	struct _Tt_s_patlist_map_rep	*rep;
+};
+
 class _Tt_s_mp : public _Tt_mp {
       public:
 					_Tt_s_mp();
@@ -80,7 +97,7 @@ class _Tt_s_mp : public _Tt_mp {
 	_Tt_ptype_table_ptr		ptable;
 	_Tt_otype_table_ptr		otable;
 	_Tt_sigs_by_op_table_ptr	sigs;
-	_Tt_patlist_table_ptr		opful_pats;
+	class _Tt_s_patlist_map		*opful_pats;
 	_Tt_pattern_list_ptr		opless_pats;
 	unsigned int			now;
 	unsigned int			when_last_observer_registered;
@@ -129,8 +146,9 @@ class _Tt_s_mp : public _Tt_mp {
 	int				_next_procid_key;
 	_Tt_int_rec_list_ptr		_active_fds;
 	_Tt_string_list_ptr		_active_fds_procids;
-	_Tt_int_rec_list_ptr		_file_scope_refcounts;
-	_Tt_string_list_ptr		_file_scope_paths;
+	// Number of file-scope patterns per file path (see
+	// in_file_scope); defined in mp_s_mp.C.
+	struct _Tt_file_scope_map	*_file_scope;
 	_Tt_s_procid_ptr		_last_proc_hit;
 	_Tt_s_procid_ptr		_self;
 	int				_min_timeout;

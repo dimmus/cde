@@ -235,8 +235,10 @@ add_pattern(const _Tt_s_pattern_ptr &p)
 	if (! _patterns.is_null()) {
 		_Tt_pattern_list_cursor	patc(_patterns);
 
+		const _Tt_string &id = p->id_ref();
+
 		while (patc.next()) {
-			if (p->id() == patc->id()) {
+			if (id == patc->id_ref()) {
 				return TT_ERR_INVALID;
 			}
 		}
@@ -358,7 +360,7 @@ del_pattern(_Tt_pattern_ptr &p)
 
 		pc.reset(_tt_s_mp->opless_pats);
 		while (pc.next()) {
-			if (pc->id() == p->id()) {
+			if (pc->id_ref() == p->id_ref()) {
 				pc.remove();
 			}
 		}
@@ -375,7 +377,7 @@ del_pattern(_Tt_pattern_ptr &p)
 			if (! po.is_null()) {
 				pc.reset(po->patterns);
 				while (pc.next()) {
-					if (pc->id() == p->id()) {
+					if (pc->id_ref() == p->id_ref()) {
 						pc.remove();
 					}
 				}
@@ -412,7 +414,7 @@ del_pattern(_Tt_string id)
 		_Tt_pattern_list_cursor		patc(_patterns);
 
 		while (patc.next()) {
-			if (patc->id() == id) {
+			if (patc->id_ref() == id) {
 				del_pattern(*patc);
 				patc.remove();
 				return(TT_OK);

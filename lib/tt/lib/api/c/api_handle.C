@@ -54,7 +54,9 @@
 _Tt_api_handle_table::
 _Tt_api_handle_table()
 {	
-	content = new _Tt_api_handle_list;
+	pbucket_count = 64;
+	pbuckets = new _Tt_api_handle_list_ptr[pbucket_count];
+	pcount = 0;
 	mbucket_count = 64;
 	mbuckets = new _Tt_api_handle_list_ptr[mbucket_count];
 	mcount = 0;
@@ -99,6 +101,62 @@ madd(_Tt_api_handle_ptr &h, int id)
 	}
 	b->push(h);
 	mcount++;
+}
+
+/*
+ * The bucket of a pattern id (FNV-1a; pattern ids are "<counter>:<procid>",
+ * so they differ in their first characters).
+ */
+_Tt_api_handle_list_ptr &_Tt_api_handle_table::
+pbucket(const _Tt_string &id) const
+{
+	const unsigned char *p = (const unsigned char *)(const char *)id;
+	int n = id.len();
+	unsigned int h = 2166136261u;
+
+	while (n-- > 0) {
+		h = (h ^ *p++) * 16777619u;
+	}
+	return pbuckets[h % (unsigned int)pbucket_count];
+}
+
+/*
+ * Adds a pattern handle to its hash bucket, growing the table when the
+ * buckets get long.
+ */
+void _Tt_api_handle_table::
+padd(_Tt_api_handle_ptr &h)
+{
+	if (pcount >= 2 * pbucket_count) {
+		int			old_count = pbucket_count;
+		_Tt_api_handle_list_ptr	*old = pbuckets;
+
+		pbucket_count *= 4;
+		pbuckets = new _Tt_api_handle_list_ptr[pbucket_count];
+		for (int i = old_count - 1; i >= 0; i--) {
+			if (old[i].is_null()) {
+				continue;
+			}
+			// Walk from the end so each bucket keeps its order
+			// (newest first, like the list it replaces).
+			_Tt_api_handle_list_cursor c(old[i]);
+			while (c.prev()) {
+				_Tt_api_handle_list_ptr &b =
+					pbucket(c->pptr()->id());
+				if (b.is_null()) {
+					b = new _Tt_api_handle_list;
+				}
+				b->push(*c);
+			}
+		}
+		delete [] old;
+	}
+	_Tt_api_handle_list_ptr &b = pbucket(h->pptr()->id());
+	if (b.is_null()) {
+		b = new _Tt_api_handle_list;
+	}
+	b->push(h);
+	pcount++;
 }
 
 /*
@@ -156,7 +214,7 @@ lookup_pat_by_id(_Tt_string pat_id, Tt_pattern &phandle)
 		return last_pattern;
 	}
 
-	_Tt_api_handle_list_cursor c(content);
+	_Tt_api_handle_list_cursor c(pbucket(pat_id));
 	_Tt_pattern_ptr x;
 	_Tt_string x_id;
 
@@ -235,7 +293,8 @@ lookup_mhandle(_Tt_c_message_ptr m)
 Tt_pattern _Tt_api_handle_table::
 lookup_phandle(_Tt_pattern_ptr p)
 {
-	_Tt_api_handle_list_cursor c(content);
+	// A pattern's id is set when it is created and never changes.
+	_Tt_api_handle_list_cursor c(pbucket(p->id()));
 	_Tt_pattern_ptr x;
 
 	while (c.next()) {
@@ -252,7 +311,7 @@ lookup_phandle(_Tt_pattern_ptr p)
 	
 	_Tt_api_handle_ptr n = new _Tt_api_handle;
 	n->ptr_set(p);
-	content->push(n);
+	padd(n);
 
         return (Tt_pattern)n.c_pointer();
 
@@ -288,7 +347,7 @@ clear(_Tt_c_message_ptr m)
 void _Tt_api_handle_table::
 clear(_Tt_pattern_ptr p)
 {
-	_Tt_api_handle_list_cursor 	c(content);
+	_Tt_api_handle_list_cursor 	c(pbucket(p->id()));
 	_Tt_pattern_ptr			pc;
 
 	if (last_pat_id == p->id()) {
@@ -299,6 +358,7 @@ clear(_Tt_pattern_ptr p)
 		if (!pc.is_null()) {
 			if (p->id() == pc->id()) {
 				c.remove();
+				pcount--;
 			}
 		}
 	}
@@ -341,11 +401,19 @@ clear(Tt_message p)
 void _Tt_api_handle_table::
 clear(Tt_pattern p)
 {
-	_Tt_api_handle_list_cursor c(content);
+	if ((Tt_pattern)0 == p) {
+		return;
+	}
+	_Tt_pattern_ptr pat = ((_Tt_api_handle *)p)->pptr();
+	if (pat.is_null()) {
+		return;
+	}
+	_Tt_api_handle_list_cursor c(pbucket(pat->id()));
 	
 	while (c.next()) {
 		if ((void *)((*c).c_pointer()) == (void *)p) {
 			c.remove();
+			pcount--;
 		}
 	}
 }
@@ -683,6 +751,7 @@ _Tt_api_handle_table::
 ~_Tt_api_handle_table()
 {
 	delete [] mbuckets;
+	delete [] pbuckets;
 }
 
 _Tt_api_userdata::
