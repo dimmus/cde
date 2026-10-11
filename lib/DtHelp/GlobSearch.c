@@ -94,6 +94,7 @@
 #include "DisplayAreaP.h"
 #include "AccessI.h"
 #include "StringFuncsI.h"
+#include "CvStringI.h"
 #include "DisplayAreaI.h"
 #include "HelpDialogP.h"
 #include "HelpDialogI.h"
@@ -650,13 +651,14 @@ static int HitLoadTopics (
         }  /* if couldn't get title */
 
         /* note that titleStr is an XmString, not an (Xt) String */
-        titlesList = (XmString *)_DtHelpCeAddPtrToArray (
-                          (void **)titlesList, (void *) titleStr);
-        idList = (char **)_DtHelpCeAddPtrToArray (
-                          (void **)idList,
+        /* (i entries in each list so far: no walk to their ends) */
+        titlesList = (XmString *)_DtCvAddPtrToArrayN (
+                          (void **)titlesList, i, (void *) titleStr);
+        idList = (char **)_DtCvAddPtrToArrayN (
+                          (void **)idList, i,
 			  (void *) XtNewString(origTopicIdList[i]));
-        fileList = (char **)_DtHelpCeAddPtrToArray (
-                          (void **)fileList,
+        fileList = (char **)_DtCvAddPtrToArrayN (
+                          (void **)fileList, i,
 			  (void *) XtNewString(file->fullFilePath));
     }  /* for all topics of this index entry */
 

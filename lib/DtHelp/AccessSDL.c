@@ -1692,8 +1692,8 @@ _DtHelpCeGetSdlTopicChildren(
 		done = True;
 	    else if (segLev == _SdlIdInfoPtrRlevel(idInfo))
 	      {
-		*ret_ids = (char **) _DtHelpCeAddPtrToArray( (void **) *ret_ids,
-			(void *)(strdup(_DtCvContainerIdOfSeg(idSeg))));
+		*ret_ids = (char **) _DtCvAddPtrToArrayN( (void **) *ret_ids,
+			count, (void *)(strdup(_DtCvContainerIdOfSeg(idSeg))));
 		if ((*ret_ids) == NULL)
 		    return -1;
 

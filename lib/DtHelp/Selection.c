@@ -784,6 +784,7 @@ GetSegsInArea (
     int			 start;
     int			 length;
     int			 lineCnt;
+    int			 segCnt = 0;	/* entries in *ret_segs */
     int			 result = 0;
     _DtCvValue		 processing = True;
     _DtCvUnit		 minY;
@@ -933,11 +934,14 @@ GetSegsInArea (
 	            newPt->len     = cnt;
 		    newPt->segment = pSeg;
 
-		    *ret_segs = (_DtCvSegPts **) _DtCvAddPtrToArray(
+		    *ret_segs = (_DtCvSegPts **) _DtCvAddPtrToArrayN(
 							(void **) *ret_segs,
+							segCnt,
 							(void  *)  newPt);
 		    if (NULL == *ret_segs)
 		        result = -1;
+		    else
+			segCnt++;
 
 		    pSeg    = pSeg->next_disp;
 		    length -= cnt;
@@ -980,8 +984,8 @@ GetSegsInArea (
      */
     if (0 != result)
       {
-        *ret_segs = (_DtCvSegPts **) _DtCvAddPtrToArray((void **) *ret_segs,
-							(void  *) NULL);
+        *ret_segs = (_DtCvSegPts **) _DtCvAddPtrToArrayN((void **) *ret_segs,
+							segCnt, (void  *) NULL);
 	if (NULL == *ret_segs)
 	    result = -1; 
       }
@@ -1289,8 +1293,8 @@ _DtCvGetMarkSegs (
 						NULL, NULL))
 	    return _DtCvSTATUS_BAD;
 
-	*ret_info = (_DtCvPointInfo **) _DtCvAddPtrToArray((void **) *ret_info,
-							(void *) nxtInfo);
+	*ret_info = (_DtCvPointInfo **) _DtCvAddPtrToArrayN((void **) *ret_info,
+							i, (void *) nxtInfo);
 	if (NULL == *ret_info)
 	    return _DtCvSTATUS_BAD;
 	  }
@@ -1723,8 +1727,8 @@ _DtCanvasGetMarkPositions (
 	nextPos->y2 = nextPos->baseline2 +
 				canvas->txt_lst[markLst->end.line_idx].descent;
 
-	*ret_pos = (_DtCvMarkPos **) _DtCvAddPtrToArray((void **) *ret_pos,
-							(void *) nextPos);
+	*ret_pos = (_DtCvMarkPos **) _DtCvAddPtrToArrayN((void **) *ret_pos,
+							i, (void *) nextPos);
 	if (NULL == *ret_pos)
 	    return _DtCvSTATUS_BAD;
       }

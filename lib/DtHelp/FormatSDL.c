@@ -4070,6 +4070,7 @@ static	_DtCvSegment **
 ConvertToList(_DtCvSegment *segs)
 {
     _DtCvSegment **ptr  = NULL;
+    int		   cnt  = 0;
 
     /*
      * count the segments
@@ -4078,7 +4079,7 @@ ConvertToList(_DtCvSegment *segs)
       {
 	_DtCvSegment *next;
 
-	ptr = (_DtCvSegment **) _DtCvAddPtrToArray ((void **) ptr,
+	ptr = (_DtCvSegment **) _DtCvAddPtrToArrayN ((void **) ptr, cnt++,
 							(void *) segs);
 	next = _DtCvNextSeg(segs);
 	_DtCvNextSeg(segs) = NULL;

@@ -381,6 +381,7 @@ GetResourceStringArray (
 {
     char	 *val;
     char	**valArray = NULL;
+    int		  valCnt   = 0;
     char	 *token;
     char	 *nextC;
 
@@ -408,8 +409,9 @@ GetResourceStringArray (
 
 	    if (*token != '\n')
 	      {
-	        valArray = (char **) _DtHelpCeAddPtrToArray (
-					(void **) valArray, (void *) token);
+	        valArray = (char **) _DtCvAddPtrToArrayN (
+					(void **) valArray, valCnt++,
+					(void *) token);
 	        /*
 	         * If we malloc'ed ourselves out of existence...stop processing.
 	         */
@@ -805,8 +807,9 @@ _DtHelpCeGetCcdfTopicChildren (
 		    child_id = strdup (*topicList);
 		    if (child_id)
 		      {
-		        *retTopics = (char **) _DtHelpCeAddPtrToArray (
-					(void **) (*retTopics), child_id);
+		        *retTopics = (char **) _DtCvAddPtrToArrayN (
+					(void **) (*retTopics), count,
+					child_id);
 		        if (*retTopics == NULL)
 			    result = -1;
 			count++;
