@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 #include <unistd.h>
 #include "util/tt_stats.h"
 
@@ -161,6 +162,16 @@ report()
 	}
 }
 
+// A forked child starts from zero, so that a child that exits without
+// exec'ing does not report its parent's calls again.
+static void
+reset_in_child()
+{
+	memset(session_slots, 0, sizeof(session_slots));
+	memset(db_slots, 0, sizeof(db_slots));
+	memset(connects, 0, sizeof(connects));
+}
+
 int
 _tt_stats_init()
 {
@@ -171,6 +182,7 @@ _tt_stats_init()
 		return 0;
 	}
 	_tt_stats_state = 2;
+	pthread_atfork(0, 0, reset_in_child);
 	atexit(report);
 	return 1;
 }
