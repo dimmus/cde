@@ -357,6 +357,14 @@ AC_ARG_ENABLE([hardening],
         [], [enable_hardening=yes]
 )
 
+dnl Warnings as errors (the CI build uses it).  Only the flags of the
+dnl tree's own code (CDE_CFLAGS, CDE_CXXFLAGS) get -Werror: ksh93's
+dnl build takes CFLAGS, and the configure tests are not affected.
+AC_ARG_ENABLE([werror],
+        AS_HELP_STRING([--enable-werror], [Treat the compiler warnings enabled for the tree's code as errors (default=no)]),
+        [], [enable_werror=no]
+)
+
 dnl Export maps: each library exports only the symbols listed in
 dnl build-aux/symbols/lib<name>.sym (see build-aux/gen-exports.py, which
 dnl needs a tree built with --disable-export-maps to regenerate them).
@@ -557,6 +565,80 @@ CDE_CHECK_CXXFLAG([-Wno-write-strings])
 
 CDE_CHECK_CFLAG([-Wno-unused-result])
 CDE_CHECK_CXXFLAG([-Wno-unused-result])
+
+dnl A curated part of -Wextra, enabled warning by warning (so no -Wno-
+dnl undoes anything), and the tree builds without any of them.  With GCC
+dnl 16 and the whole tree (--disable-docs) -Wextra reported, counting each
+dnl source line once:
+dnl
+dnl   enabled, and every site fixed:
+dnl     -Wempty-body (101: debug macros that expanded to nothing in an if or
+dnl     else, and the "...} else" statement macros), -Wimplicit-fallthrough
+dnl     (99: each case checked; marked FALLTHROUGH, or a missing break
+dnl     added where the fall-through was a bug), -Wenum-conversion (75),
+dnl     -Wignored-qualifiers (204, nearly all "const int f()" in the C++
+dnl     programs), -Wcalloc-transposed-args (34), -Wdeprecated-copy (37,
+dnl     C++), -Wtype-limits (12), -Wclobbered (10), -Wshift-negative-value
+dnl     (5), -Wunused-but-set-parameter (5), -Wabsolute-value (3),
+dnl     -Wold-style-declaration (2), and the -Wextra warnings that reported
+dnl     nothing: -Wmissing-parameter-type, -Woverride-init,
+dnl     -Wstring-compare, -Wexpansion-to-defined, -Wredundant-move (C++).
+dnl     Among the fixed sites were real bugs: an invalid search date never
+dnl     rejected on LP64 (DtSearch), mblen() failures not seen (dtcm),
+dnl     softkey strings wrapping at 256 bytes (DtTerm), wrong help or error
+dnl     texts after a missing break (dtmail, dtstyle).
+dnl
+dnl   not enabled, with the reason:
+dnl     -Wunused-parameter (6126): Xt, Motif, ToolTalk and RPC callbacks
+dnl       must take the parameters their prototypes declare; marking each
+dnl       one unused would touch every callback in the tree and find
+dnl       nothing.
+dnl     -Wsign-compare (687): int counters against Cardinal, size_t and
+dnl       other unsigned values that are never negative there; each site
+dnl       needs a cast or a type change, and type changes in this code
+dnl       change behaviour where a value does wrap.  The real cases of this
+dnl       kind that -Wtype-limits reports are fixed.
+dnl     -Wcast-function-type (495): the casts the APIs are built on
+dnl       ((xdrproc_t) xdr_foo, (XtCallbackProc), (XtActionProc), qsort
+dnl       comparators, the DtEncap and ToolTalk dispatch tables); casting
+dnl       through void (*)(void) instead would hide the same thing.
+dnl     -Wmissing-field-initializers (147): tables (class records, locale
+dnl       tables, resource lists) that leave their trailing members to the
+dnl       zero initialisation C guarantees.
+dnl     The few C++ diagnostics -Wextra has no separate option for (a base
+dnl       class not initialised in a user copy constructor, 3) come only
+dnl       with -Wextra itself.
+dnl
+dnl ksh93's own build (programs/dtksh/ksh93) does not get these flags, and
+dnl neither does the copy of its init.c that dtksh compiles (see
+dnl programs/dtksh/Makefile.am).  --enable-werror adds -Werror to them.
+C_EXTRA_WARNINGS=""
+CXX_EXTRA_WARNINGS=""
+for cde_warning in -Wempty-body -Wimplicit-fallthrough -Wignored-qualifiers \
+		   -Wcalloc-transposed-args -Wtype-limits -Wclobbered \
+		   -Wshift-negative-value -Wunused-but-set-parameter \
+		   -Wstring-compare -Wexpansion-to-defined
+do
+	CDE_CHECK_CFLAG([$cde_warning], [C_EXTRA_WARNINGS])
+	CDE_CHECK_CXXFLAG([$cde_warning], [CXX_EXTRA_WARNINGS])
+done
+for cde_warning in -Wenum-conversion -Wabsolute-value -Wold-style-declaration \
+		   -Wmissing-parameter-type -Woverride-init
+do
+	CDE_CHECK_CFLAG([$cde_warning], [C_EXTRA_WARNINGS])
+done
+for cde_warning in -Wdeprecated-copy -Wredundant-move
+do
+	CDE_CHECK_CXXFLAG([$cde_warning], [CXX_EXTRA_WARNINGS])
+done
+if test "x$enable_werror" = xyes; then
+	CDE_CHECK_CFLAG([-Werror], [C_EXTRA_WARNINGS])
+	CDE_CHECK_CXXFLAG([-Werror], [CXX_EXTRA_WARNINGS])
+fi
+C_EXTRA_WARNINGS=`echo ${C_EXTRA_WARNINGS}`
+CXX_EXTRA_WARNINGS=`echo ${CXX_EXTRA_WARNINGS}`
+AC_SUBST(C_EXTRA_WARNINGS)
+AC_SUBST(CXX_EXTRA_WARNINGS)
 
 dnl -fno-strict-aliasing stays tree-wide.  -Wstrict-aliasing=2 reports 529
 dnl places in about 150 files of more than 30 directories (rpcgen's
@@ -1071,8 +1153,8 @@ dnl (-I$(top_srcdir)/include: automake's default include path has only
 dnl the include/ of the build directory, which in a VPATH build holds just
 dnl the generated headers; in-tree it is that same directory.)
 CDE_CPPFLAGS="-I\$(top_srcdir)/include ${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
-CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS} ${LTO_CFLAGS} ${FILE_PREFIX_CFLAGS}"
-CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS} ${LTO_CXXFLAGS} ${FILE_PREFIX_CXXFLAGS}"
+CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${C_EXTRA_WARNINGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS} ${LTO_CFLAGS} ${FILE_PREFIX_CFLAGS}"
+CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${CXX_EXTRA_WARNINGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS} ${LTO_CXXFLAGS} ${FILE_PREFIX_CXXFLAGS}"
 CDE_LDFLAGS="${HARDEN_LDFLAGS} ${LINK_LDFLAGS} ${LTO_LDFLAGS}"
 dnl squeeze the whitespace
 CDE_CPPFLAGS=`echo ${CDE_CPPFLAGS}`

@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 include $(top_srcdir)/build-aux/cde-libs.am
 
-CLEANFILES = init.c DtFuncs.dtsh libshell.a libshell.a.tmp ksh93.stamp
+CLEANFILES = init.c ksh93-init.$(OBJEXT) DtFuncs.dtsh libshell.a libshell.a.tmp ksh93.stamp
 
 SUBDIRS = examples
 
@@ -51,7 +51,7 @@ dtksh_CPPFLAGS = $(CDE_CPPFLAGS) -I$(KSH93ROOT)/include/ast -I$(KSH93SRC)/src/cm
 		 '-DERROR_CONTEXT_T=Error_context_t' \
 		 -D_API_ast=20100309 -DBUILD_DTKSH
 
-dtksh_LDADD = $(KSH93PMAIN) libshell.a $(KSH93LIBS) \
+dtksh_LDADD = ksh93-init.$(OBJEXT) $(KSH93PMAIN) libshell.a $(KSH93LIBS) \
 	      $(LIBPRINT) $(LIBHELP) $(LIBSVC) $(LIBTT) \
 	      $(XMLIB) $(XTLIB) $(X11LIB) $(MATHLIB)
 
@@ -66,8 +66,7 @@ dtksh_CPPFLAGS += -D_IBMRPC_
 dtksh_LDFLAGS += -bE:dtksh.exp
 endif
 
-dtksh_SOURCES = init.c \
-                widget.c \
+dtksh_SOURCES = widget.c \
                 dtkcvt.c \
                 dtkcmds.c \
                 XtCvtrs.c \
@@ -132,11 +131,20 @@ $(KSH93ROOT)/bin/ksh $(KSH93LIBSHELL) $(KSH93LIBS) $(KSH93PMAIN): ksh93.stamp
 init.c: $(KSH93SRC)/src/cmd/ksh93/sh/init.c | ksh93.stamp
 	$(CP) $(KSH93SRC)/src/cmd/ksh93/sh/init.c $@
 
-libshell.a: $(KSH93LIBSHELL) dtksh-init.o
+# ksh93's init.c, built for dtksh (BUILD_DTKSH) with dtksh's flags but
+# without C_EXTRA_WARNINGS (the curated -Wextra list and -Werror, see
+# configure.ac): it is ksh93's code, like the rest of libshell, which
+# ksh93's own build compiles without them.
+ksh93-init.$(OBJEXT): init.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(dtksh_CPPFLAGS) \
+		$(CPPFLAGS) $(filter-out $(C_EXTRA_WARNINGS),$(CDE_CFLAGS)) \
+		$(CFLAGS) -c -o $@ init.c
+
+libshell.a: $(KSH93LIBSHELL) ksh93-init.$(OBJEXT)
 	$(RM) $@.tmp
 	$(CP) $(KSH93LIBSHELL) $@.tmp
 	$(AR) d $@.tmp init.o
-	$(AR) cq $@.tmp dtksh-init.o
+	$(AR) cq $@.tmp ksh93-init.$(OBJEXT)
 	mv -f $@.tmp $@
 
 # "make check" (and so make distcheck) runs dtksh once.  The ksh93
