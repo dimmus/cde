@@ -282,7 +282,6 @@ SetMappingNV(
     /* OK, we have a string mapping */
     if (m) {				/* exists - just replace value */
 	free(m->sval);
-	m->sval = strdup(value);
 	if (value) m->sval = strdup(value);
 	else m->sval = NULL;
     }
@@ -498,6 +497,17 @@ NearestOlderElem(
     return NULL;
 }
 
+static int	char_pos;   /* OutputString's character position */
+
+/*  Start output as if nothing had been written yet (-B: before each
+ *  document of a batch).
+ */
+void
+ResetOutputPosition(void)
+{
+    char_pos = 0;
+}
+
 /* ______________________________________________________________________ */
 /*  Expands escaped strings in the input buffer (things like tabs, newlines,
  *  octal characters - using C style escapes) if outputting the buffer to
@@ -521,7 +531,6 @@ OutputString(
 )
 {
     char	c = 0, *sdata, *cp;
-    static int	char_pos;   /* remembers our character position */
     static int  interp_pos; /* like char_pos but when output is to interp */
     int         *ppos;      /* points to appropriate line position var */
 
@@ -1230,8 +1239,18 @@ FindElemByID(
 )
 {
     ID_t	*id;
+    Element_t	*root;
+
     for (id=IDList; id; id=id->next)
-	if (id->id[0] == idval[0] && !strcmp(id->id, idval)) return id->elem;
+	if (id->id[0] == idval[0] && !strcmp(id->id, idval)) {
+	    if (IDScope) {
+		/* the documents of a batch are detached from the tree */
+		root = id->elem;
+		while (root->parent) root = root->parent;
+		if (root != IDScope) continue;
+	    }
+	    return id->elem;
+	}
     return 0;
 }
 

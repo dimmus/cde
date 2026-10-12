@@ -219,6 +219,8 @@ def int		nUsedElem;		/* number of used elem names */
 def char	**UsedAtt;		/* a unique list of used attrib names */
 def int		nUsedAtt;		/* number of used attrib names */
 def ID_t	*IDList;		/* list of IDs used in the doc */
+def Element_t	*IDScope;		/* if set, FindElemByID looks only in
+					   this subtree (-B) */
 def Map_t	*Variables;		/* general, global variables */
 def Map_t	*SDATAmap;		/* SDATA mappings */
 def Map_t	*PImap;			/* Processing Instruction mappings */
@@ -314,6 +316,8 @@ Element_t	*FindElemByID(char *);
 
 /* things defined in translate.c */
 void		DoTranslate(Element_t*, char *, FILE *);
+void		DoTranslateBatch(Element_t*, char *, char *, FILE *);
+void		ResetOutputPosition(void);
 
 /* things defined in traninit.c */
 void		ReadTransSpec(char *);

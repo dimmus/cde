@@ -95,6 +95,7 @@ static char	*in_file, *out_file;
 static char	*tranfile;
 static char	**cmapfile, **sdatafile;
 static char	*start_id;
+static char	*batch_gi;
 static char	*last_file;
 static char	*locale;
 static int	last_lineno;
@@ -211,7 +212,10 @@ main(
 		    }
 		free(cmapfile);
 		}
-	    DoTranslate(e, tranfile, outfp);
+	    if (batch_gi)
+		DoTranslateBatch(e, batch_gi, tranfile, outfp);
+	    else
+		DoTranslate(e, tranfile, outfp);
 	}
 	if (do_summ)		PrintElemSummary(DocTree);
 	if (do_tree)		PrintElemTree(DocTree);
@@ -419,7 +423,7 @@ HandleArgs(
     char       **thisopt;
     int          count;
 
-    while ((c=getopt(ac, av, "t:vc:s:o:L:huSxIl:bHVWi:D:Z")) != EOF) {
+    while ((c=getopt(ac, av, "t:vc:s:o:L:huSxIl:bB:HVWi:D:Z")) != EOF) {
 	switch (c) {
 	    case 't': tranfile		= optarg;	break;
 	    case 'v': do_validate	= 1;		break;
@@ -473,6 +477,7 @@ HandleArgs(
 	    case 'o': out_file		= optarg;	break;
 	    case 'L': locale		= optarg;	break;
 	    case 'b': interactive	= 1;		break;
+	    case 'B': batch_gi		= optarg;	break;
 	    case 'W': warnings		= 0;		break;
 	    case 'V': verbose		= 1;		break;
 	    case 'Z': slave		= 1;		break;
@@ -508,6 +513,8 @@ static char *help_msg[] = {
   "  -c file   <file> contains a list of character mappings",
   "  -v        Validate using translation spec specified with -t",
   "  -i id     Consider only subtree starting at element with ID <id>",
+  "  -B gi     Translate each <gi> child of the document element as a",
+  "            document of its own, each followed by a separator line",
   "  -b        Interactive browser",
   "  -S        Print statistics (how often elements occur, etc.)",
   "  -u        Print element usage summary (# of children, depth, etc.)",

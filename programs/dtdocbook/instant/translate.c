@@ -47,7 +47,8 @@
  *  suitable for a formatting application.
  *
  *  Entry points for this module:
- *	DoTranslate(elem, transfile, mapfile, fp)
+ *	DoTranslate(elem, transfile, fp)
+ *	DoTranslateBatch(elem, gi, transfile, fp)
  * ________________________________________________________________________
  */
 
@@ -55,6 +56,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <strings.h>
 #include <memory.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -81,21 +83,16 @@ void	CallInterpreter(char *, Element_t *);
  */
 
 static void	WasProcessed(Element_t *, void *unused);
-void
-DoTranslate(
+
+/* Find the transpecs for the subtree 'e', and translate it, with the
+ * _Start and _End specs before and after it. */
+static void
+TranslateTree(
     Element_t	*e,
-    char	*transfile,
     FILE	*fp
 )
 {
-    Trans_t	*t, *tn;
-
-    if (!transfile) {
-	fprintf(stderr,
-		"Translation spec file not specified. Skipping translation.\n");
-	return;
-    }
-    ReadTransSpec(transfile);
+    Trans_t	*t;
 
     /* Find transpec for each node. */
     DescendTree(e, PrepTranspecs, 0, 0, 0);
@@ -126,9 +123,15 @@ DoTranslate(
     /* Warn about unprocessed elements in this doc tree, if verbose mode. */
     if (verbose)
 	DescendTree(e, WasProcessed, 0, 0, 0);
+}
 
-    /* Clean up. This is not yet complete, which is no big deal (since the
-     * program is normally done at this point anyway.  */
+/* Clean up. This is not yet complete, which is no big deal (since the
+ * program is normally done at this point anyway.  */
+static void
+FreeTranspecs(void)
+{
+    Trans_t	*t, *tn;
+
     for (t=TrSpecs; t; ) {
 	tn = t->next;
 
@@ -143,6 +146,147 @@ DoTranslate(
 	t = tn;
     }
     TrSpecs = 0;
+}
+
+void
+DoTranslate(
+    Element_t	*e,
+    char	*transfile,
+    FILE	*fp
+)
+{
+    if (!transfile) {
+	fprintf(stderr,
+		"Translation spec file not specified. Skipping translation.\n");
+	return;
+    }
+    ReadTransSpec(transfile);
+
+    TranslateTree(e, fp);
+
+    FreeTranspecs();
+}
+
+/* ______________________________________________________________________ */
+/*  Batch mode (-B gi): translate each child of 'e' named 'gi' as if it
+ *  were the document element of a document of its own, which is what it
+ *  was before a batch of such documents was put into one, so that one
+ *  run of the parser and of instant does the work of many.  Each child is
+ *  detached from 'e' and becomes the document tree, IDs are looked up in
+ *  it alone, the variables start from their values after the translation
+ *  spec was read, and output starts at the beginning of a line.  A line
+ *  holding just BATCH_SEPARATOR follows each translation, for the caller
+ *  to split the output at.  Other children of 'e' (such as the title the
+ *  wrapper element needs) are not translated.
+ *  Arguments:
+ *	Pointer to the element that holds the documents.
+ *	GI of the documents.
+ *	Pointer to name of translation spec file.
+ *	FILE pointer to where to write output.
+ */
+
+#define BATCH_SEPARATOR	"\001instant-batch-end\001"
+
+static Map_t *
+CopyMap(
+    Map_t	*from
+)
+{
+    Map_t	*to;
+    int		i;
+
+    to = NewMap(from->slot_incr);
+    to->flags = from->flags;
+    if (from->n_used) {
+	to->n_alloc = from->n_used;
+	Malloc(to->n_alloc, to->maps, Mapping_t);
+	for (i=0; i<from->n_used; i++) {
+	    to->maps[i].name = strdup(from->maps[i].name);
+	    to->maps[i].sval = from->maps[i].sval ?
+				strdup(from->maps[i].sval) : NULL;
+	}
+	to->n_used = from->n_used;
+    }
+    return to;
+}
+
+static void
+FreeMap(
+    Map_t	*m
+)
+{
+    int		i;
+
+    for (i=0; i<m->n_used; i++) {
+	free(m->maps[i].name);
+	free(m->maps[i].sval);
+    }
+    free(m->maps);
+    free(m);
+}
+
+static void
+ShiftDepth(
+    Element_t	*e,
+    void	*by
+)
+{
+    e->depth -= *(int *)by;
+}
+
+void
+DoTranslateBatch(
+    Element_t	*e,
+    char	*gi,
+    char	*transfile,
+    FILE	*fp
+)
+{
+    Map_t	*initial;
+    Element_t	*doc, *saved_tree = DocTree;
+    int		i, depth, saved_verbose, saved_warnings;
+
+    if (!transfile) {
+	fprintf(stderr,
+		"Translation spec file not specified. Skipping translation.\n");
+	return;
+    }
+    ReadTransSpec(transfile);
+
+    /* Detach them all first: a document's IDs are then only in it. */
+    for (i=0; i<e->necont; i++) {
+	doc = e->econt[i];
+	if (strcasecmp(doc->gi, gi)) continue;
+	doc->parent = NULL;
+	doc->my_eorder = -1;
+	depth = doc->depth;
+	DescendTree(doc, ShiftDepth, 0, 0, &depth);
+    }
+
+    initial = CopyMap(Variables);
+    saved_verbose = verbose;
+    saved_warnings = warnings;
+
+    for (i=0; i<e->necont; i++) {
+	doc = e->econt[i];
+	if (strcasecmp(doc->gi, gi)) continue;
+
+	FreeMap(Variables);
+	Variables = CopyMap(initial);
+	verbose = saved_verbose;
+	warnings = saved_warnings;
+	DocTree = IDScope = doc;
+	ResetOutputPosition();
+
+	TranslateTree(doc, fp);
+
+	OutputString("^" BATCH_SEPARATOR "\\n", fp, 1);
+    }
+
+    DocTree = saved_tree;
+    IDScope = NULL;
+    FreeMap(initial);
+    FreeTranspecs();
 }
 
 /* ______________________________________________________________________ */

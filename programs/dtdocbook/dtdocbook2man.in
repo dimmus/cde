@@ -54,37 +54,26 @@ parser='onsgmls'
 parser_opts='-g -oline -wno-idref'
 decl="${sgml_dir}/docbook.dcl"
 
-nroff=
-
-if [ $# -gt 0 ] && [ "$1" = "-c" ]
-then
-	nroff=yes
-	shift
-fi
-if [ $# -eq 4 ]
-then	locale=$1
-	dclfile=$2
-	reffile=$3
-	manfile=$4
-else	echo "usage:  dtdocbook2man [-c] locale dcl-file ref-src-file man-dst-file"
+usage() {
+	echo "usage:  dtdocbook2man [-c] locale dcl-file ref-src-file man-dst-file"
+	echo "        dtdocbook2man [-c] -b locale dcl-file man-dst-file=ref-src-file..."
 	exit 1
-fi
+}
 
-# The page is written next to man-dst-file and renamed into place, so a
-# failed run leaves no half-written page behind.
-tmpfile="${manfile}.tmp$$"
-trap 'rm -f "$tmpfile" "$tmpfile.nroff"' 0
-trap 'exit 1' 1 2 3 15
+nroff=
+batch=
 
-{
-printf '%s\n' "'\\\" t"
+while [ $# -gt 0 ]
+do
+	case $1 in
+	-c)	nroff=yes; shift ;;
+	-b)	batch=yes; shift ;;
+	*)	break ;;
+	esac
+done
 
-sed -n -e '/<!-- $''XConsortium: /{
-s/<!-- $''XConsortium:/...\\"/g
-s/ -->//g
-p
-}' "$reffile"
-
+# The text that comes before the translation in every page.
+prologue() {
 cat <<\!
 .de P!
 .fl
@@ -132,11 +121,135 @@ cat <<\!
 .ds f3\"
 .ds f4\"
 !
+}
+
+refentry_sed='s/<\!\[[ ]*\%CDE\.C\.CDE;[ ]*\[<[rR]ef[eE]ntry [iI]d="[^"]*">\]\]>/<refentry>/g'
+
+if [ -n "$batch" ]
+then
+	# Batch mode: each further argument is man-dst-file=ref-src-file.
+	# The sources are put into one document, as the RefEntry children
+	# of a Reference, so that the parser reads the DTD and the
+	# declarations once and instant starts once, instead of once per
+	# page; instant -B translates each RefEntry as a document of its
+	# own, so every page comes out as it would on its own.  The pages
+	# are written in place (a rename each would cost as much as the
+	# translation), and a failed run removes all of them, so none is
+	# left half-written.
+	[ $# -ge 2 ] || usage
+	locale=$1
+	dclfile=$2
+	shift 2
+	[ $# -gt 0 ] || exit 0
+
+	for page
+	do
+		case $page in
+		*=*)	;;
+		*)	usage ;;
+		esac
+	done
+
+	DTDCBK_PROLOGUE=$(prologue)
+	export DTDCBK_PROLOGUE
+
+	trap 'for page; do rm -f "${page%%=*}" "${page%%=*}.nroff$$"; done' 0
+	trap 'exit 1' 1 2 3 15
+
+	{
+	cat "$decl" || exit 1
+	# The declarations name RefEntry as the document type.
+	LC_ALL=C awk '!done && sub(/<!DOCTYPE[ \t\n]+[A-Za-z]+/, "<!DOCTYPE Reference") { done = 1 } { print }' "$dclfile" || exit 1
+	printf '<reference><title>%s</title>\n' "$dclfile"
+	LC_ALL=C awk 'BEGIN {
+		for (i = 1; i < ARGC; i++) {
+			src = ARGV[i]; sub(/^[^=]*=/, "", src)
+			while ((r = (getline line < src)) > 0) print line
+			if (r < 0) { print "dtdocbook2man: cannot read " src | "cat 1>&2"; exit 1 }
+			close(src)
+		}
+	}' "$@" || exit 1
+	printf '</reference>\n'
+	} | \
+	sed -e "$refentry_sed" | \
+	$parser $parser_opts | \
+	$instant -BREFENTRY -L$locale -croff.cmap -sroff.sdata -tdocbook-to-man.ts | \
+	LC_ALL=C awk '
+	# Replace every "from" in s with "to", as plain strings.
+	function lrepl(s, from, to,    out, i) {
+		out = ""
+		while ((i = index(s, from)) > 0) {
+			out = out substr(s, 1, i - 1) to
+			s = substr(s, i + length(from))
+		}
+		return out s
+	}
+	function start(    src, line, r) {
+		if (++n > npages) { extra = 1; return }
+		out = page[n]; sub(/=.*/, "", out)
+		src = page[n]; sub(/^[^=]*=/, "", src)
+		print "'"'"'\\\" t" > out
+		while ((r = (getline line < src)) > 0)
+			if (index(line, "<!-- $XConsortium: ")) {
+				line = lrepl(line, "<!-- $XConsortium:", "...\\\"")
+				print lrepl(line, " -->", "") > out
+			}
+		close(src)
+		print ENVIRON["DTDCBK_PROLOGUE"] > out
+	}
+	BEGIN {
+		npages = ARGC - 1
+		for (i = 1; i < ARGC; i++) page[i] = ARGV[i]
+		ARGC = 1	# the translations come from standard input
+		start()
+	}
+	$0 == "\001instant-batch-end\001" { close(out); done++; start(); next }
+	!extra { print > out }
+	END { exit (done != npages) }
+	' "$@" || exit 1
+
+	if [ -n "$nroff" ]
+	then
+		for page
+		do
+			dst=${page%%=*}
+			tbl "$dst" | nroff -man > "$dst.nroff$$" || exit 1
+			mv -f "$dst.nroff$$" "$dst" || exit 1
+		done
+	fi
+	trap - 0
+	exit 0
+fi
+
+if [ $# -eq 4 ]
+then	locale=$1
+	dclfile=$2
+	reffile=$3
+	manfile=$4
+else	usage
+fi
+
+# The page is written next to man-dst-file and renamed into place, so a
+# failed run leaves no half-written page behind.
+tmpfile="${manfile}.tmp$$"
+trap 'rm -f "$tmpfile" "$tmpfile.nroff"' 0
+trap 'exit 1' 1 2 3 15
+
+{
+printf '%s\n' "'\\\" t"
+
+sed -n -e '/<!-- $''XConsortium: /{
+s/<!-- $''XConsortium:/...\\"/g
+s/ -->//g
+p
+}' "$reffile"
+
+prologue
 
 } > "$tmpfile" || exit 1
 
 cat "$decl" "$dclfile" "$reffile" | \
-sed -e 's/<\!\[[ ]*\%CDE\.C\.CDE;[ ]*\[<[rR]ef[eE]ntry [iI]d="[^"]*">\]\]>/<refentry>/g' | \
+sed -e "$refentry_sed" | \
 $parser $parser_opts | \
 $instant -L$locale -croff.cmap -sroff.sdata -tdocbook-to-man.ts >> \
 "$tmpfile" || exit 1
