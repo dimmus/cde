@@ -106,9 +106,13 @@ jobs:
           mkdir -p "$CCACHE_DIR"
           chown -R bench: "$CCACHE_DIR"
           for t in base head; do
+            # ccache's cc and c++ first in PATH, not CC='ccache cc':
+            # the base tree may predate the build's support for a CC
+            # of two words (ksh93's bin/package runs its first word).
             sudo -u bench --preserve-env=CCACHE_DIR,CCACHE_BASEDIR sh -c "
+              PATH=/usr/lib/ccache/bin:\$PATH &&
               cd '$GITHUB_WORKSPACE/$t' &&
-              ./autogen.sh --prefix=/usr --disable-docs CC='ccache cc' CXX='ccache c++' &&
+              ./autogen.sh --prefix=/usr --disable-docs &&
               make -j\$(nproc)"
           done
           ccache -s

@@ -51,6 +51,9 @@ jobs:
           # The github.workspace context is the runner's path, not the
           # container's: take the workspace from the container.
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          # ccache's cc and c++ first in PATH, not CC='ccache cc': the
+          # compiler stays one word for the scripts that run $CC.
+          echo /usr/lib/ccache/bin >> "$GITHUB_PATH"
 
       - uses: actions/checkout@v4
 
@@ -67,7 +70,7 @@ jobs:
           restore-keys: ccache-${{ matrix.job }}-
 
       - name: Configure
-        run: ./autogen.sh ${{ matrix.configure }} CC='ccache cc' CXX='ccache c++'
+        run: ./autogen.sh ${{ matrix.configure }}
 
       - name: Build
         run: make -j"$(nproc)"
