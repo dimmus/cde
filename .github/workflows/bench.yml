@@ -54,6 +54,10 @@ jobs:
     steps:
       - name: Dependencies
         run: |
+          # The image does not install the X locales but C and iso8859-1
+          # (NoExtract): dtterm's UTF-8 cases need en_US.UTF-8's, which
+          # C.UTF-8 maps to.  Keep them for libX11, installed below.
+          sed -i '/^NoExtract/ s|usr/share/X11/locale/\*||' /etc/pacman.conf
           pacman -Syu --noconfirm --needed git sudo
           # The trees are chowned to bench below: root's git would
           # otherwise refuse them ("dubious ownership").
