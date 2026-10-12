@@ -48,7 +48,7 @@ using namespace std;
  #define DBG(level) if (0)
  #endif
 
- static int dbgLevel;
+ static int dbgLevel = -1;
 
  //---------------------------------------------------------
  // ValList : Constructor
@@ -58,14 +58,13 @@ using namespace std;
 
    DBG(10) cerr << "(DEBUG) Invoking OL_AttributeList::OL_AttributeList()\n";
 
-   dbgLevel=-1;
-   char *dbgStr;
-
    head = NULL;
    tail = NULL;
 
-   dbgStr = getenv("OL_DEBUG");
-   dbgLevel = ( dbgStr ? atoi(dbgStr):0);
+   if ( dbgLevel < 0 ) {
+     char *dbgStr = getenv("OL_DEBUG");
+     dbgLevel = ( dbgStr ? atoi(dbgStr):0);
+   }
 
  }
 

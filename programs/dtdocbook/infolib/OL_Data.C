@@ -103,9 +103,10 @@ OL_Data::OL_Data( const Token &t,
 {
 
   
-  char *dbgStr;
-  dbgStr = getenv("OL_DEBUG");
-  dbgLevel = ( dbgStr ? atoi ( dbgStr ) : 0 );
+  if ( dbgLevel < 0 ) {	/* once: this runs for every OLIAS attribute */
+    char *dbgStr = getenv("OL_DEBUG");
+    dbgLevel = ( dbgStr ? atoi ( dbgStr ) : 0 );
+  }
 
   /* first generate grep all the mode info */
   istat = mode & IGNORE_ON;

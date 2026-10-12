@@ -68,6 +68,8 @@ public:
 public:
   void markup( const Token & );
   void data( const char *, size_t );
+  /* reset() at the end of the element sets f_base to -1 for good */
+  bool inert() const { return f_base <= 0; }
   char *filename() { return ( f_name ); }
   int   line_no()  { return ( line_num ); }
   

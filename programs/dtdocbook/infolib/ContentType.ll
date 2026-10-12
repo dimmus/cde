@@ -154,9 +154,10 @@ ol_dataerror(const char *str)
 //--------------------------------------------------------------
 ContentType::ContentType()
 {
-  char *dbgStr;
-  dbgStr = getenv ("OL_DEBUG");
-  dbgLevel = ( dbgStr ? atoi ( dbgStr ) : 0 );
+  if ( dbgLevel < 0 ) {	/* once: an OL_Data member, made per attribute */
+    char *dbgStr = getenv ("OL_DEBUG");
+    dbgLevel = ( dbgStr ? atoi ( dbgStr ) : 0 );
+  }
   exprlist  = 0;
 }
 

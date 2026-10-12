@@ -36,8 +36,9 @@
 
 ComplexTask::ComplexTask()
 {
-  used = alloc = 0;
+  used = alloc = nactive = 0;
   subtasks = NULL;
+  active = NULL;
 }
 
 ComplexTask::~ComplexTask()
@@ -49,6 +50,7 @@ ComplexTask::~ComplexTask()
   }
 
   if ( subtasks ) delete [] subtasks;
+  if ( active ) delete [] active;
 }
 
 void ComplexTask::removeAllSubTasks()
@@ -58,13 +60,15 @@ void ComplexTask::removeAllSubTasks()
   }
 
   if ( subtasks ) { delete [] subtasks; subtasks = NULL; }
-  used = alloc = 0;
+  if ( active ) { delete [] active; active = NULL; }
+  used = alloc = nactive = 0;
 }
 
 void ComplexTask::addSubTask(Task *t)
 {
   grow(used + 1);
   subtasks[used++] = t;
+  if(!t->inert()) active[nactive++] = t;
 }
 
 
@@ -81,6 +85,17 @@ void ComplexTask::stopSubTask(Task *t)
 
       used--;
 
+      for(int j = 0; j < nactive; j++){
+	if(active[j] == t){
+	  while(j + 1 < nactive){
+	    active[j] = active[j+1];
+	    j++;
+	  }
+	  nactive--;
+	  break;
+	}
+      }
+
       return;
     }
   }
@@ -95,31 +110,41 @@ ComplexTask::grow(int needed)
 {
   if(needed + 1 > alloc){
     Task **born = new Task*[alloc = needed * 3 / 2 + 10];
+    Task **bornActive = new Task*[alloc];
 
     if(used){
       memcpy(born, subtasks, sizeof(Task*) * used);
       delete [] subtasks; subtasks = NULL;
     }
+    if(nactive)
+      memcpy(bornActive, active, sizeof(Task*) * nactive);
+    if(active)
+      delete [] active;
 
     subtasks = born;
+    active = bornActive;
   }
 }
 
 void ComplexTask::markup(const Token& t)
 {
-  int i;
+  int i, keep;
 
-  for(i = 0; i < used; i++){
-    subtasks[i]->markup(t);
+  for(i = keep = 0; i < nactive; i++){
+    Task *sub = active[i];
+
+    sub->markup(t);
+    if(!sub->inert()) active[keep++] = sub;
   }
+  nactive = keep;
 }
 
 void ComplexTask::data(const char *d, size_t len)
 {
   int i;
 
-  for(i = 0; i < used; i++){
-    subtasks[i]->data(d, len);
+  for(i = 0; i < nactive; i++){
+    active[i]->data(d, len);
   }
 }
 

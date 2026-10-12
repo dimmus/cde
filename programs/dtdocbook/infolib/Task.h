@@ -54,6 +54,13 @@ public:
   virtual void data(const char *chars,
 		    size_t len) = 0;
 
+  /*
+   * True once the task will ignore every further markup() and data()
+   * call, so a ComplexTask may stop passing them on.  It must never
+   * become false again.
+   */
+  virtual bool inert() const { return false; }
+
 };
 
 class ComplexTask: public Task{
@@ -77,11 +84,20 @@ protected:
   Task *subtask(int i) { return subtasks[i]; };
 
 protected:
-  Task **subtasks;
+  Task **subtasks;	/* every subtask, in the order added: subtask(i) */
   int    used;
 
 private:
   int    alloc;
+
+  /*
+   * The subtasks that markup() and data() are passed to: subtasks in
+   * the same order, less the inert ones.  A node keeps an OL_Data per
+   * ID and cross reference until it ends, and each one is inert as soon
+   * as its element has ended.
+   */
+  Task **active;
+  int    nactive;
 
   void grow(int);
 };

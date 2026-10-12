@@ -49,7 +49,8 @@ protected:
   
 private:
 
-  Item *items;
+  Item *items;		/* sorted by string, for intern() */
+  const char **byCode;	/* indexed by code, for lookup() */
 
   size_t    used;
   size_t    total;
@@ -81,7 +82,7 @@ SGMLName::intern(const char *name, int upcase)
     size_t nlen = strlen(name);
     
     if(buflen < nlen + 1){
-      delete buf;
+      delete [] buf;
       buf = new char[buflen = nlen * 3 / 2 + 10];
     }
 
@@ -111,6 +112,7 @@ SGMLName::lookup(int indx)
 StringToInt::StringToInt()
 {
   items = 0;
+  byCode = 0;
   total = used = 0;
 }
 
@@ -136,6 +138,7 @@ StringToInt::intern(const char *name)
     
     items[indx].string = p;
     items[indx].code = used;
+    byCode[used] = p;
     used++;
   }
 
@@ -148,13 +151,17 @@ void StringToInt::grow(size_t needed)
 
   if(total < needed){
     Item *born = new Item[total = needed * 3 / 2 + 10];
+    const char **bornByCode = new const char *[total];
     
     if(used){
       memcpy(born, items, sizeof(Item) * used);
-      delete items;
+      memcpy(bornByCode, byCode, sizeof(*byCode) * used);
+      delete [] items;
+      delete [] byCode;
     }
 
     items = born;
+    byCode = bornByCode;
   }
 
 }
@@ -162,15 +169,10 @@ void StringToInt::grow(size_t needed)
 
 const char* StringToInt::lookup(int indx)
 {
-  unsigned int i;
-  
-  for(i = 0; i < used; i++){
-    if (items[i].code == indx) return items[i].string;
-  }
+  /* codes are handed out 0, 1, 2, ... in the order names are interned */
+  if (indx < 0 || (size_t)indx >= used) abort();
 
-  abort();
-
-  return NULL; /* avoid compiler warning */
+  return byCode[indx];
 }
 
 /*
