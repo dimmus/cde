@@ -1,0 +1,100 @@
+# Builds the tree in an Arch Linux container, the platform install-deps.sh
+# supports, against Motif 2.5 built from the fork (.github/actions/motif).
+#
+#   werror  the programs and libraries, without the documentation, with
+#           --enable-werror: the compiler warnings configure enables (-Wall
+#           and the curated -Wextra list, see configure.ac) are errors.
+#           ksh93's own build (programs/dtksh/ksh93) is not affected: it
+#           takes CFLAGS, not CDE_CFLAGS.  Then make check, and the build
+#           must leave the checkout as it was (no tracked file changed, no
+#           file that .gitignore does not cover).
+#   docs    the same with the documentation (the default): man pages, help
+#           volumes and the information libraries of every language, made
+#           with the tree's own DocBook tools, then installed into a
+#           staging directory outside the checkout, whose man pages,
+#           volumes and libraries are counted.
+#
+# Both use ccache, cached per job.
+
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  CCACHE_DIR: /github/home/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_MAXSIZE: 2G
+
+jobs:
+  build:
+    name: ${{ matrix.job }}
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job: werror
+            configure: --prefix=/usr --disable-docs --enable-werror
+          - job: docs
+            configure: --prefix=/usr --enable-werror
+    steps:
+      - name: Dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git ccache
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+
+      - name: Build dependencies
+        run: ./install-deps.sh --yes --no-runtime
+
+      - uses: ./.github/actions/motif
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /github/home/.ccache
+          key: ccache-${{ matrix.job }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.job }}-
+
+      - name: Configure
+        run: ./autogen.sh ${{ matrix.configure }} CC='ccache cc' CXX='ccache c++'
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: make check
+        if: matrix.job == 'werror'
+        run: make -j"$(nproc)" check
+
+      - name: The checkout is unchanged
+        run: |
+          # What autogen.sh, configure and the build make is all covered
+          # by .gitignore.
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then
+            echo "the build changed or added files in the checkout:"
+            echo "$status"
+            exit 1
+          fi
+
+      - name: Install the documentation
+        if: matrix.job == 'docs'
+        run: |
+          make -j"$(nproc)" install DESTDIR=/tmp/staging
+          man=$(find /tmp/staging/usr/share/man -type f | wc -l)
+          sdl=$(find /tmp/staging -name '*.sdl' | wc -l)
+          oli=$(find /tmp/staging -name '*.oli' | wc -l)
+          echo "man pages: $man, help volumes: $sdl, information libraries: $oli"
+          test "$man" -gt 600 && test "$sdl" -gt 0 && test "$oli" -gt 0
+
+      - name: ccache statistics
+        if: always()
+        run: ccache -s

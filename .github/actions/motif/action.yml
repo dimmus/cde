@@ -1,0 +1,56 @@
+# Builds and installs Motif 2.5 (libXm.so.5) from the fork CDE is built
+# against, https://github.com/dimmus/motif, into /usr: the distribution's
+# Motif is 2.3 (libXm.so.4) and lacks the interfaces CDE uses.  The
+# installed tree is cached per Motif commit, so a run only builds Motif
+# when the fork has moved on.  It runs inside the Arch Linux container of
+# the calling job, after install-deps.sh (which installs Motif's build
+# dependencies: cmake, ninja, fontconfig, libxft, libpng, libjpeg-turbo).
+
+name: Motif 2.5
+description: Build (or restore from the cache) and install the Motif fork
+
+inputs:
+  repository:
+    description: Motif git repository
+    default: https://github.com/dimmus/motif.git
+  ref:
+    description: Branch or tag to build
+    default: master
+
+runs:
+  using: composite
+  steps:
+    - name: Motif commit
+      id: rev
+      shell: bash
+      run: |
+        rev=$(git ls-remote "${{ inputs.repository }}" "${{ inputs.ref }}" | awk 'NR == 1 { print $1 }')
+        test -n "$rev" || { echo "cannot resolve ${{ inputs.ref }} in ${{ inputs.repository }}" >&2; exit 1; }
+        echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
+    - name: Cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: /opt/motif-install
+        key: motif-${{ runner.os }}-archlinux-${{ steps.rev.outputs.rev }}
+
+    - name: Build
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        rm -rf /tmp/motif /tmp/motif-build
+        git init -q /tmp/motif
+        git -C /tmp/motif fetch -q --depth 1 "${{ inputs.repository }}" "${{ steps.rev.outputs.rev }}"
+        git -C /tmp/motif checkout -q FETCH_HEAD
+        cmake -S /tmp/motif -B /tmp/motif-build -G Ninja \
+          -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+        cmake --build /tmp/motif-build --parallel "$(nproc)"
+        DESTDIR=/opt/motif-install cmake --install /tmp/motif-build
+
+    - name: Install
+      shell: bash
+      run: |
+        cp -a /opt/motif-install/. /
+        ldconfig
+        ldconfig -p | grep -q "libXm.so.5 "

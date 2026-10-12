@@ -1,0 +1,156 @@
+# CDE benchmarks in CI (from tools/bench/ci/bench.yml, plus the Motif
+# action and the loader cost report).
+#
+# It builds the base of a pull request (or the previous commit of a push)
+# and its head on the same runner, runs tools/bench/bench.py on both with
+# the same settings, and fails when bench.py compare does:
+#   - any increase of X round trips (exact counts: round_trips_per_op,
+#     round_trips, output_round_trips, round_trips_per_page/_burst);
+#   - more than SYSCALL_PCT % more system calls (strace pass,
+#     --syscalls): 25 here, not bench.py's 10, since the median of 5
+#     runs of a timing-dependent case (ttbench burst: poll and EAGAIN
+#     calls) still moves by 12 % between two runs of the same tree;
+#   - a program that loads more shared objects or has more unused
+#     direct dependencies, or more than TIME_PCT % more startup
+#     relocations (the loader group: LD_DEBUG=statistics, ldd -u -r);
+#   - a slowdown above TIME_PCT % of a timed case.  Hosted runners are
+#     noisy, so TIME_PCT is 25 here instead of bench.py's 5; on a quiet
+#     self-hosted runner set it back to 5 (and drop --quick).
+# Both JSON documents are kept as artifacts.
+#
+# Loader cost tracking: the loader group (tools/bench/loader-cost.sh) is
+# part of the default run, and compare gates it as above.  On top of
+# that, the head's bench.py report (its loader table lists the programs
+# with the most startup relocations) goes to the job summary, and
+# loader-cost.sh's per-binary counts for every program and library of
+# both trees are kept as the "loader" artifact, so that the cost can be
+# followed from run to run.
+#
+# The tree builds against Motif 2.5 (libXm.so.5), not the distribution's
+# Motif 2.3: .github/actions/motif builds it from the fork first.  The
+# container is Arch Linux, the platform install-deps.sh supports.
+
+name: bench
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  TIME_PCT: "25"
+  SYSCALL_PCT: "25"
+  CCACHE_DIR: /github/home/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+      # strace needs ptrace, perf needs perf_event_open
+      options: --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
+    timeout-minutes: 180
+    steps:
+      - name: Dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git sudo
+          # The trees are chowned to bench below: root's git would
+          # otherwise refuse them ("dubious ownership").
+          git config --global --add safe.directory '*'
+          useradd -m bench
+          echo "bench ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/bench
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: head
+
+      - name: Build dependencies and benchmark tools
+        run: |
+          head/install-deps.sh --yes
+          pacman -S --noconfirm --needed xorg-server-xvfb xorg-xdpyinfo \
+            xdotool strace perf less ccache python
+          chown -R bench: "$GITHUB_WORKSPACE"
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /github/home/.ccache
+          key: ccache-${{ github.sha }}
+          restore-keys: ccache-
+
+      - uses: ./head/.github/actions/motif
+
+      - name: Base tree
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            base=${{ github.event.pull_request.base.sha }}
+          else
+            base=$(git -C head rev-parse HEAD~1)
+          fi
+          git -C head worktree add --detach "$GITHUB_WORKSPACE/base" "$base"
+          chown -R bench: "$GITHUB_WORKSPACE"
+
+      - name: Build base and head
+        run: |
+          # Restored (or created) by root: ccache fails every compile
+          # it cannot write its cache for.
+          mkdir -p "$CCACHE_DIR"
+          chown -R bench: "$CCACHE_DIR"
+          for t in base head; do
+            sudo -u bench --preserve-env=CCACHE_DIR,CCACHE_BASEDIR sh -c "
+              cd '$GITHUB_WORKSPACE/$t' &&
+              ./autogen.sh --prefix=/usr --disable-docs CC='ccache cc' CXX='ccache c++' &&
+              make -j\$(nproc)"
+          done
+          ccache -s
+          # The same harness for both trees, the head's (it may have new
+          # cases; compare only judges what both ran), built once against
+          # each tree: its programs link the tree's libraries and start
+          # the tree's dtwm by absolute path.
+          for t in base head; do
+            cp -r head/tools/bench "bench-$t"
+            sudo -u bench make -C "bench-$t" TOP="$GITHUB_WORKSPACE/$t"
+          done
+          chown -R bench: "$GITHUB_WORKSPACE"
+
+      - name: Run the benchmarks
+        run: |
+          for t in base head; do
+            sudo -u bench env CDE_TOP="$GITHUB_WORKSPACE/$t" \
+              "$GITHUB_WORKSPACE/bench-$t/bench.py" run --quick --syscalls \
+              -o "$GITHUB_WORKSPACE/bench-$t.json"
+          done
+
+      - name: Loader cost
+        run: |
+          for t in base head; do
+            sudo -u bench env CDE_TOP="$GITHUB_WORKSPACE/$t" \
+              "$GITHUB_WORKSPACE/bench-$t/loader-cost.sh" \
+              -o "$GITHUB_WORKSPACE/loader-$t.jsonl" > /dev/null
+          done
+          {
+            echo "## Benchmarks of the head"
+            python3 head/tools/bench/bench.py report bench-head.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the loader costs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loader
+          path: loader-*.jsonl
+
+      - name: Compare
+        run: |
+          python3 head/tools/bench/bench.py compare -t "$TIME_PCT" \
+            --syscall-threshold "$SYSCALL_PCT" bench-base.json bench-head.json
+
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench
+          path: bench-*.json
