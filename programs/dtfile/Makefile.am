@@ -22,6 +22,10 @@ dtfile_CPPFLAGS = $(CDE_CPPFLAGS) -I$(srcdir)/dtcopy -DSHAPE -D_ILS_MACROS -DSUN
 		-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 		-DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION_TOP)\"
 
+# (made here by the .c.o rule, which leaves their dependency files, unused,
+# in dtcopy/$(DEPDIR))
+DISTCLEANFILES = dtcopy/$(DEPDIR)/sharedFuncs.Po dtcopy/$(DEPDIR)/fsrtns.Po
+
 dtfile_LDADD = dtcopy/sharedFuncs.o \
 	dtcopy/fsrtns.o \
 	$(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(LIBTT) $(LIBXIN) $(TIRPCLIB) \

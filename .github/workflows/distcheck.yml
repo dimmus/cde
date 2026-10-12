@@ -1,0 +1,67 @@
+# make distcheck: makes the release tarball, then builds it in a separate
+# build directory from a read-only copy (a VPATH build), runs make check,
+# installs and uninstalls it under a prefix of its own (with and without
+# DESTDIR) and checks that make distclean leaves nothing behind.  The
+# configure options it uses are AM_DISTCHECK_CONFIGURE_FLAGS in the top
+# Makefile.am (no documentation, but the documentation tools).
+#
+# The tree builds against Motif 2.5 (libXm.so.5), not the distribution's
+# Motif 2.3: it is built from MOTIF_REPO first.  The container is Arch
+# Linux, the platform install-deps.sh supports.  The build runs as an
+# ordinary user: root could write into the read-only source directory,
+# which is what the check is meant to catch.
+
+name: distcheck
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  MOTIF_REPO: https://github.com/dimmus/motif.git
+
+jobs:
+  distcheck:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+    timeout-minutes: 240
+    steps:
+      - name: Dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git sudo
+          git config --global --add safe.directory '*'
+          useradd -m build
+
+      - uses: actions/checkout@v4
+
+      - name: Build dependencies
+        run: |
+          ./install-deps.sh --yes
+          chown -R build: "$GITHUB_WORKSPACE"
+
+      - name: Motif 2.5
+        run: |
+          git clone --depth 1 "$MOTIF_REPO" /tmp/motif
+          cmake -S /tmp/motif -B /tmp/motif-build -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/motif-build --parallel "$(nproc)"
+          cmake --install /tmp/motif-build
+
+      - name: Configure and build
+        run: |
+          sudo -u build sh -c "
+            ./autogen.sh --prefix=/usr --disable-docs &&
+            make -j\$(nproc)"
+
+      - name: make distcheck
+        run: sudo -u build make -j"$(nproc)" distcheck
+
+      - name: Keep the tarball
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: cde-*.tar.gz

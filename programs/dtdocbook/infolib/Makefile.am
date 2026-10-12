@@ -33,18 +33,18 @@ AM_CXXFLAGS = $(CDE_CXXFLAGS) $(KEEP_ASSERTS) \
 LDADD = $(LIBMMDB)
 
 MixedGen_SOURCES = \
-		   MixedGen.C \
-		   AttributeList.C \
-		   AttributeRec.C \
-		   BTCollectable.C \
-		   BookCaseDB.C \
-		   DataBase.C \
-		   FlexBuffer.C \
-		   Handler.C \
-		   RemoteId.C \
-		   SGMLName.C \
-		   StringList.C \
-		   Token.C
+		     MixedGen.C \
+		     AttributeList.C \
+		     AttributeRec.C \
+		     BTCollectable.C \
+		     BookCaseDB.C \
+		     DataBase.C \
+		     FlexBuffer.C \
+		     Handler.C \
+		     SGMLName.C \
+		     StringList.C \
+		     Token.C
+nodist_MixedGen_SOURCES = RemoteId.C
 
 NCFGen_SOURCES = \
 		 NCFGen.C \
@@ -70,7 +70,6 @@ NodeParser_SOURCES = \
 		     BookTasks.C \
 		     ConcatTask.C \
 		     Content.C \
-		     ContentType.C \
 		     DataBase.C \
 		     DataRepository.C \
 		     Dispatch.C \
@@ -87,8 +86,6 @@ NodeParser_SOURCES = \
 		     NodeTask.C \
 		     OLAF.C \
 		     OL_Data.C \
-		     OL_DataExpr.C \
-		     ReplaceIdIdref.C \
 		     SGMLDefn.C \
 		     SGMLName.C \
 		     SearchEng.C \
@@ -99,42 +96,44 @@ NodeParser_SOURCES = \
 		     TOCTask.C \
 		     Task.C \
 		     Token.C \
-		     gr_type.C \
 		     lex.ll
+nodist_NodeParser_SOURCES = ContentType.C OL_DataExpr.C ReplaceIdIdref.C gr_type.C
 
 StyleUpdate_SOURCES = \
-		      StyleUpdate.C \
-		      AttributeData.C \
-		      AttributeList.C \
-		      AttributeRec.C \
-		      ConcatTask.C \
-		      Content.C \
-		      ContentType.C \
-		      Dispatch.C \
-		      EntityList.C \
-		      ExprList.C \
-		      Expression.C \
-		      FirstOf.C \
-		      FlexBuffer.C \
-		      GenericId.C \
-		      Handler.C \
-		      OLAF.C \
-		      OL_Data.C \
-		      OL_DataExpr.C \
-		      SGMLDefn.C \
-		      SGMLName.C \
-		      SearchPath.C \
-		      StyleTask.C \
-		      StyleValidate.C \
-		      Task.C \
-		      Token.C \
-		      lex.ll
+		     StyleUpdate.C \
+		     AttributeData.C \
+		     AttributeList.C \
+		     AttributeRec.C \
+		     ConcatTask.C \
+		     Content.C \
+		     Dispatch.C \
+		     EntityList.C \
+		     ExprList.C \
+		     Expression.C \
+		     FirstOf.C \
+		     FlexBuffer.C \
+		     GenericId.C \
+		     Handler.C \
+		     OLAF.C \
+		     OL_Data.C \
+		     SGMLDefn.C \
+		     SGMLName.C \
+		     SearchPath.C \
+		     StyleTask.C \
+		     StyleValidate.C \
+		     Task.C \
+		     Token.C \
+		     lex.ll
+nodist_StyleUpdate_SOURCES = ContentType.C OL_DataExpr.C
 
 dbdrv_SOURCES = dbdrv.C
 valBase_SOURCES = valBase.C
 validator_SOURCES = validator.C
 restore_SOURCES = restore.C
 
+# The lex and yacc outputs (nodist_: OL_DataExpr.tab.h goes with
+# OL_DataExpr.C, and a tarball holding the one without the other could not
+# be built).
 CLEANFILES = \
 	     OL_DataExpr.C \
 	     OL_DataExpr.tab.h \

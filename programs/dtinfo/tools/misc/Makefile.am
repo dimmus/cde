@@ -7,6 +7,7 @@ MAINTAINERCLEANFILES = Makefile.in
 noinst_PROGRAMS = dfiles pmaker msgsets
 
 noinst_SCRIPTS = treeres
+CLEANFILES = treeres
 
 LOCAL_SED_DEFINES = -e 's|PERL|$(PERL)|g'
 

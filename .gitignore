@@ -15,6 +15,10 @@
 DONE
 ?DONE
 
+# make dist and make distcheck
+/cde-[0-9]*.tar.gz
+/cde-[0-9]*/
+
 # imports of of headers
 # imports/x11
 # imports/motif

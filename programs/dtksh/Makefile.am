@@ -93,7 +93,8 @@ dtksh_SOURCES = init.c \
 # and a development build; here it would find the CDE repository and
 # record the CDE commit, so that every commit recompiled part of ksh93
 # and dtksh (and ccache could not help).  GIT_CEILING_DIRECTORIES keeps
-# git out of the CDE repository: ksh93 is then built as from a release
+# git out of the CDE repository (from the sources, or from their copy in a
+# VPATH build directory): ksh93 is then built as from a release
 # tarball, the same in a git checkout as in a CDE tarball.
 KSH93_CC = $(CC)
 KSH93_CCFLAGS = $(strip $(KSH93_SHOPTS) $(HARDEN_CFLAGS) $(CFLAGS))
@@ -120,7 +121,7 @@ ksh93.stamp: $(KSH93_SRCFILES) Makefile
 		$(KSH93SRC)/bin/package clean || exit 1; \
 	fi; \
 	echo "$(KSH93SRC)/bin/package make -j $(KSH93_JOBS) CC='$$cc' CCFLAGS='$$ccflags'"; \
-	GIT_CEILING_DIRECTORIES='$(abs_srcdir)' \
+	GIT_CEILING_DIRECTORIES='$(abs_srcdir):$(abs_builddir)' \
 	$(KSH93SRC)/bin/package make -j $(KSH93_JOBS) CC="$$cc" CCFLAGS="$$ccflags"
 	@touch $@
 
@@ -138,14 +139,25 @@ libshell.a: $(KSH93LIBSHELL) dtksh-init.o
 	$(AR) cq $@.tmp dtksh-init.o
 	mv -f $@.tmp $@
 
+# "make check" (and so make distcheck) runs dtksh once.  The ksh93
+# regression suite is "make shtests": run on dtksh, its builtins test
+# fails by design (dtksh's ToolTalk and Xt builtins do not take --version
+# as ksh93's own do), and its path and timetype tests depend on the PATH
+# and the time zone of the machine.  (shtests is run by absolute name:
+# it re-executes itself through bin/package, which changes directory.)
 check-local:
-	./dtksh -c true && ksh93/bin/shtests --posix --utf8 SHELL=.libs/dtksh
+	./dtksh -c 'print -r -- "$${.sh.version}"'
+
+shtests: dtksh
+	$(abs_builddir)/$(KSH93SRC)/bin/shtests --posix --utf8 SHELL=$(abs_builddir)/.libs/dtksh
+
+.PHONY: shtests
 
 clean-local:
 	if test -x $(KSH93SRC)/bin/package; then $(KSH93SRC)/bin/package clean; fi
 
 # the copy of the ksh93 sources that a VPATH build made
-distclean-local:
+distclean-local: clean-local
 	if test "$(srcdir)" != .; then rm -rf $(KSH93SRC); fi
 
 DtFuncs.dtsh: DtFuncs.sh

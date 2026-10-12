@@ -55,6 +55,41 @@ include/Dt/Dt.h: $(top_srcdir)/include/Dt/Dt.h.in $(top_builddir)/config.status
 # directory so those generated files and helpers are available.
 dist: all
 
+# make distcheck builds from a read-only copy of the tarball in a separate
+# build directory and installs as the user who runs it, under a prefix of
+# its own: the CDE trees, the configuration (/etc/dt), the state (/var/dt),
+# the PAM files and the systemd unit go there too.  The documentation is
+# left out, as in a default build; its tools are built, to cover the help
+# tag compiler.
+AM_DISTCHECK_CONFIGURE_FLAGS = --disable-docs --enable-doc-tools \
+	--with-cde-install-dir=$$dc_install_base/dt \
+	--with-cde-config-dir=$$dc_install_base/etc/dt \
+	--with-cde-state-dir=$$dc_install_base/var/dt \
+	--with-pam-dir=$$dc_install_base/etc/pam.d \
+	--with-systemdsystemunitdir=$$dc_install_base/lib/systemd/system
+
+# Many headers and data files that the build uses are named in no
+# Makefile.am, so automake alone leaves them out of the tarball.  Add every
+# file of the git tree to the distribution directory (what automake put
+# there wins), and list them in build-aux/dist-files (NUL-separated) in the
+# tarball, so that a tarball made from a tarball (make distcheck does that,
+# from its build directory) gets them too.
+DIST_FILES_LIST = build-aux/dist-files
+dist-hook:
+	@top=`cd $(top_srcdir) && pwd -P`; \
+	list=$(abs_top_builddir)/$(distdir)/$(DIST_FILES_LIST); \
+	if test "`git -C $(top_srcdir) rev-parse --show-toplevel 2>/dev/null`" = "$$top"; then \
+	  (cd $(top_srcdir) && git ls-files -z) > $$list.tmp || exit 1; \
+	elif test -f $(top_srcdir)/$(DIST_FILES_LIST); then \
+	  cp $(top_srcdir)/$(DIST_FILES_LIST) $$list.tmp || exit 1; \
+	else \
+	  exit 0; \
+	fi; \
+	echo "adding the files of $(DIST_FILES_LIST) to $(distdir)"; \
+	(cd $(top_srcdir) && \
+	 tar --null --no-recursion --ignore-failed-read -T $$list.tmp -cf -) | \
+	tar -C $(distdir) --skip-old-files -xf - && mv -f $$list.tmp $$list
+
 if BUILD_DOCS
 SUBDIRS += doc
 endif

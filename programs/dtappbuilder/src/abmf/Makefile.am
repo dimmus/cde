@@ -21,6 +21,7 @@ bin_PROGRAMS = dtcodegen
 #noinst_PROGRAMS = ab_func_strings test_parse test_merge
 
 noinst_DATA = dtcodegen.cat
+CLEANFILES = dtcodegen.cat
 
 dtcodegen_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES) -I../libABil -I$(srcdir)/../libABil
 
