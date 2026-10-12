@@ -1925,7 +1925,7 @@ proj_show_open_chooserCB(
                 (ArgList) NULL,
                 (Cardinal) 0);
 
-	info = (ChooserInfo) calloc(sizeof(ChooserInfoRec), 1);
+	info = (ChooserInfo) calloc(1, sizeof(ChooserInfoRec));
 	XtVaSetValues(AB_generic_chooser,
 			XmNuserData, (XtPointer) info,
 			NULL);
@@ -2132,7 +2132,7 @@ proj_show_import_chooserCB(
                 (ArgList) NULL,
                 (Cardinal) 0);
 
-        info = (ChooserInfo)calloc(sizeof(ChooserInfoRec), 1);
+        info = (ChooserInfo)calloc(1, sizeof(ChooserInfoRec));
         XtVaSetValues(AB_generic_chooser,
                         XmNuserData, (XtPointer) info,
                         NULL);

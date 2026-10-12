@@ -523,6 +523,7 @@ choiceOkayed(
 	    }
 	    DtTtSetLabel( label, func, status );
 	    XtUnmanageChild( instance->chooser_shellform );
+	    break;
 	case _DtTtChooserProcidSetDefault:
 	    status = tt_default_procid_set( text );
 	    DtTtSetLabel( label, "tt_default_procid_set()", status );
