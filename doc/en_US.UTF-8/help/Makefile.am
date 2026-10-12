@@ -15,3 +15,6 @@ include $(top_srcdir)/doc/common/help/sdl-data.am
 install-data-hook:
 	$(RM) -rf $(DESTDIR)$(CDE_DATA_TOP)/appconfig/help/C
 	cd $(DESTDIR)$(CDE_DATA_TOP)/appconfig/help/ && $(LN_S) en_US.UTF-8 C
+
+uninstall-hook:
+	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/appconfig/help/C

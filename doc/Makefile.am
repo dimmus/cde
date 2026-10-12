@@ -115,3 +115,6 @@ all-in-en_US.UTF-8+man all-in-en_US.UTF-8+guides: all-in-en_US.UTF-8+m-guides
 install-data-hook:
 	$(RM) $(DESTDIR)$(CDE_INSTALLATION_TOP)/man
 	cd $(DESTDIR)$(CDE_INSTALLATION_TOP)/ && $(LN_S) $(mandir) man
+
+uninstall-hook:
+	$(RM) $(DESTDIR)$(CDE_INSTALLATION_TOP)/man

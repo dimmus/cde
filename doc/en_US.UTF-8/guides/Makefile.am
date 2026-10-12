@@ -83,3 +83,6 @@ $(nodist_cdedti_DATA) $(nodist_cdedtidoc_DATA) $(generated_cdedtidocsearch_outpu
 install-data-hook:
 	$(RM) -rf $(DESTDIR)$(CDE_DATA_TOP)/infolib/C
 	cd $(DESTDIR)$(CDE_DATA_TOP)/infolib && $(LN_S) en_US.UTF-8 C
+
+uninstall-hook:
+	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/infolib/C
