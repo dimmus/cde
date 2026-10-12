@@ -2,236 +2,287 @@
 
 ## Status as of this branch
 
-Branch `claude/todo-implementation`: 165 commits on top of `d907a737d`
-(820 files changed, +41,979 / −31,390 lines), checked on 2026-10-11.
-Every item below now ends in a *(status: ...)* note. Done items are ticked.
-Partial and not-done items stay unticked, and the note gives what is missing
-and why. The Top 20 table and the bug table have a Status column.
+Branch `claude/todo-round2`: 129 commits on top of `master` @ `c575f3f66`
+(901 files changed, +28,067 / −137,036 lines), checked on 2026-10-12. About 125,000 of the deleted lines
+are the unbuilt dtudcfonted, dtudcexch and lib/pam sources. Round 1
+(`claude/todo-implementation`, 165 commits on `d907a737d`) is already in
+`master`.
+
+Every item below ends in a *(status: ...)* note. Ticked items are done;
+a part that was measured and found to bring nothing ("no change needed")
+counts as done. Unticked items are either **partial** (work that is still
+worth doing; the note says what is missing and why) or **won't do** (the
+remaining change was measured or tried and declined, because it would
+change behaviour, break compatibility, or belongs to another tree; the
+note gives the numbers). The Top 20 table and the bug table have a Status
+column.
 
 ### What was done
 
-Checkbox items per section (done / partial / not done):
+Checkbox items per section:
 
-| Section | Done | Partial | Not done |
-|---|---|---|---|
-| 0.1 Harnesses | 1 | 9 | 2 |
-| 1.1 Fixed sleeps | 12 | 1 | 0 |
-| 1.2 Polling | 7 | 2 | 0 |
-| 2.1 dtlogin/dtgreet | 4 | 1 | 0 |
-| 2.2 Xsession | 1 | 3 | 0 |
-| 2.3 dtsession | 8 | 1 | 2 |
-| 3.1 DtSvc typing/database | 15 | 3 | 0 |
-| 3.2 DtSvc startup/IPC | 7 | 1 | 0 |
-| 3.3 ToolTalk | 14 | 5 | 3 |
-| 3.4 DtWidget | 7 | 4 | 0 |
-| 4.1–4.4 dtwm | 31 | 3 | 4 |
-| 5.1 dtfile | 18 | 8 | 1 |
-| 5.2 dtterm | 12 | 1 | 1 |
-| 5.3 dtmail | 7 | 2 | 0 |
-| 5.4 dtcm | 4 | 2 | 0 |
-| 5.5 Help/dtinfo | 5 | 4 | 1 |
-| 5.6 Other apps | 7 | 2 | 0 |
-| 6.1–6.6 Build | 27 | 7 | 5 |
-| 7 Warnings | 3 | 1 | 0 |
-| **Total** | **190** | **60** | **19** |
+| Section | Done | Partial | Won't do | Done after round 1 |
+|---|---|---|---|---|
+| 0.1 Harnesses | 10 | 2 | 0 | 1 |
+| 1.1 Fixed sleeps | 13 | 0 | 0 | 12 |
+| 1.2 Polling | 7 | 0 | 2 | 7 |
+| 2.1 dtlogin/dtgreet | 5 | 0 | 0 | 4 |
+| 2.2 Xsession | 3 | 1 | 0 | 1 |
+| 2.3 dtsession | 10 | 0 | 1 | 8 |
+| 3.1 DtSvc typing/database | 16 | 0 | 2 | 15 |
+| 3.2 DtSvc startup/IPC | 7 | 0 | 1 | 7 |
+| 3.3 ToolTalk | 19 | 0 | 3 | 14 |
+| 3.4 DtWidget | 11 | 0 | 0 | 7 |
+| 4.1–4.4 dtwm | 36 | 0 | 2 | 31 |
+| 5.1 dtfile | 24 | 0 | 3 | 18 |
+| 5.2 dtterm | 14 | 0 | 0 | 12 |
+| 5.3 dtmail | 8 | 1 | 0 | 7 |
+| 5.4 dtcm | 6 | 0 | 0 | 4 |
+| 5.5 Help/dtinfo | 9 | 1 | 0 | 5 |
+| 5.6 Other apps | 9 | 0 | 0 | 7 |
+| 6.1–6.6 Build | 36 | 0 | 3 | 27 |
+| 7 Warnings | 4 | 0 | 0 | 3 |
+| **Total** | **247** | **5** | **17** | **190** |
 
-- All 41 entries of 7.2 are resolved: 38 fixed, 3 kept on purpose and documented.
-- All 36 rows of "Correctness bugs found in passing" are fixed.
-- About 60 more bugs were found and fixed along the way. They were not in the
-  audit. The larger ones:
-  - **dtsession:** restored clients got a wrong `DISPLAY` when the display
-    name had no screen number. The palette-directory loop never ended.
-  - **dtlogin:** every logout slept 1 s per child death. `wait()` reaped
-    other displays' children. `lang[500]` could overflow its stack buffer.
-  - **ttsession:** every killed ttsession left a portmapper registration
-    behind. After about 100 kills, ttsession would no longer start.
-  - **rpc.ttdbserver:** it did not work at all on LP64 (mini_isam sign
-    extension, 1-byte record buffers, key padding, NULL XDR strings).
-    `tt_file_move` deleted the source entries. Update-conflict detection
-    never triggered.
-  - **dtcm:** server callbacks were never delivered (zero RPC timeout).
-    `xdr_cms_entry` recursion crashed rpc.cmsd at about 60k entries.
-  - **DtHelp:** every help graphic crashed with the modern libXm
-    (`_XmPutScaledImage` prototype). XWD images never loaded on LP64.
-    dthelpprint printed garbage in the C locale.
-  - **DtEditor:** Format returned an empty document on glibc.
-  - **dtterm:** a single-font multibyte locale drew 3 NUL boxes per
-    character. A scroll region below `lastUsedRow` overflowed the heap.
-    Smooth scroll could hang.
-  - **dtmail:** reassembling a message/partial set segfaulted. Startup
-    crashed without a colour server. The date column read an
-    uninitialised byte.
-  - **dtprintinfo:** "Enable" ran `disable`. `-edit` segfaulted.
-  - **Overflows:** instant `FPuts`, DtHelp `CanvasOs.c`, `_DtIsSameHost`,
-    dtfile `MoveDir` and `GetLongName`.
-  - **DtSvc:** symlink targets were truncated and symlink cycles looped
-    forever. `_DtXlateMergeDbs` had a use-after-free.
+Round 2 in short:
+- **Harnesses (Phase 0):** syscall counts per operation, a CI benchmark
+  gate (`.github/workflows/bench.yml`), `TT_STATS` RPC counters in libtt,
+  new dtwm, dtterm, dtfile and dtmail cases, and new dtcm and help
+  harnesses. Startup-trace stamps in dtlogin, dtgreet, the login scripts,
+  dthello, dtdbcache, dtsession and dtwm.
+- **Login:** in-process font-path append in dtlogin, cached profile
+  syntax checks and a cached `dtsearchpath` result in Xsession, an exact
+  in-place dtappgather, restored clients forked before dtwm is ready
+  (`Dtsession*startClientsEarly`), a pre-created lock dialog.
+- **ToolTalk:** `tt_open` in one RPC (OPEN_PROCID), batched
+  ADD/DEL_PATTERNS, an AF_UNIX transport under `$XDG_RUNTIME_DIR`, dtexec
+  without an X connection or libDtSvc, hashed pattern and file-scope
+  tables, an O(depth) `_tt_realpath`. All new procedures fall back to the
+  old ones against an older ttsession, in both directions.
+- **DtSvc/DtWidget:** libpam loaded with `dlopen`, DtCodelibs in C (no
+  libstdc++ in libDtSvc), a negative `.DtDirDataType` cache,
+  `_DtDtsDataToDataTypeAt` for dtfile, Replace All in runs, asynchronous
+  spell check, a cheaper Format, no round trip on any drag start.
+- **dtwm:** no `XSync` per workspace switch (ordered message queue),
+  shared backdrop windows, `f.refresh` one round trip per tree level,
+  fewer icon-label queries.
+- **Applications:** dtfile persistent workers, `update_some` with inotify,
+  path-type cache, O(K) trash, fast desktop-object load; dtterm cell
+  arrays and a ring of line pointers with int rows; dtmail non-blocking
+  lock waits, header filter, tail-only saves on CoW filesystems; dtcm
+  server without deep copies and incremental month repaint; help
+  parsed-topic cache, table-cell index, incremental volume scan,
+  asynchronous DtSearch API, mmap'ed infolib stores; lazy dtcreate icons;
+  dtksh parse-tree cache; dtprintinfo through libcups.
+- **Build:** non-recursive DtMmdb, tt/lib, dtinfo and dthelp parser;
+  VPATH builds and `make distcheck` (`.github/workflows/distcheck.yml`);
+  batched man pages (32.3 s -> 2.5 s); a faster infolib build; ksh93
+  leaves no file outside `ksh93/arch`; a curated `-Wextra` with every site
+  fixed and `--enable-werror` (CI job in `.github/workflows/build.yml`);
+  md5 de-duplicated; dtudcfonted, dtudcexch and lib/pam deleted.
 
-### Verification on this branch (2026-10-11, GCC 16.2.1, 2 CPUs)
+Bugs found and fixed in round 2 (not in the audit):
+- **MD5 was wrong on LP64** (`UINT4` was `unsigned long`): dtmail's APOP
+  digest and the `Content-MD5` headers of dtmail and dtcm were incorrect.
+- **dtterm:** double or triple click on an empty line crashed in any UTF-8
+  locale; `-sl 40000` crashed and `-sl 70000` silently kept 4,464 lines.
+- **dtwm:** a client reading `_DT_WORKSPACE_INFO` on a TITLE notice got the
+  old title (3 times in 60).
+- **dtlogin:** every failed login appended the font directories again
+  (`xset fp+` duplicates) on a server that does not reset.
+- **dtksh:** `${CB_CALL_DATA.EVENT.TYPE}` was usually empty (4-byte value
+  read as a long). `make check` was broken.
+- **DtCodelibs:** `~user` used `getpwnam_r` storage of a returned frame;
+  empty `` `cmd` `` output read `result[-1]`; `doit()` returned an
+  uninitialised character. DtSvc `islink()` answered yes for any file once
+  a `MODE l` test had run.
+- **-Wextra fixes:** missing `break`s in dtstyle and dtmail (wrong
+  messages); `dtsrclean -russell` fell into `-m`; DtSearch never rejected
+  an invalid date on LP64; dtcm `mblen() < 0` on a `size_t`; DtTerm
+  softkey length wrapped at 256 and overflowed; DtMmdb `disk_hash` MAX of
+  an unsigned difference and `buffer::skip` throwing unconditionally; csa
+  `abs()` of a long.
+- **Others:** dtprintinfo showed `(null)` dates and owners like `alice@lp
+  is ready` with CUPS's lpq; ksh93's `mamake -jN` could hang (lost
+  SIGCHLD, 4 of 10 runs at -j2); dtinfo's store destructor could throw at
+  exit; GifUtils.c violated strict aliasing; the Application Manager
+  folder was briefly empty at every login.
+
+### Verification on this branch (2026-10-12, GCC 16.2.1, 2 CPUs)
 
 - **Clean rebuild.** `./autogen.sh --disable-docs --prefix=/usr && make clean && make -j3`
-  exits 0 in **784 s**, ksh93 included. That is about 1,900 compile
-  commands. The build modifies no tracked file. A no-op `make -j3` takes
-  **3.2 s** and runs 0 compiles.
-- **`-Wall` warnings: 0.** Remaining diagnostics, all outside `-Wall`:
-  - 14 × `-Wdiscarded-qualifiers` (on by default in GCC) in the vendored
-    ksh93 (libast, libdll, libcmd, `sh/*.c`) and in its build-time copy
-    `programs/dtksh/init.c`. They show up now because ksh93 is compiled
-    with `$(CC)`/`$(CFLAGS)`.
-  - 2 × `<command-line>: 'SHOPT_DYNAMIC' redefined` in ksh93
-    `builtins.o`/`path.o`. dtksh passes `-DSHOPT_DYNAMIC=1`, and the
-    Mamfile adds `=0` for those two objects.
-  - 2 × `-Wdeprecated-declarations` in dtinfo (`XmStringGetNextSegment`,
-    `XmStringGetLtoR`). Neither has an exact replacement.
-  - bison grammar warnings in `lib/DtMmdb/StyleSheet/style.yy`: 1 useless
-    nonterminal, 2 useless rules, 5 shift/reduce conflicts.
+  exits 0 in **837 s**, ksh93 included. A no-op `make -j3` takes **3 s**.
+  `git status` is clean after the build: ksh93 leaves nothing outside
+  `ksh93/arch`.
+- **Warnings: 0 in CDE code** at the enabled level (`-Wall` plus the
+  curated `-Wextra` set). Remaining diagnostics, none from CDE sources:
+  - 14 × `-Wdiscarded-qualifiers` (on by default in GCC) and 2 ×
+    `'SHOPT_DYNAMIC' redefined` in the vendored ksh93 (libast, libdll,
+    libcmd, `sh/*.c`), which is compiled without CDE's warning flags;
+  - bison grammar warnings in `lib/DtMmdb/StyleSheet/style.yy` (1 useless
+    nonterminal, 2 useless rules, 5 shift/reduce conflicts);
   - 1 gawk dynamic-regexp warning from `programs/dtprintinfo/msg.awk`.
-  - No linker "dangerous function" notices.
-- **Smoke tests** under `xvfb-run` with the in-tree libraries, the in-tree
-  ttsession and dtwm running:
+- **Documentation build.** `./configure --prefix=/usr` (docs, help, man
+  pages, infolib and doc tools on), `make clean && make -j3`: exits 0 in
+  **913 s** with the same diagnostics and nothing else; it regenerated the
+  19 help volumes, 661 man pages and the CDEDOC infolib with its DtSearch
+  index. The `--disable-docs` configuration was restored afterwards
+  (`make -j3` then had nothing to do: 4 s, 0 warnings).
+- **Smoke tests** under Xvfb with the in-tree libraries, the in-tree
+  ttsession (`ttsession -s -d`) and dtwm running, two runs:
 
   | Program | Result |
   |---|---|
   | dtwm | Up for the whole run, empty stderr |
-  | `dtterm -e sh -c 'echo ok'` | Exits 0 |
-  | `dtfile -folder <dir>` | Alive after 5 s and after 8 s |
-  | `dtpad -standAlone <file>` | Alive after 5 s and after 8 s |
-  | dtcalc | Alive after 5 s and after 8 s |
-  | `dthelpview -helpVolume Help4Help.sdl` | Alive after 5 s and after 8 s |
+  | `ewmhtest all`, `ewmhtest -f all` | Pass (8 of 8 runs after the fix below) |
+  | `dtterm -e sh -c 'echo ok'` | Exits 0; the child ran 5 of 5 times in both runs |
+  | `dtfile -folder <dir>` | Alive after 6 s |
+  | `dtpad -standAlone <file>` | Alive after 5 s |
+  | dtcalc | Alive after 5 s |
+  | `dthelpview -helpVolume Help4Help` | Alive after 5 s |
+  | dtprintinfo | Alive after 5 s (no CUPS scheduler: lpstat fallback) |
+  | `dtmail -f <2-message mbox>` | Alive after 6 s; mbox not rewritten |
+  | `dtksh -c 'echo ok'` | Prints `ok`, exits 0 |
+  | ttsession | Still up at the end |
 
-  Across the two runs there was no crash text, no X error and no core dump
-  (`coredumpctl`).
-  - dtterm sometimes loses the output of a child that exits immediately:
-    `ok` was logged in 2 to 7 of 10 runs. The installed pre-branch dtterm
-    shows the same race (4 of 10), so it is not a regression.
-  - With the in-tree libtt on `LD_LIBRARY_PATH`, an autostarted
-    pre-branch `/usr/bin/ttsession` aborts in malloc. See the risks below.
+  No crash text, no X error and no core dump (`coredumpctl`). Expected
+  noise only: dtmail's missing `dtsymbol` font warning, dtprintinfo's
+  `lpstat: not found`, and dtfile's `PipeRead: broken pipe` from a worker
+  when dtfile is killed.
+  - `ewmhtest -f actions` failed about 1 run in 3 with "odd extents for a
+    title and a border": a race in the test, which read the frame before
+    dtwm had applied new MWM decorations. Fixed in the test (0efa96cf5);
+    10 of 10 runs pass.
 
-### Measured numbers (details in each item's note)
+### Measured numbers, round 2 (details in each item's note)
+
+Round 1's table is in git history (`git show c575f3f66:TODO.md`).
 
 | Area | Before → after |
 |---|---|
-| Greeter visible after CHALLENGE | 5.15 s → 0.17 s |
-| First X server start | −5 s (`GettyRunning` loop) |
-| Greeter resource load | 20.6 ms → 0.18 ms |
-| Server started through a forking wrapper | 5.00 s → 0.13 s |
-| dtsession_res, cache hit | 23–44 ms → 0.5–3 ms |
-| `WaitForWM` with mwm | 60.3 s → 0.36 s |
-| dthello fallback timeout | 240 s → 15 s |
-| Stale `.ICEauthority` lock | 20 s and failure → 11 s |
-| `dtdbcache -init` with a valid cache | 36.8 ms → 14.9 ms |
-| Action/datatype cache build | 17.4 ms → 6.5 ms |
-| Cache validation | 202 µs → 69–89 µs |
-| Data typing per file | 22–26 µs → 4.5–5.6 µs |
-| Attribute lookups per file | 8.4–9.2 µs → 1.6–1.9 µs |
-| Spawn with `RLIMIT_NOFILE` 524288 | 48–57 ms → ~7 ms |
-| `tt_file_netfile` | 112 ms → 0.02 ms |
-| `tt_open` | 7.2–8.2 ms → 4.5–4.8 ms |
-| 1000 queued ToolTalk notices | 500–1085 ms → 210–250 ms |
-| dtwm drag | 3.09 → 1.01 round trips per step; idle CPU 26% → 0.8% |
-| dtwm map | 18 → 10 round trips per client |
-| dtwm `WM_NAME` change | 40.5 µs → 1.7 µs |
-| dtfile refresh of 3000 files | CPU 23–30 → 3–5 ticks; `XGetGeometry` 500 → 0 |
-| dtfile change visible | 0–3 s per view → ~105 ms |
-| dtfile copy of 5100 small files | 1.1–4.5 s → 0.11 s |
-| dtterm `cat` 40 MB base64 (C) | 6.6–6.9 s → 1.6–1.9 s |
-| dtterm with `saveLines` 30000 | 11.9–14.6 s → 1.6–2.1 s |
-| dtmail open, 50k messages | 5.2–6.0 s → 2.2 s CPU; no mbox rewrite after open |
-| dtcm Find, rare match | 3.4–5.9 s → 0.02–0.05 s |
-| dtcm load, 20k repeating entries | 27–33 s → 0.8–1.2 s |
-| Help, repeated graphic topic | 368 `XPutImage` → 0 |
-| Help, 20k-word topic layout (UTF-8) | 1.39 s → 0.084 s |
-| Objects rebuilt after reconfigure | ~120 → 0 |
-| Unresolved symbols in the libraries | 0 |
-| `dtcalc` | NEEDED 23 → 7; loader time −20% |
-| Exported symbols | libtt 3299 → 1441; libDtMmdb 4030 → 894 |
+| Xsetup per greeter cycle | 17.5 ms → 11.6 ms |
+| Xsession run (stub clients) | 55.3 ms → 44.6 ms, 2 processes fewer |
+| Restored session, all windows up (median) | 513 ms → 440 ms; 7 apps ~575 → 500 ms |
+| Lock request → keyboard grabbed | 42 ms → 10 ms (median) |
+| Startup trace (Xvfb) | T_greeter 0.108 s; wm-ready 0.60 s, last of 5 restored clients 0.69 s |
+| `tt_open` | 3 sync RPCs → 1; open-close 288 µs → 205 µs (AF_UNIX) |
+| `ttdt_session_join` | 12 ADD_PATTERN RPCs → 1; 1.53–1.73 → 0.77–1.09 ms |
+| ttsession with 10k patterns | client CPU 1,472 → 35 µs per pattern |
+| dtexec spawn → `_DtActDtexecID` | 13.6–16.6 → 10.3–11.9 ms; DSOs 44 → 23 |
+| libDtSvc client | no libpam, libaudit, libcap-ng; no libstdc++ from libDtSvc |
+| DtEditor Replace All, 100k hits | 3.7 s → 32 ms |
+| Spell check with a 0.5 s filter | returns in 517 ms → 4 ms |
+| dtwm workspace switch | 2.43 → 0 round trips; shared backdrop: Xvfb CPU 780 → 20 ms per 400 switches |
+| dtwm `f.refresh`, 3020 windows | 240–714 ms → 43–47 ms |
+| dtfile navigation, 5 folders and back | 1 fork in total instead of one per read/update |
+| dtfile one-file change in 3000 entries | update process 6.6 ms → 1.1 ms |
+| dtfile 200 desktop objects | CPU 1.9 s → 0.17 s; RSS 29 → 18 MB |
+| dtfile trash restore, 100k entries | main-loop CPU 87 ms → 5.2 ms |
+| dtterm CJK cursor-addressed edits | 1160 ms → 777 ms CPU |
+| dtterm `yes`, 16 MB, C.UTF-8 | 3881 ms → 2770 ms CPU; `saveLines` limit ~32k → 2^23 |
+| dtmail with a held lock (42 s) | UI blocked 14.4 s → 0 s |
+| dtcm month view | rpc.cmsd CPU 15.3 → 5.0 ms; per change 142 → 6 X requests |
+| Help revisit (Filemgr) | 2.3 → 1.36 ms CPU, 1840 → 154 mallocs |
+| Help topic with a 1,500-item table | 346 ms → 27 ms |
+| dtcreate icon folder (285 icons) | 1.0–1.2 s → 0.03 s |
+| dtksh 40,000-step callback stress | 16.3 s → 2.5 s |
+| dtprintinfo, 40 s, two open queues | 25 child processes → 0 |
+| Man pages (`doc/en_US.UTF-8/man`) | 32.3 s → 2.5 s |
+| en_US infolib | 6.9–8.3 s → 6.2–6.6 s (NodeParser 3.7 → 1.42 s CPU) |
+| Whole-tree no-op `make` | 3.5–3.8 s → 2.9–3.2 s |
+
+Benchmark run of the final tree: `tools/bench/bench.py run --quick --syscalls`
+(976 s, every group passes) against `tools/bench/baseline.json` (taken
+mid-round at `99a05633b`):
+- ToolTalk open-close: 4 → 2 RPCs and 125 → 109 syscalls per operation;
+  `ttdt_open` + join: 32 → 8 RPCs and 464 → 220 syscalls (B3, B5).
+- dtfile on a 1k-entry folder: idle after 0.21–0.23 s → 0.13–0.15 s.
+- Every other case is within run-to-run noise. `bench.py compare -t 25`
+  flags two cases, both artifacts of `--quick`'s single round:
+  `editor-set-nul` (4.2–4.7 ms with `-r 5`, baseline 3.9 ms) and
+  `hold-window-outline` 3 → 4 round trips (the extra one is libXm's first
+  `XmGetPixmap` of the outline stipple; 3 with `-r 3`).
+- Loader: 0 unused direct dependencies in 57 binaries; dtprintinfo has the
+  most startup relocations (18,159, 56 DSOs, now with libcups).
 
 ### What remains (most valuable first)
 
-1. **Phase 0 wiring:**
-   - CI gate for `tools/bench`;
-   - the `CDE_STARTUP_TRACE` stamps in dtlogin, dtgreet, Xsession, dtsession and dtwm;
-   - dtcm and help harnesses;
-   - syscall counts.
-2. **Login:**
-   - move the dtdbcache file to `$XDG_RUNTIME_DIR` (lib/DtSvc `_DTDTSMMTEMPDIR`);
-   - fork restored clients early (2.3 P2);
-   - in-process font-path append in Xsetup.
-3. **ToolTalk:**
-   - combined OPEN RPC (B3);
-   - batched ADD_PATTERNS (B5);
-   - `TT_SESSION` inheritance in dtexec (B6);
-   - AF_UNIX transport (B2);
-   - cache-level pass-through and one-way TT_FILE dispatch (A3).
-4. **dtfile:**
-   - `SMART_DIR_UPDATE` / view-level incremental redisplay;
-   - a virtualized icon view;
-   - asynchronous typing of desktop objects;
-   - kqueue on BSD.
-5. **dtterm:**
-   - a cell array (T8);
-   - wider row types (`saveLines` > 32k);
-   - an Xft path;
-   - the 500 ms blink default (documented in the man pages under `doc/`).
-6. **dtwm:**
-   - build against the modernised libXm;
-   - icon-box inserts (the cost is inside libXm).
-7. **Build:**
-   - non-recursive `lib/DtMmdb`, `lib/tt/lib`, dtinfo and dthelp (6.3 P1);
-   - VPATH/distcheck;
-   - narrower `-fno-strict-aliasing` (blocked by the aliasing bug in `GifUtils.c`);
-   - libpam out of libDtSvc (needs a lazy `dlopen` in `SvcPam.c`);
-   - DtCodelibs to C;
-   - md5 and `EXPAND_TEMPLATES`;
-   - delete the dtudcfonted, dtudcexch and lib/pam sources;
-   - a `.gitignore` or out-of-tree build for the ~20 files the ksh93 build leaves in the tree.
-8. **Small code fixes outside the directories each batch owned:**
-   - the `%n` in dthelpprint `PrintTopics.c` (built with `_FORTIFY_SOURCE=1` until fixed);
+1. **lib/DtSvc:** move the dtdbcache file to `$XDG_RUNTIME_DIR` or
+   `~/.dt/cache`, keyed on the search path. The name comes from
+   `shared_cache_name()`/`_DtDtsMMCacheName()` and `_DTDTSMMTEMPDIR`, and
+   every libDtSvc client must agree on it; the login scripts need no change.
+2. **DtSearch:** declare `DtSearchQueryStart/Continue/Stop` in
+   `include/Dt/Search.h`, export them in `build-aux/symbols/libDtSearch.sym`,
+   then use them from dtinfo.
+3. **Startup trace:** ttsession entry/exit stamps (lib/tt), and a T_desktop
+   run under a real dtlogin as root (round 2 measured non-root).
+4. **dtfile:** `Desktop.c` sleeps 2 s after the last failed
+   `DtWsmGetWorkspaceList` when there is no window manager, even with
+   `retryLoadDesktop: 0`.
+5. **libXm** (`/home/dimmus/motif`): icon-box inserts are O(N²) in
+   `XmeNavigChangeManaged` and BulletinBoard layout (see 4.4).
+6. **dtmail:** time the FICLONERANGE save on a CoW filesystem; a tail-only
+   save on other filesystems needs a design that keeps the crash guarantee.
+7. **Build harness:** a `remake --profile` run (remake is not installed).
+8. **Small fixes still open from round 1:**
+   - the `%n` in dthelpprint `PrintTopics.c` (built with `_FORTIFY_SOURCE=1`);
    - dtmail `RoamApp.C` `formatPropPair` (built at level 2);
    - the 15 `--enable-lto` ODR warnings;
    - the stale `_XmPutScaledImage` prototype in `include/Xm/XmPrivate.h`;
    - the `ScreenInfo` leak in dtfile `Encaps.c`;
-   - dtwm `UI.c` `GetIconName` per animation frame;
-   - DtSvc `islink()` treating any passed lstat buffer as a link;
-   - a curated `-Wextra` and `-Werror` in CI.
+   - dtwm `UI.c` `GetIconName` per animation frame.
+9. **CI:** the build (`-Werror`, docs), bench and distcheck workflows have
+   not run on GitHub yet.
 
 ### Risks to know before merging
 
-- **libtt's internal C++ ABI changed while the soname stayed the same.**
-  The pre-branch `ttsession` aborts in malloc against the new libtt. That
-  is a lockstep upgrade of `ttsession`, `rpc.ttdbserver` and the tt tools.
-  A mixed install, for example a stale `/usr/bin/ttsession` found by
-  autostart, breaks ToolTalk.
-- **Export maps hide every symbol** that is not used in the tree and not
-  declared in an installed header. Out-of-tree users of private symbols in
-  libtt, libDtSvc, libDtHelp and the other libraries would fail to link or
-  load.
-- **The dtdbcache file format is now v2.** Old readers reject it safely and
-  build a private cache.
-- **Defaults that users will notice:**
-  - `Dtwm*freezeOnConfig: False` and `useWindowOutline: True`;
-  - the dthello timeout is 15 s;
-  - `Dtlogin*restartDelay` is 2 s;
-  - ttsession RPCs time out after 10 s (they used to wait forever; override with `TT_RPC_TIMEOUT`);
-  - the dtterm cursor stops blinking after 30 s idle, the visual bell lasts 100 ms, and bells within 200 ms are dropped;
-  - the front-panel session file follows `$HOME`;
-  - a `WM_HINTS` update that reuses the same icon pixmap id no longer refreshes the icon;
-  - release builds define `NDEBUG`, and hardening (`_FORTIFY_SOURCE=3`, BIND_NOW) is on by default;
-  - `--enable-german` now fails at build time without a de_DE locale;
-  - the dtudcfonted and dtudcexch data are no longer installed.
-- **Not exercised at runtime:**
-  - the dtlogin root-only paths (getty loop, restart delay);
-  - real XIM servers;
-  - DPMS-off in dtscreen;
-  - Xprint printing in dtcm;
-  - DtEncap PTY mode;
-  - WmIPC with a live ttsession;
-  - `IS_DIR_OBJ` with a dropped directory;
-  - cold-cache `madvise`;
-  - BSD code paths;
-  - long-lived real rpc.ttdbserver databases after the LP64 fixes.
-- **The ksh93 package build still leaves about 20 untracked files** in the
-  tree, so `git status` is not clean after a build.
+- **New ToolTalk wire procedures** (OPEN_PROCID 49, ADD_PATTERNS 50,
+  DEL_PATTERNS 51) and the **AF_UNIX transport**. Old clients never use
+  them, and new clients fall back on PROCUNAVAIL or a missing socket, so a
+  mixed old/new set works (tested all four ways). The socket lives in
+  `$XDG_RUNTIME_DIR/tooltalk/`; `TT_UNIX_SOCKET=0` turns it off.
+- **libtt's internal C++ ABI** changed in round 1 with the same soname; a
+  stale pre-branch `/usr/bin/ttsession` aborts against the new libtt.
+  Round 2 kept class layouts unchanged, and an attempted layout change in
+  `_Tt_object_table` confirmed the crash and was reverted. Upgrade
+  `ttsession`, `rpc.ttdbserver` and the tt tools together.
+- **libDtSvc** loads libpam with `dlopen` (LIBPAM_SONAME, then
+  `libpam.so.0/.1/.6`): a system without a libpam of those names gets
+  `PAM_SYSTEM_ERR` from the `_DtSvcPam*` calls instead of a link failure.
+  DtCodelibs was rewritten from C++ to C with the same exports.
+- **Defaults and files that users will notice (new in round 2):**
+  - `Dtsession*startClientsEarly: True` (restored clients start before
+    dtwm is ready; set False to get the old order);
+  - Xsession writes `~/.dt/cache/syntax-ok.*` and a `dtsearchpath` cache;
+  - dtlogin sets the font path itself when Xsetup mentions
+    `DTLOGIN_FONTPATH` (the shipped one does; site copies keep `xset`);
+  - MD5 output changed: `Content-MD5` headers and APOP digests are now
+    correct, so they differ from what the old binaries produced;
+  - dtprintinfo builds against libcups when found (`--without-cups` turns
+    it off) and shows the real job owner, date and title;
+  - dtwm links `libX11-xcb` and `libxcb`; its CPU per workspace switch is
+    about 10% higher (more, smaller event batches) while wall time and
+    round trips are lower.
+- **Defaults from round 1, still in force:** `Dtwm*freezeOnConfig: False`
+  and `useWindowOutline: True`; dthello timeout 15 s;
+  `Dtlogin*restartDelay` 2 s; ttsession RPC timeout 10 s
+  (`TT_RPC_TIMEOUT`); dtterm stops blinking after 30 s idle, 100 ms visual
+  bell, bells within 200 ms dropped; `NDEBUG` and hardening in release
+  builds; dtdbcache format v2; export maps hide symbols not used in the
+  tree or declared in installed headers.
+- **Large rewrites validated by differential harnesses, not by long use:**
+  dtterm's cell-array buffer and line ring, DtEditor Replace All, the
+  dtksh parse-tree cache, dtfile's sticky workers and `update_some`, the
+  help parsed-topic cache (about 22 KB per kept topic, 16 per display
+  area), dtcm's lookups without deep copies.
+- **Removed sources:** programs/dtudcfonted, programs/dtudcexch and lib/pam
+  (not built since round 1).
+- **Not exercised at runtime:** unlock followed by a second lock; the
+  FICLONERANGE success path (no CoW filesystem here); dtlogin as root with
+  the new font-path code and trace stamps; TT_QUEUE file observers; an
+  `XTHREADS` build; the round-1 list (getty loop, real XIM servers,
+  DPMS-off in dtscreen, Xprint printing in dtcm, DtEncap PTY mode, BSD
+  code paths, long-lived rpc.ttdbserver databases).
 
 ---
 
@@ -290,17 +341,17 @@ Priority legend:
 | 3 | Stop the 100 ms `poll()` sleep and per-call mount-table reparse in ToolTalk path mapping | `lib/tt/lib/util/tt_file_system.C:390-437` | −100 ms or more per file-scoped message, folder open and ttdbserver RPC | done |
 | 4 | Use the existing name index in `_DtDtsMMGetRecordByName` | `lib/DtSvc/DtUtil1/DtsMM.c:462-489` | O(1) instead of about 350 compares per attribute lookup; dtfile does about 10 per file | done |
 | 5 | Skip `XGetGeometry` in DtIcon; compare image names with `strcmp` | `lib/DtWidget/Icon.c:1761,2097,2241,2315,2353` | −1 round trip per icon per refresh in dtfile | done |
-| 6 | Cache the action/datatype DB across logins and validate it instead of rebuilding | `dtlogin/config/Xsession.src:295-300`, `DtsMM.c:326-334` | −130–190 ms per login (measured) | partial: validated and kept, not moved to $XDG_RUNTIME_DIR |
+| 6 | Cache the action/datatype DB across logins and validate it instead of rebuilding | `dtlogin/config/Xsession.src:295-300`, `DtsMM.c:326-334` | −130–190 ms per login (measured) | partial: validated and kept, not moved to $XDG_RUNTIME_DIR (name is fixed in lib/DtSvc) |
 | 7 | Use `close_range()` instead of closing or `fcntl`ing every fd up to `RLIMIT_NOFILE` | `DtEncap/spc-exec.c:165`, `dtsession/SmRestore.c:4755`, `CmdMain.c:1005`, `tt/slib/mp_ptype.C:391` | Up to 1M syscalls (0.1–1 s) per spawn under high fd limits | done |
 | 8 | Port mwm's move/resize fixes: no `XQueryPointer` polling, no `FlashOutline` `XSync` spin | `dtwm/WmWinConf.c:3613-3679,1516-1547` | No more 100% CPU while dragging | done |
 | 9 | dtterm: non-blocking read loop, damage tracking and one frame per ~16 ms | `DtTerm/TermPrim/TermPrim.c:2870`, `TermPrimScroll.c:509` | Roughly 10–50× `cat` throughput | done |
-| 10 | dtterm: ring-buffer scrollback instead of shifting pointers and copying every line | `TermPrimRender.c:731-936`, `TermPrimBuffer.c:1768` | O(1) per scrolled line | partial: O(1) swap/slide, short row types kept |
+| 10 | dtterm: ring-buffer scrollback instead of shifting pointers and copying every line | `TermPrimRender.c:731-936`, `TermPrimBuffer.c:1768` | O(1) per scrolled line | done (ring of line pointers, int row types) |
 | 11 | dtfile: inotify/kqueue instead of a 3 s stat poll plus 180 s forks | `dtfile/Directory.c:4614-4757`, `Main.c:811-818` | Idle wakeups to zero; instant updates | done (inotify; no kqueue) |
 | 12 | dtfile: no rebuild of every icon gadget on every refresh | `dtfile/File.c:5986,6066,7257` | O(changed) instead of O(N) refresh | done |
 | 13 | `dtfile_copy`: `copy_file_range` and no `XSync` per 2 KB block | `dtfile/dtcopy/fsrtns.c:91-153`, `main_dtcopy.c:505-532` | −512k round trips per GB copied | done |
 | 14 | dtmail: O(1) message handles instead of `indexof` scans | `dtmail/libDtMail/RFC/RFCMailBox.C:988,1050` | O(N) instead of O(N²) mailbox open | done |
-| 15 | dtmail: don't dirty every message without `Content-Length` | `RFCMessage.C:999` | No full mbox rewrite after open | done (partial rewrite not done) |
-| 16 | dtprintinfo: libcups or one async `lpstat` instead of 6 forks per printer every 30 s on the UI thread | `dtprintinfo/objects/PrintObj/Queue.C:58-61`, `util/Invoke.C:121-183` | UI no longer freezes | done (async lpstat, no libcups) |
+| 15 | dtmail: don't dirty every message without `Content-Length` | `RFCMessage.C:999` | No full mbox rewrite after open | done (tail-only write on CoW filesystems via FICLONERANGE) |
+| 16 | dtprintinfo: libcups or one async `lpstat` instead of 6 forks per printer every 30 s on the UI thread | `dtprintinfo/objects/PrintObj/Queue.C:58-61`, `util/Invoke.C:121-183` | UI no longer freezes | done (libcups when available, async lpstat otherwise) |
 | 17 | `LT_INIT([disable-static])` | `configure.ac:33` | −751 compiles (about 21% of the build) | done |
 | 18 | Per-program `LDADD`, real library `_LIBADD`, `-Wl,--as-needed` | `configure.ac:176-177`, `lib/*/Makefile.am` | About −10 DSOs and −30% relocations per process start | done |
 | 19 | Drop `.NOTPARALLEL` with grouped targets or stamps | `dtappbuilder/src/ab/Makefile.am:3`, `dthelp/parser/**`, `ttsnoop` | About 280 TUs compiled in parallel | done |
@@ -311,7 +362,7 @@ Priority legend:
 ## Phase 0 — Measure first
 
 ### 0.1 Harnesses
-- [ ] Add `tools/bench/` (or `tests/bench/`), modelled on Motif's `xmbench`, `mwmbench` and `xmbench-proxy` (`/home/dimmus/motif/src/tests/bench`). *(status: partial: tools/bench/ has the preload counter (mallocs, X requests, round trips), JSON output, Xvfb runner, compare gate and cdebench-proxy; no syscall counts (no strace/perf here) and no CI job)*
+- [x] Add `tools/bench/` (or `tests/bench/`), modelled on Motif's `xmbench`, `mwmbench` and `xmbench-proxy` (`/home/dimmus/motif/src/tests/bench`). *(status: done; syscalls per op from strace with begin/end markers (syscount.py, `bench.py run --syscalls`); compare fails on >10% more syscalls or RPCs, more DSOs or unused deps, >5% more relocations; CI job .github/workflows/bench.yml (base vs head on one runner, not yet run on GitHub))*
   - Run each case headless under `xvfb-run -s "-screen 0 1920x1080x24 +extension RENDER"`.
   - Pin with `taskset` and take the median of 5 runs.
   - Write JSON and fail CI on a regression above 5% or on any increase in round trips.
@@ -321,7 +372,7 @@ Priority legend:
     - syscalls (`strace -c` / `perf trace -s`);
     - X requests (`XNextRequest` delta);
     - **round trips**, through an LD_PRELOAD on `_XReply`, or through the delay proxy so that they show up in wall time.
-- [ ] **Startup trace.** Add an opt-in `CDE_STARTUP_TRACE=<file>` that appends `CLOCK_MONOTONIC` stamps. *(status: partial: tools/bench/startup-trace.{h,ksh,py} exist; the stamp calls in dtlogin, dtgreet, Xsession, dtsession and dtwm are not added yet)*
+- [ ] **Startup trace.** Add an opt-in `CDE_STARTUP_TRACE=<file>` that appends `CLOCK_MONOTONIC` stamps. *(status: partial: stamps in dtlogin, dtgreet, Xsetup/Xstartup/Xsession, dthello, dtdbcache, dtsession (99a05633b) and dtwm start/ready/frontpanel-mapped (b142f74d1); dtlogin writes the clock line itself. Measured under Xvfb: T_greeter 0.108 s median; restored session of 5 clients wm-ready 0.60 s, last client mapped 0.69 s (Xsession run as the user, auth-ok stamped at its start). Missing: ttsession entry/exit stamps (lib/tt))*
   - In C use `clock_gettime`; in ksh use `printf '%(%s.%N)T'`, which needs no fork.
   - Stamp points:
     - dtlogin: master start, server exec, SIGUSR1, greeter fork;
@@ -344,7 +395,7 @@ Priority legend:
   - `XeSPCSpawn("/bin/true")` ×100 under `ulimit -n 1024` and under `ulimit -n 1048576`;
   - `DtComboBoxAddItem` / `DtSpinBoxAddItem` ×1k;
   - DtEditor cases (1 MB with 100k NUL runs; Replace All with 10k hits; 10k cursor moves with the status line on).
-- [ ] **`ttbench`** (links libtt; started with `ttsession -S`, plus an optional `rpc.ttdbserver`): *(status: partial: tools/bench/ttbench.c covers the cases; TT_STATS counters in libtt not added)*
+- [x] **`ttbench`** (links libtt; started with `ttsession -S`, plus an optional `rpc.ttdbserver`): *(status: done; TT_STATS=1 per-procedure counters (sync/one-way, time, failures, per-interface connections) in libtt and around every rpc.ttdbserver clnt_call (lib/tt/lib/util/tt_stats.C); ttbench-rpcs.py gives rpcs_per_op; file-notice-db runs end to end against a user-started `rpc.ttdbserver -S`)*
   - `tt_open`/`tt_close` ×200;
   - `ttdt_open` + `ttdt_session_join`;
   - request/reply ping ×10k;
@@ -353,7 +404,7 @@ Priority legend:
   - `tt_message_file_set` / `tt_file_netfile` ×100 (watch for `poll([],0,100)`);
   - file-scoped notices with and without rpc.ttdbserver.
   - Add `TT_STATS=1` counters to `_Tt_rpc_client::call` (per procedure, sync vs one-way) and to `_Tt_db_client`.
-- [ ] **dtwm**: reuse `mwmbench -m dtwm` together with `libmwmbench_preload.so`. Add these cases: *(status: partial: dtwmbench: map, map Dtterm, destroy, title, title-net, hints-urgency, 3 drag variants; no workspace switch, front panel, backdrop, f.refresh or hold-still cases)*
+- [x] **dtwm**: reuse `mwmbench -m dtwm` together with `libmwmbench_preload.so`. Add these cases: *(status: done; added ws-switch, fp-switch(-tt), backdrop (Xvfb RSS instead of xrestop, not installed), refresh/refresh-cover, drag-move-xor and 4 hold-still cases, all with wakeup counts; TTSESSION_CMD stops the installed ttsession from being autostarted)*
 
   | Case | What it does |
   |---|---|
@@ -366,31 +417,31 @@ Priority legend:
   | backdrop | 100 fit/fill backdrop changes (watch pixmap memory with `xrestop`) |
   | `f.refresh` | with 200 clients |
 
-- [ ] **dtterm**: *(status: partial: dtterm-throughput.sh: base64 and yes in C/UTF-8 with -sl 4s/10000; no vtebench cases, no per-screenful or less page-down counts)*
+- [x] **dtterm**: *(status: done; vtgen.py/dtterm-vtebench.sh (the 6 vtebench cases, one screen per write), ttywrite.sh (requests and round trips of the output alone), requests per 24-line screen, dtterm-less.py page-down behind cdebench-proxy -d 2)*
   - Time `cat` of 100 MB of base64 text and `yes | head -c 200M`, in `LANG=C` and in UTF-8, with `-sl 4s` and with `-sl 10000`.
   - vtebench cases: `dense_cells`, `scrolling`, `scrolling_in_region_*`, `unicode`, `cursor_motion`.
   - Requests per screenful, and round trips per output burst (the target is 0).
   - Round trips per `less` page-down with 2 ms of added delay.
-- [ ] **dtfile**: *(status: partial: dtfile-gendir.py and dtfile-time.sh (first window, idle, per view mode, preload totals); no strace/xtrace counts, idle wakeups, dtfile_copy or DT_PERFORMANCE runs)*
+- [x] **dtfile**: *(status: done; dtfile-time.sh -S (strace, readers apart), -x (requests per opcode via cdebench-proxy; the installed xtrace is glibc's), -w (idle wakeups from /proc); dtfile-copy.sh; dtfile-perf.sh builds a -DDT_PERFORMANCE dtfile. Found: dtfile sleeps 2 s without a WM (Desktop.c), so runs now use the tree's dtwm)*
   - Directories of 1k/10k/100k entries: time to first paint and to all done, for each view mode, cold and warm.
   - `strace -f -c` for the reader.
   - `xtrace -c` counts of `GetGeometry`, `GetInputFocus` and `ClearArea`.
   - Idle wakeups over 10 min (`perf stat -e sched:sched_process_fork,sched:sched_wakeup`).
   - `dtfile_copy` of 1 GB against `cp`.
   - The existing `-DDT_PERFORMANCE` timers.
-- [ ] **dtmail**: synthetic mboxes of 1k/10k/50k messages, without `Content-Length` and with 30% multipart. Measure time to first paint, Sort, delete all, and 10 idle minutes under `strace -c`. *(status: partial: mbox-gen.py and dtmail-time.sh (open to idle, rewrite check); no Sort/delete-all/idle runs)*
-- [ ] **dtcm**: 5k one-time entries plus 200 repeating entries. Time month and year lookups and Find "all", and count RPCs and `/etc/localtime` opens. *(status: not done: needs an rpc.cmsd/rpcbind setup and a calendar populator)*
-- [ ] **help**: *(status: not done: no dthelpprint/dthelpview harness; apptime.py can time launches)*
+- [x] **dtmail**: synthetic mboxes of 1k/10k/50k messages, without `Content-Length` and with 30% multipart. Measure time to first paint, Sort, delete all, and 10 idle minutes under `strace -c`. *(status: done; dtmail-time.sh runs By Sender/Size/Date sorts, Select All + Delete and a 60 s idle window, -S adds strace; 10k messages: each sort 0.16-0.20 s, idle 8.5 wakeups/min, 0 forks)*
+- [x] **dtcm**: 5k one-time entries plus 200 repeating entries. Time month and year lookups and Find "all", and count RPCs and `/etc/localtime` opens. *(status: done; tools/bench/dtcm/: rpc.cmsd in a user namespace (no root), dtcmbench populate/bench/dump/change, run.sh with strace and a dtcm-on-Xvfb pass; baseline month view 912 entries, 71,966 /etc/localtime stats per 12 month views)*
+- [x] **help**: *(status: done; tools/bench/help/: helpbench.c (13 in-process DtHelpDialog cases with mallocs/requests/round trips and per-call Xlib counts), run.py groups print/view/mmdb/dtsearch, -S screenshots for cmp)*
   - `dthelpprint -allTopics` (no canvas; still needs Xvfb) under `perf`/callgrind.
   - `dthelpview` back/forward over topics that contain TIFFs.
   - Page-down through `dthelpview -manPage ksh`.
   - Index "complete" over all volumes.
-- [ ] **Build**: *(status: partial: cc-trace.sh + cc-trace2json.py added; clean/no-op/config.status timings are recorded in the status section above, not by a harness; no remake --profile or ccache runs)*
+- [ ] **Build**: *(status: partial: tools/bench/build-time.sh times configure, clean, no-op and `config.status && make` in a shared clone (used for the 6.3 P1 numbers) plus the cc-trace Chrome trace and a two-clone ccache mode; `remake --profile` (-R) not run: remake is not installed)*
   - `time make -j$(nproc)` for a clean build, a no-op rebuild, and `./config.status && make` (120 objects are rebuilt today).
   - A `CC` wrapper that logs per-TU start and end times, converted to Chrome trace JSON.
   - `remake --profile`.
   - `ccache -s` across two worktrees.
-- [ ] **Loader cost**: track `LD_DEBUG=statistics`, `ldd -u -r` and `nm -D --defined-only | wc -l` per binary and per library in CI. Today `dtcalc` loads 48 DSOs and does 11,047 relocations. *(status: partial: tools/bench/loader-cost.sh with a 61-binary baseline; not tracked in CI)*
+- [x] **Loader cost**: track `LD_DEBUG=statistics`, `ldd -u -r` and `nm -D --defined-only | wc -l` per binary and per library in CI. Today `dtcalc` loads 48 DSOs and does 11,047 relocations. *(status: done; loader group gated by `bench.py compare` (any more DSOs or unused deps, >5% more relocations) and run in CI; 57 binaries, unused deps 0 everywhere)*
 
 ---
 
@@ -427,7 +478,7 @@ Priority legend:
 - [x] **[verified]** `lib/tt/lib/mp/mp_auth.h:62-64`, `mp_auth_functions.C:160-191`: the `~/.TTauthority` lock costs 10 × `sleep(2)`, and this happens **while the X server is grabbed** (see 3.3). *(status: done; 100 ms polling, 10 s dead time; orphaned lock 20 s+failure -> 11.0 s; the X grab is no longer held (D1))*
 - [x] **[verified]** `dtsession/SmLock.c:591,599`: grab retries use `sleep(1)` (up to 6 s of frozen session manager). *(status: done; retries from a 100 ms XtAppAddTimeOut, 5 s total; dtsession no longer freezes)*
   - Fix: retry from an `XtAppAddTimeOut` (50–100 ms).
-- [ ] **[verified]** `dtmail/libDtMail/RFC/RFCMailBox.C:4001,4014` and `FileShare.C:352`: on lock contention dtmail does `sleep(5)` per retry, on the UI thread, for up to 5 min. *(status: partial: exponential backoff 10 ms -> 1 s in lockFile (5.0 s -> 0.32 s with a 0.3 s holder) and 50 ms -> 2 s in FileShare (its 900000-ms-as-seconds bug fixed); still synchronous, not an Xt timer)*
+- [x] **[verified]** `dtmail/libDtMail/RFC/RFCMailBox.C:4001,4014` and `FileShare.C:352`: on lock contention dtmail does `sleep(5)` per retry, on the UI thread, for up to 5 min. *(status: done; background check and autosave never wait for a busy .lock (retried from an Xt timer, 50 ms doubling to 6.4 s; old stale-lock rule after 5 min); blocking waits end on inotify of the lock's directory with timed backoff for NFS; UI blocked 14.4 s -> 0 with a 42 s holder, lock taken 0-7 ms after release. FileShare (ToolTalk locking) handover still synchronous, see B8)*
   - Fix: backoff from about 10 ms, driven by an Xt timer.
 - [x] **[verified]** `dtudcfonted/dtcpftogpf/cpftogpf.c:376`: an unconditional `sleep(1)` after `wait()`. *(status: done; sleep removed, waitpid on the child; dtudcfonted is not built, syntax-checked only)*
   - Fix: delete it.
@@ -446,15 +497,15 @@ Priority legend:
   - Fix:
     - inotify (Linux) or kqueue (BSD) watches through `XtAppAddInput`, feeding an update of only the changed entries.
     - Keep polling as a fallback (NFS) using `st_mtim` and `st_ctim`.
-- [ ] **[verified]** dtmail polls every 15 s (`RoamApp.C:1460-1466,1629-1641`). Every 60 s while idle it shows the busy cursor on **every window** *before* checking anything (`RFCMailBox.C:2655`; `RoamApp.C:1712-1749`), then does `open(O_SYNC)` + a 1-byte read (`IO.C:369-401`). *(status: partial: busy cursor only when there is real work (20 idle checks: 20 -> 0); plain stat() instead of O_SYNC open on known-local filesystems; no inotify, mailrc lookups not cached (negligible))*
+- [ ] **[verified]** dtmail polls every 15 s (`RoamApp.C:1460-1466,1629-1641`). Every 60 s while idle it shows the busy cursor on **every window** *before* checking anything (`RFCMailBox.C:2655`; `RoamApp.C:1712-1749`), then does `open(O_SYNC)` + a 1-byte read (`IO.C:369-401`). *(status: won't do (rest): size/mtime first and busy only on change were done in round 1; inotify measured: at most 24 of 321 syscalls per idle 10 min, and the 15 s tick must stay (autosave, inactivityinterval, retrieveinterval); inotify is used for lock waits instead (1.1))*
   - Fix: compare size and mtime first; show busy only on change; use inotify on local filesystems; cache mailrc values.
-- [x] **[verified]** dtprintinfo: every 30 s each visible printer runs 2 × `ksh -c "lpstat … | awk"` (about 6 processes), plus `lpq` for expanded queues. This happens **synchronously on the UI thread** (`DtPrinterIcon.C:457-492`, `Queue.C:58-61`, `util/Invoke.C:121-183`). `wait()` reaps any child. *(status: done; one shared timer, one async `lpstat -a -p` per tick through XtAppAddInput, async lpq, waitpid on the exact pid, ticks skipped while hidden; 65 -> 18 forks/40 s, UI stalls 7.7 s -> 0.45 s. lpstat, not libcups (no headers installed))*
+- [x] **[verified]** dtprintinfo: every 30 s each visible printer runs 2 × `ksh -c "lpstat … | awk"` (about 6 processes), plus `lpq` for expanded queues. This happens **synchronously on the UI thread** (`DtPrinterIcon.C:457-492`, `Queue.C:58-61`, `util/Invoke.C:121-183`). `wait()` reaps any child. *(status: done; one shared timer, one async `lpstat -a -p` per tick through XtAppAddInput, async lpq, waitpid on the exact pid, ticks skipped while hidden; 65 -> 18 forks/40 s, UI stalls 7.7 s -> 0.45 s. libcups since round 2 (5dda73247, configure --with-cups 33d4f8078): one CUPS-Get-Printers per tick and one Get-Jobs per open queue from threads, 25 -> 0 child processes per 40 s; lpstat/lpq kept when no scheduler answers)*
   - Fix: libcups (`cupsGetDests`/`cupsGetJobs`), or one `lpstat -a -p -o` for all queues; asynchronous through `XtAppAddInput`; `waitpid` on the exact pid; one shared timer.
 - [x] **[verified]** Front panel mail and monitor controls `stat()` every 30 s per control (`lib/DtWidget/Control.c:448-529`). *(status: done; one shared inotify fd on local filesystems, 1 s quiet debounce; poll kept for NFS etc.; 0 stat()s idle, changes in 1-2 s)*
   - Fix: inotify where available.
 - [x] **[verified]** dtimsstart polls the input-method selection owner once a second for up to 180 s (`start.c:141-157`, `win.c:1697-1746`, `xims.h:82-84`), which adds about 0.5 s to CJK logins. *(status: done; exponential polling 20 ms -> 250 ms; D=0: 1.17 -> 0.20 s. XFixes not used (needs a configure dependency))*
   - Fix: `XFixesSelectSelectionInput`, or 20 ms exponential polling.
-- [ ] **[verified]** dtterm's cursor blink at 250 ms (`TermPrim.c:194-197`) means 4 wakeups/s forever. *(status: partial: timer armed only when not armed; blinking stops after 30 s idle (181 -> 126 arms/45 s); the 250 ms default is kept because it is documented in the man pages)*
+- [ ] **[verified]** dtterm's cursor blink at 250 ms (`TermPrim.c:194-197`) means 4 wakeups/s forever. *(status: won't do (rest): timer re-arm and 30 s idle stop done in round 1 (0 syscalls after 35 s); blinking costs ~24 syscalls/s only during activity. 250 ms is the documented default of the public DtTerm blinkRate resource (Term.sgm, dtterm(1), Terminal help); Dtterm*blinkRate: 500 or 0 already opts out)*
   - Fix: 500 ms; stop blinking after N s idle; re-arm the timer only when it is not already armed (`TermPrimCursor.c:341-346,507-511`).
 - [x] **[verified]** dticon's selection "marching ants" timer re-arms every 300 ms indefinitely, even while iconified (`graphics.c:178,266,325`). *(status: done; timer paused while unmapped or unfocused; 10 -> 0 draws/3 s when unfocused)*
   - Fix: stop it on unmap or focus-out.
@@ -472,7 +523,7 @@ Today's critical path is serial: dtlogin → `system(xrdb)` (cpp) → Xsetup (ks
 ### 2.1 dtlogin and dtgreet
 - [x] **[verified]** `dtlogin/session.c:648-711`: greeter resources are merged in-process, written to a temp file, then loaded through `system("xrdb … -load")`. That is sh, xrdb and cpp (driver plus `cc1`) on every greeter cycle. *(status: done; RESOURCE_MANAGER set in-process with XChangeProperty; xrdb -nocpp only as fallback; 20.6 -> 0.18 ms per greeter cycle; also fixes cpp mangling of values)*
   - Fix: `XChangeProperty(RESOURCE_MANAGER)` directly from the in-memory Xrm database; at minimum pass `-nocpp`.
-- [ ] **[verified]** Xsetup forks `xset fp+` per greeter (`config/_common.ksh.src:283-303`), then `ApplyFontPathMods` does `XSetFontPath` + `XSync` (`fontpath.c:168-169`), and dtsession sets the font path again (`SmRestore.c:1301`). *(status: partial: one `xset fp+` (falls back to two); ApplyFontPathMods and dtsession skip no-op sets; the in-process append is not done (Xsetup is a user-editable script))*
+- [x] **[verified]** Xsetup forks `xset fp+` per greeter (`config/_common.ksh.src:283-303`), then `ApplyFontPathMods` does `XSetFontPath` + `XSync` (`fontpath.c:168-169`), and dtsession sets the font path again (`SmRestore.c:1301`). *(status: done; dtlogin appends the alias and server font directories in-process (one XGetFontPath, skips present entries, one XSetFontPath, the script's fallbacks), exports DTLOGIN_FONTPATH=done and Xsetup skips xset; only when the Xsetup file mentions DTLOGIN_FONTPATH, so edited copies keep their xset calls. Xsetup 17.5 -> 11.6 ms per greeter; repeated failed logins no longer grow the path (e1ec943ff))*
   - Fix: one in-process append that skips entries already present; skip no-op sets.
 - [x] **[verified]** `config/Xreset.src:43-46`: `dtprintinfo -populate` runs synchronously at logout, before the next greeter. It forks lpstat/awk per queue plus `system(mkdir/cp)` per printer (`DtPrinterIcon.C:86-92,277,296`). *(status: done; runs in the background; -populate itself 38 -> 22 ms (one lpstat -v, in-process mkdir/cp); 'skip when unchanged' not done)*
   - Fix: run it in the background or at boot; skip it when the printer list is unchanged.
@@ -481,7 +532,7 @@ Today's critical path is serial: dtlogin → `system(xrdb)` (cpp) → Xsetup (ks
 - [x] `util.c:441-610` (`MakeLangList`): O(n²) `strcat` and an insertion sort under a 30 s alarm. It is cheap today; bound it. *(status: done; running length, d_type, qsort+dedupe; byte-identical output; fixes a lang[500] stack overflow)*
 
 ### 2.2 Xsession and friends
-- [ ] **[verified] P1** The action/datatype cache is rebuilt from scratch on every login, synchronously, and deleted three times. *(status: partial: dtdbcache -init no longer initializes X, validates and keeps a valid cache (36.8 -> 14.9 ms), runs in parallel with ttsession; the rm's are gone (Xstartup removes only a foreign file). Not done: moving the cache to $XDG_RUNTIME_DIR/~/.dt/cache keyed on the search path (lib/DtSvc _DTDTSMMTEMPDIR))*
+- [ ] **[verified] P1** The action/datatype cache is rebuilt from scratch on every login, synchronously, and deleted three times. *(status: partial: round 1 parts stand (-init without X, validate and keep 36.8 -> 14.9 ms, parallel with ttsession, no rm's). Moving the cache to $XDG_RUNTIME_DIR/~/.dt/cache keyed on the search path is not done: the name comes from lib/DtSvc (DtsMM.c shared_cache_name, _DTDTSMMTEMPDIR in include/Dt/DtsMM.h) and every libDtSvc client must agree on it; no script change would be needed)*
   - Built at `Xsession.src:295,547-565`; deleted at `Xsession.src:300,570`, `Xstartup.src:45-49` and `Xreset.src:68-76`.
   - `dtdbcache -init` calls `_DtDtsMMInit(1)` → `_DtDtsMMCreateDb`. That parses about 93 `.dt` files and writes about 220 KB, after a full `XtAppInitialize` it does not need (`dtdbcache/Main.c:95-106,161`). Measured at **130–190 ms**.
   - Fix:
@@ -492,7 +543,7 @@ Today's critical path is serial: dtlogin → `system(xrdb)` (cpp) → Xsetup (ks
     - Remove the three `rm`s.
 - [x] **[verified] P2** `lib/tt/bin/ttsession/mp_server.C:391-448`: the ttsession parent waits until the child has finished `init_types()`. Clients may already connect before that (see the comment at `:395-401`). *(status: done; child signals the parent right after s_init(), before init_types())*
   - Fix: signal the parent right after `s_init()`.
-- [ ] **[verified] P2** Xsession runs about 15–25 short forks before dtsession: *(status: partial: 38-39 -> 28-29 processes per Xsession run (ksh93 printf %T, /proc reads, globs, SetFirst, true >>); dtsearchpath links 23 libs instead of 48 (14.9 -> 6.6 ms). Kept: the two -n profile checks (an mtime gate can be fooled) and the uncached dtsearchpath output)*
+- [x] **[verified] P2** Xsession runs about 15–25 short forks before dtsession: *(status: done; ksh93 CheckSyntax keeps the text of a profile that passed -n in ~/.dt/cache/syntax-ok.* (content compare, no fork; rechecks when the shell is newer); `dtsearchpath -ksh -cache` writes a ksh script valid only while every env variable and -d/-e/-f/-L test it used still holds (no cache on first login, ToolTalk mapping or changes); session environment byte-identical; 55.3 -> 44.6 ms per run, 2 processes fewer (9dbe4d9b3))*
   - `$(date)`;
   - log-rotation `rm`/`mv`/`touch`;
   - `hostname`;
@@ -503,7 +554,7 @@ Today's critical path is serial: dtlogin → `system(xrdb)` (cpp) → Xsetup (ks
   - `uname -n`;
   - several `$(GetFirst …)` subshells.
   - Fix: ksh93 builtins (`printf '%(%c)T'`, `$(</proc/$PPID/comm)`, `: >file`, globs); drop or mtime-gate the `-n` checks; cache the dtsearchpath output keyed on directory mtimes.
-- [ ] **[verified] P3** `dtappgather` (`dtappg/dtappgather.C:117-131,270-300`) rebuilds the app-manager directory on every login. It calls `regcomp` **inside** the per-entry loop and never calls `regfree` (`libCliSrv/UnixEnv.C:291-302`). *(status: partial: regex compiled once and freed, d_type, one stat per link, setuid binary links 6 libs instead of 48; the mtime skip is not done (would miss changes inside linked dirs))*
+- [x] **[verified] P3** `dtappgather` (`dtappg/dtappgather.C:117-131,270-300`) rebuilds the app-manager directory on every login. It calls `regcomp` **inside** the per-entry loop and never calls `regfree` (`libCliSrv/UnixEnv.C:291-302`). *(status: done; exact in-place update instead of an mtime gate: links with the right target are kept (readlink), only stale ones removed and missing ones made, so no cache file is written by the setuid binary; steady state makes no unlink/symlink and the Application Manager is never briefly empty; 189 -> 119 syscalls, 3.9 -> 3.6 ms (background) (7e2a6c54e))*
   - Fix: compile the regex once, use `d_type`, and skip when the source directory mtimes are unchanged.
 
 ### 2.3 dtsession
@@ -513,7 +564,7 @@ Today's critical path is serial: dtlogin → `system(xrdb)` (cpp) → Xsetup (ks
     - Load the saved `dt.resources` with `-nocpp` or in-process.
 - [x] **[verified] P1 (non-dtwm WMs)** `SmRestore.c:646-701,3919-3949`: `WaitForWM` waits up to 60 s for `_DT_WM_READY`, which only dtwm sends. *(status: done; WM_S<n> owner, MANAGER ClientMessage or 200 ms owner poll; 10 s cap for non-dtwm WMs; mwm 60.3 -> 0.36 s, twm 60.2 -> 10.1 s)*
   - Fix: also accept ICCCM readiness (the `WM_S<n>` selection owner or a MANAGER ClientMessage); use a short fallback timeout.
-- [ ] **[verified] P2** Restored clients are not forked until the window manager is fully up (`SmRestore.c:2112-2141,4331-4400`). *(status: not done: needs StartWM split and the SM_CM_HANDSHAKE reworked, with placement measured against real dtwm; not verifiable headless)*
+- [x] **[verified] P2** Restored clients are not forked until the window manager is fully up (`SmRestore.c:2112-2141,4331-4400`). *(status: done; Dtsession*startClientsEarly (default True): BeginWM/FinishWM split; clients forked once dtwm has SubstructureRedirect and DtWsmGetWorkspaceList succeeds (10 ms poll), ~160 ms after dtwm starts; not used with contManagement handshaking or another WM. Placement identical in 76 runs with real dtwm; all windows up 30-70 ms sooner (513 -> 440 ms median), 7-app session ~575 -> 500 ms (4d974261f))*
   - Fix: fork dtwm and then the clients immediately, behind a resource, and measure placement.
 - [x] **[verified] P2** `SrvPalette.c:1242-1285,1448-1449,485`: on TrueColor, about 40 synchronous `XAllocColor` calls plus an `XSync` per screen. *(status: done; pixels computed locally on a verified TrueColor visual (0 mismatches on 20000 colours at depth 24/30); one XSync after the loop)*
   - Fix: compute pixels from the visual masks; pipeline the rest.
@@ -524,11 +575,11 @@ Today's critical path is serial: dtlogin → `system(xrdb)` (cpp) → Xsetup (ks
 - [x] **[verified] P3** `lib/DtSvc/DtUtil2/addToRes.c:440-506`: every `_DtAddToResource` fetches, re-parses (with an O(n²) duplicate check), sorts and rewrites **both** `RESOURCE_MANAGER` and `_DT_SM_PREFERENCES`, then calls `XSync`. That is about 4 round trips per call. *(status: done; addToRes.c: qsort dedup, one XSync per call (3000 entries 27.3 -> 6.0 ms); dtsession OutputResource batched into one call)*
   - Callers: `SrvPalette.c:319,658`, `SmRestore.c:1021`, and in dtwm `WmBackdrop.c:749-750`, `WmWrkspace.c:298,3311-3340,3737` (once per workspace in a loop).
   - Fix: batch everything into one call per save; hash-based dedup; no `XSync`.
-- [ ] **[verified] P3** `SmMain.c:318,323`: a second full `XtOpenDisplay` for the color server. *(status: not done: kept on purpose: the colour server connection is used at once, and sharing it would break palette colours in dtsession's dialogs (~1-2 ms cost))*
+- [ ] **[verified] P3** `SmMain.c:318,323`: a second full `XtOpenDisplay` for the color server. *(status: won't do: InitializeDtcolor runs at once and owns the palette selections, so it cannot be lazy; a shared connection breaks dialog colours (ColorObj asks the colour server during its own initialisation); presetting the Xrm database is ignored by libXt. Measured cost: 0.3 ms median (1.1 ms with a 58 KB RESOURCE_MANAGER) once per login)*
   - Fix: open it lazily, or share the connection.
 - [x] **[verified] P3** `SmRestore.c:1301,1445,1486,1504-1521`: `RestoreSettings` re-applies the font path, pointer mapping, keyboard mapping (broadcasting MappingNotify to every client) and modifier mapping unconditionally. *(status: done; font path, pointer, keyboard and modifier mappings are set only when they differ from the server's)*
   - Fix: compare with the server's current state first.
-- [ ] **[verified] P3** `SmLock.c:527,540,563-575`: two `XSync`s and a duplicate pointer grab on lock. *(status: partial: both XSyncs and the duplicate grab removed; the lock dialog is not pre-created (would freeze palette/saver settings at creation))*
+- [x] **[verified] P3** `SmLock.c:527,540,563-575`: two `XSync`s and a duplicate pointer grab on lock. *(status: done; XSyncs and duplicate grab removed in round 1; the lock dialog of the kind the saver settings imply is pre-created in an idle work proc at startup and after each unlock (TrueColor/DirectColor only; colormapped displays keep lazy creation); lock request to keyboard grab 42 -> 10 ms median, locked screen pixel-identical (8c677b51a). Unlock + second lock not tested (no password headless))*
   - Fix: remove the duplicates; pre-create the lock dialog in an idle work proc.
 - [x] **[verified] P3** `SrvFile_io.c:247-284` opendirs a whole directory to test whether one file exists; use `access()`. `SmGlobals.c:1316-1477` forks `mv`/`rm -rf` and waits at save and logout; use `rename(2)` and `nftw`. *(status: done; FindPalette does one lstat; MoveDirectory uses rename(2), RemoveFiles an in-process walk; mv/rm -rf only as fallback)*
 
@@ -557,9 +608,9 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
 - [x] **[verified] P2 (T6)** `Dts.c:127-287`, `DtNlUtils.c:659-710`: `gmatch` calls `mbtowc` per character, `_MBADV` calls `mblen` twice per step, and `next_sep` → `_is_previous_single` rescans from the start (O(n²)). *(status: done; byte-wise matcher for pure-ASCII strings (0 mismatches on 5M random pairs in 3 locales); wide path kept for non-ASCII)*
   - Fix: detect UTF-8 once and use byte-wise `fnmatch`/`strpbrk`.
 - [x] **[verified] P3 (T7)** `Dts.c:742-744,782-783`: the "cached" database pointer is a non-static local, so it is looked up on every call. *(status: done; cached in statics keyed on a new mapping generation counter)*
-- [ ] **[verified] P3 (T8)** `DtsMM.c:73-101`: `_DtDtsMMGetPtr` takes the process lock on every address computation, and typing holds the global locks across blocking file I/O. *(status: partial: no process lock once mapped (atomic publication); the locks are compiled out in this build (no XTHREADS), so narrowing them around file I/O would have no effect)*
-- [ ] **[verified] P3 (T9)** `Dts.c:1028-1064`: an extra `open("<dir>/.DtDirDataType")` per directory, with an unbounded `sprintf`. When `fstat` fails, `strstr(NULL)` crashes. *(status: partial: bounded path, O_NONBLOCK (no FIFO hang), strstr(NULL) and buffer overrun fixed; the extra open() per directory remains)*
-- [ ] **[verified] P3 (T10)** `Dts.c:1594-1651`: backticks in an attribute value `popen` a shell on every lookup, i.e. per file in dtfile. *(status: partial: values without a backquote no longer go through expand_shell; backquoted values still popen each time (caching would change behaviour; no shipped DATA_ATTRIBUTES uses them))*
+- [ ] **[verified] P3 (T8)** `DtsMM.c:73-101`: `_DtDtsMMGetPtr` takes the process lock on every address computation, and typing holds the global locks across blocking file I/O. *(status: won't do: no process lock once mapped (round 1); the remaining locks expand to nothing without XTHREADS (nm: no XtProcessLock/XtAppLock in Dts.o/DtsMM.o), so narrowing them changes nothing; an XTHREADS build would also need a reference-counted mapping)*
+- [x] **[verified] P3 (T9)** `Dts.c:1028-1064`: an extra `open("<dir>/.DtDirDataType")` per directory, with an unbounded `sprintf`. When `fstat` fails, `strstr(NULL)` crashes. *(status: done; folders without .DtDirDataType remembered by dev/ino while their mtime is unchanged (not for folders changed in the last 2 s, errors other than ENOENT, or a dangling link of that name); 65,536 entries, cleared by DtDtsSetDataType; 7.7 -> 4.8 us per folder, no open() on rereads; types byte-identical (83e744059))*
+- [ ] **[verified] P3 (T10)** `Dts.c:1594-1651`: backticks in an attribute value `popen` a shell on every lookup, i.e. per file in dtfile. *(status: won't do: values without a backquote skip expand_shell (round 1); typing all 3,284 attribute values of the 404 shipped types forks nothing (the 11 backquotes are in EXEC_STRINGs); caching command output would change what user commands return)*
 - [x] **[verified] P2 (A1)** `ActionFind.c:297-310,517-529,666-678`: label, icon and description lookups stop early only when they compare bosons, which are in insertion order, so they usually scan to the end. *(status: done; scans only the run of matching records; NULL start crash fixed)*
   - Fix: `for (n=*start; n<cnt && list[n].recordName==q; n++)`.
   - Bug: NULL `start` is dereferenced at `:295,665`.
@@ -602,13 +653,13 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
 - [x] **[verified] P3 (E3)** `Action.c:3627-3646`: command strings are built with `strcat` (O(n²)). `_DtIsSameHost` (`ActionUtil.c:452-512`) does two uncached `gethostbyname` calls per argument. *(status: done; length-tracking buffer (10000 args 194.6 -> 0.29 ms); _DtIsSameHost memoized 60 s; 65-byte host buffer overflow fixed)*
 - [x] **[verified] P2 (X1)** `XlationSvc.c:1190-1239,1919-2021`: every locale translation enumerates the whole Xrm database and does `regcomp`/`regexec`/`regfree` per candidate. dtmail does this 3–5× per body part. *(status: done; 256-entry memo per db (10-13 ms -> 35-80 us warm); use-after-free in _DtXlateMergeDbs fixed. Precompiled regexes not done)*
   - Fix: a memo cache; precompiled regexes; compare quark ids.
-- [ ] **[verified] P3 (M1)** `DtXinerama.c:41-68`: `XineramaQueryScreens` is a round trip on every call, and it leaks. dtfile calls it per dialog placement (`Encaps.c:2495`). *(status: partial: not cached in the library (no RandR events without a new libXrandr dependency; callers own the result); leaks in SharedProcs.c fixed; dtwm already caches)*
+- [ ] **[verified] P3 (M1)** `DtXinerama.c:41-68`: `XineramaQueryScreens` is a round trip on every call, and it leaks. dtfile calls it per dialog placement (`Encaps.c:2495`). *(status: won't do: the library cannot know when to drop a cache (XSelectInput on the root would replace the client's mask; RandR needs libXrandr and an event hook non-Xt callers lack); _DtXineramaInit costs 59-196 us against 1.3-3.3 ms per dialog; dtwm already caches; SharedProcs leaks fixed in round 1)*
   - Fix: cache per display; invalidate on RandR events.
 - [x] **[verified] P3** `DtHelp/Environ_c.c:86` runs `popen("uname -n")`; use `uname(2)`. *(status: done; uname(2))*
 
 ### 3.3 ToolTalk (lib/tt, ttsession, rpc.ttdbserver)
-- [ ] **[verified] P2 (A2)** `realpath` runs twice per mapping (`tt_db_network_path.C:57` and `tt_file_system.C:252`; `tt_path.C:246-252`). For non-existent paths it is O(depth²). *(status: partial: each path resolved once in the netfile paths; _tt_realpath is still O(depth^2) for nonexistent paths)*
-- [ ] **[verified] P1 (A3)** `mp_c_message.C:186-270`, `tt_db_file.C:400-417`: every file-scoped send makes a synchronous ttdbserver RPC. *(status: partial: mount sleep gone on the server; session liveness check polls only readable/hung-up fds; dbserver connection kept on a miss. Not done: passing the cache level, a session TTL cache, one-way TT_FILE dispatch. End-to-end file scope still untested here)*
+- [x] **[verified] P2 (A2)** `realpath` runs twice per mapping (`tt_db_network_path.C:57` and `tt_file_system.C:252`; `tt_path.C:246-252`). For non-existent paths it is O(depth²). *(status: done; netfile paths resolved once (round 1); _tt_realpath stats each prefix and calls realpath() only on the first that exists (EACCES prefixes still go to realpath); 0 differences over 180k generated paths; 10 missing components 197 -> 45 syscalls; dm_server.C's unused copy removed)*
+- [ ] **[verified] P1 (A3)** `mp_c_message.C:186-270`, `tt_db_file.C:400-417`: every file-scoped send makes a synchronous ttdbserver RPC. *(status: won't do (rest): passing the cache level skips only the property read (~17 us CPU) and is unsafe (a re-created file restarts at level 0, so a cached session list goes stale); a session TTL cache would starve sessions that join inside the TTL; one-way TT_FILE dispatch loses qmsg_info, which the sender uses to queue for TT_QUEUE observers. Measured round trip 78-430 us. File scope verified end to end with rpc.ttdbserver (join/quit, ADD/DELETE_FILE_PROP))*
   - The client defeats the protocol's own cache by forcing `dbFilePropertiesCacheLevel = -1` (`:406`).
   - The server then does about 6 ISAM reads plus the 100 ms mount sleep.
   - TT_FILE sends use the synchronous dispatch.
@@ -620,21 +671,21 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
   - **Bug:** `:298` copies the bytes of the `h_addr_list` pointer array, not the address.
 - [x] **[verified] P1 (B1)** `mp_session.C:212-219`, `mp_desktop.C:162-174,382-390`: every libtt client opens and **keeps** a second X connection just to read one property. *(status: done; the X connection is opened only when needed and closed after reading TT_SESSION; 4 -> 3 sockets per client)*
   - Fix: close it after reading, or export the address in the environment from dtsession.
-- [ ] **[verified] P1 (B2)** `mp_rpc_client.C:152-157`: port 0 forces an rpcbind query on every connect. The AF_UNIX transport exists but is disabled on Linux (`tt_options.h:232-233`). *(status: partial: port appended as an optional 8th address field with portmapper fallback (0 portmapper queries per tt_open), compatible both ways; AF_UNIX transport not enabled (needs its own design/security review))*
+- [x] **[verified] P1 (B2)** `mp_rpc_client.C:152-157`: port 0 forces an rpcbind query on every connect. The AF_UNIX transport exists but is disabled on Linux (`tt_options.h:232-233`). *(status: done; port field in the address (round 1) plus AF_UNIX RPC on $XDG_RUNTIME_DIR/tooltalk/<pid>.<prog>: directory must be a real 0700 dir owned by the user, SO_PEERCRED checked both ways, TCP fallback (no XDG_RUNTIME_DIR, long path, old or killed ttsession, TT_UNIX_SOCKET=0); replaces the never-built OPT_UNIX_SOCKET_RPC; open-close 288 -> 205 us, ping 208 -> 182 us)*
   - Fix: add the port as an 8th address field (old clients ignore it); enable unix sockets under `$XDG_RUNTIME_DIR`.
-- [ ] **[verified] P1 (B3)** `tt_open` makes at least 3 synchronous ttsession round trips plus a connect-back: `VRFY_SESSION`, `ALLOC_PROCID_KEY`, then `SET_FD_CHANNEL` with the server connecting back (`mp_c_session.C:97`, `mp_c_procid.C:395,777-788`, `slib/mp_s_procid.C:1292`). *(status: not done: a combined OPEN RPC needs a new procedure, a PROCUNAVAIL fallback and a rework of c_init)*
+- [x] **[verified] P1 (B3)** `tt_open` makes at least 3 synchronous ttsession round trips plus a connect-back: `VRFY_SESSION`, `ALLOC_PROCID_KEY`, then `SET_FD_CHANNEL` with the server connecting back (`mp_c_session.C:97`, `mp_c_procid.C:395,777-788`, `slib/mp_s_procid.C:1292`). *(status: done; new TT_RPC_OPEN_PROCID (49) = ALLOC_PROCID_KEY + SET_FD_CHANNEL and replaces the VRFY_SESSION ping when there is no start token; per tt_open 3 sync RPCs -> 1; older ttsession answers PROCUNAVAIL and the client falls back (remembered per address); exports, class layouts and address format unchanged; all four old/new combinations tested)*
   - Fix: one combined OPEN RPC.
 - [x] **[verified] P1 (B4)** `tt_global_env.C:77-111`, `tt_host.C:172,222,255`: the client does `gethostbyaddr` on the session IP and `gethostbyname` twice on every `tt_open`, which can mean resolver timeouts of seconds. *(status: done; one forward lookup, no reverse lookup on the client (gethostbyname 2 -> 1, gethostbyaddr 1 -> 0))*
   - Fix: use the dotted address only; one forward lookup.
-- [ ] **[verified] P1 (B5)** `tttk/ttdtprocid.C:75-77`, `ttdesktop.C:156`, `mp_c_procid.C:96-102`: `ttdt_session_join` makes about 13 synchronous `ADD_PATTERN` RPCs plus `JOIN_SESSION` per application. *(status: not done: a one-way ADD_PATTERN loses per-pattern errors; a batched RPC needs a new server procedure; join measured at ~4 ms)*
+- [x] **[verified] P1 (B5)** `tttk/ttdtprocid.C:75-77`, `ttdesktop.C:156`, `mp_c_procid.C:96-102`: `ttdt_session_join` makes about 13 synchronous `ADD_PATTERN` RPCs plus `JOIN_SESSION` per application. *(status: done; TT_RPC_ADD_PATTERNS/DEL_PATTERNS (50/51), up to 256 per call with one status each; tttk registers and destroys its pattern sets in one call; per ttdt_session_join 12 ADD_PATTERN -> 1 (ttdt-open-join 1.53-1.73 -> 0.77-1.09 ms); PROCUNAVAIL fallback; API tracing unchanged)*
   - Fix: a batched `ADD_PATTERNS` RPC or a one-way variant.
-- [ ] **[verified] P2 (B6)** `dtexec/Main.c:945,1247-1262`: every ToolTalk-tracked action pays the full `tt_open` cost. B1–B4 fix it transitively; also inherit `TT_SESSION`. *(status: not done: TT_SESSION inheritance in dtexec/Main.c not done; B1/B2/B4 already cut tt_open 7.2-8.2 -> 4.5-4.8 ms)*
-- [ ] **[verified] P2 (B8)** `dtmail/libDtMail/Common/FileShare.C:55,247-278`: mailbox open makes two blocking file-scoped requests with 900 s timeouts. *(status: partial: handover wait unit bug fixed and polling backed off; the 900 s timeouts are kept on purpose (a timeout counts as 'no lock holder'))*
+- [x] **[verified] P2 (B6)** `dtexec/Main.c:945,1247-1262`: every ToolTalk-tracked action pays the full `tt_open` cost. B1–B4 fix it transitively; also inherit `TT_SESSION`. *(status: done; dtexec sets TT_SESSION from the caller's -ttprocid address only around tt_open() (child already forked), so libtt opens no X connection; libDtSvc dlopen()ed on first log message (ldd 44 -> 23 DSOs); spawn to _DtActDtexecID 13.6-16.6 -> 10.3-11.9 ms, syscalls 803 -> 509 (789fd269c))*
+- [ ] **[verified] P2 (B8)** `dtmail/libDtMail/Common/FileShare.C:55,247-278`: mailbox open makes two blocking file-scoped requests with 900 s timeouts. *(status: won't do: FileShare runs only with cdetooltalklock; without a handler ttsession fails the request at once; the 900 s only elapses when another dtmail holds the lock and does not reply, and a shorter timeout would take over a live session's mailbox; dispatching X events during the wait would let the user re-enter the half-done open)*
 - [x] **[verified] P2 (C1)** `slib/mp_s_procid.C:846-879`: ttsession pushes only the top message per `NEXT_MESSAGE` RPC, so N notices cost N round trips; the client already accepts a list (`mp_c_procid.C:502-509`). *(status: done; up to 32 queued notices per NEXT_MESSAGE reply; 1000 notices 500-1085 -> 210-250 ms; old/new clients interoperate)*
   - Fix: batch them, or finish `OPT_ADDMSG_DIRECT` (`mp_s_procid.C:160-181,944-1065`).
 - [x] **[verified] P2 (C2)** `slib/mp_s_message.C:1051-1065`: the opless pattern list is copied on every delivery attempt. *(status: done; match_patterns walks both lists without copying)*
 - [x] **[verified] P3 (C3)**, correctness: `mp_s_message.C:1176-1181` uses `return(0)` where `continue` is meant, so one inactive registrant aborts matching for every remaining pattern. *(status: done; continue instead of return(0))*
-- [ ] **[verified] P3 (C4/C5/C6)**: *(status: partial: C6 done (hashed message handles: 858 -> 125 ms with 5000 live handles); C4 and C5 left as they are (short lists; changing the hash changes handler and types.xdr order))*
+- [ ] **[verified] P3 (C4/C5/C6)**: *(status: won't do (rest): C6 done (round 1); C4 done: file-scope refcount map and client pattern handles hashed by id (patterns-10k client CPU 1,472 -> 35 us per pattern); C5 done in ttsession (opful_pats unordered_map, 10k ops lookup 1.72 -> 0.28 us). libtt's _Tt_object_table left as is: changing its layout crashed the installed ttsession and a new hash would change handler choice and types.xdr order)*
   - Pattern and file-scope bookkeeping uses linear lists keyed by strings (`mp_s_procid.C:126-150,350-387`, `mp_s_mp.C:624-674`).
   - Hash tables have a fixed size and a weak hash (`tt_string.C:901-916`, `mp_s_mp.C:86-91`).
   - The client handle table is a linear list searched per message (`api_handle.C:108-281`).
@@ -664,12 +715,12 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
 - [x] **[verified] P1 (W1)** `Icon.c:1761-1766,2241-2243,2315-2317,2353-2355`: a blocking `XGetGeometry` per pixmap set. The same file already avoids it in `LoadPixmap` (`:3661`) via `XmeGetPixmapData`. *(status: done; pixmap sizes from XmeGetPixmapData (100 icons: 146 -> 46 replies); image names were already compared with strcmp (the pointer claim was wrong); height clamp fixed)*
   - Also, `SetValues` compares image-name **pointers** (`:2097-2098`), so dtfile's fresh strings force a full reload every time.
   - Bug: `:3663` clamps the height with `G_MaxPixmapWidth`.
-- [ ] **[verified] P3 (W2)** `MenuButton.c:637-643` and `DtUtil1/DndIcon.c:127-166` make the same blocking round trip (2 per drag start). *(status: partial: MenuButton and DndIcon offset no longer round-trip; DtDndCreateSourceIcon keeps its one XGetGeometry (needs the depth))*
+- [x] **[verified] P3 (W2)** `MenuButton.c:637-643` and `DtUtil1/DndIcon.c:127-166` make the same blocking round trip (2 per drag start). *(status: done; DtDndCreateSourceIcon reads size and depth from Motif's pixmap cache (_XmGetPixmapData, does not add pixmaps), XGetGeometry only for uncached pixmaps; no drag start round-trips any more (8328af3a8))*
 - [x] **[verified] P2 (W3)** `ComboBox.c:1973-2025,2980-3066`, `SpinBox.c:1986-1990,2533-2621`: each add or delete re-measures **every** item with `XmStringExtent`, and SpinBox grows its array by one. Adding n items is O(n²). *(status: done; running max per widget in ItemExtent.c; 150M -> 85k XmStringExtent calls; SpinBox grows geometrically; DtSpinBoxDeletePos off-by-one fixed)*
   - Fix: keep a running max; grow geometrically.
 - [x] **[verified] P2 (W4)** `Editor.c:4617-4632`: the status line passes `FORCE`, so `XmTextFieldSetString` runs on every cursor move. *(status: done; status field set only when its text differs; 38985 -> 19005 requests per 1000 moves)*
   - Fix: `DONT_FORCE`.
-- [ ] **[verified] P2 (W5)** `SearchCalls.c:607-660`: Replace All does one `XmTextReplace` per hit, each with a redraw, a line-table update and undo bookkeeping. *(status: partial: Change All runs inside XmTextDisableRedisplay (6004 -> 390 requests); still one XmTextReplace per hit (a single replace would change undo, selection and callback behaviour))*
+- [x] **[verified] P2 (W5)** `SearchCalls.c:607-660`: Replace All does one `XmTextReplace` per hit, each with a redraw, a line-table update and undo bookkeeping. *(status: done; hits found on one copy emulating ReplaceAll exactly, runs of hits replaced with one XmTextReplace each (never across cursor, selection ends or view edges), undo rebuilt per hit; word wrap and some multibyte cases still go hit by hit; identical on 20,000+ random cases; 100k hits 3.7 s -> 32 ms (5f43d28a1))*
   - Fix: one pass and one replace, inside `DtEditorDisableRedisplay`.
 - [x] **[verified] P2 (W6)** `EditAreaData.c:153-189` `StripEmbeddedNulls`: `strlen` from the start plus a `memcpy` of the tail per NUL run, which is O(n·k). The overlapping `memcpy` is undefined behaviour. *(status: done; one compaction pass)*
   - Fix: one compaction pass.
@@ -681,9 +732,9 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
   - Check correctness: `mb_str_loc` is indexed from the start of the string but used relative to `startPos` (`:1447-1468`).
 - [x] **[verified] P2** `EditCalls.c:263-319`: continuous deletion appends to undo with `strlen`/`strcpy`/`strcat` of the whole run, which is O(n²). *(status: done; XtRealloc + memcpy/memmove; 20000 backspaces 1.65 -> 0.95 s)*
   - Fix: a growable buffer.
-- [ ] **[verified] P3** `SearchCalls.c:95-200`: spell check copies the text, uses `tmpnam` (a security issue) and reads the pipe synchronously, adding one list item at a time. *(status: partial: mkstemp, allocated command line (fixes a 27-byte overflow), one XmListAddItemsUnselected (15250 -> 192 requests); the pipe is still read synchronously (the API returns with the dialog filled))*
+- [x] **[verified] P3** `SearchCalls.c:95-200`: spell check copies the text, uses `tmpnam` (a security issue) and reads the pipe synchronously, adding one list item at a time. *(status: done; mkstemp, allocated command line, one XmListAddItemsUnselected (round 1); filter output now read through XtAppAddInput, dialog managed at end of output; a 0.5 s filter returns in 4 ms instead of 517 ms (dc3bd0454))*
   - Fix: `mkstemp`, `XtAppAddInput`, and one `XmListAddItems`.
-- [ ] **[verified] P3** `Editor.c:5346-5530`: Format allocates per line and writes indentation one byte at a time. *(status: partial: fixed Format returning an empty document on glibc; tmpfile/mkstemp; chunked indentation; the per-line allocation remains)*
+- [x] **[verified] P3** `Editor.c:5346-5530`: Format allocates per line and writes indentation one byte at a time. *(status: done; fixLeftMarginAndNewlines fetches the range once; identical on 1,800 random cases; 1 MB: 34,283 -> 7,434 mallocs (6a262acb0))*
 - [x] **P3** `Control.c:1863-1884,1970`: front-panel animation frames are all loaded eagerly at dtwm startup. *(status: done; frames stored by name and loaded on first animation; 67 -> 1 request when adding 22 frames)*
   - Fix: load them on first push.
 
@@ -713,7 +764,7 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
   - Fix: switch the backdrop first, map in stacking order from the top down, then unmap the old windows.
 - [x] **[verified] P2** `WmWinState.c:192-193,335-345,538-550,766-807`: hiding a client rewrites an unchanged `WM_STATE`, and shown clients are mapped twice. Transient trees are walked twice. *(status: done; SetWMStateOnce skips unchanged writes; the duplicate XMapWindow pair kept (no round trip))*
   - Fix: remember the last `WM_STATE` value written.
-- [ ] **[verified] P3** `WmProperty.c:1258-1272`: an `XSync` on every switch ("XFlush didn't work here, why?"). `:1516-1524`: an `XFlush` per client in `SetWorkspacePresence`. *(status: partial: per-client XFlush removed; the XSync is kept and documented (orders the property before the ToolTalk notice))*
+- [x] **[verified] P3** `WmProperty.c:1258-1272`: an `XSync` on every switch ("XFlush didn't work here, why?"). `:1516-1524`: an `XFlush` per client in `SetWorkspacePresence`. *(status: done; XSync removed: workspace notices and replies wait in a queue behind a zero-length property append and go out once its serial is processed (250 ms timer fallback), which also fixes a TITLE/ADD/DELETE race (old title 3/60 -> 0/60); duplicate front-panel PropertyNotify and WM_ICON_NAME read-back gone; round trips per switch 2.43 -> 0, 2.97-3.03 -> 2.74-2.76 ms per switch, dtwm CPU +10% (6128587b9))*
 
 ### 4.3 Mapping new clients
 - [x] **[verified] P1** `WmEvent.c:2477-2524` `GetTimestamp`: property change + `XSync` + an O(queue) `XCheckWindowEvent`, at 31 call sites. In motif's measurements it made up 42% of CPU when 500 clients mapped. *(status: done; ported 00e4c1e7 (SYNC SERVERTIME counter))*
@@ -744,22 +795,22 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
   - Fix: keep a `hasNetWmName` flag.
 - [x] **[verified] P3** `WmGraphics.c:1111-1139`: `XmStringWidth` on every title draw. Cache it (port `7242649d`). *(status: done; width cached per title and font list)*
 - [x] **[verified] P3** `WmCEvent.c:854-869`: a `_MOTIF_WM_HINTS` change rewrites the **client's** `WM_NORMAL_HINTS`, which is also a correctness bug. *(status: done; ProcessWmNormalHintsNoMaxSize works in memory; the client's property is no longer rewritten)*
-- [ ] **[verified] P3** `WmProperty.c:1953-2002`: `_NET_WM_STATE` is updated read-modify-write. `WmIDecor.c:1815,1840,2023` queries values dtwm already knows. *(status: partial: _NET_WM_STATE: one read-modify-write instead of two and a direct write at manage; WmIDecor queries kept (cached values would be wrong for icon-box frames and during icon moves))*
+- [x] **[verified] P3** `WmProperty.c:1953-2002`: `_NET_WM_STATE` is updated read-modify-write. `WmIDecor.c:1815,1840,2023` queries values dtwm already knows. *(status: done; _NET_WM_STATE: no change needed (WmEwmh.c computes and writes only on change); WmIDecor: XGetGeometry dropped from ShowActiveIconText and 3 redundant MoveActiveIconText calls removed, icon focus 2 -> 1 and icon move 3 -> 1 round trips (a680edf26))*
 - [x] **[verified] P2** `WmResource.c:5155,5158`, `WmBackdrop.c:300-429`: each backdrop is processed twice at startup, and TILED backdrops are copied into a duplicate pixmap. *(status: done; TILED backdrops skip the second pass and share the Xm-cache pixmap)*
-- [ ] **[verified] P2** `WmBackdrop.c:722`: pixmaps that dtwm created are freed with `XmDestroyPixmap`, which fails for pixmaps not in Xm's cache, so **each backdrop change leaks a pixmap**. Each workspace also keeps a full-screen window and, for fit or fill modes, a full-screen pixmap (about 33 MB per workspace at 4K). *(status: partial: leak fixed (XFreePixmap for owned pixmaps; +77 MB -> +5 MB Xvfb RSS over 30 changes); identical centered/fit/fill backdrops share one pixmap; one shared backdrop window not done (window id is public API in _DT_WORKSPACE_INFO))*
+- [x] **[verified] P2** `WmBackdrop.c:722`: pixmaps that dtwm created are freed with `XmDestroyPixmap`, which fails for pixmaps not in Xm's cache, so **each backdrop change leaks a pixmap**. Each workspace also keeps a full-screen window and, for fit or fill modes, a full-screen pixmap (about 33 MB per workspace at 4K). *(status: done; leak and pixmap sharing (round 1); workspaces with the same pixmap or colour now share one backdrop window (copy on write on change, destroyed when unused), so switching between them maps nothing; 400 switches Xvfb CPU 780 -> 20 ms; root hashes identical in 6 setups (59675b258). One window with swapped background for different backdrops: no gain measured)*
   - Fix: `XFreePixmap`; share identical backdrops; use one backdrop window and swap its background.
 - [x] **[verified] P3** `WmBackdrop.c:344,395-402`: Render version and format queries on every scale. *(status: done; no change needed: libXrender caches version and formats per display (3 requests on first call, 0 after))*
 - [x] **[verified] P3** `WmWinState.c:809-1095`: the subpanel slide calls `XSync` at every step, and its duration depends on height. *(status: done; time-based 75 ms slide, no XSync; new slideSubpanels resource)*
   - Fix: a fixed duration, no sync, and a resource to turn it off.
-- [ ] **[verified] P3** `Callback.c:301,313,334,390,443`: `XSync` on panel button presses. *(status: not done: kept: the XSyncs order an ungrab on one connection before a grab on the other)*
+- [ ] **[verified] P3** `Callback.c:301,313,334,390,443`: `XSync` on panel button presses. *(status: won't do: each sync orders an ungrab on DISPLAY1 before a grab on DISPLAY (or the raise's Exposes before a repaint), which no request on the other connection can do; one ~90 us round trip per click)*
 - [x] **[verified] P3** `UI.c:2016-2045`: workspace titles are read from the server at panel startup although they are in `pSD->pWS[i].title`. *(status: done; titles taken from pSD->pWS[i].title)*
-- [ ] **[verified] P3** `WmFunction.c:3000-3026`: `f.refresh` does recursive `XQueryTree` + `XClearArea` over every window. *(status: not done: refreshByClearing default kept: the cover-window path does not refresh backing-store/composited windows)*
+- [x] **[verified] P3** `WmFunction.c:3000-3026`: `f.refresh` does recursive `XQueryTree` + `XClearArea` over every window. *(status: done; refreshByClearing default kept; RefreshByClearing sends all QueryTree requests of a tree level through XCB before reading replies (one round trip per level), still clearing every window; 3020 windows 240-714 -> 43-47 ms; dtwm links -lX11-xcb -lxcb (e623ee6e1))*
   - Fix: use the cover-window path by default.
 - [x] **[verified] P3** `WmMenu.c:1592`: 2 × `XSync` per menu unpost. *(status: done; no round trip on unpost; the two syncs only before XGrabServer)*
 - [x] **[verified] P2** `WmSignal.c:231-240`: the signal handler calls Xlib and Xt directly. Port `c84ebfaa` (`XtNoticeSignal`). *(status: done; XtNoticeSignal; 20/20 deadlocks -> 0/20)*
-- [ ] **[verified] P3** `WmIPlace.c:342-361`, `WmIconBox.c:1969-2635`: icon-box inserts are O(N²). *(status: not done: measured: the cost is in libXm per-child traversal (XmeNavigChangeManaged), not in dtwm's placement code; belongs in the motif tree)*
+- [ ] **[verified] P3** `WmIPlace.c:342-361`, `WmIconBox.c:1969-2635`: icon-box inserts are O(N²). *(status: won't do in this tree: perf with 800 icons: the O(N^2) is in libXm (XmeNavigChangeManaged -> XmGetVisibility per insert, BulletinBoard layout); dtwm's placement is 6.3%. Fix belongs to /home/dimmus/motif (skip the in-view check of an unchanged focus item; lay out only new children); deferring XtManageChild in dtwm would change focus traversal timing)*
 - [x] **[verified] P3** `WmResParse.c:5477-5497,5948-5975`: when `cppCommand` is set, `system(cpp)`, `tmpnam` and `system("/bin/rm")` are used. Port `ece1a79f`. *(status: done; mkstemp, file names passed as $1/$2 through execl, unlink instead of system(rm))*
-- [ ] **P2** Build dtwm, and all of CDE, against the modernised libXm (`/home/dimmus/motif`). Its Phase 3 removed Xft color round trips on every Label/Text/title draw, `_XmIsISO10646` round trips per segment, and spot-location IM round trips. That is free speed for every CDE client. *(status: not done: needs top-level configure/build changes)*
+- [x] **P2** Build dtwm, and all of CDE, against the modernised libXm (`/home/dimmus/motif`). Its Phase 3 removed Xft color round trips on every Label/Text/title draw, `_XmIsISO10646` round trips per segment, and spot-location IM round trips. That is free speed for every CDE client. *(status: done (already the case): configure uses pkg-config motif 2.5.0; dtwm, dtfile, dtterm, dtsession and libDtWidget resolve /usr/lib/libXm.so.5 (XM_2.5), whose headers match /home/dimmus/motif/build; perf shows code only the modernised Traversal.c has)*
 
 ---
 
@@ -769,9 +820,9 @@ dtfile performs about 10 of these lookups per file shown (`SharedProcs.c:678-935
 
 N = entries in the directory, K = files in one operation, T = data types.
 
-- [ ] **[verified] P1 (A1)** `Directory.c:4991`, `:331-337`: every directory activity (read, update, link check, position write) forks the whole X/Motif/ToolTalk process. Only the directory check is persistent. *(status: not done: measured fork at 0.1-1.5 ms against 30-60 ms of worker time; a persistent worker would need the fork-time state serialised; only the checks became sticky workers)*
+- [x] **[verified] P1 (A1)** `Directory.c:4991`, `:331-337`: every directory activity (read, update, link check, position write) forks the whole X/Motif/ToolTalk process. Only the directory check is persistent. *(status: done; reads, update_all and update_some share a pool of sticky workers (at most 2 idle) with framed bulk requests (1 MB pipe via F_SETPIPE_SZ); dead workers replaced, retired on database reload; 5 folders and back plus 3 changes and New Folder: 1 fork instead of one per activity (each fork blocked the main loop 0.5-1.5 ms at 3000 icons); screenshots identical)*
   - Fix: one persistent worker (a `posix_spawn`ed helper or a thread) with a framed, buffered pipe.
-- [ ] **[verified] P1 (A2)** `Directory.c:1016-1308` `ReadFileData2`, per entry: *(status: partial: fstatat/faccessat relative to the dir fd; DtActionExists and LABEL cached per type per batch. Passing the lstat buffer to DtDtsDataToDataType needs a DtSvc API change)*
+- [x] **[verified] P1 (A2)** `Directory.c:1016-1308` `ReadFileData2`, per entry: *(status: done; ReadFileData2At types non-link entries through _DtDtsDataToDataTypeAt (dir fd + lstat buffer, openat for content and .DtDirDataType), exported from libDtSvc (326313a6a), with a weak reference and fallback to DtDtsDataToDataType; 533 files opened with openat(dirfd) instead of full paths)*
   - `lstat`, plus `stat` for links;
   - `DtDtsDataToDataType` without the lstat buffer, so it may do an extra `readlink`;
   - content mmap;
@@ -780,7 +831,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - `DtActionExists`;
   - a LABEL lookup.
   - Fix: pass the lstat result; `fstatat(dirfd)` and `d_type`; a per-type label and is-action cache; `faccessat(AT_EACCESS)`.
-- [ ] **[verified] P2 (A3)** `Directory.c:1388-1458,1757-1830`: path components are retyped and `GetTTPath`'d on every read and update, followed by two `XSync`s (`:2208-2212`). *(status: partial: header icons rebuilt only when path types change; XSync -> XFlush; path components are still retyped on each read)*
+- [x] **[verified] P2 (A3)** `Directory.c:1388-1458,1757-1830`: path components are retyped and `GetTTPath`'d on every read and update, followed by two `XSync`s (`:2208-2212`). *(status: done; workers cache each path component's type (valid while its lstat, link target stat and .DtDirDataType stat are unchanged; 512 entries) and each folder's ToolTalk path; 13-deep folder 94-99 -> 74-84 syscalls before readdir, access() 26 -> 5)*
 - [x] **[verified] P2 (A4)** `FileOp.c:259-331`, `Directory.c:635-647,1676-1683,1991-2110`: the pipe protocol writes field by field with 2 × `signal()` per string, one ~8 KB `FileData2` per file, and one message per Xt dispatch. *(status: done; one write() per message, FILEDATA3 batches of 50, the main process drains the pipe for up to 20 ms per callback, no signal() calls)*
   - Fix: batch everything with `writev`; ignore SIGPIPE once; drain the buffer per callback.
 - [x] **[verified] P2 (A5)** `Directory.c:2257-2286`: appending to the list walks it from the head (O(N²)). Keep a tail pointer. *(status: done; tail pointer)*
@@ -790,7 +841,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - An O(N·M) old/new merge (`:2409-2430`).
   - `_DtFlushIconFileCache` after every read (`:2520`; the comment says nobody knows why).
   - `CheckAccess` costs 7 syscalls (`FileManip.c:112-157`); use `faccessat`.
-- [ ] **[verified] P1 (B3)** `Directory.c:3177,3288-3296`: `SMART_DIR_UPDATE` is never defined, so any change → full rescan → full re-sort, re-filter and re-gadget of all N entries. *(status: partial: automatic refreshes are event-driven update_all sending only changed entries, and an empty update skips the redisplay; SMART_DIR_UPDATE (update_some) is still off)*
+- [x] **[verified] P1 (B3)** `Directory.c:3177,3288-3296`: `SMART_DIR_UPDATE` is never defined, so any change → full rescan → full re-sort, re-filter and re-gadget of all N entries. *(status: done; update_some (SMART_DIR_UPDATE) on with inotify event names, used only while every change since the last full read is named (cleared on overflow, lost watch, nameless event, too many names, first refresh after a new watch); 3000-entry folder with one change: update process 6.6 -> 1.1 ms; screenshots identical)*
   - Fix: incremental view updates.
 - [x] **[verified] P3 (B4)** `Directory.c:3331-3432`: no cache of past directories, so Back/Up always forks and retypes. *(status: done; LRU of 8 directories / 20,000 entries; going back to a 10k directory costs no fork and no read)*
   - Fix: a small LRU.
@@ -801,17 +852,17 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: a time budget (about 8 ms) and reuse of the array.
 - [x] **[verified] P2 (C4)** `File.c:7181,7308`: managing in batches of 100 into an `XmDrawingArea` with `XmRESIZE_GROW` relays out all children per batch, i.e. O(N²/100). *(status: done; one XtManageChildren for the off-screen icons; XmRESIZE_GROW kept on purpose)*
   - Fix: manage everything in one call; use `XmRESIZE_NONE`.
-- [ ] **[verified] P2 (C5)** One gadget per file, and every icon is a drop site (`File.c:4141-4228`). DrawingArea redisplays every gadget on every expose. *(status: partial: unchanged gadgets skip XmDropSiteUpdate; drop sites are still registered for every icon (a NOOP site refuses drops instead of falling through); no virtualized view)*
+- [ ] **[verified] P2 (C5)** One gadget per file, and every icon is a drop site (`File.c:4141-4228`). DrawingArea redisplays every gadget on every expose. *(status: won't do (rest): non-droppable icons get a plain Motif XmDROP_NOOP site instead of a DtDnd registration (10,000 data files: drop-site work 95-122 -> 22-45 ms, same feedback and refusals). No site at all would let drops fall through to the folder; a virtualized icon view means rewriting File.c's selection, traversal, DnD and rename)*
   - Fix: register drop sites only for droppable types. Longer term, a virtualized icon view.
 - [x] **[verified] P2 (C6)** `FileMgr.c:4027-4136`: widget-reuse matching is O(N_old·N_new), about 10⁸ compares for 10k files. *(status: done; hash map keyed on the FileData pointer)*
   - Fix: a back-pointer.
-- [ ] **[verified] P2 (C7)** `File.c:484-602,863`: about 5 `strcoll` calls per sort comparison. The type sub-sort compares *pointers* to per-file string copies, so every group has size 1. *(status: partial: character tests for . and .., equality fast path, redundant second pass removed; strxfrm keys and interned type ids not added (measured gain too small))*
+- [ ] **[verified] P2 (C7)** `File.c:484-602,863`: about 5 `strcoll` calls per sort comparison. The type sub-sort compares *pointers* to per-file string copies, so every group has size 1. *(status: won't do (rest): strxfrm keys differ in sign from strcoll for 22 of 2.25M glibc en_US.UTF-8 pairs (icon order would change) and cost as much as the sort; type comparisons cost at most ~2 ms per 10k sort. Round 1 fixed the type grouping bug and cut strcoll to 1 per comparison)*
   - Fix: precomputed flags and `strxfrm` keys; interned type ids.
 - [x] **[verified] P2 (C8/C9)** `File.c:951,1085-1105`: filtering is O(N·T). In total there are about 10 DtDts lookups per file per display. *(status: done; _DtGetTypeInfo per-type cache flushed in ReloadDatabases; filter entries hashed)*
   - Fix: one per-type attribute cache cleared in `ReloadDatabases` (`Main.c:4940-4950`).
 - [x] **[verified] P2 (C10)** `IconWindow.c:191-222`, `File.c:7434,7777`: every ConfigureNotify relays out all N icons and calls `XSync`. *(status: done; relayout from a work proc, at most every 40 ms)*
   - Fix: coalesce resizes.
-- [ ] **[verified] P2 (C11)** `File.c:1196-1208,6512-6620`: tree view walks all rows on every Expose with an ancestor linear search, and expanding a branch rebuilds the whole tree. *(status: partial: Expose no longer searches ancestors (more_after computed once); expanding a branch still relays out the tree, now cheap thanks to C1)*
+- [ ] **[verified] P2 (C11)** `File.c:1196-1208,6512-6620`: tree view walks all rows on every Expose with an ancestor linear search, and expanding a branch rebuilds the whole tree. *(status: won't do (rest): Expose fixed in round 1; expand/collapse of a 3000-row tree costs 1.4-3.9 ms CPU and already reads and adds only the branch; the first read of a new branch triggers a full redisplay (12.6 ms), and a branch-only GetFileData would duplicate widget reuse, selection, rename and drag remapping at high risk of dangling pointers)*
 - [x] **[verified] P2 (C12)** `File.c:3752-3790,4097-4105`: "as placed" mode does O(children·objects) ordering per commit and creates 2 Regions per object per expose. *(status: done; XRectInRegion, PtrMap ordering)*
 - [x] **[verified] P3 (C13/C14/C15)**: *(status: done; C13 one allocation and memmove, C14 stack buffer + uid/gid caches + localtime_r (also fixes a 20-byte name overflow), C15 already fixed)*
   - Selection reallocs +1 and prepends (`File.c:2707-2969`).
@@ -821,7 +872,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: `copy_file_range`/`FICLONE` with a buffer of 1 MB or more; check events at most every 50 ms without syncing.
 - [x] **[verified] P1 (D2)** `FileManip.c:1076-1189`, `MkDir.c:92-160`: copies use 1 KB blocks, moves are `link`+`unlink` instead of `rename`, and directory moves fork `/bin/mv` and `wait()`. *(status: done; rename() for moves, fsCopyData for copies, rename() for directory moves (/bin/mv only for EXDEV), posix_spawn for dtfile_copy, waitpid in MkDir.c)*
 - [x] **[verified] P2 (D3)** `FileOp.c:155,2160-2290`, `Directory.c:3219-3227`: the UI blocks in `select()` for up to 2 s, and deduplication is O(K²) (about 10⁸ `strcmp` for 10k dropped files). *(status: done; no 2 s select() wait; hashed dedup; collision dialog 2.63-2.73 -> 0.65-0.69 s)*
-- [ ] **[verified] P2 (D4)** `Trash.c:636-735,2276,3089,3621-3969,4211-4270`: *(status: partial: hashed lookups, geometric growth, rewrite only when needed at startup, rename-only replace, openat-based permission walk; .trashinfo still rewritten once per restore/shred, and the walk still runs before the rename)*
+- [x] **[verified] P2 (D4)** `Trash.c:636-735,2276,3089,3621-3969,4211-4270`: *(status: done; persistent name/path hash indexes with holes and lazy compaction (O(K) per restore/shred), children write .trashinfo themselves (kept if a generation counter is unchanged), startup checks entries against one readdir instead of one lstat each; 100k entries main-loop CPU per restore 87 -> 5.2 ms, startup with 10k entries 13,813 -> 3,830 syscalls (6d672d480, e22de4224). The permission walk before the rename is kept on purpose (it decides the error shown first))*
   - the trash list grows by 10;
   - the whole `.trashinfo` file is rewritten after every operation;
   - restore and remove are O(K·N);
@@ -829,7 +880,7 @@ N = entries in the directory, K = files in one operation, T = data types.
 - [x] **[verified] P2 (D5)** `Find.c:1916-2337,2864-2903`: Find forks `ksh -c find` and reads with a 1-byte `fread` per callback; results stall in the stdio buffer. *(status: done; posix_spawnp of find/grep, 16 KB non-blocking reads, batched list adds, cached typing; 10,100 matches 0.52-0.55 -> 0.20-0.42 s)*
   - Per result it does a `stat` and an uncached typing call (and leaks the type), then a single `XmListAddItemUnselected`.
   - Content search builds its buffer with `strcat` (O(N²)) and runs `sh -c grep` per directory.
-- [ ] **[verified] P3 (D6/D7)**: *(status: partial: translation table parsed once; position saves run in a thread instead of a fork; desktop objects are still separate shells typed synchronously)*
+- [x] **[verified] P3 (D6/D7)**: *(status: done; separate shells kept on purpose (per-object workspace occupancy, stacking, SHAPE). The real cost was XmAddToPostFromList re-grabbing the popup accelerator on every shell (337,600 XGrabKey for 200 objects) and a per-object wait for the WM: 200 objects CPU 1.9 -> 0.17 s, load 2.6-3.0 -> 0.64 s, RSS 29 -> 18 MB (2000fd5f2). Typing stays synchronous on purpose (3.8% of load CPU; async would flash placeholder icons))*
   - Each desktop object is a top-level shell that re-parses its translations (`Desktop.c:280-327`).
   - Desktop objects are typed synchronously at load (`:488-499`).
   - Icon position saves fork (`Directory.c:3894-3955`).
@@ -843,7 +894,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: per-row dirty spans; paint once per frame.
 - [x] **[verified] P1 (T7)** `TermPrimRender.c:1054-1109,1360-1380`: in UTF-8, every byte goes through `mblen` → `mbtowc` → `mblen` again, with a malloc per run, an O(n²) `memmove` per invalid byte, and a copy of the whole read when a sequence straddles the boundary. *(status: done; inline UTF-8 decoder with ASCII fast path (0 mismatches vs mbrtowc on 143M sequences); 40 MB UTF-8 user CPU 5.3-5.5 -> 2.25-2.28 s)*
   - Fix: an inline UTF-8 DFA with an ASCII fast path and a reusable buffer.
-- [ ] **[verified] P1 (T11)** `TermPrimRender.c:731-936`, `TermPrimBuffer.c:1768-1770`: every scrolled line shifts all H history pointers, `XtMalloc(BUFSIZ)`s, and copies characters and enhancements one at a time through function pointers. *(status: partial: scrolled-off lines swap into history and the line array slides in O(1) amortized; saveLines 30000: 11.9-14.6 s -> 1.6-2.1 s; short row types kept (limits saveLines to ~32k))*
+- [x] **[verified] P1 (T11)** `TermPrimRender.c:731-936`, `TermPrimBuffer.c:1768-1770`: every scrolled line shifts all H history pointers, `XtMalloc(BUFSIZ)`s, and copies characters and enhancements one at a time through function pointers. *(status: done; int row types throughout the buffer and tpd (saveLines clipped to 2^23; -sl 100000 keeps every line, was a crash at 40000), line pointers in a ring so scrolling a full buffer writes no pointer, prefetch of the line to recycle, no 64-bit division without a selection; yes 16 MB C.UTF-8 CPU 3881 -> 2770 ms (709e23ead, 9513b1e83))*
   - Fix: one ring of `TermLine*`; widen the `short` row types.
 - [x] **[verified] P1 (T12)** `TermPrimScroll.c:37-98,201-294,875,893`: every `XCopyArea` scroll blocks on GraphicsExpose/NoExpose, i.e. one round trip per scroll in less/vim, per scrollbar event, and per autoscroll tick. *(status: done; GraphicsExpose/NoExpose handled asynchronously in jump mode; 977 -> 0 blocking waits per 1000 lines; smooth scroll still waits by design)*
   - Fix: handle GraphicsExpose asynchronously, use `graphics_exposures=False` while unobscured, or use a back buffer.
@@ -851,7 +902,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - 8 KB or 32 KB malloc per inserted run (`TermPrimRender.c:960`, `TermPrimRenderMb.c:617`).
   - Pending text is processed 1 KB per main-loop pass (`TermPrimPendingTextP.h:41`).
   - Paste is written 128 bytes per callback (`:69`).
-- [ ] **[verified] P2 (T8)** `TermPrimRenderMb.c:228-322,715`, `TermPrimBuffer.c:900-950`: `wcwidth` is recomputed everywhere and column lookup is O(cols). *(status: not done: a cell array means replacing the shared line representation; per-row scans now run at most ~60 times/s)*
+- [x] **[verified] P2 (T8)** `TermPrimRenderMb.c:228-322,715`, `TermPrimBuffer.c:900-950`: `wcwidth` is recomputed everywhere and column lookup is O(cols). *(status: done; CELL_WIDTH inlined for printable ASCII (cat base64 C.UTF-8 2041 -> 1214 ms); multibyte line buffers are xterm-style cell arrays with continuation cells, O(1) column lookup and widths computed once on insert; CJK cursor-addressed edits 1160 -> 777 ms; harness over 32 streams identical to the old code; fixed a double-click crash on empty lines in UTF-8 (eaa1f6eab, bdc888208, b4fabcebd))*
   - Fix: an xterm-style cell array.
 - [x] **[verified] P2 (T9)** `TermPrimRenderFontSet.c:78-187`: `XmbTextExtents` on every run plus a second conversion for drawing, and `renderGC.fid = 0` defeats the GC cache. *(status: done; fixExtents decided from font-set metrics at create time (53 -> 7 extents calls); the GC reset costs no requests (Xlib GC cache). Xft path not attempted)*
   - Fix: decide `fixExtents` once at create time. Longer term, an Xft/XRender path.
@@ -877,12 +928,12 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: store the slot index in the handle.
 - [x] **[verified] P1** `MsgScrollingList.C:480,611,1164-1196`, `RFCMessage.C:283-293,1434-1488`: building the list parses the MIME bodies of every multipart message, which defeats lazy parsing. *(status: done; multipart glyph from a header-and-boundary scan, full parse only for alternative/V3/single-part; 0 glyph mismatches)*
   - Fix: decide the attachment glyph from headers only.
-- [ ] **[verified] P1** `RFCMessage.C:999`, `RFCEnvelope.C:403-447`: a synthetic `Content-Length` header marks every message dirty, so the whole mbox is rewritten (with `fsync`) on autosave. Any flag change also rewrites the whole file. *(status: partial: derived Content-Length no longer dirties messages (no rewrite after open); rewriting only from the first dirty message not done (the temp-file+rename write is crash/MTA-safe))*
+- [ ] **[verified] P1** `RFCMessage.C:999`, `RFCEnvelope.C:403-447`: a synthetic `Content-Length` header marks every message dirty, so the whole mbox is rewritten (with `fsync`) on autosave. Any flag change also rewrites the whole file. *(status: partial: no rewrite after open (round 1); a save still writes a temp file and renames it, but the leading unchanged messages are cloned with FICLONERANGE, so on btrfs/XFS/bcachefs only the tail is really written; byte-identical output. ext4/tmpfs/NFS refuse the ioctl and write everything on purpose (an in-place tail rewrite gives up the crash guarantee). Success path untimed: no CoW filesystem here)*
   - Fix: don't persist the synthetic header; rewrite only from the first dirty message.
 - [x] **[verified] P2** `RFCMessage.C:771-786,965-975`: a `strncmp` per body byte to find message boundaries. *(status: done; memmem/memchr; 10k open 0.49-0.65 -> 0.07-0.14 s)*
   - Fix: `memchr`/`memmem`.
 - [x] **[verified] P2** `RFCMailBox.C:2344-2375,3358-3367,3587`: incorporating new mail re-walks the whole mailbox, and removal is O(N) per message. *(status: done; partials tracked, one-pass removal; incorporating one message into 50k 36.7 -> 0.1 ms)*
-- [ ] **[verified] P2** `RFCEnvelope.C:288-310,684-745`: every header lookup is a double linear scan with a mutex per header, about 10 lookups per list row. *(status: partial: one-pass length-filtered lookup without the per-header mutex; no header index or cached flag bits)*
+- [x] **[verified] P2** `RFCEnvelope.C:288-310,684-745`: every header lookup is a double linear scan with a mutex per header, about 10 lookups per list row. *(status: done; 64-bit header-name presence filter per envelope, generation counter, cached New/DeletePending/Multipart/Partial flags, inline DtVirtArray accessors; 50k mbox summary pass 0.075 -> 0.058 s, flags + second pass 0.163 -> 0.113 s; headers, flags and written files identical)*
   - Fix: a header index; cache flag bits.
 - [x] **[verified] P2** `MsgScrollingList.C:2330-2481`, `Sort.C:101,138,370`: sort, display-property changes and selection restore are all O(N²). *(status: done; insert_all/remove_all merges and hashed selection restore (50k insert 1.3 s -> 1 ms); the count bug was already fixed)*
   - **Bug:** `:2460` passes a count that includes deleted messages; `delete` should be `delete[]`.
@@ -899,10 +950,10 @@ N = entries in the directory, K = files in one operation, T = data types.
   - **Bug:** `:251` compares pointers, not values.
 - [x] **[verified] P1** `dtcm/find.c:606-748`: Find "all" makes about 880 sequential 4-week RPCs, adds one `XmListAddItem` per hit, and matches with naive `strncasecmp`. *(status: done; server-side CSA_MATCH_CONTAIN in 52-week chunks (888 -> 69 RPCs), one XmListAddItems; rare match 3.4-5.9 s -> 0.018-0.05 s)*
   - Fix: one RPC with a `CSA_MATCH_CONTAIN` filter; `XmListAddItems`; `strcasestr`.
-- [ ] **[verified] P2** `server/lookup.c:228-233,461-558`: each query scans every repeating entry with no early exit, builds results by sorted insertion (O(K²)), and deep-copies each instance. *(status: partial: per-sequence runs merged in O(K log R); 30,141 instances 16.8 -> 0.59 s; no early exit (list is sorted by id) and the deep copy is kept (XDR frees each entry))*
+- [x] **[verified] P2** `server/lookup.c:228-233,461-558`: each query scans every repeating entry with no early exit, builds results by sorted insertion (O(K²)), and deep-copies each instance. *(status: done; O(K log R) merge (round 1); no deep copy (instances point at the calendar's own data, da6e2a67d); time zone checked once per wakeup (/etc/localtime stats 71,966 -> 12 per 12 month views); ISO 8601 without sprintf; libcsa moves decoded values. Month view server CPU 15.3 -> 5.0 ms, year 178 -> 51 ms, old Find 1.41 -> 0.38 s; dumps identical. Early exit measured at 0.3% of a lookup, not done)*
 - [x] **[verified] P2** `server/callback.c:560-682`: `clnt_create` for every client on every change. *(status: done; CLIENT* cached per registration; also fixed callbacks never being delivered (zero timeout))*
   - Fix: cache the `CLIENT*`.
-- [ ] **[verified] P2** `dtcm/calendarA.c:3269-3284`, `editor.c:1103-1140`, `todo.c:2000`: any change triggers a full repaint and three RPCs, and the lists are refilled one item at a time. *(status: partial: callbacks coalesced into one refresh after 100 ms, lists filled with one XmListAddItems; still a full refresh, not incremental)*
+- [x] **[verified] P2** `dtcm/calendarA.c:3269-3284`, `editor.c:1103-1140`, `todo.c:2000`: any change triggers a full repaint and three RPCs, and the lists are refilled one item at a time. *(status: done; update_canvas compares a paint cache: unchanged entries paint nothing, year view needs no fetch, month view repaints only changed day boxes (pixel-identical to a full repaint); per change 142 -> 6 X requests (0 for another year), CPU 24.5 -> 17 ms (a753b0955). Editor and to-do refills unchanged on purpose (they clear the list selection))*
 - [x] **[verified] P3**: *(status: done; GC dump uses one fsync instead of O_SYNC per entry; per-record O_SYNC append kept (one flush per record is required); O(1) tail insert (20k repeating entries 27-33 -> 0.8-1.2 s); GC out of the signal handler; one RPC per printed page; CmDataList cursor)*
   - The log is reopened `O_SYNC` per record (`server/log.c:136-1016`).
   - Loading repeating entries is O(R²) (`list.c:148-191`).
@@ -917,7 +968,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: compute TrueColor pixels; an rgb→pixel cache.
 - [x] **[verified] P2 (B3)** `UtilSDL.c:579-760`, `FormatUtil.c:271-280`: parsing calls `mblen` per byte and `_DtHelpCeAddCharToBuf` per character, growing the buffer by 32 bytes. *(status: done; ASCII fast path, inline appends, geometric growth; -29% dthelpprint samples with B4)*
   - Fix: an ASCII fast path, `memcpy` of runs, geometric growth.
-- [ ] **[verified] P3 (B4–B7)**: *(status: partial: B4 hash index and B7 TOSS index done; B5 caches decompressed topic blocks (8 MB LRU), parsed topics not cached; B6 adds _DtCvAddPtrToArrayN for the big callers only)*
+- [x] **[verified] P3 (B4–B7)**: *(status: done; B5 parsed-topic cache (16 topics plus TOC per display area, validated on volume and graphic dev/ino/size/mtime, never for SDL-script topics) and the volume title kept: Filemgr revisit 2.3 -> 1.36 ms CPU, 770 requests 2.77 -> 1.99 s; B6 remaining growing appends use _DtCvAddPtrToArrayN and selection lookup is no longer O(L^2) (ksh(1) resize 104 -> 19.5 ms); 1,297 screenshots identical)*
   - ID lookups are linear (`AccessSDL.c:1156-1250`).
   - Topics are re-read and re-parsed on every visit (`Format.c:1027-1085`).
   - `_DtCvAddPtrToArray` walks to the end on every append (`CvString.c:352-390`).
@@ -925,18 +976,18 @@ N = entries in the directory, K = files in one operation, T = data types.
 - [x] **[verified] P2 (C1)** `LayoutUtil.c:1373-1540`: line layout re-measures the rest of the run for every line (O(N·L)); each measurement is an `XmbTextEscapement` in UTF-8. *(status: done; segment length computed once, prefix measuring, ASCII fast paths; 20,000-word topic UTF-8 1.39 -> 0.084 s)*
 - [x] **[verified] P2 (C2)** `Canvas.c:2167-2265,226-275`: each expose or scroll scans every line, and `CheckAround` makes it O(visible·N). *(status: done; y index with binary search for topics of 128+ lines; 400 scroll steps on 30,000 lines 2.6 -> 0.62 s)*
   - Fix: a y-sorted line index.
-- [ ] **[verified] P3 (C3–C7)**: *(status: partial: C3 geometric growth, C4 bisection, C7 pixel stored, C6 negative font cache (XCreateFontSet 8 -> 3); C5 table re-layout left as is (column widths could change))*
+- [x] **[verified] P3 (C3–C7)**: *(status: done; C5: the O(cells^2) was the cell lookup by id, now a hash index in ResolveCell and ResolveAsyncBlock (1,500-item list 346 -> 27 ms); layout algorithm untouched, so column widths cannot change; output of all 19 volumes identical)*
   - Canvas arrays grow by +10 (`Layout.c:114`, `LayoutUtil.c:72`).
   - `FindChar` is O(n²) per mouse motion (`Canvas.c:297-362`).
   - Table re-layout is O(rows²) (`Layout.c:2403-2492`).
   - Fonts are resolved per chunk with no negative cache and no XLFD dedup (`XInterface.c:800-865`, `Font.c:366-460,1006-1100`).
   - `XAllocNamedColor` is repeated and leaked per redraw (`XInterface.c:1067-1112`).
-- [ ] **[verified] P2 (D1–D3)** `GlobSearch.c`: *(status: partial: D1 tail append + keyword hash, D2 regex cached (1,453 -> 1 regcomp); D3 keeps closed volumes in a 12-entry LRU, but the first scan is still synchronous)*
+- [x] **[verified] P2 (D1–D3)** `GlobSearch.c`: *(status: done; D3: incremental volume scan (_DtHelpFileListScanBegin/Step/End, same order) run one volume per search work proc call; longest stall in the first complete-index search 20-53 -> 6-16 ms; results identical)*
   - Index display is O(K²) (`:1129-1146,2775-2800`).
   - `regcomp` runs per index entry (`:2440-2444`).
   - The volume scan parses every volume synchronously and unloads it immediately (`:426-523,1691-1731`, `Access.c:1956-1968`).
-- [ ] **[verified] P3 (E1)** `boolsrch.c:1123-1140`: proximity queries scan synchronously (the comment says "rewrite as its own workproc"). *(status: not done: the public DtSearch API runs workprocs to completion; needs an asynchronous API (public header change))*
-- [ ] **[verified] P3 (F1/F2)**: *(status: partial: F1 colours cached per (display, colormap); F2 default page cache 100 -> 1024 pages; mmap of the store not done)*
+- [ ] **[verified] P3 (E1)** `boolsrch.c:1123-1140`: proximity queries scan synchronously (the comment says "rewrite as its own workproc"). *(status: partial: collocation checks 32 records per workproc call; new DtSearchQueryStart/Continue/Stop in lib/DtSearch (0.7-1.5 s queries run in 99-195 slices of at most 23-46 ms, identical results); DtSearchQuery unchanged. Missing: declarations in include/Dt/Search.h and libDtSearch.sym exports, then a dtinfo caller; the CDE infolib DBs store no documents, so collocation is rejected on them anyway)*
+- [x] **[verified] P3 (F1/F2)**: *(status: done; F2: read-only stores mmap'ed at first read (fstream fallback), mapping dropped on write/truncate/remove; also fixed an lru::remove throw at dtinfo exit; reading the whole infolib 3x: syscalls 21,321 -> 279 (CPU within noise, 55% is LZSS))*
   - dtinfo re-allocates named colours for every node view and never frees them (`NodeViewInfo.C:856-905`).
   - The DtMmdb page cache is 800 KB, with `seekg`+`read` per miss (`page_cache.h:31`, `unixf_storage.C:203-221`).
   - Fix: mmap the read-only store; raise the default cache.
@@ -951,8 +1002,8 @@ N = entries in the directory, K = files in one operation, T = data types.
 - [x] **[verified] P3 dtcalc** `motif.c:2429-2455`: `XSync` on every display update, i.e. per keypress. *(status: done; XFlush; 204 -> 104 round trips per 110 keys (the rest is Motif's))*
 - [x] **[verified] P3 dticon** `utils.c:707-760`: every repaint does `XGetImage` of the whole icon plus 2 requests per magnified pixel. *(status: done; one magnified XImage and one XPutImage per repaint, grid with one XDrawSegments)*
   - Fix: a client-side XImage and one scaled `XPutImage`.
-- [ ] **[verified] P2 dtcreate** `icon_selection_dialog.c:281,681-850`: per-gadget manage, every icon loaded, a global `XmeFlushIconFileCache(NULL)`, and a `stat` per entry. *(status: partial: one XtManageChildren, directory-scoped XmeFlushIconFileCache, d_type; every icon is still loaded (14k XAllocColor in Motif's XPM loader))*
-- [ ] **[verified] P3 dtksh** `extra.c:70-76`, `dtkcmds.c:3559-6342`, `widget.c:430-540`: every callback or translation re-parses its command string; widget→wtab lookup is linear. *(status: partial: Widget->wtab hash (1.65 -> 0.24 s for 30000 lookups); command strings are still re-parsed (pre-compiling changes ksh semantics))*
+- [x] **[verified] P2 dtcreate** `icon_selection_dialog.c:281,681-850`: per-gadget manage, every icon loaded, a global `XmeFlushIconFileCache(NULL)`, and a `stat` per entry. *(status: done; icons load only when they scroll into view (placeholder of the right size from the XPM/XBM header); screenshots identical; opening 285 icons busy 1.0-1.2 -> 0.03 s, client CPU 0.55 -> 0.02 s (3c8d388f0))*
+- [x] **[verified] P3 dtksh** `extra.c:70-76`, `dtkcmds.c:3559-6342`, `widget.c:430-540`: every callback or translation re-parses its command string; widget→wtab lookup is linear. *(status: done; ksh_eval keeps up to 512 parse trees, reused only while options, lexer state, locale, aliases, function/builtin tables, namespace and start line are unchanged (functions, here-docs, subshells, verbose/noexec bypass it); semantics script and 6000-step stress identical; 40000-step stress 16.3 -> 2.5 s (25cf0213c); fixed ${CB_CALL_DATA.EVENT.TYPE} (d2c7705e2))*
 - [x] **[verified] P3 dtprintinfo** `libUI/MotifUI/MotifUI.C:121-140`: `XGetWindowAttributes` or `XQueryTree` per printer per tick for visibility. *(status: done; visibility tracked from Map/Unmap/VisibilityNotify; ticks skipped while hidden)*
   - Fix: track `VisibilityNotify`.
 
@@ -969,7 +1020,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - `install-deps.sh` does not install `ncompress`;
   - the main checkout has 22 leftover `book.<pid>.log` failures.
   - Fix: in-process LZW (the decoder is already in `lib/DtHelp/decompress.c`), or `AC_PATH_PROG(COMPRESS)` plus the dependency.
-- [ ] **[verified]** `programs/ttsnoop/Makefile.am:158-163` overwrites the tracked `ttsnoop.c`. The `dtcodegen -merge` rules write tracked `*_stubs.c` files in the source directory. ksh93 drops about 20 untracked files into the tree. *(status: partial: dtcodegen runs in a scratch dir (build-aux/dtcodegen-scratch), so ab/ and ttsnoop/ tracked files are no longer rewritten; the ksh93 package build still drops ~20 untracked files into the tree)*
+- [x] **[verified]** `programs/ttsnoop/Makefile.am:158-163` overwrites the tracked `ttsnoop.c`. The `dtcodegen -merge` rules write tracked `*_stubs.c` files in the source directory. ksh93 drops about 20 untracked files into the tree. *(status: done; dtcodegen in a scratch dir (round 1); ksh93 built without `flat`, so everything stays in ksh93/arch/HOSTTYPE (ignored upstream); an old flat view is removed once; no file outside arch/ after a full build (3f0668d95))*
   - Fix: generate into the build directory.
 
 ### 6.2 Compiler flags
@@ -978,7 +1029,7 @@ N = entries in the directory, K = files in one operation, T = data types.
 - [x] **[verified] P2** `configure.ac:26,74-75,624`: C is strict `-std=c99` with a pile of `_BSD_SOURCE`/`_SVID_SOURCE` defines. C++ has no `-std`, so it silently follows the compiler default (gnu++20 on GCC 16) for 1990s code. *(status: done; -std=gnu11 / -std=gnu++17; _BSD_SOURCE/_SVID_SOURCE/_POSIX_SOURCE dropped, _DEFAULT_SOURCE kept)*
   - Fix: `-std=gnu11`/`gnu17` and `-std=gnu++17`; drop the deprecated feature macros.
 - [x] Warning baseline: `-Wall` for C and C++, with the whole tree warning-free (see Phase 7). The `-Wno-*` probes in `m4/compiler_flag_chk.m4` are no-ops, because GCC accepts any unknown `-Wno-*`; probe the positive form instead. *(status: done; m4/compiler_flag_chk.m4 now probes the positive form of -Wno-X (CDE_CHECK_CFLAG/CXXFLAG))*
-- [ ] **[verified] P3** `configure.ac:354-355`: `-fno-strict-aliasing` is applied to the whole tree. *(status: not done: tried: GifUtils.c has a real aliasing violation that -Wstrict-aliasing does not report, so the flag stays tree-wide (documented in configure.ac))*
+- [ ] **[verified] P3** `configure.ac:354-355`: `-fno-strict-aliasing` is applied to the whole tree. *(status: won't do: the GifUtils.c violation is fixed (260bfa8d2), but -Wstrict-aliasing=2 reports 818 warnings at 529 places in ~150 files across 30+ directories (rpcgen XDR, Xt class records, ...), so the flag cannot be limited to DtSearch/il; strict aliasing changes 889 objects but shrinks .text only 0.13%, and benchmarks show noise. Numbers recorded in configure.ac (2f3ddab33))*
   - Fix: limit it to the code that needs it (DtSearch/raima, il) and enable `-Wstrict-aliasing=2` elsewhere.
 - [x] **[verified] P2** There is no release/debug split and nothing defines `NDEBUG`, so about 380 `assert`s are live (dtinfo 142, dtmail 142, dtappbuilder 57, tt 40). `programs/dticon/constants.h:34` hard-codes `#define DEBUG True`. *(status: done; --enable-debug; release builds use -DNDEBUG; asserts audited; $(KEEP_ASSERTS) for code that relies on them. dticon constants.h DEBUG left alone)*
   - Fix: add `--enable-debug`; audit the asserts for side effects before setting `-DNDEBUG`.
@@ -992,7 +1043,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - `xournal.dt` is listed twice (`types.am:20,23`).
 
 ### 6.3 Parallel and incremental builds
-- [ ] **[verified] P1** Recursive SUBDIRS serialise the tree: 277 `Makefile.am`, about 100 s for `lib/` of which `lib/DtMmdb` is about 50 s, and DtMmdb is independent of every other library. *(status: not done: not started)*
+- [x] **[verified] P1** Recursive SUBDIRS serialise the tree: 277 `Makefile.am`, about 100 s for `lib/` of which `lib/DtMmdb` is about 50 s, and DtMmdb is independent of every other library. *(status: done; lib/DtMmdb, lib/tt/lib, dtinfo/src and dthelp/parser each one Makefile (Makefile.inc with %reldir%); lib/ runs its 11 libraries as parallel jobs; same objects, flags, exports and sizes; no-op make processes 21 -> 2, 11 -> 2, 31 -> 2, 40 -> 1; whole-tree no-op 3.5-3.8 -> 2.9-3.2 s; clean build noise-level on 2 CPUs)*
   - Fix: non-recursive `lib/DtMmdb` (19 SUBDIRS), `lib/tt/lib`, `programs/dtinfo/dtinfo/src` and `dthelp/parser/*` with `include …/Makefile.inc` and `%reldir%`; later, all of `lib/`.
 - [x] **[verified] P1** `.NOTPARALLEL` serialises about 280 TUs: *(status: done; all 18 .NOTPARALLEL removed; grouped targets with a fallback for make < 4.3; ab -j3 41 s vs 57 s serial)*
 
@@ -1010,7 +1061,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: move-if-change, or put the content in `AC_CONFIG_HEADERS`.
 - [x] **[verified] P2** 178 recipes end in `|| $(RM) $@` (exit 0 with a missing file), and 110 `$(GENCPP) … > $@` leave truncated targets. *(status: done; .DELETE_ON_ERROR in 40 Makefile.am + sdl-docs.am; the 178 recipes write $@.tmp and mv)*
   - Fix: `.DELETE_ON_ERROR:` and `$@.tmp` + `mv`.
-- [ ] **[verified] P2** Generated files with no prerequisites never rebuild: *(status: partial: prerequisites added for dtinfo Prelude.h/msg, sdl-docs, ManLinks.sgm, msg.am wildcard; no distcheck job (VPATH builds still impossible), sdl-data.am still uses $(shell))*
+- [x] **[verified] P2** Generated files with no prerequisites never rebuild: *(status: done; VPATH builds (also read-only srcdir and --enable-doc-tools) and `make distcheck` pass: $(srcdir) -I flags and recipes, generated headers found in builddir, nothing written to srcdir, sdl-data.am uses $(wildcard) (178 -> 1 processes per dry run), make dist in any configuration, root-free install/uninstall; fixed a ksh93 mamake -jN hang; .github/workflows/distcheck.yml)*
   - `dtinfo/src/Makefile.am:34,48`
   - `doc/common/help/sdl-docs.am:21`
   - `doc/en_US.UTF-8/m-guides/Makefile.am:6`
@@ -1026,9 +1077,9 @@ N = entries in the directory, K = files in one operation, T = data types.
 
 ### 6.4 Docs and help toolchain
 - [x] **[verified] P1** `htag2` runs `system("compress")` per topic page and for the volume structure: about 2,500 fork/execs per locale. See 6.1. *(status: done; in-process LZW since d907a737d)*
-- [ ] **[verified] P1** `doc/Makefile.am:3-23`, `doc/en_US.UTF-8/Makefile.am:3`, `guides/Makefile.am:35-37`, `dtdocbook2infolib.c:1324-1500`: locales and subdirectories are serial, and the infolib build is one sequential `system()` pipeline. *(status: partial: doc/ starts one sub-make per leaf directory in parallel (en_US docs 50 -> 37 s); NCFGen/MixedGen still serial (they share one bookcase))*
+- [x] **[verified] P1** `doc/Makefile.am:3-23`, `doc/en_US.UTF-8/Makefile.am:3`, `guides/Makefile.am:35-37`, `dtdocbook2infolib.c:1324-1500`: locales and subdirectories are serial, and the infolib build is one sequential `system()` pipeline. *(status: done; doc/ parallel per directory (round 1); NCFGen/MixedGen cannot run concurrently (each needs the OIDs the previous dbdrv load stored) and cost 0.74 s of 11.5 s; instead NodeParser 3.7 -> 1.42 s CPU (O(1) SGMLName lookup, inert subtasks skipped) and dtdocbook2infolib pipes directly: en_US infolib 6.9-8.3 -> 6.2-6.6 s, identical outputs (3a8923882, ebab1ed98))*
   - Fix: a non-recursive `doc/`; run the independent NCFGen/MixedGen passes concurrently.
-- [ ] **[verified] P2** About 657 man pages each run a 9-process pipeline that re-parses the DocBook DTD (`dtdocbook2man.in:79-135`), and all of them depend on `ManLinks.sgm`. *(status: partial: one sed instead of grep|sed, no /tmp chain (5 pages 0.98 -> 0.41 s); no batching (one onsgmls+instant per page))*
+- [x] **[verified] P2** About 657 man pages each run a 9-process pipeline that re-parses the DocBook DTD (`dtdocbook2man.in:79-135`), and all of them depend on `ManLinks.sgm`. *(status: done; instant -B translates each child of the document element as its own document; dtdocbook2man -b runs one onsgmls+instant over all pages of a batch; doc/en_US.UTF-8/man rebuilds only changed pages via a stamp; 32.3 -> 2.5 s, 655 pages byte-identical apart from the date (d3180e469))*
   - Fix: batch them per section, or ship pre-generated pages.
 - [x] **[verified] P2** `--disable-docs` still builds and requires `dthelp` (about 220 TUs), `dtdocbook`/`instant` with Tcl and `onsgmls`, `dtsr`, and 7 `dtdocbook/locales` directories that ignore the language switches. *(status: done; --enable-doc-tools gates dthelp/parser, dtdocbook and dtsr; --disable-help-docs/--disable-man-pages/--disable-infolib; dtdocbook locales follow the language switches)*
   - Fix: gate them on `BUILD_DOCS`; split the switch into help/man/infolib.
@@ -1036,7 +1087,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: one shared `libhelputil.a`.
 - [x] **[verified] P2** `dthelp_htag*`, `ctag1` and `instant` are text tools that link the whole Dt+Motif stack (22 of 22 direct libraries unused, 48 DSOs per run). *(status: done; htag1/ctag1/htag2 need only libc, instant only libtcl and libc)*
   - Fix: link only libc and `-ltcl`, so they build early and can be cross-built.
-- [ ] **[verified] P3**: *(status: partial: instant: Tcl_EvalObjv, no encoding leak (5 runs 1.235 -> 0.320 s); GraphicsTask reads in BUFSIZ chunks; doc_utils no longer recompiles validator. Not done: dtsrload/dtsrindex (outside scope; cache premise was wrong) and the double parse of guides)*
+- [ ] **[verified] P3**: *(status: won't do (rest): instant, GraphicsTask and validator done in round 1, NodeParser and the TOC pass faster (6.4 P1). dtsrindex+dtsrload are 0.79 s of a 6.5 s infolib build and live in programs/dtsr and lib/DtSearch; folding the TOC pass into the book build means restructuring dtdocbook2infolib for at most 2.8 s CPU per language)*
   - `instant` calls `Tcl_GetEncoding` per element and leaks it, and runs `Tcl_Eval` on fresh strings (`translate.c:324-331`, `util.c:742-815`).
   - `GraphicsTask` reads with `getc` per byte (`GraphicsTask.C:220-226`).
   - `dtsrload` runs with an 8-page cache, and `dtsrindex` does seek/read/seek/write per word (`dtsrload.c:916`, `dio.c:203,981-1018`, `dtsrindex.c:822-958`).
@@ -1072,7 +1123,7 @@ N = entries in the directory, K = files in one operation, T = data types.
   - Fix: per-program `LDADD`.
 - [x] **[verified] P1** `configure.ac:451,454`: `-lcrypt -lm` go into the global `LIBS`, so every library and program gets them. *(status: done; MATHLIB/CRYPTLIB per target; LIBS is empty)*
   - Fix: `AC_SEARCH_LIBS` with an empty action and per-target `CRYPT_LIBS`/`MATH_LIBS`.
-- [ ] **[verified] P2** `lib/DtSvc/Makefile.am:176-179`: `SvcPam.c` and libpam are in libDtSvc, so every client loads libpam. Only dtlogin and dtsession use it. *(status: not done: Dt/SvcPam.h is installed API; moving it out needs a lazy dlopen in lib/DtSvc/DtUtil2/SvcPam.c)*
+- [x] **[verified] P2** `lib/DtSvc/Makefile.am:176-179`: `SvcPam.c` and libpam are in libDtSvc, so every client loads libpam. Only dtlogin and dtsession use it. *(status: done; SvcPam.c dlopen()s libpam (RTLD_NOW|RTLD_GLOBAL, LIBPAM_SONAME then .so.0/.1/.6) on first use, PAM_SYSTEM_ERR if absent; libDtSvc NEEDED has no libpam; same 254 exports; a libDtSvc client maps 3 fewer DSOs; PAM auth unchanged (213f489d6))*
 - [x] **[verified] P2** `lib/csa/Makefile.am:10`: libcsa links all of Motif and X for one `XtAppAddInput`. `ttsession` and `tt_type_comp` link `XTOOLLIB` and use none of it. *(status: done; libcsa NEEDED 14 -> 3; tt tools no longer link X (ttsession 17 -> 5 NEEDED))*
 - [x] **[verified] P1** There is no export control: 10,161 exported symbols, of which only 1,404 are referenced in-tree. *(status: done; version scripts from build-aux/symbols/*.sym (no version node); libtt 3299 -> 1441, libDtMmdb 4030 -> 894 exports; -fvisibility-inlines-hidden/-Bsymbolic-functions not used)*
 
@@ -1083,17 +1134,17 @@ N = entries in the directory, K = files in one operation, T = data types.
 
   - About 9,160 symbolic relocations and PLT calls.
   - Fix: `-export-symbols-regex` or version scripts; `-fvisibility-inlines-hidden`; `-fno-semantic-interposition`/`-Bsymbolic-functions`.
-- [ ] **[verified] P3** libDtSvc pulls in libstdc++ for 4 `new`/`delete` symbols from `DtCodelibs/*.C`; convert those files to C. *(status: not done: needs DtCodelibs/*.C converted to C)*
-- [ ] **[verified] P3** `programs/dtudcfonted` and `dtudcexch` are not built, but their app-defaults and catalogs are generated. `lib/pam` is not built. Decide whether to build or delete them. *(status: partial: decision: do not build dtudcfonted/dtudcexch and stop shipping their data (done); the sources and lib/pam are not deleted yet)*
+- [x] **[verified] P3** libDtSvc pulls in libstdc++ for 4 `new`/`delete` symbols from `DtCodelibs/*.C`; convert those files to C. *(status: done; all 12 DtCodelibs files are C (privbuf macros, structs with init/free, strtokx(char**) same ABI); 3 latent bugs fixed; libDtSvc linked by cc, no libstdc++/libgcc_s NEEDED, same 254 exports; outputs byte-identical over a shellscan/pattern harness (3e801cd0c). Processes still map libstdc++ through libtt)*
+- [x] **[verified] P3** `programs/dtudcfonted` and `dtudcexch` are not built, but their app-defaults and catalogs are generated. `lib/pam` is not built. Decide whether to build or delete them. *(status: done; programs/dtudcfonted, programs/dtudcexch and lib/pam deleted (178 files, ~125,000 lines) with their app-defaults templates, catalogs in every locale (still generated and installed until now), .gitignore and debian/copyright lines; the reference-manual pages and the UDC guide chapter are kept (54494b0f5))*
 
 ### 6.6 Dead code and toolchain extras
-- [ ] **[verified] P3** ToolTalk dead weight: *(status: partial: lib/tt/demo, mapfiles, tt_trace grammar, OPT_CLASSING_ENGINE code, ce2xdr and bin/scripts removed (~13,000 lines); TT 1.0 protocol and the optional tools kept (feature decision))*
+- [ ] **[verified] P3** ToolTalk dead weight: *(status: won't do (rest): demo, mapfiles, trace grammar, OPT_CLASSING_ENGINE and bin/scripts removed in round 1. The TT 1.0 dbserver protocol is a live wire fallback (_Tt_db_client drops to dbVersion 1; the server answers old clients); ttdbck, tttar, ttcp/ttmv/ttrm and tttrace are documented commands (ttsnoop runs tttrace), and a switch would keep them in the default build anyway)*
   - `lib/tt/demo/` and Solaris mapfiles;
   - the never-compiled `tt_trace` grammar files and the duplicate `mp_types_gram.y`/`lex.l`;
   - `bin/scripts` (only used under the never-defined `OPT_CLASSING_ENGINE`) plus about 1,000 lines of `#ifdef`;
   - the TT 1.0 dbserver protocol (about 7,000 lines);
   - optional `dbck`/`tttar`/`ttcp`/`tttrace` tools (about 7,100 lines) that could go behind a switch.
-- [ ] **[verified] P3** `md5` is duplicated (`dtcm/dtcm/md5.c`, `dtmail/libDtMail/Common/md5.C`). C++ templates are expanded by textual inclusion (`-DEXPAND_TEMPLATES`, 24 headers), giving 1,283 weak exports in libDtMmdb. *(status: not done: not changed)*
+- [x] **[verified] P3** `md5` is duplicated (`dtcm/dtcm/md5.c`, `dtmail/libDtMail/Common/md5.C`). C++ templates are expanded by textual inclusion (`-DEXPAND_TEMPLATES`, 24 headers), giving 1,283 weak exports in libDtMmdb. *(status: done; dtmail uses dtcm's md5.c/md5.h (b93a0826e, 86ae19386); UINT4 is uint32_t, so MD5 is now right on LP64 (APOP digests and Content-MD5 headers were wrong) (15a6a7bff). EXPAND_TEMPLATES: no change needed: libDtMmdb now exports 85 weak symbols, 4 of them template instantiations used by consumers, and the linker already merges COMDAT copies)*
   - Fix: explicit instantiation in one TU.
 - [x] **[verified] P2** ccache breakers: *(status: done; no $(PWD)/$(abs_top_srcdir) in -D flags, ksh93 built without the CDE git hash, -ffile-prefix-map by default, ksh93 uses $(CC))*
   - `$(abs_top_srcdir)` and `$(PWD)` baked into defines (`doc_utils/Makefile.am:24-70`);
@@ -1112,13 +1163,13 @@ N = entries in the directory, K = files in one operation, T = data types.
   - The baseline build had 10,343 warning lines: 9,889 distinct diagnostics at 5,478 distinct sites, after collapsing the per-enum-value `-Wswitch` lines (4,748 of them) into 337 switch statements.
   - No pragmas and no blanket `-Wno-*` flags were used. Generated code was fixed at the generator: the rpcgen post-filter in `lib/csa/Makefile.am`, dtcodegen (`dtappbuilder/src/abmf`), dthelp's `build`/`eltdef` tools, flex `%option nounput`, and bison directives.
   - X11 `Xos_r.h` thread-safety buffers are kept with `(void) var; /* unused unless XTHREADS */`.
-  - Still reported, all outside `-Wall`: *(status: all fixed on this branch except the 2 dtinfo deprecated calls and `programs/dtksh/init.c` -Wdiscarded-qualifiers; see the status section)*
+  - Still reported, all outside `-Wall`: *(status: all fixed: the dtinfo calls were replaced in 26fdb3afd, and dtksh compiles its init.c copy through its own ksh93-init.o rule without the extra warnings)*
     - Motif `-Wdeprecated-declarations`: dtmail 49 sites, dtinfo 9 (`XmListGetSelectedPos`, `Xm*GetChild`, `XmStringGetLtoR`). The replacements are not drop-in.
     - `-Wfree-nonheap-object` from `lib/DtMmdb/dti_cc/cc_hdict.C:12`, instantiated from `dtinfo/src/OnlineRender/FontCache.C:86`.
     - `-Wdiscarded-qualifiers` in `programs/dtksh/init.c`, a build-time copy of the vendored ksh93 source.
     - Linker "dangerous" notices for `tmpnam`/`tempnam`/`mktemp`: dtwm, dtlogin, dtspcd, dticon, dtcalc, dtcm, dtcreate, dtpdmd, dtpad, dtfile, dtfile_copy, dtmail, dtstyle, dtinfo, ttsnoop. Move them to `mkstemp`; that also closes the `/tmp` races.
 - [x] Remove `-Wno-format-truncation` (part of `-Wall`) and fix what it reports. *(status: done; dropped from configure.ac; all 55 sites fixed; 0 format-truncation warnings with and without docs)*
-- [ ] Replace the deprecated Motif calls above. Then add a curated `-Wextra`, as in motif TODO 2.3, and `-Werror` in CI. *(status: partial: dtmail's 49 sites replaced through XmCompat.h; 2 dtinfo calls have no exact replacement (XmStringGetLtoR, XmStringGetNextSegment); curated -Wextra and -Werror in CI not done)*
+- [x] Replace the deprecated Motif calls above. Then add a curated `-Wextra`, as in motif TODO 2.3, and `-Werror` in CI. *(status: done; deprecated calls replaced (dtmail round 1, dtinfo 26fdb3afd); configure enables a curated -Wextra set warning by warning (17 warnings, ~590 sites fixed, real bugs among them, 0cb3be2df); unused-parameter, sign-compare, cast-function-type and missing-field-initializers left out with the counts in configure.ac; --enable-werror; CI -Werror job in .github/workflows/build.yml (not yet run on GitHub))*
 
 ### 7.1 Bugs the `-Wall` cleanup exposed and fixed (behaviour changes)
 
