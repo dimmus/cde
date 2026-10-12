@@ -1565,13 +1565,25 @@ static int execute_v(Rule_t *r, char **argv)
 	/* run job in background if wanted & possible */
 	if (r && PARALLEL(r))
 	{
-		/* if we're at maxjobs, wait for some to finish */
+		/*
+		 * if we're at maxjobs, wait for some to finish; SIGCHLD stays
+		 * blocked but in sigsuspend(), so that children which end
+		 * between the check and the wait cannot leave us waiting for a
+		 * signal that was already delivered (which hung -j builds)
+		 */
+		sigset_t chld, prev;
+		sigemptyset(&chld);
+		sigaddset(&chld, SIGCHLD);
+		sigprocmask(SIG_BLOCK, &chld, &prev);
 		assert(state.jobs <= state.maxjobs);
 		while (state.jobs == state.maxjobs)
 		{
-			sigsuspend(&empty_sigmask);
 			walk(state.rules, wreap_nowait);
+			if (state.jobs < state.maxjobs)
+				break;
+			sigsuspend(&empty_sigmask);
 		}
+		sigprocmask(SIG_SETMASK, &prev, NULL);
 		/* let it run in parallel */
 		state.jobs++;
 		r->pid = pid;
