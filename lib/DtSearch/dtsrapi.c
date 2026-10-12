@@ -434,7 +434,7 @@ int	DtSearchReinit (char ***dbnames, int *dbcount)
 		fflush (aa_stderr);
 	    }
 	    aa_reinit();
-	    /*  fall thru to OK... */
+	    /* FALLTHROUGH - to OK... */
 
 	case OE_OK:
 	    *dbnames = ausapi_dbnamesv;
@@ -484,10 +484,10 @@ static int      both_valid_dates (char *date1, char *date2)
 {
     int             convert_error = FALSE;
 
-    if ((usrblk.objdate1 = DtSearchValidDateString (date1)) == -1L)
+    if ((usrblk.objdate1 = DtSearchValidDateString (date1)) == (DtSrObjdate) -1)
 	convert_error = TRUE;
 
-    if ((usrblk.objdate2 = DtSearchValidDateString (date2)) == -1L)
+    if ((usrblk.objdate2 = DtSearchValidDateString (date2)) == (DtSrObjdate) -1)
 	convert_error = TRUE;
 
     if (!convert_error &&

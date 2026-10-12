@@ -668,7 +668,7 @@ CvtStr( char *charSet, void *from, unsigned long from_len,
 	    void *new_from = from;
 	    unsigned long new_from_len = from_len;
 	    unsigned long _passed = 0;
-	    size_t clen;
+	    int clen;		/* mblen() returns -1 for a bad sequence */
 	    void *_tmp = NULL;
 	    unsigned long _tmp_len = 0;
 

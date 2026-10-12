@@ -194,8 +194,10 @@ Boolean disk_hash::rehash(data_t& w)
 //////////////////////////////////////////
 // expand the buckets and the hash table
 //////////////////////////////////////////
-      bucket_vector -> expandWith(MAX(0, M+v - bucket_vector -> count()));
-      hash_vector -> expandWith(MAX(0, 2*n - hash_vector -> count()));
+      // M, v and n are unsigned: subtract in int, or MAX() never
+      // sees a negative difference
+      bucket_vector -> expandWith(MAX(0, int(M+v) - bucket_vector -> count()));
+      hash_vector -> expandWith(MAX(0, int(2*n) - hash_vector -> count()));
       
 /////////////////////
 // clean buckets

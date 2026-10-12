@@ -93,7 +93,9 @@ typedef struct _StateTableRec
 typedef struct _stringParameter
 {
     unsigned char   str[STR_SIZE + 1];   /* buffer for string */
-    unsigned char   length;              /* length of str     */
+    unsigned short  length;              /* length of str (an unsigned
+					    char wrapped at 256, before
+					    the STR_SIZE checks) */
 } stringParameter;
 
 /*

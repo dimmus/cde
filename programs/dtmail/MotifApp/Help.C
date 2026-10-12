@@ -351,6 +351,7 @@ HelpTexteditCB (
  	    break;
  	case DtEDITOR_HELP_STATUS_OVERSTRIKE:
  	    locationId = STATUS_OVERSTRIKE_HELP;
+	    break;
  
  	/* -----> Format Settings dialog and dialog fields */
  	case DtEDITOR_HELP_FORMAT_DIALOG:

@@ -147,7 +147,8 @@ _DtTermSaveChar(Widget w)
   context = GetParserContext(w) ;
 
   mbtowc(&c,(char *)context->inputChar,MB_CUR_MAX);
-  if ( context->stringParms[0].length < STR_SIZE && iswprint(c) ) {
+  if ( context->stringParms[0].length + context->inputCharLen <= STR_SIZE &&
+       iswprint(c) ) {
       strncpy( (
          (char *)&context->stringParms[0].str[context->stringParms[0].length]), 
                 (char *)context->inputChar, context->inputCharLen) ;

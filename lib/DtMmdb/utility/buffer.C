@@ -184,9 +184,10 @@ buffer& buffer::get(char *x, int sz)
 /***********************************************************/
 buffer& buffer::skip(int i)
 {
-   if ( i + v_aptr > v_eptr ) 
+   if ( i + v_aptr > v_eptr ) {
       MESSAGE(cerr, "buffer::skip(): underflow");
-   throw ( CASTBNDEXCEPT boundaryException( long(v_aptr), long(v_eptr), long(i + v_aptr) ));
+      throw ( CASTBNDEXCEPT boundaryException( long(v_aptr), long(v_eptr), long(i + v_aptr) ));
+   }
 
    v_aptr += i;
    return *this;

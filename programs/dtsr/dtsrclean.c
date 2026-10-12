@@ -323,7 +323,7 @@ static void     user_args_processor (int argc, char **argv)
     int             oops = FALSE;
     int             i;
     time_t          stamp;
-    size_t          tempsize;
+    long            tempsize;
 
     if (argc < 3)
 	end_of_job (2, SHOW_USAGE);
@@ -340,6 +340,7 @@ static void     user_args_processor (int argc, char **argv)
 		    debug_mode = TRUE;
 		else
 		    goto UNKNOWN_ARG;
+		break;
 
 	    case 'm':
 		fprintf (aa_stderr, CATGETS(dtsearch_catd, MS_dtsrclean, 301,

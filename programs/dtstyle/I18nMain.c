@@ -1285,6 +1285,7 @@ _DtI18nErrorDialog(
 	break;
     case ErrRemoteFailed:
 	err_str = GETMESSAGE(19, 38, "Remote execution failed on\n the selected host.");
+	break;
 
         /* Pipe */
     case ErrNoPopen:
