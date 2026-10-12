@@ -12,7 +12,8 @@ $(if $(filter grouped-target,$(.FEATURES)),,$(eval .NOTPARALLEL:))
 
 appdefaultsdir = $(CDE_DATA_TOP)/app-defaults/C
 
-ABINCLUDES = -I$(srcdir)/../include -I$(srcdir)/../include/ab_private -I$(srcdir)/../libABil
+ABINCLUDES = -I$(srcdir)/../include -I$(srcdir)/../include/ab_private \
+	-I../libABil -I$(srcdir)/../libABil
 
 AM_CPPFLAGS = $(CDE_CPPFLAGS) \
 	      -DCDE_INSTALLATION_TOP=\"$(CDE_INSTALLATION_TOP)\" \
@@ -38,7 +39,7 @@ DTCODEGEN = $(DTCODEGENCAT) ../abmf/dtcodegen
 # keep only the generated files; the stubs and dtbuilder.h stay as they
 # are in the tree (regenerate them on purpose with dtbuilder or
 # "make regen-stubs").
-DTCODEGEN_SCRATCH = $(SHELL) $(top_srcdir)/build-aux/dtcodegen-scratch \
+DTCODEGEN_SCRATCH = $(SHELL) $(top_srcdir)/build-aux/dtcodegen-scratch -s $(srcdir) \
 	"NLSPATH=$(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.cat $(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen"
 
 # dtbuilder.c and dtbuilder.msg are dtbuilder.c.src and dtbuilder.msg.src

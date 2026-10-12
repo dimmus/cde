@@ -1,6 +1,9 @@
 noinst_LTLIBRARIES += %reldir%/libStyleSheet.la
 
-%canon_reldir%_libStyleSheet_la_CXXFLAGS = $(CDE_CXXFLAGS) -DEXPAND_TEMPLATES -DCDE_NEXT
+# (-I: the lex and yacc outputs, which are in the build directory, include
+# this directory's headers)
+%canon_reldir%_libStyleSheet_la_CXXFLAGS = $(CDE_CXXFLAGS) -DEXPAND_TEMPLATES -DCDE_NEXT \
+	-I$(srcdir)/%reldir%
 
 %canon_reldir%_libStyleSheet_la_SOURCES = %reldir%/Attribute.C \
 	%reldir%/AttributeList.C %reldir%/BitVector.C %reldir%/DocParser.C \

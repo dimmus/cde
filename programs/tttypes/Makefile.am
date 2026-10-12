@@ -35,13 +35,23 @@ TT_CPP_FLAGS = -I$(top_builddir)/include -I$(top_srcdir)/include
 # does not contact, or autostart, a ttsession just to announce the
 # new build-tree types.xdr (the libtool wrapper would also make an
 # installed ttsession run against the build tree's libtt).
-# (The sources are looked up in $(srcdir) as well, for VPATH builds.)
+# tt_type_comp has cpp write a dependency file next to each source
+# (X.ptype.deps): in a VPATH build, where the source directory may be
+# read-only, it reads copies of the sources in $(PTYPES_VPATH).
+PTYPES_VPATH = ptypes.vpath
 types.xdr: $(PTYPES) dtinfo_start.opnums $(TT_TYPE_COMP)
 	$(RM) $@ .tt_lock
-	srcs=; for f in $(PTYPES); do \
-	  if test -f $$f; then srcs="$$srcs $$f"; \
-	  else srcs="$$srcs $(srcdir)/$$f"; fi; \
-	done; \
+	srcs="$(PTYPES)"; \
+	if test "$(srcdir)" != .; then \
+	  rm -rf $(PTYPES_VPATH) && mkdir $(PTYPES_VPATH) && \
+	  for f in $(PTYPES) dtinfo_start.opnums; do \
+	    cp $(srcdir)/$$f $(PTYPES_VPATH)/ || exit 1; \
+	  done; \
+	  srcs=; for f in $(PTYPES); do srcs="$$srcs $(PTYPES_VPATH)/$$f"; done; \
+	fi; \
 	(unset DISPLAY TT_SESSION _SUN_TT_SESSION; \
 	 TTPATH=. $(TT_TYPE_COMP) $(TT_CPP_FLAGS) -sd user -m $$srcs); \
 	status=$$?; $(RM) .tt_lock; exit $$status
+
+clean-local:
+	rm -rf $(PTYPES_VPATH)

@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 include $(top_srcdir)/build-aux/cde-libs.am
 
-ABINCLUDES = ../include
+ABINCLUDES = $(srcdir)/../include
 
 EXTRA_DEFINES =  -D_POSIX_SOURCE=1
 
@@ -22,7 +22,7 @@ bin_PROGRAMS = dtcodegen
 
 noinst_DATA = dtcodegen.cat
 
-dtcodegen_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES) -I$(srcdir)/../libABil
+dtcodegen_CFLAGS = $(CDE_CFLAGS) $(KEEP_ASSERTS) $(EXTRA_DEFINES) -I$(ABINCLUDES) -I../libABil -I$(srcdir)/../libABil
 
 dtcodegen_LDADD = ../libABil/libABil.a  \
 		  ../libABobjXm/libABobjXm.a  \
@@ -63,4 +63,4 @@ dtcodegen_SOURCES = abmf.c                  args.c \
 #test_merge_SOURCES = merge_c.c
 
 dtcodegen.cat:: $(SOURCES.msg)
-	$(GENCAT) dtcodegen.cat $(SOURCES.msg)
+	$(GENCAT) dtcodegen.cat $^

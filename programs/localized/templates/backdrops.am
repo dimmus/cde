@@ -10,4 +10,4 @@ TOP = $(top_builddir)/programs
 MERGE = $(top_builddir)/programs/localized/util/merge
 
 desc.$(LANG): $(TOP)/dtstyle/Backdrops Backdrops.tmsg
-	$(MERGE) -lang $(LANG) Backdrops.tmsg < $< > $@.tmp && mv -f $@.tmp $@
+	$(MERGE) -lang $(LANG) $(srcdir)/Backdrops.tmsg < $< > $@.tmp && mv -f $@.tmp $@

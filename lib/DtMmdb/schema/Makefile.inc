@@ -1,6 +1,9 @@
 noinst_LTLIBRARIES += %reldir%/libschema.la
 
-%canon_reldir%_libschema_la_CXXFLAGS = $(CDE_CXXFLAGS)
+# (-I: the lex and yacc outputs, which are in the build directory, include
+# this directory's headers)
+%canon_reldir%_libschema_la_CXXFLAGS = $(CDE_CXXFLAGS) \
+	-I$(srcdir)/%reldir%
 
 %canon_reldir%_libschema_la_SOURCES = %reldir%/desc.C \
 	%reldir%/store_desc.C %reldir%/object_dict.C \

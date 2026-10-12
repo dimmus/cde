@@ -10,4 +10,4 @@ TOP = $(top_builddir)/programs
 MERGE = $(top_builddir)/programs/localized/util/merge
 
 desc.$(LANG): $(TOP)/dtstyle/Palettes Palettes.tmsg
-	$(MERGE) -lang $(LANG) Palettes.tmsg < $< > $@.tmp && mv -f $@.tmp $@
+	$(MERGE) -lang $(LANG) $(srcdir)/Palettes.tmsg < $< > $@.tmp && mv -f $@.tmp $@

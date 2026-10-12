@@ -24,7 +24,7 @@ dtsr_DATA = \
 
 noinst_PROGRAMS = mkdbd
 
-dtsearch = ../../../lib/DtSearch
+dtsearch = $(top_srcdir)/lib/DtSearch
 
 mkdbd_CPPFLAGS = $(CDE_CPPFLAGS) -DBASE_FILE_NAME=\"dtsearch\"
 mkdbd_CFLAGS = $(CDE_CFLAGS) $(DT_INCDIR) -I$(dtsearch)/raima

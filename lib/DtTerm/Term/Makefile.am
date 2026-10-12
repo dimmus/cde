@@ -15,7 +15,7 @@ $(top_builddir)/lib/DtTerm/util/lineToData:
 
 TermLineData.c: TermLineData.data $(top_builddir)/lib/DtTerm/util/lineToData
 	$(RM) $@
-	$(top_builddir)/lib/DtTerm/util/lineToData -p _DtTerm -f TermLineData.data > $@
+	$(top_builddir)/lib/DtTerm/util/lineToData -p _DtTerm -f $< > $@
 
 includes:: TermLineData.c
 
@@ -27,8 +27,10 @@ libTerm_la_SOURCES = \
         TermEnhance.c \
         TermFunction.c \
         TermFunctionKey.c \
-        TermLineData.c \
         TermParse.c \
         TermParseTable.c \
         TermVersion.c
+
+# made by lineToData (above)
+nodist_libTerm_la_SOURCES = TermLineData.c
 

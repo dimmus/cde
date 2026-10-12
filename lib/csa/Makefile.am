@@ -65,10 +65,14 @@ reparser.c reparser.h: reparser.y
 	sed -e s/yyparse/_DtCm_rule_parser/g -e s/yy/_DtCm_yy/g y.tab.c > reparser.c
 	sed s/yy/_DtCm_yy/g y.tab.h > reparser.h
 
+# rpcgen runs in $(srcdir), so that the names it writes into its output
+# (the header to include) are those of an in-tree build.
+RPCGEN_SED = sed -f $(srcdir)/namechange1.sed | sed -f $(srcdir)/namechange2.sed
+
 rtable2_clnt.c rtable3_clnt.c rtable4_clnt.c cm_clnt.c:
 	$(RM) $@
-	cat EUSinclude > $@
-	rpcgen -l $(@:_clnt.c=.x) | sed -f namechange1.sed | sed -f namechange2.sed >> $@
+	cat $(srcdir)/EUSinclude > $@
+	(cd $(srcdir) && rpcgen -l $(@:_clnt.c=.x)) | $(RPCGEN_SED) >> $@
 
 # rpcgen declares "register int32_t *buf;" in every xdr routine but uses it
 # only in some of them; drop the declaration where it is unused.
@@ -81,17 +85,19 @@ XDR_DROP_UNUSED_BUF = $(AWK) '/^[{]/ { n = 0; used = 0; infn = 1 } \
 
 rtable2_xdr.c rtable3_xdr.c rtable4_xdr.c agent_xdr.c:
 	$(RM) $@
-	cat EUSinclude > $(@:.x=_xdr.c)
-	rpcgen -c $(@:_xdr.c=.x) | sed -f namechange1.sed | sed -f namechange2.sed | $(XDR_DROP_UNUSED_BUF) >> $(@:.x=_xdr.c)
+	cat $(srcdir)/EUSinclude > $(@:.x=_xdr.c)
+	(cd $(srcdir) && rpcgen -c $(@:_xdr.c=.x)) | $(RPCGEN_SED) | $(XDR_DROP_UNUSED_BUF) >> $(@:.x=_xdr.c)
 
-rtable4_clnt.c rtable4_xdr.c: rtable4.h namechange1.sed namechange2.sed
-rtable3_clnt.c rtable3_xdr.c: rtable3.h namechange1.sed namechange2.sed
-rtable2_clnt.c rtable2_xdr.c: rtable3.h namechange1.sed namechange2.sed
+rtable4_clnt.c rtable4_xdr.c: rtable4.x rtable4.h namechange1.sed namechange2.sed
+rtable3_clnt.c rtable3_xdr.c: rtable3.x rtable3.h namechange1.sed namechange2.sed
+rtable2_clnt.c rtable2_xdr.c: rtable2.x rtable3.h namechange1.sed namechange2.sed
+cm_clnt.c: cm.x namechange1.sed namechange2.sed
+agent_xdr.c: agent.x namechange1.sed namechange2.sed
 agent_xdr.c agent.c: agent.h
 
-agent.h:
+agent.h: agent.x agent.wrapbegin agent.wrapend namechange1.sed namechange2.sed
 	$(RM) $@
-	cat agent.wrapbegin > agent.h
-	rpcgen -h agent.x | $(SED) -f namechange1.sed | $(SED) -f namechange2.sed >> agent.h
-	cat agent.wrapend >> agent.h
+	cat $(srcdir)/agent.wrapbegin > agent.h
+	(cd $(srcdir) && rpcgen -h agent.x) | $(RPCGEN_SED) >> agent.h
+	cat $(srcdir)/agent.wrapend >> agent.h
 

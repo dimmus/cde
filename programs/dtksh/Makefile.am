@@ -12,11 +12,16 @@ dist_ksh_SCRIPTS = DtFuncs.dtsh
 
 KSH93SRC = ksh93
 
+# The ksh93 sources.  ksh93's bin/package builds inside the ksh93 tree
+# ($(KSH93SRC) above); in a VPATH build, where the source directory may
+# be read-only, the ksh93.stamp rule first copies the sources there.
+KSH93SRCDIR = $(srcdir)/ksh93
+
 # ksh93's bin/package builds in $(KSH93SRC)/arch/HOSTTYPE (ignored by
 # ksh93's own .gitignore) and installs its libraries and headers there.
 # It is run without "flat", which would also link every file it builds
 # into bin/, lib/, include/ and the source directories of $(KSH93SRC).
-KSH93_HOSTTYPE := $(shell CC='$(CC)' $(KSH93SRC)/bin/package host type 2>/dev/null)
+KSH93_HOSTTYPE := $(shell CC='$(CC)' $(KSH93SRCDIR)/bin/package host type 2>/dev/null)
 KSH93ROOT = $(KSH93SRC)/arch/$(KSH93_HOSTTYPE)
 
 KSH93LIBSHELL = $(KSH93ROOT)/lib/libshell.a
@@ -93,10 +98,17 @@ dtksh_SOURCES = init.c \
 KSH93_CC = $(CC)
 KSH93_CCFLAGS = $(strip $(KSH93_SHOPTS) $(HARDEN_CFLAGS) $(CFLAGS))
 KSH93_JOBS = $(or $(patsubst -j%,%,$(filter -j%,$(MAKEFLAGS))),1)
-KSH93_SRCFILES := $(shell find $(KSH93SRC)/src $(KSH93SRC)/bin/package -type f ! -name "*.o" 2>/dev/null)
+KSH93_SRCFILES := $(shell find $(KSH93SRCDIR)/src $(KSH93SRCDIR)/bin/package -type f ! -name "*.o" 2>/dev/null)
 
 ksh93.stamp: $(KSH93_SRCFILES) Makefile
 	@cc='$(KSH93_CC)'; ccflags='$(KSH93_CCFLAGS)'; \
+	if test "$(srcdir)" != .; then \
+		echo "ksh93: copying the sources into the build directory"; \
+		$(MKDIR_P) $(KSH93SRC) && \
+		(cd $(KSH93SRCDIR) && tar --exclude=./arch -cf - .) | \
+		(cd $(KSH93SRC) && tar -xpf -) && \
+		chmod -R u+w $(KSH93SRC) || exit 1; \
+	fi; \
 	if test -d $(KSH93SRC)/lib/package/gen; then \
 		echo "ksh93: removing the flat view of an older build"; \
 		$(KSH93SRC)/bin/package clean flat || exit 1; \
@@ -130,7 +142,11 @@ check-local:
 	./dtksh -c true && ksh93/bin/shtests --posix --utf8 SHELL=.libs/dtksh
 
 clean-local:
-	$(KSH93SRC)/bin/package clean
+	if test -x $(KSH93SRC)/bin/package; then $(KSH93SRC)/bin/package clean; fi
+
+# the copy of the ksh93 sources that a VPATH build made
+distclean-local:
+	if test "$(srcdir)" != .; then rm -rf $(KSH93SRC); fi
 
 DtFuncs.dtsh: DtFuncs.sh
-	$(CP) DtFuncs.sh DtFuncs.dtsh
+	$(CP) $(srcdir)/DtFuncs.sh $@

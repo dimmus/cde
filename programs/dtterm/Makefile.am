@@ -18,9 +18,9 @@ if HAS_UTEMPTER_LIBRARY
 dtterm_LDADD += -lutempter
 endif
 
-dtterm_CFLAGS = $(CDE_CFLAGS) -I$(top_builddir)/lib/DtTerm/TermPrim	\
-	-I$(top_builddir)/lib/DtTerm/Term			\
-	-I$(top_builddir)/lib/DtTerm/TermView	\
+dtterm_CFLAGS = $(CDE_CFLAGS) -I$(top_srcdir)/lib/DtTerm/TermPrim	\
+	-I$(top_srcdir)/lib/DtTerm/Term			\
+	-I$(top_srcdir)/lib/DtTerm/TermView	\
 	$(DT_INCDIR) \
 	-DSUN_TERMINAL_SERVER
 
@@ -52,11 +52,11 @@ DtTermFallBackResources.c.src: Dtterm.ad.src $(TRADCPP)
 
 DtTermFallBackResources.c: DtTermFallBackResources.c.src
 	$(RM) $@
-	./mkfallbk < DtTermFallBackResources.c.src > $@
+	$(srcdir)/mkfallbk < DtTermFallBackResources.c.src > $@
 
 dtterm.ti: terminfoChecklist $(TRADCPP)
 	$(RM) $@
-	CPP="$(GENCPP)" $(SHELL) terminfoCreate < terminfoChecklist > $@
+	CPP="$(GENCPP)" $(SHELL) $(srcdir)/terminfoCreate < $< > $@
 
 install-exec-hook:
 if !HAS_UTEMPTER_LIBRARY

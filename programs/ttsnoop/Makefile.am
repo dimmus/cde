@@ -18,7 +18,7 @@ DTCODEGENCAT = NLSPATH=$(top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.
 
 DTCODEGEN = $(DTCODEGENCAT) $(top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen
 
-DTCODEGEN_SCRATCH = $(SHELL) $(top_srcdir)/build-aux/dtcodegen-scratch \
+DTCODEGEN_SCRATCH = $(SHELL) $(top_srcdir)/build-aux/dtcodegen-scratch -s $(srcdir) \
 	"NLSPATH=$(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.cat $(abs_top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen"
 
 CLEANFILES = Ttsnoop Ttsnoop.tmp .dtcodegen.log *.BAK *.delta *.patched \
@@ -60,7 +60,7 @@ ttsnoop_ui.c ttsnoop_ui.h ttsnoop_stubs.C &: ttsnoop.bip ttsnoop.bil ttsnoop_stu
 	$(DTCODEGEN_SCRATCH) -i ttsnoop_stubs.C.src=ttsnoop_stubs.c \
 		ttsnoop_ui.c ttsnoop_ui.h ttsnoop_stubs.c=ttsnoop_stubs.C \
 		-- -changed -merge -p ttsnoop.bip ttsnoop.bil
-	cat externC.h ttsnoop_ui.h closeBrace.h > ttsnoop_ui.h.patched
+	cat $(srcdir)/externC.h ttsnoop_ui.h $(srcdir)/closeBrace.h > ttsnoop_ui.h.patched
 	mv ttsnoop_ui.h.patched ttsnoop_ui.h
 	$(SED) \
 	-e 's/^DtbTt/extern String snooperArgv[];DtbTt/' \
@@ -75,7 +75,7 @@ apiTracer_ui.c apiTracer_ui.h apiTracer_stubs.C &: ttsnoop.bip apiTracer.bil api
 	$(DTCODEGEN_SCRATCH) -i apiTracer_stubs.C.src=apiTracer_stubs.c \
 		apiTracer_ui.c apiTracer_ui.h apiTracer_stubs.c=apiTracer_stubs.C \
 		-- -changed -merge -p ttsnoop.bip apiTracer.bil
-	cat externC.h apiTracer_ui.h closeBrace.h > apiTracer_ui.h.patched
+	cat $(srcdir)/externC.h apiTracer_ui.h $(srcdir)/closeBrace.h > apiTracer_ui.h.patched
 	mv apiTracer_ui.h.patched apiTracer_ui.h
 	$(SED) -e 's/^DtbApi/extern String apiTracerArgv[];DtbApi/' \
 	-e 's/XmNrows, 24/XmNrows, 24, DtNsubprocessArgv, apiTracerArgv/' \
@@ -86,56 +86,56 @@ ttChooser_ui.c ttChooser_ui.h ttChooser_stubs.C &: ttsnoop.bip ttChooser.bil ttC
 	$(DTCODEGEN_SCRATCH) -i ttChooser_stubs.C.src=ttChooser_stubs.c \
 		ttChooser_ui.c ttChooser_ui.h ttChooser_stubs.c=ttChooser_stubs.C \
 		-- -changed -merge -p ttsnoop.bip ttChooser.bil
-	cat externC.h ttChooser_ui.h closeBrace.h > ttChooser_ui.h.patched
+	cat $(srcdir)/externC.h ttChooser_ui.h $(srcdir)/closeBrace.h > ttChooser_ui.h.patched
 	mv ttChooser_ui.h.patched ttChooser_ui.h
 
 patternProps_ui.c patternProps_ui.h patternProps_stubs.C &: ttsnoop.bip patternProps.bil patternProps_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i patternProps_stubs.C.src=patternProps_stubs.c \
 		patternProps_ui.c patternProps_ui.h patternProps_stubs.c=patternProps_stubs.C \
 		-- -changed -merge -p ttsnoop.bip patternProps.bil
-	cat externC.h patternProps_ui.h closeBrace.h > patternProps_ui.h.patched
+	cat $(srcdir)/externC.h patternProps_ui.h $(srcdir)/closeBrace.h > patternProps_ui.h.patched
 	mv patternProps_ui.h.patched patternProps_ui.h
 
 stringChooser_ui.c stringChooser_ui.h stringChooser_stubs.C &: ttsnoop.bip stringChooser.bil stringChooser_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i stringChooser_stubs.C.src=stringChooser_stubs.c \
 		stringChooser_ui.c stringChooser_ui.h stringChooser_stubs.c=stringChooser_stubs.C \
 		-- -changed -merge -p ttsnoop.bip stringChooser.bil
-	cat externC.h stringChooser_ui.h closeBrace.h > stringChooser_ui.h.patched
+	cat $(srcdir)/externC.h stringChooser_ui.h $(srcdir)/closeBrace.h > stringChooser_ui.h.patched
 	mv stringChooser_ui.h.patched stringChooser_ui.h
 
 messageProps_ui.c messageProps_ui.h messageProps_stubs.C &: ttsnoop.bip messageProps.bil messageProps_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i messageProps_stubs.C.src=messageProps_stubs.c \
 		messageProps_ui.c messageProps_ui.h messageProps_stubs.c=messageProps_stubs.C \
 		-- -changed -merge -p ttsnoop.bip messageProps.bil
-	cat externC.h messageProps_ui.h closeBrace.h > messageProps_ui.h.patched
+	cat $(srcdir)/externC.h messageProps_ui.h $(srcdir)/closeBrace.h > messageProps_ui.h.patched
 	mv messageProps_ui.h.patched messageProps_ui.h
 
 sessionChooser_ui.c sessionChooser_ui.h sessionChooser_stubs.C &: ttsnoop.bip sessionChooser.bil sessionChooser_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i sessionChooser_stubs.C.src=sessionChooser_stubs.c \
 		sessionChooser_ui.c sessionChooser_ui.h sessionChooser_stubs.c=sessionChooser_stubs.C \
 		-- -changed -merge -p ttsnoop.bip sessionChooser.bil
-	cat externC.h sessionChooser_ui.h closeBrace.h > sessionChooser_ui.h.patched
+	cat $(srcdir)/externC.h sessionChooser_ui.h $(srcdir)/closeBrace.h > sessionChooser_ui.h.patched
 	mv sessionChooser_ui.h.patched sessionChooser_ui.h
 
 fileChooser_ui.c fileChooser_ui.h fileChooser_stubs.C &: ttsnoop.bip fileChooser.bil fileChooser_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i fileChooser_stubs.C.src=fileChooser_stubs.c \
 		fileChooser_ui.c fileChooser_ui.h fileChooser_stubs.c=fileChooser_stubs.C \
 		-- -changed -merge -p ttsnoop.bip fileChooser.bil
-	cat externC.h fileChooser_ui.h closeBrace.h > fileChooser_ui.h.patched
+	cat $(srcdir)/externC.h fileChooser_ui.h $(srcdir)/closeBrace.h > fileChooser_ui.h.patched
 	mv fileChooser_ui.h.patched fileChooser_ui.h
 
 argChooser_ui.c argChooser_ui.h argChooser_stubs.C &: ttsnoop.bip argChooser.bil argChooser_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i argChooser_stubs.C.src=argChooser_stubs.c \
 		argChooser_ui.c argChooser_ui.h argChooser_stubs.c=argChooser_stubs.C \
 		-- -changed -merge -p ttsnoop.bip argChooser.bil
-	cat externC.h argChooser_ui.h closeBrace.h > argChooser_ui.h.patched
+	cat $(srcdir)/externC.h argChooser_ui.h $(srcdir)/closeBrace.h > argChooser_ui.h.patched
 	mv argChooser_ui.h.patched argChooser_ui.h
 
 callbackChooser_ui.c callbackChooser_ui.h callbackChooser_stubs.C &: ttsnoop.bip callbackChooser.bil callbackChooser_stubs.C.src externC.h closeBrace.h
 	$(DTCODEGEN_SCRATCH) -i callbackChooser_stubs.C.src=callbackChooser_stubs.c \
 		callbackChooser_ui.c callbackChooser_ui.h callbackChooser_stubs.c=callbackChooser_stubs.C \
 		-- -changed -merge -p ttsnoop.bip callbackChooser.bil
-	cat externC.h callbackChooser_ui.h closeBrace.h > callbackChooser_ui.h.patched
+	cat $(srcdir)/externC.h callbackChooser_ui.h $(srcdir)/closeBrace.h > callbackChooser_ui.h.patched
 	mv callbackChooser_ui.h.patched callbackChooser_ui.h
 
 # dtcodegen -main merges into ttsnoop.c, which is a tracked (stale) file
@@ -145,7 +145,7 @@ ttsnoop.C ttsnoop.h dtb_utils.c dtb_utils.h &: ttsnoop.bip ttsnoop.C.src externC
 		ttsnoop.c=ttsnoop.C ttsnoop.h dtb_utils.c dtb_utils.h \
 		-- -changed -merge -p ttsnoop.bip -main
 	chmod -w ttsnoop.C
-	cat externC.h dtb_utils.h closeBrace.h > dtb_utils.h.patched
+	cat $(srcdir)/externC.h dtb_utils.h $(srcdir)/closeBrace.h > dtb_utils.h.patched
 	mv dtb_utils.h.patched dtb_utils.h
 	$(SED) \
 	-e 's/\(MoreButton;\)/\1Boolean _DtCanHelp( const char * );/' \

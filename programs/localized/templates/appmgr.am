@@ -90,5 +90,7 @@ appmgr_allfiles = $(desktop_apps_SCRIPTS) $(graphics_SCRIPTS)		\
 BUILT_SOURCES = $(appmgr_allfiles)
 CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
 
+# (the directories exist in a VPATH build only once this makes them)
 $(appmgr_allfiles): $(ACTION)
+	@$(MKDIR_P) $(@D)
 	$(CP) $(ACTION) $@.tmp && mv -f $@.tmp $@

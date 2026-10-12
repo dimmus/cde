@@ -1,7 +1,8 @@
 #!/bin/sh
 # Run dtcodegen in a scratch directory.
 #
-# usage: dtcodegen-scratch DTCODEGEN [-i SRC=NAME]... OUTPUT[=DEST]... -- ARGS...
+# usage: dtcodegen-scratch [-s SRCDIR] DTCODEGEN [-i SRC=NAME]... OUTPUT[=DEST]...
+#                          -- ARGS...
 #
 # dtcodegen -merge reads and rewrites every file it generates that already
 # exists next to the project, and several of those (the *_stubs.c files,
@@ -12,10 +13,19 @@
 # only the named OUTPUT files back (to DEST if given).  Nothing else in the
 # current directory is written.
 #
+# With -s, the *.bip and *.bil files are taken from SRCDIR, and so is each
+# SRC that is not in the current directory (a VPATH build, where the
+# current directory is the build directory).
+#
 # DTCODEGEN may be a command with leading VAR=value words; it is run
 # through "env" from inside the scratch directory, so its path must be
 # absolute.
 
+srcdir=.
+if [ "$1" = -s ]; then
+	srcdir=$2
+	shift 2
+fi
 dtcodegen=$1
 shift
 inputs=
@@ -34,10 +44,11 @@ mkdir "$tmp" || exit 1
 trap 'rm -rf "$tmp"' 0
 trap 'exit 1' 1 2 15
 
-cp ./*.bip ./*.bil "$tmp"/ || exit 1
+cp "$srcdir"/*.bip "$srcdir"/*.bil "$tmp"/ || exit 1
 for i in $inputs; do
 	src=${i%%=*}
 	name=${i#*=}
+	[ -f "$src" ] || src=$srcdir/$src
 	cp "$src" "$tmp/$name" || exit 1
 	chmod u+w "$tmp/$name"
 done

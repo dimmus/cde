@@ -1,6 +1,9 @@
 noinst_LTLIBRARIES += %reldir%/libcompression.la
 
-%canon_reldir%_libcompression_la_CXXFLAGS = $(CDE_CXXFLAGS)
+# (-I: the lex and yacc outputs, which are in the build directory, include
+# this directory's headers)
+%canon_reldir%_libcompression_la_CXXFLAGS = $(CDE_CXXFLAGS) \
+	-I$(srcdir)/%reldir%
 
 %canon_reldir%_libcompression_la_SOURCES = %reldir%/abs_agent.C \
 	%reldir%/zip.C %reldir%/huffman.C %reldir%/trie.C %reldir%/code.C \

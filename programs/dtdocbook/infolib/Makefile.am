@@ -28,7 +28,7 @@ AM_CXXFLAGS = $(CDE_CXXFLAGS) $(KEEP_ASSERTS) \
 	      -DDTSEARCH \
 	      -DDtinfoClient \
 	      -DEXPAND_TEMPLATES \
-	      -I$(top_builddir)/lib/DtMmdb
+	      -I$(top_srcdir)/lib/DtMmdb
 
 LDADD = $(LIBMMDB)
 

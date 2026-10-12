@@ -10,7 +10,7 @@ CLEANFILES = mp_types_gram.h
 
 mp_types_gram.h:
 	$(RM) mp_types_gram.h
-	$(LN_S) frozen.mp_types_gram.h mp_types_gram.h
+	$(LN_S) $(srcdir)/frozen.mp_types_gram.h mp_types_gram.h
 
 bin_PROGRAMS = tt_type_comp
 

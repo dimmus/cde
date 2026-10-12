@@ -4,7 +4,7 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = rpc.cmsd
 
-rpc_cmsd_CFLAGS = $(CDE_CFLAGS) -I$(srcdir)/../../../lib/csa $(DT_INCDIR) $(CSA_INCDIR)
+rpc_cmsd_CFLAGS = $(CDE_CFLAGS) -I$(top_builddir)/lib/csa -I$(top_srcdir)/lib/csa $(DT_INCDIR) $(CSA_INCDIR)
 
 rpc_cmsd_LDADD = $(LIBCSA) $(TIRPCLIB)
 

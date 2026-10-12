@@ -1,5 +1,9 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# Delete a generated file whose recipe failed instead of keeping it
+# half-written.
+.DELETE_ON_ERROR:
+
 include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = dtprintinfo
@@ -67,7 +71,7 @@ dtprintinfo_SOURCES = $(UTIL_SRC) $(LIBUI_SRC) $(OBJ_SRC) $(UI_SRC)	\
 	DtPrintinfo.C dtprintinfomsg.h
 
 # special processing for message files
-SYM2NUM_CMD = CPP=$(GENCPP) $(KSH) sym2num
+SYM2NUM_CMD = CPP=$(GENCPP) $(KSH) $(srcdir)/sym2num
 
 BUILT_SOURCES = dtprintinfo_cat.h dtprintinfo_msg.h dtprintinfo.msg
 CLEANFILES = $(BUILT_SOURCES)
@@ -83,9 +87,9 @@ dtprintinfo_msg.h:
 
 dtprintinfo.msg: dtprintinfo.msg.src
 	$(RM) dtprintinfo_msg.h dtprintinfo.msg
-	$(SYM2NUM_CMD) dtprintinfo dtprintinfo.msg.src > dtprintinfo.msg
+	$(SYM2NUM_CMD) dtprintinfo $< > dtprintinfo.msg
 
 dtprintinfo_cat.h: dtprintinfo.msg.src
 	$(RM) dtprintinfo_cat.h
-	$(AWK) -f msg.awk dtprintinfo.msg.src > dtprintinfo_cat.h
+	$(AWK) -f $(srcdir)/msg.awk $< > dtprintinfo_cat.h
 

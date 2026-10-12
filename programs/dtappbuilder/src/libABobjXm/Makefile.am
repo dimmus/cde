@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-ABINCLUDES = ../include
+ABINCLUDES = $(srcdir)/../include
 
 EXTRA_DEFINES =  -D_POSIX_SOURCE=1
 

@@ -72,8 +72,15 @@ RESFILES = Macros.res Strings.res Messages.res Query/QueryEditor.res	\
 	Agents/NodeHistoryAgent.res Agents/NodeWindowAgent.res		\
 	Agents/GraphicAgent.res Query/QueryTermView.res
 
+# Prelude.h starts with #include "config.h", meaning the config.h next to
+# it.  In a VPATH build Prelude.h is in the build directory, so name the
+# one in $(srcdir) there.
 Prelude.h: Classlist.mk $(PMAKER)
 	$(PMAKER) $(CLASSLIBS)
+	if test "$(srcdir)" != .; then \
+	  sed -e '1s|^#include "config.h"$$|#include "$(srcdir)/config.h"|' \
+	    $@ > $@.tmp && mv -f $@.tmp $@; \
+	fi
 
 Dtinfo: Dtinfo.res $(RESFILES)
 	$(CPP_PROGRAM) -traditional -nostdinc -C $(srcdir)/Dtinfo.res | $(TREERES) > $@
@@ -90,7 +97,7 @@ dtinfo.msg.updated: $(foreach i,$(MSGS),$(i)/$(i).msg) dtinfo_msg.tmpl $(MSGSETS
 	mv -f $@.tmp $@; \
 	status=$$?; $(RM) dtinfo.cpp; exit $$status
 
-CLEANFILES += dtinfo.msg.updated dtinfo.msg.updated.tmp dtinfo.cpp
+CLEANFILES += dtinfo.msg.updated dtinfo.msg.updated.tmp dtinfo.cpp Prelude.h.tmp
 
 ## dtinfo proper
 OLIASNORMALLIBS= Agents/libAgents.a Other/libOther.a			\
