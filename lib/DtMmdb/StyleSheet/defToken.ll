@@ -186,6 +186,11 @@ boolean ([Bb][Oo][Oo][Ll][Ee][Aa][Nn])
 		addToDefTokenStringBuf(yytext, yyleng);
 		}
 
+<quoted_string>\n	{
+		addToDefTokenStringBuf(yytext, yyleng);
+		yylineno++;
+		}
+
 "&"[^ \t\n\";.=@+*\/\.\*:?\^,{}\[\]()]+	{
 		defParserlval.charPtrData =
                   (unsigned char*)strdup((const char*)(yytext+1));

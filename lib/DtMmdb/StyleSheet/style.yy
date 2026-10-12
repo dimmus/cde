@@ -130,7 +130,6 @@ const char* toUpperCase(unsigned char* string)
 
 %type<charData>
 	OPER_mult
-	OPER_binop
 	OPER_add
 	OPER_feature
 
@@ -187,6 +186,12 @@ const char* toUpperCase(unsigned char* string)
 
 %nonassoc OPER_period
 %nonassoc SGMLGI_STRING
+
+/* A number or symbol takes the unit after it ("12 pt"), and a product
+   goes on ("a * b") before the expression it is part of ends. */
+%nonassoc BEFORE_UNIT BEFORE_STAR
+%nonassoc UNIT_STRING OPER_star
+
 
 %%
 
@@ -318,7 +323,7 @@ rhs.gp	: simple_expr
 	;
 
 
-simple_expr   : simple_expr OPER_add multi_expr 
+simple_expr   : simple_expr OPER_add multi_expr %prec BEFORE_STAR
 	{
 	   BinaryOperatorNode::operatorType opType;
            switch ($2) {
@@ -338,7 +343,7 @@ simple_expr   : simple_expr OPER_add multi_expr
 				       )
 			      );
 	}
-	| multi_expr 
+	| multi_expr %prec BEFORE_STAR
 	{
 	   $$=$1;
 	}
@@ -366,16 +371,6 @@ multi_expr	: multi_expr OPER_mult term
 	}
 	;
 
-OPER_binop : OPER_mult
-        {
-	   $$=$1;
-        }
-	| OPER_add
-	{
-	   $$=$1;
-	}
-        ;
-
 OPER_mult	: OPER_star
         {
 	   $$=$1;
@@ -399,7 +394,7 @@ term	: BOOLVAL
 	  delete $2 ;
           $$=new ConstantNode(x);
 	}
-	| symbol
+	| symbol %prec BEFORE_UNIT
 	{
 	  $$=$1;
 	}
@@ -422,11 +417,11 @@ term	: BOOLVAL
           $$=new ConstantNode(new FeatureValueDimension(new FeatureValueReal($1), (const char*)$2));
 	  delete $2 ;
         }
-        | INTEGER
+        | INTEGER %prec BEFORE_UNIT
         {
           $$=new ConstantNode(new FeatureValueInt($1));
         }
-        | REAL
+        | REAL %prec BEFORE_UNIT
         {
           $$=new ConstantNode(new FeatureValueReal($1));
         }

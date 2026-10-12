@@ -41,7 +41,7 @@ awk '/^\$set/ { SET_NAME=$2; SET_COUNT++; MES_COUNT=0;
 # find all lines which begin with a combination of letters, numbers
 # and underscores followed by spaces and then a quotation mark,
 # and increment the message counter. 
-/^[0-9A-Za-z_]+[ |\t]*\"/ { MES_NAME=$1; MES_COUNT++; 
+/^[0-9A-Za-z_]+[ |\t]*"/ { MES_NAME=$1; MES_COUNT++; 
       printf( "#define %s %s\n", MES_NAME, MES_COUNT) }
       END {print "#define LAST_MSG_NO "MES_COUNT"\n\n#endif"}' \
        ${SOURCE_FILE}  >> ${inc_file}

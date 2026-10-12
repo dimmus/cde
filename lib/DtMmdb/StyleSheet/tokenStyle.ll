@@ -293,10 +293,6 @@ unit ([Ii][Nn]|[Ii][Nn][Cc][Hh]|[Pp][Cc]|[Pp][Ii][Cc][Aa]|[Pp][Tt]|[Pp][Oo][Ii][
 		addToQstringBuf((unsigned char*)yytext, yyleng);
 		}
 
-<quoted_string>.	{
-		addToQstringBuf((unsigned char*)yytext, yyleng);
-		}
-
 {unit}		{
 		stylelval.charPtrData =
                   (unsigned char*)strdup((const char*)yytext);
@@ -314,6 +310,12 @@ unit ([Ii][Nn]|[Ii][Nn][Cc][Hh]|[Pp][Cc]|[Pp][Ii][Cc][Aa]|[Pp][Tt]|[Pp][Oo][Ii][
                   (unsigned char*)strdup((const char*)yytext);
 		BEGIN 0;
 		return(SGMLGI_STRING);
+	}
+
+<sgmlgimode>.|\n {
+		/* not an SGML GI: scan it again as usual (a syntax error) */
+		yyless(0);
+		BEGIN 0;
 	}
 
 [\t]	{

@@ -190,4 +190,9 @@ int linecount = 1;
          return (TOKEN);
 	}
 
+.    {
+	 /* a character no token starts with: a syntax error */
+         return (*yytext);
+	}
+
 %%
