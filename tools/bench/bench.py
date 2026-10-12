@@ -66,7 +66,10 @@ shared objects or has more unused direct dependencies (loader: dsos,
 unused) or more than PCT % more startup relocations, and when a case or
 one of those numbers that BASE has is missing from a group HEAD ran (the
 benchmark failed, timed out or skipped it), or was run at another size
-(n, bytes, screens, pages: --quick against a full run, say).
+(n, bytes, screens, pages: --quick against a full run, say).  With
+--no-time-gate it prints the timings but does not fail on them: on a
+shared machine (a hosted CI runner) two runs of the same tree differ by
+more than 50 %, while the counts are exact.
 
 Every Xvfb display's /tmp/dtdbcache_:N is removed before and after the
 group: the CDE clients build that shared database cache when it is
@@ -569,7 +572,7 @@ def cmd_compare(a):
                 if isinstance(c.get(k), (int, float)) and \
                         isinstance(b.get(k), (int, float)) and b[k] > 0:
                     pct = (c[k] - b[k]) * 100.0 / b[k]
-                    flag = pct > a.threshold
+                    flag = pct > a.threshold and not a.no_time_gate
                     bad += flag
                     print("%-8s %-28s %-10s %12.4g -> %12.4g %+7.1f%%%s" %
                           (g, c["name"], k, b[k], c[k], pct,
@@ -639,6 +642,8 @@ def main():
     c = sub.add_parser("compare")
     c.add_argument("-t", "--threshold", type=float, default=5.0)
     c.add_argument("--syscall-threshold", type=float, default=10.0)
+    c.add_argument("--no-time-gate", action="store_true",
+                   help="print the timings, but do not fail on them")
     c.add_argument("base")
     c.add_argument("head")
     p = sub.add_parser("profile")

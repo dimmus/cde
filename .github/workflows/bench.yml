@@ -13,9 +13,11 @@
 #   - a program that loads more shared objects or has more unused
 #     direct dependencies, or more than TIME_PCT % more startup
 #     relocations (the loader group: LD_DEBUG=statistics, ldd -u -r);
-#   - a slowdown above TIME_PCT % of a timed case.  Hosted runners are
-#     noisy, so TIME_PCT is 25 here instead of bench.py's 5; on a quiet
-#     self-hosted runner set it back to 5 (and drop --quick).
+#   - not a slowdown of a timed case: hosted runners are too noisy for
+#     that (two runs of the same tree differed by up to 51 %), so the
+#     times are printed but compare runs with --no-time-gate.  On a
+#     quiet self-hosted runner drop --no-time-gate and --quick, and set
+#     TIME_PCT back to bench.py's 5.
 # Both JSON documents are kept as artifacts.
 #
 # Loader cost tracking: the loader group (tools/bench/loader-cost.sh) is
@@ -156,7 +158,8 @@ jobs:
       - name: Compare
         run: |
           python3 head/tools/bench/bench.py compare -t "$TIME_PCT" \
-            --syscall-threshold "$SYSCALL_PCT" bench-base.json bench-head.json
+            --syscall-threshold "$SYSCALL_PCT" --no-time-gate \
+            bench-base.json bench-head.json
 
       - name: Keep the results
         if: always()
