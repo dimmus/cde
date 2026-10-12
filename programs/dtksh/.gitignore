@@ -20,3 +20,5 @@ examples/XdrawTest
 examples/crMovesText1
 init.c
 ksh93.stamp
+ksh93-cc
+ksh93-cc.tmp

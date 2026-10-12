@@ -2,7 +2,8 @@ MAINTAINERCLEANFILES = Makefile.in
 
 include $(top_srcdir)/build-aux/cde-libs.am
 
-CLEANFILES = init.c ksh93-init.$(OBJEXT) DtFuncs.dtsh libshell.a libshell.a.tmp ksh93.stamp
+CLEANFILES = init.c ksh93-init.$(OBJEXT) DtFuncs.dtsh libshell.a libshell.a.tmp ksh93.stamp \
+	ksh93-cc ksh93-cc.tmp
 
 SUBDIRS = examples
 
@@ -21,7 +22,19 @@ KSH93SRCDIR = $(srcdir)/ksh93
 # ksh93's own .gitignore) and installs its libraries and headers there.
 # It is run without "flat", which would also link every file it builds
 # into bin/, lib/, include/ and the source directories of $(KSH93SRC).
-KSH93_HOSTTYPE := $(shell CC='$(CC)' $(KSH93SRCDIR)/bin/package host type 2>/dev/null)
+#
+# bin/package runs the first word of CC as the compiler, so a CC of more
+# than one word (CC='ccache cc') becomes a one-word wrapper script that
+# runs it: ksh93-cc below, and a temporary one for "package host type",
+# which reads the size of a pointer from the compiler.
+KSH93_HOSTTYPE := $(shell \
+	if test -n '$(word 2,$(CC))'; then \
+		t=`mktemp` && printf '\043!/bin/sh\nexec %s "$$@"\n' '$(CC)' > $$t && \
+		chmod +x $$t && CC=$$t $(KSH93SRCDIR)/bin/package host type; \
+		rm -f $$t; \
+	else \
+		CC='$(CC)' $(KSH93SRCDIR)/bin/package host type; \
+	fi 2>/dev/null)
 KSH93ROOT = $(KSH93SRC)/arch/$(KSH93_HOSTTYPE)
 
 KSH93LIBSHELL = $(KSH93ROOT)/lib/libshell.a
@@ -95,12 +108,16 @@ dtksh_SOURCES = widget.c \
 # git out of the CDE repository (from the sources, or from their copy in a
 # VPATH build directory): ksh93 is then built as from a release
 # tarball, the same in a git checkout as in a CDE tarball.
-KSH93_CC = $(CC)
+KSH93_CC = $(if $(word 2,$(CC)),$(abs_builddir)/ksh93-cc,$(CC))
 KSH93_CCFLAGS = $(strip $(KSH93_SHOPTS) $(HARDEN_CFLAGS) $(CFLAGS))
 KSH93_JOBS = $(or $(patsubst -j%,%,$(filter -j%,$(MAKEFLAGS))),1)
 KSH93_SRCFILES := $(shell find $(KSH93SRCDIR)/src $(KSH93SRCDIR)/bin/package -type f ! -name "*.o" 2>/dev/null)
 
-ksh93.stamp: $(KSH93_SRCFILES) Makefile
+ksh93-cc: Makefile
+	$(AM_V_GEN)printf '#!/bin/sh\nexec %s "$$@"\n' '$(CC)' > $@.tmp && \
+	chmod +x $@.tmp && mv -f $@.tmp $@
+
+ksh93.stamp: $(KSH93_SRCFILES) Makefile $(if $(word 2,$(CC)),ksh93-cc)
 	@cc='$(KSH93_CC)'; ccflags='$(KSH93_CCFLAGS)'; \
 	if test "$(srcdir)" != .; then \
 		echo "ksh93: copying the sources into the build directory"; \
