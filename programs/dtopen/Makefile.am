@@ -24,3 +24,7 @@ install-data-hook:
 	cd $(DESTDIR)$(bindir) && $(LN_S) dtopen dtopen_image
 	cd $(DESTDIR)$(bindir) && $(LN_S) dtopen dtopen_ps
 	cd $(DESTDIR)$(bindir) && $(LN_S) dtopen dtopen_pdf
+
+uninstall-hook:
+	$(RM) $(DESTDIR)$(bindir)/dtopen_video $(DESTDIR)$(bindir)/dtopen_image \
+	      $(DESTDIR)$(bindir)/dtopen_ps $(DESTDIR)$(bindir)/dtopen_pdf

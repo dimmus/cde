@@ -7,3 +7,6 @@ include ../../templates/msg.C.am
 install-data-hook:
 	$(RM) -rf $(DESTDIR)$(CDE_DATA_TOP)/lib/nls/msg/en_US.UTF-8
 	cd $(DESTDIR)$(CDE_DATA_TOP)/lib/nls/msg/ && $(LN_S) C en_US.UTF-8
+
+uninstall-hook:
+	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/lib/nls/msg/en_US.UTF-8

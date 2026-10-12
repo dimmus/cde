@@ -7,3 +7,6 @@ include ../../templates/appmgr.am
 install-data-hook:
 	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/appconfig/appmanager/en_US.UTF-8
 	cd $(DESTDIR)$(CDE_DATA_TOP)/appconfig/appmanager/ && $(LN_S) C en_US.UTF-8
+
+uninstall-hook:
+	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/appconfig/appmanager/en_US.UTF-8

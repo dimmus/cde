@@ -8,5 +8,5 @@ install-data-hook:
 	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/app-defaults/en_US.UTF-8
 	cd $(DESTDIR)$(CDE_DATA_TOP)/app-defaults/ && $(LN_S) C en_US.UTF-8
 
-
-
+uninstall-hook:
+	$(RM) $(DESTDIR)$(CDE_DATA_TOP)/app-defaults/en_US.UTF-8

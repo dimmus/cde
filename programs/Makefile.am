@@ -16,3 +16,8 @@ endif
 install-data-hook:
 	-if [ $(CDE_INSTALLATION_TOP)/bin != $(bindir) ];then \
 		cd $(DESTDIR)$(CDE_INSTALLATION_TOP) && $(LN_S) $(bindir) bin ; fi
+
+uninstall-hook:
+	-if [ $(CDE_INSTALLATION_TOP)/bin != $(bindir) ] && \
+	    [ -h $(DESTDIR)$(CDE_INSTALLATION_TOP)/bin ]; then \
+		$(RM) $(DESTDIR)$(CDE_INSTALLATION_TOP)/bin; fi
