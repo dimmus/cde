@@ -26,7 +26,6 @@ on:
 
 env:
   CCACHE_DIR: /github/home/.ccache
-  CCACHE_BASEDIR: ${{ github.workspace }}
   CCACHE_MAXSIZE: 2G
 
 jobs:
@@ -49,6 +48,9 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed git ccache
           git config --global --add safe.directory '*'
+          # The github.workspace context is the runner's path, not the
+          # container's: take the workspace from the container.
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@v4
 

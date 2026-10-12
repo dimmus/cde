@@ -42,7 +42,6 @@ env:
   TIME_PCT: "25"
   SYSCALL_PCT: "25"
   CCACHE_DIR: /github/home/.ccache
-  CCACHE_BASEDIR: ${{ github.workspace }}
 
 jobs:
   bench:
@@ -59,6 +58,9 @@ jobs:
           # The trees are chowned to bench below: root's git would
           # otherwise refuse them ("dubious ownership").
           git config --global --add safe.directory '*'
+          # The github.workspace context is the runner's path, not the
+          # container's: take the workspace from the container.
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           useradd -m bench
           echo "bench ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/bench
 
@@ -111,7 +113,7 @@ jobs:
           # each tree: its programs link the tree's libraries and start
           # the tree's dtwm by absolute path.
           for t in base head; do
-            cp -r head/tools/bench "bench-$t"
+            sudo -u bench cp -r head/tools/bench "bench-$t"
             sudo -u bench make -C "bench-$t" TOP="$GITHUB_WORKSPACE/$t"
           done
           chown -R bench: "$GITHUB_WORKSPACE"
