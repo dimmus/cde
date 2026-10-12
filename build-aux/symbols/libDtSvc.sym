@@ -162,6 +162,7 @@ _DtCommandInvokerExecute
 _DtCreateDtDirs
 _DtDbGetDataBaseEnv
 _DtDbRead
+_DtDtsDataToDataTypeAt
 _DtDtsMMBosonToString
 _DtDtsMMCacheName
 _DtDtsMMExpandValue
