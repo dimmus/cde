@@ -67,6 +67,7 @@ build_deps+=(
     libtirpc lmdb
     pam libutempter
     libxcrypt           # crypt() in dtlogin and the dtsession screen lock
+    libcups             # cups-config; dtprintinfo's queue and job lists
 )
 
 # Needed to actually run the desktop (ToolTalk needs rpcbind, dtsession uses
