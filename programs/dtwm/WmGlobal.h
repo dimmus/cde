@@ -1320,6 +1320,7 @@ typedef struct _WmScreenData
     int		joinBevel;
     Boolean	limitResize;			/* resource */
     WHSize	maximumMaximumSize;		/* resource */
+    Boolean	maximumMaximumSizeDefault;	/* from the screen size */
     int		resizeBorderWidth;		/* resource */
     Boolean	resizeCursors;			/* resource */
     int		transientDecoration;		/* resource */
@@ -1771,6 +1772,8 @@ struct _ClientData
     long	netDesktopWritten;		/* _NET_WM_DESKTOP */
     unsigned int netStateWritten;		/* _NET_WM_STATE, NETSTATE bits */
     unsigned char maxAxes;			/* MAX_AXIS_* when maximized */
+    unsigned char maxFromScreen;		/* MAX_AXIS_* whose size limit
+						   is the screen's */
     unsigned char netType;			/* NETTYPE_* */
     unsigned char layer;			/* LAYER_* of its type */
     long	strut[12];			/* _NET_WM_STRUT_PARTIAL */

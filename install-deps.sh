@@ -63,6 +63,7 @@ build_deps+=(
 build_deps+=(
     libx11 libxext libxrender libxau libxpm libxt libxmu libsm libice
     libxinerama libxss libxdmcp
+    libxrandr           # dtrandr (optional: without it dtrandr is not built)
     xbitmaps
     libtirpc lmdb
     pam libutempter

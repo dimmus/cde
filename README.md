@@ -19,6 +19,8 @@ after the 2.5.3 release) is merged. On top of that it adds:
   algorithms in the file manager, terminal, mail, calendar and help;
 - hundreds of bug fixes, a `-Wall`-clean build with no use of
   deprecated or obsolete Motif API;
+- automatic display setup (`dtrandr`): the right monitor layout at
+  login and when monitors are plugged in;
 - a modern, parallel, hardened build with configurable install paths.
 
 It is developed on Arch Linux against
@@ -47,6 +49,20 @@ launches, and moves and resizes no longer poll the pointer.
 
 Not implemented: shaded windows, `_NET_WM_PING`, `_NET_WM_SYNC_REQUEST`,
 `_NET_DESKTOP_LAYOUT`, virtual roots.
+
+### dtrandr: automatic display setup
+
+`dtrandr` (new, in C on libXrandr) detects the connected monitors by
+their EDIDs and applies the matching saved display setup — which
+monitors are on, their modes, positions, rotation, scaling, gamma and
+the primary one — like [autorandr](https://github.com/phillipberndt/autorandr),
+whose profile format and hooks it uses (existing autorandr profiles work
+as they are). `dtrandr --save NAME` saves the current setup. If no
+profile matches, newly connected monitors are turned on to the right of
+the others and unplugged ones are turned off. The login screen applies
+the system profiles; each session applies the user's and follows
+monitors being plugged in or out (`DTRANDR=no` in `~/.dtprofile` turns
+it off). See `dtrandr(1)`.
 
 ### Speed
 

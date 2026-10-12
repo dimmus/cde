@@ -385,6 +385,15 @@ programs/dtcreate/dtcreate
 programs/dtdbcache/dtdbcache
 programs/dtdspmsg/dtdspmsg
 
+# programs/dtrandr
+programs/dtrandr/dtrandr
+programs/dtrandr/tests/unit
+programs/dtrandr/tests/xsetedid
+programs/dtrandr/tests/*.log
+programs/dtrandr/tests/*.trs
+programs/dtrandr/tests/work
+programs/dtrandr/test-suite.log
+
 # programs/dtfile
 programs/dtfile/dtcopy/dtfile_copy
 programs/dtfile/dtfile
@@ -2222,6 +2231,7 @@ depcomp
 install-sh
 ltmain.sh
 missing
+test-driver
 ylwrap
 *.lo
 *.la

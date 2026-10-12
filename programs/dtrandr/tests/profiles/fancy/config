@@ -1,0 +1,17 @@
+output eDP-1
+crtc 1
+dpi 96
+gamma 0.8:0.9:1.0
+mode 1920x1080
+pos 0x0
+rate 59.93
+reflect x
+rotate left
+output HDMI-1
+filter nearest
+mode 1280x720
+panning 2560x1440+1080+0
+pos 1080x0
+scale 2x2
+output DP-1
+off

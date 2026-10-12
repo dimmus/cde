@@ -4763,6 +4763,10 @@ ProcessScreenResources (WmScreenData *pSD, unsigned char *screenName)
 	pSD->iconPlacementMargin = MAXIMUM_ICON_MARGIN;
     }
 
+    pSD->maximumMaximumSizeDefault =
+	(pSD->maximumMaximumSize.width <= 0) &&
+	(pSD->maximumMaximumSize.height <= 0);
+
     if (pSD->maximumMaximumSize.width <= 0)
     {
 	pSD->maximumMaximumSize.width =

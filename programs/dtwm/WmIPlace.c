@@ -905,4 +905,168 @@ void MoveIconInfo (IconPlacementData *pIPD, int p1, int p2)
     }
 }
 
+/*
+ * An icon place of one grid as the place at the same column and row,
+ * counted from the corner where the icons start, of another grid, or
+ * NO_ICON_PLACE if the other grid has no such place.
+ */
+static int SamePlace (IconPlacementData *pOld, IconPlacementData *pNew,
+    int place)
+{
+    int along, across;
+
+    if (place < 0 || place >= pOld->totalPlaces)
+	return (NO_ICON_PLACE);
+
+    if (pOld->iconPlacement &
+	(ICON_PLACE_LEFT_PRIMARY | ICON_PLACE_RIGHT_PRIMARY))
+    {
+	along = place % pOld->placementCols;
+	across = place / pOld->placementCols;
+	if (along >= pNew->placementCols || across >= pNew->placementRows)
+	    return (NO_ICON_PLACE);
+	return (across * pNew->placementCols + along);
+    }
+    else
+    {
+	along = place % pOld->placementRows;
+	across = place / pOld->placementRows;
+	if (along >= pNew->placementRows || across >= pNew->placementCols)
+	    return (NO_ICON_PLACE);
+	return (across * pNew->placementRows + along);
+    }
+}
+
+
+/*************************************<->*************************************
+ *
+ *  ResizeIconPlacement (pWS)
+ *
+ *
+ *  Description:
+ *  -----------
+ *  The screen changed size: makes the icon placement grid of a workspace
+ *  again for the new size, and moves its icons on the root window.  An
+ *  icon keeps its column and row counted from the corner where the
+ *  icons start (iconPlacement), so the icons along the bottom stay along
+ *  the bottom; an icon whose place the new grid lacks goes to a free
+ *  place near where it was, or to the next free place.  Without
+ *  automatic placement, icons are only moved onto the screen.  The
+ *  icons in an icon box stay where they are.
+ *
+ *
+ *  Inputs:
+ *  ------
+ *  pWS = pointer to workspace data
+ *
+ *************************************<->***********************************/
+
+void ResizeIconPlacement (WmWorkspaceData *pWS)
+{
+    WmScreenData *pSD = pWS->pSD;
+    IconPlacementData old = pWS->IPData;
+    int sW = DisplayWidth (DISPLAY, pSD->screen);
+    int sH = DisplayHeight (DISPLAY, pSD->screen);
+    int pass, i, place, oldPlace;
+    ClientData *pCD;
+    WsClientData *pWsc;
+    Boolean shown, *done;
+
+    if (!wmGD.iconAutoPlace)
+    {
+	/* only onto the screen */
+	for (i = 0; i < pWS->numClients; i++)
+	{
+	    pCD = pWS->ppClients[i];
+	    if (!(pWsc = GetWsClientData (pWS, pCD)) || pWsc->pIconBox)
+		continue;
+	    if (pWsc->iconX + ICON_WIDTH(pCD) > sW)
+		pWsc->iconX = sW - ICON_WIDTH(pCD);
+	    if (pWsc->iconY + ICON_HEIGHT(pCD) > sH)
+		pWsc->iconY = sH - ICON_HEIGHT(pCD);
+	    if (pWsc->iconX < 0) pWsc->iconX = 0;
+	    if (pWsc->iconY < 0) pWsc->iconY = 0;
+	    if (pWsc->iconFrameWin)
+		XMoveWindow (DISPLAY, pWsc->iconFrameWin,
+			     pWsc->iconX, pWsc->iconY);
+	}
+	return;
+    }
+
+    InitIconPlacement (pWS);
+
+    /*
+     * Two passes: first the icons whose place is in the new grid, then
+     * the others, in the places that are left.  The place of an icon
+     * that is not shown (its client is not minimized) is kept for when
+     * it is, if the new grid has it.
+     */
+    done = (Boolean *) XtCalloc (pWS->numClients + 1, sizeof (Boolean));
+    for (pass = 0; pass < 2; pass++)
+    {
+	for (i = 0; i < pWS->numClients; i++)
+	{
+	    pCD = pWS->ppClients[i];
+	    if (done[i] || !(pWsc = GetWsClientData (pWS, pCD)) ||
+		pWsc->pIconBox || pWsc->iconPlace == NO_ICON_PLACE)
+		continue;
+
+	    oldPlace = pWsc->iconPlace;
+	    shown = (oldPlace < old.totalPlaces &&
+		     old.placeList[oldPlace].pCD == pCD);
+	    place = SamePlace (&old, &pWS->IPData, oldPlace);
+	    if (place != NO_ICON_PLACE && pWS->IPData.placeList[place].pCD)
+		place = NO_ICON_PLACE;
+
+	    if (place == NO_ICON_PLACE && pass == 0)
+		continue;		/* in the second pass */
+
+	    if (place == NO_ICON_PLACE && shown)
+	    {
+		place = FindIconPlace (pCD, &pWS->IPData,
+		    pWsc->iconX + ICON_WIDTH(pCD) / 2,
+		    pWsc->iconY + ICON_HEIGHT(pCD) / 2);
+		if (place == NO_ICON_PLACE)
+		    place = GetNextIconPlace (&pWS->IPData);
+		if (place == NO_ICON_PLACE)
+		    place = CvtIconPositionToPlace (&pWS->IPData,
+			pWsc->iconX + ICON_WIDTH(pCD) / 2,
+			pWsc->iconY + ICON_HEIGHT(pCD) / 2);
+	    }
+
+	    done[i] = True;
+	    pWsc->iconPlace = place;
+	    if (place == NO_ICON_PLACE)
+		continue;
+
+	    if (shown)
+	    {
+		pWS->IPData.placeList[place].pCD = pCD;
+		pWS->IPData.placeList[place].theWidget =
+		    old.placeList[oldPlace].theWidget;
+	    }
+	    CvtIconPlaceToPosition (&pWS->IPData, place,
+				    &pWsc->iconX, &pWsc->iconY);
+	    if (pWsc->iconFrameWin)
+		XMoveWindow (DISPLAY, pWsc->iconFrameWin,
+			     pWsc->iconX, pWsc->iconY);
+	}
+    }
+    XtFree ((char *) done);
+
+    XtFree ((char *) old.placeList);
+    XtFree ((char *) old.placementRowY);
+    XtFree ((char *) old.placementColX);
+
+    pCD = wmGD.keyboardFocus;
+    if (pCD && pCD->pSD == pSD && pWS == pSD->pActiveWS &&
+	pCD->clientState == MINIMIZED_STATE && !P_ICON_BOX(pCD) &&
+	(ICON_DECORATION(pCD) & ICON_ACTIVE_LABEL_PART))
+    {
+	MoveActiveIconText (pCD);
+    }
+
+} /* END OF FUNCTION ResizeIconPlacement */
+
+
 /****************************   eof    ***************************/

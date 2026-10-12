@@ -903,6 +903,24 @@ AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
                  XINERAMALIB="-lXinerama"],
                 [AC_MSG_ERROR([libXinerama not found])], $X_LIBS)
 
+dnl libXrandr (1.3 or later) for dtrandr, which is only built if it is
+dnl there
+XRANDRLIB=""
+have_xrandr=no
+AC_CHECK_LIB(Xrandr, XRRGetScreenResourcesCurrent,
+             [save_CPPFLAGS="${CPPFLAGS}"
+              CPPFLAGS="${CPPFLAGS} ${X_CFLAGS}"
+              AC_CHECK_HEADER([X11/extensions/Xrandr.h],
+                              [XRANDRLIB="-lXrandr"; have_xrandr=yes], [],
+                              [#include <X11/Xlib.h>])
+              CPPFLAGS="${save_CPPFLAGS}"],
+             [], [$X_LIBS -lX11])
+if test "x$have_xrandr" != xyes; then
+   AC_MSG_WARN([libXrandr (1.3 or later) not found, dtrandr will not be built])
+fi
+AC_SUBST(XRANDRLIB)
+AM_CONDITIONAL([BUILD_DTRANDR], [test "x$have_xrandr" = xyes])
+
 dnl Sun RPC: libtirpc where the C library has none (glibc 2.32 and
 dnl later), found through pkg-config, with a plain library check as a
 dnl fallback for systems without libtirpc.pc.
@@ -1265,6 +1283,7 @@ programs/dtstyle/Makefile
 programs/dtexec/Makefile
 
 programs/dtdbcache/Makefile
+programs/dtrandr/Makefile
 
 programs/dticon/Makefile
 

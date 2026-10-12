@@ -1,0 +1,395 @@
+.\" dtrandr(1) - CDE display setup
+.TH dtrandr 1 "October 2026" "CDE 2.5" "User Commands"
+.SH NAME
+dtrandr \- apply the saved display setup that matches the connected monitors
+.SH SYNOPSIS
+.B dtrandr
+.RB [ \-c | \-\-change ]
+.RB [ \-\-default
+.IR name ]
+.RB [ \-f ]
+.RB [ \-n ]
+.RB [ \-v ]
+.br
+.B dtrandr
+.RB [ \-l ]
+.I name
+.br
+.B dtrandr
+.BR \-s | \-r
+.I name
+.RB [ \-\-system ]
+.RB [ \-f ]
+.br
+.B dtrandr
+.BR \-\-list | \-\-detected | \-\-current | \-\-fingerprint | \-\-config
+.br
+.B dtrandr
+.BR \-d | \-\-daemon
+.SH DESCRIPTION
+.B dtrandr
+sets up the screens of an X display with the RandR extension.
+It reads which monitors are connected (each with its EDID, the
+identification a monitor sends), looks for a saved
+.I profile
+made for those monitors, and applies it: which outputs are on, at which
+mode, rate, position, rotation, scale and so on.
+It is the CDE counterpart of
+.BR autorandr ,
+and reads and writes autorandr's profiles, so that profiles saved with
+either work with both.
+.PP
+The desktop runs it twice: the login screen
+.RI ( Xsetup )
+runs
+.B dtrandr \-\-change
+with the system profiles, and the session
+.RI ( Xsession )
+runs
+.B dtrandr \-\-change
+before the session manager starts, then
+.B dtrandr \-\-daemon
+to follow monitors that are plugged in or out while the session runs.
+.PP
+To make a profile, arrange the screens (with
+.BR xrandr (1)
+or another tool) and save the arrangement:
+.PP
+.RS
+.nf
+xrandr \-\-output HDMI\-1 \-\-auto \-\-left\-of eDP\-1 \-\-primary
+dtrandr \-\-save docked
+.fi
+.RE
+.PP
+From then on, whenever the same monitors are connected,
+.B dtrandr
+applies
+.IR docked .
+.SH OPTIONS
+.TP
+.BR \-c ", " \-\-change
+Apply the profile that matches the connected monitors, if it is not
+applied already.  This is what
+.B dtrandr
+does without options.
+If no profile matches, the profile named by
+.BR \-\-default ,
+else the
+.B default
+setting (see
+.BR FILES ),
+else the virtual profile
+.B auto
+is applied; a default of
+.B none
+leaves the display alone.
+.TP
+.BR \-l ", " \-\-load " \fIname\fP"
+Apply profile (or virtual profile)
+.IR name ,
+whether it matches or not.  Every output it turns on must be connected.
+A
+.I name
+without an option means the same.
+.TP
+.BR \-s ", " \-\-save " \fIname\fP"
+Save the current setup as profile
+.I name
+in the user's profile directory.  An existing profile is only replaced
+with
+.BR \-\-force .
+The names of the virtual profiles cannot be used.
+.TP
+.BR \-r ", " \-\-remove " \fIname\fP"
+Remove profile
+.I name
+from the user's profile directory.
+.TP
+.B \-\-system
+With
+.B \-\-save
+or
+.BR \-\-remove :
+use the system profile directory instead (which takes write access to it).
+.TP
+.BR \-f ", " \-\-force
+Replace a profile with
+.BR \-\-save ;
+apply a profile even if it is applied already; allow
+.BR "\-\-load off" .
+.TP
+.BI \-\-default " name"
+The profile to apply when no profile matches (instead of the
+.B default
+setting).
+.TP
+.B \-\-list
+List the profiles with the directory they are in, marking those that
+match the connected monitors
+.RB ( (detected) )
+and those that are applied
+.RB ( (current) ).
+.TP
+.B \-\-detected
+Print the names of the profiles that match the connected monitors, the
+best match first.
+.TP
+.B \-\-current
+Print the names of the profiles that are applied now.
+.TP
+.B \-\-fingerprint
+Print the
+.I setup
+lines of the connected monitors, as a profile's setup file has them.
+.TP
+.B \-\-config
+Print the current setup as a profile's config file has it.
+.TP
+.BR \-d ", " \-\-daemon
+Apply the matching profile as
+.B \-\-change
+does, then stay and do it again whenever monitors are connected or
+disconnected (or report another EDID), half a second after the last such
+change.  Changes of the setup itself, its own included, are left alone.
+It exits when the X server goes away (at the end of the session) or on
+SIGTERM, SIGINT or SIGHUP.  Only one runs per display; another one exits
+at once.
+.TP
+.BR \-n ", " \-\-dry\-run
+Change nothing and run no hooks: print the profile that would be applied
+and an
+.B xrandr
+command line that does what
+.B dtrandr
+would do.
+.TP
+.BR \-v ", " \-\-verbose
+Say more, for example about keys of a profile that are ignored.
+.TP
+.B \-\-debug
+Say everything.
+.TP
+.BR \-h ", " \-\-help
+Print a summary of the options.
+.TP
+.B \-\-version
+Print the version.
+.SH PROFILES
+A profile is a directory, named after the profile, with two files.
+.TP
+.I setup
+One line per connected monitor: the output name and the monitor's EDID
+in hexadecimal.  A profile matches when its outputs are exactly the
+connected ones and every EDID matches.  An EDID may be
+.B *
+(any monitor) or a pattern with
+.B *
+and
+.BR ? ;
+a profile with more exact EDIDs is preferred, then one whose patterns
+spell out more of the EDIDs, then the first in the directory order below
+and, within a directory, in name order.  A monitor that sends no EDID has
+the fingerprint
+.BI \-\-CONNECTED\-BUT\-EDID\-UNAVAILABLE\-\- output\fR.
+.TP
+.I config
+For each output, a line
+.BI output " name"
+followed by lines of the options below.  Outputs the file does not name
+are turned off.
+.RS
+.TP
+.B off
+The output is off.
+.TP
+.BI mode " name"
+The mode, by its name or, if the output has no mode of that name, by its
+size
+.IR width x height .
+.TP
+.BI rate " hz"
+Of the modes of that name, the one closest to this refresh rate.
+.TP
+.BI pos " x" x y
+The position of the output's top left corner on the screen.
+.TP
+.B primary
+The primary output.  Without it, the primary output stays as it is.
+.TP
+.BR rotate " normal|left|right|inverted"
+The rotation.
+.TP
+.BR reflect " normal|x|y|xy"
+The reflection.
+.TP
+.BI transform " a,b,c,d,e,f,g,h,i"
+A projective transform, as
+.BR "xrandr \-\-transform" .
+.TP
+.BI scale " x" x y
+Scale the output's picture (a transform; a
+.B transform
+line wins over it).
+.TP
+.BR filter " nearest|bilinear"
+The filter of a transform.
+.TP
+.BI panning " width" x height [+ x + y [/ track ...]]
+As
+.BR "xrandr \-\-panning" .
+.TP
+.BI gamma " r" : g : b
+As
+.BR "xrandr \-\-gamma" .
+.TP
+.BI crtc " n"
+The CRTC to drive the output with, if it can; another one otherwise.
+.TP
+.BI dpi " n"
+The DPI that sets the physical size of the screen (anywhere in the file;
+without it, the DPI stays as it is).
+.RE
+.IP
+Other keys (such as autorandr's
+.BR x\-prop\- *)
+are kept, but ignored.
+.PP
+A profile directory, and the profile directory as a whole, may also hold
+programs that are run around a change (when they are executable):
+.B predetect
+before the monitors are read,
+.B preswitch
+before a profile is applied, and
+.B postswitch
+after it has been applied (not when nothing had to change), each also as
+a directory
+.IB name .d
+of programs run in name order.  Those of the profile directory as a whole
+run first, then those of the profile.  They get the environment variables
+.B AUTORANDR_CURRENT_PROFILE
+and
+.B DTRANDR_PROFILE
+(the profile),
+.B AUTORANDR_PROFILE_FOLDER
+(its directory) and
+.B AUTORANDR_MONITORS
+(the connected outputs, separated by colons).
+.SS Virtual profiles
+These are always there:
+.TP
+.B auto
+Change as little as possible: outputs that are on and connected stay as
+they are, outputs that are on but no longer connected are turned off,
+and connected outputs that are off are turned on at their preferred mode,
+right of the others.  If no output is on, as
+.BR horizontal .
+The primary output stays, or else is the first output that is on.
+.TP
+.BR horizontal ", " vertical
+The connected outputs at their preferred modes side by side, or one
+below the other, in name order; the first is primary.
+.BR horizontal\-reverse " and " vertical\-reverse
+take the reverse order.
+.TP
+.B common
+All connected outputs show the same picture, at the largest size they
+all have a mode of.
+.TP
+.B clone\-largest
+All connected outputs show the same picture, at the size of the largest
+of them; the others scale it.
+.TP
+.B off
+All outputs off (only with
+.BR \-\-force ).
+.SH FILES
+Profiles are looked for in these directories, and the first profile of a
+name is the one used:
+.TP
+.I $XDG_CONFIG_HOME/dtrandr
+(default
+.IR ~/.config/dtrandr ),
+where
+.B \-\-save
+saves, and where the global hooks are,
+.TP
+.IR $XDG_CONFIG_HOME/autorandr ", " ~/.autorandr
+autorandr's (only read),
+.TP
+.I /etc/dt/dtrandr
+the system profiles (in the CDE configuration directory, which is
+.I /etc/dt
+unless CDE was configured otherwise), where
+.B \-\-save \-\-system
+saves,
+.TP
+.I /etc/xdg/autorandr
+autorandr's system profiles (each directory of
+.B $XDG_CONFIG_DIRS
+with
+.I /autorandr
+added).
+.PP
+Without a usable home directory (as when the login screen runs it), only
+the system directories are used, and the global hooks are those of
+.IR /etc/dt/dtrandr .
+.TP
+.IR $XDG_CONFIG_HOME/dtrandr/settings ", " /etc/dt/dtrandr/settings
+Settings, as
+.IB key = value
+lines;
+.B #
+starts a comment.  The user's settings win.  The only key is
+.BR default :
+the profile to apply when none matches, a virtual profile,
+.B auto
+(the default) or
+.B none
+(change nothing).
+.SH ENVIRONMENT
+.TP
+.B DISPLAY
+The X display.
+.TP
+.B DTRANDR
+When
+.B no
+(set it in
+.IR ~/.dtprofile ),
+the session does not run
+.B dtrandr
+at all.
+.TP
+.B DTRANDR_SYSTEM_DIR
+Another system profile directory than
+.IR /etc/dt/dtrandr .
+.TP
+.B DTRANDR_FAKE
+For the tests: a file that describes a display, which
+.B dtrandr
+uses instead of the X server, and to which it writes what it applies.
+.SH EXIT STATUS
+0 on success (also when nothing had to change or no profile applies), 1
+on errors, 2 for a wrong command line.
+.SH COMPATIBILITY
+The profiles are autorandr's, and are written as autorandr writes them.
+Not supported: autorandr's legacy profiles whose
+.I setup
+has MD5 sums of the EDIDs, the output properties
+.RB ( x\-prop\- *,
+kept but not applied), and the
+.B \-\-skip\-options
+and
+.B \-\-match\-edid
+options.
+.B \-d
+is
+.B \-\-daemon
+here, not autorandr's
+.BR \-\-default .
+.SH SEE ALSO
+.BR xrandr (1),
+.BR autorandr (1),
+.BR dtlogin (1),
+.BR dtsession (1)

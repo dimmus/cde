@@ -8,6 +8,11 @@ SUBDIRS = backdrops icons dsdm dtmail dtpad dtfile dtwm dtlogin		\
         dtpdm dtpdmd dtinfo types tttypes util dtopen localized	\
         dthelp
 
+# dtrandr needs libXrandr
+if BUILD_DTRANDR
+SUBDIRS += dtrandr
+endif
+
 # The documentation tools (dthelp/parser is the other part of them)
 if BUILD_DOC_TOOLS
 SUBDIRS += dtsr dtdocbook

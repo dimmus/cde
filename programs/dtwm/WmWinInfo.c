@@ -206,6 +206,7 @@ GetClientInfo (WmScreenData *pSD, Window clientWindow, long manageFlags)
 
     pCD->maxWidth = pCD->maxWidthLimit = BIGSIZE;
     pCD->maxHeight = pCD->maxHeightLimit = BIGSIZE;
+    pCD->maxFromScreen = 0;
     pCD->maxConfig = FALSE;
     pCD->pSD = pSD;
     pCD->dataType = CLIENT_DATA_TYPE;
@@ -1820,6 +1821,27 @@ ProcessWmNormalHints (ClientData *pCD, Boolean firstTime, long manageFlags)
 	{
 	    pCD->maxHeight = MAX_MAX_SIZE(pCD).height;
 	}
+    }
+
+    /*
+     * Which limits are the screen's (its work area's), for when the
+     * screen changes size (RefitSizeLimits): those that neither the
+     * hints nor maximumClientSize give.
+     */
+
+    if (pCD->maximumClientSize.width || pCD->maximumClientSize.height)
+    {
+	pCD->maxFromScreen = 0;
+    }
+    else if (flags & P_MAX_SIZE)
+    {
+	pCD->maxFromScreen =
+	    ((pNormalHints->max_width < 0) ? MAX_AXIS_HORZ : 0) |
+	    ((pNormalHints->max_height < 0) ? MAX_AXIS_VERT : 0);
+    }
+    else if (firstTime)
+    {
+	pCD->maxFromScreen = MAX_AXES_BOTH;
     }
 
     /*
