@@ -1,16 +1,19 @@
 # build and install SDL files for the help system
 
-BUILT_SOURCES = Appmanager.sdl $(APPBUILDER) Calculator.sdl		\
+# The help volumes.  They are made here, so they are not BUILT_SOURCES
+# (which make dist makes too) and not distributed: make dist works from a
+# tree that builds no help.
+SDL_VOLUMES = Appmanager.sdl $(APPBUILDER) Calculator.sdl		\
     Calendar.sdl CreatAct.sdl Filemgr.sdl FPanel.sdl Help4Help.sdl	\
     Iconed.sdl Infomgr.sdl Intromgr.sdl LibDtPrint.sdl Loginmgr.sdl	\
     Mailer.sdl Printmgr.sdl PrnSetup.sdl Stylemgr.sdl Terminal.sdl	\
     Textedit.sdl
 
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES = $(SDL_VOLUMES)
 
 # install the help SDL files
 sdlhelpdir = $(CDE_DATA_TOP)/appconfig/help/$(LANG)
-dist_sdlhelp_DATA = $(BUILT_SOURCES)
+nodist_sdlhelp_DATA = $(SDL_VOLUMES)
 
 DTDOCBOOK = $(top_srcdir)/programs/dtdocbook/doc_utils/dtdocbook2sdl
 DTHELP_HTAG2 = $(top_builddir)/programs/dthelp/parser/pass2/parser/dthelp_htag2

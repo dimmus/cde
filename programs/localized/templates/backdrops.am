@@ -1,10 +1,14 @@
 # process the backdrop file...
 
-BUILT_SOURCES = desc.$(LANG)
-CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
+# The files made here (LOC_BUILT, not BUILT_SOURCES: make dist builds
+# BUILT_SOURCES, and these need the locale).
+LOC_BUILT = desc.$(LANG)
+CLEANFILES = $(LOC_BUILT) $(LOC_BUILT:=.tmp)
 
 backdropsdir = $(CDE_DATA_TOP)/backdrops
-dist_backdrops_DATA = $(BUILT_SOURCES)
+# (made here, so not in the tarball: a tarball can be made from a tree
+# that builds no other locale than C)
+nodist_backdrops_DATA = $(LOC_BUILT)
 
 TOP = $(top_builddir)/programs
 MERGE = $(top_builddir)/programs/localized/util/merge

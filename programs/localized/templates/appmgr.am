@@ -87,8 +87,10 @@ appmgr_allfiles = $(desktop_apps_SCRIPTS) $(graphics_SCRIPTS)		\
 	$(media_tools_SCRIPTS) $(education_SCRIPTS)			\
 	$(information_SCRIPTS)
 
-BUILT_SOURCES = $(appmgr_allfiles)
-CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
+# The files made here (LOC_BUILT, not BUILT_SOURCES: make dist builds
+# BUILT_SOURCES, and these need the locale).
+LOC_BUILT = $(appmgr_allfiles)
+CLEANFILES = $(LOC_BUILT) $(LOC_BUILT:=.tmp)
 
 # (the directories exist in a VPATH build only once this makes them)
 $(appmgr_allfiles): $(ACTION)

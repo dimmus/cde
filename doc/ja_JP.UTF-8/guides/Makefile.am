@@ -5,8 +5,12 @@ INFOLIBDESC = "CDE and Motif Information Library"
 # get some important variables
 include $(top_srcdir)/doc/common/guides/guides_env.am
 
-# prime the pump
-BUILT_SOURCES =
+# prime the pump.  The files made here are DOC_BUILT, made by "all"
+# (noinst_DATA) rather than BUILT_SOURCES, which make dist makes too; they
+# are not distributed: make dist works from a tree that builds no
+# documentation.
+DOC_BUILT =
+noinst_DATA = $(DOC_BUILT)
 CLEANFILES =
 
 # this sets the LANG variables
@@ -35,7 +39,7 @@ $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf: $(INFOLIBDEPS)
 	$(MKDIR_P) $(INFOLIB)
 	$(DGENV) $(DTINFOGEN) build -v -T $(DTINFOGENTMPDIR) $(DTINFOGENOPTIONS) $(DGOPTS) $(SSENTS) -l $(INFOLIB) bookcase.bc
 
-BUILT_SOURCES += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
+DOC_BUILT += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
 CLEANFILES += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
 
 # installation - these files *may* change depending on if the docs
@@ -43,15 +47,15 @@ CLEANFILES += $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
 # installed.
 
 cdedtidir = $(CDE_DATA_TOP)/infolib/$(LANG)/cde.dti
-dist_cdedti_DATA = ../cde.dti/bookcase.map ../cde.dti/cde.oli
+nodist_cdedti_DATA = ../cde.dti/bookcase.map ../cde.dti/cde.oli
 
 cdedtidocdir = $(cdedtidir)/CDEDOC
-dist_cdedtidoc_DATA = ../cde.dti/CDEDOC/CDEDOC.dbd	\
+nodist_cdedtidoc_DATA = ../cde.dti/CDEDOC/CDEDOC.dbd	\
 		../cde.dti/CDEDOC/CDEDOC.dbi	\
 		../cde.dti/CDEDOC/CDEDOC.sch
 
 cdedtidocsearchdir = $(cdedtidocdir)/dtsearch
-dist_cdedtidocsearch_DATA = ../cde.dti/CDEDOC/dtsearch/CDEDOC.d00	\
+nodist_cdedtidocsearch_DATA = ../cde.dti/CDEDOC/dtsearch/CDEDOC.d00	\
 	../cde.dti/CDEDOC/dtsearch/CDEDOC.d22			\
 	../cde.dti/CDEDOC/dtsearch/CDEDOC.dbd			\
 	../cde.dti/CDEDOC/dtsearch/CDEDOC.k21			\
@@ -66,9 +70,9 @@ dist_cdedtidocsearch_DATA = ../cde.dti/CDEDOC/dtsearch/CDEDOC.d00	\
 	../cde.dti/CDEDOC/dtsearch/CDEDOC.knj			\
 	../cde.dti/CDEDOC/dtsearch/dtsearch.ocf
 
-generated_cdedtidocsearch_outputs = $(filter-out $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf,$(dist_cdedtidocsearch_DATA))
+generated_cdedtidocsearch_outputs = $(filter-out $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf,$(nodist_cdedtidocsearch_DATA))
 
-BUILT_SOURCES += $(dist_cdedti_DATA) $(dist_cdedtidoc_DATA) $(dist_cdedtidocsearch_DATA)
-CLEANFILES += $(dist_cdedti_DATA) $(dist_cdedtidoc_DATA) $(dist_cdedtidocsearch_DATA)
+DOC_BUILT += $(nodist_cdedti_DATA) $(nodist_cdedtidoc_DATA) $(nodist_cdedtidocsearch_DATA)
+CLEANFILES += $(nodist_cdedti_DATA) $(nodist_cdedtidoc_DATA) $(nodist_cdedtidocsearch_DATA)
 
-$(dist_cdedti_DATA) $(dist_cdedtidoc_DATA) $(generated_cdedtidocsearch_outputs): $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf
+$(nodist_cdedti_DATA) $(nodist_cdedtidoc_DATA) $(generated_cdedtidocsearch_outputs): $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf

@@ -2,11 +2,15 @@
 # nicer :)
 
 # $(srcdir), so that this also works in a build directory.
-BUILT_SOURCES = $(patsubst %.msg,%.cat,$(filter-out libAB%,$(notdir $(wildcard $(srcdir)/*.msg))))
-CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
+# The files made here (LOC_BUILT, not BUILT_SOURCES: make dist builds
+# BUILT_SOURCES, and these need the locale).
+LOC_BUILT = $(patsubst %.msg,%.cat,$(filter-out libAB%,$(notdir $(wildcard $(srcdir)/*.msg))))
+CLEANFILES = $(LOC_BUILT) $(LOC_BUILT:=.tmp)
 
 msgcatdir = $(CDE_DATA_TOP)/lib/nls/msg/$(LANG)
-dist_msgcat_DATA = $(BUILT_SOURCES)
+# (made here, so not in the tarball: a tarball can be made from a tree
+# that builds no other locale than C)
+nodist_msgcat_DATA = $(LOC_BUILT)
 
 SUFFIXES = .msg .cat
 

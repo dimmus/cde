@@ -22,12 +22,17 @@ DTTYPES = autoStart.dt user-prefs.dt uxstd.dt dt.dt develop.dt		\
 	acroread.dt emacs.dt gv.dt kile.dt mgv.dt TeX.dt xdvi.dt	\
 	xpdf.dt
 
-BUILT_SOURCES = $(DTTYPES) action
-CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
+# The files made here (LOC_BUILT, not BUILT_SOURCES: make dist builds
+# BUILT_SOURCES, and these need the locale).
+LOC_BUILT = $(DTTYPES) action
+CLEANFILES = $(LOC_BUILT) $(LOC_BUILT:=.tmp)
+noinst_DATA = $(LOC_BUILT)
 
 # we do not want to install 'action'
 typesdir = $(CDE_DATA_TOP)/appconfig/types/$(LANG)
-dist_types_DATA = $(DTTYPES)
+# (made here, so not in the tarball: a tarball can be made from a tree
+# that builds no other locale than C)
+nodist_types_DATA = $(DTTYPES)
 
 TOP = $(top_builddir)/programs
 MERGE = $(top_builddir)/programs/localized/util/merge

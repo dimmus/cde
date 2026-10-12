@@ -1,22 +1,27 @@
 # process the config files...
 
-BUILT_SOURCES = sys.resources sys.session sys.font sys.dtwmrc	\
+# The files made here (LOC_BUILT, not BUILT_SOURCES: make dist builds
+# BUILT_SOURCES, and these need the locale).
+LOC_BUILT = sys.resources sys.session sys.font sys.dtwmrc	\
 	Xresources dtfile.config home.session current.session	\
 	display.home.session display.current.session 0100.session \
 	0120.session 0140.session 0160.session
 
 if SOLARIS
-BUILT_SOURCES += Xresources.ow
+LOC_BUILT += Xresources.ow
 endif
 
-CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
+CLEANFILES = $(LOC_BUILT) $(LOC_BUILT:=.tmp)
+noinst_DATA = $(LOC_BUILT)
 
 cfgmaindir = $(CDE_INSTALLATION_TOP)/config/$(LANG)
-dist_cfgmain_DATA = dtfile.config sys.dtwmrc sys.resources Xresources	\
+# (made here, so not in the tarball: a tarball can be made from a tree
+# that builds no other locale than C)
+nodist_cfgmain_DATA = dtfile.config sys.dtwmrc sys.resources Xresources	\
 	sys.font sys.session
 
 cfgrsrcdir = $(CDE_INSTALLATION_TOP)/config/$(LANG)/Xresources.d
-dist_cfgrsrc_DATA = 0100.session 0120.session 0140.session	\
+nodist_cfgrsrc_DATA = 0100.session 0120.session 0140.session	\
 	0160.session
 
 TOP = $(top_builddir)/programs

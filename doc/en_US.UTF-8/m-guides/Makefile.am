@@ -1,7 +1,8 @@
 MAINTAINERCLEANFILES = Makefile.in
 
-BUILT_SOURCES = common/ManLinks.sgm
-CLEANFILES = $(BUILT_SOURCES)
+# (made by "all", not a BUILT_SOURCES, which make dist would make too)
+noinst_DATA = common/ManLinks.sgm
+CLEANFILES = $(noinst_DATA)
 
 # A symbolic link: make sees the mtime of the file it points to.
 common/ManLinks.sgm: $(srcdir)/../guides/common/ManLinksMotif.sgm

@@ -117,6 +117,6 @@ $(INFOLIB)/$(BOOKCASE)/dtsearch/dtsearch.ocf: $(USERSGUIDE_TOC)
 $(USERSGUIDE_TOC): $(USERSGUIDE_SRCS)
 	$(DGENV) $(DTINFOGEN) tocgen -T $(DTINFOGENTMPDIR) $(DTINFOGENOPTIONS) -f $(USERSGUIDE_TOC) -id $(USERSGUIDE_ID) -title $(USERSGUIDE_TITLE) usersGuide/book.sgm
 
-BUILT_SOURCES += usersGuide/TOC.sgm
+DOC_BUILT += usersGuide/TOC.sgm
 CLEANFILES += usersGuide/TOC.sgm
 

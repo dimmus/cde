@@ -316,28 +316,28 @@ MANSEC6 = man6/ttsnoop.6
 # installation
 
 cdeman1dir = $(mandir)/man1
-dist_cdeman1_DATA = $(MANSEC1)
+nodist_cdeman1_DATA = $(MANSEC1)
 
 cdeman1mdir = $(mandir)/man1m
-dist_cdeman1m_DATA = $(MANSEC1m)
+nodist_cdeman1m_DATA = $(MANSEC1m)
 
 cdeman3dir = $(mandir)/man3
-dist_cdeman3_DATA = $(MANSEC3)
+nodist_cdeman3_DATA = $(MANSEC3)
 
 cdeman4dir = $(mandir)/man4
-dist_cdeman4_DATA = $(MANSEC4)
+nodist_cdeman4_DATA = $(MANSEC4)
 
 cdeman5dir = $(mandir)/man5
-dist_cdeman5_DATA = $(MANSEC5)
+nodist_cdeman5_DATA = $(MANSEC5)
 
 cdeman6dir = $(mandir)/man6
-dist_cdeman6_DATA = $(MANSEC6)
+nodist_cdeman6_DATA = $(MANSEC6)
 
-# cleanup and accounting
-BUILT_SOURCES = $(MANSEC1) $(MANSEC1m) $(MANSEC3) $(MANSEC4)	\
+# cleanup and accounting.  The pages are made here, so they are not
+# BUILT_SOURCES (which make dist makes too) and not distributed: make dist
+# works from a tree that builds no documentation.
+CLEANFILES = $(MANSEC1) $(MANSEC1m) $(MANSEC3) $(MANSEC4)	\
     $(MANSEC5) $(MANSEC6)
-
-CLEANFILES = $(BUILT_SOURCES)
 
 
 # Now the man rules, followed by the alias rules

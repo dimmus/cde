@@ -2,14 +2,18 @@
 
 
 
-BUILT_SOURCES = Dthelpview Dtimsstart Dtlogin Dthello Dtsession		\
+# The files made here (LOC_BUILT, not BUILT_SOURCES: make dist builds
+# BUILT_SOURCES, and these need the locale).
+LOC_BUILT = Dthelpview Dtimsstart Dtlogin Dthello Dtsession		\
 	Dtscreen Dtwm Dtfile Dtstyle Dtpad Dticon Dtcreate Dtcalc	\
 	Dtcm Dtterm Dtmail Dtbuilder Dt Dtinfo
 
-CLEANFILES = $(BUILT_SOURCES) $(BUILT_SOURCES:=.tmp)
+CLEANFILES = $(LOC_BUILT) $(LOC_BUILT:=.tmp)
 
 appdefdir = $(CDE_DATA_TOP)/app-defaults/$(LANG)
-dist_appdef_DATA = $(BUILT_SOURCES)
+# (made here, so not in the tarball: a tarball can be made from a tree
+# that builds no other locale than C)
+nodist_appdef_DATA = $(LOC_BUILT)
 
 TOP = $(top_builddir)/programs
 DTSVCSRC = $(top_builddir)/lib/DtSvc
