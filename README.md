@@ -15,13 +15,18 @@ after the 2.5.3 release) is merged. On top of that it adds:
   (EWMH), so pagers, taskbars, docks, video players and today's
   GTK/Qt/Electron applications behave;
 - a desktop that starts and runs much faster: no fixed sleeps on the
-  login path, far fewer X round trips, linear instead of quadratic
-  algorithms in the file manager, terminal, mail, calendar and help;
-- hundreds of bug fixes, a `-Wall`-clean build with no use of
+  login path, far fewer X round trips (none at all per workspace
+  switch), ToolTalk with a quarter of the RPCs over a Unix socket,
+  linear instead of quadratic algorithms in the file manager, terminal,
+  mail, calendar and help;
+- hundreds of bug fixes, a build without warnings (`-Wall` and a
+  curated `-Wextra`, with `--enable-werror` in CI) and no use of
   deprecated or obsolete Motif API;
 - automatic display setup (`dtrandr`): the right monitor layout at
   login and when monitors are plugged in;
-- a modern, parallel, hardened build with configurable install paths.
+- a modern, parallel, hardened build with configurable install paths,
+  `make distcheck`, and continuous integration that builds, tests and
+  benchmarks every push.
 
 It is developed on Arch Linux against
 [dimmus/motif](https://github.com/dimmus/motif) (Motif 2.5).
@@ -67,7 +72,8 @@ it off). See `dtrandr(1)`.
 ### Speed
 
 Every change was measured with the harnesses in `tools/bench`. A
-selection (all numbers and methods are in `TODO.md`):
+selection (all numbers and methods are in `TODO.md`), first from the
+first round of work:
 
 | Area | Before → after |
 |---|---|
@@ -87,10 +93,36 @@ selection (all numbers and methods are in `TODO.md`):
 | Help: lay out a 20k-word topic | 1.39 s → 0.084 s |
 | `dtcalc` start | 23 → 7 shared libraries, loader time −20% |
 
+And from the second:
+
+| Area | Before → after |
+|---|---|
+| Restored session, all windows up | 513 ms → 440 ms (clients start before dtwm is ready) |
+| Screen lock: request → keyboard grabbed | 42 ms → 10 ms |
+| ToolTalk `tt_open` | 3 RPCs → 1, over a Unix socket |
+| ToolTalk `ttdt_open` + session join | 32 → 8 RPCs, 464 → 220 system calls |
+| Starting an action (dtexec) | 13.6–16.6 → 10.3–11.9 ms; 44 → 23 shared libraries |
+| dtwm workspace switch | 2.43 → 0 round trips; X server CPU 780 → 20 ms per 400 switches |
+| dtwm `f.refresh`, 3020 windows | 240–714 ms → 43–47 ms |
+| dtfile: 200 objects on the desktop | CPU 1.9 s → 0.17 s, memory 29 → 18 MB |
+| dtfile: browsing folders | one long-lived worker instead of a fork per folder read |
+| Text editor: Replace All, 100k hits | 3.7 s → 32 ms |
+| dtmail while another program holds the mailbox lock | UI blocked 14.4 s → 0 s |
+| dtcm month view | per change 142 → 6 X requests |
+| Help topic with a 1,500-row table | 346 ms → 27 ms |
+| dtcreate icon chooser (285 icons) | 1.0–1.2 s → 0.03 s |
+| dtksh, 40,000 callbacks | 16.3 s → 2.5 s |
+| dtprintinfo, two open queues for 40 s | 25 child processes → 0 (libcups) |
+| Building the man pages | 32.3 s → 2.5 s |
+
 ### Correctness and security
 
-- The whole tree builds with `-Wall` (and `-Wformat-truncation`) without
-  warnings; the bugs the warnings exposed are fixed, not silenced.
+- The whole tree builds without warnings: `-Wall`,
+  `-Wformat-truncation` and a curated `-Wextra` set for the compiler,
+  and the flex, bison and awk steps too. The bugs the warnings exposed
+  are fixed, not silenced (missing `break`s, a softkey length that
+  overflowed, dates never rejected on 64-bit systems, …).
+  `--enable-werror` makes any new warning an error; CI builds that way.
 - Temporary files use `mkstemp`/`mkdtemp` everywhere (no
   `tmpnam`/`tempnam`/`mktemp`).
 - No deprecated or obsolete Motif API is used: each call was replaced by
@@ -102,14 +134,42 @@ selection (all numbers and methods are in `TODO.md`):
   dtimsstart, a dtsession crash when a client closes with reasons, a
   dtwm crash creating workspaces, `_FORTIFY_SOURCE` aborts in DtSearch,
   broken `va_list` use, and many leaks.
+- Also fixed: MD5 was wrong on 64-bit systems (dtmail's APOP login and
+  the `Content-MD5` headers of dtmail and dtcm), dtterm crashed on a
+  double click on an empty line in UTF-8 locales and with large
+  `-sl` values, dtlogin added the font path again after every failed
+  login, dtksh callbacks saw an empty event type, and DtSvc took any
+  file for a symbolic link once one had been tested.
 - Shared libraries export only their API (export maps): libtt 3299 →
   1441 symbols, libDtMmdb 4030 → 894.
+
+### Changes you may notice
+
+- Restored clients start before dtwm is ready
+  (`Dtsession*startClientsEarly: True`; set it to False for the old
+  order).
+- Login keeps small caches in `~/.dt/cache` (profile syntax checks,
+  the `dtsearchpath` result).
+- MD5 sums are correct now, so they differ from what older builds
+  produced.
+- dtprintinfo uses libcups when it is installed (`--without-cups` to
+  build without it) and shows the real job owners, dates and titles.
+- dtwm's defaults: `freezeOnConfig: False` and `useWindowOutline: True`.
+- libtt's internal C++ layout changed under the same soname: install
+  libtt, ttsession, rpc.ttdbserver and the tt tools together. The new
+  ToolTalk calls fall back to the old ones against an older ttsession,
+  in both directions.
+- The unbuilt dtudcfonted, dtudcexch and lib/pam sources are gone.
 
 ### Build system
 
 - Fully parallel (`make -j`): no `.NOTPARALLEL`, ordering fixed for
   generated sources, the bundled ksh93 built with the tree's compiler,
-  flags and `-j`.
+  flags and `-j` (a `CC` of several words such as `ccache cc` included),
+  and DtMmdb, libtt, dtinfo and the help parser each built from one
+  Makefile instead of dozens. A no-op `make` takes about 3 s.
+- Out-of-tree (VPATH) builds and `make distcheck` work; the build
+  leaves the source tree as it was.
 - Each library and program links only what it uses (`--as-needed`,
   no unresolved symbols).
 - Hardening on by default (`_FORTIFY_SOURCE`, stack protector, RELRO,
@@ -125,7 +185,9 @@ selection (all numbers and methods are in `TODO.md`):
   systemd is in use; installation into a staging directory and as
   non-root.
 - Documentation can be built per part (`--disable-help-docs`,
-  `--disable-man-pages`, `--disable-infolib`) and in parallel.
+  `--disable-man-pages`, `--disable-infolib`) and in parallel; the man
+  pages are made in batches.
+- `make check` runs dtrandr's tests and starts dtksh once.
 
 ### From upstream
 
@@ -146,7 +208,9 @@ changes were corrected on the way (see `git log`).
 ./install-deps.sh                 # build and runtime dependencies (pacman)
 ```
 
-Motif is not taken from pacman: build and install
+It also generates the en_US.UTF-8 locale if it is missing (the build
+makes message catalogs and documentation in it). Motif is not taken
+from pacman: build and install
 [dimmus/motif](https://github.com/dimmus/motif) first
 (`install-deps.sh` checks for it and says what is missing).
 
@@ -183,6 +247,8 @@ sudo gmake install
 | `--enable-german`, `--enable-french`, `--enable-italian`, `--enable-spanish`, `--enable-japanese`, `--enable-chinese`, `--enable-chinese-tw` | extra locales |
 | `--enable-lto`, `--with-linker=NAME` | link-time optimisation, faster linkers |
 | `--enable-debug` | keep `assert()` checks |
+| `--enable-werror` | make compiler warnings errors |
+| `--without-cups` | dtprintinfo without libcups (lpstat and lpq only) |
 | `--with-pam-dir=DIR`, `--with-systemdsystemunitdir=DIR` | where the PAM file and the dtlogin unit go |
 
 The default layout is the traditional one (`/usr/dt`, `/etc/dt`,
@@ -206,8 +272,24 @@ make -C tools/bench
 Xvfb :9 & DISPLAY=:9 tools/bench/ewmhtest all        # or -f: with the front panel
 ```
 
+`tools/bench/bench.py run` runs every benchmark group and writes JSON;
+`bench.py compare BASE HEAD` fails on any extra X round trip, on more
+system calls, ToolTalk RPCs, shared libraries or relocations, and on
+slowdowns.
+
+Continuous integration (GitHub Actions, in an Arch Linux container
+against Motif 2.5 built from the fork) runs on every push and pull
+request:
+
+| Workflow | What it checks |
+|---|---|
+| `build` | the tree with `--enable-werror`, `make check`, and that the build changes no file in the checkout; and a second job with all documentation, installed into a staging directory |
+| `distcheck` | the release tarball builds out of tree from a read-only copy, passes `make check`, installs and uninstalls |
+| `bench` | the previous commit and this one, benchmarked on the same runner; fails on any regression of the exact counts (timings are reported but not gated: shared runners are too noisy for them) |
+
 `TODO.md` is the performance and correctness audit this work follows:
-every item, its status and its measured effect.
+every item, its status and its measured effect (247 of its 269 items
+are done; the rest are partly done or declined, with the reasons).
 
 ## License
 
