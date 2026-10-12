@@ -2263,6 +2263,11 @@ static int extents_are(Window w, Atom prop, const void *arg)
 	return ok;
 }
 
+static int extents_differ(Window w, Atom prop, const void *arg)
+{
+	return !extents_are(w, prop, arg);
+}
+
 static void expect_extents(Window w, const long ext[4], const char *what)
 {
 	char text[160];
@@ -3170,6 +3175,9 @@ static void test_redecorate(void)
 	/* a title bar and a border, no resize handles */
 	set_mwm_hints(w, MWM_HINTS_DECORATIONS, 0,
 		      MWM_DECOR_TITLE | MWM_DECOR_BORDER);
+	/* (until dtwm handles the hints, the old frame still matches) */
+	wait_for_on(w, net_atom("_NET_FRAME_EXTENTS"), extents_differ, plain,
+		    "_NET_FRAME_EXTENTS of a window with a title and a border");
 	expect_real_extents(w, "a window with a title and a border");
 	real_extents(w, titled);
 	if (titled[2] <= titled[0] || titled[0] >= plain[0] || !titled[0])
