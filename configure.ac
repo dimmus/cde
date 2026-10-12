@@ -232,12 +232,15 @@ dnl build-aux/cde-libs.am, which the Makefile.am files that link them
 dnl include, so that automake makes the programs depend on them.
 
 dnl set up come convenience replacements for global include dirs
-AC_SUBST(DT_INCDIR, '-I$(top_builddir)/include/Dt')
-AC_SUBST(DTI_INCDIR, '-I$(top_builddir)/include/DtI')
-AC_SUBST(TT_INCDIR, '-I$(top_builddir)/include/Tt')
-AC_SUBST(XM_INCDIR, '-I$(top_builddir)/include/Xm')
-AC_SUBST(CSA_INCDIR, '-I$(top_builddir)/include/csa')
-AC_SUBST(SPC_INCDIR, '-I$(top_builddir)/include/SPC')
+dnl include/ in the source directory holds the headers, the one in the
+dnl build directory the generated ones (cde_config.h, Dt/Dt.h).  In-tree
+dnl they are the same directory, and the compiler drops the second -I.
+AC_SUBST(DT_INCDIR, '-I$(top_builddir)/include/Dt -I$(top_srcdir)/include/Dt')
+AC_SUBST(DTI_INCDIR, '-I$(top_srcdir)/include/DtI')
+AC_SUBST(TT_INCDIR, '-I$(top_srcdir)/include/Tt')
+AC_SUBST(XM_INCDIR, '-I$(top_srcdir)/include/Xm')
+AC_SUBST(CSA_INCDIR, '-I$(top_srcdir)/include/csa')
+AC_SUBST(SPC_INCDIR, '-I$(top_srcdir)/include/SPC')
 
 dnl language enables.  AC_ARG_ENABLE sets enable_<feature> to "yes" for
 dnl --enable-<feature> and to "no" for --disable-<feature>, so the
@@ -1064,7 +1067,10 @@ dnl AM_CFLAGS, AM_CXXFLAGS and AM_LDFLAGS, which are substituted below;
 dnl a Makefile.am that sets one of those, or a per-target _CPPFLAGS,
 dnl _CFLAGS, _CXXFLAGS or _LDFLAGS (which replace the AM_ ones), starts it
 dnl with the matching $(CDE_...) variable.
-CDE_CPPFLAGS="${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
+dnl (-I$(top_srcdir)/include: automake's default include path has only
+dnl the include/ of the build directory, which in a VPATH build holds just
+dnl the generated headers; in-tree it is that same directory.)
+CDE_CPPFLAGS="-I\$(top_srcdir)/include ${SOURCE_CPP_DEFINES} ${CPP_COMPILER_FLAGS} ${TIRPC_CPPFLAGS} ${EXTRA_INCS} ${HARDEN_CPPFLAGS} ${DEBUG_CPPFLAGS}"
 CDE_CFLAGS="-std=${C_STD} ${C_COMPILER_FLAGS} ${HARDEN_CFLAGS} ${PTHREAD_CFLAGS} ${LTO_CFLAGS} ${FILE_PREFIX_CFLAGS}"
 CDE_CXXFLAGS="-std=${CXX_STD} ${CXX_COMPILER_FLAGS} ${HARDEN_CXXFLAGS} ${PTHREAD_CFLAGS} ${LTO_CXXFLAGS} ${FILE_PREFIX_CXXFLAGS}"
 CDE_LDFLAGS="${HARDEN_LDFLAGS} ${LINK_LDFLAGS} ${LTO_LDFLAGS}"
