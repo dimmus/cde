@@ -13,7 +13,8 @@ LIB_DIRS = DtXinerama tt DtSvc DtSearch DtWidget DtHelp DtPrint DtTerm \
 	   DtMrm csa DtMmdb
 
 # No recursion through SUBDIRS; distclean, maintainer-clean and distdir
-# still visit every directory.
+# still visit every directory.  (distclean removes their Makefiles before
+# it runs clean here: the clean jobs skip a directory without one.)
 SUBDIRS =
 DIST_SUBDIRS = $(LIB_DIRS)
 
@@ -40,9 +41,9 @@ $(LIB_INSTALL): install-in-%:
 $(LIB_UNINSTALL): uninstall-in-%:
 	@$(MAKE) $(AM_MAKEFLAGS) -C $* uninstall
 $(LIB_CLEAN): clean-in-%:
-	@$(MAKE) $(AM_MAKEFLAGS) -C $* clean
+	@if test -f $*/Makefile; then $(MAKE) $(AM_MAKEFLAGS) -C $* clean; fi
 $(LIB_MOSTLYCLEAN): mostlyclean-in-%:
-	@$(MAKE) $(AM_MAKEFLAGS) -C $* mostlyclean
+	@if test -f $*/Makefile; then $(MAKE) $(AM_MAKEFLAGS) -C $* mostlyclean; fi
 
 # Which library links which (and so must be built, and installed, first:
 # libtool relinks a library against the installed ones it uses).

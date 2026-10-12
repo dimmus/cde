@@ -68,7 +68,9 @@ endif
 endif
 
 # No recursion through SUBDIRS (see above); distclean, maintainer-clean
-# and distdir still visit every directory.
+# and distdir still visit every directory.  (distclean removes their
+# Makefiles before it runs clean here: the clean jobs skip a directory
+# without one.)
 SUBDIRS =
 DIST_SUBDIRS = en_US.UTF-8/m-guides en_US.UTF-8/man en_US.UTF-8/guides	\
 	en_US.UTF-8/help de_DE.UTF-8/help de_DE.UTF-8/guides		\
@@ -103,9 +105,9 @@ $(DOC_INSTALL): install-in-%:
 $(DOC_UNINSTALL): uninstall-in-%:
 	@$(MAKE) $(AM_MAKEFLAGS) -C $(doc_dir) uninstall
 $(DOC_CLEAN): clean-in-%:
-	@$(MAKE) $(AM_MAKEFLAGS) -C $(doc_dir) clean
+	@if test -f $(doc_dir)/Makefile; then $(MAKE) $(AM_MAKEFLAGS) -C $(doc_dir) clean; fi
 $(DOC_MOSTLYCLEAN): mostlyclean-in-%:
-	@$(MAKE) $(AM_MAKEFLAGS) -C $(doc_dir) mostlyclean
+	@if test -f $(doc_dir)/Makefile; then $(MAKE) $(AM_MAKEFLAGS) -C $(doc_dir) mostlyclean; fi
 
 # en_US.UTF-8/man and en_US.UTF-8/guides read m-guides/common/ManLinks.sgm.
 all-in-en_US.UTF-8+man all-in-en_US.UTF-8+guides: all-in-en_US.UTF-8+m-guides
