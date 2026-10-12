@@ -98,7 +98,7 @@ class MsgScrollingList : public ScrollingList {
     DtMailMessageHandle current_msg_handle();
     int       position(DtMailMessageHandle msgno);
     
-    virtual const char *const className() {return ("MsgScrollingList");}
+    virtual const char *className() {return ("MsgScrollingList");}
     virtual void insertMsg(DtMailMessageHandle);
     virtual void insertDeletedMsg(DtMailMessageHandle);
     virtual void deleteSelected(Boolean silent = TRUE);

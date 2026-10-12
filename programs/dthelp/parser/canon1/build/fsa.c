@@ -118,7 +118,7 @@ int checkrepeat(STATE *from, ANDGROUP *and, ELTSTRUCT **errelt)
       for (parc = and->start->first ; parc ; parc = parc->next) {
         if (parc->group)
           if ((c = checkrepeat(from, parc->group, errelt))) return(c) ;
-          else ;
+          else { }
         else
           if ((c = checkdfsa(from,
                             parc->label,
@@ -126,7 +126,7 @@ int checkrepeat(STATE *from, ANDGROUP *and, ELTSTRUCT **errelt)
                             parc->id,
                             errelt)))
             return(c) ;
-          else ;
+          else { }
         }
     return(FALSE) ;
     }
@@ -546,7 +546,7 @@ void repeat(TREE *root)
             nondeterm(root, c, errelt) ;
             }
           else
-            ;
+            { }
         else
           if ((c = checkdfsa(final->value,
                             a->label,
@@ -555,7 +555,7 @@ void repeat(TREE *root)
                             &errelt)))
             nondeterm (root, c, errelt) ;
           else
-            ;
+            { }
         }
       for (final = top->finals ; final ; final = final->next) {
         if (samelabelarc(a, final->value)) continue ;

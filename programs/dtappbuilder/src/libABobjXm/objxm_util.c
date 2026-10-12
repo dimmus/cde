@@ -211,7 +211,7 @@ objxm_pixmap_conversion_error_msg(
     int		status
 )
 {
-    char	static buf[LG_BUF_SIZE];
+    static char	buf[LG_BUF_SIZE];
     char	buf2[BUF_SIZE];
     char	file_buf[BUF_SIZE];
 

@@ -268,7 +268,7 @@ static int euro_mbtowc (wchar_t *pwc, const char *p, const char *s)
 
     if (p < s) goto done;
 
-    if (*p >= 0 && *p <= 0x7F) {
+    if ((unsigned char) *p <= 0x7F) {
 	len = 1;
 	*pwc = *p;
 	goto done;

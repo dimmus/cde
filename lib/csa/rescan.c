@@ -227,7 +227,7 @@ scanbuf(
 					return(ERROR);
 				}
 			}
-
+			/* FALLTHROUGH */
 		case 4:
 			/* Found a single letter...probably a command */
 

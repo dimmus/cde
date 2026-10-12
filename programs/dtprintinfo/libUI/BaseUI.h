@@ -353,15 +353,15 @@ class BaseUI {
    virtual void Details(char *) { }
 
    // Access functions
-   const boolean Visible()          { return _visible; }
-   const boolean Active()           { return _active; }
-   const boolean Selected()         { return _selected; }
-   const boolean Open()             { return _opened; }
-   const boolean HasBeenOpened()    { return _has_been_opened; }
+   boolean Visible()          { return _visible; }
+   boolean Active()           { return _active; }
+   boolean Selected()         { return _selected; }
+   boolean Open()             { return _opened; }
+   boolean HasBeenOpened()    { return _has_been_opened; }
    const char * Name()              { return _name; }
    const char * Category()          { return _category; }
-   const ViewStyle ContainerView()  { return _viewStyle; }
-   const IconStyle IconView()       { return _iconStyle; }
+   ViewStyle ContainerView()  { return _viewStyle; }
+   IconStyle IconView()       { return _iconStyle; }
    virtual char * Details()         { return NULL; }
 
    BaseUI * Parent()                { return _parent; }
@@ -462,10 +462,10 @@ class BaseUI {
    virtual void Selection(int *n_items,
 			  BaseUI ***items = NULL);
 
-   virtual const UI_Class UIClass() { return BASE_UI; }
-   virtual const int UISubClass() { return NO_SUBCLASS; }
+   virtual UI_Class UIClass() { return BASE_UI; }
+   virtual int UISubClass() { return NO_SUBCLASS; }
 
-   virtual const char *const UIClassName() { return "BaseUI"; }
+   virtual const char *UIClassName() { return "BaseUI"; }
 
 };
 

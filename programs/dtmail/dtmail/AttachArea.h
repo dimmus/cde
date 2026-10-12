@@ -192,7 +192,7 @@ class AttachArea : public UIComponent {
   
     Widget       		getDescriptionDialog()	
 					{ return (_descriptionDialog );}
-    virtual const char *const className()	{ return ( "AttachArea" ); }
+    virtual const char *className()	{ return ( "AttachArea" ); }
 
 
     void 			addToList( Attachment * );

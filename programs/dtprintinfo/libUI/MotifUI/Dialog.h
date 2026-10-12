@@ -90,7 +90,7 @@ class Dialog : public MotifUI {
    int Height() { return MotifUI::Height(); }
    void WidthHeight(int w, int h);
    void WidthHeight(int *w, int *h) { MotifUI::WidthHeight(w, h); }
-   const Widget InnerWidget()       { return _clientArea; }
+   Widget InnerWidget()       { return _clientArea; }
 
  public:
 
@@ -152,12 +152,12 @@ class Dialog : public MotifUI {
    virtual void CloseCB();
    void DefaultButton(MotifUI *);
    void CancelButton(MotifUI *);
-   const boolean Answer(char **string); // user must delete string
-   const boolean Answer()           { return _rc; }
+   boolean Answer(char **string); // user must delete string
+   boolean Answer()           { return _rc; }
 
-   const UI_Class UIClass()         { return DIALOG; }
-   const int UISubClass()           { return _dialog_type; }
-   const char *const UIClassName()  { return "Dialog"; }
+   UI_Class UIClass()         { return DIALOG; }
+   int UISubClass()           { return _dialog_type; }
+   const char *UIClassName()  { return "Dialog"; }
 };
 
 #endif /* DIALOG_H */

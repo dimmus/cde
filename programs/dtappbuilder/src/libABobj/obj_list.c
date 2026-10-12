@@ -601,7 +601,7 @@ objlistP_build_user_data_array(ABObjList list, int index, void *data)
     {
 	return -1;
     }
-    list->user_datas = (void **)calloc(sizeof(void*), list->objs_size);
+    list->user_datas = (void **)calloc(list->objs_size, sizeof(void*));
     if (list->user_datas == NULL)
     {
 	return -1;

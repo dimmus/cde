@@ -186,7 +186,7 @@ static int  ManageGreeter( struct display *d, struct greet_info *greet,
                         struct verify_info *verify, struct greet_state *state) ;
 static void RunGreeter( struct display *d, struct greet_info *greet,
                         struct verify_info *verify) ;
-static void SessionExit( struct display *d, int status) ;
+static _Noreturn void SessionExit( struct display *d, int status) ;
 static void SessionPingFailed( struct display *d) ;
 static int  StartClient(struct verify_info *verify, struct display *d,
                         int *pidp) ;
@@ -355,7 +355,7 @@ ErrorHandler( Display *dpy, XErrorEvent *event )
 void
 ManageSession( struct display *d )
 {
-    int			pid;
+    volatile int	pid;
     Window		root = 0;
    /* Display 		*dpy; */
 #ifdef BYPASSLOGIN
@@ -1316,7 +1316,7 @@ release_aix_lic(void)
 #endif /* _AIX */
 
 
-static void
+static _Noreturn void
 SessionExit( struct display *d, int status )
 {
 
@@ -1824,6 +1824,7 @@ AbortClient( int pid )
 	    case EPERM:
 		LogError(ReadCatalog(
 			MC_LOG_SET,MC_LOG_NO_KILLCL,MC_DEF_LOG_NO_KILLCL));
+	    /* FALLTHROUGH */
 	    case EINVAL:
 	    case ESRCH:
 		return 0;

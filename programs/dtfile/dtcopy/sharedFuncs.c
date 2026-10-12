@@ -498,7 +498,7 @@ CheckDeleteAccess(
      XEvent event;
      int perm_status = 0;
 
-     delay = 10000;
+     (void) delay;
      tmpptr = strrchr(tmpstring,'/');
      if(!tmpstring || !tmpptr)                               /* Error */
        perm_status = 1;

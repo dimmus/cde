@@ -179,6 +179,7 @@ const ilYCbCrSampleInfo              *pSample;
       case IL_PALETTE:
         if (pDes->nLevelsPerSample[0] > 256)
             return IL_ERROR_LEVELS_PER_SAMPLE;
+      /* FALLTHROUGH */
       case IL_GRAY:
         if (nSamplesPerPixel != 1)
             return IL_ERROR_SAMPLES_PER_PIXEL;

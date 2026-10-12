@@ -82,7 +82,7 @@ class QuitCmd : public WarnNoUndoCmd {
   public:
     
     QuitCmd ( char *, char *, int, MainWindow *);
-    virtual const char *const className () { return "QuitCmd"; }
+    virtual const char *className () { return "QuitCmd"; }
     virtual void execute(); // Overrides the AskFirstCmd member function
 };
 #endif

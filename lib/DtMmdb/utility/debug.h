@@ -57,8 +57,8 @@
 
 #else /* DEBUG */
 
-#define debug(s,x)
-#define MESSAGE(s,x)
+#define debug(s,x)	((void)0)
+#define MESSAGE(s,x)	((void)0)
 #endif /* DEBUG */
 
 #ifndef C_API

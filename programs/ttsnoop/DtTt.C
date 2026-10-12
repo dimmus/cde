@@ -123,7 +123,7 @@ DtTtCreated(
 			return TT_OK;
 		}
 		if (! listAppend( dtTtMessages, dtTtMessagesCount, Tt_message,
-				  (const Tt_message)entity ))
+				  (Tt_message)entity ))
 		{
 			return TT_ERR_NOMEM;
 		}
@@ -133,7 +133,7 @@ DtTtCreated(
 			return TT_OK;
 		}
 		if (! listAppend( dtTtPatterns, dtTtPatternsCount, Tt_pattern,
-				  (const Tt_pattern)entity ))
+				  (Tt_pattern)entity ))
 		{
 			return TT_ERR_NOMEM;
 		}

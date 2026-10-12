@@ -933,7 +933,7 @@ void
 build_new_attrval(CSA_attribute *attrval, char *name, char *tag, char *value)
 
 {
-	CSA_attribute_value *vptr = calloc(sizeof(CSA_attribute_value), 1);
+	CSA_attribute_value *vptr = calloc(1, sizeof(CSA_attribute_value));
 	char	*s_ptr, *b_ptr;
 	CSA_access_list l_ptr;
 	boolean_t	done = B_FALSE;
@@ -956,7 +956,7 @@ build_new_attrval(CSA_attribute *attrval, char *name, char *tag, char *value)
 		vptr->type = CSA_VALUE_CALENDAR_USER;
 		s_ptr = strchr(value, ':');
 		*s_ptr = '\0';
-		vptr->item.calendar_user_value = calloc(sizeof(CSA_calendar_user), 1);
+		vptr->item.calendar_user_value = calloc(1, sizeof(CSA_calendar_user));
 		vptr->item.calendar_user_value->user_name = cm_strdup(s_ptr + 1);
 		vptr->item.calendar_user_value->user_type = atoi(value);
 	}
@@ -976,7 +976,7 @@ build_new_attrval(CSA_attribute *attrval, char *name, char *tag, char *value)
 		s_ptr = strchr(value, ':');
 		*s_ptr = '\0';
 		
-		vptr->item.reminder_value = calloc(sizeof(CSA_reminder), 1);
+		vptr->item.reminder_value = calloc(1, sizeof(CSA_reminder));
 		
 		vptr->item.reminder_value->lead_time = malloc(BUFSIZ);
 		_csa_duration_to_iso8601(atoi(value), vptr->item.reminder_value->lead_time);
@@ -1000,7 +1000,7 @@ build_new_attrval(CSA_attribute *attrval, char *name, char *tag, char *value)
 			/* we have an initial value. */
 
 			while (!done) {
-				l_ptr = calloc(sizeof(CSA_access_rights), 1);
+				l_ptr = calloc(1, sizeof(CSA_access_rights));
 
 				s_ptr = strchr(b_ptr, ':');
 				*s_ptr = '\0';

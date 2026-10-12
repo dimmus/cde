@@ -327,7 +327,7 @@ Help(void)
     exit(0);
 }
 
-static void
+static _Noreturn void
 DumpResources(void)
 {
     int         i;

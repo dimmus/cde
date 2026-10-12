@@ -2674,6 +2674,7 @@ void PullQueuedExposureEvents (void)
 	{
 	    dispatchEvent = WmDispatchClientEvent (&event);
 	}
+       /* FALLTHROUGH */
        default:
 	dispatchEvent = True;
       }

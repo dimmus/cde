@@ -36,7 +36,7 @@
 #ifdef CM_DEBUG
 #define DP(a)	{ printf a ; }
 #else
-#define DP(a)
+#define DP(a)	do { } while (0)
 #endif /* CM_DEBUG */
 
 extern void		_DtCm_print_tick(time_t t);

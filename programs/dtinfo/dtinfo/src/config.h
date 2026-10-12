@@ -129,7 +129,7 @@ typedef unsigned char  u_char;
 #ifdef DEBUG
 #define ON_DEBUG(stmt)	stmt
 #else
-#define ON_DEBUG(stmt)
+#define ON_DEBUG(stmt)	do { } while (0)
 #endif
 
 #define ISSPACE_C(C) (C == ' ' || (C > 0x8 && C < 0x14))

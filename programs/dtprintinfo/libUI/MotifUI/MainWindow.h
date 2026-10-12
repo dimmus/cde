@@ -92,8 +92,8 @@ class MainWindow : public MotifUI {
    BaseUI *PopupObject;
    int PopupObjectUniqueID;
 
-   const UI_Class UIClass()            { return MAIN_WINDOW; }
-   const char *const UIClassName()     { return "MainWindow"; }
+   UI_Class UIClass()            { return MAIN_WINDOW; }
+   const char *UIClassName()     { return "MainWindow"; }
 
 };
 

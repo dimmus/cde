@@ -50,7 +50,7 @@
 #ifdef DEBUG
 #define ON_DEBUG(X) X
 #else
-#define ON_DEBUG(X)
+#define ON_DEBUG(X) do { } while (0)
 #endif
 
 #include <stdio.h>

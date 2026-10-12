@@ -4774,7 +4774,7 @@ EmitSDL(pVirpage);
 
 
 /* A routine to emit a help message and exit */
-static void Help(void)
+static _Noreturn void Help(void)
 {
 printf("The available options to %s are 'c', 'd', 'h', 'o' and 't'.\n\n",
        progName);
@@ -4794,7 +4794,7 @@ exit(0);
 
 
 /* A routine to emit a usage message and exit */
-static void Usage(void)
+static _Noreturn void Usage(void)
 {
 fprintf(stderr,
 	"Usage: %s [-cdhot] <inFileName> [<outFileName>]\n",

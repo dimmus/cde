@@ -161,6 +161,7 @@ c_init()
 				_address_string = (char *) 0;
 				break;
 			}
+		    /* FALLTHROUGH */
 		    case TT_ERR_ACCESS:
 		    case TT_ERR_NO_MATCH:
 			// Can't recover from these

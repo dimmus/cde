@@ -218,7 +218,7 @@ XmTextEditor::append_to_contents(
 void
 XmTextEditor::append_to_contents(const char * path)
 {
-    loadFile(path, (const int) XmTextGetLastPosition(_w));
+    loadFile(path, (int) XmTextGetLastPosition(_w));
 }
 
 void
@@ -249,7 +249,7 @@ XmTextEditor::append_at_cursor(
 void
 XmTextEditor::append_at_cursor(const char * path)
 {
-    loadFile(path, (const int)XmTextGetInsertionPosition(_w));
+    loadFile(path, (int)XmTextGetInsertionPosition(_w));
 }
 
 void    

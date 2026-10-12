@@ -612,5 +612,5 @@ PRoot::generate ()
   f_node_of[pos] = f_right;
   f_old_length = f_length;
   f_length = pos;
-  // ON_DEBUG (printf ("Generated: <%s>\n", f_char_of);)
+  // ON_DEBUG (printf ("Generated: <%s>\n", f_char_of));
 }

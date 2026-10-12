@@ -229,7 +229,7 @@ int ceiling(const float x)
 
 unsigned getbits(unsigned x, unsigned p, unsigned n)
 {
-   return((x>> (p-n)) & ~(~0 << n));
+   return((x>> (p-n)) & ~(~0U << n));
 }
 
 int del_file(const char* filename, const char* pathname)
@@ -722,12 +722,12 @@ char* access_info( char* request )
 void lsb_putbits(unsigned& target, unsigned position_from_lsb, 
              unsigned bits, unsigned source)
 {
-   target |= ((source & ~( ~0 << bits )) << position_from_lsb) ;
+   target |= ((source & ~( ~0U << bits )) << position_from_lsb) ;
 }
 
 unsigned lsb_getbits(unsigned source, unsigned position_from_lsb, unsigned bits)
 {
-   return ( ( source >> position_from_lsb ) & ~( ~0 << bits ) );
+   return ( ( source >> position_from_lsb ) & ~( ~0U << bits ) );
 }
 
 Boolean cc_is_digit(istream& in)

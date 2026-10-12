@@ -1202,12 +1202,12 @@ OutlineListView::activate (WCallback *wcb)
 	      {
 	        UAS_List<UAS_Common> kids =
 	              ((TOC_Element *)oe)->toc()->children();
-	        if (   (kids != (const int)0)
-	            && (kids[0] != (const int)0)
+	        if (   (kids != (int)0)
+	            && (kids[0] != (int)0)
                     && (kids[0]->type() == UAS_BOOKCASE))
 	        {
 	          UAS_List<UAS_Common> bckids = kids[0]->children();
-	          if (! (bckids[0] == (const int)0))
+	          if (! (bckids[0] == (int)0))
 	          {
 	            bckids[0]->retrieve();
 	          }
@@ -1219,7 +1219,7 @@ OutlineListView::activate (WCallback *wcb)
 	      {
 	        UAS_List<UAS_Common> kids =
 	              ((TOC_Element *)oe)->toc()->children();
-	        if (! (kids[0] == (const int)0))
+	        if (! (kids[0] == (int)0))
 	        {
 	          kids[0]->retrieve();
 	        }

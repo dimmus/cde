@@ -160,6 +160,7 @@ int	expand_string(char *in_str, char *out_str, int out_len, ImsConf *ims)
 		case 'C':	ep = conf->dt->confDir; break;
 		case 'U':	ep = conf->dt->userDir; break;
 		case 'L':	if ((ep = uenv->real_locale))	break;
+		/* FALLTHROUGH */
 		case 'l':	ep = uenv->locale; break;
 		case 'H':	ep = uenv->homedir; break;
 		case 'u':	ep = uenv->username; break;
@@ -168,6 +169,7 @@ int	expand_string(char *in_str, char *out_str, int out_len, ImsConf *ims)
 		case 'd':	ep = uenv->displaydir; break;
 
 		case 'N':	if (ims && (ep = ims->servername2)) break;
+		/* FALLTHROUGH */
 		case 'n':	if (ims) ep = ims->servername; break;
 		case 'c':	if (ims) ep = ims->classname; break;
 		case 's':	sprintf(str, "%ld", (long) uenv->screen_num); 
@@ -176,6 +178,7 @@ int	expand_string(char *in_str, char *out_str, int out_len, ImsConf *ims)
 		case 'r':	ep = userSel.hostname; break;
 
 		case '%':	p++;
+		/* FALLTHROUGH */
 		default:	DPR2(("expand_string: '%%%c' unknown\n"));
 				ep = 0; break;
 	    }

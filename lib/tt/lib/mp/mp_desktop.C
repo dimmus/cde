@@ -115,7 +115,7 @@ init(_Tt_string dt_handle, _Tt_dt_type /* t */)
 	_Tt_string	h, hostname;
 	pid_t		s;
 	int		parse_status;
-	int		ret_val;
+	volatile int	ret_val;
 
 	if (priv->xd != (Display *)0) {
 		return(1);
@@ -222,7 +222,7 @@ restore_user_handler()
 int _Tt_desktop::
 close()
 {
-	int     ret_val = 1;
+	volatile int ret_val = 1;
 
 	set_error_handler(_Tt_desktop::io_error_proc);
 	if (0 == sigsetjmp(io_exception, 1)) {
@@ -284,7 +284,7 @@ process_event()
 	XMappingEvent	*xm;
 	int		pending;
 	int		iostat;
-	int		ret_val = 1;
+	volatile int	ret_val = 1;
 
 	if (priv->xd == (Display *)0) {
 		return(0);

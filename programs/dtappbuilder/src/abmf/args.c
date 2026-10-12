@@ -106,7 +106,7 @@ static int spew_extra_spinbox_args(
 			ABMF_ARG_CLASS	argClasses
 			);
 
-static BOOL	get_wclass_and_res_value(
+static int	get_wclass_and_res_value(
 			ABObj		obj, 
 			STRING		argName, 
 			WidgetClass	*wClassOut,
@@ -1480,7 +1480,7 @@ abmfP_comp_get_num_args_of_classes(ABObj obj, ABMF_ARG_CLASS argClasses)
 }
 
 
-static BOOL
+static int
 get_wclass_and_res_value(
 			ABObj		obj, 
 			STRING		argName, 

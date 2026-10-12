@@ -69,7 +69,7 @@ class PrintJob : public BaseObj {
 
    const char *JobNumber() { return _jobNumber; }
 
-   virtual const char *const ObjectClassName() { return PRINTJOB; }
+   virtual const char *ObjectClassName() { return PRINTJOB; }
 
 };
 

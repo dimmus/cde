@@ -80,6 +80,6 @@ class IconifyCmd : public NoUndoCmd {
   public:
     
     IconifyCmd ( char *, char *, int );
-    virtual const char *const className () { return "IconifyCmd"; }
+    virtual const char *className () { return "IconifyCmd"; }
 };
 #endif

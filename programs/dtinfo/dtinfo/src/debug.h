@@ -25,7 +25,7 @@
 #ifdef DEBUG
 #define ON_DEBUG(stmt)	stmt
 #else
-#define ON_DEBUG(stmt)
+#define ON_DEBUG(stmt)	do { } while (0)
 #endif
 #endif
 

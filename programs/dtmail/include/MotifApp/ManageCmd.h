@@ -80,6 +80,6 @@ class ManageCmd : public NoUndoCmd {
   public:
     
     ManageCmd ( char *, char *, int );
-    virtual const char *const className () { return "ManageCmd"; }
+    virtual const char *className () { return "ManageCmd"; }
 };
 #endif

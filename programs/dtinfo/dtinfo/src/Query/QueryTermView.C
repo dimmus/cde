@@ -344,9 +344,7 @@ QueryTermView::_select (Widget w, XEvent *event,
   // If we end changing the selection, call the real proc.
   if (W.Sensitive())
     XtCallActionProc (w, "Select", event, params, *num_params);
-  else
-    // beep
-    ;
+  // else beep
 }
 
 

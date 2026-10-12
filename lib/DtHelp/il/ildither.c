@@ -876,7 +876,7 @@ convertBoxTotalRec          total[256];
     srcRowBytes = pPriv->srcRowBytes;
     dstRowBytes = pPriv->dstRowBytes;
 
-    if ( !(Ftable = (unsigned long *) calloc( sizeof *Ftable, 32*32*32 )) )
+    if ( !(Ftable = (unsigned long *) calloc(32*32*32, sizeof *Ftable)) )
       return IL_ERROR_MALLOC;
 
     pSrcLine = pPriv->pSrcPixels + pData->srcLine * srcRowBytes;

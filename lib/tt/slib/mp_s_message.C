@@ -483,7 +483,7 @@ set_return_sender_flags()
 	      case TT_OBJECT:
 		// scope can change for these messages
 		_ptr_guards |= _TT_MSK_SCOPE;
-		// fall into
+		// FALLTHROUGH
 	      case TT_PROCEDURE:
 		// don't send default TT_DISCARD reliability
 		SET_PTR_GUARD(_reliability != TT_DISCARD, _TT_MSK_RELIABILITY);

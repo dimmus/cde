@@ -145,7 +145,7 @@ projP_show_save_as_bil_chooser(
                 (ArgList) NULL,
                 (Cardinal) 0);
 
-        info = (ChooserInfo)calloc(sizeof(ChooserInfoRec), 1);
+        info = (ChooserInfo)calloc(1, sizeof(ChooserInfoRec));
         XtVaSetValues(AB_generic_chooser,
                         XmNuserData, (XtPointer) info,
                         NULL);

@@ -472,7 +472,7 @@ DB_ADDR *dba   /* db address of scanned record */
          MEM_UNLOCK(&curkey->Keyval);
 	 if (db_status != S_OKAY)
 	    break;
-	 /* PASS THROUGH */
+	 /* FALLTHROUGH */
       case KEYFOUND:
          MEM_LOCK(&curkey->Node_path);
 	 if (fcn == KEYNEXT)

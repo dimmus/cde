@@ -77,7 +77,7 @@ class ViewMsgDialog : public DialogShell, public AbstractEditorParent {
     virtual void initialize();
     virtual void quit();
 
-    virtual const char *const className () { return "ViewMsg"; }
+    virtual const char *className () { return "ViewMsg"; }
     void propsChanged(void);
 
 // Accessors

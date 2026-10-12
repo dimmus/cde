@@ -274,6 +274,7 @@ ReadWord(
 	    }
 	    while ((c = getc (file)) != EOF && c != '\n')
 		;
+	/* FALLTHROUGH */
 	case '\n':
 	case EOF:
 	    if (c == EOF || (EOFatEOL && !quoted))
@@ -285,6 +286,7 @@ ReadWord(
 		nextIsEOF = TRUE;
 		return wordBuffer;
 	    }
+	/* FALLTHROUGH */
 	case ' ':
 	case '\t':
 	    if (wordp != wordBuffer)
@@ -300,6 +302,7 @@ ReadWord(
 		quoted = TRUE;
 		continue;
 	    }
+	/* FALLTHROUGH */
 	default:
 	    *wordp++ = c;
 	    break;
@@ -584,6 +587,7 @@ patternMatch(
 	    return s == 0;
 	case '\\':
 	    p = *pattern++;
+	/* FALLTHROUGH */
 	default:
 	    if (p != s)
 		return 0;

@@ -64,7 +64,7 @@ class PrintSubSystem : public BaseObj {
    PrintSubSystem(BaseObj *parent);
    virtual ~PrintSubSystem();
 
-   virtual const char *const ObjectClassName() { return PRINTSUBSYSTEM; }
+   virtual const char *ObjectClassName() { return PRINTSUBSYSTEM; }
 
 };
 

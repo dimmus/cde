@@ -73,7 +73,7 @@ int _iljpgZigzagTable[];
 
     /*  Allocate _nBytes from heap, zero it, and return a ptr to it. */
 #ifndef ILJPG_MALLOC_ZERO
-#   define ILJPG_MALLOC_ZERO(_nBytes)  (calloc ((_nBytes), 1))
+#   define ILJPG_MALLOC_ZERO(_nBytes)  (calloc (1, (_nBytes)))
 #endif
 
     /*  Free given block (*_ptr), allocated by ILJPG_MALLOC_ZERO(). */

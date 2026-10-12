@@ -69,7 +69,7 @@ public:
   FeatureValue	(FeatureType type) : f_type(type) {}
   virtual ~FeatureValue();
 
-  const FeatureType	type()	const { return f_type ; }
+  FeatureType	type()	const { return f_type ; }
   
   virtual FeatureValue *clone() const = 0; /* deep copy */
 

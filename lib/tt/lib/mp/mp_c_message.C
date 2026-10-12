@@ -139,7 +139,7 @@ dispatch(int observers_only)
 			// Point-to-point messages must have a handler.
 			return TT_ERR_PROCID;
 		}
-		// fall through to check scope
+		// FALLTHROUGH - to check scope
 	      case TT_PROCEDURE:
 		if (_scope == TT_SCOPE_NONE) {
 			return(TT_ERR_SCOPE);

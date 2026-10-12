@@ -86,9 +86,9 @@ class Application : public MotifUI {
    char *Restore(char *attribute);
    void SaveMe(boolean save_as_session = false);
 
-   const UI_Class UIClass()        { return APPLICATION; }
+   UI_Class UIClass()        { return APPLICATION; }
 
-   const char *const UIClassName() { return "Application"; }
+   const char *UIClassName() { return "Application"; }
 
 };
 

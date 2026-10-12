@@ -494,6 +494,7 @@ ilThrottlePrivPtr  pPriv = NULL;
             worst case: we have 1 line less than needed for (requested) "stripHeight",
             and then previous element then writes "info.stripHeight" lines.
         */
+      /* FALLTHROUGH */
       case IL_PIPE_NOT_IMAGE:
         if (!constantStrip) {
             pPriv = (ilThrottlePrivPtr)ilAddPipeElement (pipe, IL_FILTER, 

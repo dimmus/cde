@@ -63,7 +63,7 @@ public:
 
   ScrollingList ( Widget, char * );
   ~ScrollingList ();
-  virtual const char *const className() { return ( "ScrollingList" ); }
+  virtual const char *className() { return ( "ScrollingList" ); }
   virtual void defaultAction( Widget, XtPointer, XmListCallbackStruct * ) = 0;
 };
 

@@ -216,7 +216,7 @@ UIComponent::getResources( const XtResourceList resources,
 }
 
 #ifndef CAN_INLINE_VIRTUALS
-const char *const
+const char *
 UIComponent::className(void)
 {
     return "UIComponent";

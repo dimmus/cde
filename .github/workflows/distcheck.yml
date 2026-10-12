@@ -6,10 +6,10 @@
 # Makefile.am (no documentation, but the documentation tools).
 #
 # The tree builds against Motif 2.5 (libXm.so.5), not the distribution's
-# Motif 2.3: it is built from MOTIF_REPO first.  The container is Arch
-# Linux, the platform install-deps.sh supports.  The build runs as an
-# ordinary user: root could write into the read-only source directory,
-# which is what the check is meant to catch.
+# Motif 2.3: .github/actions/motif builds it from the fork first.  The
+# container is Arch Linux, the platform install-deps.sh supports.  The
+# build runs as an ordinary user: root could write into the read-only
+# source directory, which is what the check is meant to catch.
 
 name: distcheck
 
@@ -18,9 +18,6 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
-
-env:
-  MOTIF_REPO: https://github.com/dimmus/motif.git
 
 jobs:
   distcheck:
@@ -42,13 +39,7 @@ jobs:
           ./install-deps.sh --yes
           chown -R build: "$GITHUB_WORKSPACE"
 
-      - name: Motif 2.5
-        run: |
-          git clone --depth 1 "$MOTIF_REPO" /tmp/motif
-          cmake -S /tmp/motif -B /tmp/motif-build -G Ninja \
-            -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
-          cmake --build /tmp/motif-build --parallel "$(nproc)"
-          cmake --install /tmp/motif-build
+      - uses: ./.github/actions/motif
 
       - name: Configure and build
         run: |

@@ -1585,7 +1585,7 @@ void DtMail::MailRc::mt_puthash(char *name, char *val, struct var **hasharray)
     vp = lookup(name, hasharray);
     if (vp == (struct var *)NULL) {
 	h = hash(name);
-	vp = (struct var *) (calloc(sizeof *vp, 1));
+	vp = (struct var *) (calloc(1, sizeof *vp));
 	vp->v_name = vcopy(name);
 	vp->v_link = hasharray[h];
 	vp->v_written = 0;

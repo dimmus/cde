@@ -114,7 +114,7 @@ extern "C" {
 #if defined(DEBUG_RFCMailBox)
   #define DEBUG_PRINTF(a)	printf a
 #else
-  #define DEBUG_PRINTF(a)	
+  #define DEBUG_PRINTF(a)	do { } while (0)
 #endif
 
 
@@ -228,7 +228,7 @@ void HexDump(FILE *pfp, char *pmsg, unsigned char *pbufr, int plen, int plimit)
 
     GET_DUMPFILE_NAME(dumpfilename);
     pfp_r = fopen(dumpfilename, "a");
-    const time_t clockTime = (const time_t) time(NULL);
+    const time_t clockTime = (time_t) time(NULL);
     memset((void*) &ctime_buf, 0, sizeof(_Xctimeparams));
     fprintf(pfp_r, "--------------------- pid=%ld %s",
 	    (long)getpid(), _XCtime(&clockTime, ctime_buf));
@@ -1534,7 +1534,7 @@ RFCMailBox::openRealFile(DtMailEnv & error, int open_mode, mode_t create_mode)
       // Make sure a newly created file has the correct group owner i.d.
       //
       gid_t groupId = GetIdForGroupName(DTMAIL_DEFAULT_CREATE_MAILGROUP);
-      if (groupId >= 0)
+      if (groupId != (gid_t) -1)
         (void) SafeFchown(_fd, (unsigned int) -1, groupId);
     }
 
@@ -4955,7 +4955,7 @@ RFCMailBox::writeToDumpFile(const char *format, ...)
   if (df == NULL)
     return;
   
-  const time_t clockTime = (const time_t) time(NULL);
+  const time_t clockTime = (time_t) time(NULL);
   memset((void*) &ctime_buf, 0, sizeof(_Xctimeparams));
   fprintf(df, "--------------------- pid=%ld %s", 
 	  (long)getpid(), _XCtime(&clockTime, ctime_buf));
@@ -5023,7 +5023,7 @@ RFCMailBox::dumpMaps(const char *str)
   sigaction(SIGBUS, &sig_act, &old_sig_act);
   sigbus_env_valid = 1;
   if (setjmp(sigbus_env) == 0) {
-    const time_t clockTime = (const time_t) time(NULL);
+    const time_t clockTime = (time_t) time(NULL);
     _Xctimeparams ctime_buf;
     memset((void*) &ctime_buf, 0, sizeof(_Xctimeparams));
     fprintf(df, "--------------------- pid=%ld %s", 

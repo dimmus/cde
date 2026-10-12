@@ -2844,8 +2844,10 @@ UpdateDimensionArrays(
       {
 	case _DtCvJUSTIFY_RIGHT_MARGIN:
 		j++;
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_CENTER:
 		j++;
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_LEFT_MARGIN:
 		if (vOrient == _DtCvJUSTIFY_BOTTOM)
 		    i = DIMS_BOTTOM;
@@ -2875,6 +2877,7 @@ UpdateDimensionArrays(
 		j = DIMS_RIGHT;
 		marginPtr = max_right;
 
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_LEFT_CORNER:
 	case _DtCvJUSTIFY_LEFT:
 		if (vOrient != _DtCvJUSTIFY_TOP)
@@ -3164,9 +3167,11 @@ AdjustHeadPosition(
 	case _DtCvJUSTIFY_RIGHT_MARGIN:
 		divisor = 1;
 		j++;
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_CENTER:
 		adjustX = (block_width - headWidth) / divisor;
 		j++;
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_LEFT_MARGIN:
 		adjustX += left_margin;
 		if (vOrient == _DtCvJUSTIFY_BOTTOM)
@@ -3180,6 +3185,7 @@ AdjustHeadPosition(
 		adjustX = block_width + left_margin;
 		j       = DIMS_RIGHT;
 
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_LEFT_CORNER:
 		if (vOrient == _DtCvJUSTIFY_BOTTOM)
 		    i = DIMS_BC;
@@ -3192,6 +3198,7 @@ AdjustHeadPosition(
 		adjustX = block_width + left_margin;
 		j = DIMS_RIGHT;
 
+	/* FALLTHROUGH */
 	case _DtCvJUSTIFY_LEFT:
 		if (vOrient != _DtCvJUSTIFY_TOP)
 		    i++;
@@ -3591,6 +3598,7 @@ DrawBorders(
 					|| brdr == _DtCvBORDER_BOTTOM_RIGHT)
 			    break;
     
+	    /* FALLTHROUGH */
 	    case _DtCvBORDER_TOP:
 	    case _DtCvBORDER_TOP_LEFT:
 	    case _DtCvBORDER_TOP_RIGHT:
@@ -3616,6 +3624,7 @@ DrawBorders(
 			 */
 			bot_y += line_width;
 
+	    /* FALLTHROUGH */
 	    case _DtCvBORDER_VERT:
 	    case _DtCvBORDER_LEFT:
 	    case _DtCvBORDER_TOP_LEFT:
@@ -3627,6 +3636,7 @@ DrawBorders(
 					|| brdr == _DtCvBORDER_BOTTOM_LEFT)
 			    break;
     
+	    /* FALLTHROUGH */
 	    case _DtCvBORDER_BOTTOM_RIGHT:
 			/*
 			 * if we didn't fall thru from above, we need to
@@ -3636,6 +3646,7 @@ DrawBorders(
 			if (brdr == _DtCvBORDER_BOTTOM_RIGHT)
 			    bot_y += line_width;
 
+	    /* FALLTHROUGH */
 	    case _DtCvBORDER_RIGHT:
 	    case _DtCvBORDER_TOP_RIGHT:
 			SaveLine(canvas, layout, _DtCvLINE_VERT,

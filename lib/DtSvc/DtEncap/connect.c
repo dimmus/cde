@@ -261,7 +261,7 @@ GetDomainName(XeString buffer, unsigned int bufsize)
    ptr = strstr(tmpbuf, (XeString)".");
    _DtSvcProcessLock();
    if (domainname && ptr && strcmp(domainname, ptr)) /* domains are different */
-      _DtSimpleError(XeProgName, XeWarning, NULL, (XeString) "><Domain configured in hostname and domain server are different: '%s', '%s'", domainname, ptr);
+      _DtSimpleError(XeProgName, DtWarning, NULL, (XeString) "><Domain configured in hostname and domain server are different: '%s', '%s'", domainname, ptr);
    if (!domainname && ptr)
       domainname = strdup(ptr);
    if (ptr) { /* "." in hostname */
@@ -276,7 +276,7 @@ GetDomainName(XeString buffer, unsigned int bufsize)
       firstPass = FALSE;
       host_ret = _XGethostbyname(tmpbuf, host_buf);
       if (host_ret == NULL) {
-	 _DtSimpleError(XeProgName, XeWarning, NULL, (XeString) "><%s not found in hosts database", tmpbuf);
+	 _DtSimpleError(XeProgName, DtWarning, NULL, (XeString) "><%s not found in hosts database", tmpbuf);
 	 _DtSvcProcessUnlock();
 	 return -1;
       }

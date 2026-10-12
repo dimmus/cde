@@ -127,7 +127,7 @@ class Attachment : public UIComponent {
 
 
     void			saveToFile(DtMailEnv & error,char *filename);
-    virtual const char *const 	className() 	{ return ( "Attachment" ); }
+    virtual const char *className() 	{ return ( "Attachment" ); }
 
     // Mutators
     void 			setLabel( XmString str );	

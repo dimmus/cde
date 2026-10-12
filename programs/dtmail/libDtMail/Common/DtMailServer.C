@@ -512,8 +512,8 @@ DtMailServer::retrieve_messages(DtMailEnv &error)
     DTMailError_t	ok = DTME_NoError;
     int			js;
     struct sigaction	action, o_action;
-    int			*msgsizes = (int*) NULL;
-    int			*msgisold = (int*) NULL;
+    int			* volatile msgsizes = (int*) NULL;
+    int			* volatile msgisold = (int*) NULL;
 
     _transnum = 0;
 

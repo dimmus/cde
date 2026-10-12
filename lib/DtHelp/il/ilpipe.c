@@ -357,6 +357,7 @@ ilError                 error;
       case IL_PIPE_EXECUTING:       /* executing: must abort, fall thru to complete */
         error = ilCleanupRunningPipe (pPipe, TRUE);
 
+      /* FALLTHROUGH */
       case IL_PIPE_COMPLETE:        /* elements but no buffers allocated */
       case IL_PIPE_FORMING:         /* forming is same as complete */
 
@@ -397,6 +398,7 @@ ilError                 error;
             ilDestroyObject (pPipe->destroyObjects[i]);
         pPipe->nDestroyObjects = 0;
 
+      /* FALLTHROUGH */
       case IL_PIPE_INVALID:         /* pipe already empty; change state */
         pPipe->state = IL_PIPE_EMPTY;
 
@@ -1270,6 +1272,7 @@ ilError                 error;
                     IL_ERROR_ELEMENT_COMPLETE: element states that it previously issued
                         "AGAIN" and is now done.  Pop stack; exit if underflow.
             */
+      /* FALLTHROUGH */
       case IL_PIPE_EXECUTING:
         if (pPipe->producerCode == IL_PIPE_FEED_IMAGE) {
             ilElementPtr        pFirstElement;

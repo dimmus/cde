@@ -5695,6 +5695,7 @@ DoLine (FormatData	*data,
 				if (incp == in_line)	/* nothing read yet */
 					return (False);
 
+			/* FALLTHROUGH */
 			case L'\0':			/* fall through	 */
 			case L'\n':			/* end of line	 */
 				incplim = incp;		/* set limit (quit loop) */

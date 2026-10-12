@@ -2050,12 +2050,12 @@ ensure_data_for_module_obj(ABObj module)
     }
     if (module->cgen_data == NULL)
     {
-        module->cgen_data = (CGenData)calloc(sizeof(CGenDataRec), 1);
+        module->cgen_data = (CGenData)calloc(1, sizeof(CGenDataRec));
     }
 
     if (mfobj_get_module_data(module) == NULL)
     {
-	moduleData = (CGenModuleData)calloc(sizeof(CGenModuleDataRec), 1);
+	moduleData = (CGenModuleData)calloc(1, sizeof(CGenModuleDataRec));
         moduleData->callbacks = strlist_create();
         mfobj_set_module_data(module, moduleData);
     }

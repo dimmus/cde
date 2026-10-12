@@ -1672,6 +1672,7 @@ EstablishPrinter(
 	 * no break
 	 */
 	
+    /* FALLTHROUGH */
     case DtPRINT_VERIFIED:
 	/*
 	 * fill out current printer info in setup data

@@ -79,7 +79,7 @@ MutexDestroy(void * mutex)
     mutex_destroy((mutex_t *)mutex);
     free(mutex);
 #else
-    mutex = NULL;
+    (void) mutex;
 #endif
 
     return;

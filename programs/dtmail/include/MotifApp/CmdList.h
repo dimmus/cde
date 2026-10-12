@@ -102,7 +102,7 @@ class CmdList : public Cmd {
     Cmd **contents() { return _contents; } // Return the list
     int size() { return _numElements; }    // Return list size
     Cmd *operator[]( int );            // Return an element of the list
-    virtual const char *const className () { return "CmdList"; }
+    virtual const char *className () { return "CmdList"; }
 };
 
 

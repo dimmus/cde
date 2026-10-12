@@ -263,7 +263,7 @@ MarkListView::select (WCallback *wcb)
 
   f_selected_item = lcs->item_position;
 
-  ON_DEBUG (printf ("Selected item #%d\n", f_selected_item);)
+  ON_DEBUG (printf ("Selected item #%d\n", f_selected_item));
 
   f_view.SetSensitive (True);
   f_edit.SetSensitive (True);

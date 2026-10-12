@@ -198,7 +198,7 @@ DtSR_SearchResultsEntry::section_in_abstract(char* abstract, const char* id)
 
     UAS_Pointer<UAS_String> section_id, book, section;
 
-    if (parse_abstract(abstract, section_id, book, section) == (const int)0) {
+    if (parse_abstract(abstract, section_id, book, section) == (int)0) {
 #ifdef DEBUG
 	fprintf(stderr, "(ERROR) parse_abstract failed\n");
 #endif

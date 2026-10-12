@@ -112,7 +112,7 @@ class RoamApp : public Application
     virtual ~RoamApp();     
 
     void		busyAllWindows(const char * msg = NULL);
-    virtual const char *const
+    virtual const char *
 			className()
 			    { return "RoamApp"; }
     void		closeAllWindows(void);

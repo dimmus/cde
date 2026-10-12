@@ -36,7 +36,7 @@
 //      v: item index in the page;
 ////////////////////////////////////////////////////////////
 #define PAGE_ID(x, y)  ( unsigned(x) >> pos_of_LSB(y) )
-#define PAGE_IDX(x, y)  ( unsigned(x) & ~(~0 << pos_of_LSB(y)) )
+#define PAGE_IDX(x, y)  ( unsigned(x) & ~(~0U << pos_of_LSB(y)) )
 #define FORM_PAGE_REF(u, v, y) ( ((u) << pos_of_LSB(y)) | PAGE_IDX((v), (y)) )
 
 

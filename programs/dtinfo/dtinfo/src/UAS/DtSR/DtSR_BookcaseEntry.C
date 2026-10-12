@@ -57,7 +57,7 @@ DtSR_BookcaseSearchEntry::DtSR_BookcaseSearchEntry(
 {
     f_dbname = DtSR_SearchEngine::search_engine().db_name(f_dbn);
 
-    if (f_dbname == (const int)0) {
+    if (f_dbname == (int)0) {
 #ifdef DEBUG
 	fprintf(stderr, "(ERROR) could not instantiate DtSR_BookcaseScopeEntry\n");
 	abort();
@@ -189,7 +189,7 @@ DtSR_BookcaseSearchEntry::_search_zones(UAS_SearchZones& search_zones)
 UAS_List<DtSR_BookcaseSearchEntry>&
 DtSR_BookcaseSearchEntry::bcases()
 {
-    if (f_bcases == (const int)0)
+    if (f_bcases == (int)0)
 	f_bcases = new UAS_List<DtSR_BookcaseSearchEntry>();
     return *(UAS_List<DtSR_BookcaseSearchEntry>*)f_bcases;
 }

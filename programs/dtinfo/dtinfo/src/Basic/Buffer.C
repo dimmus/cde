@@ -134,7 +134,7 @@ static u_int g_ordering = 0x01020304;
 static u_int g_ordering = 0x01020304;
 #endif
 static const unsigned char *const g_byte_pos =
-  (const unsigned char *const) &g_ordering;
+  (const unsigned char *) &g_ordering;
 static int g_int;
 static char *const g_intbuf = (char *) &g_int;
 

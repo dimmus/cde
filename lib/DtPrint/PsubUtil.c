@@ -573,12 +573,11 @@ _DtPrintGetDefaultXPrinterName(
      * if the resource is undefined, search for an appropriate
      * environment variable
      */
-    if(default_printer != (String)NULL);
-    else if((default_printer = getenv("XPRINTER")) != (String)NULL);
-    else if((default_printer = getenv("PDPRINTER")) != (String)NULL);
-    else if((default_printer = getenv("LPDEST")) != (String)NULL);
-    else if((default_printer = getenv("PRINTER")) != (String)NULL)
-        ;
+    if(default_printer == (String)NULL
+       && (default_printer = getenv("XPRINTER")) == (String)NULL
+       && (default_printer = getenv("PDPRINTER")) == (String)NULL
+       && (default_printer = getenv("LPDEST")) == (String)NULL)
+        default_printer = getenv("PRINTER");
     /*
      * return a copy of the printer name
      */

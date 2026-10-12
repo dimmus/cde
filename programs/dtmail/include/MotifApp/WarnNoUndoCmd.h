@@ -80,6 +80,6 @@ class WarnNoUndoCmd : public AskFirstCmd {
   public:
     
     WarnNoUndoCmd ( char *, char *, int );
-    virtual const char *const className () { return "WarnNoUndoCmd"; }
+    virtual const char *className () { return "WarnNoUndoCmd"; }
 };
 #endif

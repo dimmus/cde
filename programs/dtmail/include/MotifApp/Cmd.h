@@ -125,12 +125,12 @@ class Cmd {
     
     int active () { return _active; }
     int hasUndo() { return _hasUndo; }
-    const char *const name () { return _name; }
+    const char *name () { return _name; }
 
 #ifdef CAN_INLINE_VIRTUALS
     virtual const char *const className () { return "Cmd"; }
 #else /* ! CAN_INLINE_VIRTUALS */
-    virtual const char *const className ();
+    virtual const char *className ();
 #endif /* ! CAN_INLINE_VIRTUALS */
 };
 #endif

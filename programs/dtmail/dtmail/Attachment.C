@@ -421,7 +421,7 @@ Attachment::invokeAction(int index)
     // generated:  some claim a bodyPart is rfc822 but deliver something else.  
     type = bufArg.type = DtDtsBufferToDataType(
 					(char*) _myContents,
-					(const int) _myContentsSize,
+					(int) _myContentsSize,
 					_name);
 
     if (_parent->isOwnerShellEditable())

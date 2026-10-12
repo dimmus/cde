@@ -460,21 +460,21 @@ Update(
    char msg_buf[21+MAX_PATH];
 
    /* macro that updates the change count */
-# define INC_N_CHANGES() \
+# define INC_N_CHANGES() do { \
    if (n_changes++ == 0) \
    {  /* first change: unmanage all children and clear the window */ \
       XtUnmanageChildren(ip->composite.children, ip->composite.num_children); \
       if (XtIsRealized((Widget)ip)) \
          XClearWindow(XtDisplay(ip), XtWindow(ip)); \
-   } else
+   } } while (0)
 
    /* macro that moves a child and updates the change count */
-# define MOVE_OBJECT(w,_x,_y) \
+# define MOVE_OBJECT(w,_x,_y) do { \
    if ((w)->core.x != (_x) || (w)->core.y != (_y)) \
    { \
       INC_N_CHANGES(); \
       XmeConfigureObject(w, _x, _y, (w)->core.width, (w)->core.height, (w)->core.border_width); \
-   } else
+   } } while (0)
 
 
    DPRINTF2((

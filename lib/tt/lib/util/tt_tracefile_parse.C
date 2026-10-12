@@ -221,6 +221,7 @@ get_token(const _Tt_trace_tokens prev,
 				return _TT_TRACE_UNKNOWN;
 			}
 		}
+	    /* FALLTHROUGH */
 	    case _TT_TRACE_ATTRIBUTES:
 		return allnone_check(value);
 	    case _TT_TRACE_STATES:

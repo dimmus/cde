@@ -282,6 +282,7 @@ _ttdt_contract_cb(
 			return 0;
 		    case TTDT_PAUSE:
 			sensitive = False;
+		    /* FALLTHROUGH */
 		    case TTDT_RESUME:
 			if (CALLXT(XtIsSensitive)( widget ) == sensitive) {
 				tt_message_status_set(msg,TT_DESKTOP_EALREADY);
@@ -331,6 +332,7 @@ _ttdt_pat(
 	switch (op) {
 	    case TTDT_SET_XINFO:
 		mode = TT_IN;
+	    /* FALLTHROUGH */
 	    case TTDT_GET_XINFO:
 		status = tt_pattern_arg_add( pat, mode, Tttk_string, 0 );
 		if (status != TT_OK) {
@@ -347,6 +349,7 @@ _ttdt_pat(
 		break;
 	    case TTDT_SET_GEOMETRY:
 		mode = TT_INOUT;
+	    /* FALLTHROUGH */
 	    case TTDT_GET_GEOMETRY:
 		status = tt_pattern_arg_add( pat, mode, Tttk_width, 0 );
 		if (status != TT_OK) {
@@ -367,6 +370,7 @@ _ttdt_pat(
 		break;
 	    case TTDT_SET_ICONIFIED:
 		mode = TT_IN;
+	    /* FALLTHROUGH */
 	    case TTDT_GET_ICONIFIED:
 		status = tt_pattern_arg_add( pat, mode, Tttk_boolean, 0 );
 		if (status != TT_OK) {
@@ -385,6 +389,7 @@ _ttdt_pat(
 		break;
 	    case TTDT_STATUS:
 		mode = TT_IN;
+	    /* FALLTHROUGH */
 	    case TTDT_GET_STATUS:
 		status = tt_pattern_arg_add( pat, mode, Tttk_string, 0 );
 		if (status != TT_OK) {
@@ -886,7 +891,7 @@ _ttdt_do_wm_state(
 		} else {
 			CALLX11(XRaiseWindow)( dpy, win ); // or XMapRaised?
 		}
-		// Fall through, to see if it worked
+		// FALLTHROUGH - to see if it worked
 	    case TTDT_GET_ICONIFIED:
 		iconic = _ttdt_is_iconic( widget );
 		if (   (op == TTDT_SET_ICONIFIED)
@@ -906,7 +911,7 @@ _ttdt_do_wm_state(
 					attribs.screen );
 			CALLX11(XWithdrawWindow)( dpy, win, screen );
 		}
-		// Fall through, to report the resulting state
+		// FALLTHROUGH - to report the resulting state
 	    case TTDT_GET_MAPPED:
 		CALLX11(XGetWindowAttributes)( dpy, win, &attribs );
 		mapped = attribs.map_state != IsUnmapped;

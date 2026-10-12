@@ -776,6 +776,7 @@ ilContext          context;
             }
 
         /*  Allocate colors: 8 and 24 bit color only */
+        /* FALLTHROUGH */
       case IL_XWC_ALLOC_COLORS:
         if (pData) {
             context->error = IL_ERROR_OPTION_DATA;
@@ -933,6 +934,7 @@ int                     notUsed;
     else switch (pXWC->visualInfo.class) {
         case PseudoColor:
             pXWC->i.staticVisual = FALSE;
+        /* FALLTHROUGH */
         case StaticColor:
             if (pXWC->visualInfo.depth == 8)
                  pXWC->i.visualType = IL_XWC_COLOR_8;
@@ -943,6 +945,7 @@ int                     notUsed;
 		= "<unused 8><8R><8G><8B>". */
         case DirectColor:
             pXWC->i.staticVisual = FALSE;
+        /* FALLTHROUGH */
         case TrueColor:
             if ((pXWC->visualInfo.depth == 24)
              && (pXWC->visualInfo.red_mask == 0xff0000)
@@ -954,6 +957,7 @@ int                     notUsed;
 
         case GrayScale:
             pXWC->i.staticVisual = FALSE;
+        /* FALLTHROUGH */
         case StaticGray:
             if (pXWC->visualInfo.depth == 8)
                  pXWC->i.visualType = IL_XWC_GRAY_8;

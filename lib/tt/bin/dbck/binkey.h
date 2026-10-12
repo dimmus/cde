@@ -71,6 +71,7 @@ class Binkey : public _Tt_object {
 		return !(a==b);};
 	friend int operator<(const Binkey &a, const Binkey &b);
 	friend int operator>(const Binkey &a, const Binkey &b);
+	Binkey(const Binkey &) = default;
 	Binkey &operator=(const Binkey &k);
 	Binkey &operator=(const unsigned char *);
 	virtual void print(FILE *f = stdout) const;

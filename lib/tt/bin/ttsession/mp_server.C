@@ -997,7 +997,7 @@ sig_handler(int sig)
 
 			exit(0);
 		}
-		// The child ttsession falls through to clean itself up
+		// FALLTHROUGH - The child ttsession falls through to clean itself up
 	      case SIGINT:
 		// The main loop takes down a process-tree root process
 		// and exits (see do_exit()).

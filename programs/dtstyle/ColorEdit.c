@@ -1509,6 +1509,7 @@ grabcolorCB(
                     XtUngrabPointer (style.colorDialog, CurrentTime);
                     return;
                  }
+             /* FALLTHROUGH */
              default:
                  XtDispatchEvent(&event);
            }

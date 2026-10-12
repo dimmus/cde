@@ -79,6 +79,7 @@ public:
    oid_t(const char* source, Boolean ascii_format, Boolean swap_order);
    oid_t(const oid_t& x) : 
       v_c_code(x.v_c_code), v_i_code(x.v_i_code), v_e_code(x.v_e_code) {};
+   oid_t& operator=(const oid_t&) = default;
    ~oid_t() {};
 
 // oid_t equal and less test
@@ -87,7 +88,7 @@ public:
    bool  operator==(const oid_t& arg) const { return eq(arg); };
 
 // class code, oid type and instance code export functions
-   const c_code_t ccode() const { return v_c_code; } ;
+   c_code_t ccode() const { return v_c_code; } ;
    const i_code_t& icode() const { return v_i_code; } ;
 
    static unsigned hash(const oid_t&);

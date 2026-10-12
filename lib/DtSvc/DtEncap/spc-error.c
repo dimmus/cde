@@ -232,7 +232,7 @@ void SPC_Error (int error, ...)
      }
   }
   else
-     _DtSimpleError(XeProgName, XeError, XeString_NULL, err->text);
+     _DtSimpleError(XeProgName, DtError, XeString_NULL, err->text);
 
   _DtSvcProcessUnlock();
   return;
@@ -262,7 +262,7 @@ SPC_Make_Log_Filename(XeString name,
   }
   else {
     if (strlen(name) > MAXPATHLEN)
-	_DtSimpleError(XeProgName, XeInternalError, XeString_NULL, 
+	_DtSimpleError(XeProgName, DtInternalError, XeString_NULL, 
 		      (XeString)"String too long in DTSPCD_Make_Log_Filename()");
     
     strcpy(spc_logfile, name);

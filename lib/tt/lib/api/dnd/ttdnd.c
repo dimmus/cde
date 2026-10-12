@@ -215,6 +215,7 @@ _ttdnd_continue_transfer(Tt_message m, Tt_pattern p)
 		break;
 	      case TT_REJECTED: /* Couldn't rendezvous with sender */
 		(void)(*receivefunc)(-1,sourcetype,0,0,1);
+	      /* FALLTHROUGH */
 	      case TT_SENT:
 		/* tt_message_arg_val(m,0,&sourceXid); TO_DO */
 		return TT_CALLBACK_CONTINUE;

@@ -106,6 +106,6 @@ class AskFirstCmd : public Cmd {
 
     virtual void doYesCallback();
     
-    virtual const char *const className ()  { return "AskFirstCmd"; }
+    virtual const char *className ()  { return "AskFirstCmd"; }
 };
 #endif

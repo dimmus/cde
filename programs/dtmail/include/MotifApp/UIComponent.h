@@ -116,7 +116,7 @@ class UIComponent : public BasicComponent {
 #ifdef CAN_INLINE_VIRTUALS
     virtual const char *const className() { return "UIComponent"; }
 #else
-    virtual const char *const className();
+    virtual const char *className();
 #endif
 	
     //

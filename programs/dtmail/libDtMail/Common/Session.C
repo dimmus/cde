@@ -769,6 +769,7 @@ DtMail::Session::getRelativePath(DtMailEnv & error, const char * path)
 		error.clear();
 	    }
 	}
+	/* FALLTHROUGH */
 	case '+':
 	    // This is relative to the folder path. Leave it alone.
 	    // The only time we are likely to see a leading '+' is

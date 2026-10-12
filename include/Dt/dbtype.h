@@ -481,7 +481,7 @@ typedef struct MESSAGE_S {
 
 #define TDTL_PARAM
 
-#define DB_ENTER(TDTL_PARAM) if ( startup(TDTL_PARAM) != S_OKAY ) { return( db_status ); } else
+#define DB_ENTER(TDTL_PARAM) do { if ( startup(TDTL_PARAM) != S_OKAY ) { return( db_status ); } } while (0)
 
 #define RETURN(x) return( x )
 #define ALLOC(l, b, v) d_alloc(b)

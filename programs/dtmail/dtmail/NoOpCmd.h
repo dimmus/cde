@@ -81,7 +81,7 @@ class NoOpCmd : public Cmd {
   public:
     
     NoOpCmd ( char *, char *, int );
-    virtual const char *const className () { return "NoOpCmd"; }
+    virtual const char *className () { return "NoOpCmd"; }
 };
 
 class LabelCmd: public Cmd {
@@ -102,7 +102,7 @@ public:
     virtual const char *const className () { return "LabelCmd"; }
 #else /* CAN_INLINE_VIRTUALS */
     ~LabelCmd();
-    virtual const char *const className ();
+    virtual const char *className ();
 #endif /* CAN_INLINE_VIRTUALS */
 };
 

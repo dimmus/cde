@@ -264,6 +264,7 @@ waitOnCopyArea(Widget w)
 		break;
 	    }
 
+	/* FALLTHROUGH */
 	case NoExpose:
 	    /* we are done... */
 	    Debug('e', fprintf(stderr,

@@ -298,7 +298,7 @@ class SendMsgDialog : public MenuWindow, public AbstractEditorParent {
   public:
     SendMsgDialog();
     virtual ~SendMsgDialog();
-    virtual const char *const className () { return "SendMsgDialog"; }
+    virtual const char *className () { return "SendMsgDialog"; }
     void initialize();
     void send_message( const char *, int );
 
@@ -452,7 +452,7 @@ class Compose {
   public:
     Compose();
     virtual ~Compose();
-    virtual const char *const className () { return "Compose"; }
+    virtual const char *className () { return "Compose"; }
 
     SendMsgDialog	*getWin();
     SendMsgDialog	*getUnusedWin();

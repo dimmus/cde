@@ -85,7 +85,7 @@ extern int errno;
 /*****************************************************************************
  *		Private Variables
  *****************************************************************************/
-const static struct _dtCvLinkDb DefLinkDb = { 0, NULL };
+static const struct _dtCvLinkDb DefLinkDb = { 0, NULL };
 
 /*****************************************************************************
  *		Private Functions

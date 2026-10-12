@@ -154,6 +154,7 @@ inline	class_name (const WComposite&	father,			\
         : base_name (father, automanage, class, name, args.Args(), \
 		     args.NumArgs()) {} \
  \
+inline	class_name (const class_name&) = default; \
 inline	class_name& operator=(const class_name& w) { \
 		       widget = w.widget; \
 		       return *this; \

@@ -622,6 +622,7 @@ get_options(int argc, char *argv[])
                             application_args.menuBar = False;
                             break ;
                          }
+              /* FALLTHROUGH */
               case 't' : if(strcmp(&argv[0][1], "trig") == 0)
                          {
                             INC ;
@@ -656,6 +657,7 @@ get_options(int argc, char *argv[])
                               }
                             break ;
                          }
+              /* FALLTHROUGH */
               case 's' : if(strcmp(&argv[0][1], "session") == 0)
                          {
                             INC ;
@@ -663,6 +665,7 @@ get_options(int argc, char *argv[])
                             application_args.session = XtNewString(next);
                             break ;
                          }
+              /* FALLTHROUGH */
               case '?' :
               case 'v' : usage(v->progname) ;
                          break ;
@@ -1579,6 +1582,7 @@ process_str(char *str, enum menu_type mtype)
                  beep();
                  break;
               }
+           /* FALLTHROUGH */
            default:
               process_item(get_index(str[i])) ;
         }

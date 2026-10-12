@@ -286,7 +286,7 @@ cached_eval(char *cmd)
 	char comsub = sh.comsub;
 	int jmpval;
 	parse_context_t pc;
-	unsigned int hash = cmd_hash_string(cmd);
+	volatile unsigned int hash = cmd_hash_string(cmd); /* live across sigsetjmp */
 	Shnode_t *t;
 	cmd_tree_t *c;
 

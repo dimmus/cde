@@ -79,9 +79,9 @@ class Menu : public MotifUI {
    Widget GetCascade() { return _cascadeButton; }
    boolean SetActivity(boolean flag);
 
-   const UI_Class UIClass()         { return MENU; }
-   const int UISubClass()           { return _menu_type; }
-   const char *const UIClassName()  { return "Menu"; }
+   UI_Class UIClass()         { return MENU; }
+   int UISubClass()           { return _menu_type; }
+   const char *UIClassName()  { return "Menu"; }
 
 };
 

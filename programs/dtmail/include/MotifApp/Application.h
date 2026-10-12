@@ -149,7 +149,7 @@ class Application : public UIComponent {
     void	unmanage();
     
     // Convenient access functions
-    virtual const char *const
+    virtual const char *
 		className()		{ return "Application"; }
     Display     *display()		{ return _display; }
     XtAppContext appContext()		{ return _appContext; }

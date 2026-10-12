@@ -1311,6 +1311,7 @@ static Widget  LocateWidgetId(
                     *statusRet = DtHELP_SELECT_ABORT;
                     return(NULL);
 		  }
+            /* FALLTHROUGH */
             default:
                   XtDispatchEvent(&event);
       }

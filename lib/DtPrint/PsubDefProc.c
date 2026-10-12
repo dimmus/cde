@@ -1692,6 +1692,7 @@ SelectPrinterCB(
 	 * no break
 	 */
 
+    /* FALLTHROUGH */
     case XmCR_CANCEL:
 	/*
 	 * deallocate and reset the lists

@@ -70,7 +70,7 @@ int count, lcv;
 
 if (text_strings) {
     count = countItems (text_strings);
-    xmstrings = (XmStringTable) calloc (sizeof(XmString), (count));
+    xmstrings = (XmStringTable) calloc((count), sizeof(XmString));
     for (lcv = 0; lcv < count; lcv++)
         /* XmStringCreateSimple is obsolete */
         xmstrings[lcv] = XmStringCreate (text_strings[lcv],

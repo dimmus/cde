@@ -74,7 +74,7 @@ keyhash(XeSymTable t, void *key)
     {
 	hash = t->hash_fn( key, t->hashsize );
 	if (hash >= t->hashsize)
-	    _DtSimpleError(XeProgName, XeInternalError, NULL, 
+	    _DtSimpleError(XeProgName, DtInternalError, NULL, 
 			  (XeString) "Symbolic.c: Hash value from user hash function out of range",
 			  NULL);
 	    /* We don't come back from the error routine */
@@ -95,7 +95,7 @@ static unsigned int
 trap_bad_hash_fn(void * UNUSED_PARM(ptr), unsigned int UNUSED_PARM(size))
 /*------------------------------------------------------------------------+*/
 {
-    _DtSimpleError(XeProgName, XeInternalError, NULL, 
+    _DtSimpleError(XeProgName, DtInternalError, NULL, 
 		  (XeString) "Symbolic.c: Hash table at must be power of 2",
 		  NULL);
     /* We don't come back from the error routine */

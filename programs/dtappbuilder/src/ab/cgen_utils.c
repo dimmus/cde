@@ -53,6 +53,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -777,7 +778,7 @@ term_execute_command(CG_SUBCOMMAND cmd_code, STRING cmd, STRING argv[])
 
 		    if (stat("core", &fileInfo) == 0)
 		    {
-			if (labs(difftime(signalTime, fileInfo.st_mtime)) < 5)
+			if (fabs(difftime(signalTime, fileInfo.st_mtime)) < 5)
 			{
 			    coreDumped = TRUE;
 			}

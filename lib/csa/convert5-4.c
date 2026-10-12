@@ -855,8 +855,7 @@ _DtCmAccessRightToV4AccessType(unsigned int access)
 {
 	int	newaccess = access_none_4;
 
-	if (access < 0 ||
-	    access & ~(CSA_X_DT_BROWSE_ACCESS | CSA_X_DT_INSERT_ACCESS |
+	if (access & ~(CSA_X_DT_BROWSE_ACCESS | CSA_X_DT_INSERT_ACCESS |
 	    CSA_X_DT_DELETE_ACCESS))
 		return (-1);
 

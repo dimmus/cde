@@ -126,6 +126,6 @@ class MenuBar : public UIComponent {
 
     virtual void rotateLabels ( Widget, int, int );
     
-    virtual const char *const className() { return "MenuBar"; }
+    virtual const char *className() { return "MenuBar"; }
 };
 #endif   

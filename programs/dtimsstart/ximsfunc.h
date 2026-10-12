@@ -235,13 +235,13 @@ void	*_mp_;
 
 	/* for DEBUG */
 # ifdef	DEBUG
-#define	DPR(msg)		if (DebugLvl >= 1)	print_msg msg
-#define	DPR2(msg)		if (DebugLvl >= 2)	print_msg msg
-#define	DPR3(msg)		if (DebugLvl >= 3)	print_msg msg
+#define	DPR(msg)	do { if (DebugLvl >= 1) print_msg msg; } while (0)
+#define	DPR2(msg)	do { if (DebugLvl >= 2) print_msg msg; } while (0)
+#define	DPR3(msg)	do { if (DebugLvl >= 3) print_msg msg; } while (0)
 # else
-#define	DPR(msg)
-#define	DPR2(msg)
-#define	DPR3(msg)
+#define	DPR(msg)	do { } while (0)
+#define	DPR2(msg)	do { } while (0)
+#define	DPR3(msg)	do { } while (0)
 # endif	/* DEBUG */
 
 #endif	/* _XIMSFUNC_H_ */

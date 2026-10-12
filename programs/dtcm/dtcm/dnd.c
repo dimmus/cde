@@ -729,7 +729,7 @@ TranslationDragStart(
         static XtCallbackRec dragFinishCBRec[] =  { {DragFinishCB, NULL},
                                                     {NULL, NULL} };
  
-        DragContext     *context = calloc(sizeof(DragContext), 1);
+        DragContext     *context = calloc(1, sizeof(DragContext));
         Editor          *e = (Editor *) calendar->editor;
 	CSA_entry_handle	entry;
 	char		*apptstr;
@@ -816,7 +816,7 @@ ApptDragStart(
         static XtCallbackRec dragFinishCBRec[] =  { {DragFinishCB, NULL},
                                                     {NULL, NULL} };
  
-        DragContext     *context = calloc(sizeof(DragContext), 1);
+        DragContext     *context = calloc(1, sizeof(DragContext));
 	Editor		*e = (Editor *) calendar->editor;
 	GEditor		*ge = (GEditor *) calendar->geditor;
 	ToDo		*t = (ToDo *) calendar->todo;

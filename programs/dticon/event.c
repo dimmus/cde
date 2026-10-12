@@ -402,6 +402,7 @@ Do_ButtonOp(
                             Selected = False;
                             Stop_HotBox();
                           }
+         /* FALLTHROUGH */
          case LINE      :
          case CIRCLE    :
          case ELLIPSE   :

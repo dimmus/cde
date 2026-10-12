@@ -32,7 +32,7 @@
 #ifdef DEBUG
 #define ON_DEBUG(x) x
 #else
-#define ON_DEBUG(x)
+#define ON_DEBUG(x) do { } while (0)
 #endif
 
 static Boolean SetValues(PixmapWidget current, PixmapWidget request, PixmapWidget new, ArgList args, Cardinal *num_args);

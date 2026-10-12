@@ -83,7 +83,7 @@ class Icon : public UIComponent {
 
 	// associated attachment
 	Attachment* 	parent() 		{ return ( _parent ); }
-	virtual const char *const className() 	{ return ( "Icon" ); }
+	virtual const char *className() 	{ return ( "Icon" ); }
 
 	// static functions
 	static int	maxIconWidth() { return 38; }

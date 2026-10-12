@@ -377,11 +377,11 @@ public:
   UAS_String font () { return f_font ; }
   void set_font (const char *f) { f_font = f ; }  
 
-  const unsigned pagebreak()		{ return f_pagebreak ; }
-  const unsigned pagebreak (unsigned b)	{ f_pagebreak = b ; return b ; }
+  unsigned pagebreak()		{ return f_pagebreak ; }
+  unsigned pagebreak (unsigned b)	{ f_pagebreak = b ; return b ; }
 
-  const unsigned linebreak()		{ return f_linebreak ; }
-  const unsigned linebreak (unsigned b)	{ f_linebreak = b ; return b ; }
+  unsigned linebreak()		{ return f_linebreak ; }
+  unsigned linebreak (unsigned b)	{ f_linebreak = b ; return b ; }
 
   const char *text ()			{ return f_text ; }
   const char *text(const char *t)	{ f_text = t ; return t ; }

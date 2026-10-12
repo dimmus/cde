@@ -99,6 +99,7 @@ class _Tt_object_list_cursor : public _Tt_allocated {
 	_Tt_object_list_cursor();
 	~_Tt_object_list_cursor();
 	_Tt_object_list_cursor(const _Tt_object_list_cursor &c);
+	_Tt_object_list_cursor &operator=(const _Tt_object_list_cursor &) = default;
 	_Tt_object_list_cursor(const _Tt_object_list_ptr &l);
 	_Tt_object_ptr &operator *() const;
 	_Tt_object_ptr &operator->() const;

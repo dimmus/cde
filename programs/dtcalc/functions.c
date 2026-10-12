@@ -540,7 +540,7 @@ do_calc(void)      /* Perform arithmetic calculation and display result. */
     }
 
   else if (IS_KEY(v->cur_op, KEY_EQ))                  /* Equals */
-      ; /* do nothing. */
+      { } /* do nothing. */
   
   show_display(v->MPresult) ;
 

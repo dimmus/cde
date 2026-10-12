@@ -383,7 +383,7 @@ static Pixel getPixel(cgm_s_type *cgm_s, int iColrs[3])
       return ((dColrs[0] + dColrs[1] + dColrs[2]) > 0.9) ? blackPixel :
 	whitePixel;
     }
-    /* else fall thru to the pseudo colour visual for XAllocColor */
+    /* FALLTHROUGH - else to the pseudo colour visual for XAllocColor */
   case 3: /* PseudoColor */
     /* just ask for closest colour */
     inColr.red = (unsigned short) (dColrs[0] * COLCONV + 0.4999);
@@ -1035,6 +1035,7 @@ static int polymarker(unsigned char *dat_ptr, struct cmd_info_s *cmd_ptr, cgm_s_
     case 3: /* asterisk, use fallthru */
       XDrawLine(display, P, markGC, x - size, y, x + size, y);
       XDrawLine(display, P, markGC, x, y - size, x, y + size);
+    /* FALLTHROUGH */
     case 5: /* cross */
       XDrawLine(display, P, markGC, x - asize, y - asize, x + asize, y + asize);
       XDrawLine(display, P, markGC, x - asize, y + asize, x + asize, y - asize);

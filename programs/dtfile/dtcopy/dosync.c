@@ -123,9 +123,9 @@ static SyncParams *SP;
       (rc = syncConfirmCallback(op, sn, st, tn, tt, l)) != 0) return rc; \
   } while (0)
 
-#define ERROR_CHECK(op, f, rc) \
+#define ERROR_CHECK(op, f, rc) do { \
   if (rc < 0 || (rc && syncErrorCallback && syncErrorCallback(op, f, rc) < 0)) \
-    return -1; else
+    return -1; } while (0)
 
 
 /*--------------------------------------------------------------------

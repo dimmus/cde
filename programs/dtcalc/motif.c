@@ -3606,55 +3606,55 @@ read_resources(void)    /* Read all possible resources from the database. */
 
   /* set the display numeration */
   if(strcmp(application_args.display, "fixed") == 0)
-     v->dtype = (enum base_type) 1 ;
+     v->dtype = (enum num_type) 1 ;
   else if(strcmp(application_args.display, "eng") == 0 ||
                   strcmp(application_args.display, "engineering") == 0)
-     v->dtype = (enum base_type) 0 ;
+     v->dtype = (enum num_type) 0 ;
   else if(strcmp(application_args.display, "scientific") == 0 ||
                   strcmp(application_args.display, "sci") == 0)
-     v->dtype = (enum base_type) 2 ;
+     v->dtype = (enum num_type) 2 ;
   else
   {
      msg = (char *) XtMalloc(strlen( opts[(int) O_DISPLAY]) + strlen(str) + 3);
      sprintf(msg, opts[(int) O_DISPLAY], str);
      _DtSimpleError (v->appname, DtWarning, NULL, msg);
      XtFree(msg);
-     v->dtype = (enum base_type) 1;
+     v->dtype = (enum num_type) 1;
   }
 
   /* set the mode */
   if(strcmp(application_args.mode, "scientific") == 0)
-     v->modetype = (enum base_type) 2 ;
+     v->modetype = (enum mode_type) 2 ;
   else if(strcmp(application_args.mode, "financial") == 0)
-     v->modetype = (enum base_type) 0 ;
+     v->modetype = (enum mode_type) 0 ;
   else if(strcmp(application_args.mode, "logical") == 0)
-     v->modetype = (enum base_type) 1 ;
+     v->modetype = (enum mode_type) 1 ;
   else
   {
      msg = (char *) XtMalloc(strlen( opts[(int) O_MODE]) + strlen(str) + 3);
      sprintf(msg, opts[(int) O_MODE], str);
      _DtSimpleError (v->appname, DtWarning, NULL, msg);
      XtFree(msg);
-     v->modetype = (enum base_type) 2;
+     v->modetype = (enum mode_type) 2;
   }
 
   /* set the display numeration */
   if(strcmp(application_args.trigType, "deg") == 0 ||
                   strcmp(application_args.trigType, "degrees") == 0)
-     v->ttype = (enum base_type) 0 ;
+     v->ttype = (enum trig_type) 0 ;
   else if(strcmp(application_args.trigType, "rad") == 0 ||
                   strcmp(application_args.trigType, "radians") == 0)
-     v->ttype = (enum base_type) 2 ;
+     v->ttype = (enum trig_type) 2 ;
   else if(strcmp(application_args.trigType, "grad") == 0 ||
                   strcmp(application_args.trigType, "gradients") == 0)
-     v->ttype = (enum base_type) 1 ;
+     v->ttype = (enum trig_type) 1 ;
   else
   {
      msg = (char *) XtMalloc(strlen( opts[(int) O_TRIG]) + strlen(str) + 3);
      sprintf(msg, opts[(int) O_TRIG], str);
      _DtSimpleError (v->appname, DtWarning, NULL, msg);
      XtFree(msg);
-     v->ttype = (enum base_type) 0;
+     v->ttype = (enum trig_type) 0;
   }
 
 }

@@ -72,7 +72,7 @@ class SeparatorCmd : public Cmd {
     virtual void doit();   
     virtual void undoit();   
     SeparatorCmd( char *, char *, int );
-    const char *const className () { return "SeparatorCmd"; }
+    const char *className () { return "SeparatorCmd"; }
 };
 
 // Its critical that children of ToggleButtonCmd not have a 
@@ -96,7 +96,7 @@ class ToggleButtonCmd : public Cmd {
 #ifdef CAN_INLINE_VIRTUALS
     const char *const	className () { return "ToggleButtonCmd"; }
 #else /* ! CAN_INLINE_VIRTUALS */
-    const char *const	className ();
+    const char *className ();
 #endif /* ! CAN_INLINE_VIRTUALS */
 
     unsigned char	_indicator_type;

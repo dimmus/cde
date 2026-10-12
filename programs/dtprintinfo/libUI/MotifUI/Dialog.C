@@ -448,7 +448,7 @@ boolean Dialog::SetVisiblity(boolean flag)
    return true;
 }
 
-const boolean Dialog::Answer(char **string)
+boolean Dialog::Answer(char **string)
 {
    if (_rc)
     {

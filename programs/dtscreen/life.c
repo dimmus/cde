@@ -596,7 +596,7 @@ drawlife(perwindow *pwin)
 		if (!(*(loc + 1) & RT)) {
 		    spawn(pwin, loc);
 		}
-		/* NO BREAK */
+		/* FALLTHROUGH */
 	    case SAME:
 		if (*(loc + 1) & RT) {
 		    drawcell(pwin, row, col);

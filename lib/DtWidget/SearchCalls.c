@@ -1222,6 +1222,7 @@ DtEditorChange(
 	     break;
         }
 
+        /* FALLTHROUGH */
         case DtEDITOR_CURRENT_SELECTION:
         {
 	   /*

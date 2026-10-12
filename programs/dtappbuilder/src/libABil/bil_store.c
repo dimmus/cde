@@ -321,6 +321,7 @@ attr_is_undef(
 		   return (util_strempty(obj_get_initial_value_string(obj)));
 	}
 
+        /* FALLTHROUGH */
         case AB_BIL_TO: 
 	case AB_BIL_ARG_TYPE:
             return (obj_get_func_type(obj) != AB_FUNC_BUILTIN);

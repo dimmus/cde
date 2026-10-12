@@ -1654,7 +1654,7 @@ initialize_cal_attr(int id, CSA_attribute *attrs, Allocation_reason reason, int 
 		memset(attrs->value, 0, size);
 		attrs->value->type = cal_ident_index_tag(id);
 		if (attrs->value->type == CSA_VALUE_REMINDER)
-			attrs->value->item.reminder_value = (CSA_reminder *) calloc(sizeof(CSA_reminder), 1);
+			attrs->value->item.reminder_value = (CSA_reminder *) calloc(1, sizeof(CSA_reminder));
 	}
 }
 
@@ -1698,7 +1698,7 @@ initialize_entry_attr(int id, CSA_attribute *attrs, Allocation_reason reason, in
 		memset(attrs->value, 0, size);
 		attrs->value->type = entry_ident_index_tag(id);
 		if (attrs->value->type == CSA_VALUE_REMINDER)
-			attrs->value->item.reminder_value = (CSA_reminder *) calloc(sizeof(CSA_reminder), 1);
+			attrs->value->item.reminder_value = (CSA_reminder *) calloc(1, sizeof(CSA_reminder));
 	}
 }
 

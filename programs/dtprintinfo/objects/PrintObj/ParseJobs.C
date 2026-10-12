@@ -164,7 +164,7 @@ int ParseRemotePrintJobs(char *printer, char *jobs, char **job_list,
 
 static void connect_timeout(int not_used)
 {
-   not_used = 0;
+   (void) not_used;
 }
 
 // Create a connection to the remote printer server.

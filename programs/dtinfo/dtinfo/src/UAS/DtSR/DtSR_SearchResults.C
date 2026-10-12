@@ -96,7 +96,7 @@ DtSR_SearchResults::create_results(int index, int nres)
 void
 DtSR_SearchResults::merge(UAS_Pointer<DtSR_SearchResults> & res)
 {
-    if (res == (const int)0 || res->f_ndocs == 0) // nothing to merge
+    if (res == (int)0 || res->f_ndocs == 0) // nothing to merge
 	return;
 
     int i;

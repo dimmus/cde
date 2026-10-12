@@ -64,7 +64,7 @@ class ComposeCmd : public ComposeFamily {
   public:
     virtual void doit();   
     ComposeCmd( char *, char *, int, RoamMenuWindow * );
-    virtual const char *const className () { return "ComposeCmd"; }
+    virtual const char *className () { return "ComposeCmd"; }
 };
 
 class ForwardCmd : public ComposeFamily {
@@ -74,7 +74,7 @@ class ForwardCmd : public ComposeFamily {
   public:
     virtual void doit();   
     ForwardCmd( char *, char *, int, RoamMenuWindow *, int );
-    virtual const char *const className () { return "ForwardCmd"; }
+    virtual const char *className () { return "ForwardCmd"; }
 };
 
 class ReplyAllCmd : public ComposeFamily {
@@ -84,7 +84,7 @@ class ReplyAllCmd : public ComposeFamily {
   public:
     virtual void doit();   
     ReplyAllCmd( char *, char *, int, RoamMenuWindow *, int );
-    virtual const char *const className () { return "ReplyAllCmd"; }
+    virtual const char *className () { return "ReplyAllCmd"; }
 };
 
 class ReplyCmd : public ComposeFamily {
@@ -94,7 +94,7 @@ class ReplyCmd : public ComposeFamily {
   public:
     virtual void doit();
     ReplyCmd( char *, char *, int, RoamMenuWindow *, int );
-    virtual const char *const className () { return "ReplyCmd"; }
+    virtual const char *className () { return "ReplyCmd"; }
 };
 
 class TemplateCmd : public NoUndoCmd {
@@ -110,7 +110,7 @@ class TemplateCmd : public NoUndoCmd {
 		SendMsgDialog *, 
 		const char * file);
     virtual ~TemplateCmd();
-    virtual const char *const className() { return "TemplateCmd"; }
+    virtual const char *className() { return "TemplateCmd"; }
 };
 
 class HideShowCmd : public NoUndoCmd {
@@ -126,7 +126,7 @@ class HideShowCmd : public NoUndoCmd {
 		SendMsgDialog *,
 		const char * label);
     virtual ~HideShowCmd(void);
-    virtual const char *const className() { return "HideShowCmd"; }
+    virtual const char *className() { return "HideShowCmd"; }
 };
 
 #endif

@@ -110,7 +110,7 @@ SearchResultsMgr::get_agent ()
   // Finally, if none are available for reuse we have to create one.
   if (ale == NULL)
     {
-      ON_DEBUG (printf ("Creating a new results agent...take cover!\n");)
+      ON_DEBUG (printf ("Creating a new results agent...take cover!\n"));
       SearchResultsAgent *sra = new SearchResultsAgent();
       sra->init ();
       ale = new AgentListEntry (sra);

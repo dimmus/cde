@@ -213,7 +213,7 @@ IL_EXTERN const int _ilSubsampleShift [];
 
         /*  Allocate _nBytes from heap, zero it, and return a ptr to it.
         */
-#define IL_MALLOC_ZERO(_nBytes)  (calloc ((_nBytes), 1))
+#define IL_MALLOC_ZERO(_nBytes)  (calloc (1, (_nBytes)))
 
         /*  Reallocate the given _ptr to be of size _nBytes.
         */

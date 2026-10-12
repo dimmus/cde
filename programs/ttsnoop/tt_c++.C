@@ -382,6 +382,7 @@ tttk_message_create(
 		break;
 	    case TTDT_GET_GEOMETRY:
 		mode = TT_OUT;
+	    /* FALLTHROUGH */
 	    case TTDT_SET_GEOMETRY:
                 tt_message_arg_add( msg, mode, Tttk_width, 0 );
                 tt_message_arg_add( msg, mode, Tttk_height, 0 );

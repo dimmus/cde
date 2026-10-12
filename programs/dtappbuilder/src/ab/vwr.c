@@ -691,8 +691,7 @@ vwr_get_cond(
 		 * We need to allocate a bigger array
 		 * and copy everything into it
 		 */
-	        new_array = (VNode *)calloc(sizeof(VNode), 
-				cur_num + child_num);
+	        new_array = (VNode *)calloc(cur_num + child_num, sizeof(VNode));
 
 		/*
 		 * Copying the current nodes list
@@ -752,8 +751,7 @@ vwr_get_cond(
 	/*
 	 * Allocate new array to add one extra node
 	 */
-        new_array = (VNode *)calloc(sizeof(VNode), 
-                                cur_num + 1);
+        new_array = (VNode *)calloc(cur_num + 1, sizeof(VNode));
 
 	/*
 	 * If we have nodes accumulated from before,

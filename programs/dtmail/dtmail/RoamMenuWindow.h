@@ -163,7 +163,7 @@ class RoamMenuWindow : public MenuWindow, public AbstractEditorParent
     void	attachmentFeedback(Boolean);
     void	checkForMail(DtMailEnv &error)
 		  { _we_called_newmail = TRUE; _mailbox->checkForMail(error); }
-    virtual const char *const
+    virtual const char *
 		className() { return "RoamMenuWindow"; }
     void	create_new_container(char*);
     Widget	getDragIcon(Widget widget);

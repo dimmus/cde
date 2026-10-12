@@ -2630,8 +2630,6 @@ activate_cb(	Widget w,
 	root_x = (disp_width - width);
 	else if (root_x <=0)
 	root_x = 0;
-	else 
-	  ;
 
     if ((int)(root_y + height) > (int)disp_height)
 	root_y = root_y0 - Y(combo_w) - height;

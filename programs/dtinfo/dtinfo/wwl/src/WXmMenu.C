@@ -62,7 +62,7 @@ WXmPopupMenu::WXmPopupMenu (WComposite& father, char* name, int automanage,
 : WXmRowColumn (XmCreatePopupMenu (Widget(father), name, args.Args(),
 				   args.NumArgs()))
 {
-   automanage = 1;
+   (void) automanage;
 #ifdef STUPID
    if (name != NULL) {
        WXmLabelGadget label(widget, "title");

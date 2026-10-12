@@ -122,7 +122,7 @@ int get_char(void);
 void cat_open(void);
 int find_message(int msg);
 int find_msg_in_file(int msg, int file);
-void fatal(char *m, int line, int file);
+_Noreturn void fatal(char *m, int line, int file);
 void get_option(int *argc, char *argv[]);
 
 int main (int argc, char *argv [])
@@ -324,7 +324,7 @@ int find_msg_in_file (int msg, int file)
  *                                2: Template file        
  *                                9: N/A                  
  */
-void fatal (char *m, int line, int file)
+_Noreturn void fatal (char *m, int line, int file)
 /* file in which the error found  0: Primary message file */
           /*                                1: Default message file */
           /*                                2: Template file        */

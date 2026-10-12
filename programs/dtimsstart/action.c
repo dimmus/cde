@@ -218,6 +218,7 @@ void	dtims_msg_proc(Widget w, XtPointer cd, XEvent *event,
 	case WIN_ST_REMOTE_RUN: 
 		actionId = 0;
 
+	/* FALLTHROUGH */
 	case WIN_ST_ACTION_DONE:
 	    DPR(("\tmsg=%d  errcode=%d\n", msg, errcode));
 	    actionErr = errcode;

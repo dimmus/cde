@@ -168,7 +168,7 @@ class AbstractEditorParent {
     AbstractEditorParent();
     virtual ~AbstractEditorParent();
 
-    virtual     const char *const className() 
+    virtual     const char *className() 
 				{ return "AbstractEditorParent"; }
 
     virtual DtMailEditor *  get_editor() = 0;

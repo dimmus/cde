@@ -272,7 +272,7 @@ WObject :: WObject (const WComposite& super,  WidgetClass c, const char* name,
 WObject :: WObject (const WComposite& super, int automanage, WidgetClass c,
                     const char* name, ArgList args, Cardinal card)
 {
-   automanage = 1;
+   (void) automanage;
    widget = XtCreateManagedWidget (name, c, super.widget, args, card);
 }
 

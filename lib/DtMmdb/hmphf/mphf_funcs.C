@@ -317,7 +317,7 @@ debug(cerr, "=====");
 	branch = 0;
      } else {
         high_part_bits = getbits(unsigned_g,t,remaining_bits);
-        lower_part_bits  = unsigned_g & ~(~0 << (t-remaining_bits));
+        lower_part_bits  = unsigned_g & ~(~0U << (t-remaining_bits));
         lower_part_bits <<= (BITS_IN(unsigned)- (t-remaining_bits));
 
         s[k++] =  target | high_part_bits;

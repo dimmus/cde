@@ -341,7 +341,7 @@ StandaloneApptDragStart(
         static XtCallbackRec dragFinishCBRec[] =  { {DragFinishCB, NULL},
                                                     {NULL, NULL} };
  
-        DragContext     *context = calloc(sizeof(DragContext), 1);
+        DragContext     *context = calloc(1, sizeof(DragContext));
 	Calendar	*c = de->c;
 	Dtcm_appointment        *appt;
 	int		old_attr_count;

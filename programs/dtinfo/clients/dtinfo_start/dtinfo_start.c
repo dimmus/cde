@@ -313,6 +313,7 @@ ActionDoneCallback (
 					(XtTimerCallbackProc) Exit,
 	      				NULL);
 
+        	/* FALLTHROUGH */
         	case DtACTION_INVOKED:
 		case DtACTION_FAILED:
 		case DtACTION_CANCELED:

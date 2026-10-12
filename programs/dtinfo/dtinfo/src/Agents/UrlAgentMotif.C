@@ -145,7 +145,7 @@ UrlAgent::document( char   *locator,
           delete [] buffer;
 
           // if no result, the unique ID was not found in a loaded infolib
-          if( d == (const int)0 ) sts = NOT_FOUND ;
+          if( d == (int)0 ) sts = NOT_FOUND ;
         }
       else if( strchr( locator, ':' ) && strchr( locator, '=' ) )
         {
@@ -161,7 +161,7 @@ UrlAgent::document( char   *locator,
           sts = BAD_ARG_FORMAT ;
         }
 
-      if( d != (const int)0 )
+      if( d != (int)0 )
         {
           // always use new window to display external requests
           if( new_window ) node_mgr().force_new_window() ;
@@ -276,7 +276,7 @@ UrlAgent::print_document(char *locator)
 	    delete [] buffer;
 	    
 	    // if no result, the unique ID was not found in a loaded infolib
-	    if( d == (const int)0 ) sts = NOT_FOUND ;
+	    if( d == (int)0 ) sts = NOT_FOUND ;
         }
 	else if( strchr( locator, ':' ) && strchr( locator, '=' ) )
         {
@@ -295,7 +295,7 @@ UrlAgent::print_document(char *locator)
         }
 
 	// if we have a setion add it to the print list
-	if( d != (const int)0 ) {
+	if( d != (int)0 ) {
  
 	    //  Need to put this single node on the print list so that
 	    //  reset_ui() can determine the number of nodes being printed 

@@ -670,7 +670,7 @@ strlistP_build_user_data_array(StringList list, int index, void *data)
     {
 	return -1;
     }
-    list->user_datas = (void **)calloc(sizeof(void*), list->strings_size);
+    list->user_datas = (void **)calloc(list->strings_size, sizeof(void*));
     if (list->user_datas == NULL)
     {
 	return -1;

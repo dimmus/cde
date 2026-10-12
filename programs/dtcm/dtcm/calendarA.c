@@ -293,7 +293,7 @@ allocate_paint_cache(CSA_entry_handle *list, int num_entries, Paint_cache **retu
 	Dtcm_appointment 	*appt;
         Calendar 		*c=calendar;
 	CSA_return_code 	stat = CSA_SUCCESS;
-	Paint_cache	*cache = (Paint_cache *) calloc(sizeof(Paint_cache), num_entries);
+	Paint_cache	*cache = (Paint_cache *) calloc(num_entries, sizeof(Paint_cache));
 	int 			i;
 
 

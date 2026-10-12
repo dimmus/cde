@@ -369,7 +369,7 @@ DB_ADDR *db_addr
 	    if ( db_status != S_OKAY ) return( db_status );
 	    break;
 	 }
-	 /* arrayed struct fall-thru to a full field copy */
+	 /* FALLTHROUGH - arrayed struct: a full field copy */
       default:
 	 bytecpy(fptr, data, fld_ptr->fd_len);
    }

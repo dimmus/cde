@@ -47,10 +47,10 @@ class Group : public MotifUI {
 	 char *name,
 	 GroupType group_type = RADIO_GROUP);
 
-   const Widget InnerWidget()         { return _rc; }
-   const UI_Class UIClass()           { return GROUP; }
-   const int UISubClass()             { return _group_type; }
-   const char *const UIClassName()    { return "Group"; }
+   Widget InnerWidget()         { return _rc; }
+   UI_Class UIClass()           { return GROUP; }
+   int UISubClass()             { return _group_type; }
+   const char *UIClassName()    { return "Group"; }
 
    // Override SetName, need to set label name, not BaseWidget
    boolean SetName(char *);

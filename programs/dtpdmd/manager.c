@@ -536,7 +536,7 @@ void mgr_fetch_pdm( XpPdmServiceRec *rec )
 #if 0 && defined(PRINTING_SUPPORTED)
     Display *tdpy;
 #endif
-    int lxerrno;
+    volatile int lxerrno;
 
     if ( g.override_pdm ) {
 	/*
@@ -733,9 +733,9 @@ void mgr_shutdown_reply( XpPdmServiceRec *rec )
 {
     XEvent cme;
     Display *pdpy;
-    char *mess;
+    const char * volatile mess;
     char buf[2048];
-    int lxerrno;
+    volatile int lxerrno;
 
 
     /*

@@ -2255,6 +2255,7 @@ Widget  create_icon_selection_dialog(swidget    _UxUxParent,
         switch (numberOfTopButtons){
                 case 0 : XtUnmanageChild (top_button_form); break;
                 case 1 : XtUnmanageChild (top_button2);
+                /* FALLTHROUGH */
                 case 2 : XtUnmanageChild (top_button3);
         };
 

@@ -75,9 +75,9 @@ class Prompt : public MotifUI {
 
    char * DefaultValue()             { return _default_value; }
 
-   const UI_Class UIClass()          { return PROMPT; }
-   const int UISubClass()            { return _prompt_type; }
-   const char *const UIClassName()   { return "Prompt"; }
+   UI_Class UIClass()          { return PROMPT; }
+   int UISubClass()            { return _prompt_type; }
+   const char *UIClassName()   { return "Prompt"; }
 
 };
 

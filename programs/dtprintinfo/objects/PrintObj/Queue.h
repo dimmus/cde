@@ -134,7 +134,7 @@ class Queue : public BaseObj {
    void ParseLocalStatus(char *output);
 #endif
 
-   virtual const char *const ObjectClassName() { return QUEUE; }
+   virtual const char *ObjectClassName() { return QUEUE; }
 
 };
 

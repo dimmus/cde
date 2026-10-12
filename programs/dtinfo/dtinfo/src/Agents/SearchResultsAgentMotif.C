@@ -567,7 +567,7 @@ SearchResultsAgent::select_item (WCallback *wcb)
 
   f_selected_item = lcs->item_position - 1;
 
-  ON_DEBUG (printf ("Selected item #%d\n", f_selected_item);)
+  ON_DEBUG (printf ("Selected item #%d\n", f_selected_item));
 
   f_display.SetSensitive (True);
 }

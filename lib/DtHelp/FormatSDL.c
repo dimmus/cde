@@ -948,19 +948,19 @@ static _CEInterpData	InterpData[] =
 	{ SdlInterpCsh,	"csh" },
 	{ SdlInterpSh ,	"sh"  },
 	{ SdlInterpTcl,	"tcl" },
-	{ _DtCvOPTION_BAD, NULL  },
+	{ SdlOptionBad, NULL  },
     };
 
 /******************************************************************************
  * Private Variables
  *****************************************************************************/
-static OptionList hclass[]  = { SDL_ENTITY_CLASSH, {NULL, _DtCvOPTION_BAD}};
-static OptionList fclass[]  = { SDL_ENTITY_CLASSF, {NULL, _DtCvOPTION_BAD}};
-static OptionList kclass[]  = { SDL_ENTITY_CLASSK, {NULL, _DtCvOPTION_BAD}};
-static OptionList pclass[]  = { SDL_ENTITY_CLASSP, {NULL, _DtCvOPTION_BAD}};
-static OptionList gclass[]  = { SDL_ENTITY_CLASSG, {NULL, _DtCvOPTION_BAD}};
+static OptionList hclass[]  = { SDL_ENTITY_CLASSH, {NULL, SdlOptionBad}};
+static OptionList fclass[]  = { SDL_ENTITY_CLASSF, {NULL, SdlOptionBad}};
+static OptionList kclass[]  = { SDL_ENTITY_CLASSK, {NULL, SdlOptionBad}};
+static OptionList pclass[]  = { SDL_ENTITY_CLASSP, {NULL, SdlOptionBad}};
+static OptionList gclass[]  = { SDL_ENTITY_CLASSG, {NULL, SdlOptionBad}};
 static OptionList fgclass[] =
-	{ SDL_ENTITY_CLASSF, SDL_ENTITY_CLASSG, {NULL, _DtCvOPTION_BAD}};
+	{ SDL_ENTITY_CLASSF, SDL_ENTITY_CLASSG, {NULL, SdlOptionBad}};
 
 static OptionList apps[] =
     {
@@ -969,13 +969,13 @@ static OptionList apps[] =
 	{ "tutorial", SdlAppTutorial },
 	{ "ref"     , SdlAppRef      },
 	{ "sys"     , SdlAppSys      },
-	{  NULL     , _DtCvOPTION_BAD   }
+	{  NULL     , SdlOptionBad   }
     };
 static OptionList timing[] =
     {
 	{ (ASyncStr+1), SdlTimingSync  },
 	{ ASyncStr    , SdlTimingAsync },
-	{  NULL       , _DtCvOPTION_BAD   },
+	{  NULL       , SdlOptionBad   },
     };
 
 static OptionList frmtTypes[] =
@@ -983,7 +983,7 @@ static OptionList frmtTypes[] =
 	{ "literal" , SdlTypeLiteral },
 	{ "lined"   , SdlTypeLined   },
 	{ DynamicStr, SdlTypeDynamic },
-	{  NULL     , _DtCvOPTION_BAD   }
+	{  NULL     , SdlOptionBad   }
     };
 
 static OptionList idTypes[] =
@@ -1009,94 +1009,94 @@ static OptionList idTypes[] =
 	{ (SyscmdStr+1)  , SdlIdSysCmd    },
 	{ (ScriptStr+1)  , SdlIdScript    },
 	{ (CallbackStr+1), SdlIdCallback  },
-	{ NULL           , _DtCvOPTION_BAD   },
+	{ NULL           , SdlOptionBad   },
     };
 
 static OptionList bool_types[] =
     {
 	{ "YES", SdlBoolYes   },
 	{ "NO" , SdlBoolNo    },
-	{ NULL , _DtCvOPTION_BAD },
+	{ NULL , SdlOptionBad },
     };
 
 static OptionList borders[] =
     {
-	{ NoBorderStr        , _DtCvBORDER_NONE   },
-	{ "full-border"      , _DtCvBORDER_FULL   },
-	{ "horizontal-border", _DtCvBORDER_HORZ   },
-	{ "vertical-border"  , _DtCvBORDER_VERT   },
-	{ "top-border"       , _DtCvBORDER_TOP    },
-	{ "bottom-border"    , _DtCvBORDER_BOTTOM },
-	{ "left-border"      , _DtCvBORDER_LEFT   },
-	{ "right-border"     , _DtCvBORDER_RIGHT  },
-	{ NULL               , _DtCvOPTION_BAD    },
+	{ NoBorderStr        , SdlBorderNone   },
+	{ "full-border"      , SdlBorderFull   },
+	{ "horizontal-border", SdlBorderHorz   },
+	{ "vertical-border"  , SdlBorderVert   },
+	{ "top-border"       , SdlBorderTop    },
+	{ "bottom-border"    , SdlBorderBottom },
+	{ "left-border"      , SdlBorderLeft   },
+	{ "right-border"     , SdlBorderRight  },
+	{ NULL               , SdlOptionBad    },
     };
 
 static OptionList justify1[] =
     {
-	{ LeftJustifyStr   , _DtCvJUSTIFY_LEFT   },
-	{ RightJustifyStr  , _DtCvJUSTIFY_RIGHT  },
-	{ CenterJustifyStr , _DtCvJUSTIFY_CENTER },
-	{ "numeric-justify", _DtCvJUSTIFY_NUM    },
-	{ NULL             , _DtCvOPTION_BAD    },
+	{ LeftJustifyStr   , SdlJustifyLeft   },
+	{ RightJustifyStr  , SdlJustifyRight  },
+	{ CenterJustifyStr , SdlJustifyCenter },
+	{ "numeric-justify", SdlJustifyNum    },
+	{ NULL             , SdlOptionBad    },
     };
 
 static OptionList justify2[] =
     {
-	{ LeftJustifyStr   , _DtCvJUSTIFY_LEFT   },
-	{ RightJustifyStr  , _DtCvJUSTIFY_RIGHT  },
-	{ CenterJustifyStr , _DtCvJUSTIFY_CENTER },
-	{ NULL             , _DtCvOPTION_BAD    },
+	{ LeftJustifyStr   , SdlJustifyLeft   },
+	{ RightJustifyStr  , SdlJustifyRight  },
+	{ CenterJustifyStr , SdlJustifyCenter },
+	{ NULL             , SdlOptionBad    },
     };
 
 static OptionList vjust[] =
     {
-	{ TopVJustStr   , _DtCvJUSTIFY_TOP    },
-	{ "bottom-vjust", _DtCvJUSTIFY_BOTTOM },
-	{ "center-vjust", _DtCvJUSTIFY_CENTER },
-	{ NULL          , _DtCvOPTION_BAD     },
+	{ TopVJustStr   , SdlJustifyTop    },
+	{ "bottom-vjust", SdlJustifyBottom },
+	{ "center-vjust", SdlJustifyCenter },
+	{ NULL          , SdlOptionBad     },
     };
 
 static OptionList orient[] =
     {
-	{ "left-orient"        , _DtCvJUSTIFY_LEFT        },
-	{ CenterOrientStr      , _DtCvJUSTIFY_CENTER      },
-	{ "right-orient"       , _DtCvJUSTIFY_RIGHT       },
-	{ "left-margin-orient" , _DtCvJUSTIFY_LEFT_MARGIN },
-	{ "right-margin-orient", _DtCvJUSTIFY_RIGHT_MARGIN},
-	{ "left-corner-orient" , _DtCvJUSTIFY_LEFT_CORNER },
-	{ "right-corner-orient", _DtCvJUSTIFY_RIGHT_CORNER},
-	{ NULL                 , _DtCvOPTION_BAD         },
+	{ "left-orient"        , SdlJustifyLeft        },
+	{ CenterOrientStr      , SdlJustifyCenter      },
+	{ "right-orient"       , SdlJustifyRight       },
+	{ "left-margin-orient" , SdlJustifyLeftMargin },
+	{ "right-margin-orient", SdlJustifyRightMargin},
+	{ "left-corner-orient" , SdlJustifyLeftCorner },
+	{ "right-corner-orient", SdlJustifyRightCorner},
+	{ NULL                 , SdlOptionBad         },
     };
 
 static OptionList vorient[] =
     {
-	{ TopVOrientStr   , _DtCvJUSTIFY_TOP    },
-	{ "bottom-vorient", _DtCvJUSTIFY_BOTTOM },
-	{ "center-vorient", _DtCvJUSTIFY_CENTER },
-	{ NULL            , _DtCvOPTION_BAD     },
+	{ TopVOrientStr   , SdlJustifyTop    },
+	{ "bottom-vorient", SdlJustifyBottom },
+	{ "center-vorient", SdlJustifyCenter },
+	{ NULL            , SdlOptionBad     },
     };
 
 static OptionList placement[] =
     {
 	{ "object"     , SdlPlaceObject },
 	{ ParentStr    , SdlPlaceParent },
-	{  NULL        , _DtCvOPTION_BAD   },
+	{  NULL        , SdlOptionBad   },
     };
 
 static OptionList stacking[] =
     {
 	{ "horiz"  , SdlStackHoriz },
 	{ "vert"   , SdlStackVert  },
-	{  NULL    , _DtCvOPTION_BAD  },
+	{  NULL    , SdlOptionBad  },
     };
 
 static OptionList flow[] =
     {
-	{ (NoWrapStr+2), _DtCvWRAP       },
-	{  NoWrapStr   , _DtCvWRAP_NONE  },
-	{  "join"      , _DtCvWRAP_JOIN  },
-	{  NULL        , _DtCvOPTION_BAD },
+	{ (NoWrapStr+2), SdlWrap       },
+	{  NoWrapStr   , SdlNoWrap  },
+	{  "join"      , SdlWrapJoin  },
+	{  NULL        , SdlOptionBad },
     };
 
 static OptionList window[] =
@@ -1104,14 +1104,14 @@ static OptionList window[] =
 	{ "current", SdlWindowCurrent },
 	{ "new"    , SdlWindowNew     },
 	{ "popup"  , SdlWindowPopup   },
-	{ NULL    , _DtCvOPTION_BAD },
+	{ NULL    , SdlOptionBad },
     };
 
 static OptionList traversal[] =
     {
 	{ "return"  , SdlTraversalReturn   },
 	{ "noreturn", SdlTraversalNoReturn },
-	{ NULL      , _DtCvOPTION_BAD         },
+	{ NULL      , SdlOptionBad         },
     };
 
 static OptionList interpreters[] =
@@ -1120,7 +1120,7 @@ static OptionList interpreters[] =
 	{ "tcl"     , SdlInterpTcl },
 	{ "csh"     , SdlInterpCsh },
 	{ "sh"      , SdlInterpSh  },
-	{ NULL      , _DtCvOPTION_BAD },
+	{ NULL      , SdlOptionBad },
     };
 
 static	SDLAttributeOptions SDLOptionsList[] =
@@ -5104,7 +5104,7 @@ InitAttributes(
    char		 *varOffset1 = NULL;
    SDLNumber	 *numPtr1;
    SdlOption	 *enumPtr1;
-   SdlOption	  defNum = _DtCvOPTION_BAD;
+   SdlOption	  defNum = SdlOptionBad;
    const SDLAttribute *pAttr;
 
    while (attr_list->sdl_attr_define != -1)
@@ -5998,6 +5998,7 @@ ParseElementEnd(
 		case SdlElementLink:
 		    CompressLinkSeg(my_struct->seg_list);
 
+		/* FALLTHROUGH */
 		case SdlElementKey:
 		case SdlElementSphrase:
 		    /*

@@ -288,7 +288,7 @@ set_time_submenu(Widget parent,
 	if (ad == True)
 		(*widget_count)++;
 
-	*widget_list = calloc(sizeof(Widget), *widget_count);
+	*widget_list = calloc(*widget_count, sizeof(Widget));
 
 	/*
 	**  Loop through and create the time menu using the starting and

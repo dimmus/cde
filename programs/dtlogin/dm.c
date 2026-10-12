@@ -812,6 +812,7 @@ CheckDisplayStatus( struct display *d )
 	    break;
 	case NewEntry:
 	    d->state = OldEntry;
+	/* FALLTHROUGH */
 	case OldEntry:
             Debug("Check %s: status=%d wakeupTime=%d\n", d->name,
                   d->status, wakeupTime);
