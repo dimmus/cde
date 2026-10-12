@@ -142,8 +142,13 @@ fi
 
 # The build generates message catalogs and docs under en_US.UTF-8
 if ! locale -a | grep -qiE '^en_US\.utf-?8$'; then
-    echo "  locale en_US.UTF-8 is not generated: uncomment it in /etc/locale.gen and run 'sudo locale-gen'"
-    fail=1
+    echo "==> Generating the locale en_US.UTF-8 (/etc/locale.gen)"
+    "${sudo_cmd[@]}" sed -i 's/^#[[:space:]]*\(en_US\.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+    "${sudo_cmd[@]}" locale-gen >/dev/null
+    if ! locale -a | grep -qiE '^en_US\.utf-?8$'; then
+        echo "  locale en_US.UTF-8 is not generated: uncomment it in /etc/locale.gen and run 'sudo locale-gen'"
+        fail=1
+    fi
 fi
 
 if (( fail )); then
