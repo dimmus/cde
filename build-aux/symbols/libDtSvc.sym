@@ -4,8 +4,6 @@ DtActionIcon
 DtActionInvoke
 DtActionLabel
 DtAppInitialize
-DtCreateHelpDialog
-DtCreateHelpQuickDialog
 DtDbLoad
 DtDbReloadNotify
 DtDndCreateSourceIcon
@@ -34,8 +32,6 @@ DtDtsIsTrue
 DtDtsLoadDataTypes
 DtDtsRelease
 DtDtsSetDataType
-DtHelpQuickDialogGetChild
-DtHelpReturnSelectedWidgetId
 DtInfoShowTopic
 DtInitialize
 DtMsgLogMessage

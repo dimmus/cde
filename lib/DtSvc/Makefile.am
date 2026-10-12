@@ -180,7 +180,6 @@ libDtSvc_la_SOURCES = 	DtCodelibs/buf.c \
 	DtUtil2/PrintXErr.c \
 	DtUtil2/SharedProcs.c \
 	DtUtil2/SmCreateDirs.c \
-	DtUtil2/SunDtHelp.c \
 	DtUtil2/SvcTT.c \
 	DtUtil2/UErrNoBMS.c \
 	DtUtil2/Utility.c \
