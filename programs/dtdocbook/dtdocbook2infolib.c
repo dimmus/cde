@@ -1413,8 +1413,8 @@ buildBookcase(char *cmdSrc, char *dirName)
 
       runShellCmd(cmd);
 
-      snprintf(cmd, sizeof(cmd), "cat %s | dbdrv stdin_load %s %s.stylesheet",
-			style_file, bookCaseName, bookCaseName);
+      snprintf(cmd, sizeof(cmd), "dbdrv stdin_load %s %s.stylesheet < %s",
+			bookCaseName, bookCaseName, style_file);
       runShellCmd(cmd);
 
       snprintf(cmd, sizeof(cmd), "rm -f %s", style_file);
@@ -1433,8 +1433,8 @@ buildBookcase(char *cmdSrc, char *dirName)
 
       runShellCmd(cmd);
 
-      snprintf(cmd, sizeof(cmd), "cat %s | dbdrv stdin_load %s %s.node",
-			compress_file, bookCaseName, bookCaseName);
+      snprintf(cmd, sizeof(cmd), "dbdrv stdin_load %s %s.node < %s",
+			bookCaseName, bookCaseName, compress_file);
       runShellCmd(cmd);
 
       snprintf(cmd, sizeof(cmd), "rm -f %s", compress_file);
@@ -1452,8 +1452,8 @@ buildBookcase(char *cmdSrc, char *dirName)
 
       runShellCmd(cmd);
 
-      snprintf(cmd, sizeof(cmd), "cat %s | dbdrv mixed_load %s",
-					anonym_file, bookCaseName);
+      snprintf(cmd, sizeof(cmd), "dbdrv mixed_load %s < %s",
+					bookCaseName, anonym_file);
 
       runShellCmd(cmd);
 
@@ -1553,31 +1553,18 @@ storeBookCase(char *cmdSrc, char *tocOpt, char *dbName,
 {
     char *tmpFile;
     char *cmd;
-    int ret;
 
     /*
-     * changed not to use pipe for better error handling
+     * The parser's output goes straight to NodeParser, which works on it
+     * while the parser is still running; it is 36 MB for the English
+     * guides.  The pipeline's status is NodeParser's, as before the
+     * parser's was lost behind sed's (cmdSrc ends with two seds).
      */
-    {
+    tmpFile = makeTmpFile();
 
-      const char* onsgmls_file = makeTmpFile();
-
-      cmd = buildPath("%s > %s && echo", cmdSrc, onsgmls_file);
-
-      runShellCmd(cmd);
-
-      tmpFile = makeTmpFile();
-
-      cmd = buildPath("cat %s | NodeParser %s %s %s > %s",
-			onsgmls_file, tocOpt, dbName, dirName, tmpFile);
-      runShellCmd(cmd);
-
-      cmd = buildPath("rm -f %s", onsgmls_file);
-      ret = system(cmd);
-      if(ret != 0) die(-1, "system for rm failed; exiting...\n");
-      free((char*)onsgmls_file);
-    }
-
+    cmd = buildPath("%s | NodeParser %s %s %s > %s",
+		    cmdSrc, tocOpt, dbName, dirName, tmpFile);
+    runShellCmd(cmd);
     free(cmd);
 
     return tmpFile;
