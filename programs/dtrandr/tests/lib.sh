@@ -32,7 +32,9 @@ t() {
     unset XDG_CONFIG_HOME DTRANDR_FAKE_OUT
     export XDG_CONFIG_DIRS="$W/xdg" DTRANDR_SYSTEM_DIR="$W/sys"
     export DTRANDR_FAKE="$W/display" DTRANDR_FAKE_LOG="$W/log"
-    cp "$FIX/${2:-docked}.fake" "$W/display"
+    # (the copies of the fixtures are made writable: in make distcheck
+    # the source directory is read-only, and cp keeps the mode)
+    cp "$FIX/${2:-docked}.fake" "$W/display" && chmod u+w "$W/display"
     : > "$W/log"
     U=$HOME/.config/dtrandr
     # the X tests use the real display
@@ -130,7 +132,7 @@ edit() {
 # profile NAME [DIR]: install a test profile (default: the user directory)
 profile() {
     mkdir -p "${2:-$U}"
-    cp -R "$PROF/$1" "${2:-$U}/"
+    cp -R "$PROF/$1" "${2:-$U}/" && chmod -R u+w "${2:-$U}/$1"
 }
 
 # newprofile NAME SETUP CONFIG [DIR]

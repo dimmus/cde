@@ -513,7 +513,7 @@ out_has "applied profile home (detected)"
 display_has "active 0x44 0 0 normal normal HDMI-1"
 # ours before autorandr's
 profile home
-cp "$PROF/home-wild/config" "$U/home/config"
+cp "$PROF/home-wild/config" "$U/home/config" && chmod u+w "$U/home/config"
 run --change
 display_has "active 0x41 0 0 normal normal HDMI-1"
 # --save goes to ours
