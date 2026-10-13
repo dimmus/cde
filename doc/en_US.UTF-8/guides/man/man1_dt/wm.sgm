@@ -693,6 +693,11 @@ manager parts can be specified:</para>
 <entry align="left" valign="top">color</entry>
 <entry align="left" valign="top">varies&dagger;</entry></row>
 <row>
+<entry align="left" valign="top">renderTable</entry>
+<entry align="left" valign="top">RenderTable</entry>
+<entry align="left" valign="top">string&dagger;&dagger;&dagger;</entry>
+<entry align="left" valign="top">NULL</entry></row>
+<row>
 <entry align="left" valign="top">saveUnder</entry>
 <entry align="left" valign="top">SaveUnder</entry>
 <entry align="left" valign="top">T/F</entry>
@@ -752,6 +757,17 @@ the strings that are used. The default is "fixed."</para>
 <listitem>
 <para>This resource specifies the foreground color. The default is chosen
 based on the visual type of the screen.</para>
+</listitem>
+</varlistentry>
+<varlistentry><term><emphasis>renderTable</emphasis> (class  <emphasis>RenderTable</emphasis>)</term>
+<listitem>
+<para>This resource specifies a render table for the window manager
+decoration. When it is set, it replaces <emphasis>fontList</emphasis>:
+unlike a font list, a render table can name scalable (Xft) fonts, as the
+Style Manager does with <literal>*renderTable</literal> when its Font Type
+is Scalable. The Front Panel uses it too, in place of its font lists for
+each resolution. The default is NULL, which leaves
+<emphasis>fontList</emphasis> in effect.</para>
 </listitem>
 </varlistentry>
 <varlistentry><term><emphasis>saveUnder</emphasis> (class  <emphasis>SaveUnder</emphasis>)</term>

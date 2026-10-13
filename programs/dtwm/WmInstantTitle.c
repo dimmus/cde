@@ -249,7 +249,7 @@ static void InstantTitleSetPosition(PtrInstantTitleData pITD) {
     Dimension height;
     Cardinal n;
     Arg args[10];
-    XFontStruct *font;
+    unsigned int textHeight;
     Window windowGroup;
     Widget dialogShellW = pITD->dialogShellW;
     Context context = pITD->contextForClient;
@@ -260,11 +260,11 @@ static void InstantTitleSetPosition(PtrInstantTitleData pITD) {
 
     if (wmGD.positionIsFrame) {
 	if (pSD->decoupleTitleAppearance)
-	    font = pSD->clientTitleAppearance.font;
+	    textHeight = pSD->clientTitleAppearance.textHeight;
 	else
-	    font = pSD->clientAppearance.font;
+	    textHeight = pSD->clientAppearance.textHeight;
 
-	height += TEXT_HEIGHT(font) + (2 * pSD->frameBorderWidth);
+	height += textHeight + (2 * pSD->frameBorderWidth);
     }
 
     GetSystemMenuPosition(pCD, &x, &y, height, context);

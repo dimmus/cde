@@ -966,7 +966,10 @@ typedef struct _RList
 typedef struct _AppearanceData
 {
     XmFontList	fontList;			/* resource */
-    XFontStruct	*font;
+    XmRenderTable renderTable;			/* resource, replaces fontList */
+    XFontStruct	*font;				/* a core font, for the GCs */
+    Boolean	xftFont;			/* fontList has Xft renditions */
+    unsigned int	textHeight;		/* height of a line of text */
     unsigned int	titleHeight;		/* title bar's height */
     Boolean	saveUnder;			/* resource */
     Pixel	background;			/* resource */

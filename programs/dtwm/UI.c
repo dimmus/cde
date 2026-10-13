@@ -470,6 +470,14 @@ Initialize (DtPanelShellWidget panel_shell)
 		break;
    }
 
+   /*  A render table, for scalable fonts, replaces them at every resolution  */
+
+   if (S_RenderTable (panel_shell) != NULL)
+   {
+      panel.font_list = S_RenderTable (panel_shell);
+      panel.date_font_list = S_RenderTable (panel_shell);
+   }
+
    /* initialize popup_data to NULL */
    panel.popup_data = NULL; 
 

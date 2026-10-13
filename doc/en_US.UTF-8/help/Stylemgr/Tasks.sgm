@@ -542,8 +542,8 @@ uses colors.)
 </ListItem>
 <ListItem Id="HSTYM.TSKS.item.64">
 <Para>Select a font size. When the Font Type is Scalable (Xft), the list
-is labeled Bitmap Size and sets the bitmap fonts that the window manager,
-terminals, and help still use.
+is labeled Bitmap Size and sets the bitmap fonts that terminals and help
+still use.
 </Para>
 </ListItem>
 <ListItem Id="HSTYM.TSKS.item.65">
@@ -612,9 +612,10 @@ configuration.
 </Para>
 </ListItem>
 </OrderedList>
-<Para>Motif applications started after the change use the scalable fonts.
-The window manager, terminals, and help keep using the bitmap font of the
-selected Bitmap Size.
+<Para>Motif applications started after the change use the scalable fonts,
+and so do the window titles, icon labels and Front Panel when the window
+manager starts again (at the next login). Terminals and help keep using
+the bitmap font of the selected Bitmap Size.
 </Para>
 <Para>To return to bitmap fonts, open the Font dialog box, select Bitmap
 as the Font Type, and click OK. The Style Manager removes the scalable

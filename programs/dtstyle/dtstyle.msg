@@ -306,7 +306,7 @@ $ sizes when scalable (Xft) fonts are selected
 
 $ _DtMessage 61 is the label above the bitmap font sample in the preview
 $ area when scalable (Xft) fonts are selected
-61 Window manager, terminals and help:
+61 Terminals and help:
 
 $ _DtMessage 62 is shown in the Font dialog when the Motif library has no
 $ Xft support

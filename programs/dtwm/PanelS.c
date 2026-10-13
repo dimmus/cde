@@ -88,6 +88,13 @@ static XtResource panelResources[]=
 	XmNlowResFontList,
 	XmCLowResFontList, XmRFontList, sizeof (XmFontList),
 	R_Offset (low_res_font_list), XmRString, (XtPointer) "fixed"
+	},
+	/* A render table ("*renderTable", as the Style Manager writes for */
+	/* scalable fonts) replaces the font lists: it can name Xft fonts. */
+	{
+	XmNrenderTable,
+	XmCRenderTable, XmRRenderTable, sizeof (XmRenderTable),
+	R_Offset (render_table), XmRImmediate, (XtPointer) NULL
 	}
     };
 

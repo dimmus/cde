@@ -746,7 +746,7 @@ void GetIconTitleBox (ClientData *pcd, XRectangle *pBox)
 			- ICON_IMAGE_LEFT_PAD
 			- ICON_EXTERNAL_SHADOW_WIDTH;
 
-	pBox->height = TEXT_HEIGHT(ICON_APPEARANCE(pcd).font);
+	pBox->height = ICON_APPEARANCE(pcd).textHeight;
 
     }
     else if ((P_ICON_BOX(pcd)) && (pcd->clientState == MINIMIZED_STATE))
@@ -768,7 +768,7 @@ void GetIconTitleBox (ClientData *pcd, XRectangle *pBox)
 			+ ((wmGD.frameStyle == WmSLAB) ? 2 : 0) 
 			- ICON_IMAGE_LEFT_PAD;
 
-	pBox->height = TEXT_HEIGHT(ICON_APPEARANCE(pcd).font);
+	pBox->height = ICON_APPEARANCE(pcd).textHeight;
 
 	if (wmGD.frameStyle == WmSLAB)
 	{
@@ -799,7 +799,7 @@ void GetIconTitleBox (ClientData *pcd, XRectangle *pBox)
 
 	pBox->width = ICON_WIDTH(pcd) - 2 * ICON_EXTERNAL_SHADOW_WIDTH - 
 		  WM_TOP_TITLE_PADDING - WM_BOTTOM_TITLE_PADDING;
-	pBox->height = TEXT_HEIGHT(ICON_APPEARANCE(pcd).font);
+	pBox->height = ICON_APPEARANCE(pcd).textHeight;
 
     }
 
@@ -1021,7 +1021,7 @@ void GetIconDimensions (WmScreenData *pSD, unsigned int *pWidth, unsigned int *p
 
 	    *pLabelHeight = ICON_EXTERNAL_SHADOW_WIDTH            +
 			    WM_TOP_TITLE_PADDING                  +
-			    TEXT_HEIGHT(pSD->iconAppearance.font) +
+			    pSD->iconAppearance.textHeight +
 			    WM_BOTTOM_TITLE_PADDING               +
 			    ICON_EXTERNAL_SHADOW_WIDTH;
 	    break;
@@ -1062,7 +1062,7 @@ void GetIconDimensions (WmScreenData *pSD, unsigned int *pWidth, unsigned int *p
 
 	    *pLabelHeight = ICON_INTERNAL_SHADOW_WIDTH            +
 			    WM_TOP_TITLE_PADDING                  +
-			    TEXT_HEIGHT(pSD->iconAppearance.font) +
+			    pSD->iconAppearance.textHeight +
 			    WM_BOTTOM_TITLE_PADDING               +
 			    ICON_EXTERNAL_SHADOW_WIDTH;
 	    if (wmGD.frameStyle == WmSLAB)
@@ -1152,7 +1152,7 @@ void InitIconSize (WmScreenData *pSD)
     switch (pSD->iconDecoration & (ICON_IMAGE_PART | ICON_LABEL_PART)) 
     {
 	case ICON_LABEL_PART:
-	    iconShrinkHeight = TEXT_HEIGHT(pSD->iconAppearance.font);
+	    iconShrinkHeight = pSD->iconAppearance.textHeight;
 	    break;
 
 	case ICON_IMAGE_PART:

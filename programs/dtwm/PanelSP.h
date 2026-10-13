@@ -53,6 +53,7 @@ typedef struct _DtPanelShellPart
     XmFontList		high_res_font_list;
     XmFontList		medium_res_font_list;
     XmFontList		low_res_font_list;
+    XmRenderTable	render_table;	/* replaces the three font lists */
     Dimension		resolution;
     }	DtPanelShellPart;
 
@@ -81,6 +82,7 @@ typedef struct _DtPanelShellRec
 #define S_HighResFontList(s)	(s -> panel.high_res_font_list)
 #define S_MediumResFontList(s)	(s -> panel.medium_res_font_list)
 #define S_LowResFontList(s)	(s -> panel.low_res_font_list)
+#define S_RenderTable(s)	(s -> panel.render_table)
 
 
 #endif /* _DtPanelShellP_h */
