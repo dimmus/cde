@@ -881,8 +881,10 @@ __DtHelpFontDatabaseInit (
 
     /*
      * if the string_font is null, used the default user's font for strings.
+     * So too for a scalable (Xft) font, which the help canvas cannot draw
+     * (it would be taken for an XFontStruct).
      */
-    if (string_font == NULL)
+    if (string_font == NULL || type == XmFONT_IS_XFT)
       {
 /*
  * WARNING...what if the user_font is null? And what type is it?

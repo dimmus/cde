@@ -30,6 +30,7 @@
 #include <Xm/XmP.h>
 #include <Xm/IconFile.h>
 #include <Xm/XmPrivate.h>
+#include <Dt/FontListP.h>
 
 #ifdef DtUse_XmFunctions
 
@@ -238,4 +239,31 @@ void
  _DtFlushIconFileCache(String   path)
 {
 	XmeFlushIconFileCache(path);
+}
+
+
+/************************************************************************
+ *
+ * _DtFontListHasXft (Dt/FontListP.h)
+ *	Whether fontList has an Xft rendition.
+ *
+ ************************************************************************/
+Boolean
+_DtFontListHasXft(
+        XmFontList fontList)
+{
+    XmFontContext context;
+    XmFontListEntry entry;
+    XmFontType type;
+    Boolean xft = False;
+
+    if (fontList == NULL || !XmFontListInitFontContext(&context, fontList))
+        return False;
+    while (!xft && (entry = XmFontListNextEntry(context)) != NULL)
+    {
+        (void) XmFontListEntryGetFont(entry, &type);
+        xft = (type == XmFONT_IS_XFT);
+    }
+    XmFontListFreeFontContext(context);
+    return xft;
 }

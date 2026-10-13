@@ -175,6 +175,7 @@ const char gui_icon_strings[] =
 
 
 static void ClassInitialize(void);
+static void KeepFontList(Widget, int, XrmValue *);
 static void GetLabelString(Widget, int, XtArgVal *);
 static void GetTopLabelString(Widget, int, XtArgVal *);
 static void GetBottomLabelString(Widget, int, XtArgVal *);
@@ -262,6 +263,14 @@ static XtResource resources[] =
     XmNfontList, XmCFontList, XmRFontList, sizeof(XmFontList),
     XtOffsetOf(struct _IconRec, icon.font), XmRImmediate,
     (XtPointer) NULL
+    },
+    /* Another name of the same field, as in Motif's widgets: a render */
+    /* table ("*renderTable", the Style Manager's scalable fonts) wins */
+    /* over a font list; without one, KeepFontList keeps the font list. */
+    {
+    XmNrenderTable, XmCRenderTable, XmRRenderTable, sizeof(XmRenderTable),
+    XtOffsetOf(struct _IconRec, icon.font), XmRCallProc,
+    (XtPointer) KeepFontList
     },
     {
     XmNlabelPixmap, XmCLabelPixmap, XmRPrimForegroundPixmap,
@@ -708,6 +717,17 @@ ClassInitialize(
         PixmapPlacement, NULL, sizeof(PixmapPlacement) / sizeof(char *));
     GuiRID_STATE_PIXMAP_PLACEMENT = XmRepTypeRegister(GuiRStateGravity, 
 	StatePixmapPlacement, NULL,sizeof(StatePixmapPlacement)/sizeof(char *));
+}
+
+/* The default of XmNrenderTable: keep what XmNfontList got. */
+static void
+KeepFontList(
+   Widget w,
+   int offset,
+   XrmValue *value
+   )
+{
+   value->addr = (XPointer) ((char *) w + offset);
 }
 
 /*

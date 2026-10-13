@@ -109,6 +109,7 @@
 #include "HelpXlate.h"
 #include "VolSelectI.h"
 #include "Lock.h"
+#include <Dt/FontListP.h>
 
 /******** TYPES ***********/
 typedef enum {
@@ -371,6 +372,14 @@ static void LoadPrefixFont(
    /* get current font list */
    XtSetArg(args[0], XmNfontList, &curFontList);
    XtGetValues(hw->help_dialog.srch.resultList,args,1);
+
+   /* a scalable (Xft) font: the prefix uses it too, no core font is added */
+   if (_DtFontListHasXft(curFontList))
+   {
+      s_PrefixFontListTag = XmFONTLIST_DEFAULT_TAG;
+      hw->help_dialog.srch.hitsFontLoaded = True;
+      return;
+   }
 
    /* work with copy, because FontListAppendEntry() destroys input FL */
    newFontList = XmFontListCopy(curFontList);
