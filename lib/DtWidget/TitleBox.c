@@ -158,6 +158,22 @@ extern void _DtRegisterNewConverters( void ) ;
 
 /*	Define offset macros.
 */
+/*
+ * XmNrenderTable is another name of XmNfontList, as in the Motif
+ * widgets: a render table can also name scalable (Xft) fonts, such as
+ * the "*renderTable" of the Style Manager.  It follows XmNfontList in
+ * the resource list, so a value for it wins; without one, its default
+ * keeps what XmNfontList got.
+ */
+static void
+KeepFontList(
+        Widget w,
+        int offset,
+        XrmValue *value )
+{
+	value->addr = (XPointer) ((char *) w + offset);
+}
+
 #define TB_Offset(field) \
 	XtOffset (DtTitleBoxWidget, title_box.field)
 #define TBC_Offset(field) \
@@ -216,6 +232,11 @@ static XtResource resources[] =
 		XmNfontList,
 		XmCFontList, XmRFontList, sizeof (XmFontList),
 		TB_Offset (font_list), XmRImmediate, (XtPointer) NULL
+	},
+	{
+		XmNrenderTable,
+		XmCRenderTable, XmRRenderTable, sizeof (XmRenderTable),
+		TB_Offset (font_list), XmRCallProc, (XtPointer) KeepFontList
 	}
 };
 

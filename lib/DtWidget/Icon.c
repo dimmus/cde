@@ -291,6 +291,22 @@ extern XtPointer _XmCachePart( XmCacheClassPartPtr cp, XtPointer cpart, size_t  
 /*-------------------------------------------------------------
 **	Resource List
 */
+/*
+ * XmNrenderTable is another name of XmNfontList, as in the Motif
+ * widgets: a render table can also name scalable (Xft) fonts, such as
+ * the "*renderTable" of the Style Manager.  It follows XmNfontList in
+ * the resource list, so a value for it wins; without one, its default
+ * keeps what XmNfontList got.
+ */
+static void
+KeepFontList(
+        Widget w,
+        int offset,
+        XrmValue *value )
+{
+	value->addr = (XPointer) ((char *) w + offset);
+}
+
 #define I_Offset(field) \
 	XtOffset (DtIconGadget, icon.field)
 
@@ -325,6 +341,11 @@ static XtResource resources[] =
 		XmNfontList,
 		XmCFontList, XmRFontList, sizeof (XmFontList),
 		I_Offset (font_list), XmRString, "Fixed"
+	},
+	{
+		XmNrenderTable,
+		XmCRenderTable, XmRRenderTable, sizeof (XmRenderTable),
+		I_Offset (font_list), XmRCallProc, (XtPointer) KeepFontList
 	},
 	{
 		XmNimageName,
