@@ -131,6 +131,17 @@ PKG_CHECK_MODULES([MOTIF], [motif],
     [CPP_COMPILER_FLAGS="${CPP_COMPILER_FLAGS} ${MOTIF_CFLAGS}"],
     [:])
 
+dnl dtstyle's Font dialog lists scalable fonts with fontconfig and previews
+dnl them with Xft.  Both are optional: without them the dialog offers only
+dnl bitmap fonts.
+PKG_CHECK_MODULES([XFT], [xft fontconfig], [have_xft=yes], [have_xft=no])
+AM_CONDITIONAL([DTSTYLE_XFT], [test "x$have_xft" = xyes])
+if test "x$have_xft" = xyes; then
+   AC_MSG_NOTICE([Style Manager scalable (Xft) font support: yes])
+else
+   AC_MSG_NOTICE([Style Manager scalable (Xft) font support: no (xft and fontconfig not found)])
+fi
+
 # pam currently only works on netbsd (9.2 tested) and linux
 supports_pam=no
 

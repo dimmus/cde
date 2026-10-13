@@ -38,6 +38,10 @@
 <Para><XRef Linkend="ChangeFontSizeTA">
 </Para>
 </ListItem>
+<ListItem Id="HSTYM.TOC.item.45">
+<Para><XRef Linkend="UseXftFontsTA">
+</Para>
+</ListItem>
 <ListItem Id="HSTYM.TOC.item.7">
 <Para><XRef Linkend="ChangeBackdropTA">
 </Para>

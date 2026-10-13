@@ -13,9 +13,20 @@ dtstyle_CPPFLAGS = $(CDE_CPPFLAGS) -DCDE_CONFIGURATION_TOP=\"$(CDE_CONFIGURATION
 	-DCDE_DATA_TOP=\"$(CDE_DATA_TOP)\" \
 	$(DT_INCDIR)
 
-dtstyle_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(XMLIB) $(XTLIB) $(X11LIB)
+# Scalable (Xft) fonts in the Font dialog, when configure found fontconfig
+# and Xft.  FontXft.c is always built; without DTSTYLE_HAVE_XFT the dialog
+# offers bitmap fonts only.
+if DTSTYLE_XFT
+dtstyle_CPPFLAGS += -DDTSTYLE_HAVE_XFT $(XFT_CFLAGS)
+DTSTYLE_XFT_LIBS = $(XFT_LIBS)
+else
+DTSTYLE_XFT_LIBS =
+endif
 
-dtstyle_SOURCES = Main.c MainWin.c Font.c Audio.c Startup.c Mouse.c	\
+dtstyle_LDADD = $(LIBHELP) $(LIBWIDGET) $(LIBSVC) $(XMLIB) $(DTSTYLE_XFT_LIBS) \
+	$(XTLIB) $(X11LIB)
+
+dtstyle_SOURCES = Main.c MainWin.c Font.c FontXft.c Audio.c Startup.c Mouse.c	\
 		  SaveRestore.c Backdrop.c Screen.c Keyboard.c		\
 		  ColorMain.c ColorPalette.c ColorFile.c ColorEdit.c	\
 		  Resource.c Protocol.c Dtwm.c Help.c HelpCB.c		\
@@ -23,7 +34,7 @@ dtstyle_SOURCES = Main.c MainWin.c Font.c Audio.c Startup.c Mouse.c	\
 		  Help.h Keyboard.h OWsync.h Screen.h Backdrop.h	\
 		  ColorPalette.h I18nEnv.h Main.h Protocol.h		\
 		  Startup.h ColorEdit.h Dtwm.h I18nMain.h MainWin.h	\
-		  Resource.h ColorFile.h Font.h I18nUtil.h Mouse.h	\
+		  Resource.h ColorFile.h Font.h FontXft.h I18nUtil.h Mouse.h	\
 		  TrueColor.h						\
 		  SaveRestore.h
 

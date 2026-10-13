@@ -594,7 +594,7 @@ callCancels( void )
    }
 
      if(style.fontDialog != NULL && XtIsManaged(style.fontDialog)) {
-	 CancelBut.button_position = CANCEL_BUTTON;
+	 CancelBut.button_position = FONT_CANCEL_BUTTON;
 	 XtCallCallbacks(style.fontDialog, XmNcallback, &CancelBut);
      }
 

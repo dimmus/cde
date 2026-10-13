@@ -49,6 +49,27 @@ Dtstyle*NumFonts: %|nls-3-7^NumFonts|
 
 %|nls-5-#Set of UserFont#|
 
+!###
+!#
+!#  Font Dialog: scalable (Xft) fonts
+!#
+!# Defaults the Font dialog offers when no scalable font has been chosen
+!# yet.  A family is a fontconfig family or a generic name (sans-serif,
+!# serif, monospace) that the dialog resolves to an installed outline
+!# font.  Styles are fontconfig style names.  Sizes are integer points.
+!# These do not switch the desktop to scalable fonts; bitmap fonts stay
+!# the default.
+!#
+!# Do not translate the following
+!###
+
+Dtstyle*xftSystemFamily: sans-serif
+Dtstyle*xftSystemStyle:  Regular
+Dtstyle*xftSystemSize:   10
+Dtstyle*xftUserFamily:   monospace
+Dtstyle*xftUserStyle:    Regular
+Dtstyle*xftUserSize:     10
+
 
 !###
 !#

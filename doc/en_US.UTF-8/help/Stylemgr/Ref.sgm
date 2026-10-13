@@ -730,38 +730,180 @@ dialog box (from left to right):
 <Graphic Entityref="FontDialogBox" Id="HSTYM.REF.fig.7"></Graphic>
 <VariableList>
 <VarListEntry>
-<Term>Size (list)</Term>
+<Term>Font Type</Term>
 <ListItem>
-<Para>Lists a series
-of relative font sizes (not the actual font size).
+<Para>Selects how applications draw their fonts. Bitmap uses the
+bitmap font pair of the selected size. Scalable (Xft) gives Motif
+applications scalable fonts, drawn smoothly with Xft, in the family,
+style, and point size you choose.
+</Para>
+<Para>Scalable (Xft) is not available when the Style Manager was built
+without fontconfig and Xft, when the Motif library has no Xft support,
+or when no scalable fonts are installed; the dialog box then shows a
+note. Scalable fonts need a Motif 2.5 library in which the
+<ComputerOutput>*Font</ComputerOutput> resource does not apply to Xft fonts.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Size (list) or Bitmap Size (list)</Term>
+<ListItem>
+<Para>Lists a series of relative bitmap font sizes (not the actual font
+size). In Scalable (Xft) mode the list is labeled Bitmap Size: the
+window manager, terminals, help windows, and applications that do not
+use scalable fonts still use the bitmap font of the selected size.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Scalable Fonts</Term>
+<ListItem>
+<Para>Chooses the scalable fonts. These controls can be changed only in
+Scalable (Xft) mode.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>System Font</Term>
+<ListItem>
+<Para>The font used for labels, buttons, menus, lists, the choices
+shown in combo boxes and spin boxes, and other text that you do not
+edit.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>User Font</Term>
+<ListItem>
+<Para>The font used for text fields and editors, except those in combo
+boxes and spin boxes.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Family, Style, Size</Term>
+<ListItem>
+<Para>For each font, the font family (for example, DejaVu Sans), the
+style of that family (for example, Regular or Bold), and the size
+in points.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Monospace families only</Term>
+<ListItem>
+<Para>Limits the User Font families to fonts whose characters all have
+the same width, which keeps columns of text aligned.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Rendering</Term>
+<ListItem>
+<Para>Sets how scalable fonts are drawn. These controls can be changed only
+in Scalable (Xft) mode. Default means that the Style Manager does not set
+the value, so the system font configuration decides. The settings reach
+applications started after the change.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Antialiasing</Term>
+<ListItem>
+<Para>Smooths the edges of characters with shades of gray.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Hinting</Term>
+<ListItem>
+<Para>Adjusts character outlines to the pixel grid, which makes small
+text sharper.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Hint Style</Term>
+<ListItem>
+<Para>How strongly hinting adjusts the outlines: None, Slight, Medium,
+or Full.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Subpixel Order</Term>
+<ListItem>
+<Para>For LCD screens, the order of the red, green, and blue parts of
+each pixel (RGB, BGR, Vertical RGB, Vertical BGR). It makes text
+sharper horizontally. Choose None for other screens.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>LCD Filter</Term>
+<ListItem>
+<Para>The filter that reduces color fringes when a subpixel order is
+used: None, Standard, Light, or Legacy.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Resolution</Term>
+<ListItem>
+<Para>The screen resolution, in dots per inch, used to convert point
+sizes to pixels. Automatic uses the resolution computed from the size
+of the screen, shown in parentheses. Clear Automatic to enter a value.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Override the system font configuration</Term>
+<ListItem>
+<Para>Also writes the Antialiasing, Hinting, Hint Style, Subpixel Order,
+and LCD Filter settings to the fontconfig file
+<ComputerOutput>90-dtstyle.conf</ComputerOutput> in your fontconfig
+configuration directory (normally
+<ComputerOutput>~/.config/fontconfig/conf.d</ComputerOutput>), so that they take precedence over the system font configuration. The
+file affects all applications that use fontconfig, not only desktop
+applications. Without Override, the system font configuration may
+take precedence over these settings.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
 <Term>Preview</Term>
 <ListItem>
-<Para>Displays the selected font size. The text outside of the
-text field shows the font to be used for titles and labels. The
-text inside the text field shows the font to be used for lists
-and text fields. You may select the text field and type your
-own sample text.
+<Para>Displays the selected fonts. The text outside of the text field
+shows the font to be used for titles, labels, and lists. The text inside
+the text field shows the font to be used for text fields. You may select
+the text field and type your own sample text. In Scalable (Xft) mode, a
+third sample shows the bitmap font used by the window manager,
+terminals, and help.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
 <Term>OK</Term>
 <ListItem>
-<Para>Applies the selected font size and closes the Font dialog box. The
-selected font size is then used by new applications. To use the
-selected font size in currently running applications, you must
-exit and restart the application.
+<Para>Applies the selected fonts and closes the Font dialog box. The
+selected fonts are then used by new applications. To use them in
+currently running applications, you must exit and restart the
+application.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Apply</Term>
+<ListItem>
+<Para>Applies the selected fonts without closing the dialog box.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
 <Term>Cancel</Term>
 <ListItem>
-<Para>Closes the dialog box without making changes.
+<Para>Closes the dialog box and discards the changes that were not
+applied. It does not undo changes already applied with Apply.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -779,6 +921,9 @@ exit and restart the application.
 <ItemizedList Mark="&bull;">
 <ListItem Id="HSTYM.REF.item.42">
 <Para><XRef Linkend="ChangeFontSizeTA"></Para>
+</ListItem>
+<ListItem Id="HSTYM.REF.item.50">
+<Para><XRef Linkend="UseXftFontsTA"></Para>
 </ListItem>
 </ItemizedList>
 </Step>

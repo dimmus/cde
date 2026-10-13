@@ -17,6 +17,12 @@ for the following:
 Select workspace colors and palettes.
 .IP "\fBFonts\fP"
 Select application font sizes.
+The Font dialog has two font types.
+\fBBitmap\fP (the default) uses the bitmap font pair of the selected size.
+\fBScalable (Xft)\fP gives Motif applications scalable fontconfig fonts,
+drawn with Xft, with a family, style and point size for the System Font
+and the User Font, and optional rendering settings; see
+\fBFONT DIALOG\fP below.
 .IP "\fBBackdrop\fP"
 Select workspace backdrop patterns.
 .IP "\fBKeyboard\fP"
@@ -282,6 +288,12 @@ userFont4	UserFont4	FontList	-bitstream-prestige-medium-r-normal--17-128-72-72-m
 userFont5	UserFont5	FontList	-bitstream-prestige-medium-r-normal--19-160-72-72-m-110-hp-roman8
 userFont6	UserFont6	FontList	-bitstream-prestige-medium-r-normal--23-179-85-85-m-120-hp-roman8
 userFont7	UserFont7	FontList	-bitstream-prestige-medium-r-normal--26-171-110-110-m-140-hp-roman8
+xftSystemFamily	XftSystemFamily	String	sans-serif
+xftSystemStyle	XftSystemStyle	String	Regular
+xftSystemSize	XftSystemSize	int	10
+xftUserFamily	XftUserFamily	String	monospace
+xftUserStyle	XftUserStyle	String	Regular
+xftUserSize	XftUserSize	int	10
 .TE
 .sp 1
 .RS
@@ -293,7 +305,78 @@ the Font dialog.
 .IP "\fBuserFont[1-7]\fP"
 Specifies a UserFont for a particular font size that can be selected in
 the Font dialog.
+.IP "\fBxftSystemFamily\fP, \fBxftSystemStyle\fP, \fBxftSystemSize\fP"
+Specify the System Font (labels, buttons, menus, lists, combo boxes and
+spin boxes) that the Font dialog offers in Scalable (Xft) mode until one
+has been chosen.
+The family is a fontconfig family name or a generic name such as
+sans-serif, serif or monospace, which the dialog resolves to an installed
+outline font.
+The style is a fontconfig style name of that family, and the size is an
+integer number of points.
+.IP "\fBxftUserFamily\fP, \fBxftUserStyle\fP, \fBxftUserSize\fP"
+Specify the User Font (other text fields and editors) offered in
+Scalable (Xft) mode, in the same way.
 .RE
+.LP
+These six resources are only the dialog's defaults; they do not switch the
+desktop to scalable fonts.
+.sp 1
+.SH "FONT DIALOG"
+In \fBBitmap\fP mode the Font dialog writes these resources, into the
+RESOURCE_MANAGER property when \fBwriteXrdbImmediate\fP is True and into
+the session's resources for the next login:
+.sp 1
+.nf
+.RS
+*systemFont, *userFont, *FontList, *buttonFontList, *labelFontList,
+*textFontList, *XmText*FontList, *XmTextField*FontList,
+*DtEditor*textFontList, *Font, *FontSet
+.RE
+.fi
+.sp 1
+In \fBScalable (Xft)\fP mode it writes the same bitmap resources, which the
+window manager, terminals, help windows and other applications that read
+font lists keep using; the Size list is then labeled Bitmap Size.
+It adds:
+.sp 1
+.nf
+.RS
+*renderTable: DtXftSystem
+*XmText*renderTable: DtXftUser
+*XmTextField*renderTable: DtXftUser
+*XmSimpleSpinBox*XmTextField*renderTable: DtXftSystem
+*XmSpinBox*XmTextField*renderTable: DtXftSystem
+*DtComboBox*XmTextField*renderTable: DtXftSystem
+*DtSpinBox*XmTextField*renderTable: DtXftSystem
+*DtXftSystem.fontType, .fontName, .fontStyle, .fontSize
+*DtXftUser.fontType, .fontName, .fontStyle, .fontSize
+Xft.antialias, Xft.hinting, Xft.hintstyle, Xft.rgba,
+Xft.lcdfilter, Xft.dpi
+.RE
+.fi
+.sp 1
+An Xft.* resource is written only when its rendering setting is not
+Default (Xft.dpi only when the resolution is not Automatic).
+When \fBOverride the system font configuration\fP is set, the dialog also
+writes the antialiasing, hinting, hint style, subpixel order and LCD filter
+settings to
+\fI${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d/90-dtstyle.conf\fP,
+which affects every application that uses fontconfig.
+Switching back to Bitmap removes the renderTable, DtXft and Xft.*
+resources that the Style Manager wrote, and removes that file if the Style
+Manager created it.
+New settings reach applications started after the change.
+.LP
+Scalable (Xft) mode requires a Motif 2.5 library built with Xft support in
+which the loose \fB*Font\fP resource does not apply to Xft renditions;
+with an older libXm that resource replaces the scalable fonts with a bitmap
+font.
+The text and list of an XmComboBox show the System Font only with a libXm
+whose combo boxes keep their own font for them; with an older one they show
+the bitmap User Font.
+Scalable font support is optional when CDE is built: without the fontconfig
+and Xft development files, the Font dialog offers Bitmap mode only.
 .sp1
 .SH COPYRIGHT
 Copyright 1990 Hewlett-Packard Company.

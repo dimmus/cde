@@ -225,6 +225,112 @@ available in the Size list. If a new font is selected and\n\
 applied, you will not be able to return to the current font\n\
 using the Style Manager - Font dialog.
 
+$ _DtMessage 25-66 are used by the Bitmap / Scalable (Xft) part of the
+$ Font dialog.
+$ _DtMessage 25 is the label of the titlebox of the font type choice
+25 Font Type
+
+$ _DtMessage 26 and 27 are the font type toggle buttons
+26 Bitmap
+27 Scalable (Xft)
+
+$ _DtMessage 28 is the label of the titlebox of the scalable font choices
+28 Scalable Fonts
+
+$ _DtMessage 29-31 are the column headers of the scalable font choices.
+$ 31 is a size in points.
+29 Family
+30 Style
+31 Size
+
+$ _DtMessage 32 and 33 are the row labels of the scalable font choices
+32 System Font:
+33 User Font:
+
+$ _DtMessage 34 is a toggle button that limits the User Font families to
+$ monospaced ones
+34 Monospace families only
+
+$ _DtMessage 35 is the label of the titlebox of the font rendering options
+35 Rendering
+
+$ _DtMessage 36-41 are the labels of the font rendering options
+36 Antialiasing:
+37 Hinting:
+38 Hint Style:
+39 Subpixel Order:
+40 LCD Filter:
+41 Resolution:
+
+$ _DtMessage 42 is an option menu item meaning that the Style Manager does
+$ not set this rendering option
+42 Default
+
+$ _DtMessage 43 and 44 are the options of Antialiasing and Hinting
+43 On
+44 Off
+
+$ _DtMessage 45-48 are the options of Hint Style.  45 means no hinting style.
+45 None
+46 Slight
+47 Medium
+48 Full
+
+$ _DtMessage 49-53 are the options of Subpixel Order.  49 means no subpixel
+$ rendering.
+49 None
+50 RGB
+51 BGR
+52 Vertical RGB
+53 Vertical BGR
+
+$ _DtMessage 54-57 are the options of LCD Filter.  54 means no filter; 55 is
+$ the fontconfig filter "lcddefault".
+54 None
+55 Standard
+56 Light
+57 Legacy
+
+$ _DtMessage 58 is the toggle button for an automatic resolution.  The
+$ program appends " (N dpi)" with the resolution computed from the screen.
+58 Automatic
+
+$ _DtMessage 59 is a toggle button that makes the Style Manager write a
+$ fontconfig file with the rendering options
+59 Override the system font configuration\n\
+(affects all applications)
+
+$ _DtMessage 60 is the label of the titlebox containing the list of font
+$ sizes when scalable (Xft) fonts are selected
+60 Bitmap Size
+
+$ _DtMessage 61 is the label above the bitmap font sample in the preview
+$ area when scalable (Xft) fonts are selected
+61 Window manager, terminals and help:
+
+$ _DtMessage 62 is shown in the Font dialog when the Motif library has no
+$ Xft support
+62 Scalable fonts are not available: the Motif\n\
+library was built without Xft support.
+
+$ _DtMessage 63 is shown in the Font dialog when fontconfig finds no
+$ scalable fonts
+63 No scalable fonts are installed.
+
+$ _DtMessage 64 is a note below the font rendering options
+64 Rendering settings take effect in applications\n\
+started after the change. Without Override,\n\
+the system font configuration may take precedence.
+
+$ _DtMessage 65 appears in an Error dialog when the fontconfig file of
+$ message 59 could not be written or removed
+65 The font configuration file could not be written.
+
+$ _DtMessage 66 is shown in the Font dialog when the Style Manager was built
+$ without fontconfig and Xft
+66 Scalable fonts are not available: Style Manager\n\
+was built without fontconfig and Xft.
+
 $set 6
 $ _DtMessage set 6 is for the Beep dialog
 $ _DtMessage 1,6 from set 6 have been deleted from the message catalog

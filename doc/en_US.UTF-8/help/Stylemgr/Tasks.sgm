@@ -32,6 +32,9 @@
 <ListItem Id="HSTYM.TSKS.item.6">
 <Para><XRef Linkend="ChangeFontSizeTA"></Para>
 </ListItem>
+<ListItem Id="HSTYM.TSKS.item.186">
+<Para><XRef Linkend="UseXftFontsTA"></Para>
+</ListItem>
 <ListItem Id="HSTYM.TSKS.item.7">
 <Para><XRef Linkend="ChangeBackdropTA"></Para>
 </ListItem>
@@ -538,7 +541,9 @@ uses colors.)
 </Para>
 </ListItem>
 <ListItem Id="HSTYM.TSKS.item.64">
-<Para>Select a font size.
+<Para>Select a font size. When the Font Type is Scalable (Xft), the list
+is labeled Bitmap Size and sets the bitmap fonts that the window manager,
+terminals, and help still use.
 </Para>
 </ListItem>
 <ListItem Id="HSTYM.TSKS.item.65">
@@ -555,6 +560,82 @@ uses colors.)
 <ItemizedList Mark="&bull;" Role="tight">
 <ListItem Id="HSTYM.TSKS.item.66">
 <Para><XRef Linkend="SMFontDialogDE"></Para>
+</ListItem>
+<ListItem Id="HSTYM.TSKS.item.187">
+<Para><XRef Linkend="UseXftFontsTA"></Para>
+</ListItem>
+</ItemizedList>
+</Step>
+</Procedure>
+</Sect1>
+<Sect1 Id="UseXftFontsTA">
+<Title>To Use Scalable (Xft) Fonts</Title>
+<IndexTerm>
+<Primary>font: scalable</Primary>
+</IndexTerm>
+<IndexTerm>
+<Primary>scalable fonts</Primary>
+</IndexTerm>
+<IndexTerm>
+<Primary>Xft fonts</Primary>
+</IndexTerm>
+<IndexTerm>
+<Primary>font: antialiasing</Primary>
+</IndexTerm>
+<IndexTerm>
+<Primary>font: returning to bitmap fonts</Primary>
+</IndexTerm>
+<OrderedList>
+<ListItem Id="HSTYM.TSKS.item.188">
+<Para>Click the Style Manager Font control.
+</Para>
+</ListItem>
+<ListItem Id="HSTYM.TSKS.item.189">
+<Para>Select Scalable (Xft) as the Font Type.
+</Para>
+</ListItem>
+<ListItem Id="HSTYM.TSKS.item.190">
+<Para>Choose the family, style, and size of the System Font (labels,
+buttons, menus, and lists) and of the User Font (text fields and
+editors). Select Monospace families only to list only fixed-width
+families for the User Font.
+</Para>
+</ListItem>
+<ListItem Id="HSTYM.TSKS.item.191">
+<Para>Optionally, change the Rendering settings, such as Antialiasing
+or Subpixel Order. Leave a setting at Default to keep the system font
+configuration.
+</Para>
+</ListItem>
+<ListItem Id="HSTYM.TSKS.item.192">
+<Para>Click OK, or click Apply to keep the dialog box open.
+</Para>
+</ListItem>
+</OrderedList>
+<Para>Motif applications started after the change use the scalable fonts.
+The window manager, terminals, and help keep using the bitmap font of the
+selected Bitmap Size.
+</Para>
+<Para>To return to bitmap fonts, open the Font dialog box, select Bitmap
+as the Font Type, and click OK. The Style Manager removes the scalable
+font settings it wrote.
+</Para>
+<Para>Applications that are already running show the change only after
+they are restarted, or after the next login.
+</Para>
+<Para>Scalable (Xft) cannot be selected when the Style Manager or the
+Motif library was built without Xft support, or when no scalable fonts
+are installed.
+</Para>
+<Procedure>
+<Title>See Also</Title>
+<Step>
+<ItemizedList Mark="&bull;" Role="tight">
+<ListItem Id="HSTYM.TSKS.item.193">
+<Para><XRef Linkend="SMFontDialogDE"></Para>
+</ListItem>
+<ListItem Id="HSTYM.TSKS.item.194">
+<Para><XRef Linkend="ChangeFontSizeTA"></Para>
 </ListItem>
 </ItemizedList>
 </Step>

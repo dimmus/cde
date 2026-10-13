@@ -53,7 +53,10 @@ build_deps+=(
     tcl                 # tclConfig.sh (dtksh)
 )
 
-# Build dependencies of our own Motif (~/motif, CMake)
+# Build dependencies of our own Motif (~/motif, CMake).  fontconfig and
+# libxft are also used by CDE itself: the Style Manager (dtstyle) needs them
+# for scalable (Xft) fonts in its Font dialog (optional; without them it
+# offers bitmap fonts only).
 build_deps+=(
     cmake fontconfig libxft libpng libjpeg-turbo
     ninja ccache        # 'make ... ninja ccache' targets in ~/motif/GNUmakefile
