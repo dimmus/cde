@@ -4307,57 +4307,6 @@ FallbackMakeTitleHeight (AppearanceData *pAData) {
 
 /*************************************<->*************************************
  *
- *  LoadFontSetFont (fontList)
- *
- *
- *  Description:
- *  -----------
- *  This function loads the first font of the first font set in fontList.
- *  In a UTF-8 locale Xlib loads the fonts of a font set on demand, and
- *  XmeRenderTableGetDefaultFont refuses a font that is not loaded yet
- *  (fid 0), so a font set that is fine for drawing gives no font for
- *  the measurements done with pAData->font (icon labels, feedback box).
- *
- *  Inputs:
- *  ------
- *  fontList = the font list of an appearance
- *
- *
- *  Outputs:
- *  -------
- *  return = the loaded font, or NULL
- *
- *************************************<->***********************************/
-
-static XFontStruct *
-LoadFontSetFont (XmFontList fontList)
-{
-  XmFontContext       fc;
-  XmFontType          type;
-  XmFontListEntry     entry;
-  XtPointer           pFont;
-  XFontStruct         **fonts;
-  char                **names;
-  XFontStruct         *font = NULL;
-
-  if (!XmFontListInitFontContext (&fc, fontList))
-    return NULL;
-  while (!font && (entry = XmFontListNextEntry (fc)) != NULL)
-  {
-    pFont = XmFontListEntryGetFont (entry, &type);
-    if (type == XmFONT_IS_FONTSET &&
-	XFontsOfFontSet ((XFontSet) pFont, &fonts, &names) > 0)
-    {
-      font = XLoadQueryFont (wmGD.display, names[0]);
-    }
-  }
-  XmFontListFreeFontContext (fc);
-  return font;
-}
-
-
-/*************************************<->*************************************
- *
  *  MakeAppearanceResources (pSD, pAData, makeActiveResources)
  *
  *
@@ -4391,20 +4340,7 @@ MakeAppearanceResources (WmScreenData *pSD, AppearanceData *pAData, Boolean make
      * Extract a font from the font list.
      */
 
-    if (! XmeRenderTableGetDefaultFont(pAData->fontList, &(pAData->font)) &&
-	(pAData->font = LoadFontSetFont(pAData->fontList)) != NULL)
-    {
-	/*
-	 * A font set whose fonts are not loaded yet (UTF-8 locales): the
-	 * title height comes from its extents, as in the fallback below.
-	 */
-	if (!FallbackMakeTitleHeight(pAData))
-	{
-	  pAData->titleHeight = (pAData->font)->ascent + (pAData->font)->descent
-	    + WM_TITLE_BAR_PADDING;
-	}
-    }
-    else if (! pAData->font)
+    if (! XmeRenderTableGetDefaultFont(pAData->fontList, &(pAData->font)))
     {
 #if 0
         /* This always prints garbage on failure, which seems to
