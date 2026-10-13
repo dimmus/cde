@@ -57,6 +57,7 @@
 #if defined(sgi) || defined(CSRG_BASED)
 #include <getopt.h>
 #endif
+#include "../../../../programs/dtlogin/startup-trace.h"
 
 TT_INSERT_COPYRIGHT
 
@@ -200,6 +201,8 @@ int main(int argc, char **argv)
 	Tt_status	status;
 	_Tt_wait_status	ch_status;
 	int		i;
+
+	cde_startup_trace("ttsession", "start");
 
 	//
 	// Initialize all the global objects needed.
@@ -433,12 +436,14 @@ int main(int argc, char **argv)
 			if (background_mode) {
 				kill(getppid(), SIGTERM);
 			}
+			cde_startup_trace("ttsession", "released");
 
 			// initialize ptypes/otypes 
 			if (! init_types()) {
 				// init_types() has emitted diagnostic
 				exit(1);
 			}
+			cde_startup_trace("ttsession", "types");
 			break;
 		      case TT_ERR_SESSION:
 			// couldn't initialize because there's already

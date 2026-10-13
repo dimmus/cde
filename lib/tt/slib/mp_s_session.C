@@ -57,6 +57,7 @@
 
 #include "mp/mp_unix_socket.h"
 #include "mp_rpc_server_utils.h"
+#include "../../../programs/dtlogin/startup-trace.h"
 
 // Use the parent class (_Tt_session) for construction and destruction.
 _Tt_s_session::_Tt_s_session () {}
@@ -206,6 +207,7 @@ s_init()
 		// then be used to add the fd for the desktop
 		// connection to the list of fds that get polled.
 		_tt_s_mp->xfd = _desktop->notify_fd();
+		cde_startup_trace("ttsession", "x-open");
 
 		//
 		// Check for a session already running.  This used to
@@ -234,6 +236,7 @@ s_init()
 				   _tt_enumname(status));
 			return TT_ERR_INTERNAL;
 		}
+		cde_startup_trace("ttsession", "live-check");
 	}
 	_pid = getpid();
 	_server_uid = getuid();
@@ -256,6 +259,7 @@ s_init()
 	_rpc_program = _rpc_server->program();
 	_rpc_version = _rpc_server->version();
 	_rpc_port = _rpc_server->port();
+	cde_startup_trace("ttsession", "rpc");
 
 	// initializes our local host object which allows us to
 	// inquire our host address so we can then advertise it to
@@ -274,12 +278,14 @@ s_init()
 	    (status = _auth.generate_auth_cookie()) != TT_OK) {
 		return status;
 	}
+	cde_startup_trace("ttsession", "auth");
 
 	if ((status = set_id()) == TT_OK) {
 		// advertise our address according to the type of
 		// session environment that we are in.
 
 		if ((status = advertise_address(seen_addr)) == TT_OK) {
+			cde_startup_trace("ttsession", "advertised");
 #ifdef _TT_HAVE_UNIX_SOCKET_RPC
 			// open the local socket for connection
 			// requests and set the unix_fd field in the

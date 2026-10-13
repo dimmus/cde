@@ -77,13 +77,18 @@ const int	TT_PUSH_ROTATE_XDR_VERSION	= 4;
 /* 
  * Default timeout for synchronous RPC requests (in seconds).
  * This used to be 1000000 (11.6 days), so a wedged ttsession hung every
- * client forever.  ttsession serves these requests without blocking on
- * anything else, so a bounded wait is enough; a session that does not
- * answer within it is reported as TT_ERR_NOMP.  Set TT_RPC_TIMEOUT
- * (seconds) in the environment to wait longer, e.g. while debugging
- * ttsession.
+ * client forever; a session that does not answer within it is now
+ * reported as TT_ERR_NOMP.  It must stay well above anything a working
+ * ttsession can be busy with before it answers: loading the types
+ * database right after it has released Xsession, the ~/.TTauthority
+ * lock (about 11 s for a fresh orphaned one), a stalled X server, and
+ * rpc.ttdbserverd requests, which may take TT_DB_RPC_NORMAL_TIMEOUT_SECS
+ * (30 s).  With 10 s a slow but working session failed the login
+ * ("Could not connect to ToolTalk", TT_ERR_NOMP) on some VMs.  Set
+ * TT_RPC_TIMEOUT (seconds) in the environment to change it, e.g. while
+ * debugging ttsession.
  */
-#define TT_RPC_TMOUT		10
+#define TT_RPC_TMOUT		60
 
 /*
  * RPC procedure numbers
