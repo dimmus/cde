@@ -46,6 +46,7 @@
  *		ShowChangeDirDialog
  *		ShowFastChangeDir
  *		TimerEvent
+ *		cd_xmstring
  *		draw_imagestring
  *		get_text_pieces
  *		get_textwidth
@@ -912,6 +913,13 @@ DrawCurrentDirectory(
        font_yoffset = -(extents->max_logical_extent.y);
        font_height = extents->max_logical_extent.height;
    }
+   else if(file_mgr_data->cd_fonttype == XmFONT_IS_XFT)
+   {
+       XmString xms = XmStringCreateLocalized(" ");
+       font_yoffset = XmStringBaseline(file_mgr_data->cd_fontlist, xms);
+       font_height = XmStringHeight(file_mgr_data->cd_fontlist, xms);
+       XmStringFree(xms);
+   }
    else
    {
        font_yoffset = file_mgr_data->cd_font->ascent;
@@ -1300,13 +1308,32 @@ TimerEvent(
  * get_textwidth
  *------------------------------------------------------------------*/
 
-/* use Xmb functions if XFontSet is used. */
+/* An XmString of the first len bytes of str, for an Xft render table.
+ * XmStringCreate makes one text segment; XmStringCreateLocalized would
+ * parse a newline or tab in a directory name into a separator or tab
+ * component, unlike the core font and font set paths. */
+static XmString
+cd_xmstring( char *str,
+             int len)
+{
+    char *buf = XtMalloc(len + 1);
+    XmString xms;
+
+    memcpy(buf, str, len);
+    buf[len] = '\0';
+    xms = XmStringCreate(buf, XmFONTLIST_DEFAULT_TAG);
+    XtFree(buf);
+    return(xms);
+}
+
+/* use Xmb functions if XFontSet is used, XmString ones for Xft. */
 static int
 get_textwidth( FileMgrData *fmd,
                char *str,
                int len)
 {
     int w = 0;
+    XmString xms;
 
     switch(fmd->cd_fonttype)
     {
@@ -1315,6 +1342,12 @@ get_textwidth( FileMgrData *fmd,
             break;
         case XmFONT_IS_FONT:
             w = XTextWidth(fmd->cd_font, str, len);
+            break;
+        case XmFONT_IS_XFT:
+            xms = cd_xmstring(str, len);
+            w = XmStringWidth(fmd->cd_fontlist, xms);
+            XmStringFree(xms);
+            break;
         default:
             break;
     }
@@ -1338,6 +1371,19 @@ draw_imagestring( Display *display,
             break;
         case XmFONT_IS_FONT:
             XDrawImageString(display, d, gc, x, y, text, bytes);
+            break;
+        case XmFONT_IS_XFT:
+            {
+                /* y is the baseline, XmStringDrawImage wants the top */
+                XmString xms = cd_xmstring(text, bytes);
+                XmStringDrawImage(display, d, fmd->cd_fontlist, xms, gc,
+                                  x, y - XmStringBaseline(fmd->cd_fontlist, xms),
+                                  XmStringWidth(fmd->cd_fontlist, xms),
+                                  XmALIGNMENT_BEGINNING,
+                                  XmSTRING_DIRECTION_L_TO_R, NULL);
+                XmStringFree(xms);
+            }
+            break;
         default:
             break;
     }

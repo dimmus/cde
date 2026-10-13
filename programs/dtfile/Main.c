@@ -238,6 +238,7 @@ typedef struct
    int instanceIconWidth;
    int instanceIconHeight;
    XmFontList user_font;
+   XmRenderTable user_render_table;
    Dimension tool_width;
    Dimension tool_height;
    Dimension dir_width;
@@ -765,6 +766,14 @@ static XtResource resources[] =
    {
      "userFont", "XmCFontList", XmRFontList, sizeof (XmFontList),
      XtOffset (ApplicationArgsPtr, user_font), XmRString, (XtPointer) "Fixed",
+   },
+
+   /* Set (to DtXftUser) only in the Style Manager's Scalable fonts mode */
+   {
+     "userRenderTable", "UserRenderTable", XmRRenderTable,
+     sizeof (XmRenderTable),
+     XtOffset (ApplicationArgsPtr, user_render_table), XmRImmediate,
+     (XtPointer) NULL,
    },
 
    {
@@ -1429,7 +1438,14 @@ _DtPerfChkpntMsgSend("Begin XtInitialize");
    smallIconHeight = application_args.smallIconHeight;
    largeIconWidth = application_args.largeIconWidth;
    largeIconHeight = application_args.largeIconHeight;
-   user_font = application_args.user_font;
+   /*
+    * user_font is passed as XmNfontList to the icon gadgets, which beats
+    * any renderTable in the database, so the Xft face has to come in here.
+    */
+   if (application_args.user_render_table != NULL)
+      user_font = application_args.user_render_table;
+   else
+      user_font = application_args.user_font;
    dragThreshold = application_args.dragThreshold;
    rereadTime = application_args.rereadTime;
    checkBrokenLink = application_args.checkBrokenLink;
