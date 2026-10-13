@@ -35,6 +35,9 @@
  **                    *renderTable: DtXftSystem
  **                    *XmText*renderTable: DtXftUser
  **                    *XmTextField*renderTable: DtXftUser
+ **                    *XmSimpleSpinBox*XmTextField*renderTable: DtXftSystem
+ **                    (and the same for XmSpinBox, DtComboBox and
+ **                    DtSpinBox)
  **                    *DtXftSystem.fontType/fontName/fontStyle/fontSize
  **                    *DtXftUser.fontType/fontName/fontStyle/fontSize
  **                    Xft.antialias/hinting/hintstyle/rgba/lcdfilter/dpi
@@ -151,9 +154,28 @@ static const char *fxTriState[]   = { "default", "on", "off" };
 
 #define FX_NUM(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
+/*
+ * The text fields of combo boxes and spin boxes show a choice, like a
+ * list or an option menu, and get the System font: these lines name
+ * the container before XmTextField, so Xrm prefers them to
+ * "*XmTextField*renderTable".  XmComboBox needs none: it gives its text
+ * field and list its own render table (a libXm with the ComboBox fix
+ * keeps a database font list from replacing it).
+ */
+static const char *fxSystemTextTags[] = {
+    "*XmSimpleSpinBox*XmTextField*renderTable",
+    "*XmSpinBox*XmTextField*renderTable",
+    "*DtComboBox*XmTextField*renderTable",
+    "*DtSpinBox*XmTextField*renderTable"
+};
+
 /* Owned tags (exact, after trimming) */
 static const char *fxRenderTags[] = {
-    "*renderTable", "*XmText*renderTable", "*XmTextField*renderTable"
+    "*renderTable", "*XmText*renderTable", "*XmTextField*renderTable",
+    "*XmSimpleSpinBox*XmTextField*renderTable",
+    "*XmSpinBox*XmTextField*renderTable",
+    "*DtComboBox*XmTextField*renderTable",
+    "*DtSpinBox*XmTextField*renderTable"
 };
 static const char *fxRenderPrefixes[] = {
     "*" FX_TAG_SYSTEM ".", "*" FX_TAG_USER "."
@@ -613,6 +635,8 @@ FxBuildResources(
         BufLine(&buf, "*renderTable", FX_TAG_SYSTEM);
         BufLine(&buf, "*XmText*renderTable", FX_TAG_USER);
         BufLine(&buf, "*XmTextField*renderTable", FX_TAG_USER);
+        for (i = 0; i < FX_NUM(fxSystemTextTags); i++)
+            BufLine(&buf, fxSystemTextTags[i], FX_TAG_SYSTEM);
         AddFaceBlock(&buf, FX_TAG_SYSTEM, &s->sys, "sans-serif");
         AddFaceBlock(&buf, FX_TAG_USER, &s->user, "monospace");
 

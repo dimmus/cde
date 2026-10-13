@@ -766,15 +766,17 @@ Scalable (Xft) mode.
 <VarListEntry>
 <Term>System Font</Term>
 <ListItem>
-<Para>The font used for labels, buttons, menus, lists, and other
-text that you do not edit.
+<Para>The font used for labels, buttons, menus, lists, the choices
+shown in combo boxes and spin boxes, and other text that you do not
+edit.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
 <Term>User Font</Term>
 <ListItem>
-<Para>The font used for text fields and editors.
+<Para>The font used for text fields and editors, except those in combo
+boxes and spin boxes.
 </Para>
 </ListItem>
 </VarListEntry>

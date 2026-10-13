@@ -306,16 +306,17 @@ the Font dialog.
 Specifies a UserFont for a particular font size that can be selected in
 the Font dialog.
 .IP "\fBxftSystemFamily\fP, \fBxftSystemStyle\fP, \fBxftSystemSize\fP"
-Specify the System Font (labels, buttons, menus and lists) that the Font
-dialog offers in Scalable (Xft) mode until one has been chosen.
+Specify the System Font (labels, buttons, menus, lists, combo boxes and
+spin boxes) that the Font dialog offers in Scalable (Xft) mode until one
+has been chosen.
 The family is a fontconfig family name or a generic name such as
 sans-serif, serif or monospace, which the dialog resolves to an installed
 outline font.
 The style is a fontconfig style name of that family, and the size is an
 integer number of points.
 .IP "\fBxftUserFamily\fP, \fBxftUserStyle\fP, \fBxftUserSize\fP"
-Specify the User Font (text fields and editors) offered in Scalable (Xft)
-mode, in the same way.
+Specify the User Font (other text fields and editors) offered in
+Scalable (Xft) mode, in the same way.
 .RE
 .LP
 These six resources are only the dialog's defaults; they do not switch the
@@ -344,6 +345,10 @@ It adds:
 *renderTable: DtXftSystem
 *XmText*renderTable: DtXftUser
 *XmTextField*renderTable: DtXftUser
+*XmSimpleSpinBox*XmTextField*renderTable: DtXftSystem
+*XmSpinBox*XmTextField*renderTable: DtXftSystem
+*DtComboBox*XmTextField*renderTable: DtXftSystem
+*DtSpinBox*XmTextField*renderTable: DtXftSystem
 *DtXftSystem.fontType, .fontName, .fontStyle, .fontSize
 *DtXftUser.fontType, .fontName, .fontStyle, .fontSize
 Xft.antialias, Xft.hinting, Xft.hintstyle, Xft.rgba,
@@ -367,6 +372,9 @@ Scalable (Xft) mode requires a Motif 2.5 library built with Xft support in
 which the loose \fB*Font\fP resource does not apply to Xft renditions;
 with an older libXm that resource replaces the scalable fonts with a bitmap
 font.
+The text and list of an XmComboBox show the System Font only with a libXm
+whose combo boxes keep their own font for them; with an older one they show
+the bitmap User Font.
 Scalable font support is optional when CDE is built: without the fontconfig
 and Xft development files, the Font dialog offers Bitmap mode only.
 .sp1
