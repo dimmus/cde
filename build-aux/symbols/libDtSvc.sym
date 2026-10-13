@@ -170,6 +170,7 @@ _DtDtsMMSearchPath
 _DtDtsMMapFd
 _DtEnvControl
 _DtFlushIconFileCache
+_DtFontListHasXft
 _DtFreeDatabaseDirPaths
 _DtFreeStringVector
 _DtGetDatabaseDirPaths

@@ -94,6 +94,7 @@ extern int errno;
 #include "CanvasOsI.h"
 #include "CleanUpI.h"
 #include "FormatI.h"
+#include <Dt/FontListP.h>
 
 
 #ifdef NLS16
@@ -568,6 +569,8 @@ FormatChunksToXmString(
     XrmName		 myCharSetQuarks[20];
     XrmName		 xrmName[_CEFontAttrNumber];
     Boolean		 myMore;
+    Boolean		 useXft = False;
+    const char		*segTag;
 
     /*
      * Initialize the pointers.
@@ -582,6 +585,12 @@ FormatChunksToXmString(
      * initialize the font context
      */
     _DtHelpCeCopyDefFontAttrList(&fontSpecs);
+
+    /*
+     * A scalable (Xft) font in the widget's list: the titles use it,
+     * not the help canvas's core fonts.
+     */
+    useXft = _DtFontListHasXft(*ret_list);
     if ( NULL != *ret_list )
       {
         if (XmFontListInitFontContext (&fontContext, *ret_list) == False)
@@ -727,11 +736,17 @@ FormatChunksToXmString(
         while (j < quarkCount && myCharSetQuarks[j] != charSetQuark)
             j++;
 
+	/*
+	 * With an Xft font the segments take the widget's own font, under
+	 * the default tag; no core font is added to its list.
+	 */
+	segTag = useXft ? XmFONTLIST_DEFAULT_TAG : buffer;
+
         /*
          * If we didn't find a matching character set,
          * add it to the list.
          */
-        if (j >= quarkCount)
+        if (!useXft && j >= quarkCount)
           {
 	    /* Copy the input list so XmFontListAppendEntry can mangle it. */
 	    /* But only do it once! */
@@ -775,11 +790,11 @@ FormatChunksToXmString(
         if (result == 0)
           {
             if (*ret_title == NULL)
-                *ret_title = XmStringGenerate ((char *) strChunk, buffer, 
+                *ret_title = XmStringGenerate ((char *) strChunk, (char *) segTag, 
 					       XmCHARSET_TEXT, NULL);
             else
               {
-                partTitle = XmStringGenerate ((char *) strChunk, buffer,
+                partTitle = XmStringGenerate ((char *) strChunk, (char *) segTag,
 					      XmCHARSET_TEXT, NULL);
 
                 newTitle = XmStringConcat (*ret_title, partTitle);
@@ -795,7 +810,7 @@ FormatChunksToXmString(
              */
             if (*ret_title != NULL && (chunkType & DT_HELP_CE_NEWLINE))
               {
-                partTitle = XmStringGenerate (" ", buffer, XmCHARSET_TEXT, NULL);
+                partTitle = XmStringGenerate (" ", (char *) segTag, XmCHARSET_TEXT, NULL);
                 newTitle = XmStringConcat (*ret_title, partTitle);
                 XmStringFree (*ret_title);
                 XmStringFree (partTitle);

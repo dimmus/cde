@@ -2408,8 +2408,9 @@ _DtHelpXmFontListGetPropertyMax(
              }
           } /* if the getproperty call was good */
        }
-       else  /* XmFONT_IS_FONTSET */
+       else if (XmFONT_IS_FONTSET == type)
        {
+          /* A scalable (Xft) font has no font properties: skipped. */
           XFontSet fontSet;
           XFontStruct **font_list;
           char **name_list;
