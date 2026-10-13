@@ -41,6 +41,18 @@
 #ifndef _font_h
 #define _font_h
 
+/*
+ * Font dialog buttons (DtDialogBox button positions).  The Font dialog
+ * has an Apply button, so it does not use OK_BUTTON/CANCEL_BUTTON/
+ * HELP_BUTTON from Main.h; callCancels() in MainWin.c uses
+ * FONT_CANCEL_BUTTON.
+ */
+#define FONT_OK_BUTTON     1
+#define FONT_APPLY_BUTTON  2
+#define FONT_CANCEL_BUTTON 3
+#define FONT_HELP_BUTTON   4
+#define FONT_NUM_BUTTONS   4
+
 /* typedef statements */
 
 typedef struct {
