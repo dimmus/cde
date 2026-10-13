@@ -32,12 +32,8 @@
  **                the old dialog.  Xft mode writes them too (a libXm with
  **                the loose *Font fix is required) and adds
  **
- **                    *renderTable: DtXftSystem
- **                    *XmText*renderTable: DtXftUser
- **                    *XmTextField*renderTable: DtXftUser
- **                    *XmSimpleSpinBox*XmTextField*renderTable: DtXftSystem
- **                    (and the same for XmSpinBox, DtComboBox and
- **                    DtSpinBox)
+ **                    the render table lines of fxRenderLines (the one
+ **                    place that says which widgets get which face)
  **                    *DtXftSystem.fontType/fontName/fontStyle/fontSize
  **                    *DtXftUser.fontType/fontName/fontStyle/fontSize
  **                    Xft.antialias/hinting/hintstyle/rgba/lcdfilter/dpi
@@ -155,27 +151,47 @@ static const char *fxTriState[]   = { "default", "on", "off" };
 #define FX_NUM(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
 /*
- * The text fields of combo boxes and spin boxes show a choice, like a
- * list or an option menu, and get the System font: these lines name
- * the container before XmTextField, so Xrm prefers them to
- * "*XmTextField*renderTable".  XmComboBox needs none: it gives its text
- * field and list its own render table (a libXm with the ComboBox fix
- * keeps a database font list from replacing it).
+ * THE place that says which widgets get which scalable font.
+ *
+ * Scalable (Xft) mode writes one line for each entry, "resource: face",
+ * in this order, and switching back to Bitmap removes them (when their
+ * value is a DtXft rendition tag).  To give more widgets the scalable
+ * fonts, add a line here (and to dtstyle.man).  A line that is no longer
+ * wanted stays, with face NULL: it is then removed but not written, so a
+ * session saved by an older Style Manager is cleaned up too.
+ *
+ * A widget takes a render table line only if it has a render table
+ * resource (Motif widgets do, and DtWidget's DtIcon and DtTitleBox,
+ * see _DtRenderTableResource in lib/DtWidget/DtWidgetI.h) and does not
+ * get its font in its creation arglist.
  */
-static const char *fxSystemTextTags[] = {
-    "*XmSimpleSpinBox*XmTextField*renderTable",
-    "*XmSpinBox*XmTextField*renderTable",
-    "*DtComboBox*XmTextField*renderTable",
-    "*DtSpinBox*XmTextField*renderTable"
-};
-
-/* Owned tags (exact, after trimming) */
-static const char *fxRenderTags[] = {
-    "*renderTable", "*XmText*renderTable", "*XmTextField*renderTable",
-    "*XmSimpleSpinBox*XmTextField*renderTable",
-    "*XmSpinBox*XmTextField*renderTable",
-    "*DtComboBox*XmTextField*renderTable",
-    "*DtSpinBox*XmTextField*renderTable"
+static const struct {
+    const char *resource;
+    const char *face;               /* FX_TAG_SYSTEM, FX_TAG_USER or NULL */
+} fxRenderLines[] = {
+    /* everything: labels, buttons, menus, lists, ... */
+    { "*renderTable",                             FX_TAG_SYSTEM },
+    /* text that is edited */
+    { "*XmText*renderTable",                      FX_TAG_USER },
+    { "*XmTextField*renderTable",                 FX_TAG_USER },
+    /*
+     * Text fields that show a choice, like a list or an option menu:
+     * these lines name the container before XmTextField, so Xrm prefers
+     * them.  XmComboBox needs none: it gives its text field and list its
+     * own render table.
+     */
+    { "*XmSimpleSpinBox*XmTextField*renderTable", FX_TAG_SYSTEM },
+    { "*XmSpinBox*XmTextField*renderTable",       FX_TAG_SYSTEM },
+    { "*DtComboBox*XmTextField*renderTable",      FX_TAG_SYSTEM },
+    { "*DtSpinBox*XmTextField*renderTable",       FX_TAG_SYSTEM },
+    /*
+     * DtEditor (dtpad, dtmail) gives its text, and the buttons and labels
+     * of its dialogs, its own font lists, kept in the BulletinBoard's
+     * fields: Motif's render table names of those fields reach them.
+     */
+    { "*DtEditor*textRenderTable",                FX_TAG_USER },
+    { "*DtEditor*buttonRenderTable",              FX_TAG_SYSTEM },
+    { "*DtEditor*labelRenderTable",               FX_TAG_SYSTEM },
 };
 static const char *fxRenderPrefixes[] = {
     "*" FX_TAG_SYSTEM ".", "*" FX_TAG_USER "."
@@ -632,11 +648,9 @@ FxBuildResources(
 
     if (s && s->mode == FX_MODE_XFT)
     {
-        BufLine(&buf, "*renderTable", FX_TAG_SYSTEM);
-        BufLine(&buf, "*XmText*renderTable", FX_TAG_USER);
-        BufLine(&buf, "*XmTextField*renderTable", FX_TAG_USER);
-        for (i = 0; i < FX_NUM(fxSystemTextTags); i++)
-            BufLine(&buf, fxSystemTextTags[i], FX_TAG_SYSTEM);
+        for (i = 0; i < FX_NUM(fxRenderLines); i++)
+            if (fxRenderLines[i].face != NULL)
+                BufLine(&buf, fxRenderLines[i].resource, fxRenderLines[i].face);
         AddFaceBlock(&buf, FX_TAG_SYSTEM, &s->sys, "sans-serif");
         AddFaceBlock(&buf, FX_TAG_USER, &s->user, "monospace");
 
@@ -753,8 +767,8 @@ OwnedGroup(
     if (e->tag == NULL)
         return 0;
 
-    for (i = 0; i < FX_NUM(fxRenderTags); i++)
-        if (TagIs(e, fxRenderTags[i]))
+    for (i = 0; i < FX_NUM(fxRenderLines); i++)
+        if (TagIs(e, fxRenderLines[i].resource))
             return (ValueIs(e, FX_TAG_SYSTEM) || ValueIs(e, FX_TAG_USER))
                    ? FX_OWN_RENDER : 0;
 
