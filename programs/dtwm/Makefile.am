@@ -8,8 +8,12 @@ include $(top_srcdir)/build-aux/cde-libs.am
 
 bin_PROGRAMS = dtwm dtfplist
 
-configdir = $(CDE_INSTALLATION_TOP)/config/C
-dist_config_DATA = sys.dtwmrc
+# Built here as the template that programs/localized merges with each
+# language's messages; programs/localized/C installs the result into
+# config/C.  Installing the template from here as well put its
+# unexpanded %|nls-...| placeholders over the merged file whenever this
+# directory was installed after programs/localized (make -C ... install).
+dist_noinst_DATA = sys.dtwmrc
 
 BUILT_SOURCES = sys.dtwmrc Dtwm.defs
 CLEANFILES = sys.dtwmrc Dtwm.defs
