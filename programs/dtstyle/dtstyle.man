@@ -350,6 +350,9 @@ It adds:
 *XmSpinBox*XmTextField*renderTable: DtXftSystem
 *DtComboBox*XmTextField*renderTable: DtXftSystem
 *DtSpinBox*XmTextField*renderTable: DtXftSystem
+*DtEditor*textRenderTable: DtXftUser
+*DtEditor*buttonRenderTable: DtXftSystem
+*DtEditor*labelRenderTable: DtXftSystem
 *DtXftSystem.fontType, .fontName, .fontStyle, .fontSize
 *DtXftUser.fontType, .fontName, .fontStyle, .fontSize
 Xft.antialias, Xft.hinting, Xft.hintstyle, Xft.rgba,

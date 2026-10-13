@@ -1788,6 +1788,7 @@ extractFontMetrics(
     Boolean have_font_struct = False;
     Boolean have_font_set = False;
     Boolean use_font_set = False;
+    Boolean have_xft = False;
     XFontSetExtents *fs_extents;
     unsigned long tmp_width = 0;
     int	font_descent, font_ascent;
@@ -1809,7 +1810,14 @@ extractFontMetrics(
           if (next_entry) {
 
              tmp_font = XmFontListEntryGetFont(next_entry, &type_return);
-             if (type_return == XmFONT_IS_FONTSET) {
+             if (type_return == XmFONT_IS_XFT) {
+		/*
+		 * A scalable (Xft) font has no XFontStruct: it is measured
+		 * with the render table below, if there is no core font.
+		 */
+                have_xft = True;
+             }
+             else if (type_return == XmFONT_IS_FONTSET) {
 
 		/* 
 		 * Have a font set
@@ -1876,6 +1884,24 @@ extractFontMetrics(
        } while (next_entry != NULL);
 
        XmFontListFreeFontContext(context);
+
+       if (font == NULL) {
+          /*
+	   * No core font or font set, only Xft renditions (or nothing):
+	   * the width of a "0" and the height of a line, as the text
+	   * widget draws them.
+	   */
+          if (have_xft) {
+             XmString zero = XmStringCreateLocalized("0");
+             Dimension zw = 0, zh = 0;
+
+             XmStringExtent(fontlist, zero, &zw, &zh);
+             XmStringFree(zero);
+             *width = (zw > 0) ? (int) zw : 1;
+             *height = (int) zh;
+          }
+          return;
+       }
 
        /*
 	* Now, extract the font metrics from the font set or font that
