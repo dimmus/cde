@@ -109,7 +109,10 @@ dtksh_SOURCES = widget.c \
 # VPATH build directory): ksh93 is then built as from a release
 # tarball, the same in a git checkout as in a CDE tarball.
 KSH93_CC = $(if $(word 2,$(CC)),$(abs_builddir)/ksh93-cc,$(CC))
-KSH93_CCFLAGS = $(strip $(KSH93_SHOPTS) $(HARDEN_CFLAGS) $(CFLAGS))
+# FILE_PREFIX_CFLAGS: ksh93's __FILE__ strings and debug information
+# name its sources relative to the tree, as everywhere else.
+KSH93_CCFLAGS = $(strip $(KSH93_SHOPTS) $(HARDEN_CFLAGS) $(FILE_PREFIX_CFLAGS) \
+	$(CFLAGS))
 KSH93_JOBS = $(or $(patsubst -j%,%,$(filter -j%,$(MAKEFLAGS))),1)
 KSH93_SRCFILES := $(shell find $(KSH93SRCDIR)/src $(KSH93SRCDIR)/bin/package -type f ! -name "*.o" 2>/dev/null)
 

@@ -45,14 +45,14 @@ usage()
 {
    echo "usage:  dthelpprint.sh options";
    echo "options:";
-   echo "\t -d <lpdest>         : printer to use";
-   echo "\t -f <print file>     : file to print";
-   echo "\t -m <print command>  : print command to use";
-   echo "\t -n <num copies>     : number copies to print";
-   echo "\t -u <user file name> : filename to show user";
-   echo "\t -w                  : print raw";
-   echo "\t -s                  : print silent";
-   echo "\t -e                  : remove file";
+   printf '\t -d <lpdest>         : printer to use\n';
+   printf '\t -f <print file>     : file to print\n';
+   printf '\t -m <print command>  : print command to use\n';
+   printf '\t -n <num copies>     : number copies to print\n';
+   printf '\t -u <user file name> : filename to show user\n';
+   printf '\t -w                  : print raw\n';
+   printf '\t -s                  : print silent\n';
+   printf '\t -e                  : remove file\n';
    exit 0;
 }
 

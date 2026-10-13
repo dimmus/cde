@@ -758,6 +758,9 @@ if test "x$enable_file_prefix_map" != xno; then
       FILE_PREFIX_CXXFLAGS="$prefix_map"
    fi
 fi
+dnl (also on its own: the bundled ksh93's build takes it, see
+dnl programs/dtksh/Makefile.am)
+AC_SUBST(FILE_PREFIX_CFLAGS)
 
 dnl export maps need a linker that takes GNU version scripts
 if test "x$enable_export_maps" != xno; then

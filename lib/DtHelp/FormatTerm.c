@@ -846,7 +846,7 @@ AddHyperToList(
 		        sprintf(title, "Text File \"%s\"", id);
 			break;
 	        default:
-			title = strdup ("Unkown link type");
+			title = strdup ("Unknown link type");
 			break;
 
 	      }
