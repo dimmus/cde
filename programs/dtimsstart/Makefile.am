@@ -10,6 +10,8 @@ MAINTAINERCLEANFILES = Makefile.in
 
 bin_PROGRAMS = dtimsstart
 
+# Installed once, as a script like the other Xsession.d files: a second
+# install of it as data raced with this one under make -j.
 dist_xsession_SCRIPTS = 0020.dtims
 
 dtimsstart_CFLAGS = $(CDE_CFLAGS) -DNLS \
@@ -26,9 +28,6 @@ dtimsstart_SOURCES = action.c env.c file.c main.c remote.c select.c	\
 
 BUILT_SOURCES = 0020.dtims
 CLEANFILE = $(BUILT_SOURCES)
-
-cfgdir = $(CDE_INSTALLATION_TOP)/config/Xsession.d
-dist_cfg_DATA = 0020.dtims
 
 imsdir = $(CDE_INSTALLATION_TOP)/config/ims
 dist_ims_DATA = conf/start.conf
