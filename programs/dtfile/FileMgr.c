@@ -871,6 +871,12 @@ Create(
           extents = XExtentsOfFontSet((XFontSet)entry_font);
           font_height = extents->max_logical_extent.height;
       }
+      else if(type == XmFONT_IS_XFT) {
+          /* entry_font is an XftFont, not an XFontStruct: ask Motif */
+          XmString xms = XmStringCreateLocalized(" ");
+          font_height = XmStringHeight(font_list, xms);
+          XmStringFree(xms);
+      }
       else {
           font_height = ((XFontStruct *)entry_font)->ascent +
                  ((XFontStruct *)entry_font)->descent;
@@ -1233,6 +1239,7 @@ GetDefaultValues( void )
    file_mgr_data->cd_inited = False;
    file_mgr_data->cd_font = NULL;
    file_mgr_data->cd_fontset = NULL;
+   file_mgr_data->cd_fontlist = NULL;
    file_mgr_data->cd_normal_gc = 0;
    file_mgr_data->cd_select_gc = 0;
    file_mgr_data->cd_select = NULL;
@@ -1450,6 +1457,7 @@ GetResourceValues(
    file_mgr_data->cd_inited = False;
    file_mgr_data->cd_font = NULL;
    file_mgr_data->cd_fontset = NULL;
+   file_mgr_data->cd_fontlist = NULL;
    file_mgr_data->cd_normal_gc = 0;
    file_mgr_data->cd_select_gc = 0;
    file_mgr_data->cd_select = NULL;
@@ -1738,6 +1746,16 @@ SetValues(
       if(type == XmFONT_IS_FONTSET) {
           file_mgr_data->cd_fontset = (XFontSet)entry_font;
           file_mgr_data->cd_fonttype = XmFONT_IS_FONTSET;
+          gc_mask = GCForeground | GCBackground;
+      }
+      else if(type == XmFONT_IS_XFT) {
+          /*
+           * An XftFont has no core font to put in the GCs: the line is
+           * measured and drawn with XmString calls on the render table
+           * (see ChangeDirP.c), the GCs only give the colors.
+           */
+          file_mgr_data->cd_fontlist = XmFontListCopy(font_list);
+          file_mgr_data->cd_fonttype = XmFONT_IS_XFT;
           gc_mask = GCForeground | GCBackground;
       }
       else {
@@ -2204,6 +2222,12 @@ FreeValues(
    {
       XtFree ((char *) file_mgr_data->cd_select);
       file_mgr_data->cd_select = NULL;
+   }
+
+   if (file_mgr_data->cd_fontlist != NULL)
+   {
+      XmFontListFree (file_mgr_data->cd_fontlist);
+      file_mgr_data->cd_fontlist = NULL;
    }
 
    if (file_mgr_data->desktop_file != NULL)

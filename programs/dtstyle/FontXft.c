@@ -192,6 +192,14 @@ static const struct {
     { "*DtEditor*textRenderTable",                FX_TAG_USER },
     { "*DtEditor*buttonRenderTable",              FX_TAG_SYSTEM },
     { "*DtEditor*labelRenderTable",               FX_TAG_SYSTEM },
+    /*
+     * Programs that take the desktop fonts as their own app resources
+     * systemFont and userFont (font lists, the bitmap lines) take these
+     * when they are set: dtfile for its icon labels, dtcm for its
+     * calendar.  One convention for every such program.
+     */
+    { "*systemRenderTable",                       FX_TAG_SYSTEM },
+    { "*userRenderTable",                         FX_TAG_USER },
 };
 static const char *fxRenderPrefixes[] = {
     "*" FX_TAG_SYSTEM ".", "*" FX_TAG_USER "."

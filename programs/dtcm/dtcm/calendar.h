@@ -123,6 +123,13 @@ typedef struct {
 
         int             screen_depth;   /* screen depth */
         XColor          colorcell_del[RED+1];/* rgb colors */
+
+        /*
+         * The clip of the GCs above, when it is one rectangle: Xft text
+         * is not clipped by a GC, so CalDrawString passes it on.
+         */
+        XRectangle      clip;
+        Boolean         clip_set;
 } new_XContext;
 
 typedef enum {
@@ -172,6 +179,19 @@ typedef struct _Cal_Font {
 	union {
 		XFontStruct	*cf_font;
 		XFontSet	 cf_fontset;
+		/*
+		 * XmFONT_IS_XFT: a render table that holds one Xft
+		 * rendition.  The text is measured and drawn with the
+		 * XmString functions; the metrics are kept here since
+		 * every view asks for them on each repaint.
+		 */
+		struct {
+			XmRenderTable	 rt;
+			XmStringTag	 tag;
+			int		 ascent;
+			int		 height;
+			int		 char_width;
+		} cf_xft;
 	} f;
 } Cal_Font;
 
@@ -226,6 +246,10 @@ typedef struct {
 	XmFontList  	userfontlist;
 	String  	systemfont;
 	XmFontList  	systemfontlist;
+	String  	userrendertable;
+	XmRenderTable  	userrendertablelist;
+	String  	systemrendertable;
+	XmRenderTable  	systemrendertablelist;
 	String  	app_font_family;
 	String  	session_file;
 	Boolean		debug;
@@ -384,11 +408,13 @@ extern void		day_paint_range(Calendar *, time_t *, time_t *);
 extern int		repaint_month_days(Calendar *, Paint_cache *, int);
 
 extern Boolean 		fontlist_to_font(XmFontList, Cal_Font *);
+extern Boolean 		rendertable_to_font(XmRenderTable, Cal_Font *);
+extern Boolean 		bold_xft_font	(Widget, Cal_Font *, Cal_Font *);
 extern void 		CalTextExtents	(Cal_Font *, char *, int, 
 						   int *, int *, int *, int *);
 extern void 		CalDrawString	(Display *, Drawable,
 						   Cal_Font *, GC, int, int,
-						   char *, int);
+						   char *, int, XRectangle *);
 extern void 		CalFontExtents	(Cal_Font *, 
 						   XFontSetExtents *);
 #endif

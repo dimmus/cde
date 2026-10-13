@@ -306,14 +306,14 @@ paint_icon_date(
 	x = c->icon->icon_width/2 - width/2 - 1;
 	y = c->icon->icon_height - 2 * (c->icon->icon_height - height) / 3;
 
-	CalDrawString(dpy, c->icon->icon, font, gc, x, y, buf, len);
+	CalDrawString(dpy, c->icon->icon, font, gc, x, y, buf, len, NULL);
 
 	gc_vals.foreground = bg;
 	XChangeGC(xc->display, gc, GCForeground, &gc_vals);
 	if (c->icon_inverted && c->icon_inverted->icon 
 			     && c->icon_inverted->icon_mask)
 		CalDrawString(dpy, c->icon_inverted->icon, font, 
-				   gc, x, y, buf, len);
+				   gc, x, y, buf, len, NULL);
 
 	XFreeGC(xc->display, gc);
 	XFlush(xc->display);

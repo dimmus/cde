@@ -2407,6 +2407,25 @@ static XtResource resources[] = {
 	{ "systemFont", "SystemFont", XtRString, sizeof(String),
 	XtOffset(DtCmAppResourcesPtr, systemfont), XtRString,
 	"-b&h-lucida-medium-r-*-sans-*-120-*-*-*-*-*-*:"},
+/*
+ * Render tables for the system and user fonts.  The Style Manager sets
+ * these, with Xft renditions, next to the bitmap systemFont and userFont
+ * when it is in Scalable mode, and dtcm then takes them instead.
+ */
+	{ "systemRenderTable", "SystemRenderTable", XmRRenderTable,
+	sizeof(XmRenderTable),
+	XtOffset(DtCmAppResourcesPtr, systemrendertablelist), XtRImmediate,
+	(XtPointer)NULL},
+	{ "systemRenderTable", "SystemRenderTable", XtRString, sizeof(String),
+	XtOffset(DtCmAppResourcesPtr, systemrendertable), XtRImmediate,
+	(XtPointer)NULL},
+	{ "userRenderTable", "UserRenderTable", XmRRenderTable,
+	sizeof(XmRenderTable),
+	XtOffset(DtCmAppResourcesPtr, userrendertablelist), XtRImmediate,
+	(XtPointer)NULL},
+	{ "userRenderTable", "UserRenderTable", XtRString, sizeof(String),
+	XtOffset(DtCmAppResourcesPtr, userrendertable), XtRImmediate,
+	(XtPointer)NULL},
 /* bold font */
 	{ "boldFont", "BoldFont", XmRFontList, sizeof(XmFontList),
 	XtOffset(DtCmAppResourcesPtr, boldfontlist), XtRString,
@@ -3326,7 +3345,11 @@ init_fonts(
 {
 	XrmDatabase	 db;
 	Cal_Font	 systemfont,
-			 userfont;
+			 userfont,
+			 systemrt,
+			 userrt;
+	Boolean		 have_systemrt,
+			 have_userrt;
 
 	/*
 	 * Some of the scrolling lists contain formatted text and thus
@@ -3362,6 +3385,40 @@ init_fonts(
 		else
 			XrmPutStringResource(&db, "*yearLabel.fontList",
 						     cal->app_data->systemfont);
+
+		/*
+		 * With the render tables a ``*renderTable'' line is in
+		 * the database too, and a widget takes its render table
+		 * over its font list: name the user render table for the
+		 * lists, or they lose their fixed width face.
+		 */
+		if (cal->app_data->userrendertable) {
+			XrmPutStringResource(&db, "*find_list.renderTable",
+					       cal->app_data->userrendertable);
+			XrmPutStringResource(&db, "*view_list.renderTable",
+					       cal->app_data->userrendertable);
+			XrmPutStringResource(&db, "*todo_list.renderTable",
+					       cal->app_data->userrendertable);
+			XrmPutStringResource(&db, "*ge_appt_list.renderTable",
+					       cal->app_data->userrendertable);
+			XrmPutStringResource(&db, "*access_list.renderTable",
+					       cal->app_data->userrendertable);
+			XrmPutStringResource(&db, "*browseList.renderTable",
+					       cal->app_data->userrendertable);
+		}
+		if (cal->app_data->systemrendertable) {
+			XrmPutStringResource(&db,
+					     "Dtcm*canvas*week2day.renderTable",
+					     cal->app_data->systemrendertable);
+			if (!cal->app_data->labelfont) {
+				XrmPutStringResource(&db,
+					     "*monthLabel.renderTable",
+					     cal->app_data->systemrendertable);
+				XrmPutStringResource(&db,
+					     "*yearLabel.renderTable",
+					     cal->app_data->systemrendertable);
+			}
+		}
 	}
 
 	if (!fontlist_to_font(cal->app_data->systemfontlist, &systemfont)) {
@@ -3381,17 +3438,33 @@ init_fonts(
 			userfont.cf_type = XmFONT_IS_FONT; 
 	}
 
-	*cal->fonts->userfont =  userfont;
+	/*
+	 * The render tables, when set, take the place of the system and
+	 * user fonts.  The fonts are still loaded: load_app_font() takes
+	 * its size from the user font, and the icon needs a core font.
+	 */
+	have_systemrt = rendertable_to_font(
+				cal->app_data->systemrendertablelist,
+				&systemrt);
+	have_userrt = rendertable_to_font(
+				cal->app_data->userrendertablelist,
+				&userrt);
+
+	*cal->fonts->userfont = have_userrt ? userrt : userfont;
 
 	/*
 	 * If the application resources for the view, label, icon or bold
 	 * font are not set, default to the system/user font or application
-	 * font for the views.
+	 * font for the views.  With a system render table the views take
+	 * it and its bold variant: like the application font, it is a
+	 * proportional face.
 	 */
 	if (cal->app_data->viewfontlist) {
 		if (!fontlist_to_font(cal->app_data->viewfontlist, 
 				      cal->fonts->viewfont))
 			*cal->fonts->viewfont = userfont;
+	} else if (have_systemrt) {
+			*cal->fonts->viewfont = systemrt;
 	} else {
 			load_app_font(cal, MEDIUM, &userfont, 
 				      cal->fonts->viewfont);
@@ -3402,9 +3475,14 @@ init_fonts(
 				      cal->fonts->labelfont))
 			*cal->fonts->labelfont = systemfont;
 	} else {
-			*cal->fonts->labelfont = systemfont;
+			*cal->fonts->labelfont = 
+					have_systemrt ? systemrt : systemfont;
 	}
 
+	/*
+	 * The icon stays with core fonts: its pixmap may have a depth of
+	 * one, and Motif draws Xft text with the visual of the screen.
+	 */
 	if (cal->app_data->iconfontlist) {
 		if (!fontlist_to_font(cal->app_data->iconfontlist, 
 				      cal->fonts->iconfont))
@@ -3417,7 +3495,12 @@ init_fonts(
 		if (!fontlist_to_font(cal->app_data->boldfontlist, 
 				      cal->fonts->boldfont))
 			*cal->fonts->boldfont = userfont;
-	} else {
+	} else if (!have_systemrt ||
+		   !bold_xft_font(cal->frame, &systemrt, cal->fonts->boldfont)) {
+			/*
+			 * No bold variant of a render table that is not Xft
+			 * or names no family: the bitmap bold font.
+			 */
 			load_app_font(cal, BOLD, &userfont, 
 				      cal->fonts->boldfont);
 	}

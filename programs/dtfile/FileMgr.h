@@ -293,6 +293,7 @@ typedef struct
    XFontStruct * cd_font;
    XFontSet      cd_fontset;
    XmFontType    cd_fonttype;
+   XmFontList    cd_fontlist;   /* XmFONT_IS_XFT: the line's render table */
    GC            cd_normal_gc;
    GC            cd_select_gc;
    char          *cd_select;
