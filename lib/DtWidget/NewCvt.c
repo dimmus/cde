@@ -98,6 +98,20 @@ static void _DtCvtStringToTitlePosition(
 **	_DtRegisterNewConverters
 **		Convert MotifPlus resource converters.
 */
+/*
+ * The default of a render table resource that is another name of a font
+ * list field (_DtRenderTableResource, DtWidgetI.h): keep what the font
+ * list resource got, from the arglist, the database or its own default.
+ */
+void
+_DtWidgetKeepFontList(
+        Widget w,
+        int offset,
+        XrmValue *value )
+{
+	value->addr = (XPointer) ((char *) w + offset);
+}
+
 void 
 _DtRegisterNewConverters( void )
 {

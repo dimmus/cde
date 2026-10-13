@@ -216,7 +216,9 @@ static XtResource resources[] =
 		XmNfontList,
 		XmCFontList, XmRFontList, sizeof (XmFontList),
 		TB_Offset (font_list), XmRImmediate, (XtPointer) NULL
-	}
+	},
+	_DtRenderTableResource (XmNrenderTable, XmCRenderTable,
+				TB_Offset (font_list))
 };
 
 /*	Synthetic Resources

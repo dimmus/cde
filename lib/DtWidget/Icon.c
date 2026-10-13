@@ -326,6 +326,8 @@ static XtResource resources[] =
 		XmCFontList, XmRFontList, sizeof (XmFontList),
 		I_Offset (font_list), XmRString, "Fixed"
 	},
+	_DtRenderTableResource (XmNrenderTable, XmCRenderTable,
+				I_Offset (font_list)),
 	{
 		XmNimageName,
 		XmCString, XmRString, sizeof (XmString),

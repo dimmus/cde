@@ -60,6 +60,29 @@
 
 #endif /* XTHREADS */
 
+/*
+ * Scalable (Xft) fonts.  A font list resource (XmRFontList) cannot name
+ * an Xft font; a render table can, and the Style Manager writes
+ * "*renderTable: DtXftSystem" for them.  As in the Motif widgets, a
+ * render table resource can be another name of a font list field: it
+ * follows the XmRFontList resource in the resource list, so a value for
+ * it wins, and its default keeps what the font list got.  That takes one
+ * line in a resource list, after the font list's:
+ *
+ *	_DtRenderTableResource (XmNrenderTable, XmCRenderTable,
+ *				I_Offset (font_list)),
+ *
+ * The instance record does not change.  (Widgets that keep a font list
+ * in a field of a Motif superclass, as DtEditor keeps its text font in
+ * the BulletinBoard's text_font_list, already have Motif's names for it,
+ * here XmNtextRenderTable.)
+ */
+extern void _DtWidgetKeepFontList (Widget w, int offset, XrmValue *value);
+
+#define _DtRenderTableResource(name, class, offset) \
+	{ name, class, XmRRenderTable, sizeof (XmRenderTable), offset, \
+	  XmRCallProc, (XtPointer) _DtWidgetKeepFontList }
+
 #ifdef __cplusplus
 }  /* Close scope of 'extern "C"' declaration which encloses file. */
 #endif
