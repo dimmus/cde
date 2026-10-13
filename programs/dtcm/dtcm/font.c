@@ -33,6 +33,8 @@
 #include <Xm/AtomMgr.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include "calendar.h"
 
 #ifndef ABS
@@ -61,6 +63,8 @@ get_font(
 	XmFontListEntry	 fl_entry;
 	XtPointer	 fl_entry_font,
 			 font_to_use = NULL;
+	XmFontType	 entry_type,
+			 type_to_use = XmFONT_IS_FONT;
 	char		*fl_entry_font_tag;
 	Boolean		 found_font_set = False,
 			 found_font_struct = False;
@@ -74,8 +78,15 @@ get_font(
 		fl_entry = XmFontListNextEntry(fl_context);
 		if (fl_entry) {
 			fl_entry_font = 
-				XmFontListEntryGetFont(fl_entry, type_return);
-			if (*type_return == XmFONT_IS_FONTSET) {
+				XmFontListEntryGetFont(fl_entry, &entry_type);
+			/*
+			 * The font of an Xft entry is an XftFont, neither
+			 * an XFontStruct nor an XFontSet: skip it.  Render
+			 * tables with Xft go through rendertable_to_font().
+			 */
+			if (entry_type == XmFONT_IS_XFT)
+				continue;
+			if (entry_type == XmFONT_IS_FONTSET) {
 				fl_entry_font_tag = 
 						XmFontListEntryGetTag(fl_entry);
 					/* 
@@ -84,6 +95,7 @@ get_font(
 					 */
 				if (!found_font_set) {
 					font_to_use = fl_entry_font;
+					type_to_use = entry_type;
 					found_font_set = True;
 					found_font_struct = True;
 
@@ -94,10 +106,12 @@ get_font(
 						    fl_entry_font_tag)) {
 					/* Found right font set */
 					font_to_use = fl_entry_font;
+					type_to_use = entry_type;
 					break;
 				}
 			} else if (!found_font_struct) {
 				font_to_use = fl_entry_font;
+				type_to_use = entry_type;
 				found_font_struct = True;
 			}
 		}
@@ -108,6 +122,7 @@ get_font(
 	if (!found_font_set && !found_font_struct)
 		return (XtPointer)NULL;
 
+	*type_return = type_to_use;
 	return (XtPointer)font_to_use;
 }
 
@@ -134,6 +149,217 @@ fontlist_to_font(
 		cal_font->f.cf_font = (XFontStruct *)font_data;
 
 	return True;
+}
+
+/*
+ * Make an XmString of the first nbytes of string, tagged so that it is
+ * drawn with the rendition of the Xft font.
+ */
+static XmString
+xft_string(
+	Cal_Font	*font,
+	char		*string,
+	int		 nbytes)
+{
+	char		 buf[256],
+			*text = buf;
+	XmString	 xms;
+
+	if (nbytes < 0)
+		nbytes = 0;
+	if (nbytes >= sizeof(buf))
+		text = XtMalloc(nbytes + 1);
+	memcpy(text, string, nbytes);
+	text[nbytes] = '\0';
+
+	xms = XmStringCreate(text, font->f.cf_xft.tag);
+
+	if (text != buf)
+		XtFree(text);
+	return xms;
+}
+
+static int
+xft_width(
+	Cal_Font	*font,
+	char		*string,
+	int		 nbytes)
+{
+	XmString	 xms = xft_string(font, string, nbytes);
+	int		 width = XmStringWidth(font->f.cf_xft.rt, xms);
+
+	XmStringFree(xms);
+	return width;
+}
+
+/*
+ * Fill in cal_font from a render table that holds the one Xft rendition
+ * tagged tag.  Both become the font's.  The metrics come from the
+ * XmString functions: ascent and height are the font's, whatever the
+ * text, and the views take the width of a ``W'' for the width of a
+ * character.
+ */
+static Boolean
+xft_font(
+	XmRenderTable	 rt,
+	XmStringTag	 tag,
+	Cal_Font	*cal_font)
+{
+	XmString	 xms;
+	Cal_Font	 font;
+
+	font.cf_type = XmFONT_IS_XFT;
+	font.f.cf_xft.rt = rt;
+	font.f.cf_xft.tag = tag;
+
+	xms = XmStringCreate("W", tag);
+	font.f.cf_xft.ascent = XmStringBaseline(rt, xms);
+	font.f.cf_xft.height = XmStringHeight(rt, xms);
+	font.f.cf_xft.char_width = XmStringWidth(rt, xms);
+	XmStringFree(xms);
+
+	/* No height: the font could not be opened. */
+	if (font.f.cf_xft.height <= 0) {
+		XmRenderTableFree(rt);
+		XtFree(tag);
+		return False;
+	}
+
+	*cal_font = font;
+	return True;
+}
+
+/*
+ * Return a copy of the tag of the first Xft rendition of rt, or NULL if
+ * it has none.
+ */
+static XmStringTag
+xft_tag(
+	XmRenderTable	 rt)
+{
+	XmStringTag	*tags,
+			 found = NULL;
+	XmRendition	 rend;
+	XmFontType	 type;
+	Arg		 args[1];
+	int		 i, ntags;
+
+	ntags = XmRenderTableGetTags(rt, &tags);
+	for (i = 0; i < ntags; i++) {
+		if (!found && (rend = XmRenderTableGetRendition(rt, tags[i]))) {
+			type = XmFONT_IS_FONT;
+			XtSetArg(args[0], XmNfontType, &type);
+			XmRenditionRetrieve(rend, args, 1);
+			XmRenditionFree(rend);
+			if (type == XmFONT_IS_XFT)
+				found = XtNewString(tags[i]);
+		}
+		XtFree(tags[i]);
+	}
+	if (ntags > 0)
+		XtFree((char *)tags);
+
+	return found;
+}
+
+/*
+ * Like fontlist_to_font() for a render table, but a render table with an
+ * Xft rendition gives an Xft font.  This is how the systemRenderTable
+ * and userRenderTable resources, the Xft companions of systemFont and
+ * userFont, reach the views.
+ */
+extern Boolean
+rendertable_to_font(
+	XmRenderTable	 rt,
+	Cal_Font	*cal_font)
+{
+	XmStringTag	 tag;
+
+	if (!rt) return False;
+
+	if (!(tag = xft_tag(rt)))
+		return fontlist_to_font(rt, cal_font);
+
+	return xft_font(XmRenderTableCopy(rt, &tag, 1), tag, cal_font);
+}
+
+/*
+ * Make the bold variant of an Xft font: the same family, size, foundry
+ * and encoding with a bold style.  This fails for a font that is not an
+ * Xft font or whose rendition names no family.
+ */
+extern Boolean
+bold_xft_font(
+	Widget		 w,
+	Cal_Font	*regular,
+	Cal_Font	*bold_return)
+{
+	XmRendition	 rend,
+			 bold;
+	XmRenderTable	 rt;
+	String		 name = NULL,
+			 style = NULL,
+			 foundry = NULL,
+			 encoding = NULL;
+	char		 bold_style[128];
+	int		 size = 0;
+	Arg		 args[8];
+	Cardinal	 n;
+
+	if (regular->cf_type != XmFONT_IS_XFT)
+		return False;
+
+	if (!(rend = XmRenderTableGetRendition(regular->f.cf_xft.rt,
+					       regular->f.cf_xft.tag)))
+		return False;
+
+	n = 0;
+	XtSetArg(args[n], XmNfontName, &name);		n++;
+	XtSetArg(args[n], XmNfontStyle, &style);	n++;
+	XtSetArg(args[n], XmNfontSize, &size);		n++;
+	XtSetArg(args[n], XmNfontFoundry, &foundry);	n++;
+	XtSetArg(args[n], XmNfontEncoding, &encoding);	n++;
+	XmRenditionRetrieve(rend, args, n);
+
+	if (!name || name == (String)XmAS_IS || !*name) {
+		XmRenditionFree(rend);
+		return False;
+	}
+
+	/* Book, Regular, ... become Bold; Oblique becomes Bold Oblique. */
+	if (!style || !*style || !strcasecmp(style, "Book") ||
+	    !strcasecmp(style, "Regular") || !strcasecmp(style, "Normal") ||
+	    !strcasecmp(style, "Medium") || !strcasecmp(style, "Roman"))
+		strcpy(bold_style, "Bold");
+	else if (strstr(style, "Bold"))
+		snprintf(bold_style, sizeof(bold_style), "%s", style);
+	else
+		snprintf(bold_style, sizeof(bold_style), "Bold %s", style);
+
+	/*
+	 * A rendition keeps the strings it is given, it does not copy
+	 * them all, so give it its own.  The fonts live as long as dtcm.
+	 */
+	n = 0;
+	XtSetArg(args[n], XmNfontType, XmFONT_IS_XFT);	n++;
+	XtSetArg(args[n], XmNfontName, XtNewString(name)); n++;
+	XtSetArg(args[n], XmNfontStyle, XtNewString(bold_style)); n++;
+	if (size > 0) {
+		XtSetArg(args[n], XmNfontSize, size);	n++;
+	}
+	if (foundry) {
+		XtSetArg(args[n], XmNfontFoundry, XtNewString(foundry)); n++;
+	}
+	if (encoding) {
+		XtSetArg(args[n], XmNfontEncoding, XtNewString(encoding)); n++;
+	}
+	bold = XmRenditionCreate(w, regular->f.cf_xft.tag, args, n);
+	XmRenditionFree(rend);
+
+	rt = XmRenderTableAddRenditions(NULL, &bold, 1, XmMERGE_REPLACE);
+	XmRenditionFree(bold);
+
+	return xft_font(rt, XtNewString(regular->f.cf_xft.tag), bold_return);
 }
 
 /*
@@ -252,7 +478,7 @@ load_app_font(
 		if (!XGetFontProperty(userfont->f.cf_font, pixel_atom, 
 							&pixel_size))
 			pixel_size = 12;
-	} else {
+	} else if (userfont->cf_type == XmFONT_IS_FONTSET) {
 		XFontStruct 	**font_struct_list;
 		char		**font_name_list;
 		int		  list_size;
@@ -267,7 +493,8 @@ load_app_font(
 					      &pixel_size))
 				pixel_size = 12;
 		}
-	}
+	} else
+		pixel_size = 12;
 
 	/* If the font family is not ``application'' then it is probably
 	 * multibyte so we can't assume there is an add-style or a proportional
@@ -343,6 +570,12 @@ CalTextExtents(
 		*y_return = overall.ascent;
 		*width_return = overall.width;
 		*height_return = overall.ascent + overall.descent;
+	} else if (font->cf_type == XmFONT_IS_XFT) {
+		/* The logical extents, as for a font set. */
+		*x_return = 0;
+		*y_return = - font->f.cf_xft.ascent;
+		*width_return = xft_width(font, string, nbytes);
+		*height_return = font->f.cf_xft.height;
 	} else {
 		XRectangle	ink,
 				logical;
@@ -358,7 +591,12 @@ CalTextExtents(
 }
 
 /*
- * Given a font or fontset, render the text.
+ * Given a font or fontset, render the text.  y is the baseline.
+ *
+ * clip is the clip of gc, or NULL when gc is not clipped to one
+ * rectangle.  Xft text is not clipped by the GC: without it a repaint
+ * of an exposed area would draw the text around that area again, over
+ * itself, and the antialiased edges would grow darker.
  */
 void
 CalDrawString(
@@ -369,12 +607,35 @@ CalDrawString(
 	int		 x,
 	int		 y,
 	char		*string,
-	int		 length)
+	int		 length,
+	XRectangle	*clip)
 {
 
 	if (font->cf_type == XmFONT_IS_FONT) {
 		XSetFont(dpy, gc, font->f.cf_font->fid);
 		XDrawString(dpy, draw, gc, x, y, string, length);
+	} else if (font->cf_type == XmFONT_IS_XFT) {
+		XmString	xms = xft_string(font, string, length);
+		Dimension	width = XmStringWidth(font->f.cf_xft.rt, xms);
+		int		top = y - font->f.cf_xft.ascent;
+
+		/*
+		 * XmStringDraw draws a line it does not find in the clip
+		 * unclipped, so leave out such text here.
+		 */
+		if (!clip || (x < clip->x + (int)clip->width &&
+			      clip->x < x + (int)width &&
+			      top < clip->y + (int)clip->height &&
+			      clip->y < top + font->f.cf_xft.height)) {
+			XmStringDraw(dpy, draw, font->f.cf_xft.rt, xms, gc,
+				     x, top, width, XmALIGNMENT_BEGINNING,
+				     XmSTRING_DIRECTION_L_TO_R, clip);
+			/* XmStringDraw leaves gc unclipped: put it back. */
+			if (clip)
+				XSetClipRectangles(dpy, gc, 0, 0, clip, 1,
+						   Unsorted);
+		}
+		XmStringFree(xms);
 	} else {
 		XmbDrawString(dpy, draw, font->f.cf_fontset, gc, x, y, 
 							string, length);
@@ -405,6 +666,13 @@ CalFontExtents(
 		fse->max_logical_extent.height = 
 					 font->f.cf_font->ascent +
 					 font->f.cf_font->descent;
+	} else if (font->cf_type == XmFONT_IS_XFT) {
+		/* The ink extents are not known: use the logical ones. */
+		fse->max_logical_extent.x = 0;
+		fse->max_logical_extent.y = - font->f.cf_xft.ascent;
+		fse->max_logical_extent.width = font->f.cf_xft.char_width;
+		fse->max_logical_extent.height = font->f.cf_xft.height;
+		fse->max_ink_extent = fse->max_logical_extent;
 	} else {
 		*fse = *XExtentsOfFontSet(font->f.cf_fontset);
 	}

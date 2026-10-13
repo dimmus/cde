@@ -390,7 +390,7 @@ gr_text(new_XContext *xc, int x, int y, Cal_Font *font, char *str,
                         return;
         }
         CalDrawString(xc->display, xc->xid, font, xc->draw_gc, x, y,
-                      str, cm_strlen(str));
+                      str, cm_strlen(str), xc->clip_set ? &xc->clip : NULL);
 }
  
 extern void
@@ -416,7 +416,7 @@ gr_text_rgb(new_XContext *xc, int x, int y, Cal_Font *font, char *str,
 			(unsigned long)shade);
 
         CalDrawString(xc->display, xc->xid, font, xc->gc, x, y, 
-			str, cm_strlen(str));
+			str, cm_strlen(str), xc->clip_set ? &xc->clip : NULL);
 }
 
 extern void 
@@ -578,6 +578,14 @@ gr_set_clip_rectangles(new_XContext *xc, int x, int y, XRectangle *rectangles,
                            x, y, rectangles, n, ordering);
         XSetClipRectangles(xc->display, xc->invert_gc,
                            x, y, rectangles, n, ordering);
+
+        /* Keep the clip for the Xft text: see CalDrawString(). */
+        xc->clip_set = (n == 1);
+        if (xc->clip_set) {
+                xc->clip = rectangles[0];
+                xc->clip.x += x;
+                xc->clip.y += y;
+        }
         return;
 }
 
@@ -588,6 +596,7 @@ gr_clear_clip_rectangles(new_XContext *xc) {
         XSetClipMask(xc->display, xc->draw_gc, None);
         XSetClipMask(xc->display, xc->clear_gc, None);
         XSetClipMask(xc->display, xc->invert_gc, None);
+        xc->clip_set = False;
 }
 
 extern Boolean

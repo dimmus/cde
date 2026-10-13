@@ -1420,6 +1420,12 @@ mb_draw_chartgrid(Browser *b, Calendar *c)
  
         /* clear header */
         gr_clear_area(xc, 0, 0, b->canvas_w, b->chart_y);
+
+        /* clear the hour label column left of the chart: the labels
+           are drawn again on every refresh, and antialiased Xft text
+           drawn over itself gets darker each time */
+        gr_clear_area(xc, 0, b->chart_y, b->chart_x,
+                      b->chart_height + char_height);
         label[0] = '\0';
 
         /* draw hour labels */
