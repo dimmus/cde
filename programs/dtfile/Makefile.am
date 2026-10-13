@@ -4,8 +4,6 @@ include $(top_srcdir)/build-aux/cde-libs.am
 # half-written.
 .DELETE_ON_ERROR:
 
-configdir = $(CDE_INSTALLATION_TOP)/config/C
-
 SUBDIRS = dtcopy
 
 bin_PROGRAMS = dtfile
@@ -13,7 +11,12 @@ bin_PROGRAMS = dtfile
 BUILT_SOURCES = dtfile.config dtfile_error
 CLEANFILES = dtfile.config dtfile_error
 
-dist_config_DATA = dtfile.config
+# Built here as the template that programs/localized merges with each
+# language's messages; programs/localized/C installs the result into
+# config/C.  Installing the template from here as well put its
+# unexpanded %|nls-...| placeholders over the merged file whenever this
+# directory was installed after programs/localized (make -C ... install).
+dist_noinst_DATA = dtfile.config
 
 dist_bin_SCRIPTS = dtfile_error dterror.ds
 

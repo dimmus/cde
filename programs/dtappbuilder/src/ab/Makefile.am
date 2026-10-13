@@ -10,8 +10,6 @@ $(if $(filter grouped-target,$(.FEATURES)),,$(eval .NOTPARALLEL:))
 
 .DELETE_ON_ERROR:
 
-appdefaultsdir = $(CDE_DATA_TOP)/app-defaults/C
-
 ABINCLUDES = -I$(srcdir)/../include -I$(srcdir)/../include/ab_private \
 	-I../libABil -I$(srcdir)/../libABil
 
@@ -28,7 +26,10 @@ bin_PROGRAMS = dtbuilder
 BUILT_SOURCES = dtbuilder.c dtbuilder.msg dtb_utils.c dtb_utils.h \
 		$(PROJFILE_MODULES:=_ui.h)
 
-appdefaults_DATA = Dtbuilder
+# programs/localized/C installs app-defaults/C/Dtbuilder, made from
+# Dtbuilder.ad with the messages; installing this one too replaced it
+# whenever this directory was installed after programs/localized.
+noinst_DATA = Dtbuilder
 
 DTCODEGENCAT = NLSPATH=$(top_builddir)/programs/dtappbuilder/src/abmf/dtcodegen.cat
 
