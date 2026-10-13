@@ -749,9 +749,9 @@ note. Scalable fonts need a Motif 2.5 library in which the
 <Term>Size (list) or Bitmap Size (list)</Term>
 <ListItem>
 <Para>Lists a series of relative bitmap font sizes (not the actual font
-size). In Scalable (Xft) mode the list is labeled Bitmap Size: the
-window manager, terminals, help windows, and applications that do not
-use scalable fonts still use the bitmap font of the selected size.
+size). In Scalable (Xft) mode the list is labeled Bitmap Size:
+terminals, help windows, and applications that do not use scalable fonts
+still use the bitmap font of the selected size.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -877,8 +877,7 @@ take precedence over these settings.
 shows the font to be used for titles, labels, and lists. The text inside
 the text field shows the font to be used for text fields. You may select
 the text field and type your own sample text. In Scalable (Xft) mode, a
-third sample shows the bitmap font used by the window manager,
-terminals, and help.
+third sample shows the bitmap font used by terminals and help.
 </Para>
 </ListItem>
 </VarListEntry>

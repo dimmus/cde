@@ -1103,7 +1103,7 @@ wspSetPosition(
     WmScreenData *pSD = pPres->pCDforClient->pSD;
     Arg args[10];
     int n;
-    XFontStruct *font;
+    unsigned int textHeight;
     Dimension height;
     int x, y;
 
@@ -1118,14 +1118,14 @@ wspSetPosition(
     {
 	if (pSD->decoupleTitleAppearance)
 	{
-	    font = pSD->clientTitleAppearance.font;
+	    textHeight = pSD->clientTitleAppearance.textHeight;
 	}
 	else
 	{
-	    font = pSD->clientAppearance.font;
+	    textHeight = pSD->clientAppearance.textHeight;
 	}
 
-	height += TEXT_HEIGHT(font) + (2 * pSD->frameBorderWidth);
+	height += textHeight + (2 * pSD->frameBorderWidth);
     }
 
 

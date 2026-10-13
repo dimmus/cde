@@ -2151,6 +2151,21 @@ XtResource wmAppearanceResources[] =
 	"fixed"
     },
 
+    /*
+     * A render table, when there is one ("*renderTable", as the Style
+     * Manager writes for scalable fonts), replaces the font list: unlike
+     * a font list it can name Xft fonts.
+     */
+    {
+	XmNrenderTable,
+	XmCRenderTable,
+	XmRRenderTable,
+	sizeof (XmRenderTable),
+	XtOffsetOf (AppearanceData, renderTable),
+	XtRImmediate,
+	(XtPointer) NULL
+    },
+
     {
 	WmNsaveUnder,
 	WmCSaveUnder,
@@ -4304,6 +4319,42 @@ FallbackMakeTitleHeight (AppearanceData *pAData) {
   return result;
 }
 
+
+/*
+ * Whether fontList has an Xft rendition: then text is measured and drawn
+ * with the render table, as XmStringDraw does, not with a core font.
+ */
+static Boolean
+RenderTableHasXft (XmFontList fontList)
+{
+  XmFontContext       fc;
+  XmFontListEntry     entry;
+  XmFontType          type;
+  Boolean             xft = False;
+
+  if (fontList == NULL || !XmFontListInitFontContext (&fc, fontList))
+    return False;
+  while (!xft && (entry = XmFontListNextEntry (fc)) != NULL)
+  {
+    (void) XmFontListEntryGetFont (entry, &type);
+    xft = (type == XmFONT_IS_XFT);
+  }
+  XmFontListFreeFontContext (fc);
+  return xft;
+}
+
+/* The height of a line of text in fontList. */
+static unsigned int
+RenderTableTextHeight (XmFontList fontList)
+{
+  XmString            s = XmStringCreateLocalized ("Mg");
+  Dimension           width = 0, height = 0;
+
+  XmStringExtent (fontList, s, &width, &height);
+  XmStringFree (s);
+  return height;
+}
+
 
 /*************************************<->*************************************
  *
@@ -4336,11 +4387,30 @@ MakeAppearanceResources (WmScreenData *pSD, AppearanceData *pAData, Boolean make
 {
     Pixel foreground;
 
+    if (pAData->renderTable != NULL)
+    {
+	pAData->fontList = pAData->renderTable;
+    }
+
     /*
      * Extract a font from the font list.
      */
 
-    if (! XmeRenderTableGetDefaultFont(pAData->fontList, &(pAData->font)))
+    if ((pAData->xftFont = RenderTableHasXft (pAData->fontList)))
+    {
+	/*
+	 * Xft renditions have no core font: the text is measured and
+	 * drawn with the render table, and the GCs get "fixed".
+	 */
+	pAData->font = XLoadQueryFont(wmGD.display, "fixed");
+	if (pAData->font == NULL)
+	{
+	  ExitWM(WM_ERROR_EXIT_VALUE);
+	}
+	pAData->textHeight = RenderTableTextHeight (pAData->fontList);
+	pAData->titleHeight = pAData->textHeight + WM_TITLE_BAR_PADDING;
+    }
+    else if (! XmeRenderTableGetDefaultFont(pAData->fontList, &(pAData->font)))
     {
 #if 0
         /* This always prints garbage on failure, which seems to
@@ -4368,6 +4438,7 @@ MakeAppearanceResources (WmScreenData *pSD, AppearanceData *pAData, Boolean make
 	  pAData->titleHeight = (pAData->font)->ascent + (pAData->font)->descent
 	    + WM_TITLE_BAR_PADDING;
 	}
+	pAData->textHeight = TEXT_HEIGHT(pAData->font);
 #else
 	ExitWM(WM_ERROR_EXIT_VALUE);
 #endif
@@ -4378,6 +4449,7 @@ MakeAppearanceResources (WmScreenData *pSD, AppearanceData *pAData, Boolean make
 	 */
 	pAData->titleHeight = (pAData->font)->ascent + (pAData->font)->descent
 	+ WM_TITLE_BAR_PADDING;
+	pAData->textHeight = TEXT_HEIGHT(pAData->font);
     }
 
 

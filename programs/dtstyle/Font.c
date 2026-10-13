@@ -138,7 +138,7 @@
 #define DPI_AUTO       ((char *)GETMESSAGE(5, 58, "Automatic"))
 #define FC_OVERRIDE    ((char *)GETMESSAGE(5, 59, "Override the system font configuration\n(affects all applications)"))
 #define BITMAP_SIZE    ((char *)GETMESSAGE(5, 60, "Bitmap Size"))
-#define BITMAP_CAPTION ((char *)GETMESSAGE(5, 61, "Window manager, terminals and help:"))
+#define BITMAP_CAPTION ((char *)GETMESSAGE(5, 61, "Terminals and help:"))
 #define NO_XFT_MOTIF   ((char *)GETMESSAGE(5, 62, "Scalable fonts are not available: the Motif\nlibrary was built without Xft support."))
 #define NO_XFT_FONTS   ((char *)GETMESSAGE(5, 63, "No scalable fonts are installed."))
 #define RENDER_NOTE    ((char *)GETMESSAGE(5, 64, "Rendering settings take effect in applications\nstarted after the change. Without Override,\nthe system font configuration may take precedence."))
@@ -943,7 +943,7 @@ CreateFontDlg(
     /* Add callback to determine if user changes text in sample field */
     XtAddCallback(font.userText, XmNvalueChangedCallback, valueChangedCB, NULL);
 
-    /* Xft mode: the bitmap font that dtwm, terminals and help keep using */
+    /* Xft mode: the bitmap font that terminals and help keep using */
     font.bitmapCaption = LabelGadget(font.previewForm, "bitmapCaption",
                                      BITMAP_CAPTION);
     n = 0;

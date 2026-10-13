@@ -335,9 +335,10 @@ the session's resources for the next login:
 .RE
 .fi
 .sp 1
-In \fBScalable (Xft)\fP mode it writes the same bitmap resources, which the
-window manager, terminals, help windows and other applications that read
-font lists keep using; the Size list is then labeled Bitmap Size.
+In \fBScalable (Xft)\fP mode it writes the same bitmap resources, which
+terminals, help windows and other applications that read font lists keep
+using; the Size list is then labeled Bitmap Size.  The window manager's
+titles, icon labels and Front Panel use the \fB*renderTable\fP below.
 It adds:
 .sp 1
 .nf

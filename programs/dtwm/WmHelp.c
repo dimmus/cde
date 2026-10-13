@@ -2493,7 +2493,7 @@ wmDtHelpSetPosition(
 {
     Arg args[10];
     int n;
-    XFontStruct *font;
+    unsigned int textHeight;
     Dimension height;
     Window wGroup = None;
     int x, y;
@@ -2511,15 +2511,15 @@ wmDtHelpSetPosition(
 	{
 	    if (pSD->decoupleTitleAppearance)
 	    {
-		font = pSD->clientTitleAppearance.font;
+		textHeight = pSD->clientTitleAppearance.textHeight;
 	    }
 	    else
 	    {
-		font = pSD->clientAppearance.font;
+		textHeight = pSD->clientAppearance.textHeight;
 	    }
 	    
-/*	    height += TEXT_HEIGHT(font) + (2 * pSD->frameBorderWidth);*/
-	    height += TEXT_HEIGHT(font) + (2 * pSD->resizeBorderWidth);
+/*	    height += textHeight + (2 * pSD->frameBorderWidth);*/
+	    height += textHeight + (2 * pSD->resizeBorderWidth);
 	}
 
 	
