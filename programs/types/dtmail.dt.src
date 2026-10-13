@@ -52,6 +52,9 @@ DATA_CRITERIA DTMAIL_FILE2
 	CONTENT		0 string From
 	MODE		f&!x
 }
+XCOMM MailAppend only accepts a DTMAIL_FILE as the drag source.  (No
+XCOMM comment inside the script: its lines are joined into one, so a
+XCOMM shell comment there would end the script.)
 ACTION MailAppend
 {
 	TYPE		COMMAND
@@ -60,8 +63,6 @@ ACTION MailAppend
         EXEC_STRING     sh -c ' \
          if [ "%(File)Arg_2%" !=  "%(File)Arg_1%" ];\
           then \
-             XCOMM check if the source is DTMAIL_FILE ;\
-             XCOMM we only accept DTMAIL_FILE as drag source ;\
              IS_DTMAIL=`CDE_INSTALLATION_TOP/bin/dttypes -type "%(File)Arg_2%"|grep DTMAIL_FILE`;\
              if  [ -n "\$IS_DTMAIL" ]; then \
                ERROR=`cat "%(File)Arg_2%" >> "%(File)Arg_1%" \

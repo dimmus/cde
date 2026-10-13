@@ -108,8 +108,7 @@ static void ResolveVariableReference(
 			int escape,
 			int brackets) ;
 static char *read_line( 
-			char string[],
-			int n,
+			char **string,
         		FILE *fd) ;
 static void clean_line( 
                         char **string) ;
@@ -545,15 +544,20 @@ get_variable (
  *      of K&R's "fgets" (Second Edition). Note that the EOLN
  *      mark is replaced with a '\0'.
  *
+ *      The line may be longer than MAX_LINE_LENGTH: the buffer is
+ *      grown until it holds all of it.  (It used to be read in
+ *      MAX_LINE_LENGTH - 1 byte pieces, each piece losing its last
+ *      byte as if it were the newline, and the rest taken for the
+ *      next line, e.g. a field named by the tail of a long EXEC_STRING.)
+ *
  * Synopsis:
  *
- *	ret_value = read_line (string, n, fd);
+ *	ret_value = read_line (string, fd);
  *
- *	char *ret_vaulue;  	NULL if EOF, string otherwise 
+ *	char *ret_vaulue;  	NULL if EOF, *string otherwise 
  *
- *	char string[];  	The array to put the line into.
- *
- *	int n; 			Max number of chars to read.
+ *	char **string;  	The buffer to put the line into, at least
+ *				MAX_LINE_LENGTH bytes; it may be realloc'ed.
  *
  *	FILE * fd;		The file descriptor to read from.
  *
@@ -562,16 +566,26 @@ get_variable (
 static
 char*
 read_line (
-	char string[],			/* MODIFIED */
-	int n,
+	char **string,			/* MODIFIED */
         FILE *fd )
 {
-   if ((fgets (string, n, fd)) == NULL)
+   size_t size = MAX_LINE_LENGTH;
+   size_t len;
+
+   if ((fgets (*string, (int) size, fd)) == NULL)
       return (NULL);
-   else {
-      string[strlen (string) - 1] = '\000';
-      return (string);
+   len = strlen (*string);
+   while (len == size - 1 && (*string)[len - 1] != '\n')
+   {
+      size *= 2;
+      *string = XtRealloc (*string, size);
+      if (fgets (*string + len, (int) (size - len), fd) == NULL)
+	 break;				/* last line, no newline */
+      len += strlen (*string + len);
    }
+   if (len > 0 && (*string)[len - 1] == '\n')
+      (*string)[len - 1] = '\000';
+   return (*string);
 }
 
 /*********************
@@ -987,7 +1001,7 @@ ReadNextEntry(
       start = NULL;
       indx = 0;
 
-      if (read_line (*tmpLine, MAX_LINE_LENGTH, fd) == NULL) 
+      if (read_line (tmpLine, fd) == NULL) 
       { 
 	 /* EOF */
 	 break;
@@ -1107,7 +1121,7 @@ ReadNextEntry(
       {
 	 (*tmpLine)[0] = '\000';
 
-	 if (read_line (*tmpLine, MAX_LINE_LENGTH, fd) == NULL) /* EOF */ 
+	 if (read_line (tmpLine, fd) == NULL) /* EOF */ 
 	 { 
 	    if (multi_line || (indx >=1)) 
 	    {
