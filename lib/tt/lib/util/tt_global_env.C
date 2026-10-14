@@ -102,23 +102,26 @@ find_host(_Tt_string haddr, _Tt_host_ptr &h, int create_ifnot)
 	}
 	h = new _Tt_host();
 	/* host not found, add it to list */
-	// Clients only need the address of a session host: its name
-	// is used only in diagnostics (and by the TLI and secure-RPC
-	// transports, which need it).  A reverse DNS lookup on every
-	// tt_open can stall for seconds when the resolver is slow, so
-	// clients skip it.  A dotted address is never passed to
-	// init_byaddr(), which wants the raw bytes.
+	// Only the address of a host is needed: its name is used only
+	// in diagnostics (and by the TLI and secure-RPC transports,
+	// which need it).  A reverse DNS lookup can stall for minutes
+	// when the resolver is slow -- in a login, while the network
+	// comes up, ttsession sat 120 s in the lookup of its own
+	// client's address and every tt_open() of the session timed
+	// out with TT_ERR_NOMP -- so neither clients nor the server do
+	// one.  A dotted address is never passed to init_byaddr(),
+	// which wants the raw bytes.
 #if defined(OPT_TLI) || defined(OPT_SECURE_RPC)
 	int resolve_name = 1;
 #else
-	int resolve_name = _tt_mp->in_server();
+	int resolve_name = 0;
 #endif
 	if (dotted) {
 		if (! h->init_bystringaddr(haddr, resolve_name)) {
 			return(0);
 		}
 	} else if (_tt_mp->in_server()) {
-		if (! h->init_byaddr(haddr)) {
+		if (! resolve_name || ! h->init_byaddr(haddr)) {
 			// No name for this address: it is still a
 			// perfectly usable address.  (This used to fail,
 			// so a client on a host without reverse DNS got
