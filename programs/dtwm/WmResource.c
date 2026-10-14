@@ -1411,6 +1411,16 @@ XtResource wmScreenResources[] =
     },
 
     {
+	WmNmoveOpaqueRate,
+	WmCMoveOpaqueRate,
+	XtRInt,
+	sizeof (int),
+	XtOffsetOf (WmScreenData, moveOpaqueRate),
+	XtRImmediate,
+	(XtPointer)60
+    },
+
+    {
 	WmNhelpResources,
 	WmCHelpResources,
 	XtRString,
@@ -5700,6 +5710,7 @@ SetStdScreenResourceValues (WmScreenData *pSD)
 
     pSD->feedbackGeometry = NULL;
     pSD->moveOpaque = False;
+    pSD->moveOpaqueRate = 60;
 
 } /* END OF FUNCTION SetStdScreenResourceValues */
 

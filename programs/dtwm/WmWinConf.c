@@ -35,7 +35,9 @@
  */
 #include "WmGlobal.h"	/* This should be the first include */
 #include <X11/X.h>
+#include <errno.h>
 #include <poll.h>
+#include <time.h>
 
 #define XK_MISCELLANY
 #include <X11/keysymdef.h>
@@ -134,6 +136,53 @@ static long marqueeWidth0, marqueeHeight0;	/* old size of area */
 
 static int opaqueMoveX = 0;    /* for cancel request on opaque moves */
 static int opaqueMoveY = 0;
+
+/*
+ * Opaque moves are paced to moveOpaqueRate per second (the display's
+ * refresh rate by default): a pointer can report hundreds of positions
+ * a second, each of which made the X server move the frame and repaint
+ * what it uncovers, though no more than one per refresh can be seen.
+ * Without acceleration (modesetting with AccelMethod none, as on a
+ * VMware guest) that took a fifth of a CPU and the frame trailed the
+ * pointer in jerks.  The time of the last opaque move, in microseconds
+ * of CLOCK_MONOTONIC (0: none yet in this move).
+ */
+static long long lastOpaqueMoveUs = 0;
+
+static long long
+MonotonicUs (void)
+{
+    struct timespec ts;
+
+    clock_gettime (CLOCK_MONOTONIC, &ts);
+    return (long long) ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
+/*
+ * Called before a motion hint is answered (and the next one asked for)
+ * while a window is moved opaquely: waits out the rest of the frame
+ * interval.  The server sends no further hint meanwhile, so nothing
+ * piles up, and the query that follows gets the newest position.
+ */
+static void
+PaceOpaqueMove (Display *display)
+{
+    int rate = wmGD.pActiveSD->moveOpaqueRate;
+    long long wait;
+
+    if (rate <= 0 || lastOpaqueMoveUs == 0)
+	return;
+    wait = lastOpaqueMoveUs + 1000000 / rate - MonotonicUs ();
+    if (wait > 0) {
+	struct timespec ts;
+
+	XFlush (display);
+	ts.tv_sec = wait / 1000000;
+	ts.tv_nsec = (long) (wait % 1000000) * 1000;
+	while (nanosleep (&ts, &ts) != 0 && errno == EINTR)
+	    ;
+    }
+}
 static int moveX = 0;		/* root coords of UL corner of frame */
 static int moveY = 0;
 static int moveIBbbX = 0;	/* root coords of icon box bulletin board */
@@ -1507,6 +1556,7 @@ void MoveOpaque (ClientData *pcd, int x, int y,
 	XMoveWindow (DISPLAY, pcd->clientFrameWin, x, y);
 	
     }
+    lastOpaqueMoveUs = MonotonicUs ();
     
     /*
      * Clean up exposed frame parts.  Without a round trip: the
@@ -4232,6 +4282,10 @@ void GetConfigEvent (Display *display, Window window, unsigned long mask, int cu
 	if (pev->type == MotionNotify &&
 	    pev->xmotion.is_hint == NotifyHint)
 	{
+	    if (wmGD.pActiveSD->moveOpaque &&
+		wmGD.configAction == MOVE_CLIENT)
+		PaceOpaqueMove (display);
+
 	    /* 
 	     * "Ack" the motion notify hint.  This also asks the server
 	     * for the next hint.

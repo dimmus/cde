@@ -1594,6 +1594,11 @@ the key bindings to use for screen "1".</para>
 <entry align="left" valign="top">T/F</entry>
 <entry align="left" valign="top">F</entry></row>
 <row>
+<entry align="left" valign="top">moveOpaqueRate</entry>
+<entry align="left" valign="top">MoveOpaqueRate</entry>
+<entry align="left" valign="top">number</entry>
+<entry align="left" valign="top">60</entry></row>
+<row>
 <entry align="left" valign="top">resizeBorderWidth</entry>
 <entry align="left" valign="top">ResizeBorderWidth</entry>
 <entry align="left" valign="top">pixels</entry>
@@ -1814,6 +1819,18 @@ is twice the screen width and height.</para>
 <para>This resource controls whether the actual window is moved or a rectangular
 outline of the window is moved. A default value of False displays a rectangular
 outline on moves.</para>
+</listitem>
+</varlistentry>
+<varlistentry><term><emphasis>moveOpaqueRate</emphasis> (class  <emphasis>MoveOpaqueRate</emphasis>)</term>
+<listitem>
+<para>This resource limits how many times per second a window that is moved
+opaquely (see <emphasis>moveOpaque</emphasis>) is moved: to the refresh rate
+of the display, more cannot be seen. A pointer may report its position several
+hundred times per second; moving the window, and redrawing what it uncovers,
+for each of them takes much processor time without acceleration, and makes
+the window trail the pointer in jerks. The window always moves to the latest
+position of the pointer. A value of 0 moves it for each position. The default
+value is 60.</para>
 </listitem>
 </varlistentry>
 <varlistentry><term><emphasis>resizeBorderWidth</emphasis> (class  <emphasis>ResizeBorderWidth</emphasis>)</term>

@@ -1333,6 +1333,8 @@ typedef struct _WmScreenData
     String      subpanelResources;              /*to restore subpanels */
     Boolean	iconBoxControl;			/* FP control for icon box */
     Boolean     moveOpaque;                     /* move window not outlines */
+    int         moveOpaqueRate;                 /* opaque moves per second,
+						   0: one per pointer step */
 
     /* pixel set info (from color object) */
     XmPixelSet	*pPixelData;		/* all pixel data */

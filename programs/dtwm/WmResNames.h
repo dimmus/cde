@@ -129,6 +129,7 @@
 #define WmNslideSubpanels		"slideSubpanels"
 #define WmNdtLite			"useDtLite"
 #define WmNmoveOpaque                   "moveOpaque"
+#define WmNmoveOpaqueRate               "moveOpaqueRate"
 #define WmNframeStyle			"frameStyle"
 
 /* conponent appearance resources: */
@@ -296,6 +297,7 @@
 #define WmCSlideSubpanels		"SlideSubpanels"
 #define WmCDtLite			"UseDtLite"
 #define WmCMoveOpaque                   "MoveOpaque"
+#define WmCMoveOpaqueRate               "MoveOpaqueRate"
 #define WmCFrameStyle			"FrameStyle"
 #define WmCWorkspaceList	        "WorkspaceList"
 #define WmCWorkspaceCount	        "WorkspaceCount"

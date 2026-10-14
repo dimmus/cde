@@ -1403,6 +1403,8 @@ static const char *const xrm_hold_freeze[] = {
 
 static const char *const xrm_opaque[] = {
 	"Dtwm*moveOpaque: True",
+	/* the cost of each step: not paced to the refresh rate */
+	"Dtwm*moveOpaqueRate: 0",
 	NULL
 };
 
