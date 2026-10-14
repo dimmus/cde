@@ -385,6 +385,9 @@ programs/dtcreate/dtcreate
 programs/dtdbcache/dtdbcache
 programs/dtdspmsg/dtdspmsg
 
+# programs/dtdbus
+programs/dtdbus/dtdbus
+
 # programs/dtrandr
 programs/dtrandr/dtrandr
 programs/dtrandr/tests/unit

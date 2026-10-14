@@ -935,6 +935,25 @@ fi
 AC_SUBST(XRANDRLIB)
 AM_CONDITIONAL([BUILD_DTRANDR], [test "x$have_xrandr" = xyes])
 
+dnl dtdbus: the session's freedesktop.org D-Bus services (screen saver
+dnl inhibition, notifications, locking through logind), with sd-bus
+AC_ARG_WITH([sd-bus],
+  AS_HELP_STRING([--without-sd-bus],
+    [do not build dtdbus (default: build it when libsystemd is found)]),
+  [], [with_sd_bus=check])
+have_sdbus=no
+if test "x$with_sd_bus" != xno; then
+   PKG_CHECK_MODULES([SDBUS], [libsystemd >= 221],
+                     [have_sdbus=yes], [have_sdbus=no])
+   if test "x$with_sd_bus" = xyes && test "x$have_sdbus" != xyes; then
+      AC_MSG_ERROR([--with-sd-bus: libsystemd (sd-bus) not found])
+   fi
+fi
+if test "x$have_sdbus" != xyes; then
+   AC_MSG_WARN([libsystemd (sd-bus) not found, dtdbus will not be built])
+fi
+AM_CONDITIONAL([BUILD_DTDBUS], [test "x$have_sdbus" = xyes])
+
 dnl Sun RPC: libtirpc where the C library has none (glibc 2.32 and
 dnl later), found through pkg-config, with a plain library check as a
 dnl fallback for systems without libtirpc.pc.
@@ -1304,6 +1323,7 @@ programs/dtexec/Makefile
 
 programs/dtdbcache/Makefile
 programs/dtrandr/Makefile
+programs/dtdbus/Makefile
 
 programs/dticon/Makefile
 

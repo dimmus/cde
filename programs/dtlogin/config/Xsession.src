@@ -527,6 +527,24 @@ XCOMM ##########################################################################
 
 
 XCOMM ##########################################################################
+XCOMM
+XCOMM  D-Bus services section
+XCOMM
+XCOMM  The freedesktop.org services that today's applications ask of a
+XCOMM  desktop (see dtdbus(1)): screen saver inhibition by video players,
+XCOMM  notifications, and locking the display when logind asks and before
+XCOMM  sleep.  dtdbus exits with the X server.  DTDBUS=no in
+XCOMM  $HOME/.dtprofile turns this off.
+XCOMM
+XCOMM ##########################################################################
+
+  if [ "$DTDBUS" != "no" ] && [ -x $DT_BINPATH/dtdbus ]; then
+    Log "starting $DT_BINPATH/dtdbus"
+    $DT_BINPATH/dtdbus </dev/null &
+  fi
+
+
+XCOMM ##########################################################################
 XCOMM 
 XCOMM   Startup section.
 XCOMM      

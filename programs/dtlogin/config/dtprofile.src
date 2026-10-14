@@ -175,6 +175,18 @@ XCOMM DTRANDR=no
 
 XCOMM ##########################################################################
 XCOMM #
+XCOMM #  dtdbus answers the D-Bus requests of today's applications: video
+XCOMM #  players keep the screen from blanking, notifications are shown,
+XCOMM #  and the display locks when logind asks and before sleep.  See
+XCOMM #  dtdbus(1).  To leave it out, uncomment the following line.
+XCOMM #
+XCOMM ##########################################################################
+
+XCOMM DTDBUS=no
+
+
+XCOMM ##########################################################################
+XCOMM #
 XCOMM #  The desktop's messaging (ToolTalk) and session manager accept only
 XCOMM #  programs of this machine, through local sockets: no network port
 XCOMM #  is open, and the network's state does not matter.  To let programs

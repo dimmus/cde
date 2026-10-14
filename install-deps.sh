@@ -68,6 +68,7 @@ build_deps+=(
     libxinerama libxss libxdmcp
     libxaw              # Xaw headers (dtinfo has its own Porthole, Panner, Tree)
     libxrandr           # dtrandr (optional: without it dtrandr is not built)
+    systemd-libs        # sd-bus for dtdbus (optional: without it dtdbus is not built)
     xbitmaps
     libtirpc lmdb
     pam libutempter

@@ -13,6 +13,11 @@ if BUILD_DTRANDR
 SUBDIRS += dtrandr
 endif
 
+# dtdbus needs sd-bus (libsystemd)
+if BUILD_DTDBUS
+SUBDIRS += dtdbus
+endif
+
 # The documentation tools (dthelp/parser is the other part of them)
 if BUILD_DOC_TOOLS
 SUBDIRS += dtsr dtdocbook

@@ -1,0 +1,76 @@
+.TH DTDBUS 1 "October 2026" "CDE" "User Commands"
+.SH NAME
+dtdbus \- the CDE session's freedesktop.org D-Bus services
+.SH SYNOPSIS
+.B dtdbus
+[\fB\-v\fR] [\fB\-display\fR \fIdisplay\fR]
+.SH DESCRIPTION
+.B dtdbus
+answers the requests that today's applications make of the desktop
+over D-Bus, for a CDE session.
+.TP
+.B org.freedesktop.ScreenSaver
+(session bus).  A video player, or a browser that plays a video,
+inhibits the screen saver: while any inhibition is held, the X
+server's screen saver is suspended (and with it the monitor's power
+saving), so the screen neither blanks nor locks.  An inhibition ends
+when its application ends it or leaves the bus.
+.B Lock
+locks the display;
+.B SimulateUserActivity
+resets the idle timer;
+.B GetSessionIdleTime
+returns the idle time in seconds.
+.TP
+.B org.freedesktop.Notifications
+(session bus), unless another notification service runs.
+Notifications are shown at the top right of the screen until they
+expire (6 seconds unless the application says otherwise; critical
+ones stay) or are clicked.  A click invokes the notification's
+default action, if it has one.  Markup is shown as plain text.
+.TP
+.B org.freedesktop.login1
+(system bus).  When logind is asked to lock the session (for example
+by
+.BR "loginctl lock-session" ),
+the display is locked; and before the machine goes to sleep,
+.B dtdbus
+locks the display, holding the suspend up (with a logind delay
+inhibitor lock) until the session manager has answered, or 3 seconds,
+so that the machine wakes up locked.
+.PP
+The display is locked through the session manager
+.RB ( dtsession ),
+with its ToolTalk request Display_Lock, as the LockDisplay action
+does.
+.PP
+.B Xsession
+starts
+.B dtdbus
+for each session; it exits when the session's X server connection
+closes.
+.SH OPTIONS
+.TP
+.B \-v
+Report what is done (inhibitions, notifications, locking) on the
+standard error, which Xsession sends to
+.IR $HOME/.dt/startlog .
+.SH ENVIRONMENT
+.TP
+.B DTDBUS
+Set to
+.B no
+in
+.I $HOME/.dtprofile
+to leave
+.B dtdbus
+out of the session.
+.TP
+.B XDG_SESSION_ID
+The logind session to follow; without it, the session of the
+process.
+.SH SEE ALSO
+.BR dtsession (1),
+.BR Xsession (1),
+.BR loginctl (1),
+.BR systemd-inhibit (1)

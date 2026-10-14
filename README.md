@@ -160,6 +160,21 @@ And from the second:
   ToolTalk calls fall back to the old ones against an older ttsession,
   in both directions.
 - The unbuilt dtudcfonted, dtudcexch and lib/pam sources are gone.
+- The session opens no network port: ToolTalk and the session manager
+  are reached through local sockets only, so the login no longer
+  depends on the network's state (a lost DHCP lease used to stall it),
+  and rpcbind is not needed for them.  `TTSESSION_NETWORK=1` in
+  `~/.dtprofile` (or `ttsession -n`) lets programs on other hosts in
+  again.
+- ToolTalk file scope works without `rpc.ttdbserver`, within the
+  session (dtmail's coordination of two instances on one mailbox
+  depends on it).
+- `dtdbus` answers today's applications over D-Bus: video players keep
+  the screen from blanking (`org.freedesktop.ScreenSaver`),
+  notifications are shown at the top right (`org.freedesktop.Notifications`),
+  and the display locks when logind asks (`loginctl lock-session`) and
+  before the machine sleeps.  `DTDBUS=no` in `~/.dtprofile` leaves it
+  out; it needs libsystemd (sd-bus) to build.
 
 ### Build system
 
