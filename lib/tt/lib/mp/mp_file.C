@@ -79,6 +79,7 @@ _Tt_qmsg_info::xdr(
 
 _Tt_file::_Tt_file()
 {
+	_local_only = 0;
 }
 
 _Tt_file::_Tt_file(
@@ -86,6 +87,7 @@ _Tt_file::_Tt_file(
 ) :
 	_Tt_db_file( path )
 {
+	_local_only = 0;
 }
 
 _Tt_file::~_Tt_file()

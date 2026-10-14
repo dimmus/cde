@@ -111,7 +111,9 @@ _Tt_c_file::c_join(
 		sp->add_joined_file(getNetworkPath());
 		// add our session to the list of sessions
 		// interested in this file.
-		if (status == TT_WRN_STALE_OBJID) {
+		if (status == TT_WRN_STALE_OBJID && local_only()) {
+			status = TT_OK;		// no database to tell
+		} else if (status == TT_WRN_STALE_OBJID) {
 			dbStatus = addSession(d_session->process_tree_id());
 			status = _tt_get_api_error( dbStatus, _TT_API_FILE );
 			if (status == TT_ERR_INTERNAL) {
@@ -167,6 +169,8 @@ _Tt_c_file::c_quit(
 			     (char *)&status);
 	if (status == TT_WRN_NOTFOUND) {
 		status = TT_OK; 
+	} else if (status == TT_WRN_STALE_OBJID && local_only()) {
+		status = TT_OK;			// no database to tell
 	} else if (status == TT_WRN_STALE_OBJID) {
 		_Tt_db_results dbStatus;
 		dbStatus = deleteSession( d_session->process_tree_id() );
@@ -207,6 +211,9 @@ _Tt_c_file::process_message_queue(
 	Tt_status		status;
 	_Tt_db_results		dbStatus;
 
+	if (local_only()) {
+		return TT_OK;		// messages are queued in the database
+	}
 	dbStatus = dequeueMessages( _tt_c_mp->default_procid()->ptypes(),
 				    msgs );
 	status = _tt_get_api_error( dbStatus, _TT_API_FILE );

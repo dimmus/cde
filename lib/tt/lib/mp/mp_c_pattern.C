@@ -100,6 +100,9 @@ join_files(const _Tt_string &sessID) const
 			worstErr = status;
 			continue;
 		}
+		if (file->local_only()) {
+			continue;	// no database to tell
+		}
 		dbStatus = file->addSession( sessID );
 		status = _tt_get_api_error( dbStatus, _TT_API_FILE );
 		if (status == TT_ERR_INTERNAL) {

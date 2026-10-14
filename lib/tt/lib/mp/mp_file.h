@@ -83,6 +83,17 @@ class _Tt_file : public _Tt_db_file {
 	static _Tt_string	networkPath_(
 					_Tt_object_ptr	   &obj
 				);
+	// No ToolTalk database server could be reached for this file
+	// (none runs, which is the rule on a desktop of its own): the
+	// file is joined, and file-scoped messages about it are
+	// delivered, within the session, as if the database knew of no
+	// other session interested in it.  What only the database can
+	// do (other sessions, queued messages, specs, objects) is not
+	// done.  See _Tt_mp::find_file().
+	int			local_only() const { return _local_only; }
+	void			set_local_only() { _local_only = 1; }
+      private:
+	int			_local_only;
 };
 
 #endif				/* _MP_FILE_H */

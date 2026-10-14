@@ -195,7 +195,11 @@ dispatch(int observers_only)
 		// message is file-scoped (pure dispatch) and then we
 		// deliver accordingly. This is mostly just
 		// performance-tuning.
-		if (_tt_mp->find_file(_file, fptr, 1) == TT_OK) {
+		if (_tt_mp->find_file(_file, fptr, 1) == TT_OK &&
+		    fptr->local_only()) {
+			// No database: no other session to send to
+			_rsessions = (_Tt_string_list *)0;
+		} else if (_tt_mp->find_file(_file, fptr, 1) == TT_OK) {
 			_rsessions = fptr->getSessions();
 			dbStatus = fptr->getDBResults();
 			status = _tt_get_api_error( dbStatus, _TT_API_FILE );
@@ -302,7 +306,8 @@ dispatch(int observers_only)
 
 	// queue the message if necessary. XXX what to do if queueing fails?
 	if (!(args.qmsg_info).is_null()) {
-		if (_tt_mp->find_file(_file, fptr, 1) == TT_OK) {
+		if (_tt_mp->find_file(_file, fptr, 1) == TT_OK &&
+		    ! fptr->local_only()) {
 			dbStatus = fptr->queueMessage(args.qmsg_info->ptypes,
 						      mptr);
 			if (dbStatus != TT_DB_OK) {

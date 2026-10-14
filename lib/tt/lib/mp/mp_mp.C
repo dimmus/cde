@@ -172,6 +172,17 @@ _Tt_mp::find_file(
 		}
 		_Tt_db_results dbStatus = file->getDBResults();
 		status = _tt_get_api_error( dbStatus, _TT_API_FILE );
+		if (dbStatus == TT_DB_ERR_RPC_CONNECTION_FAILED ||
+		    dbStatus == TT_DB_ERR_RPC_FAILED ||
+		    dbStatus == TT_DB_ERR_DB_CONNECTION_FAILED) {
+			// No database server (rpc.ttdbserver) for this
+			// file: the file serves within the session (see
+			// _Tt_file::local_only()) rather than failing
+			// tt_file_join() and every TT_FILE message.
+			// What needs the database fails there, as before.
+			file->set_local_only();
+			status = TT_OK;
+		}
 		if (status == TT_OK) {
 			_file_cache->insert( file );
 		} else if (status == TT_ERR_INTERNAL) {

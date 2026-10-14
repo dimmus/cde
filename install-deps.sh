@@ -75,7 +75,9 @@ build_deps+=(
     libcups             # cups-config; dtprintinfo's queue and job lists
 )
 
-# Needed to actually run the desktop (ToolTalk needs rpcbind, dtsession uses
+# Needed to actually run the desktop (dtcm's calendar server rpc.cmsd, and
+# ToolTalk across hosts - ttsession -n, rpc.ttdbserver - need rpcbind;
+# a desktop's own ToolTalk session does not; dtsession uses
 # xset/xsetroot, fonts for the default interface)
 runtime_deps=(
     rpcbind
@@ -163,5 +165,5 @@ fi
 echo "==> All dependencies present. Build with:"
 echo "    ./autogen.sh && ./configure && make -j\$(nproc) && sudo make install"
 if (( runtime )); then
-    echo "==> To run CDE, also enable rpcbind:  sudo systemctl enable --now rpcbind"
+    echo "==> For the calendar (dtcm), also enable rpcbind:  sudo systemctl enable --now rpcbind"
 fi
