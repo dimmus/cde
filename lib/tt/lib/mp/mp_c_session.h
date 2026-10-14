@@ -54,6 +54,7 @@ class _Tt_c_session : public _Tt_session {
 	Tt_status		c_quit(_Tt_procid_ptr &procid);
 	Tt_status		c_setprop(_Tt_string prop, _Tt_string val);
       private:
+	Tt_status		c_init_attempts(long long t0, int &tried);
 	int			startup_ttsession(_Tt_string &command);
 };
 

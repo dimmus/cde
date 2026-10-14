@@ -51,6 +51,7 @@
 #include "mp/mp_session.h"
 #include "mp/mp_desktop.h"
 #include "mp/mp_xdr_functions.h"
+#include "util/tt_startup_trace.h"
 #include <unistd.h>
 
 #include "mp/mp_unix_socket.h"
@@ -104,8 +105,8 @@ static int
 c_open_unix_socket(pid_t server_pid, int program)
 {
 	struct sockaddr_un	server_addr;
-	uid_t			peer_uid;
-	pid_t			peer_pid;
+	uid_t			peer_uid = (uid_t)-1;
+	pid_t			peer_pid = -1;
 	int			sock;
 
 	memset(&server_addr, 0, sizeof(server_addr));
@@ -113,18 +114,28 @@ c_open_unix_socket(pid_t server_pid, int program)
 	if (! _tt_unix_socket_path(server_addr.sun_path,
 				   sizeof(server_addr.sun_path),
 				   (long)server_pid, program, 0)) {
+		_tt_trace("tt-unix", "ok=0 why=no-path");
 		return -1;
 	}
 	sock = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
 	if (sock < 0) {
+		_tt_trace("tt-unix", "ok=0 why=socket:%s", strerror(errno));
 		return -1;
 	}
-	if (connect(sock, (sockaddr *)&server_addr, sizeof(server_addr)) != 0 ||
-	    ! _tt_unix_socket_peer(sock, &peer_uid, &peer_pid) ||
-	    peer_uid != geteuid() || peer_pid != server_pid) {
+	if (connect(sock, (sockaddr *)&server_addr, sizeof(server_addr)) != 0) {
+		_tt_trace("tt-unix", "ok=0 path=%s why=connect:%s",
+			  server_addr.sun_path, strerror(errno));
 		close(sock);
 		return -1;
 	}
+	if (! _tt_unix_socket_peer(sock, &peer_uid, &peer_pid) ||
+	    peer_uid != geteuid() || peer_pid != server_pid) {
+		_tt_trace("tt-unix", "ok=0 path=%s why=peer uid=%ld pid=%ld",
+			  server_addr.sun_path, (long)peer_uid, (long)peer_pid);
+		close(sock);
+		return -1;
+	}
+	_tt_trace("tt-unix", "ok=1 path=%s", server_addr.sun_path);
 	return sock;
 }
 #endif // _TT_HAVE_UNIX_SOCKET_RPC
@@ -170,7 +181,6 @@ client_session_init()
 	//
 	Tt_status err;
 	int			rpc_init_done = 0;
-	_Tt_host_ptr		lh;
 
 
 	_is_server = 0;
@@ -190,15 +200,33 @@ client_session_init()
 		Tt_status found;
 
 		if (env() == _TT_ENV_X11) {
+			long long t_dpy = _tt_trace_ms();
+			int ok;
+
 			connected_here = ! _desktop->connected();
-			if (! _desktop->init(_displayname, _TT_DESKTOP_X11)) {
+			ok = _desktop->init(_displayname, _TT_DESKTOP_X11);
+			if (connected_here) {
+				// (XOpenDisplay() is retried for 20 s)
+				_tt_trace("tt-display", "ok=%d display=%s ms=%lld",
+					  ok, _displayname.len() ?
+						(char *)_displayname : "-",
+					  _tt_trace_ms() - t_dpy);
+			}
+			if (! ok) {
 				return(TT_ERR_ACCESS);
 			}
 		}
+		long long t_find = _tt_trace_ms();
+
 		found = find_advertised_address(_address_string);
 		if (connected_here) {
 			_desktop->release();
 		}
+		_tt_trace("tt-find", "found=%d addr=%s ms=%lld",
+			  found == TT_OK,
+			  _address_string.len() ?
+				(char *)_address_string : "-",
+			  _tt_trace_ms() - t_find);
 		if (found != TT_OK) {
 			return(TT_WRN_NOTFOUND);
 		}
@@ -227,12 +255,22 @@ client_session_init()
 	}
 
 #ifdef _TT_HAVE_UNIX_SOCKET_RPC
-	// A session of this user on this host: try its local socket
-	// first (see mp_unix_socket.h).  Should the connection later
-	// need rebinding, _Tt_rpc_client::init() goes to TCP.
-	if (_server_uid == geteuid() &&
-	    _tt_global->get_local_host(lh) &&
-	    lh->stringaddr() == _host->stringaddr()) {
+	// A session of this user: try its local socket first (see
+	// mp_unix_socket.h).  Should the connection later need
+	// rebinding, _Tt_rpc_client::init() goes to TCP.
+	//
+	// This used to be tried only when the session's address was the
+	// one this host's name resolves to now.  That ties a connection
+	// between two processes of the same machine to the state of the
+	// network: while a DHCP lease is renewed, or a virtual machine's
+	// NIC loses its carrier for a few seconds, the name resolves to
+	// another address (or to none), and clients went to TCP towards
+	// the address that had just gone, which stalled the login for
+	// half a minute or failed it ("could not connect to ToolTalk").
+	// The socket is only there if a ttsession of ours with this pid
+	// serves this session's program on this machine, and the peer
+	// credentials prove it; a session on another host has none here.
+	if (_server_uid == geteuid()) {
 		int u_sock = c_open_unix_socket(_pid, _rpc_program);
 
 		if (u_sock != -1) {
@@ -253,9 +291,16 @@ client_session_init()
 	}
 #endif	// _TT_HAVE_UNIX_SOCKET_RPC
 	if (! rpc_init_done) {
+		long long t_tcp = _tt_trace_ms();
+		int ok;
+
 		_rpc_client = new _Tt_rpc_client();
-		if (! _rpc_client->init(_host, _rpc_program, _rpc_version,
-					_server_uid, _auth, _rpc_port)) {
+		ok = _rpc_client->init(_host, _rpc_program, _rpc_version,
+				       _server_uid, _auth, _rpc_port);
+		_tt_trace("tt-tcp", "ok=%d host=%s port=%d ms=%lld", ok,
+			  (char *)_host->stringaddr(), _rpc_port,
+			  _tt_trace_ms() - t_tcp);
+		if (! ok) {
 			return(TT_ERR_NOMP);
 		}
 	}

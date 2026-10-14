@@ -46,6 +46,7 @@
 #include "mp/mp_desktop.h"
 #include "mp/mp_xdr_functions.h"
 #include "util/tt_port.h"
+#include "util/tt_startup_trace.h"
 #include <unistd.h>
 #include <signal.h>
      
@@ -73,8 +74,26 @@ _Tt_c_session::~_Tt_c_session () {}
 Tt_status _Tt_c_session::
 c_init()
 {
-	_Tt_string	start_ttcmd;
+	long long	t0 = _tt_trace_ms();
 	int		tried = 0;
+	Tt_status	status;
+
+	_tt_trace("tt-open", "display=%s TT_SESSION=%s",
+		  _tt_global->xdisplayname.len() ?
+			(char *)_tt_global->xdisplayname : "-",
+		  getenv("TT_SESSION") ? "set" : "-");
+	status = c_init_attempts(t0, tried);
+	_tt_trace("tt-open-done", "status=%s attempts=%d ms=%lld",
+		  _tt_enumname(status), tried + 1, _tt_trace_ms() - t0);
+	return status;
+}
+
+// c_init()'s attempts: find the session, connect, contact it, and
+// start one if there is none.
+Tt_status _Tt_c_session::
+c_init_attempts(long long t0, int &tried)
+{
+	_Tt_string	start_ttcmd;
 	Tt_status	status;
 	// Retries used to sleep whole seconds: 1 s between pings, 2 s after
 	// another ttsession won the autostart race and 1 s between later
@@ -91,6 +110,11 @@ c_init()
 	while (tried < 10 || _tt_monotonic_ms() < retry_deadline) {
 		_is_dead = 0;
 		status = client_session_init();
+		_tt_trace("tt-session", "attempt=%d status=%s addr=%s ms=%lld",
+			  tried + 1, _tt_enumname(status),
+			  _address_string.len() ?
+				(char *)_address_string : "-",
+			  _tt_trace_ms() - t0);
 		switch (status) {
 		    case TT_OK: {
 			// We try to ping the session to give it
@@ -102,6 +126,9 @@ c_init()
 				// ping(), or tt_open()'s first contact
 				// standing in for it
 				status = _tt_c_procid_first_contact(this);
+				_tt_trace("tt-contact", "status=%s ms=%lld",
+					  _tt_enumname(status),
+					  _tt_trace_ms() - t0);
 				if (status != TT_ERR_NOMP) {
 					// Fatal error or TT_OK
 					return status;
@@ -198,6 +225,8 @@ c_init()
 			return TT_ERR_NOMP;
 		}
 		if (tried == 0) {
+			_tt_trace("tt-autostart", "ms=%lld",
+				  _tt_trace_ms() - t0);
 			int sysStat = startup_ttsession(start_ttcmd);
 			int exitStat;
 			if (WIFEXITED(sysStat)) {
@@ -214,6 +243,8 @@ c_init()
 					    (char *)start_ttcmd, sysStat );
 				exitStat = 11;
 			}
+			_tt_trace("tt-autostart-done", "exit=%d ms=%lld",
+				  exitStat, _tt_trace_ms() - t0);
 			switch (exitStat) {
 			    case 1:
 				// Race condition -- no ttsession was

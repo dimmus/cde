@@ -50,7 +50,8 @@ extern "C" in_addr_t inet_addr(const char *);
 #define XOS_USE_XT_LOCKING
 #include <X11/Xos_r.h>
 
-#include "util/tt_port.h"   
+#include "util/tt_port.h"
+#include "util/tt_startup_trace.h"
 
 #if defined(OPT_BUG_SUNOS_4) && defined(__GNUG__)
 	extern "C" { int endhostent(); }
@@ -120,6 +121,41 @@ init_from_hostent(hostent *h)
 }
 
 
+// The resolver calls, timed: one that takes 50 ms or more leaves a
+// CDE_STARTUP_TRACE stamp, since a stalled name service (no network
+// yet, a lost DHCP lease, an unreachable DNS server) is a classic
+// cause of a slow or failed tt_open() in a login.
+static struct hostent *
+tt_gethostbyname(char *name, _Xgethostbynameparams &buf)
+{
+	long long	t = _tt_trace_ms();
+	struct hostent	*h = _XGethostbyname(name, buf);
+	long long	ms = _tt_trace_ms() - t;
+
+	if (ms >= 50) {
+		_tt_trace("tt-resolve", "name=%s found=%d ms=%lld",
+			  name, h != NULL, ms);
+	}
+	return h;
+}
+
+static struct hostent *
+tt_gethostbyaddr(char *addr, _Xgethostbynameparams &buf)
+{
+	long long	t = _tt_trace_ms();
+	struct hostent	*h = _XGethostbyaddr(addr, 4, AF_INET, buf);
+	long long	ms = _tt_trace_ms() - t;
+
+	if (ms >= 50) {
+		const unsigned char *b = (const unsigned char *)addr;
+
+		_tt_trace("tt-resolve", "addr=%u.%u.%u.%u found=%d ms=%lld",
+			  b[0], b[1], b[2], b[3], h != NULL, ms);
+	}
+	return h;
+}
+
+
 /* 
  * Initializes a _Tt_host object from an IP address.
  * 
@@ -136,7 +172,7 @@ init_byaddr(_Tt_string addr)
 	_Xgethostbynameparams	addr_buf;
 
 	memset((char*) &addr_buf, 0, sizeof(_Xgethostbynameparams));
-  	addr_ret = _XGethostbyaddr((char *)addr, 4, AF_INET, addr_buf);
+  	addr_ret = tt_gethostbyaddr((char *)addr, addr_buf);
 	result = init_from_hostent(addr_ret);
 #ifdef OPT_BUG_SUNOS_5
 	// gethostbyaddr is effectively built on gethostent.  If
@@ -171,8 +207,7 @@ init_bystringaddr(_Tt_string addr, int resolve_name)
 
 	_addr.set((const unsigned char *)&ip_address, 4);
 	if (resolve_name) {
-		addr_ret = _XGethostbyaddr((char *)_addr, 4, AF_INET,
-					   addr_buf);
+		addr_ret = tt_gethostbyaddr((char *)_addr, addr_buf);
 	}
 	if (! init_from_hostent(addr_ret)) {
 		// given an ip address we can still communicate with
@@ -225,7 +260,7 @@ init_byname(_Tt_string name)
              * CDE
              */
             _name = _tt_gethostname();
-            host_ret = _XGethostbyname((char *)_name, host_buf);
+            host_ret = tt_gethostbyname((char *)_name, host_buf);
             if (host_ret != NULL) {
                 /* The name resolves: use this answer instead of
                  * asking the resolver the same question again below.
@@ -269,7 +304,7 @@ init_byname(_Tt_string name)
 			}
 		}
 	}
-	host_ret = _XGethostbyname((char *)_name, host_buf);
+	host_ret = tt_gethostbyname((char *)_name, host_buf);
 	if (host_ret == NULL) {
 		result = init_bystringaddr(_name);
 	} else {

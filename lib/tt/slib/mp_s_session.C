@@ -294,6 +294,18 @@ s_init()
 			_tt_s_mp->unix_fd =
 				s_open_unix_socket((long)_pid, _rpc_program);
 #endif	// _TT_HAVE_UNIX_SOCKET_RPC
+			if (cde_startup_tracing()) {
+				cde_startup_tracef("ttsession", "listening",
+					"addr=%s host=%s port=%d unix=%s",
+					(char *)_address_string,
+					(char *)_host->stringaddr(), _rpc_port,
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
+					_tt_s_mp->unix_fd >= 0 ? "ok" : "none"
+#else
+					"no"
+#endif
+					);
+			}
 			return(TT_OK);
 		} else {
 			if (status == TT_ERR_SESSION) {

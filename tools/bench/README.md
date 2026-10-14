@@ -79,6 +79,24 @@ wm-ready/client-fork/ready`.  ksh stamps use `CLOCK_REALTIME`; run
 `startup-trace.py --stamp-clock FILE` once (for example from Xsetup) so
 that they can be aligned with the C stamps' `CLOCK_MONOTONIC`.
 
+Some stamps carry details after the event, as `key=value` words
+(`cde_startup_tracef()`; the summariser ignores them).  ToolTalk is the
+usual suspect when a login hangs, so its connection is traced step by
+step:
+
+| Stamp | When |
+|---|---|
+| `ttsession listening addr=… host=… port=… unix=ok` | the session's address is on the X server and its local socket is open |
+| `dtsession msgserver-begin`, `msgserver-dtappinit ok=`, `msgserver-ttopen status=`, `msgserver` | dtsession's connection to ToolTalk (the "desktop messaging system could not be started" dialog follows a `status` other than `TT_OK`) |
+| `libtt(<program>) tt-open display=… TT_SESSION=set\|-` | a client's `tt_open()` starts |
+| `… tt-display ok= ms=` | it connected to the X server to read the session address (`XOpenDisplay()` is retried for 20 s) |
+| `… tt-find found= addr= ms=` | the advertised address it found |
+| `… tt-unix ok=1 path=…` or `ok=0 why=…` | the session's local socket, or why not |
+| `… tt-tcp ok= host= port= ms=` | TCP instead (another host's session, or no local socket) |
+| `… tt-session attempt= status=`, `tt-contact status=`, `tt-autostart`, `tt-autostart-done exit=` | each attempt, its first RPC, and starting a ttsession when there is none |
+| `… tt-open-done status= attempts= ms=` | the result and the total time |
+| `… tt-resolve name=… found= ms=` (or `addr=…`) | a host name lookup that took 50 ms or more (in clients and in ttsession) |
+
 ## Notes on the method
 
 - Per-operation numbers of the C benchmarks are medians over the runs;

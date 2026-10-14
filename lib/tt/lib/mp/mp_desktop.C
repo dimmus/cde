@@ -64,7 +64,8 @@ extern "C" {  extern int ioctl 	(int, int, ...) ; };
 static int parse_Xdisplay_string(_Tt_string display,
 				 _Tt_string &host,
 				 pid_t &svnum,
-				 _Tt_string &hostname);
+				 _Tt_string &hostname,
+				 int want_host = 1);
 
 
 sigjmp_buf _Tt_desktop::io_exception;
@@ -134,7 +135,9 @@ init(_Tt_string dt_handle, _Tt_dt_type /* t */)
 	// parse the dt_handle string to extract the host and server
 	// number information.
 
-	parse_status = parse_Xdisplay_string(dt_handle, h, s, hostname);
+	// (A local display needs no host name: looking up our own name
+	// stalls every tt_open() while the resolver is slow.)
+	parse_status = parse_Xdisplay_string(dt_handle, h, s, hostname, 0);
 
 	// Now we examine the parse status to determine if this is a
 	// local host or remote host and if we should use a unix
@@ -458,7 +461,8 @@ get_prop(_Tt_string pname, _Tt_string &pval)
 //	 remove this.
 // 
 static int
-parse_Xdisplay_string(_Tt_string display, _Tt_string &host, pid_t &svnum,_Tt_string &hostname)
+parse_Xdisplay_string(_Tt_string display, _Tt_string &host, pid_t &svnum,_Tt_string &hostname,
+		      int want_host)
 {
 	int		status = 1;
 	int	   	offset;
@@ -473,12 +477,16 @@ parse_Xdisplay_string(_Tt_string display, _Tt_string &host, pid_t &svnum,_Tt_str
 	if (offset == 0) {
 
 		// use local host
-		if(!_tt_global->get_local_host(h)){
+		if (! want_host) {
+			host = (char *)0;
+			hostname = (char *)0;
+		} else if(!_tt_global->get_local_host(h)){
 			_tt_syslog(0,LOG_ERR,"get_local_host(): 0");
 			return 0;
+		} else {
+			host = h->stringaddr();
+			hostname = h->name();
 		}
-		host = h->stringaddr();
-		hostname = h->name();
 		status = 2;
 	} else {
 		// Get the hostid portion of an X display of the
@@ -487,12 +495,16 @@ parse_Xdisplay_string(_Tt_string display, _Tt_string &host, pid_t &svnum,_Tt_str
 		host = display.mid(0, offset);
 
 		if (host == "unix") {
-			if(!_tt_global->get_local_host(h)){
+			if (! want_host) {
+				host = (char *)0;
+				hostname = (char *)0;
+			} else if(!_tt_global->get_local_host(h)){
 				_tt_syslog(0,LOG_ERR,"get_local_host(): 0");
 				return 0;
+			} else {
+				host = h->stringaddr();
+				hostname = h->name();
 			}
-			host = h->stringaddr();
-			hostname = h->name();
 			status = 3;
 
 		} else {

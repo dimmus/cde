@@ -72,6 +72,7 @@
 #include "SmCommun.h"
 #include "SmRestore.h"
 #include "SmSave.h"
+#include "../dtlogin/startup-trace.h"
 #include "SmUI.h"
 #include "SmProtocol.h"
 #include "SmGlobals.h"
@@ -383,9 +384,12 @@ StartMsgServer(void)
     smCust.dClickChange = False;
     smCust.preeditChange = False;
     
+    cde_startup_trace("dtsession", "msgserver-begin");
     makeConnect = DtAppInitialize(smGD.appCon, smGD.display, smGD.topLevelWid,
 				  SM_RESOURCE_NAME,
 				  DtSM_TOOL_CLASS);
+    cde_startup_tracef("dtsession", "msgserver-dtappinit", "ok=%d",
+		       (int) makeConnect);
 
     smDD.okString = XmStringCreateLocalized(((char *)GETMESSAGE(18, 39, "OK")));
     smDD.okLogoutString = XmStringCreateLocalized(((char *)GETMESSAGE(18, 39, "OK")));
@@ -403,6 +407,13 @@ StartMsgServer(void)
 
     procId = tt_open();
     status = tt_ptr_error( procId );
+    if (cde_startup_tracing()) {
+	char *msg = tt_status_message(status);
+
+	cde_startup_tracef("dtsession", "msgserver-ttopen", "status=%.*s",
+			   msg ? (int) strcspn(msg, "\t") : 1, msg ? msg : "?");
+	tt_free(msg);
+    }
     if (status == TT_OK) {
 	fd = tt_fd();
 	status = tt_int_error( fd );
