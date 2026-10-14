@@ -121,6 +121,18 @@ socket()
 	return(_socket);
 }
 
+int _Tt_rpc_client::
+local()
+{
+	struct sockaddr_storage	a;
+	socklen_t		len = sizeof(a);
+
+	return (_client != (CLIENT *)0 && _socket >= 0 &&
+		getsockname(_socket, (struct sockaddr *)&a, &len) == 0 &&
+		a.ss_family == AF_UNIX);
+}
+
+
 /* 
  * create client connection to host,program,version
  */

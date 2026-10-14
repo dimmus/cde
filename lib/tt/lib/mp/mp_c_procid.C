@@ -659,6 +659,11 @@ open(_Tt_string *session_id)
 	}
 	if (_socket.is_null()) {
 		_socket = new _Tt_stream_socket(_proc_host, 0);
+		if (session->local_transport()) {
+			// The session is on this host: it connects over
+			// loopback (see _Tt_stream_socket::use_loopback()).
+			_socket->use_loopback();
+		}
 		if (! _socket->init(1)) {
 			_socket = (_Tt_stream_socket *)0;
 			return(TT_ERR_PROCID);
@@ -1168,6 +1173,9 @@ set_fd_channel(int p)
 	// (open() may have made the socket already.)
 	if (_socket.is_null()) {
 		_socket = new _Tt_stream_socket(_proc_host, p);
+		if (default_session()->local_transport()) {
+			_socket->use_loopback();	// see open()
+		}
 		if (! _socket->init(1)) {
 			_socket = (_Tt_stream_socket *)0;
 			return(-1);

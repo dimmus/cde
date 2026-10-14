@@ -109,6 +109,9 @@ class _Tt_session : public _Tt_object {
 	}
 
 	Tt_status		ping();
+	// Talks to the session over its local socket (so it runs on
+	// this host)
+	int			local_transport();
 	//void			print(FILE *fs = stdout) const;
 	int			rpc_program() {
 		return _rpc_program;

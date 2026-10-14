@@ -77,6 +77,9 @@
 #include "mp_s_xdr_functions.h"
 #include "util/tt_trace.h"
 #include "mp_typedb.h"
+#include <sys/socket.h>
+
+static int _tt_rpc_is_local(SVCXPRT *transp);
 
 #if defined(OPT_SECURE_RPC)
 
@@ -1118,8 +1121,24 @@ _tt_rpc_set_fd_channel(SVCXPRT *transp)
 	if (status == TT_OK) {
 		_Tt_s_procid	*sp = (_Tt_s_procid *)proc.c_pointer();
 		sp->set_start_token(fd_args.start_token);
-		sp->set_fd_channel(fd_args.fd);
+		sp->set_fd_channel(fd_args.fd, _tt_rpc_is_local(transp));
 	}
+}
+
+
+/*
+ * Whether the request came in over the local (AF_UNIX) socket, i.e.
+ * from a process of this host.
+ */
+static int
+_tt_rpc_is_local(SVCXPRT *transp)
+{
+	struct sockaddr_storage	a;
+	socklen_t		len = sizeof(a);
+
+	return (transp != 0 &&
+		getsockname(transp->xp_fd, (struct sockaddr *)&a, &len) == 0 &&
+		a.ss_family == AF_UNIX);
 }
 
 
@@ -1169,7 +1188,7 @@ _tt_rpc_open_procid(SVCXPRT *transp)
 	if (reply.status == TT_OK) {
 		_Tt_s_procid	*sp = (_Tt_s_procid *)proc.c_pointer();
 		sp->set_start_token(args.start_token);
-		sp->set_fd_channel(args.fd);
+		sp->set_fd_channel(args.fd, _tt_rpc_is_local(transp));
 	}
 }
 

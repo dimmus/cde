@@ -225,7 +225,15 @@ int main(int argc, char **argv)
 
 	// needed by the getopt call
 	opterr = 0;
-	while ((c = getopt(argc, argv, "A:pa:htvcd:sSXEN")) != -1) {
+	{
+		// TTSESSION_NETWORK=1 (from ~/.dtprofile, say) as -n
+		const char *net = getenv("TTSESSION_NETWORK");
+
+		if (net != 0 && *net != 0 && strcmp(net, "0") != 0) {
+			_tt_s_mp->network_clients = 1;
+		}
+	}
+	while ((c = getopt(argc, argv, "A:pa:htvcd:sSXENn")) != -1) {
 		switch (c) {
 		      case 'A':
 			// set maximum number of undelivered messages
@@ -313,6 +321,14 @@ int main(int argc, char **argv)
 			break;
 		      case 'N':
 			option_maximize_procids = 1;
+			break;
+		      case 'n':
+			// Clients on other hosts, too: listen on TCP
+			// and register with the portmapper.  Without
+			// it, a session is reached through its local
+			// socket only where there is one (Linux, with a
+			// private $XDG_RUNTIME_DIR).
+			_tt_s_mp->network_clients = 1;
 			break;
 		      case 'h':
 		      case '?':
@@ -874,7 +890,7 @@ print_usage_and_exit()
 {
 	_tt_syslog( errstr, LOG_ERR, "%s%s%s%s%s",
 		    catgets( _ttcatd, 3, 16,
-"\nUsage: ttsession [-a cookie|unix|des][-d display][-spStvhNX" ),
+"\nUsage: ttsession [-a cookie|unix|des][-d display][-spStvhnNX" ),
 		    "",
 		    catgets( _ttcatd, 3, 17,
 "][-c command]\n"
@@ -887,6 +903,8 @@ print_usage_and_exit()
 " -s		silent. Don't print out any warnings\n"
 " -S		don't fork into the background\n"
 " -N		maximize the number of clients allowed\n"
+" -n		accept clients on other hosts (TCP, portmapper);\n"
+"		also TTSESSION_NETWORK=1\n"
 " -t		turn on message tracing\n"
 " -X		use XDR databases for static types (default)\n" ),
 		    "",

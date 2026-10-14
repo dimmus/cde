@@ -71,6 +71,7 @@ _Tt_stream_socket::
 _Tt_stream_socket()
 {
 	_is_source = 0;
+	_loopback = 0;
 	_msgsock = -1;
 	_sock = -1;
 	_hostaddr.sin_port = 0;
@@ -89,6 +90,7 @@ _Tt_stream_socket(_Tt_host_ptr &host, int portnum)
 	_hostaddr.sin_port = htons(portnum);
 	_hostaddr.sin_family = AF_INET;
 	_is_source = 0;
+	_loopback = 0;
 	_sock = -1;
 }
 
@@ -206,6 +208,9 @@ init(int init_as_source)
 				    "setsockopt(TCP_NODELAY): %m" );
 		}
 
+		if (_loopback) {
+			_hostaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		}
 		if (bind(_sock, (struct sockaddr *)&_hostaddr,
 			 sizeof(_hostaddr)) < 0) {
 			close(_sock);
@@ -265,7 +270,9 @@ init(int init_as_source)
 		// "configured" ip address.
 		// 
 		_Tt_host_ptr	local_host;
-		if ( (_tt_global->get_local_host(local_host) ) && 
+		if (_loopback) {
+			_hostaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		} else if ( (_tt_global->get_local_host(local_host) ) && 
 			( _host->stringaddr() == local_host->stringaddr() ) ) {
 			//
 			// _host_ == local_host => (both on same host)

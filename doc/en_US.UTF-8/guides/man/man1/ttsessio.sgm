@@ -27,7 +27,7 @@
 <RefSynopsisDiv>
 <CmdSynopsis>
 <Command>ttsession</Command>
-<Arg Choice="opt">-hNpsStv</Arg>
+<Arg Choice="opt">-hnNpsStv</Arg>
 <Group>
 <Arg>-E</Arg>
 <Arg>-X</Arg>
@@ -139,6 +139,23 @@ If neither
 <Para>Write a help message to standard error that
 describes the command syntax of
 <Command>ttsession</Command>, and exit.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-n</Literal></Term>
+<ListItem>
+<Para>Accept clients on other hosts: listen on TCP and register the
+session with the portmapper (<Command>rpcbind</Command>).
+Without this option, where the system allows it (Linux, with a
+private <SystemItem Class="EnvironVar">XDG_RUNTIME_DIR</SystemItem>),
+the session is reached only through a local socket in
+<Filename>$XDG_RUNTIME_DIR/tooltalk</Filename>: no network port is
+open, the portmapper is not used, and clients of this host reach the
+session whatever the state of the network.
+Setting <SystemItem Class="EnvironVar">TTSESSION_NETWORK</SystemItem>
+to <Literal>1</Literal> (for example in
+<Filename>$HOME/.dtprofile</Filename>) has the same effect.
 </Para>
 </ListItem>
 </VarListEntry>

@@ -75,7 +75,8 @@ class _Tt_s_procid : public _Tt_procid {
 	void			deactivate(int remove_fds);
 	void			set_active(int on);
 	int			set_fd(int fd = 0);
-	int			set_fd_channel(int port = 0);
+	int			set_fd_channel(int port = 0,
+					       int local = 0);
 	void			set_timeout_for_message(const _Tt_message &m);
 	//
 	// Must be virtual, since _Tt_self_procid redefines them,

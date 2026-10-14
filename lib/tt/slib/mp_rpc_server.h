@@ -47,6 +47,11 @@ class _Tt_rpc_server : public _Tt_object {
 	_Tt_rpc_server(int program, int version, int Rsocket, _Tt_auth &auth);
 	virtual ~_Tt_rpc_server();
 	int			init(void (*service_fn)(svc_req *, SVCXPRT *));
+	// A server with no transport of its own: it only names the
+	// program that the servers on accepted local connections
+	// (see the constructor above) serve.  Nothing is registered
+	// with the portmapper.
+	void			init_local(int program);
 	_Tt_rpcsrv_err		run_until(int *stop, int sec_timeout,
 				    _Tt_int_rec_list_ptr &efds);
 	int			program() { return _program; };

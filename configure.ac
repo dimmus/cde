@@ -1011,6 +1011,12 @@ AC_CHECK_LIB(Xmu, XmuMakeAtom, [XTOOLLIB="-lXmu ${XTOOLLIB}"; XMULIB="-lXmu"], ,
                  [${EXTRA_LIBS}])
 AC_CHECK_LIB(ICE, IceCloseConnection, [XTOOLLIB="-lICE ${XTOOLLIB}"; ICELIB="-lICE"], ,
                   [${EXTRA_LIBS}])
+dnl dtsession's session manager (XSMP) listens on local transports only,
+dnl through libICE's private _IceTransNoListen() as xsm does
+AC_CHECK_LIB(ICE, _IceTransNoListen,
+             [AC_DEFINE([HAVE__ICETRANSNOLISTEN], [1],
+                        [Define if libICE has _IceTransNoListen()])], ,
+             [${EXTRA_LIBS}])
 AC_CHECK_LIB(SM, SmcOpenConnection, [XTOOLLIB="-lSM ${XTOOLLIB}"; SMLIB="-lSM"], ,
                  [${EXTRA_LIBS}])
 AC_CHECK_LIB(Xm, XmTextSetString, [XTOOLLIB="-lXm ${XTOOLLIB}"; XMLIB="-lXm"],

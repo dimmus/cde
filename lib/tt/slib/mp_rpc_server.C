@@ -330,6 +330,15 @@ init(void (*service_fn)(struct svc_req *, SVCXPRT *))
 }
 
 
+void _Tt_rpc_server::
+init_local(int program)
+{
+	_program = program;
+	_registered = 0;
+	_transp = (SVCXPRT *)0;
+}
+
+
 /*
  * Returns the TCP port the server listens on (0 if unknown, e.g. for
  * a TLI transport or a server on a connected descriptor).  It is

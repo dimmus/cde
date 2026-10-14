@@ -332,6 +332,13 @@ client_session_init()
 //	TT_ERR_INVALID	Could not parse advertised address
 //	TT_ERR_AUTHORIZATION	RPC authorization error
 //
+int _Tt_session::
+local_transport()
+{
+	return ! _rpc_client.is_null() && _rpc_client->local();
+}
+
+
 Tt_status _Tt_session::
 ping()
 {

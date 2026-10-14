@@ -64,6 +64,8 @@ class _Tt_rpc_client : public _Tt_object {
 	// 1 if the advertised port turned out to belong to some other
 	// RPC program, i.e. the session that advertised it is gone.
 	int			stale_port() const { return _stale_port; };
+	// Connected over the session's local (AF_UNIX) socket
+	int			local();
       private:
 	_Tt_host_ptr		_host;
 	int			_program;

@@ -42,6 +42,9 @@
  *****************************************************************************
  *************************************<+>*************************************/
 
+#ifdef HAVE_CONFIG_H
+#include <cde_config.h>
+#endif
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -203,6 +206,21 @@ Boolean InitXSMP (void)
 		DtMsgLogMessage (smGD.programName, DtMsgLogError, errorMsg);
 		PostXSMPFailureDialog (XSMP_FAILURE_SMS_INITIALIZE, True);
 	}
+
+#ifdef HAVE__ICETRANSNOLISTEN
+	/*
+	 * Session clients (X11R6 session management) on this host only,
+	 * as ToolTalk: no TCP listener, so no port open to the network,
+	 * unless clients on other hosts are wanted (TTSESSION_NETWORK=1,
+	 * see ttsession -n).
+	 */
+	env = getenv ("TTSESSION_NETWORK");
+	if (env == NULL || *env == '\0' || strcmp (env, "0") == 0) {
+	    extern int _IceTransNoListen (const char *protocol);
+
+	    _IceTransNoListen ("tcp");
+	}
+#endif
 
 	if (!IceListenForConnections (&smXSMP.numTransports, 
 				      &smXSMP.listenObjs, 

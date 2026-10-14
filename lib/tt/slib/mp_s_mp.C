@@ -147,6 +147,7 @@ _Tt_s_mp() : _Tt_mp()
 	_next_procid_key = 0;
 	xfd = -1;
 	unix_fd = -1;
+	network_clients = 0;
 	exit_main_loop = 0;
 	max_active_messages = 2000;
 	fin = 0;

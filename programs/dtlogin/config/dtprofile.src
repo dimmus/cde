@@ -171,3 +171,17 @@ XCOMM #
 XCOMM ##########################################################################
 
 XCOMM DTRANDR=no
+
+
+XCOMM ##########################################################################
+XCOMM #
+XCOMM #  The desktop's messaging (ToolTalk) and session manager accept only
+XCOMM #  programs of this machine, through local sockets: no network port
+XCOMM #  is open, and the network's state does not matter.  To let programs
+XCOMM #  on other hosts (an "ssh -X" session, say) join this desktop's
+XCOMM #  session, uncomment the following lines.  See ttsession(1), -n.
+XCOMM #
+XCOMM ##########################################################################
+
+XCOMM TTSESSION_NETWORK=1
+XCOMM export TTSESSION_NETWORK

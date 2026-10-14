@@ -112,6 +112,9 @@ class _Tt_s_mp : public _Tt_mp {
 	int				unix_cred_chk_flag;
 	int				xfd;
 	int				unix_fd;	// local RPC socket, or -1
+	// Also accept clients over TCP (ttsession -n): see
+	// _Tt_s_session::s_init().
+	int				network_clients;
 	int				fin;
 	int				fout;
 	int				in_file_scope(const _Tt_string &f);

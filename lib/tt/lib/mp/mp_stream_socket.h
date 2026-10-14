@@ -62,8 +62,16 @@ class _Tt_stream_socket : public _Tt_object {
 	int		fd();
 	int		sock();
 	int		read_would_block();
+	// Before init(): the procid end listens on the loopback
+	// interface only, or the session end connects there, whatever
+	// the procid's host address.  For a client and a ttsession of
+	// the same host (one that reached the session's local socket),
+	// so that the signalling channel neither depends on the
+	// network's state nor opens a port to it.
+	void		use_loopback() { _loopback = 1; }
       private:
 	int		accept();
+	int		_loopback;
 	int		_is_source;
 	int		_msgsock;
 	int		_sock;

@@ -1317,9 +1317,15 @@ _Tt_s_procid::set_fd(
 // procid ids. See _Tt_s_mp::find_proc for more details.
 //  
 int _Tt_s_procid::
-set_fd_channel(int portnum)
+set_fd_channel(int portnum, int local)
 {
 	_socket = new _Tt_stream_socket(_proc_host, portnum);
+	if (local) {
+		// The procid asked over our local socket: it runs on
+		// this host, and listens on loopback (see
+		// _Tt_stream_socket::use_loopback()).
+		_socket->use_loopback();
+	}
 	if (! _socket->init(0)) {
 		_socket = (_Tt_stream_socket *)0;
 		return(0);

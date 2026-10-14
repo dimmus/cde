@@ -252,7 +252,28 @@ s_init()
 					 TT_RPC_VERSION,
 					 RPC_ANYSOCK,
 					 _auth); 
-	
+
+#ifdef _TT_HAVE_UNIX_SOCKET_RPC
+	// Local only, unless asked for clients on other hosts (-n): the
+	// session is reached through its local socket alone (see
+	// mp_unix_socket.h).  No TCP listener, so no port open to the
+	// network and nothing tied to the host's addresses, which come
+	// and go with the network (a lost DHCP lease used to stall or
+	// fail the login), and no portmapper: the program number only
+	// has to be unique among this ttsession's own, as the socket's
+	// path carries our pid.  The socket is opened before the
+	// address is advertised, so a client never finds the session
+	// without it.  Where it cannot be opened (no private
+	// $XDG_RUNTIME_DIR, TT_UNIX_SOCKET=0), TCP it is, as before.
+	if (! _tt_s_mp->network_clients) {
+		_tt_s_mp->unix_fd = s_open_unix_socket((long)_pid,
+						       _TT_LOCAL_RPC_PROGRAM);
+		if (_tt_s_mp->unix_fd >= 0) {
+			_rpc_server->init_local(_TT_LOCAL_RPC_PROGRAM);
+		}
+	}
+	if (_tt_s_mp->unix_fd < 0)
+#endif
 	if (! _rpc_server->init(_tt_service_rpc)) { 
 		return(TT_ERR_NOMP);
 	}
@@ -288,23 +309,27 @@ s_init()
 			cde_startup_trace("ttsession", "advertised");
 #ifdef _TT_HAVE_UNIX_SOCKET_RPC
 			// open the local socket for connection
-			// requests and set the unix_fd field in the
-			// _Tt_s_mp object to it so it can be added to
-			// the list of file descriptors polled.
-			_tt_s_mp->unix_fd =
-				s_open_unix_socket((long)_pid, _rpc_program);
+			// requests (unless it is open already, for a
+			// local session) and set the unix_fd field in
+			// the _Tt_s_mp object to it so it can be added
+			// to the list of file descriptors polled.
+			if (_tt_s_mp->unix_fd < 0) {
+				_tt_s_mp->unix_fd =
+					s_open_unix_socket((long)_pid,
+							   _rpc_program);
+			}
 #endif	// _TT_HAVE_UNIX_SOCKET_RPC
 			if (cde_startup_tracing()) {
 				cde_startup_tracef("ttsession", "listening",
-					"addr=%s host=%s port=%d unix=%s",
+					"addr=%s host=%s port=%d unix=%s tcp=%d",
 					(char *)_address_string,
 					(char *)_host->stringaddr(), _rpc_port,
 #ifdef _TT_HAVE_UNIX_SOCKET_RPC
-					_tt_s_mp->unix_fd >= 0 ? "ok" : "none"
+					_tt_s_mp->unix_fd >= 0 ? "ok" : "none",
 #else
-					"no"
+					"no",
 #endif
-					);
+					_rpc_port != 0);
 			}
 			return(TT_OK);
 		} else {

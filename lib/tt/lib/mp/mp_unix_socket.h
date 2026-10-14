@@ -56,6 +56,13 @@
 #define _TT_HAVE_UNIX_SOCKET_RPC 1
 #endif
 
+// The RPC program number of a session that only listens on its local
+// socket (no portmapper to hand out a transient one; the socket path
+// tells such sessions apart by pid).  The first transient number that
+// a TCP session tries, so that a client of any vintage takes it for a
+// ttsession's.
+#define _TT_LOCAL_RPC_PROGRAM	0x4fffffff
+
 #ifdef _TT_HAVE_UNIX_SOCKET_RPC
 
 // A directory that is the effective user's alone: a directory, not a
